@@ -416,3 +416,66 @@ its code.
   10. **No door yet.** CAM-4 (2) and CAM-6 (6) stand: the tool refuses `camera` with source
       screen, and the panel sets `camera` only for Source Camera. The landing ignores the camera
       fields until CR3b.
+
+- **CAM-10 — A camera beside the screen lands, and `record_screen` records it (CR3b), recorded
+  before its code; amends CAM-4 (2), CAM-6 (6) and CAM-9 (10).** A screen recording's
+  `(Camera).mov` files (CAM-9) land in the same grouped edit as its movies and microphone files,
+  and the tool admits `camera` and `camera_format` with source `screen`. CAM-3 to CAM-9 stand
+  except where this entry amends them.
+  1. **The track.** ONE new track at the open container's FRONT (its index is the container's
+     track count after the pictures have landed), named "Camera", added on the attempt of the
+     first camera clip that takes a frame and kept only when that clip lands (`addMicrophones`'
+     attempt pattern), so a recording none of whose camera files makes a clip adds no track.
+  2. **Time.** Segment k's camera clip is asked at `screenStart_k + cameraOffset_k`, its floor
+     `max(screenStart_k, the previous camera clip's end)`. A start below the floor is head-trimmed
+     to it by the microphone's shared dance (`headTrimmed`: add at the floor, `trim_start`, move
+     back, read back, a second try a frame up at an inexact rate). CR3a measured every
+     `cameraOffset` negative, so the trim is the usual path. A camera wholly under its head
+     lands as media only with "<path> was added to the media list without a clip: less than a
+     frame of it would remain after the <ms> ms head that keeps it clear of <the start of its
+     screen clip | the previous camera clip>." A screen picture that minted no clip still gives
+     its `at`. A segment LEFT OUT because its screen movie would not probe (`UnreadableSegment`)
+     keeps its camera file on disk, named in `kept_files` and its left-out sentence (CAM-9 (7)),
+     and never lands it; only its microphone takes the slot (#181 item 2), so the camera's
+     starts are read off the `.segment(k)` stretches alone.
+  3. **The corner.** With the container's canvas `cw × ch` (inside an open nest, the nest's) and
+     the camera file's `sw × sh`: `s = clamp(min(0.25·cw/sw, ch/(3·sh)), 0.01, 10)` — the box a
+     quarter of the canvas wide and a third of it tall, the core's scale range —
+     `x = (cw/2 − 0.05·cw − sw·s/2).rounded()` and `y = (ch/2 − 0.05·ch − sh·s/2).rounded()`, in
+     the C frame (`core/src/edit_zoom.rs`: an offset of the layer's centre from the canvas
+     centre, y down). So the picture sits in the BOTTOM-RIGHT corner, inside the 90 % ring of
+     View ▸ Safe Areas (the guide spec §4.1 names title-safe; the industry's action-safe). One
+     `set_video {x, y, scale}` per clip, right after its placement; nothing else is set, and the
+     clip stays an ordinary clip a person moves.
+  4. **One grouped edit**, in the order pictures → cameras → microphones. `place: false` lands
+     the camera media with no clip and no track. A new project lands the cameras through
+     `remainderPlacement`, after the later pictures; without clip 1, as media only with its
+     `unplacedNote`. For ONE segment that undo step is "Add Camera and Microphone" with a camera
+     and any voice (its own or a left-out segment's), "Add Camera" with a camera alone, and
+     otherwise as before ("Add Microphone", "Add Recording Segments").
+  5. **The tool.** `camera` and `camera_format` are admitted with source `screen`, lifting CAM-4
+     (2) and CAM-6 (6) for it. With source screen, a `camera_format` given without `camera` is
+     refused in CAM-4 (2)'s step (3): "With source screen, camera_format needs camera — name the
+     camera to record beside the screen." With source voice_over the given ones of `camera`,
+     `camera_format` are refused there together: "With source voice_over, <a, b> cannot be given
+     — a voice-over records the microphone alone." (CAM-4 (2)'s "only source camera records a
+     camera" is no longer true.) The order after step (5): (6) `project`; (7) the camera lookup
+     and its format — for a screen recording too, when `camera` is given; (8) the Camera grant;
+     then, for a screen, the Screen Recording grant and the display or window lookup; (9) the
+     recording. The tool never prepares a capture or adopts one (CAM-7 (7)).
+  6. **The answer.** Per `segments[k]` and never at the top level: `camera_path`,
+     `camera_duration` and `camera_offset` when that segment has a camera file;
+     `camera_problem` and `camera_note` when set; `camera_media` and `camera_clip` when known.
+     The top-level `camera` is CAM-4 (6)'s, unchanged. `note` gains every segment's
+     `cameraProblem` then `cameraNote`, in order, after `camera.problem` and `camera.note`.
+  7. **The stop wait** counts three probes per segment with a camera beside the screen
+     (`finishCeiling + 3 × probeTimeout × max(n, 1) + 5`), and its timeout sentence names the
+     camera files after the movies (" Its camera file is at <c>." / " Its camera files are at
+     <a>, <b>."), read from the recorder's held camera paths.
+  8. **The readers.** With a camera BESIDE the screen the panel's landing note says the
+     display's `.systemStopped` sentence (not the camera's) and puts `camera.problem` after the
+     microphone's problem; every segment's `cameraProblem` and `cameraNote` lead the placement's
+     notes, and follow `camera.note` in a failed landing's note. `filesClause` adds " and its
+     camera at <p>" or " and its camera files at <a>, <b>" after the microphone clause.
+  9. **No panel door yet.** The recorder panel offers no camera with a screen source until CR3c
+     (CAM-11); until then the tool is the one door that records a camera beside the screen.

@@ -199,17 +199,34 @@ struct RecordingResult {
     /// The files on disk, for a sentence that sends a person to them: every
     /// segment's movie in order, comma-joined, then — when any landed —
     /// " and its microphone at <file>" for one microphone file or " and its
-    /// microphone files at <a>, <b>" for several. One shape for the panel's
+    /// microphone files at <a>, <b>" for several; then, for a camera beside
+    /// the screen (spec §11 CAM-10 (8)), " and its camera at <file>" or " and
+    /// its camera files at <a>, <b>" the same way. One shape for the panel's
     /// note and the tool's `savedButNotAdded`, so a three-segment failure
     /// names three files at both doors (the R2 review: the panel named one).
     var filesClause: String {
         let movies = segments.map { $0.descriptor.path }.joined(separator: ", ")
         let mics = segments.compactMap { $0.micDescriptor?.path }
+        let cameras = segments.compactMap { $0.cameraDescriptor?.path }
+        let clause: String
         switch mics.count {
-        case 0: return movies
-        case 1: return movies + " and its microphone at " + mics[0]
-        default: return movies + " and its microphone files at " + mics.joined(separator: ", ")
+        case 0: clause = movies
+        case 1: clause = movies + " and its microphone at " + mics[0]
+        default: clause = movies + " and its microphone files at " + mics.joined(separator: ", ")
         }
+        switch cameras.count {
+        case 0: return clause
+        case 1: return clause + " and its camera at " + cameras[0]
+        default: return clause + " and its camera files at " + cameras.joined(separator: ", ")
+        }
+    }
+
+    /// Every segment's camera sentences beside the screen (spec §11 CAM-10
+    /// (6)): its `cameraProblem`, then its `cameraNote`, segment by segment,
+    /// joined by a space; nil when no segment has one.
+    var cameraSegmentsNote: String? {
+        let sentences = segments.flatMap { [$0.cameraProblem, $0.cameraNote].compactMap { $0 } }
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 
     init(

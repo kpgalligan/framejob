@@ -1,14 +1,15 @@
 // app/Sources/RecordingLanding+Remainder.swift — `untitled(around:)`'s
 // remainder landing (camera-recording CR3-0): `remainderPlacement`
-// (everything a fresh untitled document does not already hold), the two
-// names its undo step can take (`microphoneActionName`,
-// `segmentsActionName`), `remainderActionName(for:)`, the rule choosing
-// between them, and `unplacedNote`, the sentence for a file with no first
+// (everything a fresh untitled document does not already hold), the names
+// its undo step can take (`microphoneActionName`, `segmentsActionName`, and
+// since CR3b `cameraActionName` and `cameraMicrophoneActionName`),
+// `remainderActionName(for:)`, the rule choosing between them, and
+// `unplacedNote`, the sentence for a file with no first
 // clip to follow. A PURE MOVE out of `RecordingLanding+Microphone.swift` at
 // the 400-line cap, landed alone before camera + screen grows it;
 // `unplacedNote` stays `private`, because nothing else calls it. The voices
-// it lands are `+Microphone`'s `addMicrophones`, its stretches `+LeftOut`'s
-// `remainderStretches`.
+// it lands are `+Microphone`'s `addMicrophones`, its cameras `+Camera`'s
+// `addCameras`, its stretches `+LeftOut`'s `remainderStretches`.
 
 import AppKit
 
@@ -30,17 +31,31 @@ extension RecordingLanding {
     /// back is the rest.
     static let segmentsActionName = "Add Recording Segments"
 
-    /// Which of the two names `untitled(around:)`'s remainder edit takes:
-    /// "Add Microphone" for one segment with any voice — its own (R1's
-    /// landing, R1's name) or a left-out segment's — and "Add Recording
-    /// Segments" otherwise. A one-segment recording with no voice has no
-    /// remainder and no step, and the answer for it is never read.
+    /// The same step's name for ONE segment whose remainder is its camera
+    /// beside the screen (spec §11 CAM-10 (4)): the picture is the
+    /// document, and the step takes the camera back.
+    static let cameraActionName = "Add Camera"
+
+    /// …and for ONE segment whose remainder is its camera and a voice.
+    static let cameraMicrophoneActionName = "Add Camera and Microphone"
+
+    /// Which name `untitled(around:)`'s remainder edit takes. For ONE
+    /// segment: with a camera beside the screen, "Add Camera and
+    /// Microphone" when there is any voice and "Add Camera" when there is
+    /// not (CAM-10 (4)); without one, "Add Microphone" for any voice — its
+    /// own (R1's landing, R1's name) or a left-out segment's. "Add
+    /// Recording Segments" otherwise. A one-segment recording with no voice
+    /// and no camera has no remainder and no step, and the answer for it is
+    /// never read.
     static func remainderActionName(for result: RecordingResult) -> String {
-        if result.segments.count == 1,
-            result.segments[0].micDescriptor != nil
+        if result.segments.count == 1 {
+            let voice =
+                result.segments[0].micDescriptor != nil
                 || result.unreadable.contains(where: { $0.micDescriptor != nil })
-        {
-            return microphoneActionName
+            if result.segments[0].cameraDescriptor != nil {
+                return voice ? cameraMicrophoneActionName : cameraActionName
+            }
+            if voice { return microphoneActionName }
         }
         return segmentsActionName
     }
@@ -83,13 +98,22 @@ extension RecordingLanding {
     /// after clip 1 a gap the later pictures skip and a voice at its start;
     /// BEFORE clip 1, which is the document at 0, media only with
     /// `leadingVoiceNote`; without clip 1, media only with `unplacedNote`.
+    ///
+    /// **A camera beside the screen** (spec §11 CAM-10 (4)) lands after the
+    /// later pictures and before the voices, by `addCameras` against each
+    /// segment's picture start — clip 1's included — on ONE new track in
+    /// front of the pictures'; without clip 1, as media only with
+    /// `unplacedNote`.
     static func remainderPlacement(
         _ result: RecordingResult, in document: ProjectDocument
     ) throws -> Placement? {
         assert(Thread.isMainThread)
         let hasMicrophone = result.segments.contains { $0.micDescriptor != nil }
         let hasLeftOutVoice = result.unreadable.contains { $0.micDescriptor != nil }
-        guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice else { return nil }
+        let hasCamera = result.segments.contains { $0.cameraDescriptor != nil }
+        guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera else {
+            return nil
+        }
         let path = trimmed(result.descriptor.path)
         let snapshot = document.editedProject.snapshot
         guard let mediaId = snapshot.media.first(where: { $0.path == path })?.id else {
@@ -120,12 +144,20 @@ extension RecordingLanding {
                 notes.append(unplacedNote(segment.descriptor.path, behind: path))
             }
             for segment in result.segments {
+                if let camera = segment.cameraDescriptor {
+                    notes.append(unplacedNote(camera.path, behind: path))
+                }
+            }
+            for segment in result.segments {
                 if let mic = segment.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }
             }
             for left in result.unreadable {
                 if let mic = left.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }
             }
         }
+        let cameras = try addCameras(
+            result, screenStarts: starts.map { segmentStarts($0, of: result) }, scope: scope,
+            to: &trial, ops: &ops, notes: &notes)
         let microphones = try addMicrophones(
             voices(of: result), pictureStarts: starts,
             scope: scope, to: &trial, ops: &ops, notes: &notes)
@@ -134,7 +166,8 @@ extension RecordingLanding {
         return Placement(
             ops: ops, mediaIds: mediaIds, clipIds: split(clips, of: result).segments,
             micMediaIds: micMedia.segments, micClipIds: micClips.segments, notes: notes,
-            leftOutMicMediaIds: micMedia.leftOut, leftOutMicClipIds: micClips.leftOut)
+            leftOutMicMediaIds: micMedia.leftOut, leftOutMicClipIds: micClips.leftOut,
+            cameraMediaIds: cameras.media, cameraClipIds: cameras.clips)
     }
 
     /// The sentence for a file `remainderPlacement` lands as media because

@@ -94,8 +94,9 @@ count rather than passing vacuously.
   missing dylib), or no answer within 30 s. On PATH alone was not enough:
   a broken install is on PATH and cannot run.
 * Section 3, the tool's SOURCE, read where no call can reach: the stop
-  ceiling's derivation (`stopCeiling(segments:)` — `finishCeiling + 2 ×
-  MediaImporter.probeTimeout × max(n, 1) + 5`, the expression read with its
+  ceiling's derivation (`stopCeiling(segments:camera:)` — `finishCeiling + 2 ×
+  MediaImporter.probeTimeout × max(n, 1) + 5`, 3 × with a camera beside the
+  screen since camera-recording CR3b, the expression read with its
   line breaks folded and `probeTimeout`'s own line read as 30, over the
   segments the recorder holds, 75 s unpaused and
   60 s more per further segment, independent of `seconds`; the R2 review
@@ -1154,21 +1155,25 @@ def source_part():
     landing = source("AgentServer+RecordingLanding.swift")
     sentences = source("AgentServer+RecordingSentences.swift")
 
-    check("static func stopCeiling(segments: Int) -> TimeInterval" in tool
-          and "ScreenRecorder.finishCeiling + 2 * MediaImporter.probeTimeout "
+    # Camera recording CR3b (spec §11 CAM-10 (7)): a camera beside the screen adds a THIRD
+    # probe per segment, the camera file's.
+    check("static func stopCeiling(segments: Int, camera: Bool = false) -> TimeInterval" in tool
+          and "ScreenRecorder.finishCeiling + (camera ? 3 : 2) * MediaImporter.probeTimeout "
               "* TimeInterval(max(segments, 1)) + 5"
           in " ".join(tool.split())
           and "static let probeTimeout: TimeInterval = 30\n"
           in source("MediaImporter+Probe.swift"),
-          "the stop wait is `stopCeiling(segments:)` = finishCeiling + 2 × probeTimeout × "
-          "max(n, 1) + 5, and `MediaImporter.probeTimeout` reads 30 "
+          "the stop wait is `stopCeiling(segments:camera:)` = finishCeiling + 2 × probeTimeout × "
+          "max(n, 1) + 5 (3 × with a camera beside the screen, CAM-10), and "
+          "`MediaImporter.probeTimeout` reads 30 "
           "(75 s unpaused, 60 s more per further segment), derived from the recorder's finish "
           "ceiling and two sequential probe ceilings PER SEGMENT, independent of seconds — "
           "R2's review found a fixed 75 s shorter than two segments' probes")
-    check("Self.stopCeiling(segments: segments)" in tool and ".now() + seconds + 30" not in tool
+    check("Self.stopCeiling(segments: segments, camera: cameraBeside)" in tool
+          and ".now() + seconds + 30" not in tool
           and "static let stopCeiling" not in tool,
-          "…and the wait after stop() reads it over the segment count — the old "
-          "`.now() + seconds + 30` and the fixed constant are both gone")
+          "…and the wait after stop() reads it over the segment count and the camera beside — "
+          "the old `.now() + seconds + 30` and the fixed constant are both gone")
     check("mid-finish is `.busy`" not in tool and "`.busy` by contract" not in tool
           and "JOINS the finishing" in tool,
           "the header no longer claims a second stop() mid-finish is .busy — it says it joins")
@@ -1210,9 +1215,10 @@ def source_part():
     # Issue batch B66 (#99 phase 2): the recorder's own `heldSegmentCount` /
     # `heldFilePaths` — a screen recording's or a voice-over's — replace the
     # tool's `recorder.session?` reads.
-    check("static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false)" in sentences
-          and "Self.finishTimeoutSentence( movies: movies, voiceOver: choice.source == "
-              ".voiceOver)" in re.sub(r"\s+", " ", tool)
+    check("static func finishTimeoutSentence( movies: [String], cameras: [String] = [], "
+          "voiceOver: Bool = false )" in re.sub(r"\s+", " ", sentences)
+          and "Self.finishTimeoutSentence( movies: movies, cameras: cameras, voiceOver: "
+              "choice.source == .voiceOver)" in re.sub(r"\s+", " ", tool)
           and "return recorder.heldFilePaths" in tool
           and "let count = max(recorder.heldSegmentCount, 1)" in tool
           and "recorder.session" not in code(tool) and "session?.movieURL" not in tool,
@@ -1223,7 +1229,7 @@ def source_part():
     check("case 1:" in timeout and "its \\(noun) is at \\(movies[0])." in timeout
           and "its \\(noun)s are at " in timeout and 'movies.joined(separator: ", ")' in timeout
           and 'let noun = voiceOver ? "file" : "movie"' in timeout
-          and "stopCeiling(segments: movies.count)" in timeout,
+          and "stopCeiling(segments: movies.count, camera: !cameras.isEmpty)" in timeout,
           "…and its sentence is pluralised by count and states the ceiling it waited, sized "
           "by the same count: one movie spelled as R1 spelled it, several comma-joined, and "
           "\"file\" for a voice-over's")

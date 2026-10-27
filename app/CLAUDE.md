@@ -2461,7 +2461,7 @@ free.
   re-added around a resume's new recording output. A camera failure is never
   the recording's.
 - `RecordingLanding.swift` (+`Placement`, +`Microphone`, +`Remainder`,
-  +`Placing`, +`LeftOut`, +`VoiceOver`) · `ProjectDocument+Recording.swift`
+  +`Placing`, +`LeftOut`, +`VoiceOver`, +`Camera`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
   READ BACK (at an inexact canvas rate a raw add snaps down into a one-tick
@@ -2473,7 +2473,12 @@ free.
   documented there. A voice-over's files land back to back from the playhead
   on ONE new back Microphone track, kept only when a clip lands on it
   (`+VoiceOver`); as a new project, `untitled(around:)` and
-  `remainderPlacement` take it unchanged.
+  `remainderPlacement` take it unchanged. A camera beside the screen
+  (`+Camera`, CR3b, spec §11 CAM-10) lands its media on ONE front Camera
+  track, between the pictures and the voices: each camera at its picture's
+  start minus its offset, floored and head-trimmed through the voices'
+  shared `headTrimmed`, then put in the bottom-right corner by one
+  `set_video`, read back.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`

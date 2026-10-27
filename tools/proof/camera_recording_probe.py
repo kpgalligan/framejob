@@ -9,7 +9,8 @@ the selection rule, the device observers, the pending rebuild applied only at id
 preview's capture stopped once; and CR3a (CAM-9): a camera beside the screen — the `.screen` frame
 watch's E2 (off the stream for a resume's add, a failed re-add's E1 fallback), the camera's offset,
 the finishing's wait, the settle's camera half and the names, and a real screen recording with the
-camera beside it.
+camera beside it; and CR3b (CAM-10): that camera's landing — the front Camera track, the offsets
+and the floor, the corner — and `record_screen`'s camera with source screen.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -48,6 +49,19 @@ Sections and rows:
            through `RecordingLanding.placement`: the picture on a track, the voice on a back
            track named Microphone; L2 `ProjectDocument.untitled(around:)`: the canvas 1920×1080
            at 30; L3 the result is `isCamera`, not `isVoiceOver`, and carries its camera.
+           CR3b (CAM-10), over 4 s and 1 s 1760×1328 30 fps camera fixtures and a copy of each
+           file: L4 a two-segment screen + camera + microphone result at the playhead 1 s
+           (offsets −100 ms, +100 ms): the ops in order, the Camera track in front of the
+           pictures', camera 0 at screen 0's start with `in` the snapped 100 ms head, camera 1
+           at screen 1's start + 100 ms, each `video` `wantCorner`'s (the decision's formula,
+           written in the probe), the placement's camera ids, one undo removing all; L5
+           `cornerPatch` against `wantCorner` for 1760×1328, 1920×1080 and 1080×1920 on
+           1920×1080, the edges on the 0.95 line, nil for a zero dimension; L6 a 4 s camera 0
+           past screen 1's start floors camera 1 at its end; L7 `place: false` → camera media, no
+           clip, no Camera track; L8 `untitled(around:)` → the canvas the screen's, Camera in
+           front, Microphone at the back, a camera alone's step "Add Camera", and
+           `remainderActionName`'s four cases; L9 a camera wholly under its head → media only,
+           its note naming the screen clip's start, or the previous camera clip.
   granted  a real `ScreenRecorder()` on `defaultIndex`'s camera and the default microphone:
            2 s, a 1 s pause, 2 s more. G0 it recorded; G1 2 segments, `pauses` 1, stopped by
            `stop()`, no camera problem; G2 each `.mov`'s size (ffprobe) equals the format applied,
@@ -107,6 +121,13 @@ Sections and rows:
            on the iPhone → `@60`, `best` and `BEST` → nil, an unknown format (the format's
            sentence), an unknown camera with a bad format (the camera's), a bad format + denied
            (the format's), a good format + denied (the grant's). T3 reads `recordingCameraPick`.
+           CR3b (CAM-10 (5)–(8)): T2 and T7 re-aimed — `camera` and `camera_format` admitted
+           with screen, the voice-over's own sentence; T9 `camera_format` without `camera` with
+           screen ("needs camera") and each of the two with voice_over; T10 `segmentFields`'
+           per-segment camera keys and ids (none at the top level), `documentIds` from the
+           placement's camera lists, and `resultNotes` ending with `cameraSegmentsNote`; T11
+           `filesClause` with camera files, `stopCeiling(camera:)` and `finishTimeoutSentence`
+           with cameras.
   panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
            `grantDoors` before `shared` exists, the nine `FrameJobRecording…` keys put back; fake
            rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
@@ -163,7 +184,9 @@ Sections and rows:
            first statement `applyPendingDevices()`; `devicesDidChange(` sets `devicesPending =
            true` before `syncCameraPreview()`; the `.failed` arm's `stop()` guarded by
            `stopped`; `connected(` and `connectedMicrophones(` filter `isConnected`;
-           `rebuildMicrophones(` calls `connectedMicrophones()`.
+           `rebuildMicrophones(` calls `connectedMicrophones()`. CR3b (CAM-10 (8)): P19
+           `landingNote(cameraBeside: true)` — the display's stop sentence, then the
+           microphone's problem, the camera's problem and its note.
   beside   CR3a (CAM-9), no grant, ffmpeg fixtures (a 640×360 30 fps screen `.mov`, a camera
            `.mov` at 1760×1328 30 fps, a garbage file). B1 `ScreenFrameWatch`: `bound(rate: 60)`
            = 1/30 and `bound(rate: 0)` = 2, `keptSeconds` 2; on a watch at `bound(rate: 60)`,
@@ -211,8 +234,8 @@ Sections and rows:
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
 `MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
-camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, and `beside,screen` for
-`no-frame-watch` and `resume-keeps-watch`:
+camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, `beside,screen` for
+`no-frame-watch` and `resume-keeps-watch`, and `landing`, `tool` or `panel` for CR3b's:
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
@@ -221,7 +244,7 @@ camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, and `besid
   mic-ends-recording  an unasked microphone did-finish ends the recording → V15
   no-hold             `warmUpRun` 0: the warm-up ends at its first buffer → G6
   camera-strangers-admitted  a camera's strangers list emptied                 → T1
-  camera-elsewhere-admitted  `camera` taken with any source                    → T2
+  camera-elsewhere-admitted  `camera` taken with voice_over (CR3b's guard)     → T2
   grant-before-lookup  the Camera grant read before the lookup                 → T3
   camera-key-dropped  `recordingFields` writes no `camera`                     → T5
   camera-notes-dropped  `resultNotes` leaves out the camera's two sentences    → T6
@@ -240,7 +263,7 @@ camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, and `besid
   format-stale-kept   a stale spelling → nil, not best                         → V19
   format-size-lowest  `WxH` takes the size's last row                          → V21, T8
   format-after-grant  the format checked after the grant guard                 → T8
-  camera-format-elsewhere-admitted  `camera_format` taken with any source      → T7
+  camera-format-elsewhere-admitted  `camera_format` dropped from the given list → T7
   format-popup-live   the Format popup always enabled                          → P11
   format-unpersisted  the format key's write deleted                           → P11
   format-rebuild-skipped-on-match  the `defer` deleted, the rebuild after the early return → P12
@@ -277,6 +300,14 @@ camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, and `besid
   resume-keeps-watch  `resume()`'s remove and re-add of the watch deleted     → B4, G16
   fallback-asks-watch  `screenDidStart`'s `watchFailure` guard deleted         → B7
   fallback-unnamed    the segment's `cameraNote` always nil                    → B7
+  camera-track-behind  the Camera track added at index 0                       → L4
+  camera-offset-ignored  a camera clip asked at its screen's start             → L4
+  camera-floor-unscreened  the floor the previous camera's end only (else 0)   → L4
+  corner-top          the corner's y negated                                   → L4, L5
+  remainder-camera-dropped  the remainder's `|| hasCamera` dropped             → L8
+  camera-format-alone-admitted  `camera_format` without `camera` admitted      → T9
+  camera-ids-unwritten  `segmentFields` writes no `camera_clip`                → T10
+  beside-display-sentence  `landingNote`'s camera stop sentence beside a screen → P19
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -302,12 +333,12 @@ ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
                "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21",
                "V22"],
-    "landing": ["L1", "L2", "L3"],
+    "landing": ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"],
     "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
                 "G13", "G14", "G15"],
-    "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"],
+    "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11"],
     "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
-              "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18"],
+              "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18", "P19"],
     "beside": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
     "screen": ["G16"],
 }
@@ -398,9 +429,10 @@ MUTANTS = {
         ("AgentServer+RecordingCamera.swift",
          "let strangers = Self.cameraRefusedArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }",
          "let strangers = [String]()")]),
+    # Re-aimed at CR3b (CAM-10 (5)): the voice-over's guard, the one `camera` still meets.
     "camera-elsewhere-admitted": (["T2"], [
-        ("AgentServer+RecordingCamera.swift", "guard kind == .camera || given.isEmpty else {",
-         "guard kind == .camera || given.isEmpty || true else {")]),
+        ("AgentServer+RecordingCamera.swift", "guard kind != .voiceOver || given.isEmpty else {",
+         "guard kind != .voiceOver || given.isEmpty || true else {")]),
     "grant-before-lookup": (["T3"], [
         ("AgentServer+RecordingCamera.swift", GRANT_AFTER_LOOKUP, ""),
         ("AgentServer+RecordingCamera.swift", "        let index: Int?\n",
@@ -598,6 +630,37 @@ MUTANTS = {
     "fallback-unnamed": (["B7"], [
         ("ScreenRecorder+CameraBesideFinishing.swift", "cameraNote: descriptor == nil ? nil : note)",
          "cameraNote: nil)")]),
+    # CR3b (spec §11 CAM-10): the landing's five, each run with `--only landing`; the tool's
+    # two with `--only tool`; the panel's one with `--only panel`.
+    "camera-track-behind": (["L4"], [
+        ("RecordingLanding+Camera.swift",
+         "let addTrack = ReelOp.addTrack(index: front, name: cameraTrackName)",
+         "let addTrack = ReelOp.addTrack(index: 0, name: cameraTrackName)")]),
+    "camera-offset-ignored": (["L4"], [
+        ("RecordingLanding+Camera.swift", "        let start = screenAt + offset\n",
+         "        let start = screenAt\n")]),
+    "camera-floor-unscreened": (["L4"], [
+        ("RecordingLanding+Camera.swift",
+         "            let floor = max(screenAt, previousEnd ?? screenAt)\n",
+         "            let floor = previousEnd ?? 0\n")]),
+    "corner-top": (["L4", "L5"], [
+        ("RecordingLanding+Camera.swift",
+         "        let y = (ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n",
+         "        let y = -(ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n")]),
+    "remainder-camera-dropped": (["L8"], [
+        ("RecordingLanding+Remainder.swift",
+         "guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera else {",
+         "guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice else {")]),
+    "camera-format-alone-admitted": (["T9"], [
+        ("AgentServer+RecordingCamera.swift",
+         "guard kind != .screen || format == nil || camera != nil else {",
+         "guard kind != .screen || format == nil || camera != nil || true else {")]),
+    "camera-ids-unwritten": (["T10"], [
+        ("AgentServer+RecordingResult.swift",
+         '        if let id = ids?.cameraClip { fields["camera_clip"] = Int(id) }\n', "")]),
+    "beside-display-sentence": (["P19"], [
+        ("RecorderPanelController+Landing.swift", "            if let camera, !cameraBeside {\n",
+         "            if let camera {\n")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -626,7 +689,11 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "camera-offset-e1-only": "beside", "finish-ignores-camera": "beside",
                   "camera-fails-screen": "beside", "leftout-camera-unkept": "beside",
                   "no-frame-watch": "beside,screen", "resume-keeps-watch": "beside,screen",
-                  "fallback-asks-watch": "beside", "fallback-unnamed": "beside"}
+                  "fallback-asks-watch": "beside", "fallback-unnamed": "beside",
+                  "camera-track-behind": "landing", "camera-offset-ignored": "landing",
+                  "camera-floor-unscreened": "landing", "corner-top": "landing",
+                  "remainder-camera-dropped": "landing", "camera-format-alone-admitted": "tool",
+                  "camera-ids-unwritten": "tool", "beside-display-sentence": "panel"}
 
 
 def run(command, **kw):
@@ -834,17 +901,29 @@ def preview_source_row(sources, base):
 
 
 def fixtures(here):
-    """The landing's two files, made by ffmpeg; (movie, voice) or None and why."""
-    movie, voice = here / "camera-1080p30.mov", here / "camera-voice.m4a"
+    """The landing's files, made by ffmpeg: L1–L3's movie and voice, and CR3b's (CAM-10)
+    1760×1328 30 fps camera movies — 4 s, so a camera can outrun its 2 s screen segment, and
+    1 s — with a second copy of each movie, voice and camera for a two-segment recording; a
+    dict of name → path, or None and why."""
+    made = {"movie": here / "camera-1080p30.mov", "voice": here / "camera-voice.m4a",
+            "camera": here / "beside-camera-4s.mov", "short": here / "beside-camera-1s.mov"}
     for argv in (
             ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30",
-             "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(movie)],
+             "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(made["movie"])],
             ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
-             "-t", "2", "-c:a", "aac", str(voice)]):
+             "-t", "2", "-c:a", "aac", str(made["voice"])],
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1760x1328:rate=30",
+             "-t", "4", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(made["camera"])],
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1760x1328:rate=30",
+             "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(made["short"])]):
         done = run(argv, timeout=120)
         if done.returncode != 0:
             return None, f"{' '.join(argv[:6])}… exit {done.returncode}: {done.stderr[-200:]}"
-    return (movie, voice), None
+    for name in ("movie", "voice", "camera", "short"):
+        copy = made[name].with_name(made[name].stem + " (2)" + made[name].suffix)
+        shutil.copyfile(made[name], copy)
+        made[name + "2"] = copy
+    return {k: str(v) for k, v in made.items()}, None
 
 
 def beside_fixtures(here):
@@ -1251,7 +1330,7 @@ def main():
                 for row in ROWS[name]:
                     results[row] = (False, f"fixtures: {why}")
                 continue
-            request.update(movie=str(made[0]), voice=str(made[1]))
+            request.update(made)
         if name == "granted":
             folder = here / "recordings"
             folder.mkdir(parents=True, exist_ok=True)

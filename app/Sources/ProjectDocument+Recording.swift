@@ -55,7 +55,9 @@ extension ProjectDocument {
     /// 4. The remainder's grouped edit — named by
     ///    `RecordingLanding.remainderActionName(for:)`: "Add Microphone"
     ///    for one segment with any voice — its own or a left-out segment's
-    ///    (#181 item 2) — "Add Recording Segments" otherwise,
+    ///    (#181 item 2) — "Add Camera and Microphone" or "Add Camera" for
+    ///    one segment with a camera beside the screen, with a voice or
+    ///    without (spec §11 CAM-10 (4)), "Add Recording Segments" otherwise,
     ///    and NOT "Add Recording", because the step removes the remainder
     ///    and keeps the first segment's picture, and the Edit menu should
     ///    say what ⌘Z will do — before the window, so the `generateCaches()`

@@ -15,7 +15,8 @@ import Foundation
 /// clauses only it reads (`recordingPauseClause`,
 /// `recordingUnreadableClause`, `recordingResultClause` and
 /// `recordingVoiceOverClause`), still hoisted for the type checker's budget;
-/// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, for the same.
+/// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, and CR3b's
+/// `recordingCameraBesideClause` (CAM-10) a sixth, for the same.
 /// It is SPLICED back in where it left — LAST, after `cancel_export` — so the
 /// catalog's order, which `recording_probe.py` reads and `tools/list`
 /// publishes, and the description `recording_proof.py` section 0 reads, are
@@ -140,7 +141,7 @@ extension AgentServer {
             + "recording's picture does; as a new project the canvas is the file's size at "
             + "the format's rate, rounded. display, window, system_audio, show_clicks, size, "
             + "include_framejob_windows and rate are refused by name with source camera, and "
-            + "camera and camera_format with any other source. The camera is looked up after "
+            + "camera and camera_format with source voice_over. The camera is looked up after "
             + "project — an unknown one is refused naming every camera connected, and \"No "
             + "camera is connected.\" when there is none — and only then is the Camera grant "
             + "read, never the Screen Recording one. The span counts from the camera's first "
@@ -151,6 +152,34 @@ extension AgentServer {
             + "camera.note when the camera had not settled at its rate when the recording "
             + "began; each of the two also said in the note — and has_audio false: the movie "
             + "holds no sound."
+        // CR3b's camera-beside paragraph (spec §11 CAM-10), hoisted for the same budget
+        // reason; camera_recording_proof.py reads its phrases.
+        let recordingCameraBesideClause: String =
+            " A CAMERA BESIDE THE SCREEN: source: \"screen\" (the default) with camera records "
+            + "that camera at the same time as the screen — camera_format as for source "
+            + "camera, refused without camera — one <movie stem> (Camera).mov per segment beside "
+            + "each movie. The camera files land in the same undo step, on ONE new track named "
+            + "Camera in FRONT of the screen's, one clip per segment at its screen clip's start "
+            + "plus that segment's camera_offset (ticks, positive when the camera began after "
+            + "the screen; it is usually negative, a camera starting first, and then the clip's "
+            + "head is trimmed rather than the clip placed early), never before its screen clip "
+            + "and never overlapping the camera clip before it. Each camera clip is placed in "
+            + "the BOTTOM-RIGHT corner — scaled to fit a quarter of the canvas wide and a third "
+            + "of it tall, inside the 90 % safe-area ring — by set_video x, y and scale, and "
+            + "stays an ordinary clip to move. The microphone, when asked for, is its own file "
+            + "on the Microphone track as for any screen recording. With place: false the "
+            + "camera files are media with no clip and no Camera track. As a new project the "
+            + "first movie is the document and the camera lands in its remainder step — named "
+            + "Add Camera, or Add Camera and Microphone with a voice, for one segment. Each "
+            + "entry of segments then also carries camera_path, camera_duration and "
+            + "camera_offset when that segment's camera file landed, camera_problem and "
+            + "camera_note when set (also said in the note), and camera_media and camera_clip "
+            + "when known; the top-level camera is as for source camera. A segment left out "
+            + "because its movie will not read keeps its camera file on disk, named in its "
+            + "kept_files, and does not land it. The stop wait allows 105 s, and 90 s more for "
+            + "each further segment, because the camera's file is probed too, and a timeout "
+            + "names the camera files after the movies. The recorder panel does not offer a "
+            + "camera beside the screen yet."
         return [
             // MARK: Recording
             //
@@ -191,7 +220,7 @@ extension AgentServer {
                     + "mic_problem carries the sentence (the note repeats it). THE GRANTS: this tool never "
                     + "asks for one and never opens the picker. The Screen Recording grant "
                     + "(and the Microphone grant when microphone is true, and the Camera "
-                    + "grant for source camera) must already be held "
+                    + "grant for source camera or a camera beside the screen) must already be held "
                     + "by this process — the panel is where somebody grants them — and a "
                     + "missing one is refused by name with the System Settings pane in the "
                     + "sentence. A Frame Job launched from a shell runs under the TERMINAL's "
@@ -202,14 +231,15 @@ extension AgentServer {
                     + "vocabulary and the arguments that source refuses, display and window "
                     + "both given, a rate or size outside the vocabulary, microphone: true "
                     + "without the Microphone grant, a project naming nothing open), then for "
-                    + "a screen recording the Screen Recording grant, then the display or "
+                    + "a camera recording or a camera beside the screen the camera lookup, "
+                    + "then its camera_format, then the Camera grant, then for a screen "
+                    + "recording the Screen Recording grant, then the display or "
                     + "window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
-                    + "that, by name — and for a camera recording the camera lookup, then its "
-                    + "camera_format, then the Camera grant; then the recording itself. "
+                    + "that, by name; then the recording itself. "
                     + recordingPauseClause
                     + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
-                    + recordingCameraClause,
+                    + recordingCameraClause + recordingCameraBesideClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
@@ -222,28 +252,35 @@ extension AgentServer {
                         "description": "What is recorded: screen (default) — a display or a "
                             + "window — voice_over, the default microphone alone with no "
                             + "picture (the panel's Microphone Only), or camera, a camera "
-                            + "alone (see camera). With voice_over, "
+                            + "alone (see camera; with screen, camera records one beside the "
+                            + "screen). With voice_over, "
                             + "display, window, system_audio, show_clicks, size, "
                             + "include_framejob_windows and microphone: false are refused "
                             + "by name; with camera, display, window, system_audio, "
-                            + "show_clicks, size, include_framejob_windows and rate are.",
+                            + "show_clicks, size, include_framejob_windows and rate are; "
+                            + "camera and camera_format are refused with voice_over.",
                     ],
                     "camera": [
                         "type": "string",
-                        "description": "With source camera, which camera: a device's unique id, "
-                            + "or its name in any case; trimmed, and blank means none. Absent, "
-                            + "the default camera — the system's preferred camera, else the "
-                            + "first built-in, else the first. One no connected camera carries "
-                            + "is refused naming every camera connected. Refused with any "
-                            + "other source.",
+                        "description": "With source camera, which camera to record alone; with "
+                            + "source screen (the default), a camera to record BESIDE the screen, "
+                            + "landing on a Camera track in front of it in the bottom-right "
+                            + "corner. A device's unique id, or its name in any case; trimmed, "
+                            + "and blank means none. With source camera, absent means the "
+                            + "default camera — the system's preferred camera, else the "
+                            + "first built-in, else the first; with source screen, absent means "
+                            + "no camera. One no connected camera carries is refused naming "
+                            + "every camera connected. Refused with source voice_over.",
                     ],
                     "camera_format": [
                         "type": "string",
-                        "description": "With source camera, the format to record at, as "
+                        "description": "With source camera, or with camera beside the screen, "
+                            + "the format to record at, as "
                             + "camera.format spells it (1920x1080@30), or WIDTHxHEIGHT for that "
                             + "size's highest rate, or best; any case. Absent, blank or null means "
                             + "best — the camera's best format. A format the camera lacks is "
-                            + "refused, naming its formats. Refused with any other source.",
+                            + "refused, naming its formats. Refused with source voice_over, and "
+                            + "with source screen without camera.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,

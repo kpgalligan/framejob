@@ -11,7 +11,9 @@
 // `addMedia`, `view`, `clip(_:in:scope:)` and `trimmed` are internal in
 // the base file for this one, and `placeBackToBack`, `placeClip`,
 // `mediaEntry`, `tooShortNote` and `milliseconds` in `+Placing`, because
-// `private` does not cross a file.
+// `private` does not cross a file. `headTrimmed` is internal for the same
+// reason since camera-recording CR3b: `+Camera`'s clips take the same dance
+// (spec §11 CAM-10 (2)).
 
 import AppKit
 
@@ -218,7 +220,7 @@ extension RecordingLanding {
     /// head — with the trial left as it was; every other surprise is a
     /// throw naming the file. The clip returned may still sit a tick under
     /// the floor at an inexact rate, which the caller reads.
-    private static func headTrimmed(
+    static func headTrimmed(
         _ media: UInt32, file: MediaSnapshot, on track: UInt32, at: Ticks, head: Ticks,
         floor: Ticks, fps: Fps, scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp]
     ) throws -> ClipSnapshot? {

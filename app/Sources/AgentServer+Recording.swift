@@ -31,7 +31,9 @@ import ScreenCaptureKit
 /// looks nothing up (spec §11 recording, "A voice-over is a recording with
 /// no picture"). A camera recording (spec §11 CAM-4) then looks the camera
 /// up — the named one, else the default, refused naming every camera present
-/// — then its format (CAM-6), and only then the Camera grant (`+RecordingCamera.swift`). A
+/// — then its format (CAM-6), and only then the Camera grant (`+RecordingCamera.swift`); so
+/// does a screen recording given a `camera` to record beside it (spec §11 CAM-10 (5)),
+/// before anything screen-side. A
 /// screen recording then reads the Screen Recording grant,
 /// synchronously, named with the System Settings pane. Only then the
 /// display or window lookup, which cannot be asked without the grant — a
@@ -54,13 +56,14 @@ import ScreenCaptureKit
 /// past the recorder's own `armCeiling`, whose timer answers first); the
 /// span, a wait on the FINISH semaphore that `onFinish` ends early when
 /// something else ended the recording; then, after `stop()`, the same
-/// semaphore again, bounded at `stopCeiling(segments:)` over the count the
-/// session holds at the stop. `stop()` is sent with NO completion (`onFinish`
+/// semaphore again, bounded at `stopCeiling(segments:camera:)` over the count
+/// the session holds at the stop. `stop()` is sent with NO completion (`onFinish`
 /// lands the result once) and in any state past idle JOINS the finishing
 /// under way (the recorder's finding 1), so a person's Stop a second before
 /// the span ends is a stop that lands, never `.busy`. A stop that never
 /// concludes within that bound is a reported timeout naming EVERY movie the
-/// recorder still holds — one per segment — and main is asked nothing more:
+/// recorder still holds — one per segment — and every camera file beside
+/// them (`heldCameraPaths`, CAM-10 (7)), and main is asked nothing more:
 /// the recorder has no cancel, and the recording may yet finish on its own.
 ///
 /// **A recording this tool starts is controllable from the machine.** Once
@@ -80,11 +83,14 @@ extension AgentServer {
     /// sequential `MediaImporter.probe` ceilings of 30 s PER SEGMENT
     /// (`MediaImporter.probeTimeout`; `settle` probes each segment's movie, then
     /// its microphone file — n segments, 2n probes), plus a margin: 75 s
-    /// unpaused, 60 s more per further segment. The old bound was
-    /// `seconds + 30`; R2's fixed 75 s was shorter than two segments' probes.
-    static func stopCeiling(segments: Int) -> TimeInterval {
+    /// unpaused, 60 s more per further segment. With a `camera` beside the
+    /// screen the settle probes a THIRD file per segment, the camera's
+    /// (spec §11 CAM-10 (7)): 105 s unpaused, 90 s more per further segment.
+    /// The old bound was `seconds + 30`; R2's fixed 75 s was shorter than two
+    /// segments' probes.
+    static func stopCeiling(segments: Int, camera: Bool = false) -> TimeInterval {
         ScreenRecorder.finishCeiling
-            + 2 * MediaImporter.probeTimeout * TimeInterval(max(segments, 1)) + 5
+            + (camera ? 3 : 2) * MediaImporter.probeTimeout * TimeInterval(max(segments, 1)) + 5
     }
 
     // MARK: - The tool
@@ -131,12 +137,14 @@ extension AgentServer {
         var source = RecordingSource.voiceOver
         var filter: SCContentFilter?
         var cameraPick: CameraPick?
-        if kind == .camera {
+        // CAM-10 (5): a screen recording given a `camera` records it beside the screen.
+        let cameraBeside = try kind == .screen && recordingCameraArgument(a) != nil
+        if kind == .camera || cameraBeside {
             // CAM-3 (7) and (8): the camera lookup and its format, then the Camera grant —
-            // read, never requested.
+            // read, never requested; for a camera beside the screen, before its grant.
             cameraPick = try recordingCamera(a)
-            source = .camera
         }
+        if kind == .camera { source = .camera }
         if kind == .screen {
             // 2. The Screen Recording grant — read, never requested.
             guard RecordingGrant.screenRecordingGranted else {
@@ -176,7 +184,8 @@ extension AgentServer {
             camera: cameraPick?.id, cameraFormat: cameraPick?.format)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
-        let result = try record(filter: filter, choice: choice, seconds: seconds)
+        let result = try record(
+            filter: filter, choice: choice, seconds: seconds, cameraBeside: cameraBeside)
 
         // 6. A drag in the target document is waited out HERE, on this
         //    thread — a wait on main would hold the gesture it waits for.
@@ -192,9 +201,10 @@ extension AgentServer {
     /// filter is a screen recording, started through `start`; with none, a
     /// camera (`choice.source == .camera`) is started through `startCamera`
     /// and a voice-over through `startVoiceOver`, and the span waits first
-    /// for their first segment's start (`awaitFirstStart`).
+    /// for their first segment's start (`awaitFirstStart`). `cameraBeside`
+    /// sizes the stop wait for the camera's probe (CAM-10 (7)).
     private func record(
-        filter: SCContentFilter?, choice: RecordingChoice, seconds: Double
+        filter: SCContentFilter?, choice: RecordingChoice, seconds: Double, cameraBeside: Bool
     ) throws -> RecordingResult {
         let recorder = ScreenRecorder.shared
         let started = DispatchSemaphore(value: 0)
@@ -253,16 +263,19 @@ extension AgentServer {
                 recorder.stop()
                 return count
             }
-            guard finished.wait(timeout: .now() + Self.stopCeiling(segments: segments)) == .success
-            else {
-                // The files the recorder still holds — one per segment.
+            let ceiling = Self.stopCeiling(segments: segments, camera: cameraBeside)
+            guard finished.wait(timeout: .now() + ceiling) == .success else {
+                // The files the recorder still holds — one per segment, and
+                // a camera file beside each movie that has one.
+                var cameras: [String] = []
                 let movies = onMain { () -> [String] in
                     chrome.remove()
+                    cameras = recorder.heldCameraPaths
                     return recorder.heldFilePaths
                 }
                 throw ToolError(
                     message: Self.finishTimeoutSentence(
-                        movies: movies, voiceOver: choice.source == .voiceOver))
+                        movies: movies, cameras: cameras, voiceOver: choice.source == .voiceOver))
             }
         }
         guard let outcome = box.value else {

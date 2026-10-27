@@ -14,7 +14,9 @@ import AppKit
 /// **The order is CAM-3's**, decided in the callers: `recordingSourceKind`
 /// calls `recordingCameraStrangers` right after `source`'s value (step 3),
 /// and `recordScreen` calls `recordingCamera` after the `project` (steps 7
-/// and 8): the lookup needs no grant, so an unknown name is answered as
+/// and 8) — for a camera recording, and since CR3b for a screen recording
+/// given a `camera` (spec §11 CAM-10 (5)), before the Screen Recording
+/// grant: the lookup needs no grant, so an unknown name is answered as
 /// that whatever the grant says, and only then is the Camera grant read.
 /// Nothing here asks for it: the grant is READ (`RecordingGrant.cameraStatus`)
 /// and a missing one is refused by `RecordingGrant.cameraRefusal`'s
@@ -52,20 +54,28 @@ extension AgentServer {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// CAM-4 points 2 and 3 with CAM-6 (6), called by `recordingSourceKind`
-    /// right after `source`'s value: with any source but `camera`, the given
-    /// ones of `camera` and `camera_format` are refused together; with
-    /// `camera`, the given ones of `cameraRefusedArguments` (a JSON null is
-    /// not given, `scalarArg`'s rule) are refused together, in that order.
+    /// CAM-4 points 2 and 3 with CAM-6 (6), as CAM-10 (5) amends them,
+    /// called by `recordingSourceKind` right after `source`'s value: with
+    /// source `voice_over`, the given ones of `camera` and `camera_format`
+    /// are refused together in the voice-over's words; with `screen`, a
+    /// `camera_format` given without `camera` is refused (a camera beside
+    /// the screen is named by `camera`); with `camera`, the given ones of
+    /// `cameraRefusedArguments` (a JSON null is not given, `scalarArg`'s
+    /// rule) are refused together, in that order.
     func recordingCameraStrangers(_ a: [String: Any], kind: RecordingSourceKind) throws {
         let camera = try recordingCameraArgument(a)
         let format = try recordingCameraFormatArgument(a)
         let given = [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }
             .map(\.0)
-        guard kind == .camera || given.isEmpty else {
+        guard kind != .voiceOver || given.isEmpty else {
             throw ToolError(
-                message: "With source \(kind.rawValue), " + given.joined(separator: ", ")
-                    + " cannot be given — only source camera records a camera.")
+                message: "With source voice_over, " + given.joined(separator: ", ")
+                    + " cannot be given — a voice-over records the microphone alone.")
+        }
+        guard kind != .screen || format == nil || camera != nil else {
+            throw ToolError(
+                message: "With source screen, camera_format needs camera — name the camera to "
+                    + "record beside the screen.")
         }
         guard kind == .camera else { return }
         let strangers = Self.cameraRefusedArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }

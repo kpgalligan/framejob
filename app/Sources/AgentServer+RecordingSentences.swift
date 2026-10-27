@@ -44,7 +44,7 @@ extension AgentServer {
     }
 
     /// The sentence for a `stop()` that did not conclude within
-    /// `stopCeiling(segments:)`: it names every movie the recorder still
+    /// `stopCeiling(segments:camera:)`: it names every movie the recorder still
     /// holds — one per segment, the recording may finish on its own after
     /// the tool has answered, and a person can then import them — and the
     /// alert clause. Empty means the recorder no longer holds a session at
@@ -52,8 +52,12 @@ extension AgentServer {
     /// is the number the wait used: the same count while the session is
     /// held (a stop removes no segment), and the one-segment number — the
     /// wait's own `?? 1` — when the recorder had let the session go. A
-    /// voice-over's files are named "file", not "movie".
-    static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false) -> String {
+    /// voice-over's files are named "file", not "movie". `cameras` are the
+    /// camera files beside a screen's movies (spec §11 CAM-10 (7)), named
+    /// after them, and the ceiling spelled is the one with the camera's probe.
+    static func finishTimeoutSentence(
+        movies: [String], cameras: [String] = [], voiceOver: Bool = false
+    ) -> String {
         let noun = voiceOver ? "file" : "movie"
         let where_: String
         switch movies.count {
@@ -68,8 +72,15 @@ extension AgentServer {
                 "The recording may still finish on its own; its \(noun)s are at "
                 + movies.joined(separator: ", ") + "."
         }
+        let besideClause: String
+        switch cameras.count {
+        case 0: besideClause = ""
+        case 1: besideClause = " Its camera file is at \(cameras[0])."
+        default: besideClause = " Its camera files are at " + cameras.joined(separator: ", ") + "."
+        }
+        let ceiling = stopCeiling(segments: movies.count, camera: !cameras.isEmpty)
         return "record_screen asked the recorder to stop and it did not finish within "
-            + "\(Int(stopCeiling(segments: movies.count))) s. " + where_ + recordingAlertClause
+            + "\(Int(ceiling)) s. " + where_ + besideClause + recordingAlertClause
     }
 
     /// A failure AFTER the recording landed on disk, as a `ToolError` naming

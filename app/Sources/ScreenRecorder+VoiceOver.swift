@@ -250,6 +250,16 @@ extension ScreenRecorder {
         return session?.segments.map(\.movieURL.path) ?? []
     }
 
+    /// The camera files beside a screen recording's movies (spec §11 CAM-9,
+    /// CAM-10 (7)), in segment order — one per segment that armed a camera
+    /// writer; empty for every other recording and idle. Apart from
+    /// `heldFilePaths` because that list's count is the segment count the
+    /// tool's stop wait is sized by.
+    var heldCameraPaths: [String] {
+        guard voiceSession == nil, cameraSession == nil else { return [] }
+        return session?.segments.compactMap { $0.camera?.url.path } ?? []
+    }
+
     /// The next voice-over file: `RecordingFiles.uniqueURL`'s rule —
     /// `<stem>.m4a`, then `<stem> (2).m4a`, `(3)`… — over the files on DISK
     /// and the paths in `held`, because a segment's file does not exist

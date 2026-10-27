@@ -126,7 +126,8 @@ extension RecorderPanelController {
                 // segment that minted none is a nil entry, and its sentence
                 // is in `placement.notes`.
                 document.selection = Set(
-                    (placement.clipIds + placement.micClipIds + placement.leftOutMicClipIds)
+                    (placement.clipIds + placement.micClipIds + placement.leftOutMicClipIds
+                        + placement.cameraClipIds)
                         .compactMap { $0 })
                 Self.editor(of: document)?.viewStateDidChange()
                 landed(result, asNewProject: false, notes: placement.notes)
@@ -167,10 +168,13 @@ extension RecorderPanelController {
     /// Back to idle; the note is `landingNote`'s, over the placement's own
     /// notes — the unreadable segments' sentences followed by what became of
     /// their readable voices (#181 item 2), said only here, on a landing
-    /// that succeeded — and the reveal last.
-    private func landed(_ result: RecordingResult, asNewProject: Bool, notes: [String]) {
+    /// that succeeded — led by every segment's camera sentences beside the
+    /// screen (`cameraSegmentsNote`, spec §11 CAM-10 (8)) — and the reveal
+    /// last.
+    private func landed(_ result: RecordingResult, asNewProject: Bool, notes placed: [String]) {
         phase = .idle
         rebuildDestinations()
+        let notes = [result.cameraSegmentsNote].compactMap { $0 } + placed
         let leftOut = [result.unreadableNote, result.leftOutVoiceNote].compactMap { $0 }
         setNote(
             Self.landingNote(
@@ -178,7 +182,7 @@ extension RecorderPanelController {
                 landedAsNewProject: asNewProject, micProblem: result.micProblem,
                 resumeProblem: resumeProblem, notes: notes,
                 unreadable: leftOut.isEmpty ? nil : leftOut.joined(separator: " "),
-                camera: result.camera))
+                camera: result.camera, cameraBeside: result.camera != nil && !result.isCamera))
         revealIfNoted()
     }
 
@@ -186,7 +190,8 @@ extension RecorderPanelController {
     /// names every one (`filesClause`: each segment's movie, and the
     /// microphone files that landed) — then what became of an unreadable
     /// segment, the microphone, the camera (its `problem` and warm-up `note`,
-    /// spec §11 CAM-5) and a refused resume, when the result or the panel
+    /// spec §11 CAM-5, then each segment's camera sentences beside the
+    /// screen, CAM-10 (8)) and a refused resume, when the result or the panel
     /// carries those sentences — and the reveal last.
     private func failedToLand(_ result: RecordingResult, _ error: any Error) {
         phase = .idle
@@ -195,7 +200,7 @@ extension RecorderPanelController {
             + error.localizedDescription
         for sentence in [
             result.unreadableNote, result.micProblem, result.camera?.problem, result.camera?.note,
-            resumeProblem,
+            result.cameraSegmentsNote, resumeProblem,
         ].compactMap({ $0 })
         {
             note += " " + sentence
@@ -226,10 +231,13 @@ extension RecorderPanelController {
     /// they did. A CAMERA result (spec §11 CAM-5) says its own stop — the
     /// camera's `problem`, else that it stopped on its own — in place of the
     /// display's, and its warm-up `note` follows the microphone's problem.
+    /// A camera BESIDE the screen (`cameraBeside`, spec §11 CAM-10 (8)) is
+    /// not the recording's stop: the display's sentence stays, and the
+    /// camera's `problem` follows the microphone's problem, before its note.
     static func landingNote(
         stoppedBy: StopReason, chosen: RecordingDestination, landedAsNewProject: Bool,
         micProblem: String?, resumeProblem: String? = nil, notes: [String] = [],
-        unreadable: String? = nil, camera: RecordingCamera? = nil
+        unreadable: String? = nil, camera: RecordingCamera? = nil, cameraBeside: Bool = false
     ) -> String {
         var sentences: [String] = []
         switch stoppedBy {
@@ -239,7 +247,7 @@ extension RecorderPanelController {
             sentences.append(
                 "Stopped from the system's screen-recording indicator; the recording was added.")
         case .systemStopped:
-            if let camera {
+            if let camera, !cameraBeside {
                 sentences.append(
                     (camera.problem ?? "The camera stopped on its own.")
                         + " What was captured was added.")
@@ -254,6 +262,7 @@ extension RecorderPanelController {
         }
         if let unreadable { sentences.append(unreadable) }
         if let micProblem { sentences.append(micProblem) }
+        if cameraBeside, let problem = camera?.problem { sentences.append(problem) }
         if let note = camera?.note { sentences.append(note) }
         if let resumeProblem { sentences.append(resumeProblem) }
         sentences.append(contentsOf: notes)

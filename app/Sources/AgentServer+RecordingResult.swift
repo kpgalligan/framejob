@@ -50,21 +50,27 @@ extension AgentServer {
     /// The ids ONE segment's files landed as, each nil until known: a
     /// `place: false` landing mints no clip, a segment whose microphone
     /// failed has no `micMedia`, and a result built before any landing
-    /// (a probe's, or a throw's) has none of the four.
+    /// (a probe's, or a throw's) has none of the four. `cameraMedia` and
+    /// `cameraClip` are a camera beside the screen's (spec §11 CAM-10 (6)),
+    /// written per segment only, never at the top level.
     struct RecordingSegmentIds {
         var media: UInt32?
         var clip: UInt32?
         var micMedia: UInt32?
         var micClip: UInt32?
+        var cameraMedia: UInt32?
+        var cameraClip: UInt32?
 
         init(
             media: UInt32? = nil, clip: UInt32? = nil, micMedia: UInt32? = nil,
-            micClip: UInt32? = nil
+            micClip: UInt32? = nil, cameraMedia: UInt32? = nil, cameraClip: UInt32? = nil
         ) {
             self.media = media
             self.clip = clip
             self.micMedia = micMedia
             self.micClip = micClip
+            self.cameraMedia = cameraMedia
+            self.cameraClip = cameraClip
         }
     }
 
@@ -145,7 +151,10 @@ extension AgentServer {
     /// screen's did-start, `startedAtFormatter`'s spelling), then `mic_path`,
     /// `mic_duration`, `mic_offset` (always, 0 with no microphone) and
     /// `mic_problem` on the top level's terms for THIS segment's files, and
-    /// the four ids when known.
+    /// the four ids when known. A camera beside the screen (spec §11 CAM-10
+    /// (6)) adds `camera_path`, `camera_duration` and `camera_offset` when
+    /// the segment has a camera file, `camera_problem` and `camera_note`
+    /// when set, and `camera_media` and `camera_clip` when known.
     static func segmentFields(
         _ segment: RecordingSegment, ids: RecordingSegmentIds? = nil
     ) -> [String: Any] {
@@ -161,6 +170,15 @@ extension AgentServer {
             fields["mic_duration"] = mic.duration
         }
         if let problem = segment.micProblem { fields["mic_problem"] = problem }
+        if let camera = segment.cameraDescriptor {
+            fields["camera_path"] = camera.path
+            fields["camera_duration"] = camera.duration
+            fields["camera_offset"] = segment.cameraOffset
+        }
+        if let problem = segment.cameraProblem { fields["camera_problem"] = problem }
+        if let note = segment.cameraNote { fields["camera_note"] = note }
+        if let id = ids?.cameraMedia { fields["camera_media"] = Int(id) }
+        if let id = ids?.cameraClip { fields["camera_clip"] = Int(id) }
         fields.merge(idFields(ids)) { _, new in new }
         return fields
     }
@@ -210,13 +228,15 @@ extension AgentServer {
 
     /// The result's own `note` clauses, in order: the segments left out as
     /// unreadable (#97), the left-out voices that landed (#181 item 2), the
-    /// microphone's, then a camera's `problem` and `note`, verbatim (CAM-4).
-    /// Both doors append these after their own, on a landing that succeeded
-    /// only.
+    /// microphone's, then a camera's `problem` and `note`, verbatim (CAM-4),
+    /// then every segment's camera sentences beside the screen
+    /// (`cameraSegmentsNote`, CAM-10 (6)). Both doors append these after their
+    /// own, on a landing that succeeded only.
     static func resultNotes(_ result: RecordingResult) -> [String] {
         [
             result.unreadableNote, result.leftOutVoiceNote, microphoneNote(result),
             result.camera?.problem, result.camera?.note,
+            result.cameraSegmentsNote,
         ].compactMap { $0 }
     }
 
@@ -235,9 +255,14 @@ extension AgentServer {
         return result.segments.map { segment in
             let media = landedMedia(for: segment.descriptor.path, in: snapshot)
             let micMedia = segment.micDescriptor.flatMap { landedMedia(for: $0.path, in: snapshot) }
+            let cameraMedia = segment.cameraDescriptor.flatMap {
+                landedMedia(for: $0.path, in: snapshot)
+            }
             return RecordingSegmentIds(
                 media: media, clip: media.flatMap { landedClip(of: $0, in: snapshot) },
-                micMedia: micMedia, micClip: micMedia.flatMap { landedClip(of: $0, in: snapshot) })
+                micMedia: micMedia, micClip: micMedia.flatMap { landedClip(of: $0, in: snapshot) },
+                cameraMedia: cameraMedia,
+                cameraClip: cameraMedia.flatMap { landedClip(of: $0, in: snapshot) })
         }
     }
 
@@ -260,7 +285,9 @@ extension AgentServer {
             RecordingSegmentIds(
                 media: k < placement.mediaIds.count ? placement.mediaIds[k] : nil,
                 clip: entry(placement.clipIds, k), micMedia: entry(placement.micMediaIds, k),
-                micClip: entry(placement.micClipIds, k))
+                micClip: entry(placement.micClipIds, k),
+                cameraMedia: entry(placement.cameraMediaIds, k),
+                cameraClip: entry(placement.cameraClipIds, k))
         }
     }
 

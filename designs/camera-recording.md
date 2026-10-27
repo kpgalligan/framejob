@@ -326,7 +326,8 @@ landing back. The panel that drives both is last, as CR1c was.
   - **Per segment**, the camera's movie lies beside the screen's, named by the microphone's
     ` (Microphone).m4a` rule. Its offset is the camera's first buffer's PTS minus E2.
   - **Pause and resume in step.** A pause closes the camera's writer with the screen's output; a
-    resume opens the next writer with the next output.
+    resume opens the next writer with the next output. (Amended at CR3a, CAM-9 (6): the frame
+    watch comes off the stream for a resume's `addRecordingOutput` and goes back on after it.)
   - **A camera failure.** A camera that stops on its own during a screen recording is the
     recording's note (`camera.problem`), never its failure: the screen keeps recording and later
     segments have no camera. A camera segment that wrote no frame affects only that segment.
@@ -351,22 +352,34 @@ landing back. The panel that drives both is last, as CR1c was.
     microphone's floor rule holds between camera clips. Each clip is scaled and placed by the
     corner rule. The screen, the camera and the microphone are ONE grouped edit, and a new project
     lands the camera through `remainderPlacement`. `Placement` gains the camera's two id lists.
+    CR3a measured every `cameraOffset` NEGATIVE (the camera began 32–146 ms before the screen,
+    G16's four runs), so the head trim is the ordinary path, not the exception: the microphone's
+    trim-and-move dance (`headTrimmed`) is shared, not copied. A segment left out because its
+    screen movie would not probe keeps its camera file on disk, named in `kept_files` and the
+    left-out sentence, and never lands it (its microphone still lands in the slot, #181 item 2).
   - **The corner rule**: the corner, the scale and the inset (CAM-1's "CR3's to decide"); the
     clip stays an ordinary clip a person moves.
   - **The tool.** `camera` and `camera_format` are admitted with source `screen`, lifting CAM-4
-    (2) and CAM-6 (6) for it. The refusal order is extended for both grants. The answer carries
-    the `camera` key and, per segment, `camera_offset`, `camera_media` and `camera_clip`.
+    (2) and CAM-6 (6) for it; CAM-4 (2)'s voice-over sentence ("only source camera records a
+    camera") stops being true and is re-worded. The refusal order is extended for both grants.
+    The answer carries the `camera` key and, per segment, `camera_offset`, `camera_media` and
+    `camera_clip`. CR3a's settle probes a THIRD file per segment (the camera's), so the tool's
+    stop wait (`stopCeiling`) counts three probes per segment with a camera beside the screen.
   - **The readers that take a result's camera for a camera recording** (found at CR3a's spec).
     `landingNote`'s `.systemStopped` sentence reads `camera != nil` as "a camera recording", so
     a display that slept under a screen + camera recording would be told as the camera's stop:
-    it keys on `isCamera`, and a screen recording's camera `problem` follows as a note.
-    `filesClause` and `heldFilePaths` (the tool's timeout sentence) name the camera files.
+    it keys on a camera BESIDE the screen, and a screen recording's camera `problem` follows as
+    a note. `filesClause` and the tool's timeout sentence name the camera files; the timeout's
+    files come from a new `heldCameraPaths`, because `heldFilePaths`' count is the segment count
+    the stop wait is sized by. CR3a's per-segment `cameraProblem` and `cameraNote` (the E1
+    fallback) are said by both doors.
 
   **Proof**: `camera_recording_proof.py`'s camera + screen rows. Headless, the refusal order.
   Granted, read back through `get_project`: the track order, the track names and the placed
   transform, with the per-segment offsets in the answer. Beside it: probe rows for the landing
-  ops, with mutants, and `recording_proof.py`'s and `recording_probe.py`'s schema rows re-aimed.
-  Docs: §7.9a, the guide's screen-recording page and `mcp.md`.
+  ops, with mutants, and `recording_proof.py`'s source rows of the stop wait and the timeout
+  sentence re-aimed (the argument set does not change, so no schema row moves). Docs: §7.9a,
+  §7.4, the guide's screen-recording page and `mcp.md`.
 - **CR3c — the panel's camera row; CAM-11.** CAM-11 is recorded in §11 before the code. With
   Source a display or a window the panel offers a camera, and the Format popup and the preview
   follow it. The press reads Screen Recording, then Camera, then Microphone. The countdown
@@ -1652,6 +1665,132 @@ each command once unless said):
 ## CR3b — the landing and the tool
 
 ### Record
+
+**Landed** (2026-10-27). `record_screen` with source `screen` and `camera` records the camera
+beside the screen and lands it; the panel offers no camera with a screen source yet (CR3c).
+- Spec §11 CAM-10, written before any code (amends CAM-4 (2), CAM-6 (6), CAM-9 (10)): (1) one
+  front Camera track; (2) the time rule, the floor, the shared head trim, the under-head note, a
+  left-out segment's camera kept and never landed; (3) the corner; (4) one grouped edit in the
+  order pictures → cameras → microphones, `place: false`, the new project's remainder and its
+  two undo names; (5) the tool's admission, its two new sentences and the order; (6) the
+  per-segment answer keys; (7) the stop wait's third probe and the timeout's camera files; (8)
+  the readers; (9) no panel door until CR3c. Its index row, and the `camera-recording.md` row's
+  Lines cell (418 → 481) and summary; the `11-decisions/` cell 13354 → 13418 in 31 files.
+- `RecordingLanding+Camera.swift` (new): `cameraTrackName`, the three corner fractions,
+  `cornerPatch`, `segmentStarts`, `addCameras` (`addMicrophones`' attempt pattern, the track at
+  the container's track count), `addCameraClip` (`addMicrophoneClip`'s steps, the floor and the
+  sign of `cameraOffset`), `corner` (one `set_video`, read back) and the under-head sentence.
+- `RecordingLanding.swift`: `placement` calls `addCameras` between the pictures and the
+  microphones with `segmentStarts(pictures.map { $0.at }, of: result)` (nil with `place:
+  false`); its header and doc name `+Camera`. `+Placement`: `cameraMediaIds`,
+  `cameraClipIds`, defaulted `[]` and stored as one nil per segment. `+Remainder`: the
+  `|| hasCamera` guard, the cameras after `remainderStretches` and before the voices, the camera
+  files' `unplacedNote` without clip 1, `cameraActionName`, `cameraMicrophoneActionName` and
+  `remainderActionName`'s camera arm. `+Microphone`: `headTrimmed` internal, its header says so.
+- `RecordingResult.swift`: `filesClause`'s camera clause and `cameraSegmentsNote`.
+  `ProjectDocument+Recording.swift`: step 4's doc names the two camera undo names.
+- The tool: `+RecordingCamera` (`recordingCameraStrangers`: the voice-over's guard and words,
+  the screen's "needs camera" guard), `+Recording` (`cameraBeside`, the camera lookup before the
+  one `if kind == .screen {`, `stopCeiling(segments:camera:)`, the timeout hop reading
+  `heldFilePaths` and `heldCameraPaths`), `+RecordingSentences` (`finishTimeoutSentence`'s
+  `cameras`), `+RecordingResult` (`RecordingSegmentIds`' two camera ids, `segmentFields`'
+  camera keys, `documentIds`, `newProjectIds`, `resultNotes`' `cameraSegmentsNote`),
+  `ScreenRecorder+VoiceOver` (`heldCameraPaths`), `AgentCatalog+Recording` (the hoisted
+  `recordingCameraBesideClause`, the grants and refusal-order sentences, `source`, `camera`,
+  `camera_format`). The panel: `RecorderPanelController+Landing` (`landingNote(cameraBeside:)`,
+  `landed`'s notes led by `cameraSegmentsNote`, `failedToLand`'s, the selection's camera clips).
+- Proofs: `camera_recording_probe.py` (1328 → 1407) and `.swift` (2172 → 2589): L4–L9, T2 and T7
+  re-aimed, T9–T11, P19, eight mutants, `camera-elsewhere-admitted` re-aimed to the voice-over's
+  guard, the fixtures and the docstrings. `camera_recording_proof.py` (527 → 658): the headless
+  rows re-aimed and added, the description's CR3b phrases, and the granted camera + screen rows
+  (`beside_rows`, six checks). `recording_proof.py` (2264 → 2270): `source_part()`'s four rows
+  re-aimed. `tools/proof/README.md`'s CR3b section.
+- Docs: spec §7.9a (`record_screen`'s camera beside the screen; 500 → 511 lines), §7.4 row 51
+  (57 lines, unchanged), the guide's screen-recording page (the arguments, the paragraph, the
+  refusal order, two limits lines) and `mcp.md`'s tool row.
+
+**Sizes** (`wc -l`, before → after): `RecordingLanding+Camera.swift` new, 255;
+`RecordingLanding.swift` 309 → 323; `+Microphone` 261 → 263; `+Placement` 94 → 111;
+`+Remainder` 146 → 179; `RecordingResult.swift` 339 → 356; `ProjectDocument+Recording.swift`
+131 → 133; `AgentServer+Recording.swift` 297 → 310; `+RecordingCamera` 153 → 163;
+`+RecordingResult` 309 → 336; `+RecordingSentences` 90 → 101; `ScreenRecorder+VoiceOver.swift`
+323 → 333; `AgentCatalog+Recording.swift` 328 → 365; `RecorderPanelController+Landing.swift`
+269 → 278.
+
+**Measured** (the main display, the FaceTime HD camera at 1760×1328@30, the default microphone,
+the terminal's Screen Recording, Camera and Microphone grants; each command once unless said):
+- `python3 tools/proof/spec_index_proof.py`: exit 0, `201/201 checks passed`, after CAM-10 and
+  again after the docs.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel,beside`: exit
+  0, `scores: 76/76`, the first run. L4: the ops `add_media` ×2, `add_clip` ×2, `add_media` ×2,
+  `add_track`, `add_clip`, `trim_start`, `move_clip`, `set_video`, `add_clip`, `set_video`,
+  `add_media` ×2, `add_track`, `add_clip` ×2; tracks [Microphone, Track 1, Camera]; camera 0 at
+  600000 with `in` 60000, camera 1 at 1860000 (screen 1 at 1800000); both at x 625, y 306,
+  scale 0.2710843373493976; one undo → 0 media, 0 clips, 1 track. L5: 1760×1328 → (625, 306,
+  0.27108), 1920×1080 → (624, 351, 0.25), 1080×1920 → (763, 306, 0.1875); bottom edges 1026.0,
+  right edges 1823.55, 1824.0, 1824.25. L6: camera 0 ends 2940000, camera 1 there with `in`
+  1080000. L9: the 1500.0 ms note naming the screen clip, the 1800.0 ms one naming the previous
+  camera clip. T11: `stopCeiling` 75, 105, 195, 105.
+- The eight mutants, each exit 1 and caught: `camera-track-behind` 8/10 (L4, L8);
+  `camera-offset-ignored` 7/10 (L4, L6, L9); `camera-floor-unscreened` 8/10 (L4, L9); `corner-top`
+  7/10 (L4, L5, L8); `remainder-camera-dropped` 9/10 (L8); `camera-format-alone-admitted` 11/12
+  (T9); `camera-ids-unwritten` 11/12 (T10); `beside-display-sentence` 23/24 (P19). The two
+  re-aimed: `camera-elsewhere-admitted` 9/12 (T2, T7, T9) and `camera-format-elsewhere-admitted`
+  10/12 (T7, T9), each exit 1.
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): `all once` (72
+  and 78 mutants).
+- `python3 tools/proof/recording_probe.py --only state,landing,segments,leftout`: exit 0,
+  `415/415 checks passed`.
+- Debug (`make app-debug`, `proof_app.py launch`): `camera_recording_proof.py` exited 0 with
+  `60/60 checks passed`, the camera + screen rows run (camera_offset −89907 ticks, −149.8 ms;
+  the camera clip at the screen clip's 1200000 with `in` 80000, 9907 ticks off the offset, under
+  half a frame). `grep "Frame Job: "` printed nothing; the instance was stopped by its pid.
+- `make gate`: `gate: PASS 223s` (names 1 s, typecheck 6 s, fmt and lint skipped, test 115 s,
+  app 101 s). Once more after this record was written: `gate: PASS 1s` (names run, the rest
+  skipped as unchanged).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 93/93`, G0–G16 all run, in
+  83 s. G16: E2 − E1 [11.9, 22.6] ms, `cameraOffset` [−0.083, −0.086] s, frames 0.9992 twice.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock` exited 0
+  with `60/60 checks passed`: tracks [Microphone, Track 1, Camera], camera_offset −96925 ticks
+  (−161.5 ms), the camera clip at 1200000 with `in` 100000 (−3075 ticks off), the transform
+  (625, 306, 0.2710843373493976), one undo ("Add Recording") taking all three media and the
+  Camera track with the files kept. `RC_PROOF_APP=release python3 tools/proof/recording_proof.py
+  <dir>/agent.sock` exited 0 with `220/220 checks passed`; the tone rows (2 checks) were skipped
+  by name: the host's output was muted. `grep "Frame Job: " <dir>/framejob.log` printed nothing.
+  The instance was stopped by its pid.
+
+**Deviations.**
+- The corner's guide is named as "the 90 % ring of View ▸ Safe Areas", not "the action-safe
+  guide". Spec §4.1 and the guide call the 90 % ring title-safe and the 80 % one action-safe (the
+  industry's names are the other way round), so "action-safe" would have read as the 80 % ring
+  here. The number (a 0.05 inset, the 0.9 ring) is unchanged; CAM-10 (3) says both names.
+- The landing fixtures add a 1 s camera beside the spec's 4 s one, and a copy of each movie,
+  voice and camera for a second segment. With only the 4 s camera, L4's camera 0 would outrun
+  its 2 s screen segment, and L4 would be L6.
+- `camera-format-elsewhere-admitted`'s anchor (the `given` list) survived the rewrite unchanged,
+  so it was not re-aimed; its T7 rows were. `camera-elsewhere-admitted` now edits the
+  voice-over's guard.
+- `beside-display-sentence` edits only the `.systemStopped` arm (`if let camera, !cameraBeside`
+  → `if let camera`), which is what P19 scores.
+- `landed`'s parameter is `notes placed:`, so its body can keep the literal `notes: notes` that
+  `recording_probe.py`'s 5u row reads.
+- `record(filter:choice:seconds:)` takes `cameraBeside` as a fourth argument for the stop wait.
+- `heldCameraPaths` answers `[]` while a voice-over or camera session is held.
+- L9 also scores the "previous camera clip" wording (a 1 s camera 1 under a 1.8 s head), and L8
+  a one-segment camera alone (undo "Add Camera"), which is the row `remainder-camera-dropped`
+  fails.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s landing family gains
+  `RecordingLanding+Camera.swift` (the camera beside the screen's media, front Camera track,
+  offsets, floor and corner).
+- Observed: the Release run's `camera_offset` was −161.5 ms, past CR3a's measured 32–146 ms
+  range (the Debug run's was −149.8 ms); both within G16's 0.5 s bound. One run each.
+- CR3c: the panel's camera row with a screen source, its key, the preview with a screen source,
+  `screens.py` and the manual-check row (a talking head lined up).
 
 ## CR3c — the panel's camera row
 

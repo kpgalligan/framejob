@@ -581,7 +581,7 @@ See [Export](export.md).
 
 | Tool | What it does |
 |---|---|
-| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format). |
+| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format); with `source: "screen"` and `camera`, records that camera beside the screen on a Camera track in front, in the bottom-right corner. |
 
 See [Screen recording](screen-recording.md).
 

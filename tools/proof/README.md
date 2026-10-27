@@ -24592,3 +24592,58 @@ too when granted); and `resume-keeps-watch` (`resume()`'s remove and re-add of t
 deleted; B4 and G16, run `beside,screen`, so it is scored caught only where G16 runs). The
 numbers are in
 `designs/camera-recording.md`'s CR3a record.
+
+## Camera recording CR3b — a camera beside the screen lands, and `record_screen` records it (`camera_recording_probe.py` L4–L9, T2/T7 re-aimed, T9–T11, P19; `camera_recording_proof.py`'s camera + screen rows; spec §11 CAM-10)
+
+CR3b lands a screen recording's `(Camera).mov` files (`RecordingLanding+Camera.swift`): every
+segment's camera media after the pictures and before the microphones, ONE new front track named
+Camera added with the first camera clip that takes a frame, each clip asked at its screen clip's
+start plus its `cameraOffset`, floored at `max(screen start, previous camera end)` and
+head-trimmed by the microphone's shared `headTrimmed`, then one `set_video {x, y, scale}` for the
+bottom-right corner. `record_screen` admits `camera` and `camera_format` with source `screen`,
+looks the camera up and reads the Camera grant before the Screen Recording grant, answers the
+per-segment `camera_*` keys and ids, sizes its stop wait for a third probe per segment and names
+the camera files in its timeout.
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only landing,tool,panel   # L1–L9, T1–T11, P1–P19
+python3 tools/proof/camera_recording_probe.py --only landing --mutant corner-top   # each of the eight exits 1
+python3 tools/proof/camera_recording_proof.py <dir>/agent.sock            # headless order; the granted camera + screen rows
+```
+
+**L4** a two-segment screen + camera + microphone result into a document at the playhead 1 s
+(camera offsets −100 ms and +100 ms, 1 s cameras): the ops in order (pictures, cameras with
+`add_track`, `trim_start`, `move_clip`, `set_video`, then microphones), the Camera track in front
+of the pictures' and the Microphone at the back, camera 0 at screen 0's start with `in` the
+snapped 100 ms head, camera 1 at screen 1's start + 100 ms, each `video` the corner by the
+decision's formula written in the probe (`wantCorner`, not the app's `cornerPatch`), the
+placement's camera ids, and one undo removing everything. **L5** `cornerPatch` on 1920×1080 with
+1760×1328, 1920×1080 and 1080×1920 sources against `wantCorner`, each picture's right and bottom
+edges on the 0.95 line, and nil for a zero dimension. **L6** a 4 s camera 0 running past screen
+1's start: camera 1 starts at its end with the head trimmed to it. **L7** `place: false`: six
+`add_media`, no clip, no Camera track, the camera media ids and nil clip ids. **L8**
+`untitled(around:)`: the canvas 1920×1080 at 30, Microphone at the back, Camera in front, undo
+"Add Recording Segments"; a one-segment camera alone lands its camera on a Camera track with
+undo "Add Camera"; `remainderActionName`'s four cases. **L9** a camera wholly under its head is
+media only, its note naming the screen clip's start, and under the previous camera clip, naming
+that. **T2/T7** re-aimed: `camera` and `camera_format` admitted with screen, the voice-over's
+sentence. **T9** `camera_format` without `camera` with screen ("needs camera"), and both with
+voice_over. **T10** `segmentFields`' camera keys and ids per segment and none at the top level,
+`documentIds` from the placement's camera lists, a bare placement's lists one nil per segment,
+and `resultNotes` ending with `cameraSegmentsNote`. **T11** `filesClause` with one and two
+camera files, `stopCeiling` 75 / 105 / 195 / 105, and `finishTimeoutSentence` with no, one and two
+camera files. **P19** `landingNote(cameraBeside: true)`: the display's stop sentence, then the
+microphone's problem, the camera's problem and its note. The fixtures (ffmpeg) add a 4 s and a
+1 s 1760×1328 30 fps camera movie and a copy of each file for a second segment.
+
+`camera_recording_proof.py` re-aims its headless rows so each one carrying `camera` with the
+default source is refused before the recording on a host holding both grants (an unknown camera:
+the lookup's sentence; `project: "/nowhere"`: the project sentence), and its granted tier records
+the detected camera beside display 0 at the playhead 2 s (with the microphone when granted),
+reading back through `get_project` the track order and names, the camera clip lined up by
+`camera_offset` within half a frame, the corner transform and one undo — skipped by name without
+the Screen Recording grant or a shareable display. Eight mutants: `camera-track-behind`,
+`camera-offset-ignored`, `camera-floor-unscreened`, `corner-top` (also L5) on L4;
+`remainder-camera-dropped` on L8; `camera-format-alone-admitted` on T9; `camera-ids-unwritten` on
+T10; `beside-display-sentence` on P19. The numbers are in `designs/camera-recording.md`'s CR3b
+record.

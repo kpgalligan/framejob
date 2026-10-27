@@ -19,18 +19,23 @@ the last row opens.
 * Catalog: `record_screen` declares its fourteen arguments plus `project`, `camera` and
   `camera_format` strings;
   `source`'s enum is `["screen", "voice_over", "camera"]`; the description names
-  `source: "camera"`, `Camera Recording`, `camera.problem` and the default camera; the log
-  holds no `Frame Job: ` parity line.
+  `source: "camera"`, `Camera Recording`, `camera.problem` and the default camera, and CR3b's
+  `A CAMERA BESIDE THE SCREEN`, `Add Camera and Microphone`, `camera_offset`, `camera_clip`
+  and `BOTTOM-RIGHT`; the log holds no `Frame Job: ` parity line.
 * Refusals, each the EXACT sentence, together leaving `get_project` byte-identical with no
   undo step; the ORDER by combined calls: `seconds: 0` beats `source: "x"`; `source: "x"`
   lists `screen, voice_over, camera`; one stranger, then all seven in
   `cameraRefusedArguments` order; `{size: null}` admitted (the project sentence answers);
-  `camera` with screen, and with voice_over beating `display`; a stranger beats
+  CR3b (CAM-10 (5)): `camera` is admitted with screen, so each row naming one carries a
+  refusal before the recording — an unknown camera with the default source is the lookup's
+  sentence, `{camera: "X", project: "/nowhere"}` the project sentence (step 6 beats step 7) —
+  and `camera` with voice_over beats `display` in the voice-over's words; a stranger beats
   `project: "/nowhere"`, and `{source: camera, project: "/nowhere"}` is the project sentence;
   `microphone: true` the Microphone sentence without the grant, else the project sentence;
   an unknown `camera` against the proof's own document is the lookup's sentence (every camera
   listed as `Name (id)`, or "No camera is connected."), whatever the Camera grant says.
-  CR2a: `camera_format` with screen (exact); `camera_format: 5` (`stringArg`'s sentence);
+  CR2a: `camera_format` without `camera` with screen (CR3b's "needs camera" sentence, exact);
+  `camera_format: 5` (`stringArg`'s sentence);
   `{source: camera, camera_format: "0x0"}` the format sentence for the default camera (its
   formats listed, `best` first) when a camera is connected, else "No camera is connected.";
   an unknown camera with `camera_format: "0x0"` the camera's sentence — the lookup first.
@@ -49,7 +54,15 @@ no project open once its own document is closed (else skipped by name), `landed:
 with the canvas the file's size at the format's rate, rounded. CR2a: from the format sentence's
 list, the first spelling that is not `best` and differs from the detection's `camera.format`,
 recorded for 2 s with `camera_format`: the answer's `camera.format` and the file's size are that
-row's (skipped by name when the camera lists no such row).
+row's (skipped by name when the camera lists no such row). CR3b (CAM-10): the detection's
+camera BESIDE the screen — display 0, place, the playhead at 2 s, the microphone when its grant
+is held — read back through `get_project`: `segments[0]`'s `camera_path` (`<movie stem>
+(Camera).mov`, on disk) and `camera_offset` with no top-level `camera_*` key; the camera clip on
+a new FRONT track named Camera above the screen's (the Microphone track at the back); its
+content lined up by `camera_offset` within half a frame and never before its screen clip; its
+`video` the bottom-right corner (`x`, `y`, `scale` by the decision's formula over the canvas and
+the camera file's size); one undo taking every media, clip and the Camera track and leaving the
+files. Skipped by name without the Screen Recording grant or a shareable display.
 
 **The panel** (CR1c, run LAST, after its own document is closed): `perform_menu_item ["File",
 "New Recording…"]` answers; `snapshot_ui {window: "recorder"}`'s layout dump lists views whose
@@ -88,7 +101,16 @@ CAMERA_STRANGERS = ["display", "window", "system_audio", "show_clicks", "size",
                     "include_framejob_windows", "rate"]
 STRANGER_TAIL = (" cannot be given — a camera recording records the camera alone, at the "
                  "camera's own format.")
-ELSEWHERE_TAIL = " cannot be given — only source camera records a camera."
+# CR3b (spec §11 CAM-10 (5)): the voice-over's sentence for a camera, and the screen's for a
+# camera_format given without a camera.
+VOICE_OVER_TAIL = " cannot be given — a voice-over records the microphone alone."
+NEEDS_CAMERA = ("With source screen, camera_format needs camera — name the camera to record "
+                "beside the screen.")
+SCREEN_SENTENCE = (
+    "Screen Recording is not granted to Frame Job. Turn it on in System Settings ▸ "
+    "Privacy & Security ▸ Screen & System Audio Recording, then relaunch.")
+NO_DISPLAY_SENTENCE = ("No display is shareable right now — the console is locked or every "
+                       "display is asleep; nothing can be recorded until one is.")
 NO_OPEN_PROJECT = re.compile(
     r"^No open project is at (.+)\. get_project reports the open project's path; "
     r"open_project opens another\.$")
@@ -111,6 +133,7 @@ CHOICE_CHECKS = 2
 MIC_CHECKS = 4
 NEW_PROJECT_CHECKS = 2
 FORMAT_CHECKS = 2
+BESIDE_CHECKS = 6
 
 checks = 0
 failures = []
@@ -202,7 +225,10 @@ def catalog_part(mcp):
     check(properties.get("source", {}).get("enum") == ["screen", "voice_over", "camera"],
           f"source's enum has the three members: {properties.get('source', {}).get('enum')}")
     description = tool.get("description") or ""
-    for phrase in ('source: "camera"', "Camera Recording", "camera.problem", "the default camera"):
+    for phrase in ('source: "camera"', "Camera Recording", "camera.problem", "the default camera",
+                   # CR3b (CAM-10): a camera beside the screen.
+                   "A CAMERA BESIDE THE SCREEN", "Add Camera and Microphone", "camera_offset",
+                   "camera_clip", "BOTTOM-RIGHT"):
         check(phrase in description, f"the description names {phrase!r}")
     lines = None
     if os.path.exists(LOG):
@@ -234,10 +260,22 @@ def refusal_part(mcp, document):
     message = refusal(mcp, {"seconds": 2, "source": "camera", "size": None, "project": nowhere})
     check(message is not None and NO_OPEN_PROJECT.match(message) is not None,
           f"{{size: null}} is not given — the project sentence answers: {message!r}")
-    refused({"seconds": 2, "camera": "FaceTime HD Camera"},
-            "With source screen, camera" + ELSEWHERE_TAIL, "camera with the default screen source")
+    # CR3b (CAM-10 (5)): `camera` is admitted with the default screen source, so each row that
+    # names one carries a refusal before the recording — an unknown camera (the lookup, step
+    # 7) or a project naming nothing (step 6) — and is scored on that sentence.
+    wanted = f"No Such Camera {os.getpid()}"
+    message = refusal(mcp, {"seconds": 2, "camera": wanted, "project": document})
+    listed = NO_SUCH_CAMERA.match(message or "")
+    check(message == NO_CAMERA or (listed is not None and listed[1] == wanted),
+          f"an unknown camera with the default screen source is the LOOKUP's sentence (camera "
+          f"admitted with screen): {message!r}")
+    message = refusal(mcp, {"seconds": 2, "camera": "X", "project": nowhere})
+    check(message is not None and NO_OPEN_PROJECT.match(message) is not None
+          and nowhere in message,
+          f"ORDER: {{camera: X, project: /nowhere}} with screen → the project sentence (step 6 "
+          f"beats the lookup, step 7): {message!r}")
     refused({"seconds": 2, "source": "voice_over", "camera": "X", "display": 0},
-            "With source voice_over, camera" + ELSEWHERE_TAIL,
+            "With source voice_over, camera" + VOICE_OVER_TAIL,
             "ORDER: camera with voice_over beats the voice-over's display")
     refused({"seconds": 2, "source": "camera", "display": 0, "project": nowhere},
             "With source camera, display" + STRANGER_TAIL,
@@ -277,9 +315,8 @@ def refusal_part(mcp, document):
 def format_refusals(mcp, document, refused):
     """CR2a (CAM-6 (6)): `camera_format` refused with screen and as a number, the format sentence
     for the default camera after the lookup, and the lookup's sentence before it."""
-    refused({"seconds": 2, "camera_format": "1920x1080@30"},
-            "With source screen, camera_format" + ELSEWHERE_TAIL,
-            "camera_format with the default screen source")
+    refused({"seconds": 2, "camera_format": "1920x1080@30"}, NEEDS_CAMERA,
+            "camera_format without camera with the default screen source (CAM-10 (5))")
     refused({"seconds": 2, "source": "camera", "camera_format": 5},
             "camera_format must be a string.", "camera_format: 5 is stringArg's refusal")
     message = refusal(mcp, {"seconds": 2, "source": "camera", "camera_format": "0x0",
@@ -303,7 +340,8 @@ def format_refusals(mcp, document, refused):
 
 
 def granted_tier(mcp, document):
-    total = DETECTION_CHECKS + CHOICE_CHECKS + FORMAT_CHECKS + MIC_CHECKS + NEW_PROJECT_CHECKS
+    total = (DETECTION_CHECKS + CHOICE_CHECKS + FORMAT_CHECKS + MIC_CHECKS + BESIDE_CHECKS
+             + NEW_PROJECT_CHECKS)
     answer, message = attempt(mcp, {"seconds": 2, "source": "camera", "place": False,
                                     "path": RUN, "project": document})
     if message is not None and (message.startswith(CAMERA_GRANT) or message == NO_CAMERA):
@@ -322,6 +360,7 @@ def granted_tier(mcp, document):
         microphone_rows(mcp, document)
     else:
         skip("the microphone rows: the Microphone grant is not held here", MIC_CHECKS)
+    beside_rows(mcp, camera, document)
     close(mcp, document)
     new_project_rows(mcp)
 
@@ -425,6 +464,98 @@ def microphone_rows(mcp, document):
           f"both media and clips and leaves the files on disk: {files}")
 
 
+def beside_rows(mcp, camera, document):
+    """CR3b (CAM-10): the detection's camera recorded BESIDE the screen (display 0, place, at the
+    playhead 2 s, the microphone when its grant is held), read back through `get_project`: the
+    track order and names, the camera clip lined up by `camera_offset`, the corner transform,
+    and one undo. Skipped by name without the Screen Recording grant or a shareable display."""
+    reported = project(mcp, document)
+    fps = reported["canvas"]["fps"]
+    frame = SEC * fps[1] // fps[0]
+    media_before = len(reported["media"])
+    mcp.call_with("set_playhead", {"project": document, "t": 2 * SEC})
+    args = {"seconds": 2, "camera": camera.get("id"), "path": RUN, "project": document}
+    if host["microphone"]:
+        args["microphone"] = True
+    answer, message = attempt(mcp, args)
+    if message is not None and (message.startswith(SCREEN_SENTENCE)
+                                or message == NO_DISPLAY_SENTENCE):
+        skip(f"the camera + screen rows: {message[:120]}", BESIDE_CHECKS)
+        return
+    check(answer is not None and message is None,
+          f"camera {camera.get('id')!r} beside the screen recorded and landed (any refusal but "
+          f"the Screen Recording grant's or no display is a failure): {message!r}")
+    if answer is None:
+        skip("the camera + screen rows: the call failed", BESIDE_CHECKS - 1)
+        return
+    segment = (answer.get("segments") or [{}])[0]
+    movie = answer.get("path") or ""
+    camera_path = segment.get("camera_path") or ""
+    check(os.path.basename(camera_path) == os.path.basename(movie)[:-4] + " (Camera).mov"
+          and os.path.exists(camera_path) and isinstance(segment.get("camera_offset"), int)
+          and "camera_path" not in answer and "camera_clip" not in answer
+          and (answer.get("camera") or {}).get("id") == camera.get("id"),
+          f"segments[0] carries camera_path beside the movie, camera_offset, and the top level "
+          f"camera {{id}} and no camera_* key: {os.path.basename(camera_path)!r} beside "
+          f"{os.path.basename(movie)!r}, offset {segment.get('camera_offset')}, top-level camera "
+          f"{answer.get('camera')}")
+    reported = project(mcp, document)
+    tracks = reported["tracks"]
+    clips = {c["id"]: c for c in reported["clips"]}
+    media = {m["id"]: m for m in reported["media"]}
+    picture, shot = clips.get(answer.get("clip")), clips.get(segment.get("camera_clip"))
+    order = [t["id"] for t in tracks]
+    names = [t.get("name") for t in tracks]
+    front = shot is not None and picture is not None and order[-1] == shot["track"] \
+        and names[-1] == "Camera" and order.index(picture["track"]) < order.index(shot["track"])
+    check(front and (not host["microphone"] or names[0] == "Microphone"),
+          f"the camera clip is on a new FRONT track named Camera, above the screen's"
+          f"{', the Microphone track at the back' if host['microphone'] else ''}: tracks {names}")
+    offset = segment.get("camera_offset") or 0
+    lined = None if shot is None or picture is None else \
+        (shot["start"] - shot["source"]["in"]) - (picture["start"] + offset)
+    check(lined is not None and abs(lined) <= frame // 2 and shot["start"] >= picture["start"]
+          and shot["source"]["media"] == segment.get("camera_media"),
+          f"the camera clip lines up by camera_offset ({offset} ticks, {offset / 600:+.1f} ms) "
+          f"within half a frame, never before its screen clip: screen at "
+          f"{picture and picture['start']}, camera at {shot and shot['start']} with in "
+          f"{shot and shot['source']['in']} (off by {lined})")
+    file = media.get(segment.get("camera_media")) or {}
+    canvas = reported["canvas"]
+    want = corner(canvas["width"], canvas["height"], file.get("width", 0), file.get("height", 0))
+    video = (shot or {}).get("video") or {}
+    got = (video.get("x"), video.get("y"), video.get("scale"))
+    check(want is not None and got[0] == want[0] and got[1] == want[1]
+          and got[2] is not None and abs(got[2] - want[2]) < 1e-9,
+          f"its transform is the bottom-right corner for {file.get('width')}×{file.get('height')} "
+          f"on {canvas['width']}×{canvas['height']}: {got}, want {want}")
+    files = [movie, camera_path] + ([answer.get("mic_path")] if host["microphone"] else [])
+    undone = mcp.call_with("undo", {"project": document})
+    after = project(mcp, document)
+    gone = {answer.get("clip"), segment.get("camera_clip"), answer.get("mic_clip")} - {None}
+    check(len(after["media"]) == media_before
+          and not (gone & {c["id"] for c in after["clips"]})
+          and "Camera" not in [t.get("name") for t in after["tracks"]]
+          and all(f and os.path.exists(f) for f in files),
+          f"one undo ({undone.get('undone') if isinstance(undone, dict) else undone!r}) removes "
+          f"the screen's, the camera's and the microphone's media, clips and the Camera track "
+          f"and leaves the files on disk: {[os.path.basename(f or '') for f in files]}")
+
+
+def corner(cw, ch, sw, sh):
+    """CAM-10 (3)'s corner, (x, y, scale), or None when a dimension is not positive."""
+    if min(cw, ch, sw, sh) <= 0:
+        return None
+    s = min(max(min(0.25 * cw / sw, ch / (3 * sh)), 0.01), 10)
+    return (round_half_away(cw / 2 - 0.05 * cw - sw * s / 2),
+            round_half_away(ch / 2 - 0.05 * ch - sh * s / 2), s)
+
+
+def round_half_away(value):
+    """Swift's `.rounded()`: to the nearest, a half away from zero (Python's round is even)."""
+    return float(int(value + 0.5)) if value >= 0 else -float(int(-value + 0.5))
+
+
 def new_project_rows(mcp):
     try:
         found = state(mcp).get("project")
@@ -492,7 +623,7 @@ def main():
     os.makedirs(RUN, exist_ok=True)
     os.makedirs(DOCS, exist_ok=True)
     mcp = MCP(SOCKET, timeout=180)
-    print(f"camera recording CR1b/CR1c/CR2a — record_screen's camera and the panel, against "
+    print(f"camera recording CR1b/CR1c/CR2a/CR3b — record_screen's camera and the panel, against "
           f"{SOCKET}")
     document = os.path.join(DOCS, f"camera-{os.getpid()}.framejob")
     try:

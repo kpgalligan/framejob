@@ -42,6 +42,13 @@ extension RecordingLanding {
     /// segment (#181 item 2): the media and the clip its readable voice
     /// landed as, nil where it has no voice or minted no clip; empty for a
     /// result with nothing left out.
+    ///
+    /// The two `camera…` lists (spec §11 CAM-10) have ONE entry per segment
+    /// as well: the media and the clip segment `k`'s `(Camera).mov` landed
+    /// as, nil where it has no camera file, with `place: false`, or where it
+    /// minted no clip (its sentence in `notes`). An empty list passed to the
+    /// initialiser is stored as one nil per segment, so a landing with no
+    /// camera need not spell them.
     struct Placement {
         let ops: [ReelOp]
         let mediaIds: [UInt32]
@@ -51,6 +58,8 @@ extension RecordingLanding {
         let notes: [String]
         let leftOutMicMediaIds: [UInt32?]
         let leftOutMicClipIds: [UInt32?]
+        let cameraMediaIds: [UInt32?]
+        let cameraClipIds: [UInt32?]
 
         var mediaId: UInt32 { mediaIds[0] }
         var clipId: UInt32? { clipIds.first ?? nil }
@@ -60,7 +69,8 @@ extension RecordingLanding {
         init(
             ops: [ReelOp], mediaIds: [UInt32], clipIds: [UInt32?], micMediaIds: [UInt32?],
             micClipIds: [UInt32?], notes: [String] = [], leftOutMicMediaIds: [UInt32?] = [],
-            leftOutMicClipIds: [UInt32?] = []
+            leftOutMicClipIds: [UInt32?] = [], cameraMediaIds: [UInt32?] = [],
+            cameraClipIds: [UInt32?] = []
         ) {
             precondition(!mediaIds.isEmpty, "a Placement lands at least one segment's media")
             precondition(
@@ -70,6 +80,10 @@ extension RecordingLanding {
             precondition(
                 leftOutMicMediaIds.count == leftOutMicClipIds.count,
                 "a Placement's two left-out lists have one entry per left-out segment")
+            precondition(
+                (cameraMediaIds.isEmpty || cameraMediaIds.count == mediaIds.count)
+                    && (cameraClipIds.isEmpty || cameraClipIds.count == mediaIds.count),
+                "a Placement's two camera lists are empty or have one entry per segment")
             self.ops = ops
             self.mediaIds = mediaIds
             self.clipIds = clipIds
@@ -78,6 +92,9 @@ extension RecordingLanding {
             self.notes = notes
             self.leftOutMicMediaIds = leftOutMicMediaIds
             self.leftOutMicClipIds = leftOutMicClipIds
+            let none: [UInt32?] = mediaIds.map { _ in nil }
+            self.cameraMediaIds = cameraMediaIds.isEmpty ? none : cameraMediaIds
+            self.cameraClipIds = cameraClipIds.isEmpty ? none : cameraClipIds
         }
     }
 

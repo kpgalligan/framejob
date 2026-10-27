@@ -12,7 +12,9 @@
 // rule (V22), the observers and the pending rebuild on the hidden panel
 // (panel P16a–e, P17); CR3a (CAM-9): a camera beside the screen — the
 // frame watch, the offset, the finishing's wait, the settle and the names
-// (`beside` B1–B3, B5–B7) and a real screen + camera recording (`screen`).
+// (`beside` B1–B3, B5–B7) and a real screen + camera recording (`screen`);
+// CR3b (CAM-10): that camera's landing (`landing` L4–L9) and the tool's and
+// the panel's readers of it (`tool` T2/T7 re-aimed, T9–T11; `panel` P19).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -388,6 +390,279 @@ func landing(_ request: [String: Any]) {
     } catch {
         probeRow("L2", false, "untitled(around:) threw: \(error.localizedDescription)")
     }
+    besideLanding(request, probed: probed)
+}
+
+// MARK: - landing beside (CR3b, spec §11 CAM-10)
+
+/// CAM-10 (3)'s corner written out HERE, from the decision's own formula and
+/// not read from the app, so a mutant of `cornerPatch` cannot agree with
+/// itself: (x, y, scale), or nil when a dimension is not positive.
+func wantCorner(_ cw: Int, _ ch: Int, _ sw: Int, _ sh: Int) -> (x: Double, y: Double, scale: Double)? {
+    guard cw > 0, ch > 0, sw > 0, sh > 0 else { return nil }
+    let (w, h, a, b) = (Double(cw), Double(ch), Double(sw), Double(sh))
+    let s = min(max(min(0.25 * w / a, h / (3 * b)), 0.01), 10)
+    return ((w / 2 - 0.05 * w - a * s / 2).rounded(), (h / 2 - 0.05 * h - b * s / 2).rounded(), s)
+}
+
+/// L4–L9: a screen recording with a camera beside it through the landing's
+/// two doors, over the ffmpeg fixtures (two 2 s 1920×1080 screen movies, two
+/// microphone files, two 4 s and two 1 s 1760×1328 30 fps camera movies).
+func besideLanding(_ request: [String: Any], probed: (String) -> MediaDescriptor?) {
+    let second = ReelTime.perSecond
+    let tenth = second / 10
+    let corners = cornerRows()
+    probeRow("L5", corners.0, corners.1)
+    var files: [String: MediaDescriptor] = [:]
+    for name in ["movie", "movie2", "voice", "voice2", "camera", "camera2", "short", "short2"] {
+        guard let made = probed(request[name] as? String ?? "") else {
+            for row in ["L4", "L6", "L7", "L8", "L9"] {
+                probeRow(row, false, "the fixture \(name) did not probe")
+            }
+            return
+        }
+        files[name] = made
+    }
+    func file(_ name: String) -> MediaDescriptor { files[name]! }
+    func seg(_ movie: String, mic: String?, camera: String?, offset: Ticks) -> RecordingSegment {
+        RecordingSegment(
+            descriptor: file(movie), micDescriptor: mic.map(file), micOffset: 0,
+            startedAt: Date(), cameraDescriptor: camera.map(file),
+            cameraOffset: camera == nil ? 0 : offset)
+    }
+    func beside(_ segments: [RecordingSegment], camera: Bool = true) -> RecordingResult {
+        var choice = RecordingChoice()
+        choice.rate = 30
+        choice.microphone = "PROBE-MIC"
+        choice.camera = camera ? "PROBE-ID" : nil
+        return RecordingResult(
+            segments: segments, choice: choice, stoppedBy: .stopped, pauses: segments.count - 1,
+            camera: camera ? RecordingCamera(name: "Probe Camera", format: "1760x1328@30") : nil)
+    }
+    func landed(_ result: RecordingResult, place: Bool = true) throws
+        -> (ProjectDocument, RecordingLanding.Placement, Int)
+    {
+        let d = ProjectDocument()
+        d.playhead = second
+        let tracks = d.project.snapshot.tracks.count
+        let p = try RecordingLanding.placement(result, in: d, place: place)
+        d.performGroupedEdit(RecordingLanding.actionName, p.ops)
+        return (d, p, tracks)
+    }
+    func clip(_ s: ProjectSnapshot, _ name: String) -> ClipSnapshot? {
+        guard let media = s.media.first(where: { $0.path == file(name).path })?.id else { return nil }
+        return s.clips.first {
+            if case .media(let m, _, _) = $0.source { return m == media }
+            return false
+        }
+    }
+    func cornered(_ c: ClipSnapshot?, _ name: String, _ canvas: CanvasSnapshot) -> Bool {
+        guard let v = c?.video,
+            let w = wantCorner(canvas.width, canvas.height, file(name).width, file(name).height)
+        else { return false }
+        return v.x == w.x && v.y == w.y && abs(v.scale - w.scale) < 1e-12
+    }
+    func at(_ c: ClipSnapshot?) -> String {
+        c.map { "\($0.start)+\($0.source.sourceIn) on \($0.track) (\($0.video.map { "\($0.x),\($0.y)×\($0.scale)" } ?? "-"))" } ?? "none"
+    }
+    let pair = beside([
+        seg("movie", mic: "voice", camera: "short", offset: -tenth),
+        seg("movie2", mic: "voice2", camera: "short2", offset: tenth),
+    ])
+
+    // L4: two segments, a camera and a microphone each, at the playhead 1 s.
+    do {
+        let (d, p, before) = try landed(pair)
+        let s = d.project.snapshot
+        let (pic0, pic1) = (clip(s, "movie"), clip(s, "movie2"))
+        let (cam0, cam1) = (clip(s, "short"), clip(s, "short2"))
+        let head = ReelTime.snapToFrame(tenth, fps: s.canvas.fps)
+        let want = [
+            "add_media", "add_media", "add_clip", "add_clip", "add_media", "add_media", "add_track",
+            "add_clip", "trim_start", "move_clip", "set_video", "add_clip", "set_video", "add_media",
+            "add_media", "add_track", "add_clip", "add_clip",
+        ]
+        let names = p.ops.map(\.name)
+        let camIndex = s.tracks.firstIndex { $0.id == cam0?.track } ?? -1
+        let picIndex = s.tracks.firstIndex { $0.id == pic0?.track } ?? -1
+        let ids = (p.cameraMediaIds, p.cameraClipIds)
+        let mediaIds = [file("short"), file("short2")].map { f in s.media.first { $0.path == f.path }?.id }
+        let placed =
+            names == want && s.tracks.last?.name == "Camera" && camIndex == s.tracks.count - 1
+            && picIndex >= 0 && picIndex < camIndex && cam1?.track == cam0?.track
+            && cam0 != nil && cam0?.start == pic0?.start && cam0?.source.sourceIn == head
+            && pic1 != nil && cam1?.start == (pic1?.start ?? 0) + head && cam1?.source.sourceIn == 0
+            && cornered(cam0, "short", s.canvas) && cornered(cam1, "short2", s.canvas)
+            && ids.0 == mediaIds && ids.1 == [cam0?.id, cam1?.id]
+        d.undoManager?.undo()
+        let after = d.project.snapshot
+        let undone = after.media.isEmpty && after.clips.isEmpty && after.tracks.count == before
+        probeRow("L4", placed && undone,
+                 "ops \(names); tracks \(s.tracks.map(\.name)) (camera at \(camIndex), pictures at "
+                    + "\(picIndex)); pictures \(at(pic0)), \(at(pic1)); cameras \(at(cam0)), \(at(cam1)) "
+                    + "(head \(head)); want corner \(String(describing: wantCorner(s.canvas.width, s.canvas.height, 1760, 1328))); "
+                    + "ids \(ids); one undo → media \(after.media.count), clips \(after.clips.count), "
+                    + "tracks \(after.tracks.count) (was \(before)); notes \(p.notes)")
+    } catch {
+        probeRow("L4", false, "placement threw: \(error.localizedDescription)")
+    }
+
+    // L6: camera 0 (4 s) runs past screen 1's start: camera 1 floored at its end.
+    do {
+        let (d, p, _) = try landed(beside([
+            seg("movie", mic: nil, camera: "camera", offset: -tenth),
+            seg("movie2", mic: nil, camera: "camera2", offset: tenth),
+        ]))
+        let s = d.project.snapshot
+        let (pic1, cam0, cam1) = (clip(s, "movie2"), clip(s, "camera"), clip(s, "camera2"))
+        let asked = (pic1?.start ?? 0) + tenth
+        let ok =
+            cam0 != nil && cam1 != nil && (cam0?.end ?? 0) > (pic1?.start ?? 0)
+            && cam1?.start == cam0?.end
+            && cam1?.source.sourceIn == ReelTime.snapToFrame((cam0?.end ?? 0) - asked, fps: s.canvas.fps)
+            && p.notes.isEmpty
+        probeRow("L6", ok,
+                 "screen 1 at \(pic1?.start ?? -1); camera 0 \(at(cam0)) ends \(cam0?.end ?? -1); camera 1 "
+                    + "asked at \(asked) → \(at(cam1)); notes \(p.notes)")
+    } catch {
+        probeRow("L6", false, "placement threw: \(error.localizedDescription)")
+    }
+
+    // L7: place: false lands the camera media, no clip, no Camera track.
+    do {
+        let (d, p, _) = try landed(pair, place: false)
+        let s = d.project.snapshot
+        let names = p.ops.map(\.name)
+        let ok =
+            names == Array(repeating: "add_media", count: 6) && s.clips.isEmpty
+            && !s.tracks.contains { $0.name == "Camera" } && p.cameraMediaIds.allSatisfy { $0 != nil }
+            && p.cameraMediaIds.count == 2 && p.cameraClipIds == [nil, nil]
+        probeRow("L7", ok,
+                 "ops \(names); clips \(s.clips.count); tracks \(s.tracks.map(\.name)); camera ids "
+                    + "\(p.cameraMediaIds), \(p.cameraClipIds)")
+    } catch {
+        probeRow("L7", false, "placement threw: \(error.localizedDescription)")
+    }
+
+    // L8: a new project — the canvas the screen's, Camera in front, Microphone at the
+    // back — a camera alone's remainder, and `remainderActionName`'s four cases.
+    var l8: [String] = []
+    var l8ok = true
+    do {
+        let (d, notes) = try ProjectDocument.untitled(around: pair)
+        let s = d.project.snapshot
+        let cams = s.clips.filter { c in s.tracks.last.map { $0.id == c.track } ?? false }
+        let ok =
+            s.canvas.width == 1920 && s.canvas.height == 1080 && s.canvas.fps.num == 30
+            && s.canvas.fps.den == 1 && s.tracks.first?.name == "Microphone"
+            && s.tracks.last?.name == "Camera" && cams.count == 2
+            && cornered(clip(s, "short"), "short", s.canvas)
+            && d.undoManager?.undoActionName == "Add Recording Segments"
+        l8ok = l8ok && ok
+        l8.append("pair: canvas \(s.canvas.width)×\(s.canvas.height) at \(s.canvas.fps.num)/\(s.canvas.fps.den); "
+                  + "tracks \(s.tracks.map(\.name)); camera clips \(cams.count); undo "
+                  + "\(d.undoManager?.undoActionName ?? "-"); notes \(notes)")
+        d.close()
+    } catch {
+        l8ok = false
+        l8.append("pair: untitled(around:) threw \(error.localizedDescription)")
+    }
+    let alone = beside([seg("movie", mic: nil, camera: "short", offset: -tenth)])
+    do {
+        let (d, notes) = try ProjectDocument.untitled(around: alone)
+        let s = d.project.snapshot
+        let cam = clip(s, "short")
+        let ok =
+            s.tracks.last?.name == "Camera" && cam?.track == s.tracks.last?.id && cam?.start == 0
+            && d.undoManager?.undoActionName == "Add Camera"
+        l8ok = l8ok && ok
+        l8.append("alone: tracks \(s.tracks.map(\.name)); camera \(at(cam)); undo "
+                  + "\(d.undoManager?.undoActionName ?? "-"); notes \(notes)")
+        d.close()
+    } catch {
+        l8ok = false
+        l8.append("alone: untitled(around:) threw \(error.localizedDescription)")
+    }
+    let names = [
+        RecordingLanding.remainderActionName(for: beside([seg("movie", mic: "voice", camera: "short", offset: 0)])),
+        RecordingLanding.remainderActionName(for: alone),
+        RecordingLanding.remainderActionName(
+            for: beside([seg("movie", mic: "voice", camera: nil, offset: 0)], camera: false)),
+        RecordingLanding.remainderActionName(for: pair),
+    ]
+    let wantNames = ["Add Camera and Microphone", "Add Camera", "Add Microphone", "Add Recording Segments"]
+    l8ok = l8ok && names == wantNames
+    l8.append("remainderActionName \(names)")
+    probeRow("L8", l8ok, l8.joined(separator: " | "))
+
+    // L9: a camera wholly under its head lands as media only, with the note.
+    var l9: [String] = []
+    var l9ok = true
+    do {
+        let (d, p, _) = try landed(beside([seg("movie", mic: nil, camera: "short", offset: -15 * tenth)]))
+        let s = d.project.snapshot
+        let want = "\(file("short").path) was added to the media list without a clip: less than a "
+            + "frame of it would remain after the 1500.0 ms head that keeps it clear of the start "
+            + "of its screen clip."
+        let ok =
+            p.notes == [want] && clip(s, "short") == nil && p.cameraClipIds == [nil]
+            && p.cameraMediaIds.first != nil && p.cameraMediaIds.first! != nil
+            && !s.tracks.contains { $0.name == "Camera" }
+        l9ok = l9ok && ok
+        l9.append("screen: notes \(p.notes); tracks \(s.tracks.map(\.name)); ids \(p.cameraMediaIds), \(p.cameraClipIds)")
+    } catch {
+        l9ok = false
+        l9.append("screen: placement threw \(error.localizedDescription)")
+    }
+    do {
+        let (d, p, _) = try landed(beside([
+            seg("movie", mic: nil, camera: "camera", offset: -tenth),
+            seg("movie2", mic: nil, camera: "short2", offset: tenth),
+        ]))
+        let s = d.project.snapshot
+        let want = "\(file("short2").path) was added to the media list without a clip: less than a "
+            + "frame of it would remain after the 1800.0 ms head that keeps it clear of the previous "
+            + "camera clip."
+        let ok = p.notes == [want] && clip(s, "short2") == nil && clip(s, "camera") != nil
+            && p.cameraClipIds.count == 2 && p.cameraClipIds[0] != nil && p.cameraClipIds[1] == nil
+        l9ok = l9ok && ok
+        l9.append("behind: notes \(p.notes); ids \(p.cameraClipIds)")
+    } catch {
+        l9ok = false
+        l9.append("behind: placement threw \(error.localizedDescription)")
+    }
+    probeRow("L9", l9ok, l9.joined(separator: " | "))
+}
+
+/// L5: `cornerPatch` against `wantCorner` on a 1920×1080 canvas with the
+/// FaceTime HD's 1760×1328, a 1920×1080 and a 1080×1920 source, and nil for a
+/// zero dimension; each picture's right and bottom edges on the 0.95 line.
+func cornerRows() -> (Bool, String) {
+    var ok = true
+    var shown: [String] = []
+    for (sw, sh) in [(1760, 1328), (1920, 1080), (1080, 1920)] {
+        let got = RecordingLanding.cornerPatch(
+            canvasWidth: 1920, canvasHeight: 1080, sourceWidth: sw, sourceHeight: sh)
+        let want = wantCorner(1920, 1080, sw, sh)!
+        let (x, y, scale): (Double, Double, Double) = (got?.x ?? 0, got?.y ?? 0, got?.scale ?? 0)
+        let halfWidth: Double = Double(sw) * scale / 2
+        let halfHeight: Double = Double(sh) * scale / 2
+        let right: Double = 960 + x + halfWidth
+        let bottom: Double = 540 + y + halfHeight
+        let row =
+            got?.x == want.x && got?.y == want.y && abs((got?.scale ?? 0) - want.scale) < 1e-12
+            && abs(right - 1824) <= 0.5 && abs(bottom - 1026) <= 0.5
+        ok = ok && row
+        shown.append("\(sw)×\(sh) → x \(got?.x ?? .nan), y \(got?.y ?? .nan), scale \(got?.scale ?? .nan) "
+                     + "(want \(want)); right \(right), bottom \(bottom)")
+    }
+    let zeros = [
+        RecordingLanding.cornerPatch(canvasWidth: 0, canvasHeight: 1080, sourceWidth: 1760, sourceHeight: 1328),
+        RecordingLanding.cornerPatch(canvasWidth: 1920, canvasHeight: 1080, sourceWidth: 1760, sourceHeight: 0),
+    ]
+    ok = ok && zeros.allSatisfy { $0 == nil }
+    shown.append("a zero dimension → \(zeros.map { $0 == nil ? "nil" : "a patch" })")
+    return (ok, shown.joined(separator: " | "))
 }
 
 // MARK: - granted
@@ -1072,6 +1347,22 @@ func panelRows(_ request: [String: Any]) {
     ]
     probeRow("P7", notes == wantNotes, notes.joined(separator: " | "))
 
+    // P19 (CR3b, spec §11 CAM-10 (8)): a camera BESIDE the screen is not the stop — the
+    // display's sentence, then the microphone's problem, the camera's problem, its note.
+    func besideNote(_ stopped: StopReason, _ micProblem: String?, _ camera: RecordingCamera?) -> String {
+        RecorderPanelController.landingNote(
+            stoppedBy: stopped, chosen: .newProject, landedAsNewProject: true,
+            micProblem: micProblem, camera: camera, cameraBeside: true)
+    }
+    let slept =
+        "The system stopped the recording (the display slept or went away); what was captured was added."
+    let besideNotes = [
+        besideNote(.systemStopped, mic, cam(problem, warm)), besideNote(.stopped, nil, cam(problem, nil)),
+        besideNote(.systemStopped, nil, cam(nil, nil)),
+    ]
+    let wantBeside = [slept + " " + mic + " " + problem + " " + warm, problem, slept]
+    probeRow("P19", besideNotes == wantBeside, besideNotes.joined(separator: " | "))
+
     // P8 — the size note on CR0's lists.
     let sizes = [
         RecorderPanelController.cameraSizeNote(
@@ -1465,10 +1756,11 @@ func toolRows(_ request: [String: Any]) {
         ("a null size", ["source": "camera", "size": NSNull()], "ok: camera"),
         ("source x", ["source": "x"], "error: source must be one of screen, voice_over, camera (got \"x\")."),
     ])
-    let elsewhere = " cannot be given — only source camera records a camera."
+    // T2 (re-aimed at CR3b, spec §11 CAM-10 (5)): `camera` is admitted with screen.
+    let elsewhere = " cannot be given — a voice-over records the microphone alone."
     table("T2", [
-        ("camera, no source", ["camera": "FaceTime HD Camera"], "error: With source screen, camera" + elsewhere),
-        ("camera with screen", ["source": "screen", "camera": "FT-ID"], "error: With source screen, camera" + elsewhere),
+        ("camera, no source", ["camera": "FaceTime HD Camera"], "ok: screen"),
+        ("camera with screen", ["source": "screen", "camera": "FT-ID"], "ok: screen"),
         ("camera with voice_over and display", ["source": "voice_over", "camera": "FT-ID", "display": 0],
          "error: With source voice_over, camera" + elsewhere),
         ("a blank camera with screen", ["source": "screen", "camera": "  "], "ok: screen"),
@@ -1516,10 +1808,11 @@ func toolRows(_ request: [String: Any]) {
                 ? lookups.map { "\($0.0) → \($0.1.prefix(60))" }.joined(separator: " | ")
                 : badLookups.map { "\($0.0): got \($0.1), want \($0.2)" }.joined(separator: " | "))
 
-    // T7 (CR2a, CAM-6 (6)): `camera_format` beside `camera` in CAM-4 (2)'s step.
-    let format = "error: With source screen, camera_format" + elsewhere
+    // T7 (CR2a, CAM-6 (6); re-aimed at CR3b, CAM-10 (5)): `camera_format` beside `camera`
+    // in CAM-4 (2)'s step — admitted with screen beside a camera.
     table("T7", [
-        ("camera_format with screen", ["source": "screen", "camera_format": "1920x1080@30"], format),
+        ("camera_format with screen and camera",
+         ["source": "screen", "camera": "FT-ID", "camera_format": "1920x1080@30"], "ok: screen"),
         ("both with voice_over", ["source": "voice_over", "camera": "FT-ID", "camera_format": "best"],
          "error: With source voice_over, camera, camera_format" + elsewhere),
         ("camera_format: 5", ["source": "camera", "camera_format": 5],
@@ -1530,6 +1823,20 @@ func toolRows(_ request: [String: Any]) {
         ("a null camera_format with screen", ["source": "screen", "camera_format": NSNull()], "ok: screen"),
         ("camera_format with camera", ["source": "camera", "camera_format": "1920x1080@30"],
          "ok: camera"),
+    ])
+
+    // T9 (CR3b, CAM-10 (5)): `camera_format` without `camera` with screen, and the
+    // voice-over's sentence for each of the two.
+    let needs = "error: With source screen, camera_format needs camera — name the camera to "
+        + "record beside the screen."
+    table("T9", [
+        ("camera_format alone, no source", ["camera_format": "1920x1080@30"], needs),
+        ("camera_format alone with screen", ["source": "screen", "camera_format": "best"], needs),
+        ("camera_format with a blank camera", ["camera": " ", "camera_format": "best"], needs),
+        ("camera_format with voice_over", ["source": "voice_over", "camera_format": "best"],
+         "error: With source voice_over, camera_format" + elsewhere),
+        ("camera with voice_over", ["source": "voice_over", "camera": "FT-ID"],
+         "error: With source voice_over, camera" + elsewhere),
     ])
 
     // T8 (CAM-6 (6)): the format between the lookup and the grant.
@@ -1617,6 +1924,116 @@ func toolRows(_ request: [String: Any]) {
                 && screenNotes == [micNote].compactMap { $0 } && micNote != nil,
              "camera: \(cameraNotes.count) clauses, the last two \(cameraNotes.suffix(2)); screen: "
                 + "\(screenNotes)")
+    besideToolRows(movie: movie, micProblem: micProblem, troubled: troubled)
+}
+
+/// T10, T11 (CR3b, spec §11 CAM-10 (6)–(8)): a camera beside the screen in
+/// the answer — the per-segment keys and ids, the notes' order — and in the
+/// sentences: `filesClause`, the stop wait and its timeout.
+func besideToolRows(movie: MediaDescriptor, micProblem: String, troubled: RecordingCamera) {
+    func described(_ path: String, _ duration: Ticks) -> MediaDescriptor {
+        MediaDescriptor(path: path, duration: duration, width: 1760, height: 1328, hasVideo: true)
+    }
+    let cam0 = described("/probe/Screen Recording (Camera).mov", 1_150_000)
+    let cam1 = described("/probe/Screen Recording (2) (Camera).mov", 600_000)
+    let voice = MediaDescriptor(path: "/probe/Screen Recording (Microphone).m4a", duration: 1_200_000)
+    let movie1 = MediaDescriptor(
+        path: "/probe/Screen Recording (2).mov", duration: 600_000, width: 1920, height: 1080,
+        hasVideo: true)
+    let note0 = "This segment's camera is placed by the screen's did-start, not its first frame: "
+        + "the frame watch could not go back on the stream at the resume (probe)."
+    let problem1 = "The camera file /probe/x (Camera).mov could not be read."
+    var choice = RecordingChoice()
+    choice.camera = "PROBE-ID"
+    let result = RecordingResult(
+        segments: [
+            RecordingSegment(
+                descriptor: movie, micDescriptor: voice, micOffset: 0, startedAt: Date(),
+                cameraDescriptor: cam0, cameraOffset: -60_000, cameraNote: note0),
+            RecordingSegment(
+                descriptor: movie1, micDescriptor: nil, micOffset: 0, startedAt: Date(),
+                micProblem: micProblem, cameraProblem: problem1),
+        ], choice: choice, stoppedBy: .stopped, pauses: 1, camera: troubled)
+    let placement = RecordingLanding.Placement(
+        ops: [], mediaIds: [1, 2], clipIds: [3, 4], micMediaIds: [5, nil], micClipIds: [6, nil],
+        cameraMediaIds: [7, nil], cameraClipIds: [8, nil])
+    let bare = RecordingLanding.Placement(
+        ops: [], mediaIds: [1, 2], clipIds: [3, 4], micMediaIds: [nil, nil], micClipIds: [nil, nil])
+    let ids = AgentServer.documentIds(result, placement: placement)
+    let fields = AgentServer.recordingFields(result, ids: ids)
+    let segments = fields["segments"] as? [[String: Any]] ?? []
+    let first = segments.first ?? [:]
+    let second = segments.count > 1 ? segments[1] : [:]
+    let firstKeys = Set(first.keys.filter { $0.hasPrefix("camera_") })
+    let secondKeys = Set(second.keys.filter { $0.hasPrefix("camera_") })
+    let topKeys = fields.keys.filter { $0.hasPrefix("camera_") }
+    let notes = AgentServer.resultNotes(result)
+    let wantNotes = [
+        AgentServer.microphoneNote(result), troubled.problem, troubled.note, note0 + " " + problem1,
+    ].compactMap { $0 }
+    let ok =
+        firstKeys == ["camera_path", "camera_duration", "camera_offset", "camera_note",
+                      "camera_media", "camera_clip"]
+        && first["camera_path"] as? String == cam0.path
+        && (first["camera_duration"] as? Ticks) == cam0.duration
+        && (first["camera_offset"] as? Ticks) == -60_000 && first["camera_note"] as? String == note0
+        && first["camera_media"] as? Int == 7 && first["camera_clip"] as? Int == 8
+        && secondKeys == ["camera_problem"] && second["camera_problem"] as? String == problem1
+        && topKeys.isEmpty && fields["camera"] != nil
+        && ids.map(\.cameraMedia) == [7, nil] && ids.map(\.cameraClip) == [8, nil]
+        && bare.cameraMediaIds == [nil, nil] && bare.cameraClipIds == [nil, nil]
+        && notes == wantNotes && result.cameraSegmentsNote == note0 + " " + problem1
+    probeRow("T10", ok,
+             "segment 0's camera keys \(firstKeys.sorted()) (media \(first["camera_media"] ?? "-"), clip "
+                + "\(first["camera_clip"] ?? "-"), offset \(first["camera_offset"] ?? "-")); segment 1's "
+                + "\(secondKeys.sorted()); top level \(topKeys); ids \(ids.map { [$0.cameraMedia, $0.cameraClip] }); "
+                + "a bare placement's camera lists \(bare.cameraMediaIds), \(bare.cameraClipIds); notes "
+                + "\(notes.count) clauses, the last \(notes.last ?? "-")")
+
+    // T11: the sentences.
+    let one = RecordingResult(
+        segments: [
+            RecordingSegment(
+                descriptor: movie, micDescriptor: voice, micOffset: 0, startedAt: Date(),
+                cameraDescriptor: cam0)
+        ], choice: choice, stoppedBy: .stopped, pauses: 0)
+    let two = RecordingResult(
+        segments: [
+            RecordingSegment(
+                descriptor: movie, micDescriptor: nil, micOffset: 0, startedAt: Date(),
+                cameraDescriptor: cam0),
+            RecordingSegment(
+                descriptor: movie1, micDescriptor: nil, micOffset: 0, startedAt: Date(),
+                cameraDescriptor: cam1),
+        ], choice: choice, stoppedBy: .stopped, pauses: 1)
+    let clauses = [one.filesClause, two.filesClause]
+    let wantClauses = [
+        movie.path + " and its microphone at " + voice.path + " and its camera at " + cam0.path,
+        movie.path + ", " + movie1.path + " and its camera files at " + cam0.path + ", " + cam1.path,
+    ]
+    let ceilings = [
+        AgentServer.stopCeiling(segments: 1), AgentServer.stopCeiling(segments: 1, camera: true),
+        AgentServer.stopCeiling(segments: 2, camera: true), AgentServer.stopCeiling(segments: 0, camera: true),
+    ]
+    let alert = AgentServer.recordingAlertClause
+    let lead = "record_screen asked the recorder to stop and it did not finish within "
+    let timeouts = [
+        AgentServer.finishTimeoutSentence(movies: [movie.path]),
+        AgentServer.finishTimeoutSentence(movies: [movie.path], cameras: [cam0.path]),
+        AgentServer.finishTimeoutSentence(
+            movies: [movie.path, movie1.path], cameras: [cam0.path, cam1.path]),
+    ]
+    let wantTimeouts = [
+        lead + "75 s. The recording may still finish on its own; its movie is at \(movie.path)." + alert,
+        lead + "105 s. The recording may still finish on its own; its movie is at \(movie.path). "
+            + "Its camera file is at \(cam0.path)." + alert,
+        lead + "195 s. The recording may still finish on its own; its movies are at "
+            + "\(movie.path), \(movie1.path). Its camera files are at \(cam0.path), \(cam1.path)." + alert,
+    ]
+    probeRow("T11", clauses == wantClauses && ceilings == [75, 105, 195, 105] && timeouts == wantTimeouts,
+             "filesClause \(clauses); stopCeiling 1, 1 camera, 2 camera, 0 camera → \(ceilings); "
+                + "timeouts match \(zip(timeouts, wantTimeouts).map { $0 == $1 }): "
+                + "\(timeouts.map { String($0.prefix(140)) })")
 }
 
 // MARK: - beside (CR3a, spec §11 CAM-9)
