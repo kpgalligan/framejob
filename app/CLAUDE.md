@@ -2406,7 +2406,7 @@ free.
   call: choices, file naming, `RecordingConfiguration.make` (PURE), the grant
   reads, the step a press takes, the three pane URLs, the result types;
   nothing here prompts or opens.
-- `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
+- `ScreenRecorder.swift` (+`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
   +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`) · `CameraDevices.swift` · `CameraCapture.swift`
   (+`WarmUp`) — the machine `idle → arming → recording ⇄ paused
@@ -2451,8 +2451,8 @@ free.
   completion is the one retained closure that holds its object strongly, by
   design; `RecordingSetup+Camera.swift` the camera's stem, grant read,
   refusal and the press's camera step.
-- `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`,
-  +`VoiceOver`) · `ProjectDocument+Recording.swift`
+- `RecordingLanding.swift` (+`Placement`, +`Microphone`, +`Remainder`,
+  +`Placing`, +`LeftOut`, +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
   READ BACK (at an inexact canvas rate a raw add snaps down into a one-tick
@@ -2471,7 +2471,9 @@ free.
   / `Media` / `Render` / `Export` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
   `Graphics` / `Scopes` / `Destinations`
-  (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
+  (+`RecordingArguments`, +`RecordingResult`, +`RecordingLanding` — the
+  landing, `awaitGestureEnd` and `land`; +`RecordingSentences` — the
+  error and timeout sentences; +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
   `pauseDidChangeNotification` and frozen at its
   `finishingDidBeginNotification`; +`RecordingCamera` — `record_screen`'s

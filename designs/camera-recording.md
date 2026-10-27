@@ -280,19 +280,92 @@ what the preview shows, so it follows the preview as CR2c.
   notifications to a hidden panel (the rebuild, the selection, idle only, an unchanged list
   left alone, no key written), the observers gone after close; mutants; a manual-check row (a
   USB camera or the iPhone plugged and unplugged with the panel up).
-- **CR3 — camera + screen.** The camera row under Source when recording a display or a window;
-  the camera capture started beside the `SCStream` (CR0: the order of the starts made no
-  measurable difference, and started in one run-loop turn the writer's camera began 87–130 ms
-  before the screen file); per-segment offsets by E2 (CR0: the PTS of the first `.screen` frame
-  at or after the did-start's arrival); pause and resume in step; the landing: the screen on its track, the camera on a
-  new track ABOVE it at a corner picture-in-picture (the corner, scale and inset decided here),
-  the microphone on its back track, one grouped edit; a camera failure in a screen recording is
-  that recording's note, never its failure; `record_screen`'s `camera` with the screen source.
-  **Decides** the corner rule, the track names, the order of the starts, the result's camera
-  fields. **Proof**: `camera_recording_proof.py`'s camera + screen rows (track order and the
-  placed transform read back through `get_project`; per-segment offsets in the result), probe
-  rows for the landing ops; a manual-check row (the talking head lined up with the screen and
-  the voice).
+CR3 was one phase until CR2c landed. It is four now. Five files that CR3 must grow are within 13
+lines of the 400-line cap: `ScreenRecorder.swift` (391), `RecordingLanding.swift` (388),
+`RecordingLanding+Microphone.swift` (390), `AgentServer+Recording.swift` (394) and
+`AgentServer+RecordingResult.swift` (387). So their tolls are a pure-move phase of their own, as
+CR1-0's and CR2-0's were. The recorder is a phase of its own, proven by a probe under the
+terminal's grants, as CR1a was, because no door reaches it until the tool admits a camera with
+the screen. The landing and the tool follow together, because the tool's proof is what reads the
+landing back. The panel that drives both is last, as CR1c was.
+
+- **CR3-0 — the tolls.** Five pure moves, landed and gated alone, nothing else changed:
+  - `ScreenRecorder.swift` (391) gives `// MARK: - Stop` (`stop(completion:)`) to a new
+    `ScreenRecorder+Stop.swift`.
+  - `RecordingLanding.swift` (388) gives the nested `Placement` and `Landed` to a new
+    `RecordingLanding+Placement.swift`.
+  - `RecordingLanding+Microphone.swift` (390) gives the remainder (`microphoneActionName`,
+    `segmentsActionName`, `remainderActionName(for:)`, `remainderPlacement(_:in:)` and its
+    private `unplacedNote`) to a new `RecordingLanding+Remainder.swift`.
+  - `AgentServer+Recording.swift` (394) gives `// MARK: - The landing` (`awaitGestureEnd`,
+    `land`) to a new `AgentServer+RecordingLanding.swift`, with `private` dropped from the two
+    (B27's precedent: `private` does not cross a file).
+  - `AgentServer+RecordingResult.swift` (387) gives `// MARK: - The sentences` to a new
+    `AgentServer+RecordingSentences.swift`.
+
+  `recording_probe.py`'s three mutants of moved text and `recording_proof.py`'s section 3 reads
+  of it are re-aimed. **Proof**: typecheck; every mutant anchor of both probes found once; the
+  three re-aimed mutants caught; `recording_probe.py` whole; the Release `recording_proof.py`
+  headless tier.
+- **CR3a — the recorder: a camera beside the screen; CAM-9.** CAM-9 is recorded in §11 before
+  the code.
+  - **The start.** `ScreenRecorder.start` with a display, window or picked source and
+    `choice.camera` set reads the Camera grant (never asks), looks the camera up, resolves
+    `chosenFormat` and takes the capture (`takeCameraCapture(…, adopting: mayAsk)`, CAM-5 (5),
+    CAM-7 (7)). It spends CAM-3's warm-up before the stream starts, then starts the stream and
+    arms segment 0's camera writer in one run-loop turn. CR0: the order of the starts made no
+    measurable difference, and started in one turn the writer's camera began 87–130 ms before the
+    screen file.
+  - **The screen's start by E2** (CAM-2, CR0). An `SCStreamOutput` for `.screen` frames is on the
+    stream only when a camera is chosen. Per segment, E2 is the PTS of the first complete frame
+    whose PTS is at or after the did-start's arrival, both on the host clock.
+  - **Per segment**, the camera's movie lies beside the screen's, named by the microphone's
+    ` (Microphone).m4a` rule. Its offset is the camera's first buffer's PTS minus E2.
+  - **Pause and resume in step.** A pause closes the camera's writer with the screen's output; a
+    resume opens the next writer with the next output.
+  - **A camera failure.** A camera that stops on its own during a screen recording is the
+    recording's note (`camera.problem`), never its failure: the screen keeps recording and later
+    segments have no camera. A camera segment that wrote no frame affects only that segment.
+  - **The result and the finish.** `RecordingSegment` gains the camera's file and offset, and
+    `RecordingResult.camera` is set for a screen recording with a camera. The finishing waits for
+    the camera's writers under `finishCeiling`.
+
+  The landing does not land the camera files yet, and no door reaches the recorder: the tool
+  still refuses `camera` with source screen (CAM-4 (2)), and the panel has no camera row with a
+  screen source. **Decides** the starts' order and the warm-up's place, the file names, a segment
+  with no complete frame after its did-start, the offset's sign, and a camera failure's sentence.
+  **Proof**: `camera_recording_probe.py` pure rows (the E2 pick, the offset, the names, a result
+  with cameras) and a granted row under the terminal's Screen Recording and Camera grants,
+  skipped by name without either grant or without a camera. The granted row records with one
+  pause and checks each segment's camera file at ≥ 98 % of span × rate, an offset per segment,
+  and the screen files as before. Mutants.
+- **CR3b — the landing and the tool; CAM-10.** CAM-10 is recorded in §11 before the code.
+  - **The landing** (a new `RecordingLanding+Camera.swift`). Every segment's camera clip goes on
+    ONE new track IN FRONT of the screen's, named "Camera". Each clip starts at its screen clip's
+    start plus its offset: a camera that began before the screen is head-trimmed to it, and the
+    microphone's floor rule holds between camera clips. Each clip is scaled and placed by the
+    corner rule. The screen, the camera and the microphone are ONE grouped edit, and a new project
+    lands the camera through `remainderPlacement`. `Placement` gains the camera's two id lists.
+  - **The corner rule**: the corner, the scale and the inset (CAM-1's "CR3's to decide"); the
+    clip stays an ordinary clip a person moves.
+  - **The tool.** `camera` and `camera_format` are admitted with source `screen`, lifting CAM-4
+    (2) and CAM-6 (6) for it. The refusal order is extended for both grants. The answer carries
+    the `camera` key and, per segment, `camera_offset`, `camera_media` and `camera_clip`.
+
+  **Proof**: `camera_recording_proof.py`'s camera + screen rows. Headless, the refusal order.
+  Granted, read back through `get_project`: the track order, the track names and the placed
+  transform, with the per-segment offsets in the answer. Beside it: probe rows for the landing
+  ops, with mutants, and `recording_proof.py`'s and `recording_probe.py`'s schema rows re-aimed.
+  Docs: §7.9a, the guide's screen-recording page and `mcp.md`.
+- **CR3c — the panel's camera row; CAM-11.** CAM-11 is recorded in §11 before the code. With
+  Source a display or a window the panel offers a camera, and the Format popup and the preview
+  follow it. The press reads Screen Recording, then Camera, then Microphone. The countdown
+  prepares the camera (CAM-5 (5)), and the panel orders out as for every screen source.
+  **Decides** the row's shape (the Camera popup live with an off row, or a control of its own),
+  its key, and whether the preview shows with a screen source. **Proof**: `panel` probe rows and
+  mutants, `snapshot_ui`, `screens.py`'s recorder screen, and a manual-check row (the talking
+  head lined up with the screen and the voice). Docs: the guide, the screen catalog's prose.
+  CR3c measures its own files at its spec; a toll it needs lands first as a pure move.
 - **CR4 — the close.** The README highlight; `docs/guide/` read back against the code; the
   proofs run whole once on Release; then as root `CLAUDE.md` says: condense this into
   `designs/adr/camera-recording.md`, file each unfinished item as an issue (reviewed against
@@ -1322,7 +1395,106 @@ Unify Chat; each command once unless said):
   owner's; no script plugs a device.
 - CR3: camera + screen.
 
-## CR3 — camera + screen
+## CR3-0 — the tolls
+
+### Record
+
+**Landed** (2026-10-26). Five pure moves. No body, name or order changed; `private` was dropped
+from two declarations, and the headers changed in comments only:
+- `ScreenRecorder.swift` gave `// MARK: - Stop` and `stop(completion:)` with its doc to a new
+  `ScreenRecorder+Stop.swift`, one `extension ScreenRecorder`. The header sentence reads "This
+  file is the arming half; `+Stop.swift` is `stop()`".
+- `RecordingLanding.swift` gave the nested `Placement` (from "The ops that land one
+  recording…") and `Landed`, with their docs, to a new `RecordingLanding+Placement.swift`, one
+  `extension RecordingLanding`. Both types are still nested, so every reader spells them as
+  before. The header's list of split files names the two new files.
+- `RecordingLanding+Microphone.swift` gave `microphoneActionName`, `segmentsActionName`,
+  `remainderActionName(for:)`, `remainderPlacement(_:in:)` and `private static func
+  unplacedNote(_:behind:)`, each with its doc and in that order, to a new
+  `RecordingLanding+Remainder.swift`. `unplacedNote` stays `private`. `microphoneTrackName` is
+  now the file's first member, and its header names `+Remainder` for `remainderPlacement` and
+  the undo steps' names.
+- `AgentServer+Recording.swift` gave `// MARK: - The landing` (`awaitGestureEnd(_:)`,
+  `land(_:place:)`, with their docs) to a new `AgentServer+RecordingLanding.swift`, with
+  `private` dropped from both (B27's precedent: a `private` extension member reaches only its
+  own file). The header names the new file.
+- `AgentServer+RecordingResult.swift` gave `// MARK: - The sentences` (`sentence(of:)`,
+  `recordingAlertClause`, `startSentence(of:)`, `isStartTimeout(_:)`,
+  `finishTimeoutSentence(movies:voiceOver:)`, `savedButNotAdded(_:_:)`) to a new
+  `AgentServer+RecordingSentences.swift`. `isStartTimeout` stays `private`. The header names the
+  new file.
+- `tools/proof/recording_probe.py`: `MUTANTS["busy-finishing"]` names `ScreenRecorder+Stop.swift`,
+  and `["unplaced-voice-unnoted"]` and `["unplaced-leftout-unnoted"]` name
+  `RecordingLanding+Remainder.swift`. Their `before` and `after` text are unchanged, and the
+  docstring's file names for the three follow.
+- `tools/proof/recording_proof.py`: `source_part()` reads `landing` (`+RecordingLanding.swift`)
+  and `sentences` (`+RecordingSentences.swift`). The landing retry limit, interval and
+  `Thread.sleep` check and the three `Self.savedButNotAdded(result, error)` read `landing`. The
+  `recordingAlertClause` count, the `finishTimeoutSentence` signature and its split, the
+  `savedButNotAdded` split and the "The recording was saved at" check read `sentences`. The
+  module docstring names both new files.
+- `designs/spec/07.4-swift-file-map.md`: row 50 lists `+Stop.swift` after
+  `ScreenRecorder.swift`; row 51 lists `RecordingLanding+Placement.swift` and
+  `RecordingLanding+Remainder.swift` after `RecordingLanding+Placing.swift`; row 52 lists
+  `+RecordingLanding.swift` and `+RecordingSentences.swift` after `+RecordingResult.swift`. The
+  file still has 57 lines.
+
+**Sizes** (`wc -l`, before → after): `ScreenRecorder.swift` 391 → 357,
+`ScreenRecorder+Stop.swift` new, 44; `RecordingLanding.swift` 388 → 309,
+`RecordingLanding+Placement.swift` new, 94; `RecordingLanding+Microphone.swift` 390 → 261,
+`RecordingLanding+Remainder.swift` new, 146; `AgentServer+Recording.swift` 394 → 297,
+`AgentServer+RecordingLanding.swift` new, 110; `AgentServer+RecordingResult.swift` 387 → 309,
+`AgentServer+RecordingSentences.swift` new, 90.
+
+**Measured** (from the worktree, each command run once except `make gate`, which ran once in
+full before this record, with only its names step re-run on each edit to the record):
+- A byte-identity script against `git show HEAD:…` passed for all five moves. It checked that
+  every moved line is HEAD's, in HEAD's order, and that the old files lost exactly those lines.
+  Every line it found added to an old file was a comment. It restored the 2 expected `private `
+  keywords and found nothing else changed. Non-blank lines moved: 32, 78, 126, 95 and 72.
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings, and tsc printed no error.
+- The anchor check (every `MUTANTS` `before` of both probes found exactly once in its file):
+  `all once`, exit 0.
+- `python3 tools/proof/recording_probe.py --only state,landing,segments,leftout`: exit 0,
+  `415/415 checks passed`.
+- `… --only state --mutant busy-finishing`: exit 1, `139/142`, caught at 3i (the second stop
+  registered, the joined completion called once without `.busy`, all three one outcome).
+- `… --only leftout --mutant unplaced-voice-unnoted` and `… --mutant unplaced-leftout-unnoted`:
+  each exit 1, `26/27`, caught at X8's notes row.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
+  `scores: 59/59`.
+- `python3 tools/proof/spec_index_proof.py`: exit 0, `201/201 checks passed`.
+- `make gate`: `gate: PASS 234s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 118 s,
+  app 110 s). On each later edit to this record, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`, the count at
+  CR2c.
+- `RC_PROOF_APP=release python3 tools/proof/recording_proof.py <sock> --no-screen
+  --no-microphone` on a Release instance from `proof_app.py launch --app release`: exit 0,
+  `142/142 checks passed`, section 3's 23 source rows among them. Sections 5 (69 checks) and 6
+  (10 checks) were skipped by their flags. `grep "Frame Job: "` on its log printed nothing.
+
+**Deviations.** None in the code. The new header clauses cost `RecordingLanding.swift` three
+lines, `RecordingLanding+Microphone.swift` two, and `AgentServer+Recording.swift` and
+`AgentServer+RecordingResult.swift` one each, beyond the cuts. `ScreenRecorder.swift`'s
+header changed in place and cost no line.
+
+Applied with the commit: in `app/CLAUDE.md`, the recorder family gains `+Stop`, the landing
+family gains `+Placement` and `+Remainder`, and the `record_screen` entry gains
+`+RecordingLanding` and `+RecordingSentences`. The review's two nits were fixed with it: this
+record's gate sentence, and two header paragraphs re-wrapped (comments only).
+
+**Owed.**
+- `designs/adr/app-file-history.md`'s seams for the five files are condensed at CR4.
+
+## CR3a — the recorder: a camera beside the screen
+
+### Record
+
+## CR3b — the landing and the tool
+
+### Record
+
+## CR3c — the panel's camera row
 
 ### Record
 

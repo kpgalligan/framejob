@@ -5,8 +5,9 @@ over MCP.
 `record_screen` is File ▸ New Recording… without the panel: `ScreenRecorder`
 run for a fixed number of seconds from the agent and landed through the
 same `RecordingLanding` the panel lands with (`AgentServer+Recording.swift`,
-its arguments in `+RecordingArguments.swift`, its result and sentences in
-`+RecordingResult.swift`). This script is what a LIVE SERVER can say about
+its arguments in `+RecordingArguments.swift`, its result in
+`+RecordingResult.swift`, its landing in `+RecordingLanding.swift` and its
+sentences in `+RecordingSentences.swift`). This script is what a LIVE SERVER can say about
 it, in two tiers, and the split between them is the whole design: a
 headless machine — no Screen Recording grant, or a console with no display
 to share — can still measure the catalog, every refusal and the order the
@@ -1150,6 +1151,8 @@ def source_part():
     tool = source("AgentServer+Recording.swift")
     arguments = source("AgentServer+RecordingArguments.swift")
     result = source("AgentServer+RecordingResult.swift")
+    landing = source("AgentServer+RecordingLanding.swift")
+    sentences = source("AgentServer+RecordingSentences.swift")
 
     check("static func stopCeiling(segments: Int) -> TimeInterval" in tool
           and "ScreenRecorder.finishCeiling + 2 * MediaImporter.probeTimeout "
@@ -1191,15 +1194,15 @@ def source_part():
     check("chrome.remove()" in tool.split("let deliver")[1].split("finished.signal()")[0],
           "…and the item comes down inside onFinish, before the landing")
     check(tool.count("Self.recordingAlertClause") >= 1
-          and result.count("recordingAlertClause") >= 3,
+          and sentences.count("recordingAlertClause") >= 3,
           "the tool's start timeout, its finish timeout sentence and the recorder's own "
           "start timeout all carry the system-alert clause")
-    check("RecorderPanelController.landingRetryLimit" in tool
-          and "RecorderPanelController.landingRetryInterval" in tool
-          and "Thread.sleep" in tool,
+    check("RecorderPanelController.landingRetryLimit" in landing
+          and "RecorderPanelController.landingRetryInterval" in landing
+          and "Thread.sleep" in landing,
           "the wait for a live drag is bound to the panel's own limit and interval BY NAME, "
           "and sleeps on the server thread rather than on main")
-    check(tool.count("Self.savedButNotAdded(result, error)") == 3,
+    check(landing.count("Self.savedButNotAdded(result, error)") == 3,
           "all three post-record throw sites — the placement, the commit, the untitled "
           "document — go through savedButNotAdded")
     # R2d: the finish timeout names EVERY segment's movie, and the sentence
@@ -1207,7 +1210,7 @@ def source_part():
     # Issue batch B66 (#99 phase 2): the recorder's own `heldSegmentCount` /
     # `heldFilePaths` — a screen recording's or a voice-over's — replace the
     # tool's `recorder.session?` reads.
-    check("static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false)" in result
+    check("static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false)" in sentences
           and "Self.finishTimeoutSentence( movies: movies, voiceOver: choice.source == "
               ".voiceOver)" in re.sub(r"\s+", " ", tool)
           and "return recorder.heldFilePaths" in tool
@@ -1216,7 +1219,7 @@ def source_part():
           "the finish timeout reads the recorder's HELD segments — heldSegmentCount for the "
           "ceiling, heldFilePaths for the sentence, a screen recording's movies or a "
           "voice-over's files — and no recorder.session read is left in the tool's code")
-    timeout = result.split("static func finishTimeoutSentence")[1].split("\n    }\n")[0]
+    timeout = sentences.split("static func finishTimeoutSentence")[1].split("\n    }\n")[0]
     check("case 1:" in timeout and "its \\(noun) is at \\(movies[0])." in timeout
           and "its \\(noun)s are at " in timeout and 'movies.joined(separator: ", ")' in timeout
           and 'let noun = voiceOver ? "file" : "movie"' in timeout
@@ -1232,7 +1235,7 @@ def source_part():
           < gated[1].index("\n        }\n"),
           "recordScreen reads RecordingGrant.screenRecordingGranted only inside "
           "`if kind == .screen {` — a voice-over never reads the Screen Recording grant")
-    saved = result.split("static func savedButNotAdded")[1].split("\n    }\n")[0]
+    saved = sentences.split("static func savedButNotAdded")[1].split("\n    }\n")[0]
     clause = source("RecordingResult.swift").split("var filesClause")[1].split("\n    }\n")[0]
     check("The recording was saved at \\(result.filesClause) but could " in saved
           and 'segments.map { $0.descriptor.path }.joined(separator: ", ")' in clause
@@ -1268,8 +1271,8 @@ def source_part():
           "so a reader compiled against it would be wrong for a paused recording)")
     check('fields["mic_problem"] = problem' in result and "microphoneNote" in result,
           "the result carries mic_problem and the note mentions it")
-    check("The recording was saved at" in result and "but could not "
-          in result and "be added: " in result,
+    check("The recording was saved at" in sentences and "but could not "
+          in sentences and "be added: " in sentences,
           "savedButNotAdded's sentence names the file and carries the inner error")
     lookup = arguments.split("throws -> RecordingSource {")[1]
     no_display = lookup.find(NO_DISPLAY_SENTENCE.split(" — ")[0])

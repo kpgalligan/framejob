@@ -12,7 +12,8 @@ import AppKit
 /// cut: the other side keeps the semaphores and the `onMain` hops, this side
 /// keeps what a probe could call with no server at all. `private` →
 /// internal is the whole cost, because a `private` extension member reaches
-/// only its own file.
+/// only its own file. The SENTENCES moved on to
+/// `AgentServer+RecordingSentences.swift` at camera-recording CR3-0.
 ///
 /// **Road map 3, R2d — a recording is a SEQUENCE of files** (decision 6): a
 /// `RecordingResult` carries `segments`, one per stretch between a start or
@@ -304,84 +305,5 @@ extension AgentServer {
             if case .media(let id, _, _) = clip.source { return id == media }
             return false
         }?.id
-    }
-
-    // MARK: - The sentences
-
-    /// An error's sentence — a `ToolError`'s `localizedDescription` is generic.
-    static func sentence(of error: any Error) -> String {
-        (error as? ToolError)?.message ?? error.localizedDescription
-    }
-
-    /// The clause both of the tool's timeout sentences end with, and the
-    /// recorder's own arm timeout gets it too: macOS 15 periodically puts up
-    /// a consent alert — whether to keep letting Frame Job bypass the system
-    /// window picker — which is a prompt neither `CGPreflightScreenCaptureAccess`
-    /// (still true) nor this tool can see, and a capture waiting behind it
-    /// looks exactly like a recorder that hung.
-    static let recordingAlertClause =
-        " A system alert about screen recording may be waiting on the screen — macOS "
-        + "periodically asks whether to keep allowing Frame Job to record, and neither the "
-        + "preflight nor this tool can see that prompt; answer it and call again."
-
-    /// The start's failure as the caller reads it: the recorder's sentence,
-    /// plus the alert clause when the recorder's own arm ceiling is what
-    /// answered (`.startTimedOut`, bare or wrapped in `.filesKept`).
-    static func startSentence(of error: any Error) -> String {
-        sentence(of: error) + (isStartTimeout(error) ? recordingAlertClause : "")
-    }
-
-    private static func isStartTimeout(_ error: any Error) -> Bool {
-        guard let failure = error as? RecorderError else { return false }
-        switch failure {
-        case .startTimedOut: return true
-        case .filesKept(let inner, _, _): return isStartTimeout(inner)
-        default: return false
-        }
-    }
-
-    /// The sentence for a `stop()` that did not conclude within
-    /// `stopCeiling(segments:)`: it names every movie the recorder still
-    /// holds — one per segment, the recording may finish on its own after
-    /// the tool has answered, and a person can then import them — and the
-    /// alert clause. Empty means the recorder no longer holds a session at
-    /// all. The seconds it spells are the ceiling over `movies.count`, which
-    /// is the number the wait used: the same count while the session is
-    /// held (a stop removes no segment), and the one-segment number — the
-    /// wait's own `?? 1` — when the recorder had let the session go. A
-    /// voice-over's files are named "file", not "movie".
-    static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false) -> String {
-        let noun = voiceOver ? "file" : "movie"
-        let where_: String
-        switch movies.count {
-        case 0:
-            where_ =
-                "The recorder no longer holds the session, so the recording may already have "
-                + "finished without answering."
-        case 1:
-            where_ = "The recording may still finish on its own; its \(noun) is at \(movies[0])."
-        default:
-            where_ =
-                "The recording may still finish on its own; its \(noun)s are at "
-                + movies.joined(separator: ", ") + "."
-        }
-        return "record_screen asked the recorder to stop and it did not finish within "
-            + "\(Int(stopCeiling(segments: movies.count))) s. " + where_ + recordingAlertClause
-    }
-
-    /// A failure AFTER the recording landed on disk, as a `ToolError` naming
-    /// the file(s): the placement's trial, the commit and the untitled
-    /// document are the three throw sites, and every one of them is reached
-    /// with the footage already written. The files are
-    /// `RecordingResult.filesClause` — every segment's movie comma-joined,
-    /// then every microphone file that landed — the one spelling the panel's
-    /// note uses too; with one segment the sentence is byte for byte R1's,
-    /// which `tools/proof/recording_proof.py` matches by shape. A segment
-    /// left out as unreadable (#97) is named after it, its files too.
-    static func savedButNotAdded(_ result: RecordingResult, _ error: any Error) -> ToolError {
-        ToolError(
-            message: "The recording was saved at \(result.filesClause) but could not "
-                + "be added: " + sentence(of: error)
-                + (result.unreadableNote.map { " " + $0 } ?? ""))
     }
 }

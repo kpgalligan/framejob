@@ -9,7 +9,8 @@ import ScreenCaptureKit
 /// for a new project — so the two doors provably do one thing. This file is
 /// the wait around the recorder and the argument vocabulary in front of it;
 /// `AgentServer+RecordingResult.swift` is what the answer and the refusals
-/// SAY, cut off this file at the 400-line cap.
+/// SAY, cut off this file at the 400-line cap, and
+/// `AgentServer+RecordingLanding.swift` the landing, cut at camera-recording CR3-0.
 ///
 /// **Runs on the server thread** (`AgentServer.offMainTools`), `import_media`'s
 /// shape and never `transcribe`'s synchronous body: the recorder's every
@@ -291,104 +292,6 @@ extension AgentServer {
             let waiting = onMain { recorder.heldFirstStartedAt == nil && ended.value == nil }
             guard waiting else { return }
             Thread.sleep(forTimeInterval: 0.02)
-        }
-    }
-
-    // MARK: - The landing
-
-    /// SERVER THREAD. A target document mid-drag is not committed over the
-    /// gesture's base handle (`RecordingLanding.placement` refuses by name);
-    /// the panel retries from a half-second timer bounded at forty tries,
-    /// and this polls `isLiveEditing` through `onMain` at that interval and
-    /// bound BY NAME, so the two doors cannot drift. A gesture outlasting
-    /// the bound still reaches `placement`'s refusal, which names the file;
-    /// a `.newProject` target or a closed document has nothing to wait for.
-    private func awaitGestureEnd(_ destination: RecordingDestination) {
-        for _ in 0..<RecorderPanelController.landingRetryLimit {
-            let dragging = onMain { () -> Bool in
-                guard case .document(let document) = RecordingLanding.resolve(destination)
-                else { return false }
-                return document.isLiveEditing
-            }
-            guard dragging else { return }
-            Thread.sleep(forTimeInterval: RecorderPanelController.landingRetryInterval)
-        }
-    }
-
-    /// MAIN. The two doors: a document through `editResult` (one undo step,
-    /// the `created` ids, the scope landing); a new project through
-    /// `ProjectDocument.untitled(around:)`, which does everything. Every
-    /// throw past this point is `savedButNotAdded`'s: every segment's files
-    /// exist. The result is `recordingFields` over the segments plus the ids
-    /// each door knows them by (the placement's lists, predicted before the
-    /// commit; the new project's snapshot, read by path), and `note` is the
-    /// door's sentences in order: `place: false`, a closed target, what the
-    /// landing could NOT place (each naming its file), then `resultNotes(result)`.
-    private func land(_ result: RecordingResult, place: Bool) throws -> String {
-        var fields: [String: Any]
-        var notes: [String] = []
-        switch RecordingLanding.resolve(result.choice.destination) {
-        case .document(let document):
-            let placement: RecordingLanding.Placement
-            do {
-                placement = try RecordingLanding.placement(result, in: document, place: place)
-            } catch {
-                throw Self.savedButNotAdded(result, error)
-            }
-            fields = Self.recordingFields(
-                result, ids: Self.documentIds(result, placement: placement),
-                leftOutIds: Self.documentLeftOutIds(result, placement: placement))
-            fields["landed"] = "document"
-            if !place {
-                notes.append(
-                    "The recording is in the project's media list but not on the timeline — "
-                        + "place it with add_clip {track, media, at}.")
-            }
-            notes.append(contentsOf: placement.notes)
-            notes.append(contentsOf: Self.resultNotes(result))
-            if !notes.isEmpty { fields["note"] = notes.joined(separator: " ") }
-            let answer: String
-            do {
-                answer = try editResult(document, RecordingLanding.actionName, placement.ops, fields)
-            } catch {
-                throw Self.savedButNotAdded(result, error)
-            }
-            // `editResult` commits and does not build caches; `importMedia`
-            // calls this after its own commit for the same reason.
-            document.generateCaches()
-            return answer
-        case .newProject:
-            let document: ProjectDocument
-            var landingNotes: [String] = []
-            do {
-                let landing = try ProjectDocument.untitled(around: result)
-                document = landing.document
-                landingNotes = landing.notes
-            } catch {
-                throw Self.savedButNotAdded(result, error)
-            }
-            fields = Self.recordingFields(
-                result, ids: Self.newProjectIds(result, in: document),
-                leftOutIds: Self.newProjectLeftOutIds(result, in: document))
-            fields["landed"] = "new_project"
-            if result.choice.destination != .newProject {
-                notes.append(
-                    "The target document closed while the recording ran, so it opened as a "
-                        + "new project instead.")
-            }
-            if !place {
-                notes.append(
-                    "place: false has no meaning for a new project — the "
-                        + (result.isVoiceOver ? "voice-over" : "picture") + " IS the "
-                        + "document, so its clips are on the timeline, one per segment and "
-                        + "the first at 0.")
-            }
-            notes.append(contentsOf: landingNotes)
-            notes.append(contentsOf: Self.resultNotes(result))
-            if !notes.isEmpty { fields["note"] = notes.joined(separator: " ") }
-            fields["ok"] = true
-            fields["project"] = summary(document)
-            return try jsonResult(fields)
         }
     }
 }

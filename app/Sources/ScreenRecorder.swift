@@ -10,18 +10,18 @@ import ScreenCaptureKit
 /// sums the microphone into the system track, decision 5's bad case, so it
 /// is never set). The panel and the `record_screen` tool both drive this
 /// one object and both receive a `RecordingResult` (`RecordingResult.swift`);
-/// `RecordingLanding` turns that into ops. This file is the arming half and
-/// `stop()`; `ScreenRecorder+Pause.swift` is what a segment is and the two
-/// transitions that close one and open the next; `+Microphone.swift` the
-/// capture session's preparation and the meter; `+Finishing.swift`
-/// everything that ENDS a session; `+Delegates.swift` the three delegates;
-/// `+Content.swift` the static helpers over shareable content, filters and
-/// error codes. A VOICE-OVER (`voiceSession`, spec §11 recording) is the
-/// same machine with no stream — the microphone writer alone, a file per
-/// segment — in `+VoiceOver.swift` and `+VoiceOverFinishing.swift`;
-/// `stop()`, `elapsed`, `pause()` and `resume()` forward to it. A CAMERA
-/// recording (`cameraSession`, spec §11 CAM-3) is the same machine with a
-/// camera where the stream was, in `+Camera.swift` and
+/// `RecordingLanding` turns that into ops. This file is the arming half;
+/// `+Stop.swift` is `stop()`; `ScreenRecorder+Pause.swift` is what a segment
+/// is and the two transitions that close one and open the next;
+/// `+Microphone.swift` the capture session's preparation and the meter;
+/// `+Finishing.swift` everything that ENDS a session; `+Delegates.swift` the
+/// three delegates; `+Content.swift` the static helpers over shareable
+/// content, filters and error codes. A VOICE-OVER (`voiceSession`, spec §11
+/// recording) is the same machine with no stream — the microphone writer
+/// alone, a file per segment — in `+VoiceOver.swift` and
+/// `+VoiceOverFinishing.swift`; `stop()`, `elapsed`, `pause()` and `resume()`
+/// forward to it. A CAMERA recording (`cameraSession`, spec §11 CAM-3) is the
+/// same machine with a camera where the stream was, in `+Camera.swift` and
 /// `+CameraFinishing.swift`, forwarded to on the same terms.
 ///
 /// **A paused recording is a sequence of files over one stream** (decision
@@ -353,39 +353,5 @@ final class ScreenRecorder: NSObject {
         let stops = stopCompletions
         stopCompletions = []
         stops.forEach { $0(.failure(delivered)) }
-    }
-
-    // MARK: - Stop
-
-    /// MAIN THREAD. `completion`, when given, on main with every file
-    /// probed, or an error. Idle → `.notRecording`, synchronously; arming →
-    /// held, finishing begins the moment the start lands; recording →
-    /// finishing begins now; PAUSED → finishing begins now on the same
-    /// path, with the segment's output already closed and the microphone
-    /// already stopped, so only `stopCapture` remains; finishing → JOINED
-    /// (finding 1): the completion is registered beside the others and
-    /// never answered `.busy`, because a person's Stop a second after the
-    /// menu bar's is a stop that must land. Every registered completion and
-    /// the session's `onFinish` receive the ONE outcome at conclude. The
-    /// wait for the writers is bounded at `finishCeiling`: past it the files
-    /// are probed anyway (the writer may have finished without saying so),
-    /// and an unfinished movie that will not probe is answered `.timedOut`.
-    func stop(completion: ((Result<RecordingResult, Error>) -> Void)? = nil) {
-        if voiceSession != nil { return stopVoiceOver(completion: completion) }
-        if cameraSession != nil { return stopCamera(completion: completion) }
-        switch state {
-        case .idle:
-            completion?(.failure(RecorderError.notRecording))
-        case .arming:
-            if let completion { stopCompletions.append(completion) }
-            session?.stopAsked = true
-            pendingStop = true
-        case .recording, .paused:
-            if let completion { stopCompletions.append(completion) }
-            session?.stopAsked = true
-            beginFinishing(.stopped)
-        case .finishing:
-            if let completion { stopCompletions.append(completion) }
-        }
     }
 }

@@ -754,7 +754,7 @@ against 559/560, when 6b's "one program" row was the tree's one failure
                    613/620: 4·4a's op list, start/in, length and the
                    trim/move pair, 4·5b's in point, 4·7's op list and head.
   busy-finishing   `stop()` while `.finishing` answers `.busy` again
-                   (ScreenRecorder.swift) — 617/620, measured against a
+                   (ScreenRecorder+Stop.swift) — 617/620, measured against a
                    tree at 620/620: 3i's second stop answered at once,
                    the joined completion receiving `.busy`, and the three
                    outcomes no longer one.
@@ -1009,7 +1009,7 @@ code before the batch:
 
 **Issue batch B61's mutants** (#213: section 14's X8), measured
 2026-10-01 against the tree at 27/27 for `--only leftout`. Each removes one
-of `remainderPlacement`'s unplaced-voice notes (RecordingLanding+Microphone
+of `remainderPlacement`'s unplaced-voice notes (RecordingLanding+Remainder
 .swift) and is caught by X8's notes row alone:
 
   unplaced-voice-unnoted    a segment's voice gets no `unplacedNote` when
@@ -10241,7 +10241,7 @@ MUTANTS = {
         "untrimmed, the voice late"),
     # Lane R's four, the R1 review's recorder fixes (section 3's driven rows).
     "busy-finishing": (
-        "ScreenRecorder.swift",
+        "ScreenRecorder+Stop.swift",
         "        case .finishing:\n"
         "            if let completion { stopCompletions.append(completion) }\n"
         "        }\n",
@@ -10622,12 +10622,12 @@ MUTANTS = {
         "(the code before B55)"),
     # Issue batch B61 (#213) — section 14's X8.
     "unplaced-voice-unnoted": (
-        "RecordingLanding+Microphone.swift",
+        "RecordingLanding+Remainder.swift",
         "                if let mic = segment.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }\n",
         "                _ = segment\n",
         "a segment's voice lands as media with no clip and no note when clip 1 is missing"),
     "unplaced-leftout-unnoted": (
-        "RecordingLanding+Microphone.swift",
+        "RecordingLanding+Remainder.swift",
         "                if let mic = left.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }\n",
         "                _ = left\n",
         "a left-out segment's voice lands as media with no clip and no note when clip 1 is missing"),
