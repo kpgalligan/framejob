@@ -4,7 +4,7 @@
 
 # Frame Job
 
-[![Frame Job in 90 seconds: watch on YouTube](https://img.youtube.com/vi/An7KjPoofzI/maxresdefault.jpg)](https://www.youtube.com/watch?v=An7KjPoofzI)
+[![Frame Job in 90 seconds: watch on YouTube](https://img.youtube.com/vi/An7KjPoofzI/maxresdefault.jpg)](https://www.youtube.com/watch?v=Uftht-HkKy8)
 
 A native macOS video editor. Open a movie, arrange it on layered tracks over a
 fixed canvas, then trim, cut, grade, caption, animate and export it. Every edit
