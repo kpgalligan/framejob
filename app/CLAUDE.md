@@ -2389,10 +2389,16 @@ free.
   prepared capture (`ScreenRecorder+CameraPrepare.swift`). That prepared
   capture lives while the panel shows Camera, its layer the panel's live
   preview (CR2b, spec §11 CAM-7); the panel's start adopts it and a tool's
-  start (`record_screen`) never does. The panel
-  remembers nine `FrameJobRecording…` keys (the Camera's and the Format's
-  among them; the type doc lists them), and a probe or the harness that
-  touches them handles all nine. The
+  start (`record_screen`) never does. **The "Record the camera too" box**
+  (`+Rows`, under Include Frame Job windows, live only while idle with a
+  display or the Window row, remembered across launches) records the chosen
+  camera beside the screen: the Camera and Format popups and the preview go
+  live with it, the warm-up is spent before the countdown, and the press
+  reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
+  CAM-11). The panel
+  remembers ten `FrameJobRecording…` keys (the Camera's, the Format's and
+  `FrameJobRecordingCameraBeside` among them; the type doc lists them), and a
+  probe or the harness that touches them handles all ten. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",

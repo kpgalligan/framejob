@@ -479,3 +479,43 @@ its code.
      camera at <p>" or " and its camera files at <a>, <b>" after the microphone clause.
   9. **No panel door yet.** The recorder panel offers no camera with a screen source until CR3c
      (CAM-11); until then the tool is the one door that records a camera beside the screen.
+
+- **CAM-11 — The panel's camera beside the screen (CR3c), recorded before its code; amends CAM-5
+  (2), CAM-6 (2), CAM-7 (1) and (3), and CAM-10 (7) and (9).** With a display or the Window row
+  chosen, the recorder panel offers a "Record the camera too" checkbox; ticked, the panel records
+  the chosen camera at the chosen format beside the screen (CAM-9, CAM-10). CAM-3 to CAM-10
+  stand except where this entry amends them.
+  1. **The box** is a grid row with no label, directly under Include Frame Job windows and above
+     Camera. It is enabled only while idle with a display row or the Window row; under Camera or
+     Microphone Only it is greyed with its value kept. It is a control of its own: an "Off" row
+     in the Camera popup would change what the shared camera key means for Source Camera and for
+     hot-plug (CAM-8).
+  2. **The key.** `FrameJobRecordingCameraBeside`, a Bool, off when absent, is written by
+     `persistChoices` on every change and read by `restoreChoices`. It persists across launches,
+     unlike the session-only Camera row; it is the panel's tenth `FrameJobRecording…` key, pinned
+     in the harness and `screens.py`. A hot-plug writes nothing (CAM-8 (4)).
+  3. **A camera wanted** means Source Camera, or the box ticked with a display row or the Window
+     row. Then the Camera and Format popups are live while idle (amending CAM-5 (2) and CAM-6
+     (2)'s "only while idle with Source Camera"). `currentChoice()` carries `camera` (the popup's
+     id) and `cameraFormat` (nil for Best) beside a `.display` or `.picked` source; otherwise
+     `camera` is nil, as before. With the box ticked, System Audio, Show Clicks, Size, Include
+     Frame Job windows and Rate stay live, and the size note is the screen's.
+  4. **The preview** (amending CAM-7 (1) and (3)). The well's row is shown, and CAM-7's step
+     runs, whenever a camera is wanted; step (1) reads "the panel not visible or closing, or no
+     camera wanted → off". Step (2) also covers a screen recording's camera beside it: that
+     capture's layer, else "The camera is recording.". `prepareCamera` acts for any choice
+     naming a camera whose source is not `.voiceOver`. The countdown keeps that capture, and the
+     panel's `start(…, mayAsk: true)` adopts it (CAM-9 (1)); a tool start never does (CAM-7
+     (7)).
+  5. **The press with the box ticked**, in order: (1) Window… with nothing picked gives its
+     sentence; (2) no camera gives "No camera is connected."; (3) the Screen Recording grant;
+     (4) the Camera grant, asked from `notDetermined`, `Privacy_Camera` opened when denied or
+     restricted, and a prompt's answer re-read before the microphone is checked (CAM-5 (4));
+     (5) the Microphone grant; (6) the countdown. With the box off nothing changes, and the
+     Camera grant is never read.
+  6. **The recording** is a screen recording: the panel orders out (`hidesForRecording`
+     unchanged), the status item is its chrome, and it lands by CAM-10.
+  7. **The timeout sentence** (amending CAM-10 (7)) spells the ceiling the stop wait used — its
+     `camera:` is the wait's own `cameraBeside` — even when the recorder holds no camera file.
+  8. **CAM-10 (9) is lifted.** The box is the panel's door to a camera beside the screen, and
+     the catalog's `record_screen` description and the guide name it.

@@ -16,12 +16,13 @@ enum CameraPreviewStep: Equatable {
 /// CAM-7) — `RecorderPanelController.swift`'s eleventh file, NEW rather than
 /// cut, as `+Camera.swift` was: the rule that says what the well shows, and
 /// the one sync that acts on it. The well is `CameraPreviewWell`, a grid row
-/// of its own right under Format (`+Rows.swift`), shown only with Source
-/// Camera.
+/// of its own right under Format (`+Rows.swift`), shown only while a camera
+/// is wanted: Source Camera, or "Record the camera too" beside a screen
+/// source (spec §11 CAM-11 (4)).
 ///
 /// **The step** (`cameraPreviewStep`, pure, first match wins): a panel not
-/// visible or closing, or Source not Camera → off; a camera recording → its
-/// layer; the countdown or starting → the prepared layer, never a build; any
+/// visible or closing, or no camera wanted → off; a camera recording, or a
+/// screen recording's camera beside it → its layer; the countdown or starting → the prepared layer, never a build; any
 /// other phase, or a busy recorder → blank; no camera → "No camera is
 /// connected."; the Camera grant not authorized → a sentence; a prepared
 /// capture that failed, or a build that threw → its sentence, never
@@ -98,15 +99,16 @@ extension RecorderPanelController {
     /// step acted on (the type doc).
     func syncCameraPreview() {
         applyPendingDevices()
-        let hidden = !cameraSelected
+        let hidden = !cameraWanted
         if let row = cameraPreviewRow, row.isHidden != hidden {
             row.isHidden = hidden
             fitWindowToContent()
         }
         let step = Self.cameraPreviewStep(
-            visible: window?.isVisible == true && !panelClosing, cameraSource: cameraSelected,
+            visible: window?.isVisible == true && !panelClosing, cameraSource: cameraWanted,
             phase: phase, recorderIdle: recorder.state == .idle,
-            recordingCamera: recorder.cameraSession != nil, cameraChosen: selectedCameraID != nil,
+            recordingCamera: recorder.cameraSession != nil || recorder.session?.cameraCapture != nil,
+            cameraChosen: selectedCameraID != nil,
             grant: { Self.grantDoors.cameraStatus() }, failure: { self.previewFailure })
         switch step {
         case .off, .message:
@@ -126,7 +128,8 @@ extension RecorderPanelController {
             hostPreview(recorder.preparedCamera?.capture.previewLayer, else: nil)
         case .recording:
             hostPreview(
-                recorder.cameraSession?.capture.previewLayer, else: Self.previewRecordingSentence)
+                (recorder.cameraSession?.capture ?? recorder.session?.cameraCapture)?.previewLayer,
+                else: Self.previewRecordingSentence)
         case .blank:
             cameraPreview.showMessage(nil)
         }

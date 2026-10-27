@@ -178,8 +178,8 @@ extension AgentServer {
             + "because its movie will not read keeps its camera file on disk, named in its "
             + "kept_files, and does not land it. The stop wait allows 105 s, and 90 s more for "
             + "each further segment, because the camera's file is probed too, and a timeout "
-            + "names the camera files after the movies. The recorder panel does not offer a "
-            + "camera beside the screen yet."
+            + "names the camera files after the movies. The recorder panel's Record the "
+            + "camera too box, with a display or a window, makes the same recording."
         return [
             // MARK: Recording
             //

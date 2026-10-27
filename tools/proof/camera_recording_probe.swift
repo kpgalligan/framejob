@@ -14,7 +14,10 @@
 // frame watch, the offset, the finishing's wait, the settle and the names
 // (`beside` B1–B3, B5–B7) and a real screen + camera recording (`screen`);
 // CR3b (CAM-10): that camera's landing (`landing` L4–L9) and the tool's and
-// the panel's readers of it (`tool` T2/T7 re-aimed, T9–T11; `panel` P19).
+// the panel's readers of it (`tool` T2/T7 re-aimed, T9–T11; `panel` P19);
+// CR3c (CAM-11): the panel's "Record the camera too" box (`panel` P20–P22),
+// its source reads (P23, in Python), the panel's prepared capture adopted
+// by a screen start (`screen` G17) and the timeout's ceiling (T11 re-aimed).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -1055,6 +1058,10 @@ func preparedJoin(_ choice: RecordingChoice) -> [String: Any] {
 /// nothing opened. Sealed in before `RecorderPanelController.shared` exists.
 final class PanelGrantSpy {
     var camera: AVAuthorizationStatus = .authorized
+    /// What `screenGranted` answers (CR3c's P21; false before it).
+    var screen = false
+    /// The Screen Recording and Camera reads, in order (P21).
+    var reads: [String] = []
     var mic: AVAuthorizationStatus = .authorized
     var screenReads = 0
     var screenRequests = 0
@@ -1068,7 +1075,8 @@ final class PanelGrantSpy {
         RecorderGrantDoors(
             screenGranted: {
                 self.screenReads += 1
-                return false
+                self.reads.append("screen")
+                return self.screen
             },
             launchedByLaunchd: { true },
             requestScreen: { self.screenRequests += 1 },
@@ -1082,6 +1090,7 @@ final class PanelGrantSpy {
             },
             cameraStatus: {
                 self.cameraReads += 1
+                self.reads.append("camera")
                 return self.camera
             },
             requestCamera: { answered in
@@ -1092,7 +1101,7 @@ final class PanelGrantSpy {
 }
 
 /// CR1c (spec §11 CAM-5): `RecorderPanelController.shared`, never shown,
-/// under `PanelGrantSpy`, with the nine `FrameJobRecording…` values put back
+/// under `PanelGrantSpy`, with the ten `FrameJobRecording…` values put back
 /// as they were at the end. Neither fake id finds a device, so no camera or
 /// microphone opens.
 func panelRows(_ request: [String: Any]) {
@@ -1104,7 +1113,7 @@ func panelRows(_ request: [String: Any]) {
         RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
-        RecorderPanelController.cameraFormatKey,
+        RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -1212,7 +1221,7 @@ func panelRows(_ request: [String: Any]) {
     panel.restoreChoices()
     let kept = panel.cameraSelected && panel.currentChoice().source == .camera
         && panel.selectedCameraID == "probe-camera"
-    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 9 && kept,
+    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 10 && kept,
              "display key \(display) (sentinel 777), camera key \(stored ?? "nil"), \(keysNow.count) "
                 + "keys \(keysNow), the row and the camera kept through rebuildSources + "
                 + "restoreChoices \(kept)")
@@ -1380,6 +1389,9 @@ func panelRows(_ request: [String: Any]) {
     formatPanelRows(panel, fakeCamera: fakeCamera, cameraRow: cameraRow(), choose: choose, reset: reset)
     previewStepRows()
     previewPanelRows(panel, cameraRow: cameraRow(), choose: choose, reset: reset)
+    besidePanelRows(
+        panel, spy: spy, fakeCamera: fakeCamera, noCamera: noCamera, cameraRow: cameraRow(),
+        choose: choose, reset: reset, recordingKeys: recordingKeys)
     hotPlugPanelRows(panel, reset: reset)
     probeFacts["visibleAtEnd"] = panel.window?.isVisible ?? true
 }
@@ -1634,6 +1646,186 @@ func previewPanelRows(
                 + "pt; a display row again: hidden \(hiddenAgain.map { "\($0)" } ?? "no row") | the "
                 + "well: showMessage(x) → message \(message ?? "nil"), hosted \(messageHosted); "
                 + "show(layer) → hosted \(hosted), message \(hostedMessage ?? "nil")")
+    reset()
+}
+
+/// P20–P22 (CR3c, spec §11 CAM-11) on the hidden panel under
+/// `PanelGrantSpy`: the "Record the camera too" box — its row, its live rule,
+/// the choice and its key — the press with it ticked, and the well's row
+/// beside a screen source.
+func besidePanelRows(
+    _ panel: RecorderPanelController, spy: PanelGrantSpy, fakeCamera: NSMenuItem,
+    noCamera: NSMenuItem, cameraRow: NSMenuItem?, choose: (NSMenuItem?) -> Void,
+    reset: () -> Void, recordingKeys: () -> [String]
+) {
+    let box = panel.cameraBesideCheckbox
+    let key = RecorderPanelController.cameraBesideKey
+    let defaults = UserDefaults.standard
+    func tick(_ on: Bool) {
+        box.state = on ? .on : .off
+        panel.controlChanged(box)
+    }
+    func five() -> [[Int]] {
+        [
+            [panel.systemAudioSwitch.isEnabled, panel.showClicksSwitch.isEnabled,
+             panel.sizePopup.isEnabled, panel.includeFrameJobCheckbox.isEnabled,
+             panel.ratePopup.isEnabled].map { $0 ? 1 : 0 },
+            [panel.systemAudioSwitch.state == .on ? 1 : 0, panel.showClicksSwitch.state == .on ? 1 : 0,
+             panel.sizePopup.indexOfSelectedItem, panel.includeFrameJobCheckbox.state == .on ? 1 : 0,
+             panel.ratePopup.selectedTag()],
+        ]
+    }
+    var said: [String] = []
+    var ok = true
+    func expect(_ what: String, _ good: Bool) {
+        said.append("\(what) \(good ? "ok" : "WRONG")")
+        ok = ok && good
+    }
+
+    // P20 — the row, the live rule, the choice, the key.
+    reset()
+    defaults.set(false, forKey: key)
+    let grid = box.superview as? NSGridView
+    func rowIndex(_ view: NSView) -> Int? {
+        guard let grid, let row = grid.cell(for: view)?.row else { return nil }
+        return grid.index(of: row)
+    }
+    let rows = (rowIndex(panel.includeFrameJobCheckbox), rowIndex(box), rowIndex(panel.cameraPopup))
+    expect("the box \(box.title) at grid row \(rows.1.map(String.init) ?? "none"), Include at "
+           + "\(rows.0.map(String.init) ?? "none"), Camera at \(rows.2.map(String.init) ?? "none")",
+           box.title == "Record the camera too" && rows.0 != nil && rows.1 == rows.0.map { $0 + 1 }
+               && rows.2 == rows.1.map { $0 + 1 })
+    let ft = CameraDeviceFacts(uniqueID: "FT-ID", name: "FaceTime HD Camera", isBuiltIn: true,
+                               formats: faceTime, activeFormat: 1)
+    choose(panel.sourcePopup.item(at: 0))
+    box.state = .off
+    panel.cameraPopup.select(fakeCamera)
+    panel.controlChanged(panel.cameraPopup)
+    panel.fillCameraFormats(ft, stored: "1920x1080@30")
+    let offChoice = panel.currentChoice()
+    expect("a display, the box off: Camera \(panel.cameraPopup.isEnabled), Format "
+           + "\(panel.formatPopup.isEnabled), the box \(box.isEnabled), camera "
+           + "\(offChoice.camera ?? "nil")",
+           !panel.cameraPopup.isEnabled && !panel.formatPopup.isEnabled && box.isEnabled
+               && offChoice.camera == nil && offChoice.cameraFormat == nil)
+    panel.systemAudioSwitch.state = .off
+    panel.showClicksSwitch.state = .on
+    panel.sizePopup.selectItem(at: 1)
+    panel.includeFrameJobCheckbox.state = .on
+    _ = panel.ratePopup.selectItem(withTag: 30)
+    let before = five()
+    tick(true)
+    let after = five()
+    let choice = panel.currentChoice()
+    let stored = defaults.object(forKey: key) as? Bool
+    let note = panel.sizeNote.stringValue
+    expect("ticked: Camera \(panel.cameraPopup.isEnabled), Format \(panel.formatPopup.isEnabled); "
+           + "the five \(before) → \(after); source \(choice.source), camera "
+           + "\(choice.camera ?? "nil"), format \(choice.cameraFormat ?? "nil"); key "
+           + "\(stored.map { "\($0)" } ?? "absent"); size note \(note)",
+           panel.cameraPopup.isEnabled && panel.formatPopup.isEnabled
+               && after[0] == [1, 1, 1, 1, 1] && after[1] == before[1] && before[1] == [0, 1, 1, 1, 30]
+               && choice.source == .display(panel.selectedDisplayID)
+               && choice.camera == "probe-camera" && choice.cameraFormat == "1920x1080@30"
+               && choice.cameraFormat == panel.selectedCameraFormat && choice.includeFrameJobWindows
+               && stored == true && note.contains("points"))
+    let keys = recordingKeys()
+    expect("\(keys.count) FrameJobRecording… keys \(keys)",
+           keys.count == 10 && keys.contains(key))
+    tick(false)
+    let unticked = defaults.object(forKey: key) as? Bool
+    expect("unticked: key \(unticked.map { "\($0)" } ?? "absent"), camera "
+           + "\(panel.currentChoice().camera ?? "nil")",
+           unticked == false && panel.currentChoice().camera == nil)
+    tick(true)
+    choose(cameraRow)
+    let underCamera = (box.isEnabled, box.state == .on)
+    choose(panel.sourcePopup.menu?.item(withTag: RecorderPanelController.voiceOverTag))
+    let underVoice = (box.isEnabled, box.state == .on)
+    choose(panel.sourcePopup.item(at: 0))
+    let back = (box.isEnabled, box.state == .on)
+    expect("under Camera (enabled, on) \(underCamera), under Microphone Only \(underVoice), a "
+           + "display again \(back)",
+           underCamera == (false, true) && underVoice == (false, true) && back == (true, true))
+    defaults.set(true, forKey: key)
+    box.state = .off
+    panel.restoreChoices()
+    let restoredOn = box.state == .on
+    defaults.set(false, forKey: key)
+    panel.restoreChoices()
+    let restoredOff = box.state == .off
+    expect("restoreChoices: true → on \(restoredOn), false → off \(restoredOff)",
+           restoredOn && restoredOff)
+    probeRow("P20", ok, said.joined(separator: "; "))
+
+    // P21 — the press with the box ticked.
+    said = []
+    ok = true
+    reset()
+    choose(panel.sourcePopup.item(at: 0))
+    panel.microphonePopup.selectItem(at: 0)
+    tick(true)
+    let pane = RecordingGrant.cameraPaneURL?.absoluteString ?? ""
+    func press() -> (screen: Int, camera: Int) {
+        let (screen, camera) = (spy.screenReads, spy.cameraReads)
+        panel.record(nil)
+        return (spy.screenReads - screen, spy.cameraReads - camera)
+    }
+    panel.cameraPopup.select(noCamera)
+    spy.screen = false
+    var reads = press()
+    expect("None connected: \(panel.noteLabel.stringValue), screen reads \(reads.screen), camera "
+           + "reads \(reads.camera)",
+           panel.noteLabel.stringValue == CameraDevices.noCameraSentence && panel.phase == .idle
+               && reads == (0, 0))
+    reset()
+    panel.cameraPopup.select(fakeCamera)
+    spy.camera = .authorized
+    reads = press()
+    expect("screen false: screen reads \(reads.screen), camera reads \(reads.camera), \(panel.phase)",
+           reads == (1, 0) && panel.phase == .idle)
+    reset()
+    spy.screen = true
+    spy.camera = .notDetermined
+    let requests = spy.cameraRequests
+    reads = press()
+    expect("screen true, camera notDetermined: \(spy.cameraRequests - requests) camera request(s), "
+           + "\(panel.phase)",
+           spy.cameraRequests - requests == 1 && panel.phase == .idle)
+    spy.heldCamera?()
+    spy.heldCamera = nil
+    reset()
+    spy.camera = .denied
+    spy.opened = []
+    reads = press()
+    expect("the camera denied: opened \(spy.opened)",
+           spy.opened == [pane] && panel.phase == .idle)
+    reset()
+    spy.camera = .authorized
+    spy.reads = []
+    reads = press()
+    expect("authorized, Microphone Off: \(panel.phase), reads in order \(spy.reads)",
+           panel.phase == .countdown(RecorderPanelController.countdownSeconds)
+               && spy.reads == ["screen", "camera"])
+    panel.cancelCountdown()
+    reset()
+    tick(false)
+    reads = press()
+    expect("the box off on a display row: \(panel.phase), camera reads \(reads.camera)",
+           panel.phase == .countdown(RecorderPanelController.countdownSeconds) && reads.camera == 0)
+    panel.cancelCountdown()
+    reset()
+    spy.screen = false
+    probeRow("P21", ok, said.joined(separator: "; "))
+
+    // P22 — the well's row beside a screen source.
+    choose(panel.sourcePopup.item(at: 0))
+    tick(true)
+    let shown = panel.cameraPreviewRow?.isHidden == false
+    tick(false)
+    let hidden = panel.cameraPreviewRow?.isHidden == true
+    probeRow("P22", shown && hidden,
+             "a display with the box ticked: the well's row shown \(shown); unticked: hidden \(hidden)")
     reset()
 }
 
@@ -2017,11 +2209,14 @@ func besideToolRows(movie: MediaDescriptor, micProblem: String, troubled: Record
     ]
     let alert = AgentServer.recordingAlertClause
     let lead = "record_screen asked the recorder to stop and it did not finish within "
+    // CR3c (spec §11 CAM-11 (7)): the ceiling is the wait's `camera:`, also
+    // with no camera file held.
     let timeouts = [
         AgentServer.finishTimeoutSentence(movies: [movie.path]),
-        AgentServer.finishTimeoutSentence(movies: [movie.path], cameras: [cam0.path]),
+        AgentServer.finishTimeoutSentence(movies: [movie.path], cameras: [cam0.path], camera: true),
         AgentServer.finishTimeoutSentence(
-            movies: [movie.path, movie1.path], cameras: [cam0.path, cam1.path]),
+            movies: [movie.path, movie1.path], cameras: [cam0.path, cam1.path], camera: true),
+        AgentServer.finishTimeoutSentence(movies: [movie.path], camera: true),
     ]
     let wantTimeouts = [
         lead + "75 s. The recording may still finish on its own; its movie is at \(movie.path)." + alert,
@@ -2029,10 +2224,12 @@ func besideToolRows(movie: MediaDescriptor, micProblem: String, troubled: Record
             + "Its camera file is at \(cam0.path)." + alert,
         lead + "195 s. The recording may still finish on its own; its movies are at "
             + "\(movie.path), \(movie1.path). Its camera files are at \(cam0.path), \(cam1.path)." + alert,
+        lead + "105 s. The recording may still finish on its own; its movie is at \(movie.path)." + alert,
     ]
     probeRow("T11", clauses == wantClauses && ceilings == [75, 105, 195, 105] && timeouts == wantTimeouts,
              "filesClause \(clauses); stopCeiling 1, 1 camera, 2 camera, 0 camera → \(ceilings); "
-                + "timeouts match \(zip(timeouts, wantTimeouts).map { $0 == $1 }): "
+                + "timeouts (the last camera: true with no camera file) match "
+                + "\(zip(timeouts, wantTimeouts).map { $0 == $1 }): "
                 + "\(timeouts.map { String($0.prefix(140)) })")
 }
 
@@ -2492,6 +2689,13 @@ func screenSection(_ request: [String: Any]) {
         probeFacts["error"] = "\(error)"
         return
     }
+    besideScreenRecording(filter, camera: camera, folder: folder)
+    probeFacts["G17"] = preparedBesideScreen(filter, camera: camera, folder: folder)
+}
+
+/// G16's recording (CR3a): the main display with the camera beside it, 2 s,
+/// a 1 s pause, 2 s more, its facts in `probeFacts`.
+func besideScreenRecording(_ filter: SCContentFilter, camera: CameraDeviceFacts, folder: URL) {
     var choice = RecordingChoice()
     choice.source = .display(CGMainDisplayID())
     choice.camera = camera.uniqueID
@@ -2562,6 +2766,60 @@ func screenSection(_ request: [String: Any]) {
             ]
         }
     }
+}
+
+/// G17 (CR3c, spec §11 CAM-11 (4)): the panel's prepared capture beside a
+/// display. `prepareCamera` for a `.display` choice naming the camera, with
+/// no microphone, its answer awaited (≤ 5 s); then `start(…, mayAsk: true)`,
+/// the panel's start, adopts it — the session's `cameraCapture` is the
+/// prepared capture and the slot is nil — and 2 s are recorded as one
+/// segment. The camera file's frames are scored by G3's decode in Python.
+func preparedBesideScreen(_ filter: SCContentFilter, camera: CameraDeviceFacts, folder: URL)
+    -> [String: Any]
+{
+    var choice = RecordingChoice()
+    choice.source = .display(CGMainDisplayID())
+    choice.camera = camera.uniqueID
+    choice.folder = folder
+    let recorder = ScreenRecorder()
+    var out: [String: Any] = [:]
+    recorder.prepareCamera(for: choice)
+    out["prepared"] = recorder.preparedCamera != nil
+    out["answered"] = awaitPrepared(recorder)
+    let prepared = recorder.preparedCamera?.capture
+    var started: Error??
+    recorder.start(filter: filter, choice: choice, mayAsk: true, onFinish: { _ in }) {
+        started = .some($0)
+    }
+    out["adopted"] = prepared != nil && recorder.session?.cameraCapture === prepared
+    probeSpin(ScreenRecorder.armCeiling + 5) { started != nil }
+    out["slotNil"] = recorder.preparedCamera == nil
+    guard let answer = started else {
+        out["error"] = "the start did not answer"
+        return out
+    }
+    if let answer {
+        out["error"] = "the start failed: \(answer.localizedDescription)"
+        return out
+    }
+    var finished: Result<RecordingResult, Error>?
+    probeSpin(2)
+    recorder.stop { finished = $0 }
+    probeSpin(40) { finished != nil }
+    switch finished {
+    case nil:
+        out["error"] = "the stop did not answer in 40 s"
+    case .failure(let error):
+        out["error"] = "the recording failed: \(error.localizedDescription)"
+    case .success(let result):
+        out["segments"] = result.segments.map { segment -> [String: Any] in
+            ["movie": segment.descriptor.path, "camera": segment.cameraDescriptor?.path ?? NSNull()]
+        }
+        out["format"] = result.camera?.format ?? "none"
+        out["note"] = result.camera?.note ?? NSNull()
+        out["problem"] = result.camera?.problem ?? NSNull()
+    }
+    return out
 }
 
 // MARK: - main

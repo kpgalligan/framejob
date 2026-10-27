@@ -38,9 +38,11 @@ extension RecorderPanelController {
             toggle.target = self
             toggle.action = #selector(controlChanged(_:))
         }
-        includeFrameJobCheckbox.font = DS.sans(13)
-        includeFrameJobCheckbox.target = self
-        includeFrameJobCheckbox.action = #selector(controlChanged(_:))
+        for box in [includeFrameJobCheckbox, cameraBesideCheckbox] {
+            box.font = DS.sans(13)
+            box.target = self
+            box.action = #selector(controlChanged(_:))
+        }
         for rate in Self.rates {
             let item = NSMenuItem(title: "\(rate) fps", action: nil, keyEquivalent: "")
             item.tag = rate
@@ -69,6 +71,7 @@ extension RecorderPanelController {
         let grid = makeSheetGrid([
             [fieldLabel("Source:"), sourcePopup],
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
+            [NSGridCell.emptyContentView, cameraBesideCheckbox],
             [fieldLabel("Camera:"), cameraPopup],
             [fieldLabel("Format:"), formatPopup],
             [NSGridCell.emptyContentView, cameraPreview],
@@ -268,7 +271,8 @@ extension RecorderPanelController {
     /// The controls as one value. `.picked` only while the picker's filter
     /// is held; a "Window…" row with no filter (the picker was cancelled and
     /// the row not reselected) falls back to the main display. `camera` is
-    /// the Camera popup's id with Source Camera, and nil for every other;
+    /// the Camera popup's id while a camera is wanted (Source Camera, or the
+    /// box beside a screen source: CAM-11 (3)), and nil otherwise;
     /// `cameraFormat` the Format popup's spelling beside it, nil for Best.
     func currentChoice() -> RecordingChoice {
         var choice = RecordingChoice()
@@ -276,12 +280,14 @@ extension RecorderPanelController {
             choice.source = .voiceOver
         } else if cameraSelected {
             choice.source = .camera
-            choice.camera = selectedCameraID
-            choice.cameraFormat = selectedCameraFormat
         } else if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter != nil {
             choice.source = .picked
         } else {
             choice.source = .display(selectedDisplayID)
+        }
+        if cameraWanted {
+            choice.camera = selectedCameraID
+            choice.cameraFormat = selectedCameraFormat
         }
         choice.includeFrameJobWindows = includeFrameJobCheckbox.state == .on
         choice.microphone = microphonePopup.selectedItem?.representedObject as? String
@@ -304,7 +310,8 @@ extension RecorderPanelController {
     /// key is left alone while the Window row, Microphone Only or Camera (the
     /// two session-only rows) is selected. The camera key, and the format
     /// key beside it (`""` for Best), are written only while the Camera popup
-    /// names one, so "None connected" forgets nothing.
+    /// names one, so "None connected" forgets nothing. The box's key is written
+    /// on every change (CAM-11 (2)).
     func persistChoices() {
         let defaults = UserDefaults.standard
         if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected {
@@ -321,6 +328,7 @@ extension RecorderPanelController {
         defaults.set(showClicksSwitch.state == .on, forKey: Self.showClicksKey)
         defaults.set(
             includeFrameJobCheckbox.state == .on, forKey: Self.includeFrameJobWindowsKey)
+        defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
     }
@@ -348,6 +356,7 @@ extension RecorderPanelController {
         showClicksSwitch.state = defaults.bool(forKey: Self.showClicksKey) ? .on : .off
         includeFrameJobCheckbox.state =
             defaults.bool(forKey: Self.includeFrameJobWindowsKey) ? .on : .off
+        cameraBesideCheckbox.state = defaults.bool(forKey: Self.cameraBesideKey) ? .on : .off
         let rate = defaults.integer(forKey: Self.rateKey)
         _ = ratePopup.selectItem(withTag: Self.rates.contains(rate) ? rate : RecordingChoice().rate)
         let size = defaults.string(forKey: Self.sizeKey) ?? ""

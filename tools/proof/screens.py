@@ -182,6 +182,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobRecordingIncludeFrameJobWindows", False),
     ("FrameJobRecordingCamera", ""),
     ("FrameJobRecordingCameraFormat", ""),
+    ("FrameJobRecordingCameraBeside", False),
     ("FrameJobCaptionEngine", "apple"),
     ("FrameJobAssemblyAIRegion", "us"),
     ("FrameJobCaptionStyle", "subtitles"),

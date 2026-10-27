@@ -275,7 +275,8 @@ extension AgentServer {
                 }
                 throw ToolError(
                     message: Self.finishTimeoutSentence(
-                        movies: movies, cameras: cameras, voiceOver: choice.source == .voiceOver))
+                        movies: movies, cameras: cameras, camera: cameraBeside,
+                        voiceOver: choice.source == .voiceOver))
             }
         }
         guard let outcome = box.value else {

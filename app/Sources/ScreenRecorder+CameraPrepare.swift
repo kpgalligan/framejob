@@ -5,11 +5,13 @@ import AppKit
 /// CAM-5; CR2b, CAM-7): `prepareMicrophone`'s precedent for the camera.
 /// CAM-3's warm-up holds `startCamera` until the stream runs at the format's
 /// rate — about 0.5 s on the built-in camera, on top of the session's own
-/// start — so the panel builds and starts the capture while it shows Source
-/// Camera (`syncCameraPreview`, the countdown keeping it), with the preview's
-/// layer on it (`preview: true`, the only capture that has one), and the
-/// panel's `startCamera` ADOPTS it when it is the same device at the same
-/// format, not adopted before, with no failed start and no stop on its own.
+/// start — so the panel builds and starts the capture while it wants a
+/// camera, Source Camera or one beside the screen (`syncCameraPreview`, the
+/// countdown keeping it; CAM-11 (4)), with the preview's layer on it
+/// (`preview: true`, the only capture that has one), and the panel's
+/// `startCamera`, or its `start` beside the screen, ADOPTS it when it is the
+/// same device at the same format, not adopted before, with no failed start
+/// and no stop on its own.
 /// Otherwise it is let go and a fresh one is built, as before. The tool never
 /// prepares and never adopts (`adopting: false`, CAM-7 (7)), so its start
 /// still pays the hold. A capture that cannot be built is remembered
@@ -65,16 +67,17 @@ extension ScreenRecorder {
 
     // MARK: - Prepare and discard
 
-    /// MAIN THREAD, idle only. Acts only for a `.camera` choice naming a
-    /// camera, with the Camera grant `.authorized`, the camera connected and
-    /// a format (the choice's, else CAM-3's best: CAM-6 (3)); otherwise it
+    /// MAIN THREAD, idle only. Acts only for a choice naming a camera whose
+    /// source is not `.voiceOver` — Source Camera, or a camera beside a
+    /// display or a window (spec §11 CAM-11 (4)) — with the Camera grant
+    /// `.authorized`, the camera connected and a format (the choice's, else CAM-3's best: CAM-6 (3)); otherwise it
     /// does nothing and leaves nothing behind. A prepared capture that `startCamera` could still adopt for
     /// the same device and format is kept, and nothing is built while a
     /// failed build's record names them (CAM-7 (8)); any other is let go
     /// first. Blocks main for the capture's construction; the session starts
     /// on its own queue.
     func prepareCamera(for choice: RecordingChoice) {
-        guard state == .idle, choice.source == .camera, let id = choice.camera,
+        guard state == .idle, choice.source != .voiceOver, let id = choice.camera,
             RecordingGrant.cameraStatus == .authorized,
             let device = CameraDevices.device(withID: id)
         else { return }

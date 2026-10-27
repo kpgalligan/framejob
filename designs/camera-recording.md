@@ -380,15 +380,41 @@ landing back. The panel that drives both is last, as CR1c was.
   ops, with mutants, and `recording_proof.py`'s source rows of the stop wait and the timeout
   sentence re-aimed (the argument set does not change, so no schema row moves). Docs: §7.9a,
   §7.4, the guide's screen-recording page and `mcp.md`.
-- **CR3c — the panel's camera row; CAM-11.** CAM-11 is recorded in §11 before the code. With
-  Source a display or a window the panel offers a camera, and the Format popup and the preview
-  follow it. The press reads Screen Recording, then Camera, then Microphone. The countdown
-  prepares the camera (CAM-5 (5)), and the panel orders out as for every screen source.
-  **Decides** the row's shape (the Camera popup live with an off row, or a control of its own),
-  its key, and whether the preview shows with a screen source. **Proof**: `panel` probe rows and
-  mutants, `snapshot_ui`, `screens.py`'s recorder screen, and a manual-check row (the talking
-  head lined up with the screen and the voice). Docs: the guide, the screen catalog's prose.
-  CR3c measures its own files at its spec; a toll it needs lands first as a pure move.
+- **CR3c — the panel's camera row, and CR3b's review nit; CAM-11.** CAM-11 is recorded in §11
+  before the code; it amends CAM-5 (2), CAM-6 (2), CAM-7 (1) and (3), and CAM-10 (7) and (9).
+  Measured at its spec, no toll is needed: the files it grows stand at 355 (the base file), 380
+  (`+Rows`), 366 (`+Recording`), 215 (`+Camera`), 143 (`+CameraPreview`) and 170
+  (`+CameraPrepare`). `ScreenRecorder.swift` (399) is not touched, because its `start` already
+  adopts a prepared capture beside the screen (CAM-9 (1)).
+  - **The row is a control of its own.** It is a checkbox, "Record the camera too", under Include
+    Frame Job windows. It is live only while idle with a display or the Window row, and greyed
+    with its value kept under Camera or Microphone Only. It persists in
+    `FrameJobRecordingCameraBeside`, off by default; that is the panel's tenth key, pinned in the
+    harness and `screens.py`. An "Off" row in the Camera popup was not chosen, because it would
+    change what the shared camera key means for Source Camera and for hot-plug (CAM-8). Ticked,
+    the Camera and Format popups are live as they are with Source Camera, and the choice carries
+    `camera` and `cameraFormat`. The size note stays the screen's.
+  - **The preview shows with it.** Its row, its step and its prepared capture work as they do for
+    Source Camera, so the warm-up is spent before the countdown and the panel's start adopts the
+    capture. `prepareCamera` acts for any choice that names a camera, except a voice-over. While a
+    tool records a camera beside the screen, the well reads "The camera is recording.".
+  - **The press.** First Window… with nothing picked, then no camera ("No camera is connected."),
+    then Screen Recording, then Camera, then Microphone, then the countdown. The panel orders out
+    as it does for every screen source.
+  - **CR3b's review nit.** `finishTimeoutSentence` spells the ceiling the wait used
+    (`camera: cameraBeside`), not one keyed on the camera files it found.
+
+  **Proof**:
+  - `panel` probe rows: the box's live rule, the choice, the key, the press's order and the
+    preview's row.
+  - A granted `screen` row: the panel's prepared capture adopted by a screen start with `mayAsk`.
+  - T11 re-aimed for the nit.
+  - Mutants.
+  - `recording_probe.py` re-aimed for the tenth key.
+  - `snapshot_ui` of the panel, and `screens.py`'s recorder screen.
+  - A manual-check row: the talking head lined up with the screen and the voice.
+
+  Docs: the guide, §7.9a, §7.4, the catalog's sentence and the screen catalog's prose.
 - **CR4 — the close.** The README highlight; `docs/guide/` read back against the code; the
   proofs run whole once on Release; then as root `CLAUDE.md` says: condense this into
   `designs/adr/camera-recording.md`, file each unfinished item as an issue (reviewed against
@@ -1789,12 +1815,135 @@ the terminal's Screen Recording, Camera and Microphone grants; each command once
   offsets, floor and corner).
 - Observed: the Release run's `camera_offset` was −161.5 ms, past CR3a's measured 32–146 ms
   range (the Debug run's was −149.8 ms); both within G16's 0.5 s bound. One run each.
+- The review passed with one nit, which lands in CR3c. `finishTimeoutSentence` sizes the
+  ceiling it spells by `!cameras.isEmpty`, but the wait uses `cameraBeside`. So a camera beside
+  the screen that armed no writer waits 105 s and the sentence says 75 s.
 - CR3c: the panel's camera row with a screen source, its key, the preview with a screen source,
   `screens.py` and the manual-check row (a talking head lined up).
 
 ## CR3c — the panel's camera row
 
 ### Record
+
+**Landed** (2026-10-27). With a display or the Window row chosen, the recorder panel's "Record the
+camera too" box records the chosen camera at the chosen format beside the screen, with the live
+preview, the warm-up spent before the countdown and the press reading Screen Recording, then
+Camera, then Microphone; it lands by CAM-10. CR3b's review nit is fixed.
+- Spec §11 CAM-11, written before any code (amends CAM-5 (2), CAM-6 (2), CAM-7 (1) and (3),
+  CAM-10 (7) and (9)): (1) the box and its live rule; (2) `FrameJobRecordingCameraBeside`; (3) a
+  camera wanted, the popups, the choice and the five; (4) the preview, `prepareCamera` for any
+  choice naming a camera but a voice-over's, the panel's start adopting; (5) the press's order;
+  (6) a screen recording's chrome and landing; (7) the timeout's ceiling the wait's; (8) CAM-10
+  (9) lifted. Its index row, and the `camera-recording.md` row's Lines cell (481 → 521) and
+  summary; the `11-decisions/` cell 13418 → 13459 in 31 files.
+- The base file: `cameraBesideKey`, `cameraBesideCheckbox`, the type doc (ten keys, the box
+  remembered across launches). `+Camera`: `screenSourceSelected`, `cameraBesideSelected`,
+  `cameraWanted`; `syncCameraControls` (the popups live while idle with a camera wanted, the box
+  while idle with a screen source); the file doc. `+Rows`: the box's font, target and action
+  (one loop with Include Frame Job windows) and its grid row; `currentChoice` sets `camera` and
+  `cameraFormat` whenever a camera is wanted; `persistChoices` and `restoreChoices` write and
+  read the key. `+Recording`: `beginIfGranted`'s no-camera guard and
+  `!cameraBesideSelected || checkCameraGrant()` between Screen Recording and the microphone.
+  `+CameraPreview`: the row and the step follow `cameraWanted`, `recordingCamera` and the
+  `.recording` arm also read `recorder.session?.cameraCapture`.
+  `ScreenRecorder+CameraPrepare`: the guard `choice.source != .voiceOver`, and its docs.
+- The nit: `finishTimeoutSentence(…, camera:)` spells `stopCeiling(segments:camera:)` with the
+  wait's `cameraBeside`, passed by `record`'s timeout. The catalog's "does not offer a camera
+  beside the screen yet" became "The recorder panel's Record the camera too box, with a display
+  or a window, makes the same recording."
+- Proofs: `camera_recording_probe.py` (1407 → 1538) and `.swift` (2589 → 2847): P20–P23, G17
+  (with G16's recording moved into `besideScreenRecording` so G17 runs after it under the same
+  skips), T11 re-aimed, the spy's `screen` and ordered `reads`, the tenth key, P3's count 9 → 10,
+  nine mutants and two re-aimed anchors, the docstrings. `camera_recording_proof.py` (658 → 662):
+  section D expects a view reading "Record the camera too". `recording_probe.py` (10778 →
+  10780): the tenth key in chrome mode's `out["keys"]` and `voiceoverDoors`' `keys`, 5d's and
+  D3's counts 9 → 10, the docstrings. `recording_proof.py` (2270 → 2272): `source_part()`'s
+  timeout rows re-aimed (signature, call, ceiling). `harness/main.swift` and `screens.py` pin
+  `"FrameJobRecordingCameraBeside": false`. `tools/proof/README.md`: "all nine" → ten, and a
+  CR3c section.
+- Docs: spec §7.9a (the screen + camera clause names the box; 511 → 512 lines), §7.4 row 52
+  (57 lines, unchanged), the screen catalog's `16-recorder-panel.md`, the guide's
+  screen-recording page (the controls table's new row and its Camera, Format and Preview rows,
+  the remembered choices, "A camera beside the screen", step 4 of Recording, the Permissions
+  paragraph and its Camera bullet, the agent section's last sentence, the Limits line), and
+  `docs/manual-checks.md`'s REC-18.
+
+**Sizes** (`wc -l`, before → after): `RecorderPanelController.swift` 355 → 360; `+Camera` 215 →
+235; `+Rows` 380 → 389; `+Recording` 366 → 375; `+CameraPreview` 143 → 146;
+`ScreenRecorder+CameraPrepare.swift` 170 → 173; `AgentServer+RecordingSentences.swift` 101 →
+104; `AgentServer+Recording.swift` 310 → 311; `AgentCatalog+Recording.swift` 365 → 365.
+`ScreenRecorder.swift` (399) is untouched.
+
+**Measured** (the main display, the FaceTime HD camera at 1760×1328@30, the terminal's Screen
+Recording, Camera and Microphone grants; each command once):
+- `python3 tools/proof/spec_index_proof.py`: exit 0, `201/201 checks passed`, after CAM-11 and
+  again after §7.9a's cell.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- `python3 tools/proof/camera_recording_probe.py --only panel,tool`: exit 0, `scores: 39/39`, the
+  first run. P20: the box at grid row 2 between Include (1) and Camera (3); ticked, the choice
+  `display(1)` with `probe-camera` and `1920x1080@30`, the five `[0, 1, 1, 1, 30]` kept and live,
+  the size note `2056×1329 points · 4112×2658 pixels`, ten keys. P21: None connected 0 and 0
+  reads; `screen` false 1 screen read, 0 camera reads; `notDetermined` 1 request; denied opened
+  `…Privacy_Camera`; authorized `countdown(3)` with the reads `["screen", "camera"]`; the box off
+  0 camera reads. T11: `stopCeiling` 75, 105, 195, 105 and the four timeouts exact.
+- The nine mutants, each exit 1 and caught: `beside-choice-dropped` 27/28 (P20),
+  `beside-popups-dead` 27/28 (P20), `beside-box-live-for-camera` 27/28 (P20),
+  `beside-unpersisted` 26/28 (P3, P20), `beside-camera-grant-skipped` 27/28 (P21),
+  `beside-no-camera-unchecked` 27/28 (P21), `beside-preview-row-hidden` 27/28 (P22), all `--only
+  panel`; `beside-unprepared` 28/30 (P23, G17; `--only panel,screen`);
+  `timeout-ceiling-by-files` 11/12 (T11; `--only tool`). The two re-aimed, each exit 1:
+  `format-popup-live` 26/28 (P11, P20) and `preview-row-always` 26/28 (P14, P22).
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): none off (81
+  and 78 mutants).
+- `python3 tools/proof/camera_recording_probe.py --only screen`: exit 0, `scores: 3/3`. G16: E2 −
+  E1 [12.9, 12.0] ms, `cameraOffset` [−0.104, −0.169] s. G17: prepared and answered, adopted by
+  `start(mayAsk: true)`, the slot nil, one segment, frames 0.9992.
+- `python3 tools/proof/recording_probe.py --only chrome,voiceover_doors,exclusion`: exit 0,
+  `178/178 checks passed` (5d ten keys, the harness pinning each by value; D3 ten keys).
+- Debug (`make app-debug`, `proof_app.py launch`): `camera_recording_proof.py` exited 0 with
+  `61/61 checks passed`, section D's layout listing 'Record the camera too'. `grep "Frame Job: "`
+  printed nothing; the instance was stopped by its pid.
+- `make gate`: `gate: PASS 223s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 116 s,
+  app 101 s). Once more after this record was written: `gate: PASS 1s` (names run, the rest
+  skipped as unchanged).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 98/98`, G0–G17 all run, in
+  62 s. G16: E2 − E1 [10.6, 19.5] ms, `cameraOffset` [−0.073, −0.179] s, frames 0.9992 twice.
+  G17: adopted, the slot nil, frames 0.9992 at 1760x1328@30, no note, no problem.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`, in 152 s.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock` exited 0
+  with `61/61 checks passed` (camera_offset −102252 ticks, −170.4 ms; the camera clip at 1200000
+  with `in` 100000, 2252 ticks off; the layout listing 'Record the camera too').
+  `RC_PROOF_APP=release python3 tools/proof/recording_proof.py <dir>/agent.sock --no-screen
+  --no-microphone` exited 0 with `142/142 checks passed`, sections 5 (69 checks) and 6 (10)
+  skipped by their flags. `grep "Frame Job: " <dir>/framejob.log` printed nothing. The instance
+  was stopped by its pid.
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 16-recorder-panel`: exit 0, `scores:
+  6 pass, 0 fail, 0 skip of 6`, both looks captured, 0 new problems, no `Frame Job: ` line; the
+  light capture shows the unticked box under Include Frame Job windows.
+
+**Deviations.**
+- `PanelGrantSpy` also gained an ordered `reads` list, so P21 can score the order of the Screen
+  Recording and Camera reads, which the counters cannot.
+- G16's recording moved from `screenSection`'s tail into `besideScreenRecording` (the same
+  lines), so G17 runs after it under the same skips even when G16 errors.
+- `recording_probe.py`'s D3 count also went from 9 to 10. D3 counts the keys present after a
+  change, and `persistChoices` now writes the tenth. `camera_recording_proof.py`'s no-capture skip
+  count went from 2 to 3 for its third row.
+- The guide's "Recording" step 4 now names Source Camera and Microphone Only as the sources that
+  keep the panel up. The Source Camera paragraph's "choosing a display turns it off" now excepts
+  a ticked box.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): in `app/CLAUDE.md`, the recorder panel's entry
+  becomes ten `FrameJobRecording…` keys and names the "Record the camera too" box.
+- The review passed with two nits. The harness pin block's comment still said "nine" twice; it
+  says ten with the commit. Doc-comment paragraphs reflowed past the ~100-column wrap
+  (`+CameraPreview.swift`:25, `RecorderPanelController.swift`:23,
+  `ScreenRecorder+CameraPrepare.swift`:73) are left for CR4's read-back to rewrap.
+- REC-18 (a person at the machine): the panel's camera beside the screen, the prompts' order, the
+  talking head lined up with the screen and the voice, and the box remembered.
+- CR4: the close.
 
 ## CR4 — the close
 

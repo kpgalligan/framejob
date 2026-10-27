@@ -54,9 +54,12 @@ extension AgentServer {
     /// wait's own `?? 1` — when the recorder had let the session go. A
     /// voice-over's files are named "file", not "movie". `cameras` are the
     /// camera files beside a screen's movies (spec §11 CAM-10 (7)), named
-    /// after them, and the ceiling spelled is the one with the camera's probe.
+    /// after them. `camera` is the wait's own `cameraBeside`, so the ceiling
+    /// spelled is the one the wait used — with the camera's probe whenever a
+    /// camera was asked for beside the screen, even when no camera file is
+    /// held (CAM-11 (7)).
     static func finishTimeoutSentence(
-        movies: [String], cameras: [String] = [], voiceOver: Bool = false
+        movies: [String], cameras: [String] = [], camera: Bool = false, voiceOver: Bool = false
     ) -> String {
         let noun = voiceOver ? "file" : "movie"
         let where_: String
@@ -78,7 +81,7 @@ extension AgentServer {
         case 1: besideClause = " Its camera file is at \(cameras[0])."
         default: besideClause = " Its camera files are at " + cameras.joined(separator: ", ") + "."
         }
-        let ceiling = stopCeiling(segments: movies.count, camera: !cameras.isEmpty)
+        let ceiling = stopCeiling(segments: movies.count, camera: camera)
         return "record_screen asked the recorder to stop and it did not finish within "
             + "\(Int(ceiling)) s. " + where_ + besideClause + recordingAlertClause
     }

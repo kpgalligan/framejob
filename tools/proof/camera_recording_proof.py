@@ -66,7 +66,8 @@ files. Skipped by name without the Screen Recording grant or a shareable display
 
 **The panel** (CR1c, run LAST, after its own document is closed): `perform_menu_item ["File",
 "New Recording…"]` answers; `snapshot_ui {window: "recorder"}`'s layout dump lists views whose
-texts are `Camera:` and `Format:` (CR2a) and reports no layout problem; the log still holds no `Frame Job: ` line. Its
+texts are `Camera:` and `Format:` (CR2a) and one reading "Record the camera too" (CR3c, CAM-11),
+and reports no layout problem; the log still holds no `Frame Job: ` line. Its
 rows only show the panel: no row is changed, so no defaults key moves. The panel is left up;
 the instance is stopped by its pid.
 
@@ -601,7 +602,7 @@ def panel_part(mcp):
     text = "".join(p.get("text", "") for p in result.get("content", []) if p.get("type") == "text")
     check(not result.get("isError"), f"snapshot_ui {{window: recorder}} answers: {text[:200]!r}")
     if result.get("isError"):
-        skip("the panel's layout rows: no capture", 2)
+        skip("the panel's layout rows: no capture", 3)
         return
     answer = json.loads(text)
     with open(answer["layout_path"]) as handle:
@@ -610,6 +611,9 @@ def panel_part(mcp):
     labels = [t for t in texts if t and t.endswith(":")]
     check("Camera:" in texts and "Format:" in texts,
           f"the recorder panel's layout lists views reading 'Camera:' and 'Format:': {labels}")
+    check("Record the camera too" in texts,
+          "the recorder panel's layout lists a view reading 'Record the camera too' (CR3c, spec "
+          f"§11 CAM-11): {[x for x in texts if x and 'camera' in x.lower()]}")
     problems = layout.get("problems", [])
     check(problems == [], f"the recorder panel's layout reports no problem: {problems}")
     lines = None

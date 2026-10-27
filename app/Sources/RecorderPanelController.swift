@@ -19,8 +19,8 @@ import ScreenCaptureKit
 /// and the resume, the hidden recording's one door and the phases drawn
 /// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
 /// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit,
-/// `+Camera.swift` the Source row "Camera", its popup and the Format popup
-/// (spec §11 CAM-5, CAM-6), `+CameraPreview.swift` the camera's live
+/// `+Camera.swift` the Source row "Camera", its popup, the Format popup and
+/// the "Record the camera too" box (spec §11 CAM-5, CAM-6, CAM-11), `+CameraPreview.swift` the camera's live
 /// preview in `CameraPreviewWell` (CAM-7), and `+Devices.swift` hot-plug:
 /// the device observers and the popups rebuilt when a device comes or goes
 /// (CAM-8). Twelve files at the 400-line cap, and the
@@ -113,11 +113,12 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all nine on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all ten on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
-/// session only (the camera itself is remembered, the row is not).
+/// session only (the camera itself is remembered, the row is not). "Record
+/// the camera too" (CAM-11) is remembered across launches.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -132,6 +133,8 @@ final class RecorderPanelController: NSWindowController {
     static let includeFrameJobWindowsKey = "FrameJobRecordingIncludeFrameJobWindows"
     static let cameraKey = "FrameJobRecordingCamera"
     static let cameraFormatKey = "FrameJobRecordingCameraFormat"
+    /// "Record the camera too" (spec §11 CAM-11 (2)); an absent key reads as off.
+    static let cameraBesideKey = "FrameJobRecordingCameraBeside"
 
     // MARK: - Metrics and vocabulary
 
@@ -167,6 +170,8 @@ final class RecorderPanelController: NSWindowController {
     let sourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let includeFrameJobCheckbox = NSButton(
         checkboxWithTitle: "Include Frame Job windows", target: nil, action: nil)
+    let cameraBesideCheckbox = NSButton(
+        checkboxWithTitle: "Record the camera too", target: nil, action: nil)
     let cameraPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let formatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)

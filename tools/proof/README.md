@@ -10514,10 +10514,11 @@ full), and three are `recording_proof.py`'s.
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
 - **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
-  the panel's row reads false and its title; `out["keys"]` lists nine (seven
+  the panel's row reads false and its title; `out["keys"]` lists ten (seven
   until camera-recording CR1c added `FrameJobRecordingCamera`, eight until CR2a
-  added `FrameJobRecordingCameraFormat`), the harness pins
-  all nine by value (`"FrameJobRecordingIncludeFrameJobWindows":
+  added `FrameJobRecordingCameraFormat`, nine until CR3c added
+  `FrameJobRecordingCameraBeside`), the harness pins
+  all ten by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
   `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
@@ -24647,3 +24648,55 @@ the Screen Recording grant or a shareable display. Eight mutants: `camera-track-
 `remainder-camera-dropped` on L8; `camera-format-alone-admitted` on T9; `camera-ids-unwritten` on
 T10; `beside-display-sentence` on P19. The numbers are in `designs/camera-recording.md`'s CR3b
 record.
+
+## Camera recording CR3c — the panel's camera beside the screen (`camera_recording_probe.py` P20–P23, G17, T11 re-aimed; `camera_recording_proof.py` section D; spec §11 CAM-11)
+
+CR3c gives the recorder panel a "Record the camera too" checkbox under Include Frame Job windows,
+live only while idle with a display row or the Window row and remembered in
+`FrameJobRecordingCameraBeside` (the panel's tenth key, pinned by the harness and `screens.py`).
+Ticked, the Camera and Format popups are live, the choice carries `camera` and `cameraFormat`
+beside the screen source, the preview's row and step run as for Source Camera, `prepareCamera`
+acts for any choice naming a camera but a voice-over's, and the press reads Screen Recording,
+then Camera, then Microphone. The same phase makes `finishTimeoutSentence` spell the ceiling the
+stop wait used (`camera: cameraBeside`).
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only panel,tool          # P1–P23, T1–T11
+python3 tools/proof/camera_recording_probe.py --only panel --mutant beside-choice-dropped   # each panel mutant exits 1
+python3 tools/proof/camera_recording_probe.py --only panel,screen --mutant beside-unprepared
+python3 tools/proof/camera_recording_probe.py --only tool --mutant timeout-ceiling-by-files
+python3 tools/proof/camera_recording_probe.py --only screen              # G16, G17 (the terminal's grants)
+```
+
+**P20** on the hidden panel under `PanelGrantSpy`: the box's title and its grid row right after
+Include Frame Job windows and before Camera; a display row with the box off — Camera and Format
+disabled, `camera` nil; ticked through `controlChanged` — Camera and Format live, System Audio,
+Show Clicks, Size, Include Frame Job windows and Rate live with their values kept,
+`currentChoice()` `.display` with `probe-camera` and the Format popup's spelling, the size note
+the screen's, the key true and ten `FrameJobRecording…` keys; unticked — the key false and
+`camera` nil; under Camera and under Microphone Only the box greyed with its state kept;
+`restoreChoices()` sets it from the key. **P21** the press with the box ticked, through the spy's
+new `screen` (what `screenGranted` answers) and its ordered `reads`: "None connected" gives the
+note with no grant read; `screen` false one Screen Recording read and no camera read; the camera
+`notDetermined` one `requestCamera` and the phase idle; denied opens `Privacy_Camera`; authorized
+with Microphone Off counts down, the Screen Recording read before the Camera read; the box off
+reads no camera. **P22** the well's row shown with a display and the box ticked, hidden with it
+off. **P23** comment-stripped reads: `prepareCamera(`'s guard holds `!= .voiceOver` and no
+`== .camera`; `syncCameraPreview(` passes `cameraSource: cameraWanted` and reads
+`session?.cameraCapture`. **G17** (the `screen` section, after G16, under its skips) on a fresh
+recorder with no microphone: `prepareCamera` for the main display and the default camera, its
+answer awaited, then `start(filter:choice:mayAsk: true)` adopts it (the session's
+`cameraCapture` is the prepared capture, the slot nil), and 2 s as one segment whose camera file
+is ≥ 98 % of span × rate by G3's decode, with no `camera.note` or `camera.problem`. **T11**
+re-aimed: the two calls with camera files pass `camera: true`, and
+`finishTimeoutSentence(movies: [movie], camera: true)` spells 105 s with no camera clause.
+
+`recording_probe.py`'s chrome mode, `voiceover_doors` and 5d/D3 count ten keys;
+`camera_recording_proof.py`'s section D also expects a view reading "Record the camera too" in
+`snapshot_ui`'s layout; `recording_proof.py`'s source rows read the timeout's new signature,
+call and ceiling. Nine mutants: `beside-choice-dropped`, `beside-popups-dead`,
+`beside-box-live-for-camera` and `beside-unpersisted` on P20; `beside-camera-grant-skipped` and
+`beside-no-camera-unchecked` on P21; `beside-unprepared` on P23 and G17;
+`beside-preview-row-hidden` on P22; `timeout-ceiling-by-files` on T11. `format-popup-live` and
+`preview-row-always` are re-aimed at `cameraWanted`. The numbers are in
+`designs/camera-recording.md`'s CR3c record.

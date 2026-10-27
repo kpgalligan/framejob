@@ -1215,10 +1215,12 @@ def source_part():
     # Issue batch B66 (#99 phase 2): the recorder's own `heldSegmentCount` /
     # `heldFilePaths` — a screen recording's or a voice-over's — replace the
     # tool's `recorder.session?` reads.
+    # Camera recording CR3c (spec §11 CAM-11 (7)): the sentence's `camera:` is the wait's own
+    # `cameraBeside`, so the ceiling it spells is the one the wait used.
     check("static func finishTimeoutSentence( movies: [String], cameras: [String] = [], "
-          "voiceOver: Bool = false )" in re.sub(r"\s+", " ", sentences)
-          and "Self.finishTimeoutSentence( movies: movies, cameras: cameras, voiceOver: "
-              "choice.source == .voiceOver)" in re.sub(r"\s+", " ", tool)
+          "camera: Bool = false, voiceOver: Bool = false )" in re.sub(r"\s+", " ", sentences)
+          and "Self.finishTimeoutSentence( movies: movies, cameras: cameras, camera: cameraBeside, "
+              "voiceOver: choice.source == .voiceOver)" in re.sub(r"\s+", " ", tool)
           and "return recorder.heldFilePaths" in tool
           and "let count = max(recorder.heldSegmentCount, 1)" in tool
           and "recorder.session" not in code(tool) and "session?.movieURL" not in tool,
@@ -1229,7 +1231,7 @@ def source_part():
     check("case 1:" in timeout and "its \\(noun) is at \\(movies[0])." in timeout
           and "its \\(noun)s are at " in timeout and 'movies.joined(separator: ", ")' in timeout
           and 'let noun = voiceOver ? "file" : "movie"' in timeout
-          and "stopCeiling(segments: movies.count, camera: !cameras.isEmpty)" in timeout,
+          and "stopCeiling(segments: movies.count, camera: camera)" in timeout,
           "…and its sentence is pluralised by count and states the ceiling it waited, sized "
           "by the same count: one movie spelled as R1 spelled it, several comma-joined, and "
           "\"file\" for a voice-over's")

@@ -16,7 +16,10 @@ import ScreenCaptureKit
 /// reading "Window…" and no picked filter refuses FIRST, by name, and starts
 /// no countdown — `currentChoice()` would otherwise quietly fall back to the
 /// main display and record the wrong thing. The picker is NOT presented from
-/// the guard: a refusal that puts up a system UI is not a refusal.
+/// the guard: a refusal that puts up a system UI is not a refusal. With
+/// "Record the camera too" ticked (spec §11 CAM-11 (5)) no camera refuses
+/// next, and the Camera grant is checked between Screen Recording and the
+/// microphone; with it off the Camera grant is never read.
 ///
 /// **The start is bounded and numbered** (R1 review). `.starting` used to
 /// have no ceiling and no exit: `ScreenRecorder.shareableContent` can hold
@@ -122,7 +125,13 @@ extension RecorderPanelController {
             setNote(Self.chooseWindowSentence)
             return
         }
-        guard checkScreenRecordingGrant(), checkMicrophoneGrant() else { return }
+        if cameraBesideSelected, selectedCameraID == nil {
+            setNote(CameraDevices.noCameraSentence)
+            return
+        }
+        guard checkScreenRecordingGrant(), !cameraBesideSelected || checkCameraGrant(),
+            checkMicrophoneGrant()
+        else { return }
         setNote("")
         beginCountdown()
     }

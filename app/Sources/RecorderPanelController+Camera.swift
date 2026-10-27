@@ -43,6 +43,15 @@ import AppKit
 ///
 /// **The live preview** under Format is `+CameraPreview.swift`'s (spec §11
 /// CAM-7): its well, its step and its sync.
+///
+/// **"Record the camera too"** (CR3c, spec §11 CAM-11), a checkbox under
+/// Include Frame Job windows, is live only while idle with a display row or
+/// the Window row, and greyed with its value kept under Camera or Microphone
+/// Only. Ticked, a camera is WANTED as with Source Camera: the Camera and
+/// Format popups are live, the choice carries `camera` and `cameraFormat`
+/// beside the screen source, and the preview shows. The five screen controls
+/// stay live, and the press (`+Recording.swift`) reads Screen Recording, then
+/// Camera, then Microphone.
 extension RecorderPanelController {
     static let cameraTag = 3
     static let cameraTitle = "Camera"
@@ -50,6 +59,15 @@ extension RecorderPanelController {
     static let bestFormatTitle = "Best"
 
     var cameraSelected: Bool { sourcePopup.selectedItem?.tag == Self.cameraTag }
+
+    /// A display row or the Window row: the sources the box is live for.
+    var screenSourceSelected: Bool { !voiceOverSelected && !cameraSelected }
+
+    /// "Record the camera too" ticked beside a screen source (CAM-11).
+    var cameraBesideSelected: Bool { screenSourceSelected && cameraBesideCheckbox.state == .on }
+
+    /// Source Camera, or the box beside a screen source (CAM-11 (3)).
+    var cameraWanted: Bool { cameraSelected || cameraBesideSelected }
 
     /// The Camera popup's chosen `uniqueID`; nil for "None connected".
     var selectedCameraID: String? { cameraPopup.selectedItem?.representedObject as? String }
@@ -141,11 +159,13 @@ extension RecorderPanelController {
     // MARK: - The locks
 
     /// Called last by `syncControlsEnabled`: the Camera and Format popups
-    /// are live only while idle with Source Camera; with Source Camera the
+    /// are live only while idle with a camera wanted, the box only while
+    /// idle with a screen source (CAM-11 (1), (3)); with Source Camera the
     /// four screen-only controls and Rate are greyed, their values kept.
     func syncCameraControls() {
-        cameraPopup.isEnabled = phase == .idle && cameraSelected
-        formatPopup.isEnabled = phase == .idle && cameraSelected
+        cameraPopup.isEnabled = phase == .idle && cameraWanted
+        formatPopup.isEnabled = phase == .idle && cameraWanted
+        cameraBesideCheckbox.isEnabled = phase == .idle && screenSourceSelected
         guard cameraSelected else { return }
         let screenAndRate: [NSControl] = [
             systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox, ratePopup,

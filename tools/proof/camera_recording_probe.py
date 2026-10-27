@@ -10,7 +10,9 @@ preview's capture stopped once; and CR3a (CAM-9): a camera beside the screen —
 watch's E2 (off the stream for a resume's add, a failed re-add's E1 fallback), the camera's offset,
 the finishing's wait, the settle's camera half and the names, and a real screen recording with the
 camera beside it; and CR3b (CAM-10): that camera's landing — the front Camera track, the offsets
-and the floor, the corner — and `record_screen`'s camera with source screen.
+and the floor, the corner — and `record_screen`'s camera with source screen; and CR3c (CAM-11):
+the panel's "Record the camera too" box, its press and its preview, the panel's prepared capture
+adopted by a screen start, and the timeout sentence's ceiling.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -127,9 +129,11 @@ Sections and rows:
            per-segment camera keys and ids (none at the top level), `documentIds` from the
            placement's camera lists, and `resultNotes` ending with `cameraSegmentsNote`; T11
            `filesClause` with camera files, `stopCeiling(camera:)` and `finishTimeoutSentence`
-           with cameras.
+           with cameras; CR3c (CAM-11 (7)) re-aims it: the calls with cameras pass `camera: true`,
+           and `finishTimeoutSentence(movies: [movie], camera: true)` spells 105 s with no camera
+           clause.
   panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
-           `grantDoors` before `shared` exists, the nine `FrameJobRecording…` keys put back; fake
+           `grantDoors` before `shared` exists, the ten `FrameJobRecording…` keys put back; fake
            rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
            Source rows end Window… (1), Camera (3), Microphone Only (2), screens + 4, and the
            Camera popup is `connected()`'s `popupTitle`s (or "None connected"); P2 Camera via
@@ -137,7 +141,7 @@ Sections and rows:
            Size, Include Frame Job windows, Rate) disabled with their values kept, Camera,
            Microphone, Record Into and Source live, the size note `cameraSizeNote(nil)`; a
            display row → the five back, Camera disabled, `camera` nil; P3 session only: the
-           display key's 777 kept, the camera key `probe-camera`, nine keys, the row and camera
+           display key's 777 kept, the camera key `probe-camera`, ten keys (nine before CR3c), the row and camera
            kept through `rebuildSources()` + `restoreChoices()`; P4 `cameraStep` over four
            statuses, `cameraPaneURL`, `cameraOpenedNote(.denied)` exact; P5 the press (no camera,
            `notDetermined` and its held answer on the hidden panel, denied and restricted, the
@@ -186,7 +190,23 @@ Sections and rows:
            `stopped`; `connected(` and `connectedMicrophones(` filter `isConnected`;
            `rebuildMicrophones(` calls `connectedMicrophones()`. CR3b (CAM-10 (8)): P19
            `landingNote(cameraBeside: true)` — the display's stop sentence, then the
-           microphone's problem, the camera's problem and its note.
+           microphone's problem, the camera's problem and its note. CR3c (CAM-11), the spy's
+           `screen` (what `screenGranted` answers, false before) and its ordered `reads`: P20 the
+           box titled "Record the camera too" in the grid row right after Include Frame Job
+           windows and before Camera; a display row with the box off — Camera and Format
+           disabled, `camera` nil; ticked via `controlChanged` — Camera and Format live, the five
+           live with their values kept, `currentChoice()` `.display` with `probe-camera` and the
+           Format popup's spelling, the size note the screen's, the key true, ten keys; unticked
+           — the key false, `camera` nil; under Camera and under Microphone Only the box
+           disabled with its state kept; `restoreChoices()` sets it from the key. P21 the press
+           with the box ticked: "None connected" → the note, 0 screen and 0 camera reads;
+           `screen` false → 1 screen read, 0 camera reads; the camera `notDetermined` → one
+           `requestCamera`, idle; denied → `Privacy_Camera` opened; authorized with Microphone
+           Off → the countdown, the reads `screen` then `camera`; the box off → 0 camera reads.
+           P22 the well's row shown with a display and the box ticked, hidden with it off. P23
+           comment-stripped reads: `prepareCamera(`'s guard holds `!= .voiceOver` and no
+           `== .camera`; `syncCameraPreview(` passes `cameraSource: cameraWanted` and reads
+           `session?.cameraCapture`.
   beside   CR3a (CAM-9), no grant, ffmpeg fixtures (a 640×360 30 fps screen `.mov`, a camera
            `.mov` at 1760×1328 30 fps, a garbage file). B1 `ScreenFrameWatch`: `bound(rate: 60)`
            = 1/30 and `bound(rate: 0)` = 2, `keptSeconds` 2; on a watch at `bound(rate: 60)`,
@@ -230,12 +250,18 @@ Sections and rows:
            rate by G3's decode at the format's rate; each |`cameraOffset`| < 0.5 s (printed);
            `camera.format` CAM-3's best; `camera.problem` nil. Skipped by name without
            `CGPreflightScreenCaptureAccess()`, a shareable display, the Camera grant or a
-           camera. Never asks for a grant.
+           camera. Never asks for a grant. CR3c G17 (CAM-11 (4)), after G16 under its skips, on
+           a fresh recorder with no microphone: `prepareCamera` for `.display(CGMainDisplayID())`
+           and that camera, its answer awaited (≤ 5 s); `start(filter:choice:mayAsk: true)` — the
+           session's `cameraCapture` is the prepared capture, the slot nil once it answers; 2 s
+           as one segment, the camera file ≥ 98 % of span × rate by G3's decode, no `camera.note`
+           or `camera.problem`.
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
 `MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
 camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, `beside,screen` for
-`no-frame-watch` and `resume-keeps-watch`, and `landing`, `tool` or `panel` for CR3b's:
+`no-frame-watch` and `resume-keeps-watch`, `landing`, `tool` or `panel` for CR3b's, and `panel`
+for CR3c's but `beside-unprepared` (`panel,screen`) and `timeout-ceiling-by-files` (`tool`):
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
@@ -308,6 +334,15 @@ camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, `beside,sc
   camera-format-alone-admitted  `camera_format` without `camera` admitted      → T9
   camera-ids-unwritten  `segmentFields` writes no `camera_clip`                → T10
   beside-display-sentence  `landingNote`'s camera stop sentence beside a screen → P19
+  beside-choice-dropped  `currentChoice` sets the camera for Source Camera only → P20
+  beside-popups-dead  the Camera and Format popups' live rule `cameraSelected` → P20
+  beside-box-live-for-camera  the box live whenever idle                       → P20
+  beside-unpersisted  the box key's write deleted                              → P20
+  beside-camera-grant-skipped  the press's `checkCameraGrant()` clause deleted → P21
+  beside-no-camera-unchecked  the press's no-camera guard deleted              → P21
+  beside-unprepared   `prepareCamera`'s guard back to `== .camera`            → P23, G17
+  beside-preview-row-hidden  `hidden = !cameraSelected`                        → P22
+  timeout-ceiling-by-files  the timeout's ceiling by `!cameras.isEmpty`        → T11
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -338,9 +373,10 @@ ROWS = {
                 "G13", "G14", "G15"],
     "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11"],
     "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
-              "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18", "P19"],
+              "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18", "P19", "P20",
+              "P21", "P22", "P23"],
     "beside": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
-    "screen": ["G16"],
+    "screen": ["G16", "G17"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -499,9 +535,10 @@ MUTANTS = {
         ("AgentServer+RecordingCamera.swift",
          'let given = [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }',
          'let given = [("camera", camera)].filter { $0.1 != nil }')]),
+    # Re-aimed at CR3c (CAM-11 (3)): the live rule reads `cameraWanted`.
     "format-popup-live": (["P11"], [
         ("RecorderPanelController+Camera.swift",
-         "        formatPopup.isEnabled = phase == .idle && cameraSelected\n",
+         "        formatPopup.isEnabled = phase == .idle && cameraWanted\n",
          "        formatPopup.isEnabled = true\n")]),
     "format-unpersisted": (["P11"], [
         ("RecorderPanelController+Rows.swift",
@@ -549,8 +586,9 @@ MUTANTS = {
     "preview-retries-failure": (["P13"], [
         ("RecorderPanelController+CameraPreview.swift",
          "        if let failure = failure() { return .failed(failure) }\n", "")]),
+    # Re-aimed at CR3c (CAM-11 (4)): the row follows `cameraWanted`.
     "preview-row-always": (["P14"], [
-        ("RecorderPanelController+CameraPreview.swift", "        let hidden = !cameraSelected\n",
+        ("RecorderPanelController+CameraPreview.swift", "        let hidden = !cameraWanted\n",
          "        let hidden = false\n")]),
     "preview-unsynced-phase": (["P15"], [
         ("RecorderPanelController+Pause.swift",
@@ -661,6 +699,46 @@ MUTANTS = {
     "beside-display-sentence": (["P19"], [
         ("RecorderPanelController+Landing.swift", "            if let camera, !cameraBeside {\n",
          "            if let camera {\n")]),
+    # CR3c (spec §11 CAM-11): the panel's box, each run with `--only panel` but
+    # `beside-unprepared` (`panel,screen`) and `timeout-ceiling-by-files` (`tool`).
+    "beside-choice-dropped": (["P20"], [
+        ("RecorderPanelController+Rows.swift",
+         "        if cameraWanted {\n            choice.camera = selectedCameraID\n",
+         "        if cameraSelected {\n            choice.camera = selectedCameraID\n")]),
+    "beside-popups-dead": (["P20"], [
+        ("RecorderPanelController+Camera.swift",
+         "        cameraPopup.isEnabled = phase == .idle && cameraWanted\n",
+         "        cameraPopup.isEnabled = phase == .idle && cameraSelected\n"),
+        ("RecorderPanelController+Camera.swift",
+         "        formatPopup.isEnabled = phase == .idle && cameraWanted\n",
+         "        formatPopup.isEnabled = phase == .idle && cameraSelected\n")]),
+    "beside-box-live-for-camera": (["P20"], [
+        ("RecorderPanelController+Camera.swift",
+         "        cameraBesideCheckbox.isEnabled = phase == .idle && screenSourceSelected\n",
+         "        cameraBesideCheckbox.isEnabled = phase == .idle\n")]),
+    "beside-unpersisted": (["P20"], [
+        ("RecorderPanelController+Rows.swift",
+         "        defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)\n",
+         "")]),
+    "beside-camera-grant-skipped": (["P21"], [
+        ("RecorderPanelController+Recording.swift",
+         "        guard checkScreenRecordingGrant(), !cameraBesideSelected || checkCameraGrant(),\n",
+         "        guard checkScreenRecordingGrant(),\n")]),
+    "beside-no-camera-unchecked": (["P21"], [
+        ("RecorderPanelController+Recording.swift",
+         "        if cameraBesideSelected, selectedCameraID == nil {\n"
+         "            setNote(CameraDevices.noCameraSentence)\n            return\n        }\n", "")]),
+    "beside-unprepared": (["P23", "G17"], [
+        ("ScreenRecorder+CameraPrepare.swift",
+         "guard state == .idle, choice.source != .voiceOver, let id = choice.camera,",
+         "guard state == .idle, choice.source == .camera, let id = choice.camera,")]),
+    "beside-preview-row-hidden": (["P22"], [
+        ("RecorderPanelController+CameraPreview.swift", "        let hidden = !cameraWanted\n",
+         "        let hidden = !cameraSelected\n")]),
+    "timeout-ceiling-by-files": (["T11"], [
+        ("AgentServer+RecordingSentences.swift",
+         "let ceiling = stopCeiling(segments: movies.count, camera: camera)",
+         "let ceiling = stopCeiling(segments: movies.count, camera: !cameras.isEmpty)")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -693,7 +771,12 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "camera-track-behind": "landing", "camera-offset-ignored": "landing",
                   "camera-floor-unscreened": "landing", "corner-top": "landing",
                   "remainder-camera-dropped": "landing", "camera-format-alone-admitted": "tool",
-                  "camera-ids-unwritten": "tool", "beside-display-sentence": "panel"}
+                  "camera-ids-unwritten": "tool", "beside-display-sentence": "panel",
+                  "beside-choice-dropped": "panel", "beside-popups-dead": "panel",
+                  "beside-box-live-for-camera": "panel", "beside-unpersisted": "panel",
+                  "beside-camera-grant-skipped": "panel", "beside-no-camera-unchecked": "panel",
+                  "beside-unprepared": "panel,screen", "beside-preview-row-hidden": "panel",
+                  "timeout-ceiling-by-files": "tool"}
 
 
 def run(command, **kw):
@@ -837,7 +920,27 @@ def panel_source_rows(sources):
                   "; ".join(f"{sig[5:-1]} names {' and '.join(w)} {ok}" for sig, ok, w in reads))
     rows["P15"] = preview_source_row(sources, base)
     rows["P18"] = hot_plug_source_row(sources)
+    rows["P23"] = beside_panel_source_row(sources)
     return rows
+
+
+def beside_panel_source_row(sources):
+    """P23 (CR3c, CAM-11 (4)): comment-stripped reads — `prepareCamera(`'s guard admits any
+    source but a voice-over (`!= .voiceOver`, no `== .camera`), and `syncCameraPreview(` passes
+    `cameraSource: cameraWanted` and reads the screen session's `session?.cameraCapture`."""
+    prepare = body_of(uncommented(sources / "ScreenRecorder+CameraPrepare.swift"),
+                      "func prepareCamera(") or ""
+    guard = prepare[:prepare.find("else {")] if "else {" in prepare else ""
+    sync = body_of(uncommented(sources / "RecorderPanelController+CameraPreview.swift"),
+                   "func syncCameraPreview(") or ""
+    checks = [
+        (f"prepareCamera('s guard {' '.join(guard.split())[:120]!r} holds != .voiceOver",
+         "!= .voiceOver" in guard),
+        ("…and no == .camera", guard != "" and "== .camera" not in guard),
+        ("syncCameraPreview( passes cameraSource: cameraWanted", "cameraSource: cameraWanted" in sync),
+        ("…and reads session?.cameraCapture", "session?.cameraCapture" in sync),
+    ]
+    return (all(ok for _, ok in checks), "; ".join(f"{what} {ok}" for what, ok in checks))
 
 
 def hot_plug_source_row(sources):
@@ -1026,6 +1129,32 @@ def screen_rows(facts):
                 f"note {facts.get('note')}; camera problems "
                 f"{[s.get('cameraProblem') for s in segments]}; left out {facts.get('unreadable')}; "
                 f"steps {facts.get('steps')}; flash ticks {facts.get('flashTicks')}")
+
+
+def beside_prepared_row(facts):
+    """G17 (CR3c, CAM-11 (4)) from the screen section's facts: the panel's prepared capture
+    adopted by a screen start with `mayAsk`, the slot emptied, 2 s as one segment whose camera
+    file is ≥ 98 % of span × rate by G3's decode, no `camera.note` or `camera.problem`."""
+    if facts.get("skip"):
+        return ("skip", facts["skip"])
+    g17 = facts.get("G17")
+    if not isinstance(g17, dict):
+        return (False, f"not run: {facts.get('error') or 'no G17 facts'}")
+    match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", g17.get("format") or "")
+    rate = float(match[3]) if match else 0
+    segments = g17.get("segments") or []
+    cameras = [s.get("camera") for s in segments]
+    ratios = [decoded_ratio(c, rate) if c else (None, None) for c in cameras]
+    ok = (g17.get("prepared") is True and g17.get("answered") is True
+          and g17.get("adopted") is True and g17.get("slotNil") is True and not g17.get("error")
+          and len(segments) == 1 and all(c and os.path.exists(c) for c in cameras)
+          and all(r is not None and r >= FRAMES_PASS for r, _ in ratios)
+          and g17.get("note") is None and g17.get("problem") is None)
+    return (ok, f"prepared {g17.get('prepared')}, answered {g17.get('answered')}; start(mayAsk: "
+                f"true) adopted it {g17.get('adopted')}, the slot nil {g17.get('slotNil')}; "
+                f"{len(segments)} segment(s), camera files {[os.path.basename(c or '') for c in cameras]} "
+                f"frames/span×rate {[r for r, _ in ratios]} at {g17.get('format')}; note "
+                f"{g17.get('note')}; problem {g17.get('problem')}; {g17.get('error') or ''}")
 
 
 def movie_facts(path):
@@ -1364,12 +1493,14 @@ def main():
             results["B4"] = beside_source_row(sources)
         if name == "screen":
             results["G16"] = screen_rows(facts)
+            results["G17"] = beside_prepared_row(facts)
         if name == "panel":
             swift_p5 = results.get("P5", (False, "the section did not answer it"))
             read = panel_source_rows(sources)
             results["P9"] = read["P9"]
             results["P15"] = read["P15"]
             results["P18"] = read["P18"]
+            results["P23"] = read["P23"]
             results["P5"] = (swift_p5[0] is True and read["P5"][0] is True,
                              f"{swift_p5[1]} | the answer's re-read: {read['P5'][1]}")
             visible = facts.get("visible") is False and facts.get("visibleAtEnd") is False
