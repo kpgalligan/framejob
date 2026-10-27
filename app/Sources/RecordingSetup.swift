@@ -76,7 +76,9 @@ enum RecordingDestination: Equatable {
 /// `record_screen`, as one value. `microphone` is an
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60 (a camera
 /// recording's is its format's, `CameraDevices.canvasRate`). `camera` is an
-/// `AVCaptureDevice.uniqueID`, set iff `source` is `.camera`.
+/// `AVCaptureDevice.uniqueID`, set iff `source` is `.camera`, and
+/// `cameraFormat` its format as `CameraDevices.spelled` writes it, nil for
+/// Best and set only with `camera` (spec §11 CAM-6).
 struct RecordingChoice: Equatable {
     var source: RecordingSource = .display(CGMainDisplayID())
     var includeFrameJobWindows: Bool = false
@@ -88,6 +90,7 @@ struct RecordingChoice: Equatable {
     var destination: RecordingDestination = .newProject
     var folder: URL = RecordingFiles.folder()
     var camera: String? = nil
+    var cameraFormat: String? = nil
 }
 
 // MARK: - Where the files go

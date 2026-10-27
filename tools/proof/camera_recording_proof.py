@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Camera recording CR1b (spec §11 CAM-4) — `record_screen {source: "camera", camera?}`, driven
-against a running instance over MCP — and CR1c's recorder panel (CAM-5), seen through
-`snapshot_ui`, in `recording_proof.py`'s shape: two tiers, the split
+against a running instance over MCP, with CR2a's `camera_format` (CAM-6) — and CR1c's recorder
+panel (CAM-5), seen through `snapshot_ui`, in `recording_proof.py`'s shape: two tiers, the split
 between them the whole design. A host with no camera, or whose terminal holds no Camera grant,
 still measures the catalog, every refusal and their order; the recording itself is measured
 only where one can be made, and a run that could not make one SAYS so with a count.
@@ -16,7 +16,8 @@ and removed at the end; the one document it makes is closed again, and so is the
 the last row opens.
 
 **Headless** (always):
-* Catalog: `record_screen` declares its thirteen arguments plus `project`, `camera` a string;
+* Catalog: `record_screen` declares its fourteen arguments plus `project`, `camera` and
+  `camera_format` strings;
   `source`'s enum is `["screen", "voice_over", "camera"]`; the description names
   `source: "camera"`, `Camera Recording`, `camera.problem` and the default camera; the log
   holds no `Frame Job: ` parity line.
@@ -29,6 +30,10 @@ the last row opens.
   `microphone: true` the Microphone sentence without the grant, else the project sentence;
   an unknown `camera` against the proof's own document is the lookup's sentence (every camera
   listed as `Name (id)`, or "No camera is connected."), whatever the Camera grant says.
+  CR2a: `camera_format` with screen (exact); `camera_format: 5` (`stringArg`'s sentence);
+  `{source: camera, camera_format: "0x0"}` the format sentence for the default camera (its
+  formats listed, `best` first) when a camera is connected, else "No camera is connected.";
+  an unknown camera with `camera_format: "0x0"` the camera's sentence — the lookup first.
 
 **Detection**: `{seconds: 2, source: camera, place: false, path}` against that document. The
 Camera sentence or "No camera is connected." skips the granted tier with its count; a result
@@ -41,11 +46,14 @@ naming the same camera; `microphone: true` with place (skipped with its count wi
 Microphone grant): the picture at the playhead, the voice on the Microphone track, their starts
 `mic_offset` apart within half a frame, one undo taking both and leaving the files; and, with
 no project open once its own document is closed (else skipped by name), `landed: new_project`
-with the canvas the file's size at the format's rate, rounded.
+with the canvas the file's size at the format's rate, rounded. CR2a: from the format sentence's
+list, the first spelling that is not `best` and differs from the detection's `camera.format`,
+recorded for 2 s with `camera_format`: the answer's `camera.format` and the file's size are that
+row's (skipped by name when the camera lists no such row).
 
 **The panel** (CR1c, run LAST, after its own document is closed): `perform_menu_item ["File",
-"New Recording…"]` answers; `snapshot_ui {window: "recorder"}`'s layout dump lists a view whose
-text is `Camera:` and reports no layout problem; the log still holds no `Frame Job: ` line. Its
+"New Recording…"]` answers; `snapshot_ui {window: "recorder"}`'s layout dump lists views whose
+texts are `Camera:` and `Format:` (CR2a) and reports no layout problem; the log still holds no `Frame Job: ` line. Its
 rows only show the panel: no row is changed, so no defaults key moves. The panel is left up;
 the instance is stopped by its pid.
 
@@ -74,7 +82,7 @@ DOCS = os.path.join(WORK, f"{os.getpid()}-docs")
 SEC = 600_000
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
-    "size", "place", "path", "include_framejob_windows", "source", "camera",
+    "size", "place", "path", "include_framejob_windows", "source", "camera", "camera_format",
 }
 CAMERA_STRANGERS = ["display", "window", "system_audio", "show_clicks", "size",
                     "include_framejob_windows", "rate"]
@@ -90,6 +98,8 @@ CAMERA_GRANT = "The camera is not granted to Frame Job (status: "
 NO_CAMERA = "No camera is connected."
 NO_SUCH_CAMERA = re.compile(
     r"^No connected camera is named or has the id (.+?)\. The cameras connected are (.+)\.$")
+NO_SUCH_FORMAT = re.compile(
+    r"^The camera (.+) has no format 0x0\. Its formats are best((?:, [^,]+)*)\.$")
 NOTHING_TO_UNDO = "There is nothing to undo."
 CAMERA_NAME = re.compile(
     r"^Camera Recording \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}( \(\d+\))?\.mov$")
@@ -100,11 +110,12 @@ DETECTION_CHECKS = 7
 CHOICE_CHECKS = 2
 MIC_CHECKS = 4
 NEW_PROJECT_CHECKS = 2
+FORMAT_CHECKS = 2
 
 checks = 0
 failures = []
 skipped = []
-host = {"microphone": False}
+host = {"microphone": False, "formats": []}
 
 
 def check(ok_, what):
@@ -180,11 +191,14 @@ def catalog_part(mcp):
     properties = schema.get("properties") or {}
     declared = set(properties)
     check(declared == RECORD_PROPERTIES | {"project"},
-          f"record_screen declares its thirteen arguments plus project: "
+          f"record_screen declares its fourteen arguments plus project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(properties.get("camera", {}).get("type") == "string",
           f"camera is declared a string: {properties.get('camera', {}).get('type')!r}")
+    check(properties.get("camera_format", {}).get("type") == "string",
+          f"camera_format is declared a string: "
+          f"{properties.get('camera_format', {}).get('type')!r}")
     check(properties.get("source", {}).get("enum") == ["screen", "voice_over", "camera"],
           f"source's enum has the three members: {properties.get('source', {}).get('enum')}")
     description = tool.get("description") or ""
@@ -249,6 +263,7 @@ def refusal_part(mcp, document):
               and all(re.match(r"^.+ \([^()]+\)$", entry) for entry in entries)),
           f"an unknown camera is the LOOKUP's sentence, each camera as Name (id), whatever the "
           f"Camera grant says: {message!r}")
+    format_refusals(mcp, document, refused)
     after = fingerprint(mcp, document)
     undone = None
     try:
@@ -259,11 +274,36 @@ def refusal_part(mcp, document):
           f"the refusals left get_project byte-identical and pushed no undo step: {undone!r}")
 
 
+def format_refusals(mcp, document, refused):
+    """CR2a (CAM-6 (6)): `camera_format` refused with screen and as a number, the format sentence
+    for the default camera after the lookup, and the lookup's sentence before it."""
+    refused({"seconds": 2, "camera_format": "1920x1080@30"},
+            "With source screen, camera_format" + ELSEWHERE_TAIL,
+            "camera_format with the default screen source")
+    refused({"seconds": 2, "source": "camera", "camera_format": 5},
+            "camera_format must be a string.", "camera_format: 5 is stringArg's refusal")
+    message = refusal(mcp, {"seconds": 2, "source": "camera", "camera_format": "0x0",
+                            "project": document})
+    listed = NO_SUCH_FORMAT.match(message or "")
+    host["formats"] = [f for f in (listed[2] if listed else "").split(", ") if f]
+    check(message == NO_CAMERA or (listed is not None and host["formats"]
+                                   and all(FORMAT.match(f) for f in host["formats"])),
+          f"camera_format 0x0 is the format sentence for the default camera, its formats "
+          f"listed after best (or no camera): {message!r}")
+    wanted = f"No Such Camera {os.getpid()}"
+    message = refusal(mcp, {"seconds": 2, "source": "camera", "camera": wanted,
+                            "camera_format": "0x0", "project": document})
+    check(message == NO_CAMERA or (NO_SUCH_CAMERA.match(message or "") is not None
+                                   and wanted in message),
+          f"an unknown camera with camera_format 0x0 is the CAMERA's sentence — the lookup "
+          f"first: {message!r}")
+
+
 # ---- detection and the granted tier ---------------------------------------------------
 
 
 def granted_tier(mcp, document):
-    total = DETECTION_CHECKS + CHOICE_CHECKS + MIC_CHECKS + NEW_PROJECT_CHECKS
+    total = DETECTION_CHECKS + CHOICE_CHECKS + FORMAT_CHECKS + MIC_CHECKS + NEW_PROJECT_CHECKS
     answer, message = attempt(mcp, {"seconds": 2, "source": "camera", "place": False,
                                     "path": RUN, "project": document})
     if message is not None and (message.startswith(CAMERA_GRANT) or message == NO_CAMERA):
@@ -277,6 +317,7 @@ def granted_tier(mcp, document):
         return
     camera = detection_rows(mcp, answer, document)
     choice_rows(mcp, camera, document)
+    format_rows(mcp, camera, document)
     if host["microphone"]:
         microphone_rows(mcp, document)
     else:
@@ -330,6 +371,24 @@ def choice_rows(mcp, camera, document):
     got = (by_name or {}).get("camera") or {}
     check(message is None and got.get("id") == camera.get("id"),
           f"camera: {upper!r} records the same id: {got.get('id')!r} ({message!r})")
+
+
+def format_rows(mcp, camera, document):
+    """CR2a: a recording at the first listed format that is not best and not the detection's."""
+    row = next((f for f in host["formats"] if f != camera.get("format")), None)
+    if row is None:
+        skip(f"the camera_format rows: the camera lists no format but {camera.get('format')!r} "
+             f"(listed {host['formats']})", FORMAT_CHECKS)
+        return
+    answer, message = attempt(mcp, {"seconds": 2, "source": "camera", "camera_format": row,
+                                    "place": False, "path": RUN, "project": document})
+    answer = answer or {}
+    got = (answer.get("camera") or {}).get("format")
+    check(message is None and got == row,
+          f"camera_format {row} records at it: camera.format {got!r} ({message!r})")
+    size = format_size(row)
+    check(size is not None and (answer.get("width"), answer.get("height")) == size[:2],
+          f"…and the file is that row's size: {answer.get('width')}×{answer.get('height')}")
 
 
 def microphone_rows(mcp, document):
@@ -417,8 +476,9 @@ def panel_part(mcp):
     with open(answer["layout_path"]) as handle:
         layout = json.load(handle)
     texts = [view.get("text") for view in layout.get("views", [])]
-    check("Camera:" in texts, f"the recorder panel's layout lists a view reading 'Camera:': "
-                              f"{[t for t in texts if t and t.endswith(':')]}")
+    labels = [t for t in texts if t and t.endswith(":")]
+    check("Camera:" in texts and "Format:" in texts,
+          f"the recorder panel's layout lists views reading 'Camera:' and 'Format:': {labels}")
     problems = layout.get("problems", [])
     check(problems == [], f"the recorder panel's layout reports no problem: {problems}")
     lines = None
@@ -432,7 +492,8 @@ def main():
     os.makedirs(RUN, exist_ok=True)
     os.makedirs(DOCS, exist_ok=True)
     mcp = MCP(SOCKET, timeout=180)
-    print(f"camera recording CR1b/CR1c — record_screen's camera and the panel, against {SOCKET}")
+    print(f"camera recording CR1b/CR1c/CR2a — record_screen's camera and the panel, against "
+          f"{SOCKET}")
     document = os.path.join(DOCS, f"camera-{os.getpid()}.framejob")
     try:
         section("A — the catalog", catalog_part, mcp)

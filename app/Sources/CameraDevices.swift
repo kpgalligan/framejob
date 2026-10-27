@@ -3,7 +3,8 @@ import AppKit
 
 /// The cameras (camera-recording CR1a, spec §11 CAM-3): which are connected,
 /// what each offers, which one a name or id means, which is the default, and
-/// the format a recording is made at. Only `connected()`, `facts(of:)` and
+/// the format a recording is made at, and the Format popup's rows (CR2a,
+/// CAM-6). Only `connected()`, `facts(of:)` and
 /// `device(withID:)` touch the framework; the rule, the spelling, the rate,
 /// the lookup and the default are PURE functions over `CameraDeviceFacts`,
 /// so `tools/proof/camera_recording_probe.py` pins them on CR0's own format
@@ -23,13 +24,15 @@ struct CameraFormatFacts: Equatable {
 }
 
 /// One connected camera as the recorder reads it. `formats` is the device's
-/// own list, in its own order; `activeFormat` an index into it.
+/// own list, in its own order; `activeFormat` an index into it;
+/// `isContinuityCamera` the system's own mark (CAM-6 (5)).
 struct CameraDeviceFacts: Equatable {
     let uniqueID: String
     let name: String
     let isBuiltIn: Bool
     let formats: [CameraFormatFacts]
     let activeFormat: Int?
+    var isContinuityCamera: Bool = false
 }
 
 enum CameraDevices {
@@ -52,7 +55,8 @@ enum CameraDevices {
         return CameraDeviceFacts(
             uniqueID: device.uniqueID, name: device.localizedName,
             isBuiltIn: device.deviceType == .builtInWideAngleCamera, formats: formats,
-            activeFormat: device.formats.firstIndex { $0 == device.activeFormat })
+            activeFormat: device.formats.firstIndex { $0 == device.activeFormat },
+            isContinuityCamera: device.isContinuityCamera)
     }
 
     /// The connected camera whose `uniqueID` is `id`, or nil.
@@ -102,6 +106,79 @@ enum CameraDevices {
     /// rate written `%g`.
     static func spelled(_ format: CameraFormatFacts) -> String {
         "\(format.width)x\(format.height)@" + String(format: "%g", format.maxRate)
+    }
+
+    // MARK: - The chosen format (CAM-6)
+
+    /// CAM-6 (1)'s rows after Best: one per distinct (width, height,
+    /// maxRate) with maxRate > 0, the first listed kept; wider than tall,
+    /// then square, then taller than wide, each by area then maxRate
+    /// descending, then the device's order. Indices into `formats`.
+    static func formatRows(_ formats: [CameraFormatFacts]) -> [Int] {
+        var seen: [CameraFormatFacts] = []
+        var rows: [Int] = []
+        for index in formats.indices where formats[index].maxRate > 0 {
+            guard !seen.contains(formats[index]) else { continue }
+            seen.append(formats[index])
+            rows.append(index)
+        }
+        func shape(_ f: CameraFormatFacts) -> Int {
+            f.width > f.height ? 0 : f.width == f.height ? 1 : 2
+        }
+        return rows.sorted { a, b in
+            let (x, y) = (formats[a], formats[b])
+            if shape(x) != shape(y) { return shape(x) < shape(y) }
+            if x.width * x.height != y.width * y.height {
+                return x.width * x.height > y.width * y.height
+            }
+            if x.maxRate != y.maxRate { return x.maxRate > y.maxRate }
+            return a < b
+        }
+    }
+
+    /// CAM-6 (3): the first listed format `spelled` names; nil, or a
+    /// spelling no format carries, is CAM-3's best format.
+    static func chosenFormat(
+        _ spelled: String?, in formats: [CameraFormatFacts], active: Int?
+    ) -> Int? {
+        if let spelled, let index = formats.firstIndex(where: { Self.spelled($0) == spelled }) {
+            return index
+        }
+        return bestFormat(formats, active: active)
+    }
+
+    /// CAM-6 (6): the row `wanted` names — its spelling in any case, else
+    /// `WIDTHxHEIGHT` in any case for that size's first row, its highest
+    /// rate. The row's canonical spelling, or nil.
+    static func formatMatch(_ wanted: String, in formats: [CameraFormatFacts]) -> String? {
+        let rows = formatRows(formats).map { formats[$0] }
+        let exact = rows.first { spelled($0).caseInsensitiveCompare(wanted) == .orderedSame }
+        if let exact { return spelled(exact) }
+        let size = wanted.lowercased().split(separator: "x", omittingEmptySubsequences: false)
+        guard size.count == 2, let width = Int(size[0]), let height = Int(size[1]) else {
+            return nil
+        }
+        let sized = rows.first { $0.width == width && $0.height == height }
+        return sized.map(spelled)
+    }
+
+    /// `1920×1080 at 30 fps` — a Format row's title, the rate written `%g`.
+    static func formatTitle(_ format: CameraFormatFacts) -> String {
+        "\(format.width)×\(format.height) at " + String(format: "%g", format.maxRate) + " fps"
+    }
+
+    /// The Camera popup's title: the name, marked when it is a Continuity
+    /// Camera (CAM-6 (5)).
+    static func popupTitle(_ camera: CameraDeviceFacts) -> String {
+        camera.isContinuityCamera ? "\(camera.name) (Continuity Camera)" : camera.name
+    }
+
+    /// The refusal for a format the camera lacks, naming `best` and every
+    /// row's spelling (CAM-6 (6)).
+    static func noSuchFormatSentence(_ wanted: String, camera: CameraDeviceFacts) -> String {
+        let rows = formatRows(camera.formats).map { spelled(camera.formats[$0]) }
+        return "The camera \(camera.name) has no format \(wanted). Its formats are "
+            + (["best"] + rows).joined(separator: ", ") + "."
     }
 
     // MARK: - Which camera

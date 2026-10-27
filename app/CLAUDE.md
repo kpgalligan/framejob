@@ -2366,8 +2366,9 @@ free.
 - `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
   +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`, +`Showing` — `show()`, the
   sync timer, `setNote` and the refit, a pure move out of the base file,
-  camera-recording CR1-0, +`Camera` — Source ▸ Camera and the Camera popup,
-  camera-recording CR1c, spec §11 CAM-5) · `RecorderStatusItem.swift`
+  camera-recording CR1-0, +`Camera` — Source ▸ Camera, the Camera popup
+  (camera-recording CR1c, spec §11 CAM-5) and the Format popup under it
+  (CR2a, CAM-6)) · `RecorderStatusItem.swift`
   — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
@@ -2381,7 +2382,10 @@ free.
   Microphone Only and Camera, and comes back only with a note. **A camera**
   (the Source row "Camera", session-only, `+Camera`) keeps the panel UP as a
   voice-over does, and its countdown spends the camera's warm-up on a
-  prepared capture (`ScreenRecorder+CameraPrepare.swift`). The
+  prepared capture (`ScreenRecorder+CameraPrepare.swift`). The panel
+  remembers nine `FrameJobRecording…` keys (the Camera's and the Format's
+  among them; the type doc lists them), and a probe or the harness that
+  touches them handles all nine. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",

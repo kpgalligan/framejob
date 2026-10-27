@@ -87,7 +87,10 @@ extension ScreenRecorder {
                         + error.localizedDescription), completion)
         }
         let facts = CameraDevices.facts(of: device)
-        guard let index = CameraDevices.bestFormat(facts.formats, active: facts.activeFormat) else {
+        guard
+            let index = CameraDevices.chosenFormat(
+                choice.cameraFormat, in: facts.formats, active: facts.activeFormat)
+        else {
             return refuseCamera(
                 .cameraDevice("The camera \(device.localizedName) lists no format."), completion)
         }

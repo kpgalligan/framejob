@@ -241,7 +241,11 @@ a capture while one runs, land first, and the preview lands with #373's fix.
     grant authorized; CR0's V1 measured about 155–160 MB of RSS. Showing the panel never
     prompts. The preview stays on through a camera recording, on that recording's session.
   - **#373 fixed.** A change of camera or format rebuilds the prepared capture only after the
-    old capture's session has stopped (`CameraCapture.stop(completion:)`).
+    old capture's session has stopped (`CameraCapture.stop(completion:)`). The same change
+    answers CR2-0's G8 observation: under `no-hold`, a discarded prepared capture's session was
+    still running 0.5 s after `discardPreparedCamera`. CR2b says whether that is the
+    asynchronous stop seen early or a discard that loses a session still starting, and G8 waits
+    on the stop's completion rather than on a fixed 0.5 s.
   - **Hot-plug.** `AVCaptureDevice.wasConnectedNotification` and `wasDisconnectedNotification`,
     observed while the panel is up, rebuild the Camera and Format popups while idle. A camera
     removed during a recording ends it, CAM-3's "stops on its own", unchanged.
@@ -914,6 +918,132 @@ lines and `+Camera.swift` one beyond the cuts.
 ## CR2a — the formats
 
 ### Record
+
+**Landed** (2026-10-26).
+- Spec §11 CAM-6, written before any code: the Format popup's rows (Best first, then one row per
+  distinct size and maximum rate above 0, the first listed kept, grouped wider than tall, square,
+  taller than wide, each by area then rate descending; a format's lower rates are not rows),
+  `FrameJobRecordingCameraFormat` (one key for every camera, `""` for Best, written with the
+  camera key, the stored row else Best, live only idle with Source Camera), the choice and its
+  fallback to Best, the size note "— the chosen format", the Continuity Camera title, and
+  `record_screen`'s `camera_format` (trimmed, blank, null or `best` is Best, the spelling or
+  `WIDTHxHEIGHT` in any case, refused with another source in CAM-4 (2)'s step beside `camera`, and
+  with source camera checked after the lookup and before the grant, naming the camera's
+  formats). Its index row and the `camera-recording.md` row (214 → 255 lines); the
+  `11-decisions/` cell is 13188 in 31 files.
+- `CameraDevices.swift` (136 → 213): `CameraDeviceFacts.isContinuityCamera` (last, default false,
+  set by `facts(of:)` from `device.isContinuityCamera`), `formatRows`, `chosenFormat`,
+  `formatMatch`, `formatTitle`, `popupTitle`, `noSuchFormatSentence`.
+- `RecordingSetup.swift` (391 → 394): `RecordingChoice.cameraFormat` after `camera`, and its doc.
+  `ScreenRecorder+CameraPrepare.swift` (139 → 141) and `ScreenRecorder+Camera.swift` (339 → 342)
+  resolve with `chosenFormat(choice.cameraFormat, …)` in place of `bestFormat`; CAM-5 (5)'s adopt
+  rule compares the resolved index, unchanged. `CameraCapture.swift` is not edited.
+- The panel: `RecorderPanelController.swift` (334 → 338: `cameraFormatKey`, `formatPopup`,
+  `controlChanged` rebuilding the Format popup when the Camera popup changes, before
+  `persistChoices`; the type doc's nine keys and `+Camera`'s line); `+Rows` (372 → 382: the
+  `Format:` grid row under Camera, the popup in both of `buildRows`' arrays, `currentChoice`'s
+  `cameraFormat`, the format key written inside the camera key's `if let`); `+Camera`
+  (153 → 211: `bestFormatTitle`, `selectedCameraFormat`, `fillCameraFormats`,
+  `rebuildCameraFormats`, `selectCamera` opening with `defer { rebuildCameraFormats() }` so its
+  early return rebuilds too, the Camera rows titled by `popupTitle`, the Format popup under the
+  Camera popup's enable rule, `cameraSizeNote(_:format:)`).
+- The tool: `AgentServer+RecordingCamera.swift` (118 → 153: `recordingCameraFormatArgument`,
+  `recordingCameraStrangers` reading both arguments for every source with the guard
+  `guard kind == .camera || given.isEmpty else {`, `recordingCameraPick` replacing
+  `recordingCameraID` with the format check between the lookup and the unchanged grant guard,
+  `recordingCamera` answering a `CameraPick`, the top-level `struct CameraPick`);
+  `AgentServer+Recording.swift` (393 → 394: `cameraPick` into the choice's `camera` and
+  `cameraFormat`); `AgentCatalog+Recording.swift` (317 → 328: the `camera_format` property, a
+  clause in the camera paragraph, and `camera_format` in THE REFUSAL ORDER). The tool count is
+  unchanged and `record_screen` stays withheld from the assistant; the gate admits
+  `camera_format` through the published schema.
+- Proofs: `camera_recording_probe.py` and `.swift` gain V18–V21, T7, T8, P10–P12 and granted
+  G10, ten mutants, `MUTANT_SECTION` values that may name two sections (`values,tool`), the
+  nine keys, P1 on `popupTitle`, P3's nine, T3 on `recordingCameraPick`, and
+  `camera-elsewhere-admitted` re-aimed at the new guard; `camera_recording_proof.py` gains the
+  `camera_format` rows (catalog, four refusals, a granted recording at a chosen format, section
+  D's `Format:`); `recording_probe.py` (7c's fourteenth argument, 5d's and D3's nine keys, the
+  two key lists) and `recording_proof.py` (fourteen arguments, `camera_format` a string);
+  `harness/main.swift` and `screens.py` pin `FrameJobRecordingCameraFormat` to "".
+- Docs: spec §7.9a's `record_screen` signature and camera clause (499 → 500 lines, the camera
+  clause rewrapped); `designs/screens/16-recorder-panel.md`'s prose; `docs/guide/screen-recording.md`
+  (the Camera row's Continuity title, the Format row, the size note, what the panel remembers,
+  "A camera", the `camera_format` argument row, the camera paragraph, the refusal order,
+  Limits); `docs/guide/mcp.md`'s `record_screen` row; `tools/proof/README.md`'s CR2a section,
+  the nine keys in the CR1c and Include Frame Job windows sections, and `recordingCameraPick` in
+  CR1b's. `docs/manual-checks.md` gains no row: the format's size and rate are measured by G10
+  and the proof.
+
+**Measured** (the built-in camera, the default microphone, the terminal's grants; an iPhone was
+listed as a Continuity Camera and OBS Virtual Camera as a third camera):
+- `python3 tools/proof/spec_index_proof.py` after CAM-6: exit 0, `201/201 checks passed`.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): `all once` for
+  each.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,tool,panel`: exit 0,
+  `scores: 48/48`. V18 read FaceTime's rows 3, 0, 1, 4, 6, 5, 2 (1760×1328, 1920×1080, 1280×720,
+  640×480, 1552×1552, 1328×1760, 1080×1920) and the iPhone's 7 … 0; P1's Camera popup read
+  `FaceTime HD Camera`, `OBS Virtual Camera`, `Kevin Galligan’s iPhone Camera (Continuity
+  Camera)`; P10's titles began `Best (1760×1328 at 30 fps)`.
+- The ten mutants, plus the two whose anchors moved, each exit 1, caught:
+  `format-rows-unsorted` 23/25 (V18, and V21, whose `WxH` row comes first by the sort),
+  `format-rows-duplicated` 24/25 (V18), `format-stale-kept` 24/25 (V19), `format-size-lowest`
+  31/33 (V21, T8), `format-after-grant` 8/9 (T8), `camera-format-elsewhere-admitted` 8/9 (T7),
+  `format-popup-live` 12/13 (P11), `format-unpersisted` 11/13 (P11, and P3: eight keys),
+  `format-rebuild-skipped-on-match` 12/13 (P12), `format-ignored` 11/12 (G10: the file
+  1760×1328 and `camera.format` 1760x1328@30 for the row 1920x1080@30);
+  `camera-elsewhere-admitted` 7/9 (T2, T7), `grant-before-lookup` 7/9 (T3, T8).
+- `python3 tools/proof/recording_probe.py --only chrome,voiceover_doors,catalog`: exit 0,
+  `181/181 checks passed`.
+- `make app-debug`, then `camera_recording_proof.py` on the Debug instance: exit 0, `48/48`, the
+  granted tier run: 1.968 s recorded for a 2 s span; the format sentence for 0x0 listed `best,
+  1760x1328@30, 1920x1080@30, 1280x720@30, 640x480@30, 1552x1552@30, 1328x1760@30,
+  1080x1920@30`; `camera_format 1920x1080@30` answered `camera.format` 1920x1080@30 and a
+  1920×1080 file; `mic_offset` −64.6 ms; the new project's canvas 1760 × 1328 at [30, 1];
+  section D listed `Source:`, `Camera:`, `Format:`, `Microphone:` … and no problem.
+  `grep "Frame Job: "` nothing. Stopped by its pid.
+- `make gate`: `gate: PASS 226s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 117 s,
+  app 103 s); after this record was written, `gate: PASS 1s` (names alone re-ran).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 59/59`, G0–G10 all run. G3
+  60/0.9992 and 60/0.9992; G4 micOffset −0.105 and −0.143 s; G6 hold 0.545 s, 13 buffers,
+  steady; G7 `startCamera` 0.063 s; G9 0.687 s; **G10** the row 1920x1080@30 (best
+  1760x1328@30), `startCamera` adopted it in 0.023 s, one segment, the file 1920×1080, 60
+  frames at 0.9992, `camera.format` 1920x1080@30, no note.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/camera_recording_proof.py <dir>/agent.sock`: exit 0,
+  `48/48`, the granted tier run (2.002 s; the 1920x1080@30 recording a 1920×1080 file; `mic_offset`
+  −80.1 ms; canvas 1760 × 1328 at [30, 1]). `RC_PROOF_APP=release python3
+  tools/proof/recording_proof.py <dir>/agent.sock --no-screen --no-microphone`: exit 0,
+  `142/142`, sections 5 and 6 skipped by their flags (79 checks). `grep "Frame Job: "
+  <dir>/framejob.log`: nothing. Stopped by its pid.
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 16-recorder-panel`: exit 0, `6 pass,
+  0 fail, 0 skip of 6`, 0 new problems, P2 pass (47 key literals, 31 pinned). The light capture
+  shows the greyed Format row reading "Best (1760×1328 at 30 fps)" under Camera.
+
+**Deviations.**
+- `cameraSizeNote(_:format:)` reads "— the chosen format" only for a spelling the camera lists;
+  a stale one reads the best format's sentence, matching what `chosenFormat` records.
+- `MUTANT_SECTION` values are comma lists, so `format-size-lowest` runs `values,tool` by
+  default and both of its named rows are scored.
+- T7 also refuses `camera_format: 5` with source screen and admits a null `camera_format` with
+  screen; V20 also reads a stale size note and the no-camera note; V21 also reads `1920X1080` on
+  the iPhone and a rate the FaceTime camera does not list.
+- `camera_recording_proof.py`'s headless tier also has the catalog's `camera_format` type row,
+  and its granted tier's two `camera_format` rows are skipped by name, with their count, when
+  the camera lists no other format.
+- The spec §7.9a camera clause was rewrapped so the file stays at 500 lines.
+- T8's `1920X1080` case runs on the iPhone's list, not FaceTime's: FaceTime lists one 1920×1080
+  row, so `format-size-lowest` would survive T8 there.
+- G10 reuses G7's `preparedStart`, so it counts the same 3 s countdown and records 2 s.
+- CR2b's plan above (its #373 item) gained CR2-0's G8 observation: a discarded prepared
+  capture's session still running 0.5 s after `discardPreparedCamera` under `no-hold`, for CR2b
+  to answer.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s `+Camera` line names the
+  Format popup (CAM-6), and the panel's remembered keys become nine.
+- CR2b: the preview, hot-plug, #373's `CameraCapture.stop(completion:)` and CR2-0's G8 question.
 
 ## CR2b — the preview and hot-plug
 

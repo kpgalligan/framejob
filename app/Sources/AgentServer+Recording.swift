@@ -30,7 +30,7 @@ import ScreenCaptureKit
 /// looks nothing up (spec §11 recording, "A voice-over is a recording with
 /// no picture"). A camera recording (spec §11 CAM-4) then looks the camera
 /// up — the named one, else the default, refused naming every camera present
-/// — and only then reads the Camera grant (`+RecordingCamera.swift`). A
+/// — then its format (CAM-6), and only then the Camera grant (`+RecordingCamera.swift`). A
 /// screen recording then reads the Screen Recording grant,
 /// synchronously, named with the System Settings pane. Only then the
 /// display or window lookup, which cannot be asked without the grant — a
@@ -129,11 +129,11 @@ extension AgentServer {
         // read, and there is nothing to look up.
         var source = RecordingSource.voiceOver
         var filter: SCContentFilter?
-        var cameraID: String?
+        var cameraPick: CameraPick?
         if kind == .camera {
-            // CAM-3 (7) and (8): the camera lookup, then the Camera grant —
+            // CAM-3 (7) and (8): the camera lookup and its format, then the Camera grant —
             // read, never requested.
-            cameraID = try recordingCamera(a)
+            cameraPick = try recordingCamera(a)
             source = .camera
         }
         if kind == .screen {
@@ -171,7 +171,8 @@ extension AgentServer {
             source: source, includeFrameJobWindows: includeFrameJob,
             microphone: microphoneID, systemAudio: systemAudio,
             showClicks: showClicks, rate: rate, resolution: resolution,
-            destination: destination, folder: folder ?? RecordingFiles.folder(), camera: cameraID)
+            destination: destination, folder: folder ?? RecordingFiles.folder(),
+            camera: cameraPick?.id, cameraFormat: cameraPick?.format)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(filter: filter, choice: choice, seconds: seconds)

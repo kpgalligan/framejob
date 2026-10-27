@@ -20,6 +20,14 @@ import AppKit
 /// connected" with no id. Its selection is the stored `FrameJobRecordingCamera`
 /// when that camera is listed, else CAM-3 (7)'s default. It is rebuilt on
 /// `show()` while idle; a camera plugged in while the panel is up is CR2's.
+/// A Continuity Camera's row reads "<name> (Continuity Camera)" (CAM-6 (5)).
+///
+/// **The Format popup** (CR2a, spec §11 CAM-6) lists "Best (<CAM-3's pick>)"
+/// first, then `CameraDevices.formatRows` titled "W×H at R fps", each row
+/// carrying its spelling (`1920x1080@30`). It is rebuilt on EVERY exit of
+/// `selectCamera` — init, `show()` and a change of camera — selecting the
+/// stored `FrameJobRecordingCameraFormat` when the camera lists it, else
+/// Best, and follows the Camera popup's live rule.
 ///
 /// **The press** never reads or asks the Screen Recording grant: no camera
 /// refuses with a note, then the Camera grant (`+Grants.swift`), then the
@@ -35,11 +43,15 @@ extension RecorderPanelController {
     static let cameraTag = 3
     static let cameraTitle = "Camera"
     static let noCameraTitle = "None connected"
+    static let bestFormatTitle = "Best"
 
     var cameraSelected: Bool { sourcePopup.selectedItem?.tag == Self.cameraTag }
 
     /// The Camera popup's chosen `uniqueID`; nil for "None connected".
     var selectedCameraID: String? { cameraPopup.selectedItem?.representedObject as? String }
+
+    /// The Format popup's chosen spelling; nil for Best.
+    var selectedCameraFormat: String? { formatPopup.selectedItem?.representedObject as? String }
 
     // MARK: - The popup
 
@@ -51,7 +63,9 @@ extension RecorderPanelController {
         cameraPopup.removeAllItems()
         let cameras = CameraDevices.connected()
         for camera in cameras {
-            let item = NSMenuItem(title: camera.localizedName, action: nil, keyEquivalent: "")
+            let item = NSMenuItem(
+                title: CameraDevices.popupTitle(CameraDevices.facts(of: camera)), action: nil,
+                keyEquivalent: "")
             item.representedObject = camera.uniqueID
             cameraPopup.menu?.addItem(item)
         }
@@ -64,8 +78,10 @@ extension RecorderPanelController {
 
     /// The row carrying `id`; nil, or an id no row carries, selects the
     /// default camera's row (CAM-3 (7): the system's preferred camera, else
-    /// the first built-in, else the first), else the first row.
+    /// the first built-in, else the first), else the first row. The Format
+    /// popup is rebuilt on every exit, the early one included (CAM-6 (2)).
     func selectCamera(_ id: String?) {
+        defer { rebuildCameraFormats() }
         let rows = cameraPopup.itemArray
         if let id, let index = rows.firstIndex(where: { $0.representedObject as? String == id }) {
             cameraPopup.selectItem(at: index)
@@ -83,13 +99,49 @@ extension RecorderPanelController {
         if rows.indices.contains(index) { cameraPopup.selectItem(at: index) }
     }
 
+    // MARK: - The Format popup (CAM-6)
+
+    /// "Best (<the best format>)" — or "Best" when `camera` has none — then
+    /// one row per `CameraDevices.formatRows` row, carrying its spelling;
+    /// `stored` selected when a row carries it, else Best.
+    func fillCameraFormats(_ camera: CameraDeviceFacts?, stored: String?) {
+        formatPopup.removeAllItems()
+        let formats = camera?.formats ?? []
+        let best = camera.flatMap { CameraDevices.bestFormat($0.formats, active: $0.activeFormat) }
+        let bestTitle =
+            best.map { "\(Self.bestFormatTitle) (\(CameraDevices.formatTitle(formats[$0])))" }
+            ?? Self.bestFormatTitle
+        formatPopup.menu?.addItem(NSMenuItem(title: bestTitle, action: nil, keyEquivalent: ""))
+        for index in CameraDevices.formatRows(formats) {
+            let item = NSMenuItem(
+                title: CameraDevices.formatTitle(formats[index]), action: nil, keyEquivalent: "")
+            item.representedObject = CameraDevices.spelled(formats[index])
+            formatPopup.menu?.addItem(item)
+        }
+        let index =
+            stored.flatMap { stored in
+                formatPopup.itemArray.firstIndex { $0.representedObject as? String == stored }
+            } ?? 0
+        formatPopup.selectItem(at: index)
+    }
+
+    /// `fillCameraFormats` for the Camera popup's camera, read off the
+    /// device now, and the stored format (`""` is Best).
+    func rebuildCameraFormats() {
+        let stored = UserDefaults.standard.string(forKey: Self.cameraFormatKey) ?? ""
+        fillCameraFormats(
+            selectedCameraID.flatMap(CameraDevices.device(withID:)).map(CameraDevices.facts(of:)),
+            stored: stored.isEmpty ? nil : stored)
+    }
+
     // MARK: - The locks
 
-    /// Called last by `syncControlsEnabled`: the Camera popup is live only
-    /// while idle with Source Camera; with Source Camera the four
-    /// screen-only controls and Rate are greyed, their values kept.
+    /// Called last by `syncControlsEnabled`: the Camera and Format popups
+    /// are live only while idle with Source Camera; with Source Camera the
+    /// four screen-only controls and Rate are greyed, their values kept.
     func syncCameraControls() {
         cameraPopup.isEnabled = phase == .idle && cameraSelected
+        formatPopup.isEnabled = phase == .idle && cameraSelected
         guard cameraSelected else { return }
         let screenAndRate: [NSControl] = [
             systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox, ratePopup,
@@ -100,21 +152,27 @@ extension RecorderPanelController {
     // MARK: - The size note
 
     /// `1760×1328 at 30 fps — the camera's best format` (CAM-3's pick, the
-    /// rate written `%g`); "no camera connected" for nil or a camera with no
-    /// format.
-    static func cameraSizeNote(_ camera: CameraDeviceFacts?) -> String {
-        guard let camera,
-            let index = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
+    /// rate written `%g`) for Best, `1920×1080 at 30 fps — the chosen
+    /// format` for a row the camera lists (CAM-6 (4)); "no camera connected"
+    /// for nil or a camera with no format.
+    static func cameraSizeNote(_ camera: CameraDeviceFacts?, format: String? = nil) -> String {
+        guard let camera else { return "no camera connected" }
+        if let format,
+            let chosen = camera.formats.first(where: { CameraDevices.spelled($0) == format })
+        {
+            return CameraDevices.formatTitle(chosen) + " — the chosen format"
+        }
+        guard let index = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
         else { return "no camera connected" }
-        let format = camera.formats[index]
-        return "\(format.width)×\(format.height) at "
-            + String(format: "%g", format.maxRate) + " fps — the camera's best format"
+        return CameraDevices.formatTitle(camera.formats[index]) + " — the camera's best format"
     }
 
-    /// The size note for the chosen camera, read off the device now.
+    /// The size note for the chosen camera and format, read off the device
+    /// now.
     var selectedCameraSizeNote: String {
         Self.cameraSizeNote(
-            selectedCameraID.flatMap(CameraDevices.device(withID:)).map(CameraDevices.facts(of:)))
+            selectedCameraID.flatMap(CameraDevices.device(withID:)).map(CameraDevices.facts(of:)),
+            format: selectedCameraFormat)
     }
 
     // MARK: - The press and the launch

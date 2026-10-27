@@ -20,9 +20,10 @@ count rather than passing vacuously.
   added two, and the exact count belongs to road map 7's
   `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
   `record_screen` declaring exactly its
-  thirteen arguments (issue batch B66 added `source`, a string whose enum is
+  fourteen arguments (issue batch B66 added `source`, a string whose enum is
   `["screen", "voice_over"]` — `["screen", "voice_over", "camera"]` since
-  camera-recording CR1b, spec §11 CAM-4, which added `camera`, a string —
+  camera-recording CR1b, spec §11 CAM-4, which added `camera`, a string, and
+  CR2a, spec §11 CAM-6, `camera_format`, a string —
   and the recorder's Include Frame Job windows
   option added `include_framejob_windows`, a boolean) plus the injected
   `project`, `seconds` its only required
@@ -452,6 +453,8 @@ RECORD_PROPERTIES = {
     "source",
     # Camera-recording CR1b (spec §11 CAM-4): which camera, with source camera.
     "camera",
+    # Camera-recording CR2a (spec §11 CAM-6): the camera's format.
+    "camera_format",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of
@@ -804,7 +807,7 @@ def catalog_part(mcp):
     schema = schemas.get("record_screen", {"properties": {}})
     declared = set(schema.get("properties", {}))
     check(declared == RECORD_PROPERTIES | {"project"},
-          "record_screen declares exactly its thirteen arguments plus the injected project: "
+          "record_screen declares exactly its fourteen arguments plus the injected project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(schema.get("required") == ["seconds"],
@@ -818,7 +821,7 @@ def catalog_part(mcp):
                        ("microphone", "boolean"), ("system_audio", "boolean"),
                        ("show_clicks", "boolean"), ("place", "boolean"),
                        ("include_framejob_windows", "boolean"), ("source", "string"),
-                       ("camera", "string")):
+                       ("camera", "string"), ("camera_format", "string")):
         check(schema["properties"].get(name, {}).get("type") == kind,
               f"{name} is declared {kind}")
     check(schema["properties"].get("rate", {}).get("enum") == [30, 60],

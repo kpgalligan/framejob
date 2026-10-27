@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Camera recording CR1a (spec §11 CAM-3): the camera recorder, measured through the app's own
-sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functions; and CR1c
-(CAM-5): the recorder panel's Camera source and the countdown's prepared capture.
+sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functions; CR1c
+(CAM-5): the recorder panel's Camera source and the countdown's prepared capture; and CR2a
+(CAM-6): the camera's formats — the rows, `camera_format`, the Format popup, a chosen format.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -26,6 +27,13 @@ Sections and rows:
            `RecordingGrant.cameraStatus` before any `CameraCapture(`. V17 CAM-3's warm-up:
            `isSteady` over the cold start's intervals (33.3, 35.0, 43.3, 30.0 ms at 30 fps), the
            run of 5 and the 1 s bound, and `WarmUp.note` (nil steady; the rate named; no frame).
+           CR2a (CAM-6): V18 `formatRows` (FaceTime's 7 landscape, square, portrait, each by
+           area; the iPhone's 8 @60 before @30 per size, largest first; OBS's 1; a duplicate,
+           the first kept; a 0-rate format left out); V19 `chosenFormat` (nil → best, listed →
+           its index, stale → best, a duplicate → the first); V20 `formatTitle`, `popupTitle`
+           with and without the Continuity mark, `cameraSizeNote(_, format:)` for Best, a chosen
+           row, a stale one and no camera; V21 `formatMatch` (exact, upper-case, `WxH` → its
+           highest rate on the iPhone, a rate not listed, unknown) and `noSuchFormatSentence`.
   landing  L1 a `.camera` result over ffmpeg fixtures (a 1920×1080 30 fps `.mov`, an `.m4a`)
            through `RecordingLanding.placement`: the picture on a track, the voice on a back
            track named Microphone; L2 `ProjectDocument.untitled(around:)`: the canvas 1920×1080
@@ -48,7 +56,11 @@ Sections and rows:
            session stopped 0.5 s later; G9 `startCamera` straight after `prepareCamera`, the
            prepared start not yet answered, JOINS it: no error before `armCeiling`, `.recording`,
            the slot nil, 1 s recorded as one segment, no note (the call-to-answer time beside
-           CR1a's cold 1.943–1.962 s). Skipped by name when no camera is connected or the
+           CR1a's cold 1.943–1.962 s); G10 (CR2a) G7's prepared start at the camera's first
+           `formatRows` row whose spelling is not the best format's (`cameraFormat` set): adopted
+           in < `PREPARED_START_MAX`, 2 s as one segment, the `.mov` the row's size (ffprobe),
+           ≥ 98 % frames at its rate by G3's decode, `camera.format` the row's spelling — skipped
+           by name when the camera lists no such row. Skipped by name when no camera is connected or the
            Camera grant is not authorized (nothing is recorded); G4 is skipped by name when the
            Microphone grant is not authorized (the recording is made without one). Never asks
            for a grant.
@@ -57,24 +69,30 @@ Sections and rows:
            seven in `cameraRefusedArguments` order, a null size — and `source: "x"`'s
            vocabulary; T2 `camera` with screen (the default and named) and with voice_over
            beating `display`, a blank camera with screen and a null with voice_over admitted;
-           T3 `recordingCameraID` over V1–V3's three lists: the default (built-in, then
+           T3 `recordingCameraPick` over V1–V3's three lists: the default (built-in, then
            `preferredID`), a name in any case, an id, unknown, an empty list, unknown + denied
            (the lookup sentence), known + notDetermined and the default + restricted
            (`cameraRefusal`), known + authorized; T4 `cameraFields` without and with
            `problem`/`note`; T5 `recordingFields` of a camera result carries `camera` (and
            `has_audio` false, `stopped_by` system_stopped), a screen result's none; T6
            `resultNotes` of a camera result ends with its `problem` and `note`, a screen
-           result's is the microphone's clause alone.
+           result's is the microphone's clause alone. CR2a: T7 `camera_format` with screen,
+           `camera` and `camera_format` with voice_over (one sentence), `camera_format: 5` with
+           camera and with screen (`stringArg`'s sentence), blank and null with screen and a
+           spelling with camera admitted; T8 `recordingCameraPick`: nil, a spelling, `1920X1080`
+           on the iPhone → `@60`, `best` and `BEST` → nil, an unknown format (the format's
+           sentence), an unknown camera with a bad format (the camera's), a bad format + denied
+           (the format's), a good format + denied (the grant's). T3 reads `recordingCameraPick`.
   panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
-           `grantDoors` before `shared` exists, the eight `FrameJobRecording…` keys put back; fake
+           `grantDoors` before `shared` exists, the nine `FrameJobRecording…` keys put back; fake
            rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
            Source rows end Window… (1), Camera (3), Microphone Only (2), screens + 4, and the
-           Camera popup is `connected()`'s names (or "None connected"); P2 Camera via
+           Camera popup is `connected()`'s `popupTitle`s (or "None connected"); P2 Camera via
            `controlChanged` → `.camera` with `probe-camera`, the five (System Audio, Show Clicks,
            Size, Include Frame Job windows, Rate) disabled with their values kept, Camera,
            Microphone, Record Into and Source live, the size note `cameraSizeNote(nil)`; a
            display row → the five back, Camera disabled, `camera` nil; P3 session only: the
-           display key's 777 kept, the camera key `probe-camera`, eight keys, the row and camera
+           display key's 777 kept, the camera key `probe-camera`, nine keys, the row and camera
            kept through `rebuildSources()` + `restoreChoices()`; P4 `cameraStep` over four
            statuses, `cameraPaneURL`, `cameraOpenedNote(.denied)` exact; P5 the press (no camera,
            `notDetermined` and its held answer on the hidden panel, denied and restricted, the
@@ -84,11 +102,17 @@ Sections and rows:
            Pause / Resume button; P7 `landingNote`'s camera sentences; P8 `cameraSizeNote` on
            V1's FaceTime and V3's iPhone lists and nil; P9 comment-stripped reads: the
            countdown's `prepareCamera`, the four `discardPreparedCamera`s, `startRecording`'s
-           `launchCamera`, the meter's `cameraSession`.
+           `launchCamera`, the meter's `cameraSession`. CR2a: P10 `fillCameraFormats` on V1's
+           facts (the titles in order, Best selected; a stored row selected and in
+           `currentChoice().cameraFormat`; a stale one → Best; no camera → ["Best"]); P11 the
+           Format popup off with a display, live idle with Camera, a row via `controlChanged`
+           writing `FrameJobRecordingCameraFormat` with its spelling, Best writing "", a display
+           row's `cameraFormat` nil; P12 `selectCamera("probe-camera")`'s early return, then
+           `restoreChoices()` with it stored, each leaving the emptied Format popup ["Best"].
 
-Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only values` but the
-`tool` five, run with `--only tool`, the `panel` eight, run with `--only panel`, and `no-hold`,
-`prepare-ignored` and `join-weak`, run with `--only granted` (they need the camera):
+Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
+`MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
+camera), or `values,tool` for `format-size-lowest`:
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
@@ -111,6 +135,16 @@ Mutants (each a `--mutant` edit of a copy of `--sources`), run with `--only valu
   camera-answer-unread  `cameraAnswered`'s `cameraStatus()` re-read deleted    → P5
   prepare-ignored     `takeCameraCapture` never adopts                         → G7
   join-weak           the prepared start's completion holds `[weak prepared]`  → G9
+  format-rows-unsorted  `formatRows` in the device's order                     → V18
+  format-rows-duplicated  no dedupe                                            → V18
+  format-stale-kept   a stale spelling → nil, not best                         → V19
+  format-size-lowest  `WxH` takes the size's last row                          → V21, T8
+  format-after-grant  the format checked after the grant guard                 → T8
+  camera-format-elsewhere-admitted  `camera_format` taken with any source      → T7
+  format-popup-live   the Format popup always enabled                          → P11
+  format-unpersisted  the format key's write deleted                           → P11
+  format-rebuild-skipped-on-match  the `defer` deleted, the rebuild after the early return → P12
+  format-ignored      both resolutions back to best (`cameraFormat` read as nil) → G10
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
@@ -134,11 +168,11 @@ WORK = ROOT / "tools/proof/work/camera-recording-probe"
 SECTIONS = ["values", "landing", "granted", "tool", "panel"]
 ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
-               "V12c", "V12d", "V13", "V14", "V15", "V16", "V17"],
+               "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21"],
     "landing": ["L1", "L2", "L3"],
-    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"],
-    "tool": ["T1", "T2", "T3", "T4", "T5", "T6"],
-    "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"],
+    "granted": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10"],
+    "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"],
+    "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -161,7 +195,8 @@ GRANT_GUARD = """        let cameraGrant = RecordingGrant.cameraStatus
             return refuseCamera(.startFailed(RecordingGrant.cameraRefusal(cameraGrant)), completion)
         }
 """
-# `recordingCameraID`'s grant guard, which `grant-before-lookup` moves above the lookup.
+# `recordingCameraPick`'s grant guard, which `grant-before-lookup` moves above the lookup and
+# `format-after-grant` moves the format check below.
 GRANT_AFTER_LOOKUP = """        guard status == .authorized else {
             throw ToolError(message: RecordingGrant.cameraRefusal(status))
         }
@@ -217,8 +252,8 @@ MUTANTS = {
          "let strangers = Self.cameraRefusedArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }",
          "let strangers = [String]()")]),
     "camera-elsewhere-admitted": (["T2"], [
-        ("AgentServer+RecordingCamera.swift", "guard kind == .camera || camera == nil else {",
-         "guard kind == .camera || camera == nil || true else {")]),
+        ("AgentServer+RecordingCamera.swift", "guard kind == .camera || given.isEmpty else {",
+         "guard kind == .camera || given.isEmpty || true else {")]),
     "grant-before-lookup": (["T3"], [
         ("AgentServer+RecordingCamera.swift", GRANT_AFTER_LOOKUP, ""),
         ("AgentServer+RecordingCamera.swift", "        let index: Int?\n",
@@ -263,6 +298,48 @@ MUTANTS = {
          "            _ = prepared\n")]),
     "join-weak": (["G9"], [
         ("ScreenRecorder+CameraPrepare.swift", JOIN_STRONG, JOIN_WEAK)]),
+    # CR2a (spec §11 CAM-6): the formats.
+    "format-rows-unsorted": (["V18"], [
+        ("CameraDevices.swift", "        return rows.sorted { a, b in\n",
+         "        return rows\n        _ = rows.sorted { a, b in\n")]),
+    "format-rows-duplicated": (["V18"], [
+        ("CameraDevices.swift",
+         "            guard !seen.contains(formats[index]) else { continue }\n", "")]),
+    "format-stale-kept": (["V19"], [
+        ("CameraDevices.swift", "        return bestFormat(formats, active: active)\n",
+         "        return spelled == nil ? bestFormat(formats, active: active) : nil\n")]),
+    "format-size-lowest": (["V21", "T8"], [
+        ("CameraDevices.swift",
+         "let sized = rows.first { $0.width == width && $0.height == height }",
+         "let sized = rows.last { $0.width == width && $0.height == height }")]),
+    "format-after-grant": (["T8"], [
+        ("AgentServer+RecordingCamera.swift", GRANT_AFTER_LOOKUP, ""),
+        ("AgentServer+RecordingCamera.swift", "        var format: String?\n",
+         GRANT_AFTER_LOOKUP + "        var format: String?\n")]),
+    "camera-format-elsewhere-admitted": (["T7"], [
+        ("AgentServer+RecordingCamera.swift",
+         'let given = [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }',
+         'let given = [("camera", camera)].filter { $0.1 != nil }')]),
+    "format-popup-live": (["P11"], [
+        ("RecorderPanelController+Camera.swift",
+         "        formatPopup.isEnabled = phase == .idle && cameraSelected\n",
+         "        formatPopup.isEnabled = true\n")]),
+    "format-unpersisted": (["P11"], [
+        ("RecorderPanelController+Rows.swift",
+         '            defaults.set(selectedCameraFormat ?? "", forKey: Self.cameraFormatKey)\n', "")]),
+    "format-rebuild-skipped-on-match": (["P12"], [
+        ("RecorderPanelController+Camera.swift", "        defer { rebuildCameraFormats() }\n", ""),
+        ("RecorderPanelController+Camera.swift",
+         "        if rows.indices.contains(index) { cameraPopup.selectItem(at: index) }\n",
+         "        if rows.indices.contains(index) { cameraPopup.selectItem(at: index) }\n"
+         "        rebuildCameraFormats()\n")]),
+    "format-ignored": (["G10"], [
+        ("ScreenRecorder+CameraPrepare.swift",
+         "choice.cameraFormat, in: facts.formats, active: facts.activeFormat)",
+         "nil, in: facts.formats, active: facts.activeFormat)"),
+        ("ScreenRecorder+Camera.swift",
+         "choice.cameraFormat, in: facts.formats, active: facts.activeFormat)",
+         "nil, in: facts.formats, active: facts.activeFormat)")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -272,7 +349,11 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "camera-row-live": "panel", "camera-row-persisted": "panel",
                   "camera-panel-hides": "panel", "camera-problem-unsaid": "panel",
                   "countdown-unprepared": "panel", "camera-answer-unread": "panel",
-                  "prepare-ignored": "granted", "join-weak": "granted"}
+                  "prepare-ignored": "granted", "join-weak": "granted",
+                  "format-size-lowest": "values,tool", "format-after-grant": "tool",
+                  "camera-format-elsewhere-admitted": "tool", "format-popup-live": "panel",
+                  "format-unpersisted": "panel", "format-rebuild-skipped-on-match": "panel",
+                  "format-ignored": "granted"}
 
 
 def run(command, **kw):
@@ -494,7 +575,36 @@ def prepared_rows(facts):
                   f"the slot nil {g9.get('preparedAfter') is False}; "
                   f"{len(g9.get('segments') or [])} segment(s), note {g9.get('note')}; "
                   f"{g9.get('error') or g9.get('stopError') or ''}")
+    rows["G10"] = chosen_format_row(facts.get("G10") or {})
     return rows
+
+
+def chosen_format_row(g10):
+    """G10 (CR2a, CAM-6 (3)): G7's prepared start at the first Format row that is not the best
+    format: adopted within `PREPARED_START_MAX`, the file the row's size, its frames ≥ 98 % at the
+    row's rate by G3's decode, `camera.format` the row's spelling; skipped by name without one."""
+    if g10.get("skip"):
+        return ("skip", g10["skip"])
+    row = g10.get("row") or ""
+    match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", row)
+    if not match:
+        return (False, f"no row was chosen: {g10}")
+    width, height, rate = int(match[1]), int(match[2]), float(match[3])
+    segments = g10.get("segments") or []
+    ratios = [decoded_ratio(path, rate) for path in segments]
+    took = g10.get("startSeconds")
+    sized = all(m["width"] == width and m["height"] == height for _, m in ratios)
+    return (g10.get("prepared") is True and not g10.get("error") and not g10.get("stopError")
+            and took is not None and took < PREPARED_START_MAX
+            and g10.get("preparedAfter") is False and len(segments) == 1 and sized
+            and all(r is not None and r >= FRAMES_PASS for r, _ in ratios)
+            and g10.get("format") == row,
+            f"row {row} (best {g10.get('best')}); startCamera answered in "
+            f"{took if took is None else round(took, 3)} s (< {PREPARED_START_MAX} s), the slot nil "
+            f"after {g10.get('preparedAfter') is False}; {len(segments)} segment(s), files "
+            + ", ".join(f"{m['width']}×{m['height']} {m['frames']}/{r}" for r, m in ratios)
+            + f"; camera.format {g10.get('format')}; note {g10.get('note')}; "
+            f"{g10.get('error') or g10.get('stopError') or ''}")
 
 
 def granted_rows(facts):
@@ -584,7 +694,7 @@ def main():
     parser.add_argument("--only", help="comma-separated sections: " + ",".join(SECTIONS))
     args = parser.parse_args()
     wanted = (args.only.split(",") if args.only
-              else ([MUTANT_SECTION.get(args.mutant, "values")] if args.mutant
+              else (MUTANT_SECTION.get(args.mutant, "values").split(",") if args.mutant
                     else list(SECTIONS)))
     unknown = [s for s in wanted if s not in SECTIONS]
     if unknown:

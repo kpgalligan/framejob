@@ -212,3 +212,44 @@ its code.
      camera's `problem` (else "The camera stopped on its own.") followed by " What was captured
      was added.", in place of the display's sentence; the warm-up's `camera.note` follows the
      microphone's problem; a landing that fails carries both.
+
+- **CAM-6 — The camera's formats (CR2a), recorded before its code; amends CAM-4 (2)'s sentence
+  and CAM-5 (3)'s size note.** The panel's Format popup and `record_screen`'s `camera_format`
+  choose one of the chosen camera's formats; Best, CAM-3's pick, is the default of both. CAM-3,
+  CAM-4 and CAM-5 stand except where this entry amends them.
+  1. **The rows.** "Best (W×H at R fps)" comes first, or "Best" when the camera has no best
+     format. Then one row per distinct (width, height, maximum rate) with a maximum rate above 0,
+     the first listed kept. The rows are grouped wider than tall, then square, then taller than
+     wide; within a group by area, largest first, then by maximum rate, highest first, then in
+     the device's own order. Each row is titled "W×H at R fps" (the rate written `%g`) and
+     carries the format as `CameraDevices.spelled` writes it (`1920x1080@30`). A format's lower
+     rates are NOT rows, because a recording is made at the format's maximum rate (CAM-3); a
+     camera that lists a rate as a format of its own (the iPhone's 30 and 60) shows both.
+  2. **Persistence and the live rule.** `FrameJobRecordingCameraFormat` is one key for every
+     camera: the spelled row, or `""` for Best. It is written with the camera key, and only
+     while the Camera popup names a camera. The popup selects the stored row when the chosen
+     camera lists it, else Best — at init, on `show()` while idle, and on a change of camera.
+     It is live only while idle with Source Camera, the Camera popup's rule (CAM-5 (2)).
+  3. **The choice.** With Source Camera, `RecordingChoice.cameraFormat` is the selected row's
+     spelling, nil for Best. The format recorded is the first listed format whose spelling
+     equals it, else (nil, or a spelling the camera no longer lists) CAM-3's best format.
+     `prepareCamera` and `startCamera` both resolve it so, and CAM-5 (5)'s adopt rule compares
+     the resolved format, unchanged.
+  4. **The size note.** For Best it reads CAM-5's sentence ("1760×1328 at 30 fps — the camera's
+     best format"); for a chosen row, "W×H at R fps — the chosen format"; with no camera, "no
+     camera connected", as before.
+  5. **Continuity Camera.** A device the system marks `isContinuityCamera` is titled
+     "<name> (Continuity Camera)" in the Camera popup. `CameraDevices.match` still compares the
+     name and the `uniqueID`, and the default rule is unchanged.
+  6. **The tool's `camera_format`.** A string, trimmed; blank or null counts as absent, and
+     absent means Best. `best` in any case means Best. Otherwise the spelling is matched
+     exactly in any case (`1920x1080@30`), else as `WIDTHxHEIGHT` in any case, which takes that
+     size's first row — its highest rate. With source `screen` or `voice_over`, a given `camera`
+     or `camera_format` is refused in CAM-4 (2)'s step: "With source <kind>, <the given ones,
+     joined ", "> cannot be given — only source camera records a camera." With `camera` alone
+     the sentence is CAM-4's, byte for byte, and a `camera_format` that is not a string gets
+     `stringArg`'s refusal in the same step. With source `camera` the format is checked in
+     CAM-3's step (7), AFTER the camera lookup and BEFORE the Camera grant (8): "The camera
+     <name> has no format <wanted>. Its formats are best, <the rows spelled, joined ", ">."
+     The answer's `camera.format` and the canvas rule are unchanged: the format recorded,
+     spelled.

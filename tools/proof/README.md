@@ -10514,9 +10514,10 @@ full), and three are `recording_proof.py`'s.
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
 - **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
-  the panel's row reads false and its title; `out["keys"]` lists eight (seven
-  until camera-recording CR1c added `FrameJobRecordingCamera`), the harness pins
-  all eight by value (`"FrameJobRecordingIncludeFrameJobWindows":
+  the panel's row reads false and its title; `out["keys"]` lists nine (seven
+  until camera-recording CR1c added `FrameJobRecordingCamera`, eight until CR2a
+  added `FrameJobRecordingCameraFormat`), the harness pins
+  all nine by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
   `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
@@ -24348,7 +24349,7 @@ python3 tools/proof/camera_recording_probe.py --only tool --mutant camera-strang
 ```
 
 The probe's `tool` section (T1–T6) calls `AgentServer.shared`'s own functions: the argument
-checks, `recordingCameraID` over V1–V3's three lists, `cameraFields`, and `recordingFields` and
+checks, `recordingCameraPick` (`recordingCameraID` until CR2a) over V1–V3's three lists, `cameraFields`, and `recordingFields` and
 `resultNotes` of a camera result. Its five mutants, each run with `--only tool` by default:
 `camera-strangers-admitted` (T1), `camera-elsewhere-admitted` (T2), `grant-before-lookup`
 (T3), `camera-key-dropped` (T5) and `camera-notes-dropped` (T6). `recording_probe.py`'s D10,
@@ -24374,7 +24375,7 @@ python3 tools/proof/camera_recording_proof.py <dir>/agent.sock    # section D la
 
 The probe's `panel` section runs in its own process: `NSApplication` with the `.prohibited`
 policy, a spy sealed in `RecorderPanelController.grantDoors` before `shared` exists (every
-read counted, the prompts held, nothing opened), the eight `FrameJobRecording…` keys put back
+read counted, the prompts held, nothing opened), the nine `FrameJobRecording…` keys put back
 as they were, the panel never shown. Fake rows — "Probe Camera" (`probe-camera`), a "None
 connected" row with no id and "Probe Microphone" (`probe-mic`) — find no device, so no camera
 or microphone opens. **P1** the Source rows end Window… (1), Camera (3), Microphone Only (2),
@@ -24383,7 +24384,7 @@ screens + 4, and the Camera popup lists `CameraDevices.connected()`'s names; **P
 Include Frame Job windows and Rate with their values kept, leaves Camera, Microphone, Record
 Into and Source live, and the size note is `cameraSizeNote(nil)`; a display row brings the five
 back, disables Camera and leaves `camera` nil; **P3** session only (the display key's sentinel
-777 kept, the camera key written, eight keys, the row kept through `rebuildSources` +
+777 kept, the camera key written, nine keys since CR2a, the row kept through `rebuildSources` +
 `restoreChoices`); **P4** `cameraStep`, `cameraPaneURL`, `cameraOpenedNote`; **P5** the press
 (no camera, `notDetermined` asking and its held answer on the hidden panel, denied and
 restricted opening `Privacy_Camera`, the microphone's ask, the countdown with Microphone Off;
@@ -24405,3 +24406,41 @@ P5), `camera-row-live` (P2), `camera-row-persisted` (P3), `camera-panel-hides` (
 `recording_probe.py` is re-aimed for the fourth Source row, the eighth key, the grant doors'
 two camera members and `voice-panel-hides`. The numbers are in
 `designs/camera-recording.md`'s CR1c record.
+
+## Camera recording CR2a — the camera's formats (`camera_recording_probe.py` V18–V21, T7, T8, P10–P12 and G10, `camera_recording_proof.py`'s `camera_format` rows; spec §11 CAM-6)
+
+CR2a gives the recorder panel a Format popup under Camera ("Best (<CAM-3's pick>)" first, then
+one row per distinct size and maximum rate, `FrameJobRecordingCameraFormat`, pinned to `""` in
+the harness and `screens.py`), `record_screen` a `camera_format` argument, and a Continuity
+Camera its "(Continuity Camera)" title. `prepareCamera` and `startCamera` record at
+`CameraDevices.chosenFormat`, which falls back to Best for nil or a stale spelling.
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only values,tool,panel   # V18–V21, T7, T8, P10–P12
+python3 tools/proof/camera_recording_probe.py --mutant format-rows-unsorted   # each of the ten exits 1, in MUTANT_SECTION's section(s)
+python3 tools/proof/camera_recording_probe.py --only granted             # G10 records at a chosen format
+python3 tools/proof/camera_recording_proof.py <dir>/agent.sock           # the camera_format rows; section D lists Format:
+```
+
+**V18** `formatRows` on CR0's lists (FaceTime's seven landscape, square, then portrait, each by
+area; the iPhone's eight with @60 before @30 per size; OBS's one; a duplicate, the first kept;
+a 0-rate format left out); **V19** `chosenFormat` (nil and stale → best, a spelling → its
+index, a duplicate → the first); **V20** the titles, the Continuity mark and the size note for
+Best, a chosen row, a stale one and no camera; **V21** `formatMatch` (exact, any case,
+`WIDTHxHEIGHT` → that size's highest rate) and the format sentence. **T7** `camera_format`
+beside `camera` in CAM-4 (2)'s step (with screen, both with voice_over, a number, blank and
+null admitted, a spelling with camera admitted); **T8** `recordingCameraPick`: the format
+between the lookup and the grant. **P10** `fillCameraFormats` on V1's facts; **P11** the
+Format popup's live rule and its key (a row's spelling, Best `""`, a display row's
+`cameraFormat` nil); **P12** `selectCamera`'s early return and `restoreChoices()` each rebuild
+the Format popup. **G10** (granted) G7's prepared start at the camera's first row that is not
+Best: adopted under `PREPARED_START_MAX`, the file the row's size, ≥ 98 % frames at its rate,
+`camera.format` the row's spelling; skipped by name when there is no such row. Ten mutants:
+`format-rows-unsorted` and `format-rows-duplicated` (V18), `format-stale-kept` (V19),
+`format-size-lowest` (V21, T8; `values,tool`), `format-after-grant` (T8),
+`camera-format-elsewhere-admitted` (T7), `format-popup-live` and `format-unpersisted` (P11),
+`format-rebuild-skipped-on-match` (P12), `format-ignored` (G10, needs the camera);
+`camera-elsewhere-admitted` reads the new guard line. `recording_probe.py` (5d and D3 count
+nine keys, 7c's fourteen arguments) and `recording_proof.py` (fourteen arguments,
+`camera_format` a string) are re-aimed. The numbers are in `designs/camera-recording.md`'s
+CR2a record.

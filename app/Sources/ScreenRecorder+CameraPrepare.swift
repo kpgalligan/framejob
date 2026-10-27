@@ -54,8 +54,8 @@ extension ScreenRecorder {
 
     /// MAIN THREAD, idle only. Acts only for a `.camera` choice naming a
     /// camera, with the Camera grant `.authorized`, the camera connected and
-    /// a best format (CAM-3); otherwise it does nothing and leaves nothing
-    /// behind. A prepared capture that `startCamera` could still adopt for
+    /// a format (the choice's, else CAM-3's best: CAM-6 (3)); otherwise it
+    /// does nothing and leaves nothing behind. A prepared capture that `startCamera` could still adopt for
     /// the same device and format is kept; any other is let go first. Blocks
     /// main for the capture's construction; the session starts on its own
     /// queue.
@@ -65,7 +65,9 @@ extension ScreenRecorder {
             let device = CameraDevices.device(withID: id)
         else { return }
         let facts = CameraDevices.facts(of: device)
-        guard let format = CameraDevices.bestFormat(facts.formats, active: facts.activeFormat)
+        guard
+            let format = CameraDevices.chosenFormat(
+                choice.cameraFormat, in: facts.formats, active: facts.activeFormat)
         else { return }
         if let prepared = preparedCamera, Self.adoptable(prepared, device: id, format: format) {
             return

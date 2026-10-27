@@ -2,7 +2,10 @@
 // a camera result through the landing, and a real recording under the
 // terminal's grant; CR1b (CAM-4): `record_screen`'s camera through the
 // server's own functions (`tool`); CR1c (CAM-5): the recorder panel's Camera
-// source (`panel`) and the countdown's prepared capture (granted G7–G9).
+// source (`panel`) and the countdown's prepared capture (granted G7–G9);
+// CR2a (CAM-6): the camera's formats — the rows, the choice, the tool's
+// `camera_format`, the panel's Format popup, and a recording at a chosen
+// format (granted G10).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -187,6 +190,78 @@ func values(_ request: [String: Any]) {
              "isSteady 33.3, 35.0, 43.3, 30.0 ms at 30 fps → \(steady); run "
                  + "\(CameraCapture.warmUpRun), bound \(CameraCapture.warmUpBound) s; notes "
                  + notes.map { $0 ?? "nil" }.joined(separator: " | "))
+    formatValues()
+}
+
+/// V18–V21 (CR2a, spec §11 CAM-6): the Format rows, the choice, the titles
+/// and the tool's spelling, on CR0's three lists.
+func formatValues() {
+    func rows(_ list: [CameraFormatFacts]) -> [String] {
+        CameraDevices.formatRows(list).map { "\($0):" + CameraDevices.spelled(list[$0]) }
+    }
+    let duplicated = [fmt(1280, 720, 30), fmt(1920, 1080, 30), fmt(1280, 720, 30)]
+    let zeroRate = [fmt(640, 480, 0), fmt(320, 240, 30)]
+    let got = [rows(faceTime), rows(iPhone), rows(obs), rows(duplicated), rows(zeroRate)]
+    let want = [
+        ["3:1760x1328@30", "0:1920x1080@30", "1:1280x720@30", "4:640x480@30", "6:1552x1552@30",
+         "5:1328x1760@30", "2:1080x1920@30"],
+        ["7:1920x1440@60", "6:1920x1440@30", "5:1920x1080@60", "4:1920x1080@30", "3:1280x720@60",
+         "2:1280x720@30", "1:640x480@60", "0:640x480@30"],
+        ["0:1920x1080@60"], ["1:1920x1080@30", "0:1280x720@30"], ["1:320x240@30"],
+    ]
+    probeRow("V18", got == want,
+             "FaceTime, iPhone, OBS, a duplicate, a 0-rate format → "
+                 + got.map { $0.joined(separator: " ") }.joined(separator: " | "))
+
+    let chosen = [
+        CameraDevices.chosenFormat(nil, in: faceTime, active: 1),
+        CameraDevices.chosenFormat("1920x1080@30", in: faceTime, active: 1),
+        CameraDevices.chosenFormat("9x9@1", in: faceTime, active: 1),
+        CameraDevices.chosenFormat("1280x720@30", in: duplicated, active: nil),
+    ]
+    probeRow("V19", chosen == [3, 0, 3, 0],
+             "nil, listed, stale, a duplicate → \(chosen.map { $0.map(String.init) ?? "nil" }) "
+                 + "(want [3, 0, 3, 0])")
+
+    let ft = CameraDeviceFacts(uniqueID: "FT-ID", name: "FaceTime HD Camera", isBuiltIn: true,
+                               formats: faceTime, activeFormat: 1)
+    let phone = CameraDeviceFacts(uniqueID: "PHONE-ID", name: "Owner iPhone Camera",
+                                  isBuiltIn: false, formats: iPhone, activeFormat: 0,
+                                  isContinuityCamera: true)
+    let titles = [
+        CameraDevices.formatTitle(fmt(1920, 1080, 30)), CameraDevices.formatTitle(fmt(1280, 720, 59.94)),
+        CameraDevices.popupTitle(ft), CameraDevices.popupTitle(phone),
+        RecorderPanelController.cameraSizeNote(ft),
+        RecorderPanelController.cameraSizeNote(ft, format: "1920x1080@30"),
+        RecorderPanelController.cameraSizeNote(ft, format: "9x9@1"),
+        RecorderPanelController.cameraSizeNote(nil, format: "1920x1080@30"),
+    ]
+    let wantTitles = [
+        "1920×1080 at 30 fps", "1280×720 at 59.94 fps", "FaceTime HD Camera",
+        "Owner iPhone Camera (Continuity Camera)", "1760×1328 at 30 fps — the camera's best format",
+        "1920×1080 at 30 fps — the chosen format", "1760×1328 at 30 fps — the camera's best format",
+        "no camera connected",
+    ]
+    probeRow("V20", titles == wantTitles, titles.joined(separator: " | "))
+
+    let matches = [
+        CameraDevices.formatMatch("1920x1080@30", in: faceTime),
+        CameraDevices.formatMatch("1920X1080@30", in: faceTime),
+        CameraDevices.formatMatch("1920x1440", in: iPhone),
+        CameraDevices.formatMatch("1920X1080", in: iPhone),
+        CameraDevices.formatMatch("1920x1080@60", in: faceTime),
+        CameraDevices.formatMatch("4k", in: faceTime),
+    ]
+    let wantMatches: [String?] = [
+        "1920x1080@30", "1920x1080@30", "1920x1440@60", "1920x1080@60", nil, nil,
+    ]
+    let sentence = CameraDevices.noSuchFormatSentence("4k", camera: ft)
+    let wantSentence = "The camera FaceTime HD Camera has no format 4k. Its formats are best, "
+        + "1760x1328@30, 1920x1080@30, 1280x720@30, 640x480@30, 1552x1552@30, 1328x1760@30, "
+        + "1080x1920@30."
+    probeRow("V21", matches == wantMatches && sentence == wantSentence,
+             "exact, upper-case, 1920x1440 and 1920X1080 on the iPhone, a rate not listed, "
+                 + "unknown → \(matches.map { $0 ?? "nil" }); \(sentence)")
 }
 
 // MARK: - landing
@@ -310,6 +385,23 @@ func granted(_ request: [String: Any]) {
     probeFacts["G8"] = preparedDiscard(prepared)
     probeSpin(1)
     probeFacts["G9"] = preparedJoin(prepared)
+    // G10 (CR2a): a prepared capture at a chosen format, adopted and recorded.
+    probeSpin(1)
+    probeFacts["G10"] = chosenFormatStart(prepared, camera: camera)
+}
+
+/// G10 (CAM-6 (3)): G7's prepared start at `camera`'s first Format row whose
+/// spelling is not the best format's; a skip by name when there is none.
+func chosenFormatStart(_ base: RecordingChoice, camera: CameraDeviceFacts) -> [String: Any] {
+    let best = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
+        .map { CameraDevices.spelled(camera.formats[$0]) }
+    let rows = CameraDevices.formatRows(camera.formats).map { CameraDevices.spelled(camera.formats[$0]) }
+    guard let row = rows.first(where: { $0 != best }) else {
+        return ["skip": "the camera \(camera.name) lists no format but its best (\(best ?? "none"))"]
+    }
+    var choice = base
+    choice.cameraFormat = row
+    return preparedStart(choice).merging(["row": row, "best": best ?? NSNull()]) { $1 }
 }
 
 /// G0–G6: 2 s, a 1 s pause, 2 s more, on `camera`.
@@ -541,7 +633,7 @@ final class PanelGrantSpy {
 }
 
 /// CR1c (spec §11 CAM-5): `RecorderPanelController.shared`, never shown,
-/// under `PanelGrantSpy`, with the eight `FrameJobRecording…` values put back
+/// under `PanelGrantSpy`, with the nine `FrameJobRecording…` values put back
 /// as they were at the end. Neither fake id finds a device, so no camera or
 /// microphone opens.
 func panelRows(_ request: [String: Any]) {
@@ -553,6 +645,7 @@ func panelRows(_ request: [String: Any]) {
         RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
+        RecorderPanelController.cameraFormatKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -570,7 +663,9 @@ func panelRows(_ request: [String: Any]) {
     let screens = NSScreen.screens.count
     let tail = items.suffix(3)
     let separator = items.firstIndex { $0.isSeparatorItem } ?? -1
-    let connected = CameraDevices.connected().map(\.localizedName)
+    let connected = CameraDevices.connected().map {
+        CameraDevices.popupTitle(CameraDevices.facts(of: $0))
+    }
     let cameraTitles = panel.cameraPopup.itemArray.map(\.title)
     let wantTitles = connected.isEmpty ? [RecorderPanelController.noCameraTitle] : connected
     probeRow("P1",
@@ -658,7 +753,7 @@ func panelRows(_ request: [String: Any]) {
     panel.restoreChoices()
     let kept = panel.cameraSelected && panel.currentChoice().source == .camera
         && panel.selectedCameraID == "probe-camera"
-    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 8 && kept,
+    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 9 && kept,
              "display key \(display) (sentinel 777), camera key \(stored ?? "nil"), \(keysNow.count) "
                 + "keys \(keysNow), the row and the camera kept through rebuildSources + "
                 + "restoreChoices \(kept)")
@@ -807,7 +902,90 @@ func panelRows(_ request: [String: Any]) {
         "1760×1328 at 30 fps — the camera's best format",
         "1920×1440 at 60 fps — the camera's best format", "no camera connected",
     ], sizes.joined(separator: " | "))
+    formatPanelRows(panel, fakeCamera: fakeCamera, cameraRow: cameraRow(), choose: choose, reset: reset)
     probeFacts["visibleAtEnd"] = panel.window?.isVisible ?? true
+}
+
+/// P10–P12 (CR2a, spec §11 CAM-6): the Format popup — its fill, its live
+/// rule and its key, and its rebuild on `selectCamera`'s early return.
+func formatPanelRows(
+    _ panel: RecorderPanelController, fakeCamera: NSMenuItem, cameraRow: NSMenuItem?,
+    choose: (NSMenuItem?) -> Void, reset: () -> Void
+) {
+    let ft = CameraDeviceFacts(uniqueID: "FT-ID", name: "FaceTime HD Camera", isBuiltIn: true,
+                               formats: faceTime, activeFormat: 1)
+    func titles() -> [String] { panel.formatPopup.itemArray.map(\.title) }
+    let key = RecorderPanelController.cameraFormatKey
+
+    // P10 — the fill on V1's facts.
+    reset()
+    choose(cameraRow)
+    panel.fillCameraFormats(ft, stored: nil)
+    let filled = titles()
+    let bestSelected = panel.formatPopup.indexOfSelectedItem == 0 && panel.selectedCameraFormat == nil
+    panel.fillCameraFormats(ft, stored: "1920x1080@30")
+    let storedTitle = panel.formatPopup.titleOfSelectedItem
+    let storedChoice = panel.currentChoice().cameraFormat
+    panel.fillCameraFormats(ft, stored: "9x9@1")
+    let staleBest = panel.formatPopup.indexOfSelectedItem == 0
+    panel.fillCameraFormats(nil, stored: "1920x1080@30")
+    let none = titles()
+    let wantFilled = [
+        "Best (1760×1328 at 30 fps)", "1760×1328 at 30 fps", "1920×1080 at 30 fps",
+        "1280×720 at 30 fps", "640×480 at 30 fps", "1552×1552 at 30 fps", "1328×1760 at 30 fps",
+        "1080×1920 at 30 fps",
+    ]
+    probeRow("P10",
+             filled == wantFilled && bestSelected && storedTitle == "1920×1080 at 30 fps"
+                && storedChoice == "1920x1080@30" && staleBest
+                && none == [RecorderPanelController.bestFormatTitle],
+             "titles \(filled), Best selected \(bestSelected); stored 1920x1080@30 → "
+                + "\(storedTitle ?? "nil"), currentChoice().cameraFormat \(storedChoice ?? "nil"); "
+                + "stored 9x9@1 → Best \(staleBest); no camera → \(none)")
+
+    // P11 — the live rule and the key.
+    reset()
+    choose(panel.sourcePopup.item(at: 0))
+    let displayEnabled = panel.formatPopup.isEnabled
+    choose(cameraRow)
+    let cameraEnabled = panel.formatPopup.isEnabled
+    panel.cameraPopup.select(fakeCamera)
+    panel.fillCameraFormats(ft, stored: nil)
+    UserDefaults.standard.set("sentinel", forKey: key)
+    let row = panel.formatPopup.itemArray.firstIndex { $0.representedObject as? String == "1920x1080@30" }
+    if let row { panel.formatPopup.selectItem(at: row) }
+    panel.controlChanged(panel.formatPopup)
+    let written = UserDefaults.standard.string(forKey: key)
+    let chosenNote = panel.sizeNote.stringValue
+    panel.formatPopup.selectItem(at: 0)
+    panel.controlChanged(panel.formatPopup)
+    let bestWritten = UserDefaults.standard.string(forKey: key)
+    if let row { panel.formatPopup.selectItem(at: row) }
+    choose(panel.sourcePopup.item(at: 0))
+    let displayFormat = panel.currentChoice().cameraFormat
+    let displayAgain = panel.formatPopup.isEnabled
+    probeRow("P11",
+             !displayEnabled && cameraEnabled && written == "1920x1080@30" && bestWritten == ""
+                && displayFormat == nil && !displayAgain,
+             "Format enabled with a display \(displayEnabled), with Camera idle \(cameraEnabled); "
+                + "the 1920x1080@30 row wrote \(written ?? "nil") (size note \(chosenNote)), Best "
+                + "wrote \(bestWritten.map { "\"\($0)\"" } ?? "nil"); a display row: cameraFormat "
+                + "\(displayFormat ?? "nil"), Format enabled \(displayAgain)")
+
+    // P12 — `selectCamera`'s early return still rebuilds the Format popup.
+    reset()
+    panel.formatPopup.removeAllItems()
+    panel.selectCamera("probe-camera")
+    let selected = panel.selectedCameraID
+    let early = titles()
+    UserDefaults.standard.set("probe-camera", forKey: RecorderPanelController.cameraKey)
+    panel.formatPopup.removeAllItems()
+    panel.restoreChoices()
+    let restored = titles()
+    let best = [RecorderPanelController.bestFormatTitle]
+    probeRow("P12", selected == "probe-camera" && early == best && restored == best,
+             "selectCamera(probe-camera): selected \(selected ?? "nil"), Format \(early); "
+                + "restoreChoices with probe-camera stored: Format \(restored)")
 }
 
 // MARK: - tool
@@ -868,8 +1046,8 @@ func toolRows(_ request: [String: Any]) {
     func lookup(_ wanted: String?, _ list: [CameraDeviceFacts], _ preferred: String?,
                 _ status: AVAuthorizationStatus) -> String {
         do {
-            return "ok: " + (try AgentServer.recordingCameraID(
-                wanted, in: list, preferredID: preferred, status: status))
+            return "ok: " + (try AgentServer.recordingCameraPick(
+                wanted, format: nil, in: list, preferredID: preferred, status: status)).id
         } catch let error as AgentServer.ToolError {
             return "error: " + error.message
         } catch {
@@ -897,6 +1075,55 @@ func toolRows(_ request: [String: Any]) {
              badLookups.isEmpty
                 ? lookups.map { "\($0.0) → \($0.1.prefix(60))" }.joined(separator: " | ")
                 : badLookups.map { "\($0.0): got \($0.1), want \($0.2)" }.joined(separator: " | "))
+
+    // T7 (CR2a, CAM-6 (6)): `camera_format` beside `camera` in CAM-4 (2)'s step.
+    let format = "error: With source screen, camera_format" + elsewhere
+    table("T7", [
+        ("camera_format with screen", ["source": "screen", "camera_format": "1920x1080@30"], format),
+        ("both with voice_over", ["source": "voice_over", "camera": "FT-ID", "camera_format": "best"],
+         "error: With source voice_over, camera, camera_format" + elsewhere),
+        ("camera_format: 5", ["source": "camera", "camera_format": 5],
+         "error: camera_format must be a string."),
+        ("camera_format: 5 with screen", ["source": "screen", "camera_format": 5],
+         "error: camera_format must be a string."),
+        ("a blank camera_format with screen", ["source": "screen", "camera_format": "  "], "ok: screen"),
+        ("a null camera_format with screen", ["source": "screen", "camera_format": NSNull()], "ok: screen"),
+        ("camera_format with camera", ["source": "camera", "camera_format": "1920x1080@30"],
+         "ok: camera"),
+    ])
+
+    // T8 (CAM-6 (6)): the format between the lookup and the grant.
+    func pick(_ wanted: String?, _ format: String?, _ status: AVAuthorizationStatus) -> String {
+        do {
+            let got = try AgentServer.recordingCameraPick(
+                wanted, format: format, in: cams, preferredID: nil, status: status)
+            return "ok: \(got.id) \(got.format ?? "nil")"
+        } catch let error as AgentServer.ToolError {
+            return "error: " + error.message
+        } catch {
+            return "other: \(error)"
+        }
+    }
+    let ft = cams[1]
+    let noFormat = "error: " + CameraDevices.noSuchFormatSentence("4k", camera: ft)
+    let picks: [(String, String, String)] = [
+        ("nil", pick(nil, nil, .authorized), "ok: FT-ID nil"),
+        ("spelled", pick("FT-ID", "1920x1080@30", .authorized), "ok: FT-ID 1920x1080@30"),
+        ("1920X1080 on the iPhone", pick("PHONE-ID", "1920X1080", .authorized),
+         "ok: PHONE-ID 1920x1080@60"),
+        ("best", pick("FT-ID", "best", .authorized), "ok: FT-ID nil"),
+        ("BEST", pick(nil, "BEST", .authorized), "ok: FT-ID nil"),
+        ("unknown format", pick("FT-ID", "4k", .authorized), noFormat),
+        ("unknown camera + bad format", pick("Zed", "4k", .authorized), unknown),
+        ("bad format + denied", pick("FT-ID", "4k", .denied), noFormat),
+        ("good format + denied", pick("FT-ID", "1920x1080@30", .denied),
+         "error: " + RecordingGrant.cameraRefusal(.denied)),
+    ]
+    let badPicks = picks.filter { $0.1 != $0.2 }
+    probeRow("T8", badPicks.isEmpty,
+             badPicks.isEmpty
+                ? picks.map { "\($0.0) → \($0.1.prefix(60))" }.joined(separator: " | ")
+                : badPicks.map { "\($0.0): got \($0.1), want \($0.2)" }.joined(separator: " | "))
 
     let plain = RecordingCamera(name: "Probe Camera", format: "1920x1080@30")
     var troubled = plain

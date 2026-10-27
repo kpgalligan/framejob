@@ -132,13 +132,15 @@ extension AgentServer {
             + "camera names (a device's unique id, or its name in any case), else the default "
             + "camera (the system's preferred camera, else the first built-in, else the "
             + "first) — at its best format (the largest size wider than tall at 30 fps or "
-            + "more, at that format's highest rate), into files named Camera Recording <date> "
-            + "at <time>.mov, one file per stretch between pauses; microphone: true adds the "
-            + "DEFAULT microphone as a second file, as for a screen. It lands as a screen "
+            + "more, at that format's highest rate) or the one camera_format names (a format "
+            + "the camera lacks is refused naming its formats), into files named Camera "
+            + "Recording <date> at <time>.mov, one file per stretch between pauses; "
+            + "microphone: true adds the DEFAULT microphone as a second file, as for a "
+            + "screen. It lands as a screen "
             + "recording's picture does; as a new project the canvas is the file's size at "
             + "the format's rate, rounded. display, window, system_audio, show_clicks, size, "
             + "include_framejob_windows and rate are refused by name with source camera, and "
-            + "camera is refused with any other source. The camera is looked up after "
+            + "camera and camera_format with any other source. The camera is looked up after "
             + "project — an unknown one is refused naming every camera connected, and \"No "
             + "camera is connected.\" when there is none — and only then is the Camera grant "
             + "read, never the Screen Recording one. The span counts from the camera's first "
@@ -203,8 +205,9 @@ extension AgentServer {
                     + "a screen recording the Screen Recording grant, then the display or "
                     + "window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
-                    + "that, by name — and for a camera recording the camera lookup, then the "
-                    + "Camera grant; then the recording itself. " + recordingPauseClause
+                    + "that, by name — and for a camera recording the camera lookup, then its "
+                    + "camera_format, then the Camera grant; then the recording itself. "
+                    + recordingPauseClause
                     + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
                     + recordingCameraClause,
                 [
@@ -233,6 +236,14 @@ extension AgentServer {
                             + "first built-in, else the first. One no connected camera carries "
                             + "is refused naming every camera connected. Refused with any "
                             + "other source.",
+                    ],
+                    "camera_format": [
+                        "type": "string",
+                        "description": "With source camera, the format to record at, as "
+                            + "camera.format spells it (1920x1080@30), or WIDTHxHEIGHT for that "
+                            + "size's highest rate, or best; any case. Absent, blank or null means "
+                            + "best — the camera's best format. A format the camera lacks is "
+                            + "refused, naming its formats. Refused with any other source.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,

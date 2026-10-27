@@ -19,7 +19,8 @@ import ScreenCaptureKit
 /// and the resume, the hidden recording's one door and the phases drawn
 /// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
 /// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit, and
-/// `+Camera.swift` the Source row "Camera" and its popup (spec §11 CAM-5).
+/// `+Camera.swift` the Source row "Camera", its popup and the Format popup
+/// (spec §11 CAM-5, CAM-6).
 /// Ten files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
@@ -110,7 +111,7 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all eight on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all nine on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
@@ -128,6 +129,7 @@ final class RecorderPanelController: NSWindowController {
     static let sizeKey = "FrameJobRecordingSize"
     static let includeFrameJobWindowsKey = "FrameJobRecordingIncludeFrameJobWindows"
     static let cameraKey = "FrameJobRecordingCamera"
+    static let cameraFormatKey = "FrameJobRecordingCameraFormat"
 
     // MARK: - Metrics and vocabulary
 
@@ -164,6 +166,7 @@ final class RecorderPanelController: NSWindowController {
     let includeFrameJobCheckbox = NSButton(
         checkboxWithTitle: "Include Frame Job windows", target: nil, action: nil)
     let cameraPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let formatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
@@ -299,6 +302,7 @@ final class RecorderPanelController: NSWindowController {
         if let sender = sender as? NSPopUpButton, sender === destinationPopup {
             chosenDestination = currentChoice().destination
         }
+        if let sender = sender as? NSPopUpButton, sender === cameraPopup { rebuildCameraFormats() }
         persistChoices()
         refreshSizeNote()
         syncControlsEnabled()

@@ -22,12 +22,15 @@ extension RecorderPanelController {
     // MARK: - Rows
 
     func buildRows(into content: NSStackView) {
-        for popup in [sourcePopup, cameraPopup, microphonePopup, ratePopup, sizePopup, destinationPopup] {
+        for popup in [
+            sourcePopup, cameraPopup, formatPopup, microphonePopup, ratePopup, sizePopup,
+            destinationPopup,
+        ] {
             popup.font = DS.sans(13)
             popup.target = self
             popup.action = #selector(controlChanged(_:))
         }
-        for popup in [sourcePopup, cameraPopup, ratePopup, sizePopup, destinationPopup] {
+        for popup in [sourcePopup, cameraPopup, formatPopup, ratePopup, sizePopup, destinationPopup] {
             popup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
         }
         microphonePopup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
@@ -67,6 +70,7 @@ extension RecorderPanelController {
             [fieldLabel("Source:"), sourcePopup],
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
             [fieldLabel("Camera:"), cameraPopup],
+            [fieldLabel("Format:"), formatPopup],
             [fieldLabel("Microphone:"), microphoneRow],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
@@ -266,7 +270,8 @@ extension RecorderPanelController {
     /// The controls as one value. `.picked` only while the picker's filter
     /// is held; a "Window…" row with no filter (the picker was cancelled and
     /// the row not reselected) falls back to the main display. `camera` is
-    /// the Camera popup's id with Source Camera, and nil for every other.
+    /// the Camera popup's id with Source Camera, and nil for every other;
+    /// `cameraFormat` the Format popup's spelling beside it, nil for Best.
     func currentChoice() -> RecordingChoice {
         var choice = RecordingChoice()
         if voiceOverSelected {
@@ -274,6 +279,7 @@ extension RecorderPanelController {
         } else if cameraSelected {
             choice.source = .camera
             choice.camera = selectedCameraID
+            choice.cameraFormat = selectedCameraFormat
         } else if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter != nil {
             choice.source = .picked
         } else {
@@ -298,8 +304,9 @@ extension RecorderPanelController {
     /// Writes every control but the destination (a `recipeKey` is minted per
     /// process) and a picked window (a filter is not a value). The display
     /// key is left alone while the Window row, Microphone Only or Camera (the
-    /// two session-only rows) is selected. The camera key is written only
-    /// while the Camera popup names one, so "None connected" forgets nothing.
+    /// two session-only rows) is selected. The camera key, and the format
+    /// key beside it (`""` for Best), are written only while the Camera popup
+    /// names one, so "None connected" forgets nothing.
     func persistChoices() {
         let defaults = UserDefaults.standard
         if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected {
@@ -308,7 +315,10 @@ extension RecorderPanelController {
         defaults.set(
             microphonePopup.selectedItem?.representedObject as? String ?? "",
             forKey: Self.microphoneKey)
-        if let camera = selectedCameraID { defaults.set(camera, forKey: Self.cameraKey) }
+        if let camera = selectedCameraID {
+            defaults.set(camera, forKey: Self.cameraKey)
+            defaults.set(selectedCameraFormat ?? "", forKey: Self.cameraFormatKey)
+        }
         defaults.set(systemAudioSwitch.state == .on, forKey: Self.systemAudioKey)
         defaults.set(showClicksSwitch.state == .on, forKey: Self.showClicksKey)
         defaults.set(
