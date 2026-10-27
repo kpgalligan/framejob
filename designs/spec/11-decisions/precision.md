@@ -540,3 +540,7 @@ the unchanged product; it amends PR-5.
     each; commands and figures in #375's comment 6454026110). B4 is therefore scored on those exports: B4a
     `prores_422` (≤ ½ the control's) and B4b `hevc_10bit` (≤ 0.15 and under the control's).
   - Amends PR-5.
+  - The compositor's own output is NOT dithered (#375 part 2, dropped by the owner 2026-10-27):
+    the 8-bit lossy codecs strip a ±7/16 dither as they strip the raster's, ProRes and the
+    10-bit rows keep the float frame's levels, and what remained (8-bit PNG and JPEG stills,
+    GIF, APNG) was judged not worth a new compositor pass. PR-3 and PR-4's rounding stand.
