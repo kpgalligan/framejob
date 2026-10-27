@@ -70,12 +70,13 @@ extension ScreenRecorder {
     /// MAIN THREAD, idle only. Acts only for a choice naming a camera whose
     /// source is not `.voiceOver` — Source Camera, or a camera beside a
     /// display or a window (spec §11 CAM-11 (4)) — with the Camera grant
-    /// `.authorized`, the camera connected and a format (the choice's, else CAM-3's best: CAM-6 (3)); otherwise it
-    /// does nothing and leaves nothing behind. A prepared capture that `startCamera` could still adopt for
-    /// the same device and format is kept, and nothing is built while a
-    /// failed build's record names them (CAM-7 (8)); any other is let go
-    /// first. Blocks main for the capture's construction; the session starts
-    /// on its own queue.
+    /// `.authorized`, the camera connected and a format (the choice's, else
+    /// CAM-3's best: CAM-6 (3)); otherwise it does nothing and leaves
+    /// nothing behind. A prepared capture that `startCamera` could still
+    /// adopt for the same device and format is kept, and nothing is built
+    /// while a failed build's record names them (CAM-7 (8)); any other is
+    /// let go first. Blocks main for the capture's construction; the session
+    /// starts on its own queue.
     func prepareCamera(for choice: RecordingChoice) {
         guard state == .idle, choice.source != .voiceOver, let id = choice.camera,
             RecordingGrant.cameraStatus == .authorized,

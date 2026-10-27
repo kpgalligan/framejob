@@ -26,7 +26,7 @@ Read the first four in order to learn the editor; the rest stand alone.
 10. [Colour grading](color-grading.md) — the Color tab, wheels, curves, looks and LUTs, adjustment clips and qualifiers, Show Ungraded and the scopes.
 11. [HDR and colour management](hdr-and-color.md) — how sources are read, camera log, SDR and HDR (HLG) projects, blending, and HDR and SDR deliverables.
 12. [Motion graphics](graphics.md) — graphic clips, the built-in graphics, their properties in the inspector, and bringing in your own.
-13. [Screen recording](screen-recording.md) — recording a display or a window with system audio, microphone and click rings, and recording voice-overs.
+13. [Screen recording](screen-recording.md) — recording a display or a window with system audio, microphone and click rings, recording a camera on its own or beside the screen, and recording voice-overs.
 14. [Exporting](export.md) — the export sheet, its formats and settings, presets, the Export Queue, and saving single frames.
 15. [The Assistant](assistant.md) — chatting with Claude in the inspector to edit the open project, on your own Anthropic key.
 16. [Driving Frame Job from an AI agent (MCP)](mcp.md) — connecting an MCP client such as Claude Code, how calls behave, and every tool.

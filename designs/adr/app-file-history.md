@@ -369,6 +369,32 @@ lenient-decoding rule.
   399 lines against the 400-line cap and the voice-over needed a stored `voiceSession` and its
   forwards there. The voice-over itself is two new files, `+VoiceOver` and
   `+VoiceOverFinishing`; the base file ended at 371 lines.
+- **Camera recording paid three tolls, each a phase of pure moves gated alone** (the road map's
+  record is `designs/adr/camera-recording.md`):
+  - CR1-0 (`9d0c60e`): `record_screen`'s row (its `// MARK: Recording`) and its four hoisted
+    clauses moved from `AgentCatalog+Files.swift` to `AgentCatalog+Recording.swift` as
+    `recordingTools()`, spliced back in LAST so the catalog's order is unchanged (the Release
+    bundle's catalog equal before and after, parsed and in order); `RecorderPanelController`'s
+    `// MARK: - Showing` (`show()`, the sync timer, `setNote`, `fitWindowToContent`) moved to
+    `RecorderPanelController+Showing.swift`. `AgentCatalog+Files.swift` 409 → 166 (`+Recording`
+    273); `RecorderPanelController.swift` 399 → 326 (`+Showing` 85).
+  - CR2-0 (`11879f0`): CAM-3's warm-up rule (`warmUpRun`, `warmUpTolerance`, `warmUpBound`,
+    `WarmUp` and `isSteady`) moved from `CameraCapture.swift` to `CameraCapture+WarmUp.swift`;
+    `Warming` and the two private functions that touch its stored state stayed.
+    `CameraSession` and `CameraSegment` moved from `ScreenRecorder+Camera.swift` to
+    `ScreenRecorder+CameraSession.swift`, the precedent of `Session` above.
+    `CameraCapture.swift` 399 → 364 (`+WarmUp` 46); `ScreenRecorder+Camera.swift` 399 → 339
+    (`+CameraSession` 70).
+  - CR3-0 (`643a295`): five moves. `ScreenRecorder.swift`'s `// MARK: - Stop`
+    (`stop(completion:)`) to `ScreenRecorder+Stop.swift` (391 → 357, the new file 44);
+    `RecordingLanding.swift`'s nested `Placement` and `Landed` to
+    `RecordingLanding+Placement.swift` (388 → 309, 94); `RecordingLanding+Microphone.swift`'s
+    remainder (`microphoneActionName`, `segmentsActionName`, `remainderActionName(for:)`,
+    `remainderPlacement(_:in:)`, `unplacedNote`) to `RecordingLanding+Remainder.swift` (390 →
+    261, 146); `AgentServer+Recording.swift`'s `// MARK: - The landing` (`awaitGestureEnd`,
+    `land`) to `AgentServer+RecordingLanding.swift`, with `private` dropped from the two (394 →
+    297, 110); `AgentServer+RecordingResult.swift`'s `// MARK: - The sentences` to
+    `AgentServer+RecordingSentences.swift` (387 → 309, 90).
 
 ### Agent handlers (surviving after D1)
 
@@ -694,8 +720,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   three, the Debug catalog equal before and after, parsed and in order. Nothing widened; the
   header doc names the rows' new home and drops its stale list of six hoisted locals. `wc -l
   app/Sources/AgentCatalog+Files.swift`: 579 before, 377 after; `AgentCatalog+Render.swift` is
-  239. The next seam: `// MARK: Recording` (`record_screen` and its four hoisted clauses) to
-  `AgentCatalog+Recording.swift`.
+  239. That named seam was paid at camera-recording CR1-0 (`9d0c60e`): `// MARK: Recording`
+  (`record_screen` and its four hoisted clauses) moved to `AgentCatalog+Recording.swift` as
+  `recordingTools()`, spliced back in last; 409 before, 166 after. No next seam is named.
 - `ScopesPanelView.swift` (was `WaveformPanelView.swift`): grading-2's G2-1 (spec §11 GR-10)
   renamed the file with `git mv` and rewrote `WaveformPanelView` as `ScopesPanelView`, the
   two-slot panel and its shrink-to-fit rule (`ScopeSlotLayout`, `layout(picks:paneHeight:)`).
@@ -837,6 +864,19 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/LayerRenderers.swift`: 582 before, 494 after; `LayerRenderersImage.swift` is 105.
   The next seam: the shape group (`renderShape`, `draw`, `cgGradient`, `paint`, `drawLine`,
   `fillHead`) out whole to `LayerRenderersShape.swift`.
+- `ScreenRecorder.swift`: at 399 since camera-recording CR3a, whose camera beside the screen
+  (the frame watch, the camera take, `launchScreen`) took it from 357, after CR3-0 had moved
+  `stop(completion:)` out. The next seam: `captureStarted(_:error:at:)` and `failStart(_:)` out
+  whole to `ScreenRecorder+Started.swift`, a pure move gated alone.
+- `CameraCapture.swift`: at 399 since camera-recording CR2b (the shared session queue, the
+  preview layer, `stop(completion:)`), after CR2-0 had moved the warm-up's rule to
+  `CameraCapture+WarmUp.swift` (399 → 364). The next seam: `// MARK: - Stopping`
+  (`stop(completion:)`, `observe()`) to `CameraCapture+Stopping.swift`, with `private` dropped.
+- `RecordingSetup.swift`: at 396 since camera-recording CR3a (381 before the road map; the
+  camera's source, choice, format and pane URL grew it). The next seam: `// MARK: - The grants`
+  (`RecordingGrant`) to `RecordingGrant.swift`. The System Settings pane URLs are
+  `RecordingGrant`'s, so `recording_probe.py`'s 10f, which holds them to `RecordingSetup.swift`,
+  is re-aimed in the same move.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

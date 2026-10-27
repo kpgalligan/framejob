@@ -1,6 +1,6 @@
 # Screen recording
 
-Frame Job records your screen itself. You can record a whole display or a single window, with system audio, your microphone and rings around your clicks, and the recording goes straight into a project. You can also record a voice-over, which is the microphone alone with no picture, at the playhead of the project you're editing. Every recording is an ordinary movie or audio file on disk, and Frame Job imports it the way it imports any other media, so every edit, effect and export works on it.
+Frame Job records your screen itself. You can record a whole display or a single window, with system audio, your microphone and rings around your clicks, and the recording goes straight into a project. You can also record a camera, on its own or beside the screen as a talking head in the corner, and a voice-over, which is the microphone alone with no picture, at the playhead of the project you're editing. Every recording is an ordinary movie or audio file on disk, and Frame Job imports it the way it imports any other media, so every edit, effect and export works on it.
 
 ## Opening the recorder
 
@@ -143,7 +143,7 @@ If the project you chose was closed while you were recording, the recording open
 
 ### As a new project
 
-With **Record Into** set to **New Project**, the recording opens as a new project. The project is named after the recording's file, for example `Screen Recording 2026-09-10 at 14.03.22`, and that's the name Save offers. The canvas takes the movie's size and the frame rate you chose in **Rate**. The first stretch's picture is the project itself, so it has no undo step. Any later stretches and the microphone are added as one undo step, **Add Microphone** for a single stretch with a microphone and **Add Recording Segments** otherwise. A new project made from a recording is unsaved and asks before it closes.
+With **Record Into** set to **New Project**, the recording opens as a new project. The project is named after the recording's file, for example `Screen Recording 2026-09-10 at 14.03.22`, and that's the name Save offers. The canvas takes the movie's size and the frame rate you chose in **Rate**. The first stretch's picture is the project itself, so it has no undo step. Any later stretches, the microphone and a camera recorded beside the screen are added as one undo step: for a single stretch, **Add Microphone** with a microphone, **Add Camera** with a camera, or **Add Camera and Microphone** with both, and **Add Recording Segments** otherwise. A new project made from a recording is unsaved and asks before it closes.
 
 ### When the panel comes back
 

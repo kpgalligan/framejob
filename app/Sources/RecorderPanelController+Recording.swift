@@ -51,13 +51,13 @@ import ScreenCaptureKit
 /// on close and on a refused start, so an input never stays open past the
 /// recording it was for. **So is a camera's capture** (spec §11 CAM-5,
 /// `ScreenRecorder+CameraPrepare.swift`), so CAM-3's warm-up runs through the
-/// 3-2-1, and it is let go on the same four occasions. **The meter moves during the countdown** (#98 c):
-/// `beginCountdown` arms the tick, which through `.countdown` and
-/// `.starting` does nothing but `publishMicrophoneLevel()`, read from the
-/// prepared session; the discard publishes the silence. **The tick shows a
-/// microphone problem the moment the recorder reports one**: the picture
-/// keeps recording, the meter goes silent, and the note says so rather than
-/// leaving a dead bar.
+/// 3-2-1, and it is let go on the same four occasions. **The meter moves
+/// during the countdown** (#98 c): `beginCountdown` arms the tick, which
+/// through `.countdown` and `.starting` does nothing but
+/// `publishMicrophoneLevel()`, read from the prepared session; the discard
+/// publishes the silence. **The tick shows a microphone problem the moment
+/// the recorder reports one**: the picture keeps recording, the meter goes
+/// silent, and the note says so rather than leaving a dead bar.
 ///
 /// **Two timers run in `.common` modes** — the countdown and the 30 Hz tick
 /// — because a status item's menu runs the run loop in event-tracking mode

@@ -80,7 +80,8 @@ Title Card), properties as inspector controls, your own modules too.
 → [Motion graphics](docs/guide/graphics.md)
 
 **Screen recording.** A display or a window, with system audio, microphone and
-click rings, at 30 or 60 fps, into a new project or at the playhead; or a
+click rings, at 30 or 60 fps, into a new project or at the playhead; a camera,
+on its own or beside the screen as a corner talking head; or a
 microphone-only voice-over.
 → [Screen recording](docs/guide/screen-recording.md)
 

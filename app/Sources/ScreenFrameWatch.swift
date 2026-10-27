@@ -6,7 +6,7 @@ import ScreenCaptureKit
 /// records beside the screen. CR0 chose E2 for camera + screen — the PTS of
 /// the first COMPLETE frame at or after the did-start's arrival on the host
 /// clock (E1) — because the did-start alone is stamped where a callback lands
-/// and the frame is what the file begins with (`designs/camera-recording.md`,
+/// and the frame is what the file begins with (`archive/camera-recording.md`,
 /// CR0's S rows: E2 fell 9–22 ms after E1).
 ///
 /// **What it keeps.** The PTS of every complete frame (seconds, as delivered;

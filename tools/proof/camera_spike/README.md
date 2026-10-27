@@ -7,7 +7,7 @@ camera capture to a file through `AVCaptureMovieFileOutput` and through `AVAsset
 microphone as a second file and its offset, the camera beside a running `SCStream` recording and
 the screen file's start estimators, pause as a file sequence, the live preview's cost, the
 virtual cameras, and what a proof can measure without a person. **The answers are not here**:
-they are in `designs/camera-recording.md`'s "CR0 — the spike" record (the rows and the VERDICT
+they are in `archive/camera-recording.md`'s "CR0 — the spike" record (the rows and the VERDICT
 line). The rule the run is judged by is spec §11 CAM-2
 (`designs/spec/11-decisions/camera-recording.md`), fixed before the run; `results.json` stores
 that file's SHA-256 as `rule_sha256`, so the rule a recorded run read is pinned. What is here is

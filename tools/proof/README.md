@@ -24276,7 +24276,7 @@ hardened runtime, `AVCaptureMovieFileOutput` against `AVAssetWriter`, the microp
 the screen file's start against a display-link counter, pause as a file sequence, the preview's
 cost? Its own README (`tools/proof/camera_spike/README.md`) is the full one — the instruments,
 the rows, the selftest and the exit codes — and the ANSWERS are in
-`designs/camera-recording.md`'s "CR0 — the spike" record, not here. The rule it judges by is
+`archive/camera-recording.md`'s "CR0 — the spike" record, not here. The rule it judges by is
 spec §11 CAM-2, fixed before the run and pinned in `results.json` as `rule_sha256`.
 
 ```sh
@@ -24324,7 +24324,7 @@ Exit: `cache_pass_probe.py`'s rule. The work is under `tools/proof/work/camera-r
 
 The spike's `--format WxH` (`camera_spike/README.md`) runs W2, W3, P1 and P2 at the chosen
 camera's first format of that size at ≥ 30 fps; CAM-3's step 2 ran it at `1760x1328`. The
-numbers are in `designs/camera-recording.md`'s CR1a record.
+numbers are in `archive/camera-recording.md`'s CR1a record.
 
 ## Camera recording CR1b — `record_screen`'s camera (`camera_recording_proof.py`, `camera_recording_probe.py` `tool`; spec §11 CAM-4)
 
@@ -24356,7 +24356,7 @@ checks, `recordingCameraPick` (`recordingCameraID` until CR2a) over V1–V3's th
 (T3), `camera-key-dropped` (T5) and `camera-notes-dropped` (T6). `recording_probe.py`'s D10,
 7c and X4 and `recording_proof.py`'s sections 0 and 1 read the new vocabulary
 (`screen, voice_over, camera`) and the thirteenth argument. The numbers are in
-`designs/camera-recording.md`'s CR1b record.
+`archive/camera-recording.md`'s CR1b record.
 
 ## Camera recording CR1c — the recorder panel's Camera source (`camera_recording_probe.py` `panel` and G7–G9, `camera_recording_proof.py` section D; spec §11 CAM-5)
 
@@ -24406,7 +24406,7 @@ P5), `camera-row-live` (P2), `camera-row-persisted` (P3), `camera-panel-hides` (
 `--only panel`; `prepare-ignored` (G7) and `join-weak` (G9), each `--only granted`.
 `recording_probe.py` is re-aimed for the fourth Source row, the eighth key, the grant doors'
 two camera members and `voice-panel-hides`. The numbers are in
-`designs/camera-recording.md`'s CR1c record.
+`archive/camera-recording.md`'s CR1c record.
 
 ## Camera recording CR2a — the camera's formats (`camera_recording_probe.py` V18–V21, T7, T8, P10–P12 and G10, `camera_recording_proof.py`'s `camera_format` rows; spec §11 CAM-6)
 
@@ -24443,7 +24443,7 @@ Best: adopted under `PREPARED_START_MAX`, the file the row's size, ≥ 98 % fram
 `format-rebuild-skipped-on-match` (P12), `format-ignored` (G10, needs the camera);
 `camera-elsewhere-admitted` reads the new guard line. `recording_probe.py` (5d and D3 count
 nine keys, 7c's fourteen arguments) and `recording_proof.py` (fourteen arguments,
-`camera_format` a string) are re-aimed. The numbers are in `designs/camera-recording.md`'s
+`camera_format` a string) are re-aimed. The numbers are in `archive/camera-recording.md`'s
 CR2a record.
 
 ## Camera recording CR2b — the preview and #373 (`camera_recording_probe.py` P13–P15, G8 re-aimed, G11–G15; spec §11 CAM-7)
@@ -24492,7 +24492,7 @@ not named), `stop-answers-early` (G8), `preview-tool-capture` (G13), `tool-adopt
 `prepare-retries-thrown` (G15), all `granted`; `preview-without-grant`,
 `preview-builds-in-countdown` and `preview-retries-failure` (P13), `preview-row-always` (P14),
 `preview-unsynced-phase` and `preview-builds-on-close` (P15), all `panel`. The numbers are in
-`designs/camera-recording.md`'s CR2b record.
+`archive/camera-recording.md`'s CR2b record.
 
 ## Camera recording CR2c — hot-plug (`camera_recording_probe.py` V22, P16a–e, P17, P18; spec §11 CAM-8)
 
@@ -24538,7 +24538,7 @@ skips by name answers `"pass": "skip"`. Nine mutants: `hotplug-current-first` (V
 `hotplug-persists` (P16b, P16d), `hotplug-rebuilds-unchanged` and `hotplug-format-rebuilt`
 (P16c), `hotplug-while-busy` (P16e), `hotplug-observers-kept` (P17), `failed-stops-every-tick`
 (P18), all `panel`. A real plug or unplug is REC-17, a person's check. The numbers are in
-`designs/camera-recording.md`'s CR2c record.
+`archive/camera-recording.md`'s CR2c record.
 
 ## Camera recording CR3a — a camera beside the screen (`camera_recording_probe.py` B1–B7, G16; spec §11 CAM-9)
 
@@ -24592,7 +24592,7 @@ grant or a camera. Twelve mutants: `e2-incomplete`, `e2-before-threshold`, `e2-u
 too when granted); and `resume-keeps-watch` (`resume()`'s remove and re-add of the watch both
 deleted; B4 and G16, run `beside,screen`, so it is scored caught only where G16 runs). The
 numbers are in
-`designs/camera-recording.md`'s CR3a record.
+`archive/camera-recording.md`'s CR3a record.
 
 ## Camera recording CR3b — a camera beside the screen lands, and `record_screen` records it (`camera_recording_probe.py` L4–L9, T2/T7 re-aimed, T9–T11, P19; `camera_recording_proof.py`'s camera + screen rows; spec §11 CAM-10)
 
@@ -24646,7 +24646,7 @@ reading back through `get_project` the track order and names, the camera clip li
 the Screen Recording grant or a shareable display. Eight mutants: `camera-track-behind`,
 `camera-offset-ignored`, `camera-floor-unscreened`, `corner-top` (also L5) on L4;
 `remainder-camera-dropped` on L8; `camera-format-alone-admitted` on T9; `camera-ids-unwritten` on
-T10; `beside-display-sentence` on P19. The numbers are in `designs/camera-recording.md`'s CR3b
+T10; `beside-display-sentence` on P19. The numbers are in `archive/camera-recording.md`'s CR3b
 record.
 
 ## Camera recording CR3c — the panel's camera beside the screen (`camera_recording_probe.py` P20–P23, G17, T11 re-aimed; `camera_recording_proof.py` section D; spec §11 CAM-11)
@@ -24699,4 +24699,4 @@ call and ceiling. Nine mutants: `beside-choice-dropped`, `beside-popups-dead`,
 `beside-no-camera-unchecked` on P21; `beside-unprepared` on P23 and G17;
 `beside-preview-row-hidden` on P22; `timeout-ceiling-by-files` on T11. `format-popup-live` and
 `preview-row-always` are re-aimed at `cameraWanted`. The numbers are in
-`designs/camera-recording.md`'s CR3c record.
+`archive/camera-recording.md`'s CR3c record.

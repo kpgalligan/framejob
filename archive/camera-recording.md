@@ -415,11 +415,31 @@ landing back. The panel that drives both is last, as CR1c was.
   - A manual-check row: the talking head lined up with the screen and the voice.
 
   Docs: the guide, §7.9a, §7.4, the catalog's sentence and the screen catalog's prose.
-- **CR4 — the close.** The README highlight; `docs/guide/` read back against the code; the
-  proofs run whole once on Release; then as root `CLAUDE.md` says: condense this into
-  `designs/adr/camera-recording.md`, file each unfinished item as an issue (reviewed against
-  the tree), `git mv` this file into `archive/`, and add its row to `archive/INDEX.md`; the ADR
-  row in root `CLAUDE.md`'s table is owed to the integrator.
+
+CR4 was "the proofs run whole once on Release" until CR3c landed. CR3c ran every proof whole on
+Release over the code CR4 closes, and CR4 changes no product behaviour: its Swift edits are
+comment rewraps. So CR3c's Release runs are the road map's final figures, and CR4's own check is
+`make gate` with the mutant anchor check. CR3c's record also left two things to CR4: the
+doc-comment rewraps, and two spec files this road map took past the spec's ~500-line rule.
+
+- **CR4 — the close.** No product behaviour changes.
+  - **Documents.** The README's Screen recording highlight and the guide index's row name the
+    camera. `docs/guide/` is read back against the code: the screen-recording page's opening
+    paragraph, and `menus-and-shortcuts.md`'s New Recording… row ("the screen recorder").
+  - **The owed tidy-ups.** The doc-comment lines this road map wrote past ~100 columns are
+    rewrapped (CR3a's and CR3c's review nits); code lines and their mutant anchors stay as
+    they are. Spec §7.9a (490 lines before CR1b, 512 now) gives `record_screen`'s paragraph
+    whole to a new `07.9d-agent-recording.md`. Spec §11 `camera-recording.md` (521) gives CAM-7
+    to CAM-11, unchanged, to a new `camera-recording-2.md`, as speed-ramps' close did.
+    `designs/adr/app-file-history.md` gains the three toll phases' moves and the named next cuts
+    for the three files at the cap (`ScreenRecorder.swift` 399, `CameraCapture.swift` 399,
+    `RecordingSetup.swift` 396), and its `AgentCatalog+Files.swift` seam is marked paid (CR1-0).
+  - **The close**, as root `CLAUDE.md` says: condense this into `designs/adr/camera-recording.md`,
+    review each unfinished item against the tree and file what is left, `git mv` this file into
+    `archive/`, and add its row to `archive/INDEX.md`. Every live citation of
+    `designs/camera-recording.md` follows it. #373, fixed by CR2b, whose commit named it but did
+    not close it, is closed by this phase's commit. The ADR row in root `CLAUDE.md`'s table is
+    owed to the integrator.
 
 ## CR0 — the spike
 
@@ -1948,3 +1968,91 @@ Recording, Camera and Microphone grants; each command once):
 ## CR4 — the close
 
 ### Record
+
+**Landed** (2026-10-27). Documents and comments only: no product behaviour changed, no proof ran
+against an app, and nothing was paid for.
+- **The read-back.** `docs/guide/screen-recording.md` and `mcp.md`'s two `record_screen` lines
+  (136, 584) were read against `AgentCatalog+Recording.swift`, `RecorderPanelController+Camera.swift`,
+  `+Rows.swift`, `+Recording.swift`, `RecordingLanding+Camera.swift` and
+  `RecordingLanding+Remainder.swift`. One claim was false: "As a new project" named the remainder's
+  undo step "Add Microphone" for a single stretch with a microphone and "Add Recording Segments"
+  otherwise, but `remainderActionName(for:)` names a single stretch with a camera beside the screen
+  "Add Camera" or "Add Camera and Microphone"; the sentence now says all four. `mcp.md` was true and
+  is unchanged. Written: the README's **Screen recording.** highlight (a camera, on its own or
+  beside the screen as a corner talking head), the guide index's row 13, the page's opening
+  paragraph, and `menus-and-shortcuts.md`'s New Recording… row ("Opens the recorder").
+- **The rewraps.** The doc-comment paragraphs holding the seven comment lines over 100 columns
+  (`+CameraPreview.swift` 25, `+Recording.swift` 54, the base file 23 and 218,
+  `ScreenRecorder+CameraPrepare.swift` 73 and 74, `ScreenRecorder+Finishing.swift` 77) were
+  rewrapped from the long line on, to the width of the paragraph's other lines, words unchanged
+  (checked by script), code lines untouched. `ScreenFrameWatch.swift`'s citation reads
+  `archive/camera-recording.md` (78 columns).
+- **§7.9a → §7.9d.** `record_screen`'s paragraph moved whole from `07.9a-agent-tools.md` to the
+  new `07.9d-agent-recording.md`, its words unchanged but the final `),` now `).` (a `diff` of
+  HEAD's lines 118–157 against the new file's 7–46 shows that one line); a pointer paragraph
+  takes its place. §7.9a's, §7.9b's and §7.9c's cross-references name §7.9d, and
+  `designs/spec/README.md` gained the lettering, the `07.9d` row and the cells.
+- **§11 split.** `11-decisions/camera-recording.md` keeps CAM-1…CAM-6 (HEAD's lines 1–255) with
+  its intro naming the condensed record, this original and `camera-recording-2.md`; the new
+  `camera-recording-2.md` holds CAM-7…CAM-11, HEAD's lines 257–521 byte for byte (`diff` exit 0),
+  under a header in `speed-ramps-2.md`'s shape. The index's file rows and the CAM-7…CAM-11 ID rows
+  follow, and the `11-decisions/` cell is 13472 in 32 files.
+- **`designs/adr/app-file-history.md`**: "Recording" gains the three toll phases' moves (CR1-0,
+  CR2-0, CR3-0, with their sizes); `AgentCatalog+Files.swift`'s seam is marked paid at CR1-0 with no
+  next seam; three named next cuts: `ScreenRecorder.swift` (`captureStarted` and `failStart` to
+  `ScreenRecorder+Started.swift`), `CameraCapture.swift` (`// MARK: - Stopping` to
+  `CameraCapture+Stopping.swift`) and `RecordingSetup.swift` (`RecordingGrant` to
+  `RecordingGrant.swift`, with `recording_probe.py`'s 10f re-aimed, since the pane URLs move with
+  it).
+- **The close.** `designs/adr/camera-recording.md` (new), the condensed record; this road map
+  moved by `git mv` from `designs/camera-recording.md` to `archive/camera-recording.md`, with its
+  row in `archive/INDEX.md` after `speed-ramps.md`'s; the live citations repointed in
+  `tools/proof/README.md` (ten lines), `tools/proof/camera_spike/README.md` and
+  `camera_spike.py`'s docstring. `camera_spike.py`'s `RULE_FILE` still names
+  `11-decisions/camera-recording.md`, where CAM-2 stays.
+- **The issues, reviewed against the tree** (`gh issue view`, read only): #370 OPEN, the screen
+  recorder's own microphone offset, outside this road map; #371 and #372 OPEN until the push,
+  closed by CR1b's `Closes` lines (CR3c's `recording_probe.py` read 1222/1222, X4's rows among
+  them, and `CameraCapture.start` re-applies the format once the session runs); #373 OPEN, fixed by CR2b (`sharedSessionQueue` in
+  `CameraCapture.swift`), closed by this phase's commit. Nothing new was found unfinished, so no
+  issue is filed; the decided limits are the ADR's "Not filed".
+
+**Sizes** (`wc -l`, before → after): `RecorderPanelController+CameraPreview.swift` 146 → 147,
+`RecorderPanelController+Recording.swift` 375 → 375, `RecorderPanelController.swift` 360 → 361,
+`ScreenRecorder+CameraPrepare.swift` 173 → 174, `ScreenRecorder+Finishing.swift` 362 → 363,
+`ScreenFrameWatch.swift` 173 → 173; `07.9a-agent-tools.md` 512 → 474, `07.9d-agent-recording.md`
+new, 46; `11-decisions/camera-recording.md` 521 → 258, `camera-recording-2.md` new, 275,
+`11-decisions/README.md` 474 → 475; `designs/adr/app-file-history.md` 876 → 916;
+`designs/adr/camera-recording.md` new, 120; `archive/INDEX.md` 53 → 54.
+
+**Measured** (from the worktree on `d7c70ea` with CR4's uncommitted changes; each command once):
+- The awk over the five rewrapped files (`length>100` on a `//` line): no output.
+- The anchor check (every `before` of both probes' `MUTANTS` once in `app/Sources`): `0 []`.
+- `make typecheck`: exit 0, the 4 baseline warnings, tsc clean.
+- `python3 tools/proof/spec_index_proof.py`, after the §7.9d move and the §11 split: exit 0,
+  `207/207 checks passed`.
+- `git grep --untracked -n 'designs/camera-recording' -- ':!archive'`, after the move: no output,
+  exit 1 (no match).
+- `make gate`: exit 0, `gate: PASS 220s` (names pass 1 s, typecheck pass 5 s, fmt and lint
+  skipped, test pass 115 s with `spec_index_proof.py` 207/207, app pass 100 s with D25 and D26
+  ok).
+- `git status --porcelain`: `RM designs/camera-recording.md -> archive/camera-recording.md`
+  among the changes, beside the three new files `designs/adr/camera-recording.md`,
+  `designs/spec/07.9d-agent-recording.md` and `designs/spec/11-decisions/camera-recording-2.md`.
+
+This record was written after the gate passed. `archive/` is in `tools/proof/gate.py`'s
+`EXCLUDED`, so writing it stales no stamp, and the gate was not run again. No proof was re-run:
+CR3c's Release runs are the road map's final figures, and no mutant was added, since the phase
+makes no product decision.
+
+**Deviations.**
+- The guide's "As a new project" sentence was false against the code and was rewritten (the
+  read-back's one finding); nothing else on the page changed beyond the opening paragraph.
+- The rewraps reflow each paragraph from its long line until the next original line starts a
+  greedy line, so the lines above the long one are untouched.
+
+**Owed.**
+- REC-12..REC-18, the owner's, at the machine.
+- The root `CLAUDE.md`'s "Where to look" `designs/adr/` list gains `camera-recording`, the
+  integrator's.
+- The commit message carries `Closes #373`.

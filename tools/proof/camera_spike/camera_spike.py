@@ -9,7 +9,7 @@ microphone as a second file and its offset, the camera beside an `SCStream` reco
 the screen file's start estimators against a display-link counter, pause as a file sequence,
 the live preview's cost, the virtual cameras, and what a proof can measure without a person.
 It judges by CAM-2 (fixed before the run; `results.json` pins the §11 file's SHA-256).
-The answers are in `designs/camera-recording.md`'s CR0 record, not here.
+The answers are in `archive/camera-recording.md`'s CR0 record, not here.
 
     python3 tools/proof/camera_spike/camera_spike.py [--groups devices,grant,write,mic,screen,pause,preview,virtual,aimed]
         [--camera SUBSTR] [--mic SUBSTR] [--runs N] [--ask] [--aimed] [--format WxH]

@@ -74,16 +74,17 @@ extension ScreenRecorder {
     /// error set `micFinished`, and the wait reads the flag), and a
     /// `micFinished` set by hand is what let a file the writer was still
     /// closing be probed too early; a camera's writer beside the screen is
-    /// closed too and its E2 question dropped (spec §11 CAM-9 (8)). While PAUSED both were done at the
-    /// pause, only `stopCapture` remains, and NO did-finish is coming to
-    /// ask the wait's question — every flag may have been true for minutes
-    /// — so `checkFinished` is asked once here, synchronously, LAST (the R2
-    /// review): the alternative was to trust `stopCapture`'s completion on
-    /// a stream the system may already have stopped, which is unmeasured.
-    /// Safe from `.recording` too: there `allFinished` is false unless the
-    /// last output finished before the path began, and that file is closed.
-    /// `finishingDidBeginNotification` is posted just before `stopCapture`,
-    /// so its observers see `.finishing` before any synchronous `settle`.
+    /// closed too and its E2 question dropped (spec §11 CAM-9 (8)). While
+    /// PAUSED both were done at the pause, only `stopCapture` remains, and
+    /// NO did-finish is coming to ask the wait's question — every flag may
+    /// have been true for minutes — so `checkFinished` is asked once here,
+    /// synchronously, LAST (the R2 review): the alternative was to trust
+    /// `stopCapture`'s completion on a stream the system may already have
+    /// stopped, which is unmeasured. Safe from `.recording` too: there
+    /// `allFinished` is false unless the last output finished before the
+    /// path began, and that file is closed. `finishingDidBeginNotification`
+    /// is posted just before `stopCapture`, so its observers see
+    /// `.finishing` before any synchronous `settle`.
     func beginFinishing(_ reason: StopReason) {
         guard state == .recording || state == .paused, let current = session else { return }
         timer?.invalidate()

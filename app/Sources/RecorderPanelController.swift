@@ -20,12 +20,12 @@ import ScreenCaptureKit
 /// (R2c), `+VoiceOver.swift` the Source row "Microphone Only" (#99),
 /// `+Showing.swift` `show()`, the sync timer, `setNote` and the refit,
 /// `+Camera.swift` the Source row "Camera", its popup, the Format popup and
-/// the "Record the camera too" box (spec §11 CAM-5, CAM-6, CAM-11), `+CameraPreview.swift` the camera's live
-/// preview in `CameraPreviewWell` (CAM-7), and `+Devices.swift` hot-plug:
-/// the device observers and the popups rebuilt when a device comes or goes
-/// (CAM-8). Twelve files at the 400-line cap, and the
-/// crossing members are internal for it, the tree's rule for a class split
-/// across files.
+/// the "Record the camera too" box (spec §11 CAM-5, CAM-6, CAM-11),
+/// `+CameraPreview.swift` the camera's live preview in `CameraPreviewWell`
+/// (CAM-7), and `+Devices.swift` hot-plug: the device observers and the
+/// popups rebuilt when a device comes or goes (CAM-8). Twelve files at the
+/// 400-line cap, and the crossing members are internal for it, the tree's
+/// rule for a class split across files.
 ///
 /// **It is an `NSPanel`, floating and NON-ACTIVATING**, and each of the four
 /// window settings below is load-bearing. `.nonactivatingPanel` so Record,
@@ -215,7 +215,8 @@ final class RecorderPanelController: NSWindowController {
     var panelClosing = false
     /// `AVCaptureDevice`'s two observers while the panel is up (`+Devices.swift`).
     var deviceObservers: [NSObjectProtocol] = []
-    /// A device list may have changed (a notification, or observers newly added) and is not yet applied.
+    /// A device list may have changed (a notification, or observers newly added)
+    /// and is not yet applied.
     var devicesPending = false
     /// The recorder's sentence for a resume it refused (`+Pause.swift`):
     /// REPLACED by each retry, cleared when a resume lands or the next

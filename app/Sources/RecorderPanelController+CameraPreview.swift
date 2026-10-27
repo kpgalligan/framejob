@@ -22,11 +22,12 @@ enum CameraPreviewStep: Equatable {
 ///
 /// **The step** (`cameraPreviewStep`, pure, first match wins): a panel not
 /// visible or closing, or no camera wanted → off; a camera recording, or a
-/// screen recording's camera beside it → its layer; the countdown or starting → the prepared layer, never a build; any
-/// other phase, or a busy recorder → blank; no camera → "No camera is
-/// connected."; the Camera grant not authorized → a sentence; a prepared
-/// capture that failed, or a build that threw → its sentence, never
-/// retried; else prepare. The grant is read only at its own step, through
+/// screen recording's camera beside it → its layer; the countdown or
+/// starting → the prepared layer, never a build; any other phase, or a
+/// busy recorder → blank; no camera → "No camera is connected."; the
+/// Camera grant not authorized → a sentence; a prepared capture that
+/// failed, or a build that threw → its sentence, never retried; else
+/// prepare. The grant is read only at its own step, through
 /// `grantDoors.cameraStatus`, so showing the panel never prompts and a
 /// hidden panel reads nothing.
 ///

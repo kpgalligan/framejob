@@ -40,7 +40,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Item | Shortcut | What it does |
 |---|---|---|
 | New Project | ⌘N | A new, empty project window |
-| New Recording… | ⌥⌘N | Opens the screen recorder. While a recording runs, the item is called **Stop Recording** and stops it ([Screen recording](screen-recording.md)) |
+| New Recording… | ⌥⌘N | Opens the recorder. While a recording runs, the item is called **Stop Recording** and stops it ([Screen recording](screen-recording.md)) |
 | Pause Recording | | Pauses the running recording. It is called **Resume Recording** while paused, and is enabled only during a recording |
 | Open… | ⌘O | Opens a project or a media file |
 | Open Recent ▸ | | Recently opened documents, then **Clear Menu** |
