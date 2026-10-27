@@ -148,3 +148,9 @@ claude mcp add --scope user framejob -- '/Applications/Frame Job.app/Contents/He
 
 Xcode 26, Rust, xcodegen and bun; then `make app`. Everything else is in
 [docs/developing.md](docs/developing.md).
+
+## License
+
+Frame Job is licensed under the [Apache License, Version 2.0](LICENSE). The
+bundled fonts and the voice-activity model carry their own licences, beside
+them in `app/Resources/Fonts/` and `app/Resources/Models/`.

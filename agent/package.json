@@ -1,6 +1,7 @@
 {
   "name": "framejob-agent",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "bun build src/main.ts --compile --target=bun-darwin-arm64 --outfile ../build/agent/framejob-agent",
