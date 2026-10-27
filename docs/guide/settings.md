@@ -240,6 +240,36 @@ busy. The frames it draws are held in memory, at most a quarter of your Mac's
 memory and less when memory is short, until the window closes or newer frames
 replace them. See [Graphics](graphics.md).
 
+## Updates
+
+The copy of Frame Job you download from the project's GitHub Releases page
+updates itself, with [Sparkle](https://sparkle-project.org). A copy you build
+from source (`make app`, `make app-debug`) has no updater: no menu item, and
+it never checks.
+
+- **Frame Job ▸ Check for Updates…**, directly under About Frame Job, checks
+  now. When a newer Frame Job has been published, a window shows its version
+  and a link to its release page, and offers to install it; **Install
+  Update** replaces the app and relaunches it. When there is nothing newer,
+  it says you are up to date. The item is greyed out while a check is
+  already running.
+- **Automatic checks.** The second time you open Frame Job, it asks whether
+  to check for updates automatically. If you agree, it checks about once a
+  day while it is open, and tells you when an update is ready; it never
+  installs one without asking you.
+
+Every update is signed, and Frame Job refuses one whose signature does not
+match the key built into the app, so only a release published from the
+project itself can be installed. Updates are always the whole app; release
+notes are on the release's page on GitHub.
+
+There is no Settings control for automatic checks. Your answer is kept in
+macOS's preferences for Frame Job (below); to turn checks off later, run
+`defaults write com.kgalligan.FrameJob SUEnableAutomaticChecks -bool NO` in
+Terminal while Frame Job is closed, and **Check for Updates…** still works.
+
+*Agents:* no MCP tool checks for or installs updates.
+
 ## View settings Frame Job remembers
 
 These are View-menu choices, not Settings controls, but Frame Job remembers
@@ -288,6 +318,7 @@ choices, not the project's, and no agent tool reads them.
 | Inspector sections | Whether each section is collapsed or expanded, per section, in every window. A section you have never clicked opens in its default state (Transform, a text or shape's main section and a graphic's Properties open, the rest closed). | [Canvas and layers](canvas-and-layers.md) |
 | Screen Recording permission | That Frame Job has already asked macOS once. macOS will not show its prompt twice, so later presses of Record without the permission open System Settings' Screen Recording pane instead. | [Screen recording](screen-recording.md) |
 | Importing a file macOS cannot open | Ticking **Do this automatically from now on** in the Convert / Repackage alert remembers your answer: ticked with **Convert** or **Repackage**, such files are converted from then on without asking; ticked with **Cancel**, they are never converted and the import simply fails | [Projects and media](projects-and-media.md) |
+| Automatic update checks (the downloaded copy only) | Your answer to the question asked on the second launch, whether to check for updates automatically, and when it last checked | [Updates](#updates) |
 
 All of these, and the View settings above, live in macOS's preferences for
 Frame Job (the `com.kgalligan.FrameJob` domain). Keys are never stored

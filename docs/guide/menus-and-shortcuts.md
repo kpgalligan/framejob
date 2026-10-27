@@ -29,6 +29,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Item | Shortcut | What it does |
 |---|---|---|
 | About Frame Job | | The version and credits panel |
+| Check for Updates… | | Asks whether a newer Frame Job has been published, and offers to install it. Only in the copy you download from GitHub; a build from source has no updater ([Settings](settings.md#updates)) |
 | Settings… | ⌘, | Opens the Settings window ([Settings](settings.md)) |
 | Hide Frame Job | ⌘H | Hides the app |
 | Hide Others | ⌥⌘H | Hides every other app |

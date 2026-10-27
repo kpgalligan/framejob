@@ -63,7 +63,8 @@ a key, nothing more.
 |---|---|---|
 | — | Nothing. Phase 9 took the ⌘↓ / ⌘↑ this table claimed for it, for Clip ▸ Open Nest and Clip ▸ Close Nest, and the row has been promoted into the bound table above. Carrying a modifier does NOT keep either off the first responder — every main-menu key equivalent is offered the key-down before the window dispatches it, and what a modifier changes is only WHICH field-editor binding it displaces (here `moveToBeginningOfDocument:` / `moveToEndOfDocument:`). So the pair is validated DEAD while text is being edited, the Delete pair's precedent — otherwise ⌘↑ in an inline rename would leave the nest and discard the open field | — |
 
-Menus: Frame Job (About Frame Job, Settings… ⌘, — road map 6 §5d's window, in a
+Menus: Frame Job (About Frame Job, Check for Updates… (Distribution only, §11 PUB-7 —
+directly under About, no key; Sparkle's check of the published build's feed), Settings… ⌘, — road map 6 §5d's window, in a
 separator group of its own between About and Hide, which is where macOS puts
 one; a WINDOW and not a sheet, because the key and the region belong to the
 person rather than to a document and the item has to work with no document

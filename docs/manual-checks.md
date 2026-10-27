@@ -977,6 +977,11 @@ appearance is enough.
 - **Expect:** no Microphone or Screen Recording prompt, and the recording starts.
 - **Source:** spec §11 PUB-1 (a Developer ID signature is stable across builds; an ad-hoc one is not).
 
+**REL-4 — The downloaded build updates itself**
+- **Do:** Install release N from its DMG, with REL-2's grants given, and publish N+1. Launch N, choose Frame Job ▸ Check for Updates…, then Install Update. Answer the second-launch question (whether to check automatically).
+- **Expect:** N+1 is offered with its version. It installs and relaunches, and About shows N+1. REL-3's grants hold: no Microphone or Screen Recording prompt on the next recording.
+- **Source:** spec §11 PUB-6..PUB-9.
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

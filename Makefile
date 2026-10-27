@@ -42,7 +42,9 @@ rust:
 # `mcp-proxy` is road map 14's `framejob-mcp`, its tests black-box over the
 # built binary's stdin and stdout. `name_residue.py` (spec §11 NM-8) fails
 # on any line or path spelling the old name that its allow-list does not
-# hold; its selftest runs first.
+# hold; its selftest runs first. `appcast.py --selftest` (spec §11 PUB-6, PUB-8)
+# is the publish workflow's appcast writer over a stand-in `sign_update`: no
+# network, no key.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -56,6 +58,7 @@ test: rust
 	python3 tools/proof/swift_build.py --selftest
 	python3 tools/proof/proof_app.py --selftest
 	python3 tools/proof/gate.py --selftest
+	python3 tools/proof/appcast.py --selftest
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 	python3 tools/proof/name_residue.py --selftest
 	python3 tools/proof/name_residue.py
@@ -102,15 +105,21 @@ app-debug: rust project
 # version, Release's naming every dev tool and Distribution's none (road map
 # 14 MC3, D15–D24); and the Release app must be signed with exactly Xcode's
 # audio-input, camera and get-task-allow, and both apps must pass `codesign --verify
-# --deep --strict` (issue batch B88, D25–D27). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
-# this recipe too. `published_check.py` is the check the publish workflow runs
-# over the app it is about to pack (spec §11 PUB-4), run here over the
-# Distribution build so it cannot rot between two publishes.
+# --deep --strict` (issue batch B88, D25–D27); and the updater (spec §11
+# PUB-6..PUB-9, D28–D35): Distribution's Sparkle.framework signed with the
+# app's team and its helpers with the hardened runtime, its feed and a 32-byte
+# EdDSA public key, Release's both empty, the updater's code
+# (FRAMEJOB_UPDATER, compiled by this target alone) in Distribution's binary
+# and not in Release's, and no Sparkle load command in Release's. Until the owner's public key lands, D31 and P20 fail
+# by the owner's choice (PUB-8). The file-wide `unexport RC_ASSEMBLYAI_KEY`
+# above covers this recipe too. `published_check.py` is the check the publish
+# workflow runs over the app it is about to pack (spec §11 PUB-4), run here over
+# the Distribution build so it cannot rot between two publishes; it runs even
+# when `dist_check.py` fails, and the recipe exits non-zero if either failed.
 dist: app
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Distribution \
 		-derivedDataPath $(BUILD_DIR) build
-	python3 tools/proof/dist_check.py --release "$(APP_PATH)" --dist "$(DIST_PATH)"
-	python3 tools/proof/published_check.py --app "$(DIST_PATH)"
+	rc=0; python3 tools/proof/dist_check.py --release "$(APP_PATH)" --dist "$(DIST_PATH)" || rc=1; python3 tools/proof/published_check.py --app "$(DIST_PATH)" || rc=1; exit $$rc
 
 # The one Full verification command (issue batch B88, tools/proof/gate.py):
 # typecheck (exactly its four baseline warnings), fmt --check, lint, test, then
@@ -122,7 +131,9 @@ gate:
 
 # Fast compile check of the Swift sources without a full Xcode build.
 # `-D FRAMEJOB_DEV_TOOLS` as Debug and Release set it (project.yml); the
-# flag-OFF path, what Distribution ships, is compiled only by `make dist`.
+# flag-OFF path, what Distribution ships, is compiled only by `make dist`, and
+# so is `FRAMEJOB_UPDATER` (AppDelegate+Updates.swift, Sparkle, Distribution
+# alone, spec §11 PUB-7): this check has no Sparkle module to import.
 # The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
 # which fails rather than skips when bun is missing.
 typecheck:

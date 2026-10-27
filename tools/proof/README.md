@@ -7065,11 +7065,36 @@ and prints the needle and both paths before its rows:
   left Release signed ad hoc by Write Agent Catalog alone, with no
   entitlements and a broken seal, and no row saw it (`archive/build-velocity.md`'s
   phase 2 record).
+- **D28–D35** (Sparkle, spec §11 PUB-6..PUB-9) — the updater in Distribution
+  alone. **D28** the Distribution app holds
+  `Contents/Frameworks/Sparkle.framework`, its binary's `TeamIdentifier`
+  (`codesign -dv --verbose=4`) equal to the app binary's (library validation
+  under the hardened runtime refuses a framework of another team; an ad-hoc
+  build reads `not set` on both); **D29** every other Mach-O under it, found
+  by magic with symlinks not followed (Autoupdate, Updater.app, the
+  Downloader and Installer XPC services: 4 in Sparkle 2.10.1), passes the
+  helper rows' check (hardened runtime, `--verify --strict`); **D30** its
+  `SUFeedURL` is the `RC_SPARKLE_FEED_URL` the bare `Distribution:` block of
+  `project.yml` sets (an `https://` URL); **D31** its `SUPublicEDKey` is
+  strict base64 of exactly 32 bytes — empty until the owner's key lands, so
+  a plain `make dist` FAILs it by the owner's choice (PUB-8); **D32** the
+  Release app's `SUFeedURL` and `SUPublicEDKey` are both empty; **D33** the
+  Distribution binary holds `SPUStandardUpdaterController` (2 occurrences:
+  the class reference `AppDelegate+Updates.swift` compiles in), the positive
+  control for **D34**, the Release binary does not. Sparkle.framework is
+  embedded in Release too (xcodegen links a package per target, PUB-7); what
+  Release lacks is the code that starts it, a feed, and a load command for
+  it: **D35** no path in the Release binary's `otool -L` holds
+  `/Sparkle.framework/`. Release links with `-dead_strip_dylibs`, because a
+  loaded Sparkle stops an ad-hoc, hardened-runtime build launching (dyld:
+  "mapping process and mapped file (non-platform) have different Team IDs",
+  measured 2026-10-27); Distribution keeps the load command (its code uses
+  Sparkle), so a local Distribution build cannot be launched (PUB-7).
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/27`; the exit is 0 only at 27/27.
-`dist_check_mutants.py` makes each helper row, D14 and D15–D27 fail on
+line is `dist_check: <passed>/35`; the exit is 0 only at 35/35.
+`dist_check_mutants.py` makes each helper row, D14, D15–D32 and D35 fail on
 purpose; the A4 and MC3 sections of this file have its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
@@ -7083,8 +7108,18 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 27/27
+make dist                                                  # → dist_check: 34/35 (D31) until the owner's key lands, then 35/35
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
+```
+
+Until the owner's EdDSA public key is in `project.yml`, a full score needs a
+Distribution build with a stand-in 32-byte key on the command line (it is
+only ever read, never used to verify anything):
+
+```sh
+make app && xcodebuild -project FrameJob.xcodeproj -scheme FrameJob -configuration Distribution \
+  -derivedDataPath build RC_SPARKLE_PUBLIC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= build
+python3 tools/proof/dist_check.py                          # → dist_check: 35/35
 ```
 
 **Made to fail by hand (2026-09-26, when there were five rows)**, each
@@ -8240,8 +8275,10 @@ bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary and the helper a COPY, mutated
 and re-signed ad hoc; nothing is written into `build/`. A case passes iff
 the FAIL ids equal its expected set exactly, the last line is
-`dist_check: <14 − |set|>/14` and the exit is 0 for an empty set, 1
-otherwise; a failed setup step is a scored FAIL naming it.
+`dist_check: <35 − |set|>/35` and the exit is 0 for an empty set, 1
+otherwise; a failed setup step is a scored FAIL naming it. Since Sparkle
+(spec §11 PUB-7) every skeleton also carries a `ditto` copy of the real
+`Sparkle.framework`.
 
 | Case | The mutation | Expected FAIL |
 |---|---|---|
@@ -8256,12 +8293,26 @@ otherwise; a failed setup step is a scored FAIL naming it.
 | `app-entitlements-mic-only-release` (B88) | the whole Release app `ditto`ed and re-signed ad hoc `--options runtime` with `audio-input` alone | D25 |
 | `noop-sign-release` (B88) | the whole Release app `ditto`ed, its executable re-signed alone (`codesign -s - -f`, as Write Agent Catalog does), then a byte appended to `agent-catalog.json` — what a no-op build shipped before B88's fix | D25 D26 |
 | `seal-broken-dist` (B88) | the whole Distribution app `ditto`ed and a byte appended to `agent-catalog.json` | D27 |
+| `sparkle-missing-dist` (PUB-7) | no `Sparkle.framework` in the skeleton | D28 D29 |
+| `sparkle-unsigned-dist` (PUB-7) | the framework copy's binary `codesign --remove-signature`d | D28 |
+| `sparkle-helper-no-runtime-dist` (PUB-7) | the framework copy's first helper (`dist_check.sparkle_helper_paths`' order: `Versions/B/Autoupdate`) re-signed ad hoc without the hardened runtime | D29 |
+| `feed-empty-dist` (PUB-6) | the Info.plist copy's `SUFeedURL` emptied | D30 |
+| `key-short-dist` (PUB-8) | the Info.plist copy's `SUPublicEDKey` base64 of 31 bytes | D31 |
+| `release-feed` (PUB-7) | the Release Info.plist copy's `SUFeedURL` set to Distribution's | D32 |
+| `sparkle-load-release` (PUB-7) | the whole Release app `ditto`ed, `install_name_tool -change` turning the first of its load commands at least as long as Distribution's Sparkle one into it, then re-signed ad hoc `--options runtime` with `dist_check.RELEASE_ENTITLEMENTS` — the load command `-dead_strip_dylibs` drops, restored | D35 |
 
 ```sh
-make dist                                                  # → dist_check: 27/27
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 23/23
-python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 FAIL, 14/27, exit 1
+make dist                                                  # → dist_check: 34/35 (D31) until the owner's key lands
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 30/30 (a stand-in-key Distribution, V0's section)
+python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 D28 D29 D30 D31 D33 FAIL, 17/35, exit 1
 ```
+
+**Measured 2026-10-27 (Sparkle, the stand-in-key Distribution build):**
+`dist_check_mutants.py` 30/30, each Sparkle case failing exactly its set
+(`sparkle-missing-dist` 33/35, the other six 34/35); `--dist` at a missing
+path 17/35, exit 1, the FAIL set above. D35 read 47 load commands in the
+Release binary, none Sparkle's; Distribution's holds
+`@rpath/Sparkle.framework/Versions/B/Sparkle`.
 
 **Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY
 RC_ASSEMBLYAI_KEY; …)`: `make dist` built Release then Distribution and
@@ -16801,7 +16852,7 @@ python3 tools/proof/hevc_alpha_proof.py --mutant shape-and-note      # MUTANT PA
 python3 tools/proof/hevc_alpha_proof.py --rows size                  # 10/11, exit 1: G1 red by design on a build with phase B
 ```
 
-## Publishing — the app the workflow is about to pack (`published_check.py` P1–P16; spec §11 PUB-1..PUB-5)
+## Publishing — the app the workflow is about to pack (`published_check.py` P1–P21; spec §11 PUB-1..PUB-9)
 
 `.github/workflows/publish.yml` archives the Distribution configuration with a
 Developer ID identity, exports the archive (which signs the app a second
@@ -16826,13 +16877,23 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   dev tool;
 - **P15** `CFBundleShortVersionString` is `--version` (without one: two or
   three dot-separated integers); **P16** `CFBundleVersion` is `--build`
-  (without one: an integer).
+  (without one: an integer);
+- **P17–P21** the updater (spec §11 PUB-6..PUB-9), `dist_check.py`'s D28,
+  D29, D30, D31 and D33 on the one app: **P17** Sparkle.framework present,
+  its binary signed by the app binary's team (after the export's re-sign
+  this is the Developer ID team on both); **P18** every helper in it
+  hardened and verifying strictly; **P19** `SUFeedURL` is Distribution's
+  `RC_SPARKLE_FEED_URL` in `project.yml`; **P20** `SUPublicEDKey` is strict
+  base64 of 32 bytes; **P21** the binary holds `SPUStandardUpdaterController`.
+  Until the owner's public key lands P20 FAILs, in `make dist` and in the
+  workflow, so nothing is published without it (PUB-8).
 
-No row is skipped; the last line is `published_check: <passed>/16` and the
-exit is 0 only at 16/16.
+No row is skipped; the last line is `published_check: <passed>/21` and the
+exit is 0 only at 21/21. `make dist` runs it even when `dist_check.py`
+failed, and fails if either did.
 
 ```sh
-make dist                                                   # → dist_check: 24/24, published_check: 16/16
+make dist                                                   # → dist_check: 34/35, published_check: 20/21 (D31, P20) until the owner's key lands
 python3 tools/proof/published_check.py --app APP [--version V --build N]
 ```
 
@@ -16887,6 +16948,63 @@ provide it — the error that failed Rasterize's first run in 0 s.
 `cloud_captions_probe.py`'s row 18 expects the two version strings among
 `project.yml`'s `info:` changes; its diff was computed alone against the
 row's own baseline tree and equals the expected list (18 lines).
+
+**Sparkle (spec §11 PUB-6..PUB-9), measured 2026-10-27.** On a Distribution
+build with a stand-in 32-byte key (`RC_SPARKLE_PUBLIC_KEY=AAAA…AAA=` on the
+xcodebuild line, the V0 section's command) `published_check.py` scores
+21/21: P17 `TeamIdentifier not set` on both (ad hoc), P18 4 helpers. Made
+to fail by hand, each on a `ditto` copy outside the tree, exit 1:
+
+| Case | FAIL | Score |
+|---|---|---|
+| `SUFeedURL` emptied in the copy's Info.plist (`plutil -replace`) | P4 P19 | 19/21 |
+| `Contents/Frameworks/Sparkle.framework` removed | P4 P17 P18 | 18/21 |
+
+P4 fails with each because the edit breaks the app's seal (P15's
+precedent). What no local run reaches — the `developer-id` export's re-sign
+of Sparkle's helpers, `sign_update` with the real key, Sparkle installing an
+update — is first tested by the first Sparkle-enabled publish and REL-4.
+
+## The appcast (`appcast.py`; spec §11 PUB-6, PUB-8)
+
+The publish workflow's "Sign the update and write the appcast" step runs
+`appcast.py write` after `stapler staple`, so the signature is over the
+bytes the release serves: it runs the Sparkle package's own `sign_update`
+(the one `find build/SourcePackages/artifacts -path '*/bin/sign_update'`
+finds; none or several fail the step) with `--ed-key-file` (the key reaches
+it only as a `0600` file; without the flag `sign_update` would read the
+Keychain), refuses any output but exactly one `sparkle:edSignature="…"
+length="N"` and any N but the DMG's size, reads
+`CFBundleShortVersionString`, `CFBundleVersion` and `LSMinimumSystemVersion`
+from the exported app, and writes RSS 2.0 with the `sparkle` namespace and
+one `<item>`: "Frame Job <short>", an RFC 2822 `pubDate`,
+`sparkle:version`, `sparkle:shortVersionString`,
+`sparkle:minimumSystemVersion`, `sparkle:fullReleaseNotesLink` (the release
+page) and the signed `<enclosure>`. The workflow uploads it beside
+`FrameJob.dmg`; the feed every installed copy reads is the latest release's.
+
+`--selftest`, run by `make test`, needs no network and no key and never runs
+the real `sign_update`:
+
+- **S1** `write` with a stand-in `sign_update` printing a canned line, a
+  scratch DMG of that length and a scratch Info.plist: every field reads
+  back through `xml.etree` (10 fields);
+- **S2** eight malformed outputs are refused (empty, an error line, a
+  signature or a length alone, a non-base64 signature, a negative length,
+  two pairs, two signatures), the well-formed line accepted;
+- **S3** a length one over the DMG's size is refused by `parse_signature`,
+  and one under makes `write` exit 1 and leave no file.
+
+```sh
+python3 tools/proof/appcast.py --selftest                   # → appcast selftest: 3/3
+python3 tools/proof/appcast.py write --app APP --dmg DMG --sign-update PATH \
+  --key-file PATH --url URL --notes-url URL --out PATH
+```
+
+**Measured 2026-10-27:** 3/3. Made to fail by hand on copies outside the
+tree: the `length != size` refusal removed — S3 FAIL, 2/3; the one-pair rule
+weakened to "at least one" — S2 FAIL (the two-pair and two-signature lines
+accepted), 2/3.
 
 ## Issue batch B86 phase 1 — three word-caption looks in the model, the recipe and the picture (`core/tests/word_looks.rs`, `core/tests/schema_v12.rs`, four core mutants; `word_looks_proof.py` H0, B1, W3, G1–G3, F1–F3, D1–D3, S1, R1, Z1 and six mutants; `word_looks_baseline.json`; `words_picture_probe.py` P2, P10, P11–P16, seven mutants and `--power-selftest`; #96; spec §11 W-12, W-13, W-14)
 

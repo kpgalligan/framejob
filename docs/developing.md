@@ -22,6 +22,11 @@ this page points to them rather than repeating them.
 - **Python 3** for the scripts in `tools/proof/`, and `ffmpeg` for the proofs
   that compare exported sound sample for sample (proof time only — the product
   has no ffmpeg dependency).
+- **Network access for the first build.** The app links
+  [Sparkle](https://sparkle-project.org) 2 (the published build's updater,
+  spec §11 PUB-6..PUB-9) as a Swift package, pinned in `project.yml`; the
+  first `make app`, `make app-debug` or `make dist` fetches it into
+  `build/SourcePackages/`, and later builds reuse that copy.
 
 ## Make targets
 
@@ -31,11 +36,11 @@ this page points to them rather than repeating them.
 | `make app-debug` | The same with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
 | `make run` | `make app`, then opens it. |
 | `make typecheck` | Typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
-| `make test` | The Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the build, app-choice and gate scripts, the defaults clean-up, and the old-name residue check. |
+| `make test` | The Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
 | `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
 | `make fmt` | `cargo fmt` in the same three crates. |
 | `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
-| `make dist` | `make app`, then the Distribution configuration — Release without the dev tools — into `build/Build/Products/Distribution/Frame Job.app`, then the binary and signature checks (`tools/proof/dist_check.py`) and the check the publish workflow runs on what it ships (`tools/proof/published_check.py`). |
+| `make dist` | `make app`, then the Distribution configuration — Release without the dev tools — into `build/Build/Products/Distribution/Frame Job.app`, then the binary and signature checks (`tools/proof/dist_check.py`) and the check the publish workflow runs on what it ships (`tools/proof/published_check.py`); both run, and it fails if either does. Only this target compiles the updater (Sparkle, `FRAMEJOB_UPDATER`), so only its build loads Sparkle.framework, and, signed ad hoc, it cannot be launched: library validation refuses the framework (spec §11 PUB-7). It is only ever checked, never run. Until the owner's EdDSA public key is in `project.yml`, the key rows (D31 and P20) fail, by design. |
 | `make project` | `xcodegen generate`, with the base version from `VERSION`. |
 | `make prices` | **Network.** Regenerates `agent/prices/anthropic.json` from LiteLLM's price table; the file's only writer, never run by another target. |
 | `make clean` | Removes `build/`, the generated project and `app/Info.plist`, and runs `cargo clean` in the three crates. |
@@ -144,13 +149,23 @@ A build for another Mac comes only from a push to the `publish` branch, which
 runs `.github/workflows/publish.yml`. Pushing there publishes, so it is the
 owner's call. The workflow:
 
-1. archives the Distribution configuration signed with Developer ID and
+1. stops at once when the `SPARKLE_ED_PRIVATE_KEY` secret is missing, so
+   nothing ships without an update signature;
+2. archives the Distribution configuration signed with Developer ID and
    exports it;
-2. checks the exported app with `tools/proof/published_check.py`;
-3. packs it, with an Applications link, into `FrameJob.dmg`, signs the DMG,
+3. checks the exported app with `tools/proof/published_check.py`;
+4. packs it, with an Applications link, into `FrameJob.dmg`, signs the DMG,
    notarizes and staples it;
-4. attaches it to a GitHub Release tagged `v<version>`, creating the release or
-   replacing the DMG on a re-run.
+5. signs the stapled DMG with the EdDSA key (Sparkle's `sign_update`, from the
+   package the archive resolved) and writes a one-item `appcast.xml` for it
+   (`tools/proof/appcast.py`);
+6. attaches both to a GitHub Release tagged `v<version>`, creating the release
+   or replacing both files on a re-run. A new release is made Latest unless
+   the current Latest has a higher run number (an old run re-run), because
+   every installed copy reads its updates from
+   `https://github.com/kpgalligan/framejob/releases/latest/download/appcast.xml`
+   (spec §11 PUB-6). The repository must be public for that feed and the DMG
+   to download.
 
 The version is the `VERSION` file (MAJOR.MINOR) plus the workflow's run
 number, and the build number is the run number, so bump `VERSION` for a new
@@ -172,8 +187,30 @@ restricted to `publish`:
 | `APPLE_TEAM_ID` | The Apple Developer team id. |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID` | An App Store Connect API key's id and issuer, for notarization. |
 | `ASC_KEY_P8_BASE64` | That key's `.p8`, base64-encoded. |
+| `SPARKLE_ED_PRIVATE_KEY` | Sparkle's EdDSA private key, as `generate_keys -x` exports it (spec §11 PUB-8). Its public half is `RC_SPARKLE_PUBLIC_KEY` in `project.yml`. |
 
 Every local build stays ad-hoc signed and needs none of them.
+
+The update key is the owner's to make, once, and no agent ever handles it:
+
+1. Run Sparkle's `generate_keys`, from the Sparkle 2.10.1 release's `bin/`
+   or from `build/SourcePackages/artifacts/sparkle/Sparkle/bin/` after a
+   `make app`. It keeps the private key in your login Keychain, which is its
+   backup, and prints the public key.
+2. Export the private key to a scratch file and store it as the secret, then
+   delete the file:
+
+   ```sh
+   generate_keys -x <tmpfile>
+   gh secret set SPARKLE_ED_PRIVATE_KEY --env publish --repo kpgalligan/framejob < <tmpfile>
+   rm <tmpfile>
+   ```
+3. Put the printed public key in `project.yml`'s Distribution
+   `RC_SPARKLE_PUBLIC_KEY` and commit it. Until then `make dist` fails D31 and
+   P20, and the workflow's `published_check.py` refuses to publish.
+
+Losing the private key means installed copies can no longer be updated: keep
+the Keychain item.
 
 ## Verifying a build
 

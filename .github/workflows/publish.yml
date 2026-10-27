@@ -1,18 +1,25 @@
 # Builds, signs (Developer ID), notarizes and publishes FrameJob.dmg as a
-# GitHub Release on every push to the `publish` branch (spec §11 PUB-1..PUB-5).
+# GitHub Release on every push to the `publish` branch (spec §11 PUB-1..PUB-9).
 # Rasterize's workflow, renamed, with three differences: the archive is the
 # Distribution configuration (no dev tools, spec §11 V-1), the Metal toolchain
 # is checked for, and the exported app is checked by
-# tools/proof/published_check.py before it is packed.
+# tools/proof/published_check.py before it is packed. Beside the DMG goes a
+# one-item appcast.xml, the stapled DMG's EdDSA signature in it, which every
+# installed copy's Sparkle reads from the latest release (spec §11
+# PUB-6..PUB-9, tools/proof/appcast.py).
 #
 # Version: "<VERSION file>.<run number>", build number = run number. The run
 # counter belongs to this file — renaming or recreating it restarts numbering,
 # so leave the name alone. A re-run keeps its run number and replaces the
-# release's DMG rather than failing.
+# release's DMG and appcast rather than failing, and leaves Latest alone; a
+# run that creates an older release than the current Latest creates it with
+# --latest=false, so Latest is always the highest run number (PUB-6).
 #
 # Secrets (in the `publish` environment, restricted to the `publish` branch):
 #   DEVELOPER_ID_P12_BASE64, DEVELOPER_ID_P12_PASSWORD, KEYCHAIN_PASSWORD,
-#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64,
+#   SPARKLE_ED_PRIVATE_KEY (the owner's EdDSA private key, `generate_keys -x`
+#   output, spec §11 PUB-8; the first step fails without it)
 name: Publish
 
 on:
@@ -32,6 +39,17 @@ jobs:
     environment: publish
     timeout-minutes: 60
     steps:
+      # Nothing ships unsigned (spec §11 PUB-8): without the update key the run
+      # stops here, before anything is built or signed.
+      - name: Check the update key
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          if ! [ -n "$SPARKLE_ED_PRIVATE_KEY" ]; then
+            echo "::error::The publish environment has no SPARKLE_ED_PRIVATE_KEY secret (spec §11 PUB-8)"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - name: Toolchain
@@ -67,6 +85,8 @@ jobs:
             echo "ARCHIVE=$RUNNER_TEMP/FrameJob.xcarchive"
             echo "EXPORT=$RUNNER_TEMP/export"
             echo "DMG=$RUNNER_TEMP/FrameJob.dmg"
+            echo "APPCAST=$RUNNER_TEMP/appcast.xml"
+            echo "ED_KEY=$RUNNER_TEMP/sparkle_ed_key"
           } >> "$GITHUB_ENV"
           BASE="$(tr -d '[:space:]' < VERSION)"
           # macOS versions are at most three integers; the run number is the third.
@@ -120,7 +140,9 @@ jobs:
 
       # published_check.py holds what notarization does not look at: no dev
       # tools, each binary's exact entitlements after the export's re-sign, the
-      # catalog snapshot, and the two version numbers.
+      # catalog snapshot, the two version numbers, and the updater: Sparkle's
+      # framework and helpers signed with the app's team and the hardened
+      # runtime, the feed and a 32-byte EdDSA public key (spec §11 PUB-6..PUB-8).
       - name: Export
         run: |
           xcodebuild -exportArchive \
@@ -169,22 +191,57 @@ jobs:
           xcrun stapler validate "$DMG"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
 
+      # The EdDSA signature is made over the stapled DMG, the bytes the release
+      # serves (spec §11 PUB-8). sign_update is the Sparkle package's own, from
+      # the archive's package resolution; the key reaches it only as a 0600
+      # file, removed straight after (and by the clean-up step on a failure).
+      - name: Sign the update and write the appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          COUNT="$(find build/SourcePackages/artifacts -path '*/bin/sign_update' -type f | wc -l | tr -d ' ')"
+          if [ "$COUNT" != 1 ]; then
+            echo "::error::Expected one sign_update under build/SourcePackages/artifacts, found $COUNT"
+            exit 1
+          fi
+          SIGN_UPDATE="$(find build/SourcePackages/artifacts -path '*/bin/sign_update' -type f)"
+          umask 077; printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$ED_KEY"
+          python3 tools/proof/appcast.py write \
+            --app "$EXPORT/Frame Job.app" \
+            --dmg "$DMG" \
+            --sign-update "$SIGN_UPDATE" \
+            --key-file "$ED_KEY" \
+            --url "https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION/FrameJob.dmg" \
+            --notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION" \
+            --out "$APPCAST"
+          rm -f "$ED_KEY"
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v$VERSION"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "$DMG" --clobber
+            # A re-run: both assets replaced, Latest left alone (spec §11 PUB-6).
+            gh release upload "$TAG" "$DMG" "$APPCAST" --clobber
           else
-            gh release create "$TAG" "$DMG" \
+            # The feed is releases/latest/download/appcast.xml, so Latest is
+            # always the highest run number (spec §11 PUB-6): a release older
+            # than the current Latest (an old run re-run) is not made Latest.
+            LATEST="$(gh release view --json tagName -q .tagName 2>/dev/null || true)"
+            MAKE_LATEST="--latest"
+            if [ -n "$LATEST" ] && [ "${LATEST##*.}" -gt "$GITHUB_RUN_NUMBER" ] 2> /dev/null; then
+              MAKE_LATEST="--latest=false"
+            fi
+            gh release create "$TAG" "$DMG" "$APPCAST" \
               --target "$GITHUB_SHA" \
               --title "Frame Job $VERSION" \
-              --generate-notes
+              --generate-notes \
+              "$MAKE_LATEST"
           fi
 
       - name: Clean up signing material
         if: always()
         run: |
           security delete-keychain "$KEYCHAIN" 2> /dev/null || true
-          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/AuthKey.p8"
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/AuthKey.p8" "$ED_KEY"

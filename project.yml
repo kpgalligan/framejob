@@ -12,6 +12,17 @@ configs:
   Release: release
   Distribution: release
 
+# Sparkle 2, the published build's updater (spec §11 PUB-6..PUB-9). xcodegen
+# links a package per target, not per configuration, so Sparkle.framework is
+# embedded in every configuration but loaded only in Distribution (PUB-7):
+# Debug and Release drop its load command (`-dead_strip_dylibs` below); only
+# Distribution compiles code that uses it (FRAMEJOB_UPDATER below) and holds a
+# feed and a key. The first build fetches the package over the network.
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.1"
+
 targets:
   FrameJob:
     type: application
@@ -39,6 +50,10 @@ targets:
         buildPhase: resources
       - path: app/Resources/Shaders
         buildPhase: sources
+    # Sparkle (spec §11 PUB-7): embedded in every configuration, loaded only
+    # in Distribution.
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_NAME: "Frame Job"
@@ -74,6 +89,16 @@ targets:
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
+          # Sparkle is never loaded here (spec §11 PUB-7): no Debug code
+          # references it, so the linker drops its load command. Loaded, dyld
+          # refuses an ad-hoc framework under the hardened runtime's library
+          # validation ("different Team IDs") and the app cannot launch. A
+          # per-config OTHER_LDFLAGS replaces the base one, so the core is
+          # restated.
+          OTHER_LDFLAGS:
+            - -lframejob_core
+            - -Xlinker
+            - -dead_strip_dylibs
           # Xcode 26 splits a Debug executable into a stub and __preview.dylib,
           # and Write Agent Catalog's `codesign -s - -f "$exe"` fails on the split.
           ENABLE_DEBUG_DYLIB: "NO"
@@ -88,11 +113,26 @@ targets:
           RC_PROJECT_HANDLER_RANK: Alternate
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
+          # As Debug's: Sparkle embedded, never loaded (spec §11 PUB-7;
+          # tools/proof/dist_check.py D35 holds it).
+          OTHER_LDFLAGS:
+            - -lframejob_core
+            - -Xlinker
+            - -dead_strip_dylibs
         # Distribution is the build that ships (spec §11 V-1), and notarization
         # refuses the get-task-allow Xcode injects by default, so it is signed
         # with `entitlements` alone (#145, tools/proof/dist_check.py D14).
         Distribution:
           CODE_SIGN_INJECT_BASE_ENTITLEMENTS: "NO"
+          # The updater (spec §11 PUB-6..PUB-9) is Distribution's alone:
+          # AppDelegate+Updates.swift compiles only under FRAMEJOB_UPDATER, and
+          # Info.plist reads the feed and the EdDSA public key through
+          # `:default=` (V-5's pattern), so Debug and Release hold neither.
+          # The public key is the owner's (PUB-8); until it lands it is empty
+          # and dist_check.py's D31 and published_check.py's P20 refuse it.
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_UPDATER"
+          RC_SPARKLE_FEED_URL: https://github.com/kpgalligan/framejob/releases/latest/download/appcast.xml
+          RC_SPARKLE_PUBLIC_KEY: ""
     info:
       path: app/Info.plist
       properties:
@@ -106,6 +146,12 @@ targets:
         NSHighResolutionCapable: true
         ATSApplicationFontsPath: Fonts
         NSHumanReadableCopyright: ""
+        # Sparkle's feed and EdDSA public key (spec §11 PUB-6, PUB-8): set in
+        # Distribution alone, empty in Debug and Release (PUB-7). No
+        # SUEnableAutomaticChecks and no SUAutomaticallyUpdate: Sparkle's own
+        # defaults apply (PUB-9).
+        SUFeedURL: "$(RC_SPARKLE_FEED_URL:default=)"
+        SUPublicEDKey: "$(RC_SPARKLE_PUBLIC_KEY:default=)"
         # File ▸ New Recording… (road map 3, R1c) — the microphone half of a
         # recording, which speech never needed (the speech engine reads an
         # extracted file). The microphone takes TWO things, and this key is one:

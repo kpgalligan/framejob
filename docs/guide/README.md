@@ -30,7 +30,7 @@ Read the first four in order to learn the editor; the rest stand alone.
 14. [Exporting](export.md) — the export sheet, its formats and settings, presets, the Export Queue, and saving single frames.
 15. [The Assistant](assistant.md) — chatting with Claude in the inspector to edit the open project, on your own Anthropic key.
 16. [Driving Frame Job from an AI agent (MCP)](mcp.md) — connecting an MCP client such as Claude Code, how calls behave, and every tool.
-17. [Settings](settings.md) — the Settings window, the View choices Frame Job remembers, and where it keeps its files.
+17. [Settings](settings.md) — the Settings window, updates (Check for Updates… in the downloaded copy), the View choices Frame Job remembers, and where it keeps its files.
 18. [Menus and keyboard shortcuts](menus-and-shortcuts.md) — every menu command with its shortcut, and the keys, gestures and context menus that have no menu item.
 
 Writing your own graphic module is covered by the

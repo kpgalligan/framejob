@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3 and build velocity — the binary check `make dist` runs.
+"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3, build velocity and Sparkle — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
 `FRAMEJOB_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
@@ -63,7 +63,28 @@ Distribution's: it must name every key of the seam's flag-on `devHandlers`
 table, read out of `AgentServer+DevTools.swift` at every run, and
 Distribution's must name none.
 
-The twenty-seven rows, none ever skipped:
+**The updater (spec §11 PUB-6..PUB-9).** Sparkle.framework is embedded in
+every configuration (xcodegen links a package per target) and loaded only in
+Distribution: only Distribution compiles `AppDelegate+Updates.swift`
+(`FRAMEJOB_UPDATER`) and holds a feed and an EdDSA public key, and Release
+links with `-dead_strip_dylibs`, so its binary has no Sparkle load command
+(loaded, dyld refuses the ad-hoc framework under library validation and the
+app does not launch, PUB-7). D28 wants the Distribution
+framework present and its binary signed by the app binary's team (library
+validation under the hardened runtime refuses a framework of another team;
+an ad-hoc build reads `not set` on both); D29 wants every other Mach-O under
+it — Autoupdate, Updater.app, the two XPC services, found by magic — signed
+with the hardened runtime and verifying strictly. D30 wants Distribution's
+`SUFeedURL` to be the `RC_SPARKLE_FEED_URL` its configuration sets in
+`project.yml` (an `https://` URL), D31 its `SUPublicEDKey` to be strict
+base64 of exactly 32 bytes (an Ed25519 public key): until the owner's key
+lands it is empty and D31 fails, by the owner's choice (PUB-8). D32 wants
+both keys empty in Release, D34 the Release binary without the updater's
+class name, and D33 is that row's positive control: the Distribution binary
+holds `SPUStandardUpdaterController`. D35 wants no `Sparkle.framework`
+path among the Release binary's load commands (`otool -L`).
+
+The thirty-five rows, none ever skipped:
 
 * D1 — the needle is read from the seam file: exactly one bare declaration
   line, ASCII, at least 16 UTF-8 bytes;
@@ -96,20 +117,38 @@ The twenty-seven rows, none ever skipped:
   `com.apple.security.device.camera` and
   `com.apple.security.get-task-allow`;
 * D26 / D27 — the Release / Distribution app passes `codesign --verify
-  --deep --strict`.
+  --deep --strict`;
+* D28 — the Distribution app holds `Contents/Frameworks/Sparkle.framework`,
+  its binary signed with the app binary's TeamIdentifier;
+* D29 — every other Mach-O under that framework (at least one) is signed
+  with the hardened runtime and `codesign --verify --strict` accepts it;
+* D30 — the Distribution app's `SUFeedURL` is Distribution's
+  `RC_SPARKLE_FEED_URL` in `project.yml`, an `https://` URL;
+* D31 — the Distribution app's `SUPublicEDKey` is strict base64 of exactly
+  32 bytes;
+* D32 — the Release app's `SUFeedURL` and `SUPublicEDKey` are both empty;
+* D33 — the Distribution binary holds `SPUStandardUpdaterController` (the
+  positive control for D34);
+* D34 — the Release binary does not hold it;
+* D35 — `otool -L` lists the Release binary's load commands (at least one)
+  and none is a `Sparkle.framework` path.
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
 or helper is missing; D14 FAILs when the Distribution binary is, D25 and
-D26 when the Release binary is, and D27 when the Distribution binary is. D17–D20
+D26 when the Release binary is, and D27 when the Distribution binary is; D33
+and D34 FAIL when their binary is missing, and D35 when the Release binary
+is, or `otool` is missing or fails. D17–D20
 FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
 `tools/proof/dist_check_mutants.py` makes each helper row, D14 and each of
-D15–D27 fail on purpose. The last line is `dist_check: <passed>/27`; the exit
-is 0 only at 27/27.
+D15–D32 and D35 fail on purpose. The last line is `dist_check: <passed>/35`;
+the exit is 0 only at 35/35.
 """
 
 import argparse
+import base64
+import binascii
 import json
 import os
 import plistlib
@@ -147,7 +186,22 @@ DEV_BLOCK = re.compile(r"^\s*#if FRAMEJOB_DEV_TOOLS\s*$(.*?)^\s*#else\s*$", re.M
 DEV_TABLE = re.compile(r"private static let devHandlers: \[String: ToolHandler\] = \[(.*?)\n\s*\]",
                        re.S)
 DEV_KEY = re.compile(r'^\s*"([a-z_]+)":', re.M)
-TOTAL = 27
+# Sparkle (spec §11 PUB-6..PUB-9): the embedded framework, and the class name the
+# updater's code references, held by the Distribution binary alone.
+SPARKLE = os.path.join("Contents", "Frameworks", "Sparkle.framework")
+UPDATER_NEEDLE = b"SPUStandardUpdaterController"
+PROJECT_YML = os.path.join(ROOT, "project.yml")
+# Distribution's settings block in project.yml (the bare `Distribution:` line; the top-level
+# `configs:` map writes `Distribution: release` on one line) and its feed setting.
+DIST_BLOCK = re.compile(r"^( +)Distribution:[ \t]*$")
+FEED_SETTING = re.compile(r"^\s*RC_SPARKLE_FEED_URL:\s*(\S+)\s*$")
+TEAM = re.compile(r"^TeamIdentifier=(.*)$", re.M)
+# A load command naming the framework (`@rpath/Sparkle.framework/Versions/B/Sparkle`).
+SPARKLE_LOAD = "/Sparkle.framework/"
+# The first four bytes of a Mach-O, thin or universal, either byte order.
+MACHO_MAGIC = {bytes.fromhex(m) for m in
+               ("feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca")}
+TOTAL = 35
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -360,6 +414,160 @@ def bundle_version(app):
     return version, ""
 
 
+def feed_url():
+    """Distribution's RC_SPARKLE_FEED_URL in project.yml, or None with the reason."""
+    try:
+        with open(PROJECT_YML, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError as error:
+        return None, f"cannot read {PROJECT_YML}: {error}"
+    starts = [(i, DIST_BLOCK.match(line)) for i, line in enumerate(lines)]
+    starts = [(i, match) for i, match in starts if match]
+    if len(starts) != 1:
+        return None, f"{len(starts)} bare `Distribution:` lines in {PROJECT_YML}"
+    first, match = starts[0]
+    indent = len(match.group(1))
+    values = []
+    for line in lines[first + 1:]:
+        if line.strip() and len(line) - len(line.lstrip(" ")) <= indent:
+            break
+        setting = FEED_SETTING.match(line)
+        if setting:
+            values.append(setting.group(1).strip("\"'"))
+    if len(values) != 1:
+        return None, f"{len(values)} RC_SPARKLE_FEED_URL lines in Distribution's block"
+    if not values[0].startswith("https://"):
+        return None, f"Distribution's RC_SPARKLE_FEED_URL {values[0]!r} is not https://"
+    return values[0], ""
+
+
+def updater_keys(app):
+    """{"SUFeedURL", "SUPublicEDKey"} from the bundle's Info.plist (a missing key reads
+    ""), or None with the reason."""
+    path = os.path.join(app, INFO_PLIST)
+    try:
+        with open(path, "rb") as handle:
+            info = plistlib.load(handle)
+    except Exception as error:  # OSError or a plist that does not parse
+        return None, f"{path}: {type(error).__name__}: {error}"
+    if not isinstance(info, dict):
+        return None, f"{path} is not a dictionary"
+    keys = {key: info.get(key, "") for key in ("SUFeedURL", "SUPublicEDKey")}
+    for key, value in keys.items():
+        if not isinstance(value, str):
+            return None, f"{key} in {path} is not a string: {value!r}"
+    return keys, path
+
+
+def public_key_ok(value):
+    """Whether the value is strict base64 of exactly 32 bytes (an Ed25519 public key)."""
+    if not value:
+        return False, "SUPublicEDKey is empty (the owner's key has not landed, spec §11 PUB-8)"
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as error:
+        return False, f"SUPublicEDKey {value!r} is not strict base64: {error}"
+    if len(raw) != 32:
+        return False, f"SUPublicEDKey {value!r} decodes to {len(raw)} bytes, not 32"
+    return True, ""
+
+
+def team_identifier(path):
+    """The TeamIdentifier `codesign -dv --verbose=4` shows for the code at `path`
+    (`not set` kept as is), or None with the reason."""
+    shown, reason = run_codesign(["-dv", "--verbose=4", path])
+    if shown is None:
+        return None, reason
+    stderr = shown.stderr.decode("utf-8", "replace")
+    if shown.returncode != 0:
+        return None, f"codesign -dv exit {shown.returncode}: {stderr.strip()[:300]}"
+    match = TEAM.search(stderr)
+    if match is None:
+        return None, f"no TeamIdentifier= line in codesign -dv's display of {path}"
+    return match.group(1).strip(), ""
+
+
+def sparkle_framework(app):
+    """Whether the bundle holds Sparkle.framework, its binary signed with the app
+    binary's team (library validation refuses a framework of another team)."""
+    framework = os.path.join(app, SPARKLE)
+    binary = os.path.join(framework, "Sparkle")
+    if not os.path.isfile(binary):
+        return False, f"{binary}: no such file"
+    want, reason = team_identifier(os.path.realpath(str(proof_app.executable(app))))
+    if want is None:
+        return False, f"the app binary: {reason}"
+    held, reason = team_identifier(os.path.realpath(binary))
+    if held is None:
+        return False, f"the framework binary: {reason}"
+    if held != want:
+        return False, f"the framework's TeamIdentifier is {held!r}, the app's {want!r}"
+    return True, f"TeamIdentifier {held}"
+
+
+def is_macho(path):
+    """Whether the file starts with a Mach-O magic."""
+    try:
+        with open(path, "rb") as handle:
+            return handle.read(4) in MACHO_MAGIC
+    except OSError:
+        return False
+
+
+def sparkle_helper_paths(framework):
+    """Every Mach-O under the framework but its own binary, symlinks not followed, in a
+    stable order (folders sorted, a folder's files before its subfolders)."""
+    own = os.path.realpath(os.path.join(framework, "Sparkle"))
+    helpers = []
+    for folder, directories, files in os.walk(framework):
+        directories.sort()
+        for file in sorted(files):
+            path = os.path.join(folder, file)
+            if os.path.islink(path) or os.path.realpath(path) == own:
+                continue
+            if is_macho(path):
+                helpers.append(path)
+    return helpers
+
+
+def sparkle_helpers(app):
+    """Whether every Mach-O under Sparkle.framework but its own binary (at least one) is
+    signed with the hardened runtime and verifies strictly (`helper_runtime`)."""
+    framework = os.path.join(app, SPARKLE)
+    if not os.path.isdir(framework):
+        return False, f"{framework}: no such directory"
+    helpers = sparkle_helper_paths(framework)
+    if not helpers:
+        return False, f"no Mach-O under {framework} but its own binary"
+    for path in helpers:
+        ok, reason = helper_runtime(path)
+        if not ok:
+            return False, reason
+    return True, f"{len(helpers)} helpers"
+
+
+def load_commands(binary):
+    """The dylib paths `otool -L` lists for the executable (at least one), or None with
+    the reason."""
+    try:
+        shown = subprocess.run(["otool", "-L", binary], capture_output=True, timeout=TIMEOUT,
+                               env=child_env())
+    except FileNotFoundError:
+        return None, "otool is not on PATH"
+    except subprocess.TimeoutExpired:
+        return None, f"otool -L timed out after {TIMEOUT} s"
+    except OSError as error:
+        return None, f"otool: {error}"
+    if shown.returncode != 0:
+        return None, (f"otool -L exit {shown.returncode}: "
+                      f"{shown.stderr.decode('utf-8', 'replace').strip()[:300]}")
+    lines = shown.stdout.decode("utf-8", "replace").splitlines()[1:]
+    paths = [line.strip().rsplit(" (", 1)[0] for line in lines if line.strip()]
+    if not paths:
+        return None, f"otool -L listed no load command for {binary}"
+    return paths, ""
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--release", default=DEFAULT_RELEASE, help="the Release Frame Job.app")
@@ -367,9 +575,10 @@ def main():
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()
-    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3 and B88 — no dev tools in "
-          "Distribution; the helper signed in both; both apps' entitlements and seals; the "
-          "MCP proxy and its snapshot in both\n")
+    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3, B88 and spec §11 PUB-6..PUB-9 "
+          "— no dev tools in Distribution; the helper signed in both; both apps' entitlements "
+          "and seals; the MCP proxy and its snapshot in both; the updater in Distribution "
+          "alone\n")
     print(f"  needle:       {needle.decode('ascii') if needle else '(none)'}")
     print(f"  release:      {os.path.abspath(arguments.release)}")
     print(f"  distribution: {os.path.abspath(arguments.dist)}\n")
@@ -519,6 +728,61 @@ def main():
         else:
             ok, detail = sealed(where)
             check(name, ok, "" if ok else detail)
+
+    ok, detail = sparkle_framework(arguments.dist)
+    check("D28 the Distribution app holds Sparkle.framework, signed with the app's team",
+          ok, "" if ok else detail)
+    ok, detail = sparkle_helpers(arguments.dist)
+    check("D29 every helper in the Distribution Sparkle.framework is signed with the "
+          "hardened runtime" + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+    want, want_reason = feed_url()
+    keys, keys_where = updater_keys(arguments.dist)
+    name = "D30 the Distribution app's SUFeedURL is Distribution's RC_SPARKLE_FEED_URL"
+    if want is None:
+        check(name, False, want_reason)
+    elif keys is None:
+        check(name, False, keys_where)
+    else:
+        check(name, keys["SUFeedURL"] == want,
+              f"SUFeedURL {keys['SUFeedURL']!r} in {keys_where}; project.yml's is {want!r}")
+    name = "D31 the Distribution app's SUPublicEDKey is base64 of exactly 32 bytes"
+    if keys is None:
+        check(name, False, keys_where)
+    else:
+        ok, detail = public_key_ok(keys["SUPublicEDKey"])
+        check(name, ok, detail)
+    keys, keys_where = updater_keys(arguments.release)
+    name = "D32 the Release app's SUFeedURL and SUPublicEDKey are both empty"
+    if keys is None:
+        check(name, False, keys_where)
+    else:
+        check(name, keys == {"SUFeedURL": "", "SUPublicEDKey": ""},
+              f"{keys!r} in {keys_where}")
+    name = ("D33 the Distribution binary holds SPUStandardUpdaterController (the positive "
+            "control)")
+    if dist is None:
+        check(name, False, "no Distribution binary (D3)")
+    else:
+        count = dist.count(UPDATER_NEEDLE)
+        check(f"{name}; {count} occurrences" if count else name, count > 0,
+              f"0 occurrences in {dist_where}")
+    name = "D34 the Release binary does not hold SPUStandardUpdaterController"
+    if release is None:
+        check(name, False, "no Release binary (D2)")
+    else:
+        count = release.count(UPDATER_NEEDLE)
+        check(name, count == 0, f"{count} occurrences in {release_where}")
+    name = "D35 the Release binary has no Sparkle load command"
+    if release is None:
+        check(name, False, "no Release binary (D2)")
+    else:
+        paths, reason = load_commands(release_where)
+        if paths is None:
+            check(name, False, reason)
+        else:
+            held = [path for path in paths if SPARKLE_LOAD in path]
+            check(f"{name} ({len(paths)} load commands)" if not held else name, not held,
+                  f"{held} in {release_where}")
 
     print(f"\ndist_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

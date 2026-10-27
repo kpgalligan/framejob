@@ -107,7 +107,8 @@ Also: [Settings](docs/guide/settings.md) and
 The newest signed and notarized build is always at
 <https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg>.
 While the repository is private, the link works only for people with access to
-it. Open the DMG and drag Frame Job to Applications.
+it. Open the DMG and drag Frame Job to Applications. An installed copy
+updates itself (Frame Job ▸ Check for Updates…, [Settings](docs/guide/settings.md#updates)).
 
 To build it yourself, see [Developing Frame Job](docs/developing.md).
 

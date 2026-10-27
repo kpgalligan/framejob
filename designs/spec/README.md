@@ -56,9 +56,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 46 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, and its answer. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 109 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 196 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 197 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 13472 in 32 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 13520 in 32 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

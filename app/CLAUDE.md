@@ -668,7 +668,9 @@ the key map behind it.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
   Background, Transition, Motion, Look and Label, a pure move out of `+Menus`,
-  grading GR1 — +`Recording`, +`GraphicMenu` — the Insert
+  grading GR1 — +`Recording`, +`Updates` — Frame Job ▸ Check for Updates…
+  and the Sparkle updater, compiled only under `FRAMEJOB_UPDATER`
+  (Distribution, spec §11 PUB-6..PUB-9) —, +`GraphicMenu` — the Insert
   menu's builder (Adjustment Clip first, then Graphic ▸), File's three graphic-file items (`addGraphicFileItems(to:)`,
   called once from `fileMenu()` right after Add Image to Graphics…: a
   separator, then Rename Graphic…, Delete Graphic… and Restore Graphic

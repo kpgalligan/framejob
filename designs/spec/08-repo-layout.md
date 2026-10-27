@@ -6,7 +6,7 @@ framejob/
   Makefile            # app / test / lint / typecheck / project / run — Rasterize's, renamed
   project.yml         # xcodegen; macOS 26, arm64; document types below
   VERSION             # the base version, MAJOR.MINOR (§11 PUB-2)
-  .github/            # workflows/publish.yml: the `publish` branch's signed, notarized DMG (§11 PUB-1..PUB-5)
+  .github/            # workflows/publish.yml: the `publish` branch's signed, notarized DMG and its EdDSA-signed appcast.xml for Sparkle (§11 PUB-1..PUB-9)
   core/
     Cargo.toml        # framejob-core; lib name framejob_core; serde, serde_json, serde_path_to_error, tiny_http, svgtypes, graphic; incremental, no LTO
     include/framejob_core.h

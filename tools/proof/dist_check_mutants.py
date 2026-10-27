@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Road map 12 A4, #145, road map 14 MC3 and B88 — `dist_check.py`'s helper rows (D6–D13),
-D14, the MCP proxy's and snapshot's rows (D15–D24) and the Release entitlements and
-seal rows (D25–D27), each made to fail on purpose.
+"""Road map 12 A4, #145, road map 14 MC3, B88 and Sparkle — `dist_check.py`'s helper rows
+(D6–D13), D14, the MCP proxy's and snapshot's rows (D15–D24), the Release entitlements and
+seal rows (D25–D27) and the updater's rows (D28–D32 and D35, spec §11 PUB-6..PUB-9), each
+made to fail on purpose.
 
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
@@ -10,9 +11,15 @@ Every case runs `dist_check.py` as a child with one side a SKELETON bundle,
 symlink to the real app's untouched binary, and COPIES (never links) of the
 real `Contents/Info.plist`, `Contents/Helpers/framejob-agent`,
 `Contents/Helpers/framejob-mcp` and `Contents/Resources/agent-catalog.json`,
-for every mutation: the helper or the proxy mutated and re-signed ad hoc, or
-the snapshot removed, re-versioned or swapped for the OTHER side's. The
-other side is the real app. Nothing is written into `build/`. Four cases
+and a `ditto` copy of the real `Contents/Frameworks/Sparkle.framework`, for
+every mutation: the helper or the proxy mutated and re-signed ad hoc, the
+snapshot removed, re-versioned or swapped for the OTHER side's, the
+framework removed, its binary's signature removed (`sparkle-unsigned`) or its
+first helper (`dist_check.sparkle_helper_paths`' order) re-signed ad hoc
+without the hardened runtime, or the Info.plist copy's `SUFeedURL` emptied
+(`feed-empty`), its `SUPublicEDKey` made base64 of 31 bytes (`key-short`) or,
+in Release's, its `SUFeedURL` set to Distribution's (`release-feed`). The
+other side is the real app. Nothing is written into `build/`. Five cases
 mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Frame Job.app`:
 `app-entitlements` re-signs Distribution ad hoc with
 `dist_check.APP_ENTITLEMENTS` plus `get-task-allow` (#145), which D14 must
@@ -26,19 +33,29 @@ does to Release what a no-op build did before issue batch B88's fix — `codesig
 -s - -f` of the executable alone, then a byte appended to
 `agent-catalog.json` — which D25 (no entitlements) and D26 (the seal) must
 refuse; `seal-broken` appends a byte to Distribution's `agent-catalog.json`
-after signing, which D27 must refuse while D14 still passes.
+after signing, which D27 must refuse while D14 still passes; `sparkle-load`
+restores the Sparkle load command Release's `-dead_strip_dylibs` drops (spec
+§11 PUB-7): `install_name_tool -change` turns the first of Release's load
+commands at least as long as Distribution's Sparkle one into it, then the
+bundle is re-signed ad hoc with the hardened runtime and
+`dist_check.RELEASE_ENTITLEMENTS`, which D35 alone must refuse.
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <27 - |set|>/27`, and it exits 0 for an empty set
+last line is `dist_check: <35 - |set|>/35`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers, proxies and snapshots copied untouched) expect nothing to fail: they
 prove the skeleton is not itself a failure. A setup command that fails (a
 copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
 case's directory is removed after scoring. The last line is
-`dist_check_mutants: <passed>/23`; the exit is 0 only at 23/23.
+`dist_check_mutants: <passed>/30`; the exit is 0 only at 30/30.
+
+The control needs a Distribution build whose `SUPublicEDKey` passes D31: until
+the owner's key lands, build Distribution with a stand-in 32-byte key on the
+command line (`RC_SPARKLE_PUBLIC_KEY=AAAA…AAA=`, `tools/proof/README.md`).
 """
 
 import argparse
+import base64
 import json
 import os
 import plistlib
@@ -85,9 +102,17 @@ CASES = [
     ("app-entitlements-mic-only-release", ("release",), "app-entitlements-mic-only", {"D25"}),
     ("noop-sign-release", ("release",), "noop-sign", {"D25", "D26"}),
     ("seal-broken-dist", ("dist",), "seal-broken", {"D27"}),
+    ("sparkle-missing-dist", ("dist",), "sparkle-missing", {"D28", "D29"}),
+    ("sparkle-unsigned-dist", ("dist",), "sparkle-unsigned", {"D28"}),
+    ("sparkle-helper-no-runtime-dist", ("dist",), "sparkle-helper-no-runtime", {"D29"}),
+    ("feed-empty-dist", ("dist",), "feed-empty", {"D30"}),
+    ("key-short-dist", ("dist",), "key-short", {"D31"}),
+    ("release-feed", ("release",), "release-feed", {"D32"}),
+    ("sparkle-load-release", ("release",), "sparkle-load", {"D35"}),
 ]
 # The cases that mutate a whole `ditto`ed bundle rather than a skeleton.
-WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken"}
+WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken",
+         "sparkle-load"}
 OTHER = {"release": "dist", "dist": "release"}
 
 
@@ -119,11 +144,90 @@ def copy_in(source, target, mode=None):
         raise SetupError(f"copy {source}: {error}")
 
 
+def run_tool(arguments, what):
+    """Run a setup tool; a failure is a SetupError naming `what`."""
+    try:
+        done = subprocess.run(arguments, capture_output=True, timeout=300,
+                              env=dist_check.child_env())
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise SetupError(f"{what}: {error}")
+    if done.returncode != 0:
+        raise SetupError(f"{what} exit {done.returncode}: "
+                         f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
+
+
+def info_plist(app, real_app, other_app, mutation):
+    """The skeleton's Info.plist, a COPY of the real bundle's, its updater keys mutated
+    (spec §11 PUB-6..PUB-8, D30–D32)."""
+    target = os.path.join(app, dist_check.INFO_PLIST)
+    copy_in(os.path.join(real_app, dist_check.INFO_PLIST), target)
+    if mutation not in ("feed-empty", "key-short", "release-feed"):
+        return
+    try:
+        with open(target, "rb") as handle:
+            info = plistlib.load(handle)
+        if mutation == "feed-empty":
+            info["SUFeedURL"] = ""
+        elif mutation == "key-short":
+            info["SUPublicEDKey"] = base64.b64encode(b"\1" * 31).decode("ascii")
+        else:
+            with open(os.path.join(other_app, dist_check.INFO_PLIST), "rb") as handle:
+                info["SUFeedURL"] = plistlib.load(handle)["SUFeedURL"]
+        with open(target, "wb") as handle:
+            plistlib.dump(info, handle)
+    except (OSError, KeyError, ValueError, plistlib.InvalidFileException) as error:
+        raise SetupError(f"rewrite {target}: {error}")
+
+
+def sparkle(app, real_app, mutation):
+    """The skeleton's Sparkle.framework, a `ditto` copy of the real bundle's, its binary
+    or its first helper mutated (spec §11 PUB-7, D28/D29)."""
+    if mutation == "sparkle-missing":
+        return
+    framework = os.path.join(app, dist_check.SPARKLE)
+    run_tool(["ditto", os.path.join(real_app, dist_check.SPARKLE), framework],
+             f"ditto {os.path.join(real_app, dist_check.SPARKLE)}")
+    if mutation == "sparkle-unsigned":
+        binary = os.path.realpath(os.path.join(framework, "Sparkle"))
+        run_tool(["codesign", "--remove-signature", binary],
+                 f"codesign --remove-signature {binary}")
+    elif mutation == "sparkle-helper-no-runtime":
+        helpers = dist_check.sparkle_helper_paths(framework)
+        if not helpers:
+            raise SetupError(f"no helper under {framework}")
+        sign(helpers[0])
+
+
+def sparkle_load(app, real, case_dir):
+    """Give the `ditto`ed bundle's executable a Sparkle load command, Distribution's own,
+    in place of the first of its load commands at least as long (spec §11 PUB-7, D35);
+    then re-sign the bundle as Release is signed."""
+    binary = os.path.realpath(str(proof_app.executable(app)))
+    dist_paths, reason = dist_check.load_commands(str(proof_app.executable(real["dist"])))
+    if dist_paths is None:
+        raise SetupError(f"Distribution's load commands: {reason}")
+    wanted = [path for path in dist_paths if dist_check.SPARKLE_LOAD in path]
+    if len(wanted) != 1:
+        raise SetupError(f"{len(wanted)} Sparkle load commands in the Distribution binary")
+    paths, reason = dist_check.load_commands(binary)
+    if paths is None:
+        raise SetupError(f"the copy's load commands: {reason}")
+    room = [path for path in paths if len(path) >= len(wanted[0])
+            and dist_check.SPARKLE_LOAD not in path]
+    if not room:
+        raise SetupError(f"no load command in {binary} as long as {wanted[0]}")
+    run_tool(["install_name_tool", "-change", room[0], wanted[0], binary],
+             f"install_name_tool -change {room[0]}")
+    plist = os.path.join(case_dir, "release.plist")
+    with open(plist, "wb") as handle:
+        plistlib.dump(dist_check.RELEASE_ENTITLEMENTS, handle)
+    sign(app, "--options", "runtime", "--entitlements", plist)
+
+
 def proxy_and_snapshot(case_dir, app, real_app, other_app, mutation):
     """The skeleton's Info.plist, MCP proxy and snapshot, each a COPY of the real
     bundle's, the proxy or the snapshot mutated (road map 14 MC3, D15–D24)."""
-    copy_in(os.path.join(real_app, dist_check.INFO_PLIST),
-            os.path.join(app, dist_check.INFO_PLIST))
+    info_plist(app, real_app, other_app, mutation)
     if mutation != "no-proxy":
         proxy = os.path.join(app, dist_check.PROXY)
         copy_in(os.path.join(real_app, dist_check.PROXY), proxy, 0o755)
@@ -164,6 +268,9 @@ def skeleton(case_dir, side, real, mutation, needle):
         if done.returncode != 0:
             raise SetupError(f"ditto {real_app} exit {done.returncode}: "
                              f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
+        if mutation == "sparkle-load":
+            sparkle_load(app, real, case_dir)
+            return app
         if mutation == "noop-sign":
             sign(str(proof_app.executable(app)))
         if mutation in ("noop-sign", "seal-broken"):
@@ -188,6 +295,7 @@ def skeleton(case_dir, side, real, mutation, needle):
         raise SetupError(f"no binary at {binary}")
     os.symlink(binary, os.path.join(macos, "Frame Job"))
     proxy_and_snapshot(case_dir, app, real_app, real[OTHER[side]], mutation)
+    sparkle(app, real_app, mutation)
     if mutation == "no-helper":
         return app
     source = os.path.join(real_app, dist_check.HELPER)
@@ -262,8 +370,9 @@ def main():
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}
 
-    print("road map 12 A4, #145, road map 14 MC3 and B88 — dist_check's helper rows "
-          "(D6–D13), D14 and D15–D27, each made to fail on purpose\n")
+    print("road map 12 A4, #145, road map 14 MC3, B88 and spec §11 PUB-6..PUB-9 — "
+          "dist_check's helper rows (D6–D13), D14, D15–D32 and D35, each made to fail on "
+          "purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

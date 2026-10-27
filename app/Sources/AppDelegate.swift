@@ -37,6 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AgentServer.shared.bindSocket()
         ProjectDocumentController.complainUnlessShared()
+        #if FRAMEJOB_UPDATER
+        // Sparkle, Distribution only (spec §11 PUB-7; AppDelegate+Updates.swift).
+        startUpdater()
+        #endif
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -203,6 +207,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // exactly while the bundle holds one (road map 10's G5b).
             return FileManager.default.fileExists(atPath: GraphicStore.bundledReferenceURL.path)
         }
+        #if FRAMEJOB_UPDATER
+        if item.action == #selector(checkForUpdates(_:)) {
+            // Frame Job ▸ Check for Updates… (spec §11 PUB-7) is live while
+            // Sparkle can start a check (not during one already running).
+            return Self.updaterController.updater.canCheckForUpdates
+        }
+        #endif
         return true
     }
 

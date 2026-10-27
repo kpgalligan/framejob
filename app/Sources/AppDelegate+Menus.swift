@@ -94,6 +94,11 @@ extension AppDelegate {
     private func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Frame Job")
         menu.addItem(item("About Frame Job", #selector(AppDelegate.showAboutPanel(_:))))
+        #if FRAMEJOB_UPDATER
+        // Sparkle, in the published build only (spec §11 PUB-7);
+        // AppDelegate+Updates.swift implements it.
+        menu.addItem(item("Check for Updates…", #selector(AppDelegate.checkForUpdates(_:))))
+        #endif
         menu.addItem(.separator())
         // Road map 6 §5d: the app's first window for something PERSISTED,
         // in the place macOS puts one. ⌘, is unclaimed by spec §9's table —

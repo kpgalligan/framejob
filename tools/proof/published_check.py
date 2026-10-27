@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The app the publish workflow is about to pack: what notarization does not look at.
 
-`.github/workflows/publish.yml` (spec §11 PUB-1..PUB-5) archives the
+`.github/workflows/publish.yml` (spec §11 PUB-1..PUB-9) archives the
 Distribution configuration with a Developer ID identity, EXPORTS the archive
 — which signs the app again — and runs this over the exported `Frame Job.app`
 before it builds the DMG. Apple's notary refuses a missing hardened runtime,
@@ -19,7 +19,13 @@ broken or wrong app in a DMG that notarizes cleanly:
 * `framejob-mcp` missing or holding an entitlement it has no use for;
 * the catalog snapshot missing, at another version than the bundle's, or
   naming a dev tool;
-* the bundle's two version numbers not the ones the workflow computed.
+* the bundle's two version numbers not the ones the workflow computed;
+* the updater (spec §11 PUB-6..PUB-9) broken or unsigned: Sparkle.framework
+  missing or signed by another team than the app (library validation refuses
+  it), a helper inside it without the hardened runtime, the feed not the one
+  `project.yml` sets for Distribution, the EdDSA public key not 32 bytes of
+  base64 (empty until the owner's key lands, PUB-8), or the updater's code
+  not compiled in.
 
 `make dist` runs it too, over the Distribution build and with no `--version`
 or `--build` (P15 and P16 then hold the SHAPE of the two numbers), so the
@@ -29,8 +35,8 @@ needle, `codesign`, the snapshot — so the two scripts cannot disagree about
 what a row means. It has no positive control for the needle (P3): that is
 `dist_check.py`'s D4, which needs a Release bundle the workflow never builds.
 
-Rows, none ever skipped; the last line is `published_check: <passed>/16`
-and the exit is 0 only at 16/16:
+Rows, none ever skipped; the last line is `published_check: <passed>/21`
+and the exit is 0 only at 21/21:
 
 * P1  the needle reads from the seam (`dist_check.read_needle`);
 * P2  the app's binary exists; P3 it does not hold the needle;
@@ -43,7 +49,15 @@ and the exit is 0 only at 16/16:
 * P14 the snapshot names no dev tool;
 * P15 `CFBundleShortVersionString` is `--version`, or without one is two or
   three dot-separated integers;
-* P16 `CFBundleVersion` is `--build`, or without one is an integer.
+* P16 `CFBundleVersion` is `--build`, or without one is an integer;
+* P17 Sparkle.framework is present, signed with the app binary's team
+  (`dist_check.sparkle_framework`, D28's check);
+* P18 every other Mach-O under it is signed with the hardened runtime and
+  verifies strictly (`dist_check.sparkle_helpers`, D29's);
+* P19 `SUFeedURL` is Distribution's `RC_SPARKLE_FEED_URL` in `project.yml`
+  (D30's);
+* P20 `SUPublicEDKey` is strict base64 of exactly 32 bytes (D31's);
+* P21 the binary holds `SPUStandardUpdaterController` (D33's).
 
 Made to fail on purpose: `tools/proof/README.md`'s section for this script.
 
@@ -59,7 +73,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dist_check  # noqa: E402  (its readers; its rows are not run)
 
-TOTAL = 16
+TOTAL = 21
 SHORT_VERSION = re.compile(r"^[0-9]+\.[0-9]+(\.[0-9]+)?$")
 BUILD = re.compile(r"^[0-9]+$")
 
@@ -99,8 +113,9 @@ def main():
     app = arguments.app
 
     needle, needle_reason = dist_check.read_needle()
-    print("spec §11 PUB-4 — the app about to be packed: no dev tools, each binary's "
-          "entitlements, the MCP proxy and its snapshot, the version numbers\n")
+    print("spec §11 PUB-4 and PUB-6..PUB-9 — the app about to be packed: no dev tools, each "
+          "binary's entitlements, the MCP proxy and its snapshot, the version numbers, the "
+          "updater\n")
     print(f"  needle: {needle.decode('ascii') if needle else '(none)'}")
     print(f"  app:    {os.path.abspath(app)}\n")
 
@@ -204,6 +219,35 @@ def main():
         check(f"P16 CFBundleVersion is an integer ({build})",
               isinstance(build, str) and BUILD.match(build) is not None,
               why or f"it is {build!r}")
+
+    ok, detail = dist_check.sparkle_framework(app)
+    check("P17 the app holds Sparkle.framework, signed with the app's team",
+          ok, "" if ok else detail)
+    ok, detail = dist_check.sparkle_helpers(app)
+    check("P18 every helper in Sparkle.framework is signed with the hardened runtime"
+          + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+    want, want_reason = dist_check.feed_url()
+    keys, keys_where = dist_check.updater_keys(app)
+    name = "P19 SUFeedURL is Distribution's RC_SPARKLE_FEED_URL"
+    if want is None:
+        check(name, False, want_reason)
+    elif keys is None:
+        check(name, False, keys_where)
+    else:
+        check(name, keys["SUFeedURL"] == want,
+              f"SUFeedURL {keys['SUFeedURL']!r} in {keys_where}; project.yml's is {want!r}")
+    name = "P20 SUPublicEDKey is base64 of exactly 32 bytes"
+    if keys is None:
+        check(name, False, keys_where)
+    else:
+        ok, detail = dist_check.public_key_ok(keys["SUPublicEDKey"])
+        check(name, ok, detail)
+    name = "P21 the app's binary holds SPUStandardUpdaterController"
+    if binary is None:
+        check(name, False, "no binary (P2)")
+    else:
+        count = binary.count(dist_check.UPDATER_NEEDLE)
+        check(name, count > 0, f"0 occurrences in {where}")
 
     print(f"\npublished_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1
