@@ -2408,7 +2408,8 @@ free.
   nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
-  +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`) · `CameraDevices.swift` · `CameraCapture.swift`
+  +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`, +`CameraBeside`,
+  +`CameraBesideFinishing`) · `ScreenFrameWatch.swift` · `CameraDevices.swift` · `CameraCapture.swift`
   (+`WarmUp`) — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
@@ -2450,7 +2451,15 @@ free.
   does (`adopting: mayAsk`): its start's
   completion is the one retained closure that holds its object strongly, by
   design; `RecordingSetup+Camera.swift` the camera's stem, grant read,
-  refusal and the press's camera step.
+  refusal and the press's camera step. **A camera BESIDE the screen**
+  (CR3a, spec §11 CAM-9) rides the screen's `session`: one
+  `<movie stem> (Camera).mov` per segment, closed at a pause and opened at a
+  resume with the screen's output, its arming and launch turn, writers and
+  reports in `+CameraBeside`, each landed segment's camera half and offset in
+  `+CameraBesideFinishing`; `ScreenFrameWatch.swift` is the `.screen` stream
+  output that finds E2, on the stream only with a camera and removed and
+  re-added around a resume's new recording output. A camera failure is never
+  the recording's.
 - `RecordingLanding.swift` (+`Placement`, +`Microphone`, +`Remainder`,
   +`Placing`, +`LeftOut`, +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
@@ -3143,10 +3152,12 @@ main hop), the waveform tap's main hop (`WaveformTaps.finished` →
 recorder's two (`CameraCapture.sessionQueue` — one static queue shared by
 every capture — for the configuration lock, `startRunning`, `stopRunning`
 and the unlock; `CameraCapture.sampleQueue`, the data output's delegate queue
-and the only place the armed writer and the warm-up are touched), and — not a
+and the only place the armed writer and the warm-up are touched), the screen
+frame watch's sample handler queue (`ScreenFrameWatch.queue`, the `.screen`
+output's, with everything it shares with main under its `lock`; CAM-9), and — not a
 queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). Beyond the camera's
-two, the recorder adds NO queue of its own:
+two and the frame watch's, the recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)

@@ -10,7 +10,9 @@
 // rebuilds, a tool start beside a prepared capture and a thrown prepare
 // (granted G8 re-aimed, G11–G15); CR2c (CAM-8): hot-plug — the selection
 // rule (V22), the observers and the pending rebuild on the hidden panel
-// (panel P16a–e, P17).
+// (panel P16a–e, P17); CR3a (CAM-9): a camera beside the screen — the
+// frame watch, the offset, the finishing's wait, the settle and the names
+// (`beside` B1–B3, B5–B7) and a real screen + camera recording (`screen`).
 // Compiled AS `main.swift` beside every file of
 // app/Sources (but its own main.swift) through `swift_build.build`, with an
 // Info.plist section holding the camera's and the microphone's usage strings;
@@ -21,6 +23,7 @@
 
 import AVFoundation
 import AppKit
+import ScreenCaptureKit
 
 var probeRows: [[String: Any]] = []
 var probeFacts: [String: Any] = [:]
@@ -1616,6 +1619,534 @@ func toolRows(_ request: [String: Any]) {
                 + "\(screenNotes)")
 }
 
+// MARK: - beside (CR3a, spec §11 CAM-9)
+
+/// The answers a watch gave, by segment, in order.
+var watchAnswers: [Int: [Double]] = [:]
+
+func ask(_ watch: ScreenFrameWatch, _ segment: Int, _ host: Double) {
+    watch.firstComplete(for: segment, atOrAfter: host) { watchAnswers[segment, default: []].append($0) }
+}
+
+/// B1: `ScreenFrameWatch` — the bound, the lookback, a later frame, an
+/// incomplete frame, a frame past the bound, a dropped question, the frames
+/// kept, and `stop()`.
+func besideWatchRow() {
+    var checks: [(String, Bool)] = []
+    let b60 = ScreenFrameWatch.bound(rate: 60), b0 = ScreenFrameWatch.bound(rate: 0)
+    checks.append(("bound(rate: 60) \(b60) = 1/30", b60 == 1.0 / 30))
+    checks.append(("bound(rate: 0) \(b0) = 2", b0 == 2))
+    checks.append(("keptSeconds \(ScreenFrameWatch.keptSeconds) = 2", ScreenFrameWatch.keptSeconds == 2))
+    let e1 = 1000.0
+    let a = ScreenFrameWatch(bound: b60)
+    a.record(pts: e1 - 0.020, complete: true)
+    a.record(pts: e1 + 0.004, complete: false)
+    a.record(pts: e1 + 0.010, complete: true)
+    ask(a, 0, e1)
+    probeSpin(0.1)
+    checks.append(("lookback at E1 → \(watchAnswers[0] ?? []) (want [E1 + 10 ms])",
+                   watchAnswers[0] == [e1 + 0.010]))
+    ask(a, 1, e1 + 1)
+    probeSpin(0.1)
+    let waited = watchAnswers[1] == nil
+    a.record(pts: e1 + 1.005, complete: true)
+    probeSpin(0.1)
+    checks.append(("a question past every kept frame waited \(waited), then → \(watchAnswers[1] ?? []) "
+                   + "(want [+5 ms])", waited && watchAnswers[1] == [e1 + 1.005]))
+    ask(a, 2, e1 + 2)
+    a.record(pts: e1 + 2.004, complete: false)
+    probeSpin(0.1)
+    let incomplete = watchAnswers[2] == nil
+    a.record(pts: e1 + 2.010, complete: true)
+    probeSpin(0.1)
+    checks.append(("an incomplete frame answered nothing \(incomplete), the next complete → "
+                   + "\(watchAnswers[2] ?? []) (want [+10 ms])",
+                   incomplete && watchAnswers[2] == [e1 + 2.010]))
+    ask(a, 3, e1 + 3)
+    a.record(pts: e1 + 3.040, complete: true)
+    probeSpin(0.1)
+    let past = watchAnswers[3] == nil
+    a.record(pts: e1 + 3.050, complete: true)
+    probeSpin(0.1)
+    checks.append(("a complete frame 40 ms past E1 answered nothing \(past), nor one after it "
+                   + "\(watchAnswers[3] == nil)", past && watchAnswers[3] == nil))
+    let d = ScreenFrameWatch(bound: b60)
+    ask(d, 5, e1 + 4)
+    ask(d, 6, e1 + 4)
+    d.drop(segment: 5)
+    d.record(pts: e1 + 4.005, complete: true)
+    ask(d, 7, e1 + 4)
+    d.drop(segment: 7)
+    probeSpin(0.1)
+    checks.append(("after drop(segment: 5) → \(watchAnswers[5] ?? []), segment 6 → "
+                   + "\(watchAnswers[6] ?? []); an answer on its way dropped → \(watchAnswers[7] ?? [])",
+                   watchAnswers[5] == nil && watchAnswers[6] == [e1 + 4.005] && watchAnswers[7] == nil))
+    let k = ScreenFrameWatch(bound: b60)
+    k.record(pts: e1, complete: true)
+    k.record(pts: e1 + 2.5, complete: true)
+    ask(k, 8, e1 - 0.001)
+    probeSpin(0.1)
+    checks.append(("a frame 2.5 s older than the newest is gone: → \(watchAnswers[8] ?? [])",
+                   watchAnswers[8] == nil))
+    let s = ScreenFrameWatch(bound: b60)
+    ask(s, 9, e1)
+    s.stop()
+    s.record(pts: e1 + 0.005, complete: true)
+    ask(s, 10, e1)
+    probeSpin(0.1)
+    checks.append(("after stop() → \(watchAnswers[9] ?? []), a question after it → "
+                   + "\(watchAnswers[10] ?? [])", watchAnswers[9] == nil && watchAnswers[10] == nil))
+    probeRow("B1", checks.allSatisfy(\.1), checks.map { "\($0.0) \($0.1)" }.joined(separator: "; "))
+}
+
+/// B2: `cameraBesideOffset` — E2, E1, the arrivals, 0, and the sign.
+func besideOffsetRow() {
+    func ticks(_ seconds: Double) -> Ticks { Ticks((seconds * Double(ReelTime.perSecond)).rounded()) }
+    let screenAt = Date(timeIntervalSince1970: 1_000)
+    var checks: [(String, Bool)] = []
+    let e2 = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: 100.050, firstFrame: 100.020, screenHost: 100.010,
+        cameraArrived: screenAt.addingTimeInterval(-1), screenArrived: screenAt)
+    checks.append(("E2 \(e2) (want \(ticks(100.050 - 100.020)))", e2 == ticks(100.050 - 100.020)))
+    let e1 = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: 100.050, firstFrame: nil, screenHost: 100.010,
+        cameraArrived: screenAt.addingTimeInterval(-1), screenArrived: screenAt)
+    checks.append(("E1 \(e1) (want \(ticks(100.050 - 100.010)))", e1 == ticks(100.050 - 100.010)))
+    let arrival = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: nil, firstFrame: 100.020, screenHost: 100.010,
+        cameraArrived: screenAt.addingTimeInterval(0.25), screenArrived: screenAt)
+    let hostless = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: 100.050, firstFrame: nil, screenHost: nil,
+        cameraArrived: screenAt.addingTimeInterval(0.25), screenArrived: screenAt)
+    checks.append(("arrivals \(arrival), \(hostless) without a screen host stamp (want \(ticks(0.25)))",
+                   arrival == ticks(0.25) && hostless == ticks(0.25)))
+    let none = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: nil, firstFrame: nil, screenHost: nil, cameraArrived: nil, screenArrived: screenAt)
+    checks.append(("nothing \(none) (want 0)", none == 0))
+    let before = ScreenRecorder.cameraBesideOffset(
+        cameraPTS: 99.900, firstFrame: 100.000, screenHost: 99.990, cameraArrived: nil,
+        screenArrived: nil)
+    checks.append(("a camera begun 100 ms before E2 \(before) (want \(ticks(-0.1)), negative)",
+                   before == ticks(99.900 - 100.000) && before < 0))
+    probeRow("B2", checks.allSatisfy(\.1), checks.map { "\($0.0) \($0.1)" }.joined(separator: "; "))
+}
+
+/// A hand-built screen session over `movies`, never started — the
+/// recording probe's `Fake`: `SCContentFilter()` and the stream and its
+/// outputs construct without a grant; only `startCapture` needs one.
+func besideSession(
+    _ recorder: ScreenRecorder, _ movies: [URL], folder: URL,
+    onFinish: @escaping (Result<RecordingResult, Error>) -> Void = { _ in }
+) -> ScreenRecorder.Session {
+    var choice = RecordingChoice()
+    choice.folder = folder
+    let size = CGSize(width: 16, height: 16)
+    let configs = RecordingConfiguration.make(
+        choice, displayPointSize: size, scale: 1, outputURL: movies[0])
+    let stream = SCStream(filter: SCContentFilter(), configuration: configs.stream, delegate: recorder)
+    let now = Date()
+    let segments = movies.map { movie -> ScreenRecorder.Segment in
+        let made = RecordingConfiguration.make(choice, displayPointSize: size, scale: 1, outputURL: movie)
+        var segment = ScreenRecorder.Segment(
+            movieURL: movie, micURL: nil,
+            output: SCRecordingOutput(configuration: made.output, delegate: recorder), addedAt: now)
+        segment.screenStartedAt = now
+        segment.stoppedAt = now.addingTimeInterval(1)
+        segment.screenFinished = true
+        return segment
+    }
+    return ScreenRecorder.Session(
+        choice: choice, mayAsk: false, displayPointSize: size, scale: 1, stream: stream,
+        micSession: nil, micOutput: nil, calledAt: now, onFinish: onFinish, segments: segments)
+}
+
+/// B3: `allFinished` waits for a camera writer beside the screen.
+func besideFinishedRow(_ folder: URL) {
+    let recorder = ScreenRecorder()
+    var session = besideSession(recorder, [folder.appendingPathComponent("B3.mov")], folder: folder)
+    let plain = session.allFinished
+    session.segments[0].screenFinished = false
+    let unfinishedScreen = session.allFinished
+    session.segments[0].screenFinished = true
+    session.segments[0].camera = ScreenRecorder.CameraBesideSegment(
+        url: folder.appendingPathComponent("B3 (Camera).mov"))
+    let open = session.allFinished
+    session.segments[0].camera?.finished = true
+    let closed = session.allFinished
+    probeRow("B3", plain && !unfinishedScreen && !open && closed,
+             "no camera, screen finished \(plain) (want true), screen unfinished \(unfinishedScreen) "
+                + "(want false); a camera writer unfinished \(open) (want false), finished \(closed) "
+                + "(want true)")
+}
+
+/// B5: `settle()` on a hand-built `.finishing` session over ffmpeg fixtures:
+/// (0) the camera wrote, with host stamps; (1) a writer with no buffer; (2) a
+/// writer failure; (3) a garbage screen movie, left out.
+func besideSettleRow(_ request: [String: Any], _ folder: URL) {
+    let manager = FileManager.default
+    let screen = URL(fileURLWithPath: request["screen"] as? String ?? "")
+    let cameraFixture = URL(fileURLWithPath: request["camera"] as? String ?? "")
+    let garbage = URL(fileURLWithPath: request["garbage"] as? String ?? "")
+    var movies: [URL] = []
+    var cameras: [URL] = []
+    for index in 0..<4 {
+        let movie = folder.appendingPathComponent("B5 Recording \(index).mov")
+        cameras.append(RecordingFiles.cameraURL(beside: movie))
+        try? manager.copyItem(at: index == 3 ? garbage : screen, to: movie)
+        movies.append(movie)
+    }
+    for index in [0, 2, 3] { try? manager.copyItem(at: cameraFixture, to: cameras[index]) }
+    let recorder = ScreenRecorder()
+    var finished: Result<RecordingResult, Error>?
+    var session = besideSession(recorder, movies, folder: folder) { finished = $0 }
+    let pts = 500.040, e2 = 500.012
+    session.segments[0].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[0], startedAt: Date(), pts: pts, screenHost: 500.000, firstFrame: e2,
+        finished: true, wrote: true)
+    session.segments[1].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[1], finished: true, wrote: false)
+    session.segments[2].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[2], finished: true, wrote: true, failure: "The camera recording failed: probe.")
+    session.segments[3].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[3], finished: true, wrote: true)
+    let camera = RecordingCamera(
+        name: "Probe Camera", format: "1760x1328@30", problem: nil, note: "probe note")
+    session.camera = camera
+    recorder.session = session
+    recorder.state = .finishing
+    recorder.settle()
+    probeSpin(60) { finished != nil }
+    guard case .success(let result) = finished else {
+        probeRow("B5", false, "settle answered \(String(describing: finished))")
+        return
+    }
+    let want = Ticks(((pts - e2) * Double(ReelTime.perSecond)).rounded())
+    var checks: [(String, Bool)] = []
+    checks.append(("\(result.segments.count) landed, \(result.unreadable.count) left out (want 3, 1)",
+                   result.segments.count == 3 && result.unreadable.count == 1))
+    if result.segments.count == 3 {
+        let s0 = result.segments[0], s1 = result.segments[1], s2 = result.segments[2]
+        let d0 = s0.cameraDescriptor
+        checks.append(("(0) camera \(d0?.path == cameras[0].path) \(d0?.width ?? 0)×\(d0?.height ?? 0), "
+                       + "offset \(s0.cameraOffset) (want \(want), the PTS minus E2), problem "
+                       + "\(s0.cameraProblem ?? "nil")",
+                       d0?.path == cameras[0].path && d0?.width == 1760 && d0?.height == 1328
+                        && s0.cameraOffset == want && s0.cameraProblem == nil))
+        checks.append(("(1) no buffer: descriptor \(s1.cameraDescriptor?.path ?? "nil"), problem "
+                       + "\(s1.cameraProblem ?? "nil"), offset \(s1.cameraOffset)",
+                       s1.cameraDescriptor == nil && s1.cameraProblem == nil && s1.cameraOffset == 0))
+        checks.append(("(2) failure: descriptor \(s2.cameraDescriptor?.path ?? "nil"), problem "
+                       + "\(s2.cameraProblem ?? "nil")",
+                       s2.cameraDescriptor == nil
+                        && (s2.cameraProblem ?? "").contains("probe.")
+                        && (s2.cameraProblem ?? "").contains(cameras[2].path)))
+    }
+    let kept = result.unreadable.first?.keptFiles ?? []
+    checks.append(("(3) left out, kept \(kept.map { ($0 as NSString).lastPathComponent })",
+                   result.unreadable.first?.moviePath == movies[3].path
+                    && kept.contains(movies[3].path) && kept.contains(cameras[3].path)))
+    checks.append(("the result's camera \(String(describing: result.camera)) as set",
+                   result.camera == camera))
+    probeRow("B5", checks.allSatisfy(\.1), checks.map { "\($0.0) \($0.1)" }.joined(separator: "; "))
+}
+
+/// B6: `cameraURL(beside:)` and `namingFiles` with cameras.
+func besideNamesRow(_ folder: URL) {
+    let manager = FileManager.default
+    let movie = folder.appendingPathComponent("B6 Recording.mov")
+    let first = RecordingFiles.cameraURL(beside: movie)
+    manager.createFile(atPath: first.path, contents: Data())
+    let second = RecordingFiles.cameraURL(beside: movie)
+    var checks: [(String, Bool)] = []
+    checks.append(("\(first.lastPathComponent), then \(second.lastPathComponent)",
+                   first.lastPathComponent == "B6 Recording (Camera).mov"
+                    && second.lastPathComponent == "B6 Recording (Camera) (2).mov"
+                    && first.deletingLastPathComponent().path == folder.path))
+    let movies = [0, 1].map { folder.appendingPathComponent("B6 Named \($0).mov") }
+    let recorder = ScreenRecorder()
+    var session = besideSession(recorder, movies, folder: folder)
+    var files: [String] = []
+    for (index, movie) in movies.enumerated() {
+        let camera = RecordingFiles.cameraURL(beside: movie)
+        manager.createFile(atPath: movie.path, contents: Data())
+        manager.createFile(atPath: camera.path, contents: Data())
+        session.segments[index].camera = ScreenRecorder.CameraBesideSegment(url: camera)
+        files += [movie.path, camera.path]
+    }
+    let named = ScreenRecorder.namingFiles(.finishFailed("Probe."), session).localizedDescription
+    let want = "Probe. The recording is at " + files.joined(separator: ", ") + "."
+    checks.append(("namingFiles \(named)", named == want))
+    probeRow("B6", checks.allSatisfy(\.1), checks.map { "\($0.0) \($0.1)" }.joined(separator: "; "))
+}
+
+/// B7: a segment whose frame watch could not go back on the stream at its
+/// resume (`watchFailure`, CAM-9 (6)) — the throw itself no faked stream can
+/// reach — is placed by E1: its did-start asks the watch nothing, and the
+/// settle's offset is the PTS minus E1 with the fallback in its `cameraNote`.
+func besideFallbackRow(_ request: [String: Any], _ folder: URL) {
+    let manager = FileManager.default
+    let screen = URL(fileURLWithPath: request["screen"] as? String ?? "")
+    let cameraFixture = URL(fileURLWithPath: request["camera"] as? String ?? "")
+    var movies: [URL] = []
+    var cameras: [URL] = []
+    for index in 0..<2 {
+        let movie = folder.appendingPathComponent("B7 Recording \(index).mov")
+        cameras.append(RecordingFiles.cameraURL(beside: movie))
+        try? manager.copyItem(at: screen, to: movie)
+        try? manager.copyItem(at: cameraFixture, to: cameras[index])
+        movies.append(movie)
+    }
+    var checks: [(String, Bool)] = []
+    // The did-start: a complete frame 10 ms after each E1 is kept; only
+    // the segment whose watch is on asks for it.
+    let asking = ScreenRecorder()
+    var live = besideSession(asking, movies, folder: folder)
+    let watch = ScreenFrameWatch(bound: ScreenFrameWatch.bound(rate: 60))
+    live.frameWatch = watch
+    for index in 0..<2 {
+        live.segments[index].camera = ScreenRecorder.CameraBesideSegment(url: cameras[index])
+    }
+    live.segments[1].camera?.watchFailure = "probe re-add"
+    asking.session = live
+    asking.state = .recording
+    watch.record(pts: 300.010, complete: true)
+    watch.record(pts: 300.110, complete: true)
+    asking.screenDidStart(at: 0, host: 300.000)
+    asking.screenDidStart(at: 1, host: 300.100)
+    _ = probeSpin(0.3)
+    let on = asking.session?.segments[0].camera, off = asking.session?.segments[1].camera
+    checks.append(("watch on: E1 \(on?.screenHost.map { "\($0)" } ?? "nil"), E2 "
+                   + "\(on?.firstFrame.map { "\($0)" } ?? "nil") (want 300.0, 300.01)",
+                   on?.screenHost == 300.000 && on?.firstFrame == 300.010))
+    checks.append(("watch not re-added: E1 \(off?.screenHost.map { "\($0)" } ?? "nil"), E2 "
+                   + "\(off?.firstFrame.map { "\($0)" } ?? "nil") (want 300.1, nil; 300.11 kept)",
+                   off?.screenHost == 300.100 && off?.firstFrame == nil))
+    watch.stop()
+    asking.session = nil
+    asking.state = .idle
+    // The settle: the same two segments, written and closed.
+    let recorder = ScreenRecorder()
+    var finished: Result<RecordingResult, Error>?
+    var session = besideSession(recorder, movies, folder: folder) { finished = $0 }
+    let pts = 400.040, e1 = 400.000, e2 = 300.012
+    session.segments[0].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[0], startedAt: Date(), pts: 300.040, screenHost: 300.000, firstFrame: e2,
+        finished: true, wrote: true)
+    session.segments[1].camera = ScreenRecorder.CameraBesideSegment(
+        url: cameras[1], startedAt: Date(), pts: pts, screenHost: e1, finished: true, wrote: true,
+        watchFailure: "probe re-add")
+    session.camera = RecordingCamera(name: "Probe Camera", format: "1760x1328@30", problem: nil, note: nil)
+    recorder.session = session
+    recorder.state = .finishing
+    recorder.settle()
+    _ = probeSpin(60) { finished != nil }
+    guard case .success(let result) = finished, result.segments.count == 2 else {
+        probeRow("B7", false, "settle answered \(String(describing: finished))")
+        return
+    }
+    let s0 = result.segments[0], s1 = result.segments[1]
+    let want0 = Ticks(((300.040 - e2) * Double(ReelTime.perSecond)).rounded())
+    let want1 = Ticks(((pts - e1) * Double(ReelTime.perSecond)).rounded())
+    checks.append(("(0) watch on: offset \(s0.cameraOffset) (want \(want0), PTS − E2), note "
+                   + "\(s0.cameraNote ?? "nil") (want nil)",
+                   s0.cameraDescriptor != nil && s0.cameraOffset == want0 && s0.cameraNote == nil))
+    let note = s1.cameraNote ?? ""
+    checks.append(("(1) not re-added: offset \(s1.cameraOffset) (want \(want1), PTS − E1), note "
+                   + "\(s1.cameraNote ?? "nil")",
+                   s1.cameraDescriptor != nil && s1.cameraOffset == want1
+                    && note.contains("did-start") && note.contains("probe re-add")
+                    && s1.cameraProblem == nil))
+    probeRow("B7", checks.allSatisfy(\.1), checks.map { "\($0.0) \($0.1)" }.joined(separator: "; "))
+}
+
+func beside(_ request: [String: Any]) {
+    NSApplication.shared.setActivationPolicy(.prohibited)
+    let folder = URL(fileURLWithPath: request["work"] as? String ?? NSTemporaryDirectory())
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    besideWatchRow()
+    besideOffsetRow()
+    besideFinishedRow(folder)
+    besideSettleRow(request, folder)
+    besideNamesRow(folder)
+    besideFallbackRow(request, folder)
+}
+
+// MARK: - screen (CR3a G16)
+
+/// A 200 pt window on the main display whose colour changes every 1/60 s, so
+/// the stream keeps sending complete frames.
+final class FlashWindow: NSObject {
+    let window: NSWindow
+    var timer: Timer?
+    var ticks = 0
+
+    override init() {
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let visible = screen.visibleFrame
+        window = NSWindow(
+            contentRect: NSRect(x: visible.minX + 48, y: visible.maxY - 248, width: 200, height: 200),
+            styleMask: [.borderless], backing: .buffered, defer: false)
+        window.level = .screenSaver
+        window.isOpaque = true
+        window.ignoresMouseEvents = true
+        window.isReleasedWhenClosed = false
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+        view.wantsLayer = true
+        window.contentView = view
+        super.init()
+    }
+
+    func start() {
+        window.orderFrontRegardless()
+        let made = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(made, forMode: .common)
+        timer = made
+    }
+
+    func tick() {
+        ticks += 1
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let hue = CGFloat(ticks % 60) / 60
+        window.contentView?.layer?.backgroundColor =
+            NSColor(hue: hue, saturation: 1, brightness: 1, alpha: 1).cgColor
+        CATransaction.commit()
+    }
+
+    func stop() {
+        timer?.invalidate()
+        window.orderOut(nil)
+    }
+}
+
+/// G16: a real screen recording of the main display with the default camera
+/// beside it — 2 s, a 1 s pause, 2 s more — on a fresh `ScreenRecorder()`.
+/// Facts only; the Python side scores them.
+func screenSection(_ request: [String: Any]) {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    app.finishLaunching()
+    guard CGPreflightScreenCaptureAccess() else {
+        probeFacts["skip"] = "CGPreflightScreenCaptureAccess() is false under this process's grant"
+        return
+    }
+    var content: SCShareableContent?
+    var listFailure = ""
+    var answered = false
+    ScreenRecorder.shareableContent { outcome in
+        switch outcome {
+        case .success(let listed): content = listed
+        case .failure(let error): listFailure = error.localizedDescription
+        }
+        answered = true
+    }
+    probeSpin(20) { answered }
+    guard let content, !content.displays.isEmpty else {
+        probeFacts["skip"] = "no shareable display ("
+            + (listFailure.isEmpty ? "the console is locked or every display is asleep" : listFailure) + ")"
+        return
+    }
+    let status = RecordingGrant.cameraStatus
+    guard status == .authorized else {
+        probeFacts["skip"] = "the Camera grant is \(RecordingGrant.name(of: status)); nothing was recorded"
+        return
+    }
+    let facts = CameraDevices.connected().map(CameraDevices.facts(of:))
+    guard
+        let index = CameraDevices.defaultIndex(
+            in: facts, preferredID: AVCaptureDevice.systemPreferredCamera?.uniqueID)
+    else {
+        probeFacts["skip"] = "no camera is connected"
+        return
+    }
+    let camera = facts[index]
+    probeFacts["best"] = CameraDevices.bestFormat(camera.formats, active: camera.activeFormat)
+        .map { CameraDevices.spelled(camera.formats[$0]) } ?? "none"
+    let folder = URL(fileURLWithPath: request["folder"] as? String ?? NSTemporaryDirectory())
+    let filter: SCContentFilter
+    do {
+        try RecordingFiles.create(folder)
+        filter = try ScreenRecorder.filter(
+            for: .display(CGMainDisplayID()), in: content,
+            excluding: RecordingExclusion.make(
+                includeFrameJobWindows: false, ownBundleID: Bundle.main.bundleIdentifier,
+                panelWindowID: nil))
+    } catch {
+        probeFacts["error"] = "\(error)"
+        return
+    }
+    var choice = RecordingChoice()
+    choice.source = .display(CGMainDisplayID())
+    choice.camera = camera.uniqueID
+    choice.folder = folder
+    let micStatus = RecordingGrant.microphoneStatus
+    if micStatus == .authorized { choice.microphone = AVCaptureDevice.default(for: .audio)?.uniqueID }
+    probeFacts["microphone"] = choice.microphone != nil
+    probeFacts["bound"] = ScreenFrameWatch.bound(rate: choice.rate)
+    let flash = FlashWindow()
+    flash.start()
+    probeSpin(0.5)
+    defer { flash.stop() }
+    let recorder = ScreenRecorder()
+    var started: Error??
+    recorder.start(filter: filter, choice: choice, mayAsk: false, onFinish: { _ in }) {
+        started = .some($0)
+    }
+    probeSpin(ScreenRecorder.armCeiling + 5) { started != nil }
+    guard let startAnswer = started else {
+        probeFacts["error"] = "the start did not answer"
+        return
+    }
+    if let startAnswer {
+        probeFacts["error"] = "the start failed: \(startAnswer.localizedDescription)"
+        return
+    }
+    var reads: [[String: Any]] = []
+    func read(_ index: Int) {
+        let camera = recorder.session.flatMap { $0.segments.indices.contains(index) ? $0.segments[index].camera : nil }
+        reads.append([
+            "firstFrame": camera?.firstFrame ?? NSNull(), "screenHost": camera?.screenHost ?? NSNull(),
+            "pts": camera?.pts ?? NSNull(),
+        ])
+    }
+    var steps: [String] = []
+    probeSpin(2)
+    read(0)
+    do { try recorder.pause() } catch { steps.append("pause: \(error.localizedDescription)") }
+    probeSpin(1)
+    do { try recorder.resume() } catch { steps.append("resume: \(error.localizedDescription)") }
+    probeSpin(2)
+    read(1)
+    var finished: Result<RecordingResult, Error>?
+    recorder.stop { finished = $0 }
+    probeSpin(40) { finished != nil }
+    probeFacts["reads"] = reads
+    probeFacts["steps"] = steps
+    probeFacts["flashTicks"] = flash.ticks
+    switch finished {
+    case nil:
+        probeFacts["error"] = "the stop did not answer in 40 s"
+    case .failure(let error):
+        probeFacts["error"] = "the recording failed: \(error.localizedDescription)"
+    case .success(let result):
+        probeFacts["pauses"] = result.pauses
+        probeFacts["stoppedBy"] = "\(result.stoppedBy)"
+        probeFacts["format"] = result.camera?.format ?? "none"
+        probeFacts["problem"] = result.camera?.problem ?? NSNull()
+        probeFacts["note"] = result.camera?.note ?? NSNull()
+        probeFacts["unreadable"] = result.unreadable.map(\.sentence)
+        probeFacts["segments"] = result.segments.map { segment -> [String: Any] in
+            [
+                "movie": segment.descriptor.path,
+                "camera": segment.cameraDescriptor?.path ?? NSNull(),
+                "cameraOffset": Double(segment.cameraOffset) / Double(ReelTime.perSecond),
+                "cameraProblem": segment.cameraProblem ?? NSNull(),
+                "micProblem": segment.micProblem ?? NSNull(),
+            ]
+        }
+    }
+}
+
 // MARK: - main
 
 let arguments = CommandLine.arguments
@@ -1632,6 +2163,8 @@ case "landing": landing(request)
 case "granted": granted(request)
 case "tool": toolRows(request)
 case "panel": panelRows(request)
+case "beside": beside(request)
+case "screen": screenSection(request)
 default:
     FileHandle.standardError.write(Data("unknown section \(arguments[1])\n".utf8))
     exit(2)

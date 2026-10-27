@@ -345,3 +345,74 @@ its code.
      selection, and the failure's step stops that capture once, not at every tick.
   7. **During a recording.** A camera taken away during a recording ends it (CAM-3,
      unchanged); its list change applies at idle.
+
+- **CAM-9 — A camera beside the screen (CR3a), recorded before its code.** `ScreenRecorder.start`
+  with a display, window or picked source and `choice.camera` set also records the camera: one
+  `(Camera).mov` per segment beside the screen's movie, paused and resumed with it, each placed
+  against the screen by E2 (CAM-2's second estimator). The result carries the camera's files and
+  offsets. CAM-3's files, codec and warm-up, CAM-5 (5)'s take and CAM-7 (7)'s adopt rule stand.
+  1. **The start.** The order is `.busy`, the source guards, Screen Recording, then the Camera
+     grant (read, never asked). Then the camera lookup ("No camera with the id … is
+     connected.", `.cameraDevice`) and its format (`chosenFormat`, CAM-6 (3)). Then the
+     Microphone grant and device, the folder, the recording output, the `.screen` frame watch
+     (a throw is `.startFailed`) and the microphone capture. The camera is taken LAST
+     (`takeCameraCapture(…, adopting: mayAsk)`, CAM-5 (5), CAM-7 (7)); a throw there stops an
+     adopted microphone session and refuses. Without a camera `start` is as before: no `.screen`
+     output, the same order.
+  2. **The warm-up comes before the stream.** The state is `.arming` while the capture starts or
+     joins its prepared start. On its answer ONE main turn runs `launchScreen`: the microphone
+     file's `startRecording` (when a microphone was chosen), then `stream.startCapture`, then
+     segment 0's camera writer is armed (CR0: the order of the starts made no measurable
+     difference). Without a camera `start` calls `launchScreen` in its own turn, so road map 3
+     R0 q6b's order is kept. A camera that fails to start, or stops on its own while arming,
+     fails the start with its `.cameraDevice` sentence. The arm ceiling covers the warm-up.
+     `camera.note` is the warm-up's note.
+  3. **E2.** The watch is on the stream only with a camera, built with two frame intervals at
+     the recording's rate as its bound (`2 / rate` seconds: 33.3 ms at 60 fps; CR0's E2 fell
+     9–22 ms after E1). It keeps the PTS (seconds, as delivered; CR0 measured them on the host
+     clock) of every COMPLETE frame for 2 s. Each segment's did-start is stamped on the host
+     clock where it arrives (E1). E2 is the first kept or later complete frame at or after E1
+     and no more than the bound after it. A segment's question is dropped at its close (a pause,
+     the finishing), so a frame of a later segment never answers it. No frame in that window, or
+     none by the close, leaves E2 unset.
+  4. **The offset** is the camera's first buffer's PTS (host clock) minus E2, else minus E1, in
+     ticks; POSITIVE means the camera began after the screen. Without both host stamps it is the
+     first buffer's arrival minus the screen's start (`screenStart(of:)`); without those, 0. A
+     still screen sends no complete frame, so such a segment uses E1, as does a segment whose
+     first complete frame came past the bound.
+  5. **The files.** Each segment's camera is `<screen movie stem> (Camera).mov`, made unique as
+     the microphone's file is, at the format (HEVC else H.264, CAM-3). A resume's candidate name
+     is skipped when its camera file is held.
+  6. **Pause and resume in step.** A pause closes the open segment's camera writer and drops its
+     E2 question; a resume arms the next writer after its output is added. **The watch comes off
+     the stream for a resume's add** (measured at CR3a, amending this rule before its code). With
+     the `.screen` output left on the running stream, every resumed segment's `SCRecordingOutput`
+     reported "Failed due to failure to process first sample buffer" and wrote no movie, in 4 of
+     4 runs of G16; without the output both segments landed in 3 of 3. So `resume()` removes the
+     watch's `.screen` output BEFORE `addRecordingOutput` and adds it back once that add has
+     returned, the new output started (`addRecordingOutput` "Starts Recording if stream is
+     already capturing"). Measured so in a scratch copy, both segments landed in 2 of 2 runs,
+     with E2 − E1 at 12.0 and 17.3 ms, then 19.7 and 21.5 ms. The pause leaves the watch on the
+     stream, as measured. A remove that throws (the watch already off) is ignored. A re-add that
+     throws costs that segment's E2 alone: its camera is placed by E1, the fallback named in
+     that segment's `cameraNote`; the recording never fails over it, and the next resume tries
+     the re-add again.
+  7. **A camera failure is never the recording's.** A camera that stops on its own while
+     recording or paused sets the result's `camera.problem` (CAM-3's sentence) once: its open
+     writer is closed (what it wrote lands), later segments get no camera file, and `stoppedBy`
+     is the screen's. A camera writer that took no buffer leaves its segment without a camera,
+     silently, its file removed (CAM-3). A writer failure, or a camera file that will not probe,
+     is that segment's `cameraProblem`, naming the file when it is on disk (the microphone's
+     rule), and the screen segment still lands. A left-out screen segment's camera file is kept
+     and named in `keptFiles`, not landed.
+  8. **The finishing** drops the open segment's E2 question and waits for every armed camera
+     writer's close under `finishCeiling`. The settle stops the capture and the watch. A
+     failure's sentence names each segment's camera file after its movie. A failed start closes
+     segment 0's camera writer and removes its file unless the screen output had begun writing.
+  9. **The result.** `RecordingResult.camera` (name, format, `problem`, `note`) is set for a
+     screen recording with a camera; `isCamera` stays the source's alone. Each segment carries
+     `cameraDescriptor`, `cameraOffset`, `cameraProblem` and `cameraNote` (the E1 fallback of
+     (6), set only beside a descriptor).
+  10. **No door yet.** CAM-4 (2) and CAM-6 (6) stand: the tool refuses `camera` with source
+      screen, and the panel sets `camera` only for Source Camera. The landing ignores the camera
+      fields until CR3b.

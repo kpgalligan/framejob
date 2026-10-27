@@ -6,7 +6,10 @@ sources; CR1b (CAM-4): `record_screen`'s camera, through the server's own functi
 and CR2b (CAM-7): the preview — its step, its row and well, its layer on the prepared capture —
 and #373 (one session queue every capture shares, `stop(completion:)`); and CR2c (CAM-8): hot-plug —
 the selection rule, the device observers, the pending rebuild applied only at idle, and the failed
-preview's capture stopped once.
+preview's capture stopped once; and CR3a (CAM-9): a camera beside the screen — the `.screen` frame
+watch's E2 (off the stream for a resume's add, a failed re-add's E1 fallback), the camera's offset,
+the finishing's wait, the settle's camera half and the names, and a real screen recording with the
+camera beside it.
 
     python3 tools/proof/camera_recording_probe.py [--sources DIR] [--only SECTIONS] [--mutant NAME]
 
@@ -161,10 +164,55 @@ Sections and rows:
            true` before `syncCameraPreview()`; the `.failed` arm's `stop()` guarded by
            `stopped`; `connected(` and `connectedMicrophones(` filter `isConnected`;
            `rebuildMicrophones(` calls `connectedMicrophones()`.
+  beside   CR3a (CAM-9), no grant, ffmpeg fixtures (a 640×360 30 fps screen `.mov`, a camera
+           `.mov` at 1760×1328 30 fps, a garbage file). B1 `ScreenFrameWatch`: `bound(rate: 60)`
+           = 1/30 and `bound(rate: 0)` = 2, `keptSeconds` 2; on a watch at `bound(rate: 60)`,
+           frames complete at E1 − 20 ms, incomplete at E1 + 4 ms and complete at E1 + 10 ms, a
+           question at E1 answers E1 + 10 ms (the lookback); a question past every kept frame
+           waits and a complete frame 5 ms after it answers; an incomplete frame never answers;
+           a complete frame 40 ms past E1 (none before it) does not answer, nor one after it; a
+           frame after `drop(segment:)` answers the other segment only, and an answer already on
+           its way to main is dropped too; a frame 2.5 s older than the newest is gone; nothing
+           answers after `stop()`. B2 `cameraBesideOffset`: PTS − E2 over contrary arrivals, E1
+           without E2, the arrivals without the camera PTS or without a screen host stamp, 0
+           with nothing, a camera begun before E2 negative. B3 `allFinished` on a hand-built
+           session: no camera as before, a camera writer unfinished false, finished true. B4
+           (Python, comment-stripped): `start(` reads `screenRecordingGranted` before
+           `cameraStatus` and `cameraStatus` before `takeCameraCapture(`; `addStreamOutput(` is
+           in app/Sources exactly twice, inside `start(`'s `if camera != nil {` block and in
+           `resume(` (ScreenRecorder+Pause.swift); `resume(`'s order `removeStreamOutput(` →
+           `addRecordingOutput(` → `addStreamOutput(`, and `pause(` removes nothing;
+           `launchScreen(`'s order `startRecording(` → `startCapture` → `openCameraBeside(`;
+           `cameraBesideStoppedOnItsOwn(` calls `failStart(` once, in its `.arming` arm, and
+           never `beginFinishing(`. B5 `settle()` on a hand-built `.finishing` session (the
+           recording probe's `Fake`: an `SCStream` and its outputs construct without a grant)
+           of four segments: (0) the camera wrote, with host stamps — its descriptor
+           1760×1328, `cameraOffset` exactly the PTS minus E2; (1) `wrote` false — no
+           descriptor, no problem; (2) a writer `failure` — `cameraProblem` naming the file;
+           (3) a garbage screen movie — left out, `keptFiles` holding its camera file; the
+           result's `camera` as set. B6 `cameraURL(beside:)` → `<stem> (Camera).mov`, then
+           ` (2)` with one on disk; `namingFiles` lists each movie, then its camera file. B7
+           the failed re-add's E1 fallback (CAM-9 (6)) on hand-built sessions — the throw no
+           never-started stream reaches (its adds do not throw), so `watchFailure` is set by
+           hand: a segment with it set asks the watch nothing on its did-start (E2 nil while a
+           kept frame 10 ms after E1 answers the other), and the settle places it at PTS − E1
+           with its `cameraNote` naming the failure, the other at PTS − E2 with none.
+  screen   CR3a G16, a real `ScreenRecorder()` on the main display (`.display(CGMainDisplayID())`)
+           with `defaultIndex`'s camera beside it and the default microphone when authorized,
+           `mayAsk` false, while an `.accessory` 200 pt window changes colour every 1/60 s
+           (`.common`) so complete frames keep coming: 2 s, a 1 s pause, 2 s more. Before the
+           pause and the stop each segment's `firstFrame` (E2) and `screenHost` (E1) are read.
+           G16: each E2 found (not its fallback) within `bound` after E1; 2 segments, `pauses`
+           1; each screen `.mov` probed; each camera file `<stem> (Camera).mov`, ≥ 98 % of span ×
+           rate by G3's decode at the format's rate; each |`cameraOffset`| < 0.5 s (printed);
+           `camera.format` CAM-3's best; `camera.problem` nil. Skipped by name without
+           `CGPreflightScreenCaptureAccess()`, a shareable display, the Camera grant or a
+           camera. Never asks for a grant.
 
 Mutants (each a `--mutant` edit of a copy of `--sources`), run by default in the section(s)
 `MUTANT_SECTION` names — `values` unless named; `tool`, `panel`, `granted` (which need the
-camera), or `values,tool` for `format-size-lowest`:
+camera), `values,tool` for `format-size-lowest`, `beside` for CR3a's, and `beside,screen` for
+`no-frame-watch` and `resume-keeps-watch`:
   format-any-shape    no landscape filter                                 → V1
   offset-by-arrival   the PTS ignored                                     → V12a
   offset-sign         the PTS difference negated                          → V12a, V12c
@@ -217,12 +265,24 @@ camera), or `values,tool` for `format-size-lowest`:
   hotplug-while-busy  `applyPendingDevices`' idle guard removed                → P16e
   hotplug-observers-kept  `panelWillClose`'s `stopObservingDevices()` removed  → P17
   failed-stops-every-tick  the `.failed` arm's `stopped` guard removed         → P18
+  e2-incomplete       the watch keeps incomplete frames                        → B1
+  e2-before-threshold  the at-or-after test dropped                            → B1
+  e2-unbounded        the bound test dropped                                   → B1
+  camera-offset-sign  the PTS minus E2 negated                                 → B2
+  camera-offset-e1-only  `firstFrame` ignored                                  → B2
+  finish-ignores-camera  `allFinished`'s camera clause dropped                 → B3
+  camera-fails-screen  the stop handler's recording arm calls `beginFinishing(.systemStopped)` → B4
+  leftout-camera-unkept  `leftOut`'s kept list drops the camera                → B5
+  no-frame-watch      the `addStreamOutput` line deleted                       → B4 (G16 too, granted)
+  resume-keeps-watch  `resume()`'s remove and re-add of the watch deleted     → B4, G16
+  fallback-asks-watch  `screenDidStart`'s `watchFailure` guard deleted         → B7
+  fallback-unnamed    the segment's `cameraNote` always nil                    → B7
 
 Exit (cache_pass_probe.py's rule): a plain run exits 0 iff no row failed (a skip by name is
 not a failure) and 1 when one did; a build failure is B0's FAIL. A `--mutant` run exits 1 when
 every row it names failed (caught), 0 when one passed (survived), and 2 when the control could
 not be performed: a `before` text not found exactly once, the copy did not build, or a named
-row was not scored. No ffmpeg (needed by landing and granted) exits 2.
+row was not scored. No ffmpeg (needed by landing, granted, beside and screen) exits 2.
 """
 import argparse
 import json
@@ -237,7 +297,7 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/camera-recording-probe"
-SECTIONS = ["values", "landing", "granted", "tool", "panel"]
+SECTIONS = ["values", "landing", "granted", "tool", "panel", "beside", "screen"]
 ROWS = {
     "values": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12a", "V12b",
                "V12c", "V12d", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21",
@@ -248,6 +308,8 @@ ROWS = {
     "tool": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"],
     "panel": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13",
               "P14", "P15", "P16a", "P16b", "P16c", "P16d", "P16e", "P17", "P18"],
+    "beside": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
+    "screen": ["G16"],
 }
 SECTION_WALL = 180
 STEM_EPOCH = 1793034873   # 2026-10-26 17:14:33 UTC
@@ -494,6 +556,48 @@ MUTANTS = {
         ("RecorderPanelController+CameraPreview.swift",
          "            if let capture = recorder.preparedCamera?.capture, !capture.stopped { capture.stop() }\n",
          "            recorder.preparedCamera?.capture.stop()\n")]),
+    # CR3a (spec §11 CAM-9): a camera beside the screen, each run with `--only beside`.
+    "e2-incomplete": (["B1"], [
+        ("ScreenFrameWatch.swift", "        guard complete else { return }\n", "        _ = complete\n")]),
+    "e2-before-threshold": (["B1"], [
+        ("ScreenFrameWatch.swift", "        if pts < host { return .before }\n", "")]),
+    "e2-unbounded": (["B1"], [
+        ("ScreenFrameWatch.swift", "        if pts > host + bound { return .past }\n", "")]),
+    "camera-offset-sign": (["B2"], [
+        ("ScreenRecorder+CameraBesideFinishing.swift", "            seconds = cameraPTS - screen\n",
+         "            seconds = screen - cameraPTS\n")]),
+    "camera-offset-e1-only": (["B2"], [
+        ("ScreenRecorder+CameraBesideFinishing.swift", "let screen = firstFrame ?? screenHost {",
+         "let screen = screenHost {")]),
+    "finish-ignores-camera": (["B3"], [
+        ("ScreenRecorder+Pause.swift", "                && ($0.camera?.finished ?? true)\n", "")]),
+    "camera-fails-screen": (["B4"], [
+        ("ScreenRecorder+CameraBeside.swift", "            session?.camera?.problem = sentence\n",
+         "            session?.camera?.problem = sentence\n            beginFinishing(.systemStopped)\n")]),
+    "leftout-camera-unkept": (["B5"], [
+        ("ScreenRecorder+Finishing.swift", "segment.micURL?.path, segment.camera?.url.path]",
+         "segment.micURL?.path]")]),
+    "no-frame-watch": (["B4"], [
+        ("ScreenRecorder.swift",
+         "                try stream.addStreamOutput(made, type: .screen, sampleHandlerQueue: made.queue)\n",
+         "")]),
+    # CAM-9 (6), the orchestrator's ruling after CR3a's STOP: the watch off the stream for a
+    # resume's add, and a failed re-add's E1 fallback.
+    # Both edits: with the remove alone deleted, the re-add after the output's add (a second add
+    # of an output already on the stream) still let G16 pass, once.
+    "resume-keeps-watch": (["B4", "G16"], [
+        ("ScreenRecorder+Pause.swift",
+         "        if let watch = current.frameWatch { try? current.stream.removeStreamOutput(watch, "
+         "type: .screen) }\n", ""),
+        ("ScreenRecorder+Pause.swift",
+         "                try current.stream.addStreamOutput(watch, type: .screen, "
+         "sampleHandlerQueue: watch.queue)\n", "                _ = watch\n")]),
+    "fallback-asks-watch": (["B7"], [
+        ("ScreenRecorder+CameraBeside.swift",
+         "        guard current.segments[index].camera?.watchFailure == nil else { return }\n", "")]),
+    "fallback-unnamed": (["B7"], [
+        ("ScreenRecorder+CameraBesideFinishing.swift", "cameraNote: descriptor == nil ? nil : note)",
+         "cameraNote: nil)")]),
 }
 # The section a mutant runs when `--only` is not given.
 MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
@@ -516,7 +620,13 @@ MUTANT_SECTION = {"no-hold": "granted", "camera-strangers-admitted": "tool",
                   "hotplug-observe-twice": "panel", "hotplug-no-pending-on-observe": "panel",
                   "hotplug-persists": "panel", "hotplug-rebuilds-unchanged": "panel",
                   "hotplug-format-rebuilt": "panel", "hotplug-while-busy": "panel",
-                  "hotplug-observers-kept": "panel", "failed-stops-every-tick": "panel"}
+                  "hotplug-observers-kept": "panel", "failed-stops-every-tick": "panel",
+                  "e2-incomplete": "beside", "e2-before-threshold": "beside",
+                  "e2-unbounded": "beside", "camera-offset-sign": "beside",
+                  "camera-offset-e1-only": "beside", "finish-ignores-camera": "beside",
+                  "camera-fails-screen": "beside", "leftout-camera-unkept": "beside",
+                  "no-frame-watch": "beside,screen", "resume-keeps-watch": "beside,screen",
+                  "fallback-asks-watch": "beside", "fallback-unnamed": "beside"}
 
 
 def run(command, **kw):
@@ -735,6 +845,108 @@ def fixtures(here):
         if done.returncode != 0:
             return None, f"{' '.join(argv[:6])}… exit {done.returncode}: {done.stderr[-200:]}"
     return (movie, voice), None
+
+
+def beside_fixtures(here):
+    """B5's three files: a screen `.mov`, a camera `.mov` at 1760×1328 30 fps (made by ffmpeg) and
+    a garbage file; a dict or None and why."""
+    made = {"screen": here / "beside-screen.mov", "camera": here / "beside-camera.mov",
+            "garbage": here / "beside-garbage.mov"}
+    for argv in (
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30",
+             "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(made["screen"])],
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1760x1328:rate=30",
+             "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(made["camera"])]):
+        done = run(argv, timeout=120)
+        if done.returncode != 0:
+            return None, f"{' '.join(argv[:6])}… exit {done.returncode}: {done.stderr[-200:]}"
+    made["garbage"].write_bytes(b"not a movie " * 512)
+    return {k: str(v) for k, v in made.items()}, None
+
+
+def beside_source_row(sources):
+    """B4 (CR3a, CAM-9): comment-stripped reads of the start's order, the one frame watch, the
+    launch turn's order and the stop handler's arms."""
+    checks = []
+    base = uncommented(sources / "ScreenRecorder.swift")
+    start = body_of(base, "func start(") or ""
+    granted, grant, take = (start.find("screenRecordingGranted"), start.find("cameraStatus"),
+                            start.find("takeCameraCapture("))
+    checks.append((f"start( reads screenRecordingGranted at {granted}, cameraStatus at {grant}, "
+                   f"takeCameraCapture( at {take}", 0 <= granted < grant < take))
+    holders = {}
+    for path in sorted(sources.glob("*.swift")):
+        count = uncommented(path).count("addStreamOutput(")
+        if count:
+            holders[path.name] = count
+    branch = body_of(start[start.find("if camera != nil {"):], "if camera != nil {") or ""
+    paused = uncommented(sources / "ScreenRecorder+Pause.swift")
+    resume = body_of(paused, "func resume(") or ""
+    checks.append((f"addStreamOutput( in {holders}, inside start('s camera branch "
+                   f"{'addStreamOutput(' in branch}, inside resume( {'addStreamOutput(' in resume}",
+                   holders == {"ScreenRecorder.swift": 1, "ScreenRecorder+Pause.swift": 1}
+                   and "addStreamOutput(" in branch and "addStreamOutput(" in resume))
+    lift, add, back = (resume.find("removeStreamOutput("), resume.find("addRecordingOutput("),
+                       resume.find("addStreamOutput("))
+    pause = body_of(paused, "func pause(") or ""
+    checks.append((f"resume( removeStreamOutput( at {lift}, addRecordingOutput( at {add}, "
+                   f"addStreamOutput( at {back}; pause( removes it "
+                   f"{'removeStreamOutput(' in pause}",
+                   0 <= lift < add < back and pause != "" and "removeStreamOutput(" not in pause))
+    beside = uncommented(sources / "ScreenRecorder+CameraBeside.swift")
+    launch = body_of(beside, "func launchScreen(") or ""
+    mic, stream, camera = (launch.find("startRecording("), launch.find("startCapture"),
+                           launch.find("openCameraBeside("))
+    checks.append((f"launchScreen( startRecording( at {mic}, startCapture at {stream}, "
+                   f"openCameraBeside( at {camera}", 0 <= mic < stream < camera))
+    handler = body_of(beside, "func cameraBesideStoppedOnItsOwn(") or ""
+    start_arm = handler.find("case .arming")
+    end_arm = handler.find("case .", start_arm + 1) if start_arm >= 0 else -1
+    arm = handler[start_arm:end_arm] if 0 <= start_arm < end_arm else ""
+    fails = handler.count("failStart(")
+    ends = "beginFinishing(" in handler
+    checks.append((f"cameraBesideStoppedOnItsOwn( failStart( {fails}× , in the .arming arm "
+                   f"{'failStart(' in arm}, beginFinishing( {ends}",
+                   fails == 1 and "failStart(" in arm and not ends))
+    return (all(ok for _, ok in checks), "; ".join(f"{what} {ok}" for what, ok in checks))
+
+
+def screen_rows(facts):
+    """G16 (CR3a, CAM-9) from the screen section's facts: (state, detail)."""
+    if facts.get("skip"):
+        return ("skip", facts["skip"])
+    if facts.get("error"):
+        return (False, facts["error"])
+    bound = facts.get("bound") or 0
+    reads = facts.get("reads") or []
+    found = [r.get("firstFrame") is not None and r.get("screenHost") is not None
+             and 0 <= r["firstFrame"] - r["screenHost"] <= bound for r in reads]
+    lags = [None if r.get("firstFrame") is None or r.get("screenHost") is None
+            else round((r["firstFrame"] - r["screenHost"]) * 1000, 1) for r in reads]
+    segments = facts.get("segments") or []
+    match = re.match(r"^(\d+)x(\d+)@([\d.]+)$", facts.get("format") or "")
+    rate = float(match[3]) if match else 0
+    named, ratios, offsets = [], [], []
+    for s in segments:
+        movie, camera = s.get("movie") or "", s.get("camera")
+        named.append(camera is not None and os.path.basename(camera)
+                     == os.path.basename(movie)[:-4] + " (Camera).mov")
+        ratio, m = decoded_ratio(camera, rate) if camera else (None, None)
+        ratios.append(ratio)
+        offsets.append(s.get("cameraOffset"))
+    ok = (len(reads) == 2 and all(found) and len(segments) == 2 and facts.get("pauses") == 1
+          and all(os.path.exists(s.get("movie") or "") for s in segments) and all(named)
+          and all(r is not None and r >= FRAMES_PASS for r in ratios)
+          and all(o is not None and abs(o) < 0.5 for o in offsets)
+          and facts.get("format") == facts.get("best") and facts.get("problem") is None
+          and not facts.get("unreadable"))
+    return (ok, f"E2 − E1 ms {lags} (bound {bound * 1000:.1f} ms); segments {len(segments)}, pauses "
+                f"{facts.get('pauses')}, stoppedBy {facts.get('stoppedBy')}; camera files named "
+                f"{named}, frames/span×rate {ratios}; cameraOffset s {offsets}; format "
+                f"{facts.get('format')} (best {facts.get('best')}); problem {facts.get('problem')}; "
+                f"note {facts.get('note')}; camera problems "
+                f"{[s.get('cameraProblem') for s in segments]}; left out {facts.get('unreadable')}; "
+                f"steps {facts.get('steps')}; flash ticks {facts.get('flashTicks')}")
 
 
 def movie_facts(path):
@@ -1000,8 +1212,9 @@ def main():
     if unknown:
         print("unknown section " + ", ".join(unknown))
         return 2
-    if {"landing", "granted"} & set(wanted) and not shutil.which("ffmpeg"):
-        print("instrument failure: ffmpeg is not on PATH (landing and granted need it)")
+    if {"landing", "granted", "beside", "screen"} & set(wanted) and not shutil.which("ffmpeg"):
+        print("instrument failure: ffmpeg is not on PATH (landing, granted, beside and screen "
+              "need it)")
         return 2
     here = WORK / (f"mutant-{args.mutant}" if args.mutant else "tree")
     if here.exists():
@@ -1043,6 +1256,17 @@ def main():
             folder = here / "recordings"
             folder.mkdir(parents=True, exist_ok=True)
             request.update(folder=str(folder))
+        if name == "beside":
+            made, why = beside_fixtures(here)
+            if made is None:
+                for row in ROWS[name]:
+                    results[row] = (False, f"fixtures: {why}")
+                continue
+            request.update(made)
+        if name == "screen":
+            folder = here / "screen-recordings"
+            folder.mkdir(parents=True, exist_ok=True)
+            request.update(folder=str(folder))
         answer, why = section(binary, here, name, request)
         if answer is None:
             for row in ROWS[name]:
@@ -1057,6 +1281,10 @@ def main():
             results.update(source_rows(sources))
         if name == "granted":
             results.update(granted_rows(facts))
+        if name == "beside":
+            results["B4"] = beside_source_row(sources)
+        if name == "screen":
+            results["G16"] = screen_rows(facts)
         if name == "panel":
             swift_p5 = results.get("P5", (False, "the section did not answer it"))
             read = panel_source_rows(sources)

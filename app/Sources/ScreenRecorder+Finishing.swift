@@ -73,7 +73,8 @@ extension ScreenRecorder {
     /// and said so gets no second one, harmlessly: its did-finish with the
     /// error set `micFinished`, and the wait reads the flag), and a
     /// `micFinished` set by hand is what let a file the writer was still
-    /// closing be probed too early. While PAUSED both were done at the
+    /// closing be probed too early; a camera's writer beside the screen is
+    /// closed too and its E2 question dropped (spec §11 CAM-9 (8)). While PAUSED both were done at the
     /// pause, only `stopCapture` remains, and NO did-finish is coming to
     /// ask the wait's question — every flag may have been true for minutes
     /// — so `checkFinished` is asked once here, synchronously, LAST (the R2
@@ -93,6 +94,8 @@ extension ScreenRecorder {
         if wasRecording {
             session?.segments[current.lastIndex].stoppedAt = Date()
             current.micOutput?.stopRecording()
+            current.frameWatch?.drop(segment: current.lastIndex)
+            closeCameraBeside(at: current.lastIndex)
         }
         NotificationCenter.default.post(name: Self.finishingDidBeginNotification, object: self)
         current.stream.stopCapture { [weak self] _ in
@@ -122,8 +125,10 @@ extension ScreenRecorder {
         settle()
     }
 
-    /// Stops the microphone session and probes segment by segment — each
-    /// movie, then its microphone file — and answers ONE result. Once, per
+    /// Stops the microphone session, a camera's capture and the frame watch,
+    /// and probes segment by segment — each movie, then its microphone file,
+    /// then a camera's beside it (`+CameraBesideFinishing.swift`) — and
+    /// answers ONE result. Once, per
     /// session. The recorder stays `.finishing` until the answer is
     /// delivered, so a second start cannot overwrite the first's hook.
     func settle() {
@@ -132,6 +137,8 @@ extension ScreenRecorder {
         timer?.invalidate()
         timer = nil
         done.micSession?.stopRunning()
+        done.cameraCapture?.stop()
+        done.frameWatch?.stop()
         meter.publish(.silent, from: ObjectIdentifier(self))
         if let failure = done.screenFailure { return conclude(done, .failure(failure)) }
         probeSegment(done, at: 0, landed: [], skipped: [])
@@ -161,7 +168,7 @@ extension ScreenRecorder {
             let result = RecordingResult(
                 segments: landed, choice: done.choice,
                 stoppedBy: session?.stoppedBy ?? done.stoppedBy, pauses: done.pauses,
-                unreadable: skipped)
+                unreadable: skipped, camera: session?.camera ?? done.camera)
             return conclude(done, .success(result))
         }
         if let failure = done.segments[index].outputFailure {
@@ -183,8 +190,10 @@ extension ScreenRecorder {
                 }
             case .success(let descriptor):
                 self.probeMicrophone(done, at: index, movie: descriptor) { [weak self] segment in
-                    self?.probeSegment(
-                        done, at: index + 1, landed: landed + [segment], skipped: skipped)
+                    self?.probeCameraBeside(done, at: index, segment) { [weak self] segment in
+                        self?.probeSegment(
+                            done, at: index + 1, landed: landed + [segment], skipped: skipped)
+                    }
                 }
             }
         }
@@ -199,13 +208,15 @@ extension ScreenRecorder {
     }
 
     /// Segment `index`, left out: its movie as named, the files it left on
-    /// disk (movie, then microphone, each only if there) and `reason` — a
-    /// probe's failure, or a closed segment's `outputFailure` (#181).
+    /// disk (movie, then microphone, then a camera's beside it — kept, never
+    /// landed, CAM-9 (7) — each only if there) and `reason` — a probe's
+    /// failure, or a closed segment's `outputFailure` (#181).
     private static func leftOut(_ done: Session, at index: Int, reason: RecorderError)
         -> UnreadableSegment
     {
         let segment = done.segments[index]
-        let kept = [segment.movieURL.path, segment.micURL?.path].compactMap { $0 }
+        let kept = [segment.movieURL.path, segment.micURL?.path, segment.camera?.url.path]
+            .compactMap { $0 }
             .filter { FileManager.default.fileExists(atPath: $0) }
         return UnreadableSegment(moviePath: segment.movieURL.path, keptFiles: kept, error: reason)
     }
@@ -277,6 +288,8 @@ extension ScreenRecorder {
         if case .failure(let error) = outcome, let failure = error as? RecorderError {
             delivered = .failure(Self.namingFiles(failure, done))
         }
+        done.cameraCapture?.stop()
+        done.frameWatch?.stop()
         session = nil
         state = .idle
         microphoneProblem = nil
@@ -295,10 +308,12 @@ extension ScreenRecorder {
     /// microphone file likewise, so one segment's sentence is byte for byte
     /// R1's; with no movie on disk the microphone files alone are named (a
     /// readable voice is not lost, spec §11 recording), and no file on disk
-    /// at all leaves the error as it was.
+    /// at all leaves the error as it was. A camera's file beside the screen
+    /// is named after its movie, among the movies (CAM-9 (8)).
     static func namingFiles(_ error: RecorderError, _ done: Session) -> RecorderError {
         let manager = FileManager.default
-        let movies = done.segments.map(\.movieURL.path).filter { manager.fileExists(atPath: $0) }
+        let movies = done.segments.flatMap { [$0.movieURL.path, $0.camera?.url.path] }
+            .compactMap { $0 }.filter { manager.fileExists(atPath: $0) }
         let mics = done.segments.compactMap { $0.micURL?.path }
             .filter { manager.fileExists(atPath: $0) }
         guard !movies.isEmpty || !mics.isEmpty else { return error }

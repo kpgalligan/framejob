@@ -318,7 +318,11 @@ landing back. The panel that drives both is last, as CR1c was.
     screen file.
   - **The screen's start by E2** (CAM-2, CR0). An `SCStreamOutput` for `.screen` frames is on the
     stream only when a camera is chosen. Per segment, E2 is the PTS of the first complete frame
-    whose PTS is at or after the did-start's arrival, both on the host clock.
+    whose PTS is at or after the did-start's arrival, both on the host clock, and no more than
+    two frame intervals at the recording's rate after it (33.3 ms at 60 fps; CR0's E2 fell 9–22
+    ms after E1). A still screen sends no complete frame, so a segment with none in that window,
+    or none by its close, falls back to E1 (CR0's S rows were all measured over a counter that
+    changed every frame).
   - **Per segment**, the camera's movie lies beside the screen's, named by the microphone's
     ` (Microphone).m4a` rule. Its offset is the camera's first buffer's PTS minus E2.
   - **Pause and resume in step.** A pause closes the camera's writer with the screen's output; a
@@ -338,7 +342,8 @@ landing back. The panel that drives both is last, as CR1c was.
   with cameras) and a granted row under the terminal's Screen Recording and Camera grants,
   skipped by name without either grant or without a camera. The granted row records with one
   pause and checks each segment's camera file at ≥ 98 % of span × rate, an offset per segment,
-  and the screen files as before. Mutants.
+  and the screen files as before. It puts a window that changes every frame on the main
+  display, so each segment's E2 is found rather than its fallback. Mutants.
 - **CR3b — the landing and the tool; CAM-10.** CAM-10 is recorded in §11 before the code.
   - **The landing** (a new `RecordingLanding+Camera.swift`). Every segment's camera clip goes on
     ONE new track IN FRONT of the screen's, named "Camera". Each clip starts at its screen clip's
@@ -351,6 +356,11 @@ landing back. The panel that drives both is last, as CR1c was.
   - **The tool.** `camera` and `camera_format` are admitted with source `screen`, lifting CAM-4
     (2) and CAM-6 (6) for it. The refusal order is extended for both grants. The answer carries
     the `camera` key and, per segment, `camera_offset`, `camera_media` and `camera_clip`.
+  - **The readers that take a result's camera for a camera recording** (found at CR3a's spec).
+    `landingNote`'s `.systemStopped` sentence reads `camera != nil` as "a camera recording", so
+    a display that slept under a screen + camera recording would be told as the camera's stop:
+    it keys on `isCamera`, and a screen recording's camera `problem` follows as a note.
+    `filesClause` and `heldFilePaths` (the tool's timeout sentence) name the camera files.
 
   **Proof**: `camera_recording_proof.py`'s camera + screen rows. Headless, the refusal order.
   Granted, read back through `get_project`: the track order, the track names and the placed
@@ -1489,6 +1499,155 @@ record's gate sentence, and two header paragraphs re-wrapped (comments only).
 ## CR3a — the recorder: a camera beside the screen
 
 ### Record
+
+**Landed** (2026-10-27). No door reaches it yet (CR3b, CR3c), so nothing user-visible changed.
+- Spec §11 CAM-9, written before any code: (1) the start's order with the camera taken last;
+  (2) the warm-up before the stream and one launch turn; (3) E2 from a `.screen` frame watch
+  bounded at two frame intervals; (4) the offset; (5) the `(Camera).mov` files; (6) pause and
+  resume in step; (7) a camera failure never the recording's; (8) the finishing; (9) the
+  result's fields; (10) no door yet. Its index row, and the `camera-recording.md` row's Lines
+  cell and summary.
+- **A STOP, then CAM-9 (6) amended before the fix.** The first run implemented CAM-9 as written,
+  with the watch left on the stream through a pause and a resume. G16 failed 4 of 4: every
+  resumed segment's `SCRecordingOutput` reported "Failed due to failure to process first sample
+  buffer", wrote no movie and was left out. With no `.screen` output (`no-frame-watch`), both
+  segments landed 3 of 3. A scratch copy that removed the watch before the resume's
+  `addRecordingOutput` and added it back after passed G16 2 of 2 (E2 − E1 12.0/17.3 and
+  19.7/21.5 ms). The orchestrator ruled for that variant (option 1, over E2 for segment 0 only
+  and E1 throughout). CAM-9 (6) now records the failure, the remove and re-add rule, the pause
+  left as measured, the fallback and those numbers; (9) adds `cameraNote`. The cells are 405 →
+  418 lines, and the `11-decisions/` cell is 13282 → 13354 in 31 files.
+- `ScreenFrameWatch.swift` (new): the `.screen` `SCStreamOutput`, the complete frames kept 2 s,
+  each segment's question, `drop(segment:)`, `stop()`, one sample-handler queue and one lock.
+- `ScreenRecorder+CameraBeside.swift` (new): `CameraBesideSegment` (with `watchFailure`), the
+  camera's lookup and format, the arming, `launchScreen`, each writer's open and close,
+  `failStart`'s camera half, the did-start's E1 stamp and E2 question (none for a segment with
+  `watchFailure`), and the camera that stops on its own.
+- `ScreenRecorder+CameraBesideFinishing.swift` (new): each landed segment's camera half (probe,
+  problem, offset, and the fallback's `cameraNote`) and `cameraBesideOffset`.
+- `ScreenRecorder.swift`: `start`'s camera checks, the frame watch, the camera take, the launch
+  moved to `launchScreen`, and `private` dropped from `failStart` and `captureStarted`.
+- `+Pause`: the `Session` and `Segment` fields; `pause()` drops the E2 question and closes the
+  camera writer. `resume()` removes the watch (`try?`) before `addRecordingOutput` and re-adds
+  it once that add has returned. A re-add that throws is the new segment's `watchFailure` and
+  never the resume's. `resume()` then arms the next camera writer. `nextMovieURL` skips a held
+  camera file, and `allFinished` waits for the camera writers.
+- `+Delegates`: the did-start stamps the host clock and asks the watch. `+Finishing`: the
+  camera's close, the capture and watch stopped, the walker's camera half, `leftOut` keeping the
+  camera file, `namingFiles` naming it, and the result's `camera`.
+- `RecordingResult.swift`: `RecordingSegment`'s `cameraDescriptor`, `cameraOffset`,
+  `cameraProblem` and `cameraNote`, plus the docs. `RecordingSetup+Camera.swift`:
+  `cameraURL(beside:)`. `RecordingSetup.swift`: two docs.
+- Proofs:
+  - `camera_recording_probe.py` (1100 → 1328) and `.swift` (1639 → 2172): sections `beside` (B1–B7) and
+  `screen` (G16), twelve mutants, the docstring's CR3a paragraph, and the ffmpeg check.
+  - B4 reads `addStreamOutput(` twice (in `start(`'s camera branch and in `resume(`) and `resume(`'s order (remove, then
+  the recording output's add, then the stream output's add), with `pause(` removing nothing.
+  - B7 is the fallback's row (below). `tools/proof/README.md`'s CR3a section.
+  - `recording_probe.py` is unchanged: no anchor or row broke.
+- Docs: spec §7.4 row 50 (the three new files, a camera beside the screen, the watch off for a
+  resume's add; 57 lines, unchanged).
+
+**Sizes** (`wc -l`, before → after): `ScreenFrameWatch.swift` new, 173;
+`ScreenRecorder+CameraBeside.swift` new, 211; `ScreenRecorder+CameraBesideFinishing.swift` new,
+89; `ScreenRecorder.swift` 357 → 399; `+Pause` 291 → 330; `+Delegates` 203 → 207; `+Finishing`
+347 → 362; `RecordingResult.swift` 317 → 339; `RecordingSetup+Camera.swift` 75 → 84;
+`RecordingSetup.swift` 394 → 396.
+
+**Measured** (the main display, the FaceTime HD camera at 1760×1328@30, the default microphone,
+the terminal's Screen Recording and Camera grants, and a 200 pt window changing colour at 60 Hz;
+each command once unless said):
+- `python3 tools/proof/spec_index_proof.py`: exit 0, `201/201 checks passed`, after CAM-9 and
+  again after its amendment.
+- `make typecheck`: exit 0, the 4 baseline warnings, and tsc clean.
+- `python3 tools/proof/camera_recording_probe.py --only values,landing,beside`: exit 0, `scores:
+  36/36`. B2: E2 18000 ticks, E1 24000, arrivals 150000, a camera that began first −60000. B5:
+  segment (0)'s `cameraOffset` 16800, the PTS minus E2. B7: the watch-on segment's E2 300.01
+  and the fallback segment's nil, with 300.11 kept inside its window; offsets 16800 (PTS − E2)
+  and 24000 (PTS − E1); the note "This segment's camera is placed by the screen's did-start, not
+  its first frame: the frame watch could not go back on the stream at the resume (probe
+  re-add)." Its first run was 35/36: B7's own fixture recorded a frame 100 s after the other,
+  so `keptSeconds` let the first go. That was an instrument fault, fixed in the probe.
+- G16 on the tree, the remove and re-add in place: 4 of 4 runs passed (three `--only screen`,
+  and one in the full run). E2 − E1 (ms) was [14.6, 1.7], [15.5, 9.1], [9.5, 22.3] and [13.4,
+  15.8], under the 33.3 ms bound. `cameraOffset` (s) was [−0.071, −0.032], [−0.108, −0.119],
+  [−0.084, −0.082] and [−0.106, −0.146]. Each camera file read 0.9992 of span × rate, and no
+  segment was left out. The first run's table (watch left on: segment 1 left out 4 of 4, E2 −
+  E1 9.1–18.1 ms for segment 0) is above.
+- The twelve mutants, each exit 1 and caught, run on the final code:
+  - `e2-incomplete`, `e2-before-threshold` and `e2-unbounded`: 7/8 at B1.
+  - `camera-offset-sign` and `camera-offset-e1-only`: 5/8 at B2 (B5 and B7 too).
+  - `finish-ignores-camera`: 7/8 at B3.
+  - `camera-fails-screen`: 7/8 at B4.
+  - `leftout-camera-unkept`: 7/8 at B5.
+  - `fallback-asks-watch`: 7/8 at B7 (the fallback segment's E2 300.11).
+  - `fallback-unnamed`: 7/8 at B7 (its note nil).
+  - `no-frame-watch`: 7/9 at B4, with G16 failing too. E2 − E1 was [None, 29.4]: segment 0 had
+    no watch, and the resume's re-add put it on for segment 1.
+  - `resume-keeps-watch`: 7/9 at B4 and G16, 2 of 2.
+- How `resume-keeps-watch` was settled. With only the remove line deleted, it SURVIVED once:
+  G16 passed with E2 − E1 [17.0, 33.3]. The re-add after the output's add (a second add of an
+  output already on the stream) evidently suffices for the resumed output. The mutant now
+  deletes both the remove and the re-add, which is the first run's tree. In those two runs both
+  segments landed, so the first-sample-buffer failure did not recur. Segment 1's E2 was None
+  in both ([15.8, None], [9.5, None]), and G16 caught it there.
+- The anchor check (every `before` of both probes' `MUTANTS` once in its file): `all once` (64
+  and 78 mutants).
+- `python3 tools/proof/recording_probe.py --only state,unreadable,segments,file_pause,leftout`:
+  exit 0, `326/326 checks passed`.
+- `make gate`: `gate: PASS 224s` (names 1 s, typecheck 5 s, fmt and lint skipped, test 115 s,
+  app 103 s).
+- `python3 tools/proof/camera_recording_probe.py`: exit 0, `scores: 83/83`, G0–G16 all run
+  (none skipped). For example G3 60/0.9992 twice, G6 hold 0.598 s steady, G7 0.040 s, G9
+  0.728 s. It ran 59 s; `SECTION_WALL` 180 is kept.
+- `python3 tools/proof/recording_probe.py`: exit 0, `1222/1222 checks passed`.
+- Release (`proof_app.py launch --app release`, after the gate's `make app`):
+  `RC_PROOF_APP=release python3 tools/proof/recording_proof.py <dir>/agent.sock` exited 0 with
+  `220/220 checks passed`. The tone rows (2 checks) were skipped by name: the default output
+  is a Bluetooth device (AirPods Max), which delivers nothing to the system-audio tap. `grep
+  "Frame Job: " <dir>/framejob.log` printed nothing. The instance was stopped by its pid.
+
+**Deviations.**
+- `RecordingSegment` gains a fourth camera field, `cameraNote`, and `CameraBesideSegment`
+  gains `watchFailure`. Both carry the ruling's fallback, "named in the result's notes for that
+  segment", which no existing field could hold: `cameraProblem` means the file did not land.
+- The fallback's throw is **structural only**. On a never-started stream, `addStreamOutput`
+  does not throw: a second add of the same output, an add after a remove, and a second output
+  all returned. Only `removeStreamOutput` of an output not on the stream threw. So no faked
+  stream reaches the throw. B7 sets `watchFailure` by hand and scores what follows it; the
+  throw → `watchFailure` step is the `do`/`catch` in `resume()`.
+- If the resume's `addRecordingOutput` throws, the watch stays off the stream (the recorder
+  stays paused). The next resume's remove throws and is ignored, and its re-add puts the watch
+  back.
+- "Adds it back once the new recording output has started" is read as once
+  `addRecordingOutput` has returned, which "Starts Recording if stream is already capturing".
+  That is the measured variant. It is not read as at the output's did-start.
+- `+CameraBeside.swift` has helpers beside the interface's functions:
+  - `armCameraBeside(_:)` (so `ScreenRecorder.swift` fits under 400);
+  - `tearDownCameraBeside(_:)` (`failStart`'s camera half).
+- `closeCameraBeside` runs only while `camera.problem` is nil. The stop handler closes the open
+  writer before it sets `problem`, so a writer is never asked twice.
+- `cameraProblem` names the file only when the file is on disk (the microphone's rule).
+- A camera writer whose close never answered by `finishCeiling` and whose file will not probe
+  says "The camera recording did not finish writing within 10 s.".
+- `conclude` also stops the capture and the watch, idempotently.
+
+**Owed.**
+- Applied with the commit (the orchestrator's): `app/CLAUDE.md`'s recorder family gains
+  `+CameraBeside`, `+CameraBesideFinishing` and `ScreenFrameWatch.swift`. Its Hygiene names the
+  watch's sample-handler queue and lock as a framework-forced exception, beside
+  `CameraCapture`'s two queues.
+- The road map's CR3a bullet ("Pause and resume in step") does not name the watch's remove and
+  re-add; CAM-9 (6) does. The spec left the bullet alone.
+- Not measured: a remove at the pause instead of at the resume. The ruling keeps the pause as
+  measured.
+- Observed and not acted on: one run where only the re-add was kept, without the remove, also
+  passed (above).
+- The review passed with three nits, not acted on: `+Pause`'s remove and re-add lines run past
+  ~100 columns (wrapping them re-aims `resume-keeps-watch`'s anchors); the doc paragraphs
+  touched in `+Finishing` and `+Pause` were not reflowed; and `nextMovieURL`'s camera clause
+  goes through `uniqueURL`, as the microphone clause does, so it never matches a held file.
+- CR3b: the landing and the tool. CR3c: the panel's camera row.
 
 ## CR3b — the landing and the tool
 

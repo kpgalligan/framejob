@@ -82,14 +82,18 @@ extension ScreenRecorder: SCRecordingOutputDelegate {
     /// set): a pause inside those ~10 ms would otherwise take a start
     /// stamped after its own stop, and the span would run backwards — the
     /// fallback, the add's own call, is what `elapsed` and the result use.
+    /// Also stamped on the host clock (E1), and with a camera beside the
+    /// screen the frame watch is asked for E2 (spec §11 CAM-9 (3)).
     func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
         let at = Date()
+        let host = CMClockGetTime(CMClockGetHostTimeClock()).seconds
         DispatchQueue.main.async { [weak self] in
             guard let self, let index = self.session?.index(of: recordingOutput),
                 let segment = self.session?.segments[index], segment.screenStartedAt == nil,
                 segment.stoppedAt == nil
             else { return }
             self.session?.segments[index].screenStartedAt = at
+            if self.session?.frameWatch != nil { self.screenDidStart(at: index, host: host) }
         }
     }
 

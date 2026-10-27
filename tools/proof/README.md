@@ -24538,3 +24538,57 @@ skips by name answers `"pass": "skip"`. Nine mutants: `hotplug-current-first` (V
 (P16c), `hotplug-while-busy` (P16e), `hotplug-observers-kept` (P17), `failed-stops-every-tick`
 (P18), all `panel`. A real plug or unplug is REC-17, a person's check. The numbers are in
 `designs/camera-recording.md`'s CR2c record.
+
+## Camera recording CR3a — a camera beside the screen (`camera_recording_probe.py` B1–B7, G16; spec §11 CAM-9)
+
+CR3a teaches `ScreenRecorder.start` to record a camera beside a display, window or picked
+source: the camera is taken last, its warm-up is spent while arming, and one launch turn
+(`launchScreen`, `ScreenRecorder+CameraBeside.swift`) starts the microphone's file, the stream
+and segment 0's camera writer. Each segment's `<movie stem> (Camera).mov` is closed and armed
+with the screen's output, and placed against it by E2: the first complete `.screen` frame at
+or after the did-start's host time, within two frame intervals (`ScreenFrameWatch.swift`).
+A resume takes the watch off the stream for its `addRecordingOutput` and puts it back after:
+left on, the resumed output failed its first sample buffer (CAM-9 (6)); a re-add that throws
+places that segment by E1, named in its `cameraNote`. The finishing waits for every camera writer, and each landed segment's camera file is probed
+after its microphone (`+CameraBesideFinishing.swift`). No door reaches it yet (CR3b, CR3c).
+
+```sh
+python3 tools/proof/camera_recording_probe.py --only beside               # B1–B7, no grant, ffmpeg
+python3 tools/proof/camera_recording_probe.py --only screen               # G16 under the terminal's grants
+python3 tools/proof/camera_recording_probe.py --mutant e2-unbounded       # each of the twelve exits 1
+```
+
+**B1** `ScreenFrameWatch` driven through `record(pts:complete:)`: the bound (`bound(rate: 60)`
+= 1/30, `bound(rate: 0)` = 2), the lookback (complete at E1 − 20 ms, incomplete at E1 + 4 ms,
+complete at E1 + 10 ms: a question at E1 answers E1 + 10 ms), a later frame answering a
+question past every kept frame, an incomplete frame never answering, a complete frame 40 ms
+past E1 answering nothing, `drop(segment:)` (the other segment still answered, and an answer
+already on its way to main dropped too), a frame 2.5 s older than the newest gone, and nothing
+after `stop()`. **B2** `cameraBesideOffset` over E2, E1, the arrivals, 0 and the sign. **B3**
+`allFinished` with a camera writer unfinished and finished. **B4** comment-stripped reads:
+`start(`'s grant reads before `takeCameraCapture(`, `addStreamOutput(` twice in app/Sources
+(inside `start(`'s camera branch and in `resume(`), `resume(`'s order `removeStreamOutput(` →
+`addRecordingOutput(` → `addStreamOutput(` with `pause(` removing nothing, `launchScreen(`'s order, and the stop handler's
+`failStart(` only while arming, never `beginFinishing(`. **B5** `settle()` on a hand-built
+`.finishing` session over ffmpeg fixtures (the recording probe's `Fake`: an `SCStream` and its
+outputs construct without a grant) — a camera that wrote (`cameraOffset` exactly the PTS minus
+E2), one with no buffer, a writer failure naming its file, and a garbage screen movie left out
+with its camera file kept. **B6** `cameraURL(beside:)` and `namingFiles`. **B7** the failed
+re-add's fallback on hand-built sessions: no never-started stream makes `addStreamOutput` throw
+(a second add of the same output, an add after a remove and a second output all return), so the
+throw → `watchFailure` step is structural only and `watchFailure` is set by hand; a segment with
+it asks the watch nothing on its did-start while a kept frame answers the other, and the settle
+places it at PTS − E1 with a `cameraNote` naming the failure. **G16** records the
+main display for 2 s, pauses 1 s and records 2 s more with `defaultIndex`'s camera beside it,
+while a 200 pt window changes colour every 1/60 s so complete frames keep coming: each
+segment's E2 found within the bound, the camera files named and at ≥ 98 % of span × rate by
+G3's decode, each |`cameraOffset`| < 0.5 s, `camera.format` CAM-3's best, no problem. It is
+skipped by name without `CGPreflightScreenCaptureAccess()`, a shareable display, the Camera
+grant or a camera. Twelve mutants: `e2-incomplete`, `e2-before-threshold`, `e2-unbounded` (B1);
+`camera-offset-sign`, `camera-offset-e1-only` (B2); `finish-ignores-camera` (B3);
+`camera-fails-screen` (B4); `leftout-camera-unkept` (B5); `fallback-asks-watch`,
+`fallback-unnamed` (B7); all `beside`; `no-frame-watch` (B4, run `beside,screen`, so G16 fails
+too when granted); and `resume-keeps-watch` (`resume()`'s remove and re-add of the watch both
+deleted; B4 and G16, run `beside,screen`, so it is scored caught only where G16 runs). The
+numbers are in
+`designs/camera-recording.md`'s CR3a record.

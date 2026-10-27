@@ -57,7 +57,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 196 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 13282 in 31 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 13354 in 31 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

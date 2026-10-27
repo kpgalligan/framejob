@@ -45,7 +45,8 @@ import ScreenCaptureKit
 /// `.voiceOver` is the microphone alone, no picture (spec §11 recording, #99):
 /// `ScreenRecorder.startVoiceOver` records it and `start` refuses it.
 /// `.camera` is a camera alone, the device in `RecordingChoice.camera` (spec
-/// §11 CAM-3): `ScreenRecorder.startCamera` records it and `start` refuses it.
+/// §11 CAM-3): `ScreenRecorder.startCamera` records it and `start` refuses it,
+/// while `start` records a camera beside a display, window or picked source (CAM-9).
 enum RecordingSource: Equatable {
     case display(CGDirectDisplayID)
     case window(CGWindowID)
@@ -76,9 +77,10 @@ enum RecordingDestination: Equatable {
 /// `record_screen`, as one value. `microphone` is an
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60 (a camera
 /// recording's is its format's, `CameraDevices.canvasRate`). `camera` is an
-/// `AVCaptureDevice.uniqueID`, set iff `source` is `.camera`, and
-/// `cameraFormat` its format as `CameraDevices.spelled` writes it, nil for
-/// Best and set only with `camera` (spec §11 CAM-6).
+/// `AVCaptureDevice.uniqueID`, set with `source` `.camera`, or beside a
+/// display, window or picked source (CAM-9), and `cameraFormat` its format
+/// as `CameraDevices.spelled` writes it, nil for Best and set only with
+/// `camera` (spec §11 CAM-6).
 struct RecordingChoice: Equatable {
     var source: RecordingSource = .display(CGMainDisplayID())
     var includeFrameJobWindows: Bool = false

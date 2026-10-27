@@ -58,16 +58,36 @@ struct RecordingSegment {
     /// set only on a segment whose writer stopped on its own (spec §11
     /// recording, "A voice-over is a recording with no picture").
     let micProblem: String?
+    /// A camera beside the screen (spec §11 CAM-9): this segment's
+    /// `(Camera).mov`, probed; nil without a camera, for a writer that took
+    /// no buffer, and whenever `cameraProblem` is set.
+    let cameraDescriptor: MediaDescriptor?
+    /// The camera's first buffer minus the screen's start (E2, else E1,
+    /// else the arrivals), in ticks; POSITIVE means the camera began after
+    /// the screen. 0 without `cameraDescriptor`.
+    let cameraOffset: Ticks
+    /// This segment's camera file did not land — its writer failed or it
+    /// would not probe — naming the file when it is on disk.
+    let cameraProblem: String?
+    /// Beside `cameraDescriptor` only: this segment's camera was placed by
+    /// E1 because the frame watch could not go back on the stream at its
+    /// resume (CAM-9 (6)), naming why.
+    let cameraNote: String?
 
     init(
         descriptor: MediaDescriptor, micDescriptor: MediaDescriptor?, micOffset: Ticks,
-        startedAt: Date, micProblem: String? = nil
+        startedAt: Date, micProblem: String? = nil, cameraDescriptor: MediaDescriptor? = nil,
+        cameraOffset: Ticks = 0, cameraProblem: String? = nil, cameraNote: String? = nil
     ) {
         self.descriptor = descriptor
         self.micDescriptor = micDescriptor
         self.micOffset = micOffset
         self.startedAt = startedAt
         self.micProblem = micProblem
+        self.cameraDescriptor = cameraDescriptor
+        self.cameraOffset = cameraOffset
+        self.cameraProblem = cameraProblem
+        self.cameraNote = cameraNote
     }
 }
 
@@ -111,8 +131,9 @@ struct UnreadableSegment {
 /// What a camera recording records with (spec §11 CAM-3): the device's name,
 /// the format it recorded at as `CameraDevices.spelled` writes it
 /// (`1760x1328@30`), and `problem` — the sentence of a camera that stopped on
-/// its own (a runtime error, an interruption, a disconnect), which ended the
-/// recording with `stoppedBy` `.systemStopped`; nil when it did not. `note`
+/// its own (a runtime error, an interruption, a disconnect), which ended a
+/// camera recording with `stoppedBy` `.systemStopped` and, beside a screen
+/// (CAM-9 (7)), ended only the camera's files; nil when it did not. `note`
 /// is the warm-up's sentence when the stream had not reached the format's
 /// rate by the bound and the recording began anyway (`CameraCapture.WarmUp`).
 struct RecordingCamera: Equatable {
@@ -142,7 +163,8 @@ struct RecordingResult {
     let segments: [RecordingSegment]
     let choice: RecordingChoice
     let stoppedBy: StopReason
-    /// A camera recording's camera (`isCamera`); nil for every other source.
+    /// A camera recording's camera (`isCamera`), or the camera recorded
+    /// beside a screen (spec §11 CAM-9); nil for every other recording.
     let camera: RecordingCamera?
 
     /// The FIRST segment's movie.

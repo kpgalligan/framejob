@@ -2,7 +2,8 @@ import AVFoundation
 import AppKit
 
 /// A camera recording's half of `RecordingSetup.swift` (camera-recording
-/// CR1a, spec §11 CAM-3): its file stem and its grant's read and refusal;
+/// CR1a, spec §11 CAM-3): its file stem (and a camera's file beside a screen
+/// movie, CAM-9) and its grant's read and refusal;
 /// and the panel's step for the grant and the note once its pane is open
 /// (CR1c, CAM-5; the pane's URL is `RecordingSetup.swift`'s, beside the
 /// others, the one file a System Settings URL is spelled in). Values a probe
@@ -23,6 +24,14 @@ extension RecordingFiles {
         formatter.timeZone = .current
         formatter.dateFormat = "'Camera Recording' yyyy-MM-dd 'at' HH.mm.ss"
         return formatter.string(from: date)
+    }
+
+    /// A camera beside the screen's own file (spec §11 CAM-9 (5)): the movie's
+    /// stem plus ` (Camera)`, as `.mov`, made unique as `microphoneURL(beside:)`
+    /// is.
+    static func cameraURL(beside movie: URL) -> URL {
+        let stem = movie.deletingPathExtension().lastPathComponent + " (Camera)"
+        return uniqueURL(in: movie.deletingLastPathComponent(), stem: stem, ext: "mov")
     }
 }
 

@@ -22,7 +22,9 @@ import ScreenCaptureKit
 /// `+VoiceOverFinishing.swift`; `stop()`, `elapsed`, `pause()` and `resume()`
 /// forward to it. A CAMERA recording (`cameraSession`, spec §11 CAM-3) is the
 /// same machine with a camera where the stream was, in `+Camera.swift` and
-/// `+CameraFinishing.swift`, forwarded to on the same terms.
+/// `+CameraFinishing.swift`, forwarded to on the same terms. A camera BESIDE
+/// the screen (spec §11 CAM-9) is this machine's: `+CameraBeside.swift`,
+/// `+CameraBesideFinishing.swift` and `ScreenFrameWatch.swift`.
 ///
 /// **A paused recording is a sequence of files over one stream** (decision
 /// 6). ScreenCaptureKit has no pause, so `pause()` REMOVES the segment's
@@ -186,8 +188,10 @@ final class ScreenRecorder: NSObject {
     /// filter; measured, a display filter reports the display's point size
     /// and backing scale, a window filter the window's frame. ORDER (R0
     /// q6b): the microphone session (prepared, or started here), then its
-    /// file output, then the stream, all in this one run-loop turn. The
-    /// first segment is minted here, named by the call's own time.
+    /// file output, then the stream, all in one run-loop turn (`launchScreen`)
+    /// — this one, or with a camera beside the screen the turn its warm-up
+    /// answers (spec §11 CAM-9 (1), (2)). The first segment is minted here,
+    /// named by the call's own time.
     func start(
         filter: SCContentFilter, choice: RecordingChoice, mayAsk: Bool,
         onFinish: @escaping (Result<RecordingResult, Error>) -> Void,
@@ -206,6 +210,18 @@ final class ScreenRecorder: NSObject {
         }
         guard RecordingGrant.screenRecordingGranted else {
             return refuse(.startFailed(RecordingGrant.screenRecordingRefusal), completion)
+        }
+        if choice.camera != nil {
+            let cameraGrant = RecordingGrant.cameraStatus
+            guard cameraGrant == .authorized else {
+                return refuse(.startFailed(RecordingGrant.cameraRefusal(cameraGrant)), completion)
+            }
+        }
+        let camera: (device: AVCaptureDevice, format: Int)?
+        do {
+            camera = try cameraBesideDevice(for: choice)
+        } catch {
+            return refuse(error as? RecorderError ?? .cameraDevice("\(error)"), completion)
         }
         var microphone: AVCaptureDevice?
         if let id = choice.microphone {
@@ -246,6 +262,19 @@ final class ScreenRecorder: NSObject {
                     "The recording output could not be added: " + error.localizedDescription),
                 completion)
         }
+        var watch: ScreenFrameWatch?
+        if camera != nil {
+            let made = ScreenFrameWatch(bound: ScreenFrameWatch.bound(rate: choice.rate))
+            do {
+                try stream.addStreamOutput(made, type: .screen, sampleHandlerQueue: made.queue)
+            } catch {
+                return refuse(
+                    .startFailed(
+                        "The screen's frames could not be watched: " + error.localizedDescription),
+                    completion)
+            }
+            watch = made
+        }
         var mic: MicrophoneCapture?
         if let device = microphone {
             do {
@@ -256,6 +285,20 @@ final class ScreenRecorder: NSObject {
                 return refuse(.microphoneDevice(error.localizedDescription), completion)
             }
         }
+        var capture: CameraCapture?
+        var recorded: RecordingCamera?
+        if let camera {
+            do {
+                let taken = try takeCameraCapture(
+                    device: camera.device, format: camera.format, adopting: mayAsk)
+                capture = taken
+                recorded = RecordingCamera(
+                    name: camera.device.localizedName, format: CameraDevices.spelled(taken.applied))
+            } catch {
+                mic?.session.stopRunning()
+                return refuse(error as? RecorderError ?? .cameraDevice("\(error)"), completion)
+            }
+        }
         microphoneProblem = nil
         session = Session(
             choice: choice, mayAsk: mayAsk, displayPointSize: displayPointSize, scale: scale,
@@ -264,7 +307,7 @@ final class ScreenRecorder: NSObject {
             onFinish: onFinish,
             segments: [
                 Segment(movieURL: movieURL, micURL: mic?.url, output: output, addedAt: calledAt)
-            ])
+            ], cameraCapture: capture, camera: recorded, frameWatch: watch)
         state = .arming
         startCompletion = completion
         if let mic {
@@ -273,13 +316,10 @@ final class ScreenRecorder: NSObject {
                 return failStart(
                     RecorderError.microphoneDevice("The microphone session did not start."))
             }
-            session?.segments[0].micRecordingCalledAt = Date()
-            mic.output.startRecording(to: mic.url, outputFileType: .m4a, recordingDelegate: self)
         }
-        stream.startCapture { [weak self] error in
-            let at = Date()
-            DispatchQueue.main.async { self?.captureStarted(stream, error: error, at: at) }
-        }
+        // With a camera, its warm-up first and the launch turn on its answer
+        // (spec §11 CAM-9 (2)); without one, the launch is this turn's.
+        if let capture { armCameraBeside(capture) } else { launchScreen() }
         // The stream's own report wins over the bare ceiling (finding 5).
         // `.common`, the panel's rule: an open status-item menu runs the
         // loop in tracking mode, where a default-mode timer waits.
@@ -298,7 +338,7 @@ final class ScreenRecorder: NSObject {
         completion(error)
     }
 
-    private func captureStarted(_ stream: SCStream, error: (any Error)?, at: Date) {
+    func captureStarted(_ stream: SCStream, error: (any Error)?, at: Date) {
         guard state == .arming, let current = session, current.stream === stream else { return }
         if let error { return failStart(RecorderError.startFailed(Self.sentence(for: error))) }
         // A stream stop or an output failure that arrived while arming. A
@@ -326,8 +366,9 @@ final class ScreenRecorder: NSObject {
     /// output had NOT begun writing the half-made microphone file is
     /// removed (it is ours and holds nothing); when it had (the arm timer
     /// past a stream that started), both files are footage: they stay, and
-    /// the error names them (finding 6).
-    private func failStart(_ error: RecorderError) {
+    /// the error names them (finding 6). A camera beside the screen goes too
+    /// (`tearDownCameraBeside`, CAM-9 (8)).
+    func failStart(_ error: RecorderError) {
         timer?.invalidate()
         timer = nil
         var delivered = error
@@ -341,6 +382,7 @@ final class ScreenRecorder: NSObject {
             } else if let micURL = first.micURL {
                 try? FileManager.default.removeItem(at: micURL)
             }
+            tearDownCameraBeside(current)
         }
         session = nil
         state = .idle

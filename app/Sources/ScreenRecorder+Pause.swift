@@ -94,6 +94,15 @@ extension ScreenRecorder {
         var timedOut = false
         /// `settle` has begun: one probe, one conclude (finding 2).
         var settling = false
+        /// A camera beside the screen (spec §11 CAM-9): its capture, one
+        /// writer per segment (`+CameraBeside.swift`); nil without one.
+        var cameraCapture: CameraCapture? = nil
+        /// The camera's name, format, `problem` and warm-up `note`, the
+        /// result's `camera`; nil without one.
+        var camera: RecordingCamera? = nil
+        /// The `.screen` frames E2 is read from; on the stream only with a
+        /// camera (`ScreenFrameWatch.swift`).
+        var frameWatch: ScreenFrameWatch? = nil
     }
 
     /// What one file pair owns: the two URLs, the output writing the movie,
@@ -120,6 +129,9 @@ extension ScreenRecorder {
         /// The recording output's did-FAIL for a segment whose `stoppedAt`
         /// was already set (#181): the segment's, never the recording's.
         var outputFailure: RecorderError? = nil
+        /// The camera's writer for this segment (spec §11 CAM-9); nil without
+        /// a camera, and for every segment after it stopped on its own.
+        var camera: CameraBesideSegment? = nil
     }
 
     var isPaused: Bool { state == .paused }
@@ -137,7 +149,8 @@ extension ScreenRecorder {
     /// did-finish lands on THAT segment, 5–25 ms later), stops the
     /// microphone's writer when there is one (likewise), stamps the
     /// segment's `stoppedAt`, counts the pause (`RecordingResult.pauses`),
-    /// silences the meter, posts `pauseDidChangeNotification` — and that is
+    /// drops its E2 question and closes a camera's writer beside it (spec
+    /// §11 CAM-9 (6)), silences the meter, posts `pauseDidChangeNotification` — and that is
     /// all: the stream keeps capturing. A remove that throws is rethrown as
     /// `.finishFailed` — it is a file that could not be closed — and the
     /// recorder STAYS `.recording` with nothing changed, since the output is
@@ -159,6 +172,8 @@ extension ScreenRecorder {
         }
         session?.segments[current.lastIndex].stoppedAt = Date()
         session?.pauses += 1
+        current.frameWatch?.drop(segment: current.lastIndex)
+        closeCameraBeside(at: current.lastIndex)
         // ALWAYS sent, `beginFinishing`'s rule: the SDK answers a request
         // with one did-finish even when nothing was written, and
         // `checkFinished` waits for it. A writer that already failed and
@@ -181,12 +196,15 @@ extension ScreenRecorder {
     /// recorder STAYS `.paused` — the stream still captures, and a Stop
     /// lands what was recorded — with no segment minted, so nothing waits
     /// for a did-finish that cannot come. Then the microphone writer is
-    /// restarted to the new file, stamped where the call is made; the
-    /// did-starts are stamped where they land (`+Delegates.swift`). Never
-    /// waits for the paused segment's did-finish (the header). A
-    /// microphone that failed on an earlier segment is asked again. A
-    /// voice-over's resume is `resumeVoiceOver`, forwarded first; a camera
-    /// recording's `resumeCamera` next.
+    /// restarted to the new file, stamped where the call is made, and a
+    /// camera beside the screen arms the next writer (CAM-9 (6)), its frame
+    /// watch taken off the stream for the add and put back after — a re-add
+    /// that throws is that segment's E1 fallback (`watchFailure`), never the
+    /// resume's; the did-starts are stamped where they land
+    /// (`+Delegates.swift`). Never waits for the paused segment's
+    /// did-finish (the header). A microphone that failed on an earlier
+    /// segment is asked again. A voice-over's resume is `resumeVoiceOver`,
+    /// forwarded first; a camera recording's `resumeCamera` next.
     func resume() throws {
         if voiceSession != nil { return try resumeVoiceOver() }
         if cameraSession != nil { return try resumeCamera() }
@@ -200,11 +218,23 @@ extension ScreenRecorder {
             current.choice, displayPointSize: current.displayPointSize, scale: current.scale,
             outputURL: movieURL)
         let output = SCRecordingOutput(configuration: configs.output, delegate: self)
+        // A frame watch left on the running stream fails the resumed
+        // output's first sample buffer (CAM-9 (6), measured 4 of 4): off for
+        // the add, back on once it returned. A remove of one already off throws.
+        if let watch = current.frameWatch { try? current.stream.removeStreamOutput(watch, type: .screen) }
         do {
             try current.stream.addRecordingOutput(output)
         } catch {
             throw RecorderError.startFailed(
                 "The recording could not be resumed: " + error.localizedDescription)
+        }
+        var watchFailure: String?
+        if let watch = current.frameWatch {
+            do {
+                try current.stream.addStreamOutput(watch, type: .screen, sampleHandlerQueue: watch.queue)
+            } catch {
+                watchFailure = error.localizedDescription
+            }
         }
         var segment = Segment(
             movieURL: movieURL,
@@ -219,6 +249,8 @@ extension ScreenRecorder {
         if let micOutput = current.micOutput, let micURL = segment.micURL {
             micOutput.startRecording(to: micURL, outputFileType: .m4a, recordingDelegate: self)
         }
+        openCameraBeside(at: current.segments.count)
+        session?.segments[current.segments.count].camera?.watchFailure = watchFailure
         NotificationCenter.default.post(name: Self.pauseDidChangeNotification, object: self)
     }
 
@@ -230,7 +262,8 @@ extension ScreenRecorder {
     /// → resume inside that window, within one second, would mint the same
     /// name twice and the second output would write over the first's file.
     /// A candidate whose microphone file (`microphoneURL(beside:)`, the one
-    /// spelling of that name) is held is skipped on the same terms. Spelled
+    /// spelling of that name) or camera file (`cameraURL(beside:)`, CAM-9)
+    /// is held is skipped on the same terms. Spelled
     /// here rather than in `RecordingFiles` because the held set is the
     /// session's, and that file is the probe's pure half.
     private static func nextMovieURL(for session: Session, at date: Date) -> URL {
@@ -238,11 +271,13 @@ extension ScreenRecorder {
         let stem = RecordingFiles.stem(at: date)
         var held = Set(session.segments.map(\.movieURL.path))
         held.formUnion(session.segments.compactMap { $0.micURL?.path })
+        held.formUnion(session.segments.compactMap { $0.camera?.url.path })
         let manager = FileManager.default
         var candidate = folder.appendingPathComponent(stem).appendingPathExtension("mov")
         var counter = 2
         while manager.fileExists(atPath: candidate.path) || held.contains(candidate.path)
             || held.contains(RecordingFiles.microphoneURL(beside: candidate).path)
+            || held.contains(RecordingFiles.cameraURL(beside: candidate).path)
         {
             candidate = folder.appendingPathComponent("\(stem) (\(counter))")
                 .appendingPathExtension("mov")
@@ -273,10 +308,14 @@ extension ScreenRecorder.Session {
     }
 
     /// Every segment's screen did-finish has landed and, with a microphone,
-    /// every segment's mic did-finish: the finishing wait's question. The
-    /// paused segments' may have been true for minutes.
+    /// every segment's mic did-finish, and every camera writer armed beside
+    /// the screen has answered its close (CAM-9 (8)): the finishing wait's
+    /// question. The paused segments' may have been true for minutes.
     var allFinished: Bool {
-        segments.allSatisfy { $0.screenFinished && (micOutput == nil || $0.micFinished) }
+        segments.allSatisfy {
+            $0.screenFinished && (micOutput == nil || $0.micFinished)
+                && ($0.camera?.finished ?? true)
+        }
     }
 
     /// When segment `index`'s picture began: its did-start, else — for the
