@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01GSDGCa2JsVWmUFiYt6CEJx",
+  "agent_id": "adf769740db2a83d4",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary review codecs C3",
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 98903,
+    "cache_read_tokens": 1652467,
+    "output_tokens": 20738,
+    "api_call_count": 25
+  },
+  "started_at": "2026-10-28T11:23:59.64742-04:00",
+  "completed_at": "2026-10-28T11:27:51.701636-04:00"
+}
