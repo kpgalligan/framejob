@@ -707,7 +707,17 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   preserving, gated alone by `make typecheck` (exit 0, the four baseline warnings). `wc -l`:
   `ExporterWriter.swift` 587 before, 567 after; `ExporterWriter+Settings.swift` 474 → 513. C3's
   wiring (the `ExportMP4PacketSink` at the pump's call site) took it to 568. The next seam is
-  still the audio half.
+  still the audio half. Issue #378 paid it before splitting the writer's reader one per output:
+  `addAudio` and `addAudioOutput`, with their doc comments, went verbatim to
+  `ExporterWriter+Audio.swift` as an `extension ExportWriter`, a pure move gated alone by
+  `make typecheck` (exit 0, the four baseline warnings). `built`, `audioOutput` and the two
+  functions lost `private`, `audioGain` became `private(set)`, and `reader` was internal for the
+  move until #378's change replaced it with `videoReader` and `audioReader`. `wc -l
+  app/Sources/ExporterWriter.swift`: 568 before, 512 after; `ExporterWriter+Audio.swift` is 65.
+  #378's wiring (the two readers, each pump's own cancel, the `av1` row's cancel block, the
+  `-RCDevExportFault` hooks and the readers' log line) took it to 565. The next seam: the plain
+  pump (`// MARK: - The pumps`, `pump(_:from:reading:on:group:tracksProgress:gain:frames:end:)`)
+  out to an `ExporterWriter+Pump.swift`.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`. The
   grading road map's GR1 moved `// MARK: Colour` and `colorSection()` to `VideoPane+Color.swift`

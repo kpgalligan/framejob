@@ -12833,8 +12833,10 @@ expected. After step 2, `ExporterWriter.swift` is 782 lines and
     byte-identical to the reference's. Where G0 failed, it is an instrument
     failure instead.
   - **G2** (down) and **G3** (up) on the LPCM rows: equal length and
-    max |Δ| ≤ 1 LSB (down) or ≤ ceil(g/2) + 1 LSB (up). G3 also needs at
-    least one differing sample. On the AAC rows the checks are
+    max |Δ| ≤ 1 LSB (down) or ≤ ceil(g/2) + 1 LSB (up). G3 also needed at
+    least one differing sample (B60's control against its pre-B60
+    reference; #378 dropped it, since no build on the float path differs
+    from another and a pre-B60 build can no longer be recorded). On the AAC rows the checks are
     |ΔLUFS| ≤ 0.01 and difference RMS ≤ −55 dBFS.
 
 **Measured.** `--record` on the step-1 build gave 8/15, exit 1. G0 passed
@@ -25247,3 +25249,55 @@ and three probe mutants (a copy of `app/Sources` alone, the probe built over it,
 `opus-length-exact` P3, P4; `gap-unfilled` A1, A5; `head-uncut` A2; and two fault mutants
 (the copy's app built, F1–F3 alone run): `shared-reader` (the audio output back on the
 video's reader) and `audio-cancel-dropped` (the audio pump's own `cancelReading` gone).
+
+## Issue #378 — `ExportWriter`'s readers, one per output (`export_readers_proof.py` Z1, C1, C2, R2, R3, F1–F4; three mutants; spec §11 #378, amending G-17)
+
+`ExportWriter` (every MP4/MOV row) reads the video composition output and the audio mix
+output on an `AVAssetReader` each, and each pump cancels only its own reader, on its own
+queue, after its own last read: CX-15 (2) and (6), proven for WebM in C3, applied to the
+writer. `-RCDevExportFault audio@N|video@N|audio-hold@N` (`ExportWebMDevFault.writerKey`,
+dev tools only) puts a fault into the writer's audio pump (before its Nth read) or its plain
+video pump (before its Nth append), and with a fault set the writer logs
+`framejob export dev readers: video S, audio S` once every pump has left.
+
+```
+python3 tools/proof/export_readers_proof.py [--app debug|release|PATH]   # every row
+python3 tools/proof/export_readers_proof.py --readers                     # R2, R3 alone, no app
+python3 tools/proof/export_readers_proof.py --faults                      # F1–F4 alone
+python3 tools/proof/export_readers_proof.py --mutant NAME                 # exit 1 caught, 0 survived, 3 inexact, 2 control
+```
+
+**`export_readers_proof.py`** reuses `av1_export_proof.py` (the instance, `Doc`, `export`,
+`decoded_frames`, the mutant builder) and `webm_export_proof.py` (A1's project with its
+chapters, the text-only project, W9's long project, the chapter and sample readers, and the
+two functions C3's rows became: `fault_row` and `readers_rows`), and works under
+`work/export-readers/`. Its docstring has every row. In short, C1 is A1's project with its
+two chapters exported `h264` on an instance launched with a fault that never fires
+(`audio@1000000`): done, 150 frames, 240,000 samples, both chapters, and the readers line
+exactly `video 2, audio 2` (a clean export cancels no reader). C2 is the text-only project
+on the same instance: one stream, readers `video 2, audio none` (a silent movie has no
+audio reader). R2 and R3 are `webm_readers_probe.swift`'s new rows (no app): A1's project
+read at `h264`'s settings through one reader carrying both outputs and through two, R2 with
+the 16-bit decode and R3 with the float mix a normalised export reads. F1–F4 run W9's
+24-clip 1080p project on an instance each: `audio@40` and `video@30` on `h264`, and
+`audio-hold@40` cancelled during the hold on `h264` (F3) and on `av1` (F4, whose video
+pump is `ExportEncodePump`, its reader cancelled by the block the writer queues behind the
+pump's read loop). Each must end within 10 s of the fault (or the cancel) with no file at
+the path and the readers line exactly `video 4, audio 4`.
+
+The run recorded for #378 (Release, `RC_PROOF_APP=release`, after `make gate`): 9/9. C1
+done with 150 frames, 240,000 samples and both chapters, readers `video 2, audio 2`; C2 one
+`h264` stream, readers `video 2, audio none`; R2 and R3 150 frames byte-equal and 240,000
+frames of sound equal (16-bit, then float); F1 `failed` 0.02 s after the fault, F2 `failed`
+0.06 s after it, F3 `cancelled` 3.02 s after the cancel and F4 2.97 s; every F row readers
+`video 4, audio 4` and no file; Z1 five logs, no complaint. The 3 s of F3 and F4 are the
+hold itself (`ExportWebMDevFault.holdSeconds`).
+
+The mutants (`--mutant`, a tree copy built as Debug, F1–F4 alone run), each caught on
+exactly its rows: `shared-reader` (the audio output put on the video's reader) on F1–F4,
+whose lines all read `video 4, audio 4 (one reader)` while every timing stayed inside the
+bound (0.40, 0.00, 3.00 and 2.98 s), so only the readers line names a shared reader, as in
+C3; `no-own-cancel` (the plain pump's own `cancelReading` gone) on F1–F4, readers
+`video 1, audio 1` on F1–F3 and `video 4, audio 1` on F4; `encode-cancel-dropped` (the
+block that cancels the `av1` row's video reader gone) on F4 alone, readers
+`video 1, audio 4`.

@@ -42,7 +42,11 @@ Cross-build rows (`--against`):
 - **G2** (`down`) and **G3** (`up`) on the LPCM rows (`prores_422`,
   `prores_4444`, `audio_wav`, `audio_aiff`): equal length, and
   max |new − ref| ≤ 1 LSB (down) or ≤ ceil(g/2) + 1 LSB (up, g the reported
-  linear gain); G3 also needs at least one differing sample.
+  linear gain). (B60's G3 also needed at least one differing sample: its
+  reference was the build before B60, which gained the Int16 decode, so a
+  difference showed the float path. No such reference can be recorded now —
+  a build from before B60 predates road map 14 and listens on TCP alone —
+  and two builds on the float path agree to the sample, so #378 dropped it.)
 - **G2** and **G3** on the AAC rows (`h264`, `hevc`, `audio_m4a`):
   |ΔLUFS| ≤ 0.01 and the difference's RMS ≤ −55 dBFS. (The spec's −70 is
   under AAC's own coding error, −58.4 dBFS on the `up` export, so any
@@ -241,7 +245,7 @@ def against(got, g0, where):
                 worst = max(diffs) if diffs else 0
                 g = 10 ** (gain_db / 20) if gain_db is not None else math.inf
                 bound = 1 if label == "down" else math.ceil(g / 2) + 1
-                ok = worst <= bound and (label == "down" or len(diffs) > 0)
+                ok = worst <= bound
                 row(f"{row_id} {preset}", ok,
                     f"{len(diffs)} of {len(new) // 2} samples differ, max |Δ| {worst} LSB "
                     f"(bound {bound}); {gains}")

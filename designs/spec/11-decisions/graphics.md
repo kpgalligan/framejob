@@ -371,6 +371,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   and an MCP `export` holds the server until its one-hour ceiling. Not seen
   in 70 runs (G3c) nor in issue batch B1's M1 runs
   (`tools/proof/export_cancel_proof.py`). Revisit only if one is observed.
+  **Amended by #378**: `ExportWriter` reads its video and audio outputs on a
+  reader each. Each pump cancels its own reader on its own queue after its
+  own last read, and `allInputsFinished` cancels only the writer. A pump
+  starved because the other stopped reading is therefore closed on
+  `ExportWriter`, as CX-15 (2) closed it for WebM
+  (`tools/proof/export_readers_proof.py` F1–F4). A read that never returns
+  because a volume stops answering is still not woken, and stays accepted.
 - **G-18 — A graphic's own timeline moves with a transition's head and
   crosses a frame grid; a graphic clip with no description is tolerated**
   (issue #72, 2026-09-29).

@@ -5,7 +5,7 @@ import AVFoundation
 /// Reads the composed movie back out of AVFoundation and writes it to a file:
 /// the `AVAssetWriter` half of `Exporter` (spec §7.8).
 ///
-/// **One movie, one description of it.** The reader is built over the SAME
+/// **One movie, one description of it.** The readers are built over the SAME
 /// `AVComposition`, the SAME `AVVideoComposition` and the SAME `AVAudioMix`
 /// that `Playback` plays and `Exporter.renderFrame` samples — the custom
 /// `Compositor` runs here exactly as it does on screen, from the same frame
@@ -46,9 +46,13 @@ import AVFoundation
 /// do the mapping instead would leave the container's edit list to decide,
 /// which players disagree about.
 ///
+/// **One reader per output** (spec §11 #378, CX-15 (2)): the video composition
+/// output and the audio mix output each have an `AVAssetReader` over the same
+/// composition and range, so neither read can be starved by the other pump's stop.
+///
 /// **Cancellation and progress.** Every sample checks the flag, so a cancel
-/// lands within one frame, and the reader is torn down only once every pump
-/// has left its loop (`cancel`); `AVAssetWriter` has no `progress` of its own, so
+/// lands within one frame, and each pump cancels its own reader on its own
+/// queue after its own last read (`cancel`); `AVAssetWriter` has no `progress` of its own, so
 /// the fraction is kept here from the presentation time of the last sample
 /// appended and `Exporter`'s 0.1 s timer reads it.
 final class ExportWriter {
@@ -56,7 +60,7 @@ final class ExportWriter {
     /// The composition, held for the whole write. Not merely tidiness: the
     /// compositor asks `RecipeSource` for a recipe per frame, and the
     /// instructions inside this object carry the key it asks under.
-    private let built: BuiltComposition
+    let built: BuiltComposition
     private let destination: URL
     /// The slice of the composition being written, in composition time.
     let range: CMTimeRange
@@ -64,11 +68,14 @@ final class ExportWriter {
     /// denominator of `progress`.
     private let totalSeconds: Double
 
-    private let reader: AVAssetReader
+    /// The video composition's reader, nil for an audio-only row, and the mix's,
+    /// nil for a silent movie (#378); each cancelled only by its own pump.
+    private let videoReader: AVAssetReader?
+    let audioReader: AVAssetReader?
     let writer: AVAssetWriter
     private var videoOutput: AVAssetReaderOutput?
     var videoInput: AVAssetWriterInput?
-    private var audioOutput: AVAssetReaderOutput?
+    var audioOutput: AVAssetReaderOutput?
     var audioInput: AVAssetWriterInput?
     var chapterInput: AVAssetWriterInput?
     var chapterSamples: [CMSampleBuffer] = []
@@ -101,7 +108,7 @@ final class ExportWriter {
     /// Written once, on the main thread, between `init` and `start`; read
     /// by `start` and then only on `audioQueue`. Not under the lock for that
     /// reason and no other.
-    private var audioGain: ExportAudioGain?
+    private(set) var audioGain: ExportAudioGain?
 
     /// What the video pump makes of each frame (spec §11 G-35, PR-3;
     /// `frameForm`), set once by `addVideo` in `init` and read only by
@@ -115,7 +122,10 @@ final class ExportWriter {
     /// The audio pump's `end`: the sound cut at the range, padded to it (#337).
     private let audioEnd: ExportAudioEnd
 
-    /// Builds the reader, the writer and every track, or throws the
+    /// `-RCDevExportFault` (`ExportWebMDevFault`, dev tools only, #378), else nil.
+    private let fault = ExportWebMDevFault.current(key: ExportWebMDevFault.writerKey)
+
+    /// Builds the readers, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
     /// written until `start`.
     init(
@@ -130,13 +140,16 @@ final class ExportWriter {
         self.totalSeconds = max(0, CMTimeGetSeconds(range.duration))
         self.audioEnd = ExportAudioEnd(range: range)
 
+        let hasAudio = !built.composition.tracks(withMediaType: .audio).isEmpty
         do {
-            reader = try AVAssetReader(asset: built.composition)
+            videoReader = settings.isAudioOnly ? nil : try AVAssetReader(asset: built.composition)
+            audioReader = hasAudio ? try AVAssetReader(asset: built.composition) : nil
             writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         } catch {
             throw Exporter.ExportError.failed(error.localizedDescription)
         }
-        reader.timeRange = range
+        videoReader?.timeRange = range
+        audioReader?.timeRange = range
         writer.shouldOptimizeForNetworkUse = settings.optimizeForNetwork
 
         try addVideo(settings: settings)
@@ -186,11 +199,11 @@ final class ExportWriter {
         let canvas = built.videoComposition.renderSize
         try Self.checkAlphaSurvivesTheSize(settings, canvas: canvas)
         let output = Self.videoReadOutput(built, settings: settings)
-        guard reader.canAdd(output) else {
+        guard videoReader!.canAdd(output) else {
             throw Exporter.ExportError.failed(
                 "The composition could not be read for export.")
         }
-        reader.add(output)
+        videoReader!.add(output)
 
         // An encoder row's packets go in as they are (`ExportEncodePump`).
         let pump = settings.writer == ExportEncodePump.writer
@@ -209,62 +222,6 @@ final class ExportWriter {
         videoInput = input
         encodePump = pump
         frames = Self.frameForm(settings).map { ExportFrames(form: $0) }
-    }
-
-    /// The audio half: every composition audio track through the plan's mix.
-    ///
-    /// **`addAudioOutput`'s `audioMix` line is where the preview and the file
-    /// agree about sound.**
-    /// The mix carries the plan's volume envelope AND, for any track whose
-    /// clips use pan, the compressor or noise reduction, the
-    /// `MTAudioProcessingTap` that runs them (`AudioTap.swift`). Those taps
-    /// were long believed to be an AVPlayer-only feature — true of the
-    /// `AVAssetExportSession` this pipeline replaced, and the reason the
-    /// effects were left unimplemented — but measured against
-    /// `AVAssetReaderAudioMixOutput` they run here as well: a tap that
-    /// silenced its buffers produced a silent file, one tap per track saw only
-    /// its own track, and with `reader.timeRange` set for an in/out export the
-    /// tap is handed COMPOSITION time, so a clip's settings still line up with
-    /// the clip. Nothing had to be re-implemented for the export; the DSP has
-    /// one implementation and this reads through it.
-    ///
-    /// The one thing the file and the preview do not share is the reducer's
-    /// 512-sample delay on a track that uses it, which both paths have and
-    /// neither compensates: 10.7 ms of audio lag at 48 kHz, well inside every
-    /// A/V sync tolerance, on tracks the user asked to clean.
-    ///
-    /// A timeline with no audio at all is not an error — it is a silent
-    /// movie, and the track is simply not added. It IS an error when the
-    /// preset writes nothing else.
-    ///
-    /// This adds the writer INPUT only. The reader output is added by `start`
-    /// (`addAudioOutput`), because its format depends on the gain, which
-    /// arrives after `init`.
-    private func addAudio(settings: ExportSettings) throws {
-        let tracks = built.composition.tracks(withMediaType: .audio)
-        guard !tracks.isEmpty else {
-            if settings.isAudioOnly { throw Exporter.ExportError.emptyTimeline }
-            return
-        }
-        let input = AVAssetWriterInput(
-            mediaType: .audio, outputSettings: Self.audioSettings(settings))
-        input.expectsMediaDataInRealTime = false
-        guard writer.canAdd(input) else {
-            throw Exporter.ExportError.presetUnavailable(Self.presetName(settings))
-        }
-        writer.add(input)
-        audioInput = input
-    }
-
-    /// The mix's reader output (`audioReadOutput`). False when the reader
-    /// refuses it; there is no 16-bit fallback for a gained export, because
-    /// the gain would then meet a decode that already clipped.
-    private func addAudioOutput() -> Bool {
-        let output = Self.audioReadOutput(built, gained: audioGain != nil)
-        guard reader.canAdd(output) else { return false }
-        reader.add(output)
-        audioOutput = output
-        return true
     }
 
     // MARK: - Running
@@ -293,10 +250,18 @@ final class ExportWriter {
                 "The file could not be opened for writing.")))
             return
         }
-        guard reader.startReading() else {
+        if let videoReader, !videoReader.startReading() {
             writer.cancelWriting()
-            report(.failure(reader.error ?? Exporter.ExportError.failed(
+            report(.failure(videoReader.error ?? Exporter.ExportError.failed(
                 "The composition could not be read for export.")))
+            return
+        }
+        // A reader not yet started is started (as `ExportWebMWriter` does).
+        if let audioReader, audioReader.status == .unknown, !audioReader.startReading() {
+            videoReader?.cancelReading()
+            writer.cancelWriting()
+            report(.failure(audioReader.error ?? Exporter.ExportError.failed(
+                "The audio mix could not be read for export.")))
             return
         }
         // Zero, not `range.start`: the samples are rebased on the way in, so
@@ -309,19 +274,25 @@ final class ExportWriter {
                 sink: ExportMP4PacketSink(input: input, format: encodePump.formatDescription),
                 output: output, on: videoQueue, group: group,
                 isStopping: { [weak self] in self?.isStopping ?? true },
-                readFailure: { [weak self] in self?.readFailure },
+                readFailure: { [weak self] in self?.readFailure(of: self?.videoReader) },
                 fail: { [weak self] error in self?.stopped(with: error) },
                 advance: { [weak self] time in self?.advance(to: time) })
-        } else if let input = videoInput, let output = videoOutput {
+            // The video reader's own cancel, on its queue after the pump's read loop (#378).
+            group.enter()
+            videoQueue.async { [weak self] in
+                defer { group.leave() }
+                if let self, self.isStopping { self.videoReader?.cancelReading() }
+            }
+        } else if let input = videoInput, let output = videoOutput, let videoReader {
             pump(
-                input, from: output, on: videoQueue, group: group, tracksProgress: true,
-                frames: frames)
+                input, from: output, reading: videoReader, on: videoQueue, group: group,
+                tracksProgress: true, frames: frames)
         }
-        if let input = audioInput, let output = audioOutput {
+        if let input = audioInput, let output = audioOutput, let audioReader {
             // Audio drives the bar only when there is no picture to drive it,
             // and it is the only pump that can carry a gain.
             pump(
-                input, from: output, on: audioQueue, group: group,
+                input, from: output, reading: audioReader, on: audioQueue, group: group,
                 tracksProgress: videoInput == nil, gain: audioGain, end: audioEnd)
         }
         if let input = chapterInput {
@@ -331,9 +302,10 @@ final class ExportWriter {
     }
 
     /// Stops as soon as the pumps notice — within one sample. Safe from any
-    /// thread and safe to call twice. It ONLY sets the flag: the reader and
-    /// the writer are cancelled in `allInputsFinished`, after every pump has
-    /// left its loop.
+    /// thread and safe to call twice. It ONLY sets the flag: each pump cancels
+    /// its own reader on its own queue after its own last read, and the writer
+    /// is cancelled in `allInputsFinished`, after every pump has left its loop
+    /// (spec §11 #378).
     ///
     /// **Cancelling the reader from here crashed the app** (road map 10
     /// §10.6, G3c). `reader.cancelReading()` on main while a pump was inside
@@ -342,11 +314,12 @@ final class ExportWriter {
     /// 12 of 30 mid-export cancels of a 4K graphic project — the sheet's and
     /// the queue's Cancel path — and 16 of 40 exports stopped by a failing
     /// graphic. The cost is that a pump blocked on a slow read finishes that
-    /// one sample before it stops — and a `copyNextSampleBuffer` that never
-    /// returns (a pump starved because the other stopped reading) can no
-    /// longer be woken by a cancel, so the completion would never fire; not
-    /// seen in 70 runs, and accepted (spec §11 G-17). A cancel before `start` is refused there;
-    /// `cancelReading()` before `startReading()` would raise.
+    /// one sample before it stops. A pump can no longer be starved by the
+    /// other's stop, each output having its own reader (#378); a
+    /// `copyNextSampleBuffer` that never returns for another reason (a volume
+    /// that stops answering) is not woken, and accepted (spec §11 G-17). A
+    /// cancel before `start` is refused there; `cancelReading()` before
+    /// `startReading()` would raise.
     func cancel() {
         lock.lock()
         cancelRequested = true
@@ -374,17 +347,25 @@ final class ExportWriter {
     /// one too unless the export asked to be normalised — which is what
     /// keeps an ordinary export on exactly the samples it had before.
     /// `frames` is non-nil only for the video pump of a row `frameForm`
-    /// names: each frame is then converted by it (`ExportFrames`).
+    /// names: each frame is then converted by it (`ExportFrames`). `reader` is
+    /// the output's own, which `stop` cancels after the last read when the
+    /// write is stopping (#378). `-RCDevExportFault` reaches the audio pump
+    /// before a read and the video pump before an append.
     private func pump(
-        _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
-        group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil,
-        frames: ExportFrames? = nil, end: ExportAudioEnd? = nil
+        _ input: AVAssetWriterInput, from output: AVAssetReaderOutput,
+        reading reader: AVAssetReader, on queue: DispatchQueue, group: DispatchGroup,
+        tracksProgress: Bool, gain: ExportAudioGain? = nil, frames: ExportFrames? = nil,
+        end: ExportAudioEnd? = nil
     ) {
         group.enter()
         var finished = false
-        let stop: () -> Void = {
+        var reads = 0
+        var appends = 0
+        let stop: () -> Void = { [weak self] in
             guard !finished else { return }
             finished = true
+            // Its own reader, on its own queue, after its own last read (G-17).
+            if self?.isStopping ?? true { reader.cancelReading() }
             input.markAsFinished()
             group.leave()
         }
@@ -396,16 +377,20 @@ final class ExportWriter {
                     stop()
                     return
                 }
+                if end != nil, end?.isPadding != true {
+                    reads += 1
+                    do { try self.fault?.beforeAudioRead(reads) } catch {
+                        self.stopped(with: error)
+                        stop()
+                        return
+                    }
+                }
                 guard let decoded = end?.isPadding == true ? nil : output.copyNextSampleBuffer()
                 else {
-                    // Dry for one of three reasons: the range is written, the
-                    // read was cancelled (which `allInputsFinished` reports),
-                    // or the read failed — and only the last is ours to name.
-                    if self.reader.status == .failed {
-                        self.stopped(
-                            with: self.reader.error
-                                ?? Exporter.ExportError.failed(
-                                    "The composition could not be read to the end."))
+                    // Dry: the range is written, or the read failed — and only
+                    // the last is ours to name.
+                    if let error = self.readFailure(of: reader) {
+                        self.stopped(with: error)
                     } else if let end = end, !self.isStopping {
                         // Silence up to the range's end, while the input has room (#337).
                         guard let padded = end.pad(input) else { return }
@@ -452,6 +437,14 @@ final class ExportWriter {
                 }
                 // A buffer past the range's end is cut or dropped (#337).
                 guard let fitted = end == nil ? rebased : end?.fit(rebased) else { continue }
+                if end == nil {
+                    appends += 1
+                    if let error = self.fault?.videoPacket(appends) {
+                        self.stopped(with: error)
+                        stop()
+                        return
+                    }
+                }
                 guard input.append(fitted) else {
                     self.stopped(
                         with: self.writer.error
@@ -474,18 +467,18 @@ final class ExportWriter {
     }
 
     /// Records the first failure; later ones are noise from the other pumps
-    /// unwinding. The other pumps see it before their next sample, and the
-    /// read is cancelled in `allInputsFinished` (`cancel`'s doc says why).
+    /// unwinding. The other pumps see it before their next sample, and each
+    /// reader is cancelled by its own pump (`cancel`'s doc says why).
     private func stopped(with error: any Error) {
         lock.lock()
         if failure == nil { failure = error }
         lock.unlock()
     }
 
-    /// The reader's error once its read failed, else nil — the encoder pump's question
-    /// at the end of its read, worded as `pump`'s.
-    private var readFailure: (any Error)? {
-        guard reader.status == .failed else { return nil }
+    /// `reader`'s error once its read failed, else nil — each pump's question at
+    /// the end of its read.
+    private func readFailure(of reader: AVAssetReader?) -> (any Error)? {
+        guard let reader, reader.status == .failed else { return nil }
         return reader.error
             ?? Exporter.ExportError.failed("The composition could not be read to the end.")
     }
@@ -498,14 +491,22 @@ final class ExportWriter {
         lock.unlock()
     }
 
-    /// Main thread, once every input has marked itself finished — so no pump
-    /// is inside `copyNextSampleBuffer`, and the reader can be cancelled.
+    /// Main thread, once every input has marked itself finished — each reader
+    /// already cancelled by its own pump on a stop (#378): the writer is
+    /// cancelled or finished.
     private func allInputsFinished() {
         lock.lock()
         let error = failure
         let cancelled = cancelRequested
         lock.unlock()
-        if error != nil || cancelled { reader.cancelReading() }
+        if fault != nil {
+            let state = { (reader: AVAssetReader?) in
+                reader.map { "\($0.status.rawValue)" } ?? "none"
+            }
+            let shared = audioReader != nil && audioReader === videoReader ? " (one reader)" : ""
+            fault?.note(
+                "readers: video \(state(videoReader)), audio \(state(audioReader))" + shared)
+        }
         encodePump?.close()
         if let error = error {
             writer.cancelWriting()

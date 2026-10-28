@@ -441,12 +441,12 @@ default selection, `--measure` or a mutant's default selection (HG0 runs only un
 `capture --only`, HGu only under `--only`); hdr H-1's five, H-2's twelve, H-3's seven, H-4's
 nine, H-6's ten, clean-up batch 2's eleven, its phase 2's thirteen, clean-up 3 batch B's four
 and its phase 3's six mutants (and `still-peak-dropped`, re-anchored there) run with
-`--only <their rows>,Z1` (SI also runs under `capture --only`, writing
-DIR's references). `capture --only`
+`--only <their rows>,Z1` (SI, though an H-4 row, also runs under `capture`, by default
+and under `--only`, writing DIR's references). `capture --only`
 captures just the rows named, keeping an earlier capture's H1 record.
 `capture DIR` records H1's references (`DIR/h1-*.png`, `DIR/media/`,
-`DIR/capture.json` with the picks and the reverse's digest) and runs H2–H6 and
-R0, which must FAIL on the control (each discriminates). `--mutant NAME`
+`DIR/capture.json` with the picks and the reverse's digest) and SI's (`DIR/si/`),
+and runs H2–H6 and R0, which must FAIL on the control (each discriminates). `--mutant NAME`
 builds a COPY of the tree (`tree_copy.make_copy`), applies its edits (each
 anchor asserted to occur exactly once), builds it by the copy's own `make
 app-debug` (`make app` under `RC_PROOF_APP=release`) and runs every row on it
@@ -1896,6 +1896,8 @@ class Doc:
         got = self.call("save_project", path=str(path))
         if got["ok"]:
             self.path = path
+        else:  # the answer's own reason, so "not saved" names why (H1a's one flake)
+            self.why = f"save_project {path.name}: {got.get('error')}"
         return path if got["ok"] else None
 
     def close(self):
@@ -3964,7 +3966,10 @@ def run_ds(client, state):
         figures.append(f"{fmt}: {digest(a) if a else None} / {digest(b) if b else None}")
         if not same:
             misses.append(fmt)
-    keep = lambda got: {k: v for k, v in reply(got).items() if k not in ("path", "bytes")}
+    # The settings, not the run: since #326 the answer is `export_status`'s, whose
+    # `export_id` (a new one per export) and `elapsed` differ on every run.
+    per_run = ("path", "bytes", "export_id", "elapsed")
+    keep = lambda got: {k: v for k, v in reply(got).items() if k not in per_run}
     figures.append(f"h264 settings {keep(plain)} / {keep(sdr)}")
     if plain_out is None or sdr_out is None or keep(plain) != keep(sdr) or not keep(plain):
         misses.append("the h264 settings")
@@ -7008,7 +7013,9 @@ def main():
                          | C3_ROWS | B3_ROWS | B4_ROWS)
     if args.mode == "capture":
         if not args.only:
-            selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "Z1"}
+            # SI too: a plain run and `compare` score SI against DIR/si/, which only a
+            # capture that runs SI writes.
+            selected = {"H1", "H2", "H3", "H4", "H5", "H6", "R0", "SI", "Z1"}
         control.mkdir(parents=True, exist_ok=True)
     if args.mode is None and not args.mutant:
         selected -= {"H1"}

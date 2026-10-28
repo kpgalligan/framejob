@@ -334,7 +334,9 @@ Synchronize Audio's background analysis so a proof can act during it; and
 `-RCDevRampRenderHold <s>`, which holds each speed-ramp audio render so a
 proof can act while it is pending; and `-RCDevWebMFault audio@N|video@N|audio-hold@N`,
 which puts a fault in an `av1_webm` export's audio pump or video sink so a
-proof can time the stop, spec §11 CX-15 (6)), which
+proof can time the stop, spec §11 CX-15 (6); and
+`-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
+`ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`

@@ -1673,7 +1673,7 @@ the key map behind it.
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
-  `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
+  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
@@ -1682,7 +1682,8 @@ the key map behind it.
   `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
   the WebM writer) · `ExportWebMWriter.swift` · `ExportWebMLayout.swift` ·
-  `ExportOpusEncoder.swift` · `ExportWebMDevFault.swift` (`-RCDevWebMFault`, dev only)
+  `ExportOpusEncoder.swift` · `ExportWebMDevFault.swift` (`-RCDevWebMFault`, and
+  `-RCDevExportFault` for `ExportWriter`'s pumps, spec §11 #378, dev only)
   — the `av1_webm` row (spec §11 CX-15): `ExportWebMWriter` gives the video output and
   the audio mix output ONE `AVAssetReader` EACH, and each pump cancels only its own,
   on its own queue, after its own last read (G-17; CX-15 (2)); it adopts
@@ -1748,11 +1749,13 @@ the key map behind it.
   `ExportQueueRowView.toolTip(for:)`) and `export`'s `graphic_warnings`
   (G-24 (c)).
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
-  measurement's loop cancels its own reader, and the writer's reader and
-  writer are cancelled in `allInputsFinished`, after every pump has left its
-  loop — cancelling a reader under a running `copyNextSampleBuffer` crashed
-  the process. Never call `cancelReading` from another thread while a loop
-  reads; a read that never returns is not woken (spec §11 G-17).
+  measurement's loop cancels its own reader, `ExportWriter` reads each output
+  on a reader of its own and each pump cancels its own reader on its own queue
+  after its own last read (spec §11 #378), and the writer is cancelled in
+  `allInputsFinished`, after every pump has left its loop — cancelling a
+  reader under a running `copyNextSampleBuffer` crashed the process. Never
+  call `cancelReading` from another thread while a loop reads; a read that
+  never returns for another reason is not woken (spec §11 G-17).
 - `DeepStillFrame.swift` — whether a frame's recipe draws a still deeper than
   8 bits (`shows`), and `read`: a deep frame through export's reader
   (`AVAssetReaderVideoCompositionOutput` at `64RGBAHalf`), spec §11 PR-9 and

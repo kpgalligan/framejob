@@ -2,22 +2,29 @@
 // `ExportWebMWriter` took one `AVAssetReader` per output: two readers over the same
 // composition (one carrying the video composition output alone, one the audio mix output
 // alone) hand back the same frames and the same sound as one reader carrying both.
-// `webm_export_proof.py` builds and runs it (row R1).
+// `webm_export_proof.py` builds and runs it (row R1); issue #378 added R2 and R3, the
+// measurement made before `ExportWriter` took one reader per output, which
+// `export_readers_proof.py` runs through the same builder.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own `main.swift`
 // on `swift_build.py`'s line, beside the tree's `Compositor.metal` and `ExportI010.metal` as
 // `default.metallib` and `Blank.mp4`. No window, no app.
 //
-//   webm_readers_probe <AV.mov> [answer.json]
+//   webm_readers_probe <AV.mov> [answer.json] [R1,R2,R3]
 //
 // A1's project (`av1_export_proof.py`'s): a 640 × 360, 30 fps canvas, AV.mov from 0, a
 // two-second text clip on a track above. Each configuration gets its own build (its own
 // `AVAudioMix` and taps), its reads on two threads at once as the writer runs them, the
-// `av1_webm` settings' outputs (`ExportWriter.videoReadOutput` / `audioReadOutput`):
+// row's settings' outputs (`ExportWriter.videoReadOutput` / `audioReadOutput`):
 //
-//   R1  frames: the same count, every frame's 64RGBAHalf bytes equal, and the I010 the
-//       encoder is handed (`ExportI010Converter`, the row's size and picture) byte-equal
-//       for the first, middle and last frame; sound: the same 16-bit PCM, sample for sample
+//   R1  `av1_webm`, the 16-bit decode. Frames: the same count, every frame's 64RGBAHalf
+//       bytes equal, and the I010 the encoder is handed (`ExportI010Converter`, the row's
+//       size and picture) byte-equal for the first, middle and last frame; sound: the same
+//       16-bit PCM, sample for sample
+//   R2  `h264`, the 16-bit decode: the same frames and sound, no I010 (#378)
+//   R3  `h264`, gained: the float mix a normalised export reads (8 bytes a frame), the
+//       same frames and the same float sound, sample for sample (#378)
+// Each wants 150 frames and 240,000 frames of sound.
 import AVFoundation
 import Foundation
 
@@ -96,8 +103,13 @@ func planes(_ frame: I010Frame) -> Data {
     return out
 }
 
-/// One configuration: `split` two readers (one output each), else one reader with both.
-func read(_ project: ReelProject, urls: [UInt32: URL], split: Bool, keep: Set<Int>) throws -> Read {
+/// One configuration: `split` two readers (one output each), else one reader with both;
+/// `preset`'s outputs, the sound the float mix when `gained`; the I010 of the frames in
+/// `keep` (none for an empty set).
+func read(
+    _ project: ReelProject, urls: [UInt32: URL], preset: String, gained: Bool, split: Bool,
+    keep: Set<Int>
+) throws -> Read {
     guard let plan = project.plan else { throw ProbeError("no plan") }
     let key = RecipeSource.shared.register()
     defer { RecipeSource.shared.unregister(key) }
@@ -105,10 +117,10 @@ func read(_ project: ReelProject, urls: [UInt32: URL], split: Bool, keep: Set<In
     RecipeSource.shared.setOptions(.none, for: key)
     let built = try CompositionBuilder.build(
         plan: plan, planJSON: project.planJSON, urls: urls, recipeKey: key)
-    let settings = try ReelExport.settings(project, preset: "av1_webm")
+    let settings = try ReelExport.settings(project, preset: preset)
     let range = Exporter.timeRange(settings, composition: built.composition)
     let videoOutput = ExportWriter.videoReadOutput(built, settings: settings)
-    let audioOutput = ExportWriter.audioReadOutput(built, gained: false)
+    let audioOutput = ExportWriter.audioReadOutput(built, gained: gained)
     let videoReader = try AVAssetReader(asset: built.composition)
     let audioReader = split ? try AVAssetReader(asset: built.composition) : videoReader
     videoReader.timeRange = range
@@ -120,7 +132,7 @@ func read(_ project: ReelProject, urls: [UInt32: URL], split: Bool, keep: Set<In
     }
     let frame = ExportWriter.encodedSize(settings)
     let canvas = built.videoComposition.renderSize
-    let converter = try ExportI010Converter(
+    let converter = keep.isEmpty ? nil : try ExportI010Converter(
         width: frame.width, height: frame.height, canvas: canvas,
         fills: ExportWriter.fillsTheBox(settings, canvas: canvas),
         picture: ExportAV1Picture(color: settings.color), pool: 3)
@@ -133,7 +145,7 @@ func read(_ project: ReelProject, urls: [UInt32: URL], split: Bool, keep: Set<In
             guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
             let bytes = pixels(buffer)
             var converted: Data?
-            if keep.contains(index), let i010 = converter.convert(buffer) {
+            if keep.contains(index), let converter, let i010 = converter.convert(buffer) {
                 converted = planes(i010)
                 converter.recycle(i010)
             }
@@ -170,35 +182,62 @@ func read(_ project: ReelProject, urls: [UInt32: URL], split: Bool, keep: Set<In
     return result
 }
 
-let arguments = CommandLine.arguments
-do {
-    guard arguments.count > 1 else { throw ProbeError("usage: webm_readers_probe <AV.mov>") }
-    let media = URL(fileURLWithPath: arguments[1])
-    let project = try a1(media)
-    var urls: [UInt32: URL] = [:]
-    for item in project.snapshot.media { urls[item.id] = URL(fileURLWithPath: item.path) }
-    let keep: Set<Int> = [0, 75, 149]
-    let one = try read(project, urls: urls, split: false, keep: keep)
-    let two = try read(project, urls: urls, split: true, keep: keep)
-    let unequal = zip(one.frames, two.frames).enumerated().filter { $0.element.0 != $0.element.1 }
-        .map(\.offset)
-    let i010 = keep.sorted().map { (index: $0, equal: one.i010[$0] != nil && one.i010[$0] == two.i010[$0],
-                                    bytes: one.i010[$0]?.count ?? 0) }
-    let firstSampleDiff = zip(one.audio, two.audio).enumerated().first { $0.element.0 != $0.element.1 }?
-        .offset
-    let distinct = Set(one.frames).count
-    let ok = distinct > 1 && one.errors.isEmpty && two.errors.isEmpty && one.frames.count == 150
-        && one.frames.count == two.frames.count && unequal.isEmpty
-        && i010.allSatisfy(\.equal) && one.audio.count == 240_000 * 4 && one.audio == two.audio
-    check("R1 two readers (one output each) read A1's project as one reader with both",
-          ok, "\(distinct) distinct frames; frames \(one.frames.count) / \(two.frames.count) (want 150), unequal 64RGBAHalf "
+/// One row: A1's project read on one reader and on two, compared. `frameBytes` is the
+/// sound's bytes a frame (4 for the 16-bit decode, 8 for the float mix).
+func compare(
+    _ name: String, media: URL, preset: String, gained: Bool, keep: Set<Int>, frameBytes: Int
+) {
+    do {
+        let project = try a1(media)
+        var urls: [UInt32: URL] = [:]
+        for item in project.snapshot.media { urls[item.id] = URL(fileURLWithPath: item.path) }
+        let one = try read(
+            project, urls: urls, preset: preset, gained: gained, split: false, keep: keep)
+        let two = try read(
+            project, urls: urls, preset: preset, gained: gained, split: true, keep: keep)
+        let unequal = zip(one.frames, two.frames).enumerated()
+            .filter { $0.element.0 != $0.element.1 }.map(\.offset)
+        let i010 = keep.sorted().map { (index: $0, equal: one.i010[$0] != nil && one.i010[$0] == two.i010[$0],
+                                        bytes: one.i010[$0]?.count ?? 0) }
+        let firstSampleDiff = zip(one.audio, two.audio).enumerated()
+            .first { $0.element.0 != $0.element.1 }?.offset
+        let distinct = Set(one.frames).count
+        let ok = distinct > 1 && one.errors.isEmpty && two.errors.isEmpty && one.frames.count == 150
+            && one.frames.count == two.frames.count && unequal.isEmpty
+            && i010.allSatisfy(\.equal) && one.audio.count == 240_000 * frameBytes
+            && one.audio == two.audio
+        check(name, ok, "\(distinct) distinct frames; frames \(one.frames.count) / "
+            + "\(two.frames.count) (want 150), unequal 64RGBAHalf "
             + "frames \(unequal.prefix(8)); I010 \(i010.map { "#\($0.index) \($0.bytes) bytes equal \($0.equal)" }); "
-            + "audio \(one.audio.count / 4) / \(two.audio.count / 4) frames (want 240000), equal "
+            + "audio \(one.audio.count / frameBytes) / \(two.audio.count / frameBytes) frames (want 240000), equal "
             + "\(one.audio == two.audio), first differing byte \(firstSampleDiff.map(String.init) ?? "none"); "
             + "errors \(one.errors + two.errors)")
-} catch {
+    } catch {
+        check(name, false, "\(error)")
+    }
+}
+
+let arguments = CommandLine.arguments
+if arguments.count > 1 {
+    let media = URL(fileURLWithPath: arguments[1])
+    let asked = arguments.count > 3
+        ? Set(arguments[3].split(separator: ",").map(String.init)) : ["R1", "R2", "R3"]
+    if asked.contains("R1") {
+        compare("R1 two readers (one output each) read A1's project as one reader with both",
+                media: media, preset: "av1_webm", gained: false, keep: [0, 75, 149],
+                frameBytes: 4)
+    }
+    if asked.contains("R2") {
+        compare("R2 two readers read A1's project as h264 as one reader with both",
+                media: media, preset: "h264", gained: false, keep: [], frameBytes: 4)
+    }
+    if asked.contains("R3") {
+        compare("R3 two readers read A1's project as h264 with the float mix as one reader with both",
+                media: media, preset: "h264", gained: true, keep: [], frameBytes: 8)
+    }
+} else {
     check("R1 two readers (one output each) read A1's project as one reader with both", false,
-          "\(error)")
+          "usage: webm_readers_probe <AV.mov> [answer.json] [R1,R2,R3]")
 }
 
 let answer = try JSONSerialization.data(withJSONObject: ["rows": rows], options: [.prettyPrinted])

@@ -708,17 +708,18 @@ def long_doc(instance, name):
     return doc
 
 
-def row_fault(ident, app, logs):
-    spec, want = FAULTS[ident]
-    instance = av1.Instance(f"fault-{ident.lower()}", app,
-                            arguments=["-RCDevWebMFault", spec])
+def fault_row(ident, app, logs, *, spec, want, preset, word, default, cancel, out, suffix):
+    """One fault row: `long_doc` exported as `preset` on an instance launched with
+    `-<default> <spec>`, timed from the fault's log line (`cancel`: `cancel_export` sent at
+    the hold's line, timed from it); (ok, detail). Shared with `export_readers_proof.py`."""
+    instance = av1.Instance(f"fault-{ident.lower()}", app, arguments=[f"-{default}", spec])
     logs.append(instance)
-    out = WORK / "out"
     out.mkdir(parents=True, exist_ok=True)
-    path = out / f"{ident.lower()}.webm"
+    path = out / f"{ident.lower()}{suffix}"
     path.unlink(missing_ok=True)
     doc, ok, detail = None, False, ""
-    marker = "is held" if ident == "F3" else "framejob webm dev fault:"
+    marker = "is held" if cancel else f"framejob {word} dev fault:"
+    readers_line = f"framejob {word} dev readers: "
 
     def log_lines():
         try:
@@ -730,7 +731,7 @@ def row_fault(ident, app, logs):
             raise RuntimeError(f"the app did not listen ({instance.log})")
         doc = long_doc(instance, ident.lower())
         job = doc.client.call_with("export", {"project": doc.path, "path": str(path),
-                                              "preset": "av1_webm"})["export_id"]
+                                              "preset": preset})["export_id"]
         deadline, fired = time.monotonic() + 300, None
         status = {}
         while time.monotonic() < deadline:
@@ -743,7 +744,7 @@ def row_fault(ident, app, logs):
             time.sleep(0.05)
         if fired is None:
             raise RuntimeError(f"the fault never fired: {status}")
-        if ident == "F3":
+        if cancel:
             doc.client.call("cancel_export", export_id=job)
         final = {}
         while time.monotonic() - fired < 120:
@@ -753,13 +754,14 @@ def row_fault(ident, app, logs):
             time.sleep(0.05)
         took = time.monotonic() - fired
         time.sleep(0.5)    # the readers' line follows the pumps, on main
-        readers = [line.split("readers: ", 1)[1] for line in log_lines() if "readers: " in line]
+        readers = [line.split("readers: ", 1)[1] for line in log_lines()
+                   if readers_line in line]
         exists = path.exists()
         named = want == "cancelled" or "dev fault" in json.dumps(final)
         ok = (final.get("status") == want and named and took <= FAULT_BOUND and not exists
               and readers == ["video 4, audio 4"])
         detail = (f"{spec}: status {final.get('status')!r} (want {want!r}) {took:.2f} s after "
-                  f"the {'cancel' if ident == 'F3' else 'fault'} (≤ {FAULT_BOUND}); the dev "
+                  f"the {'cancel' if cancel else 'fault'} (≤ {FAULT_BOUND}); the dev "
                   f"fault named: {named}; readers {readers} (want ['video 4, audio 4'], 4 = "
                   f"cancelled); a file at the path: {exists}; {json.dumps(final)[:300]}")
     except (mcp.ToolError, KeyError, RuntimeError, OSError) as error:
@@ -771,6 +773,14 @@ def row_fault(ident, app, logs):
             except Exception:  # an instance that died is the row's FAIL already
                 pass
         instance.stop()
+    return ok, detail
+
+
+def row_fault(ident, app, logs):
+    spec, want = FAULTS[ident]
+    ok, detail = fault_row(ident, app, logs, spec=spec, want=want, preset="av1_webm",
+                           word="webm", default="RCDevWebMFault", cancel=ident == "F3",
+                           out=WORK / "out", suffix=".webm")
     check(ident, ok, detail)
 
 
@@ -871,13 +881,18 @@ def run_probe(sources):
             check(ident, row["ok"], f"{row['name'][len(ident) + 1:]}: {row['detail']}")
 
 
-def run_readers_probe(sources=ROOT / SOURCES):
-    """R1: `webm_readers_probe.swift` beside the tree's two export shaders as
-    `default.metallib`, `Blank.mp4`, `Silence.caf` and the fonts, run over AV.mov."""
+def readers_rows(idents, sources=ROOT / SOURCES, folder=WORK / "readers-probe"):
+    """`webm_readers_probe.swift` beside the tree's two export shaders as
+    `default.metallib`, `Blank.mp4`, `Silence.caf` and the fonts, run over AV.mov for the
+    rows `idents`: [(ident, ok, detail)], one per ident, a FAIL for each when the instrument
+    cannot run. Shared with `export_readers_proof.py` (R2, R3)."""
     import shutil
     import reference_build
     import swift_build
-    folder = WORK / "readers-probe"
+
+    def failed(why):
+        return [(ident, False, why) for ident in idents]
+    folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     entry = folder / "main.swift"
     text = READERS_SWIFT.read_text()
@@ -894,12 +909,12 @@ def run_readers_probe(sources=ROOT / SOURCES):
         step = run(["xcrun", "-sdk", "macosx", "metal", "-c",
                     resources / "Shaders" / f"{shader}.metal", "-o", air], 300)
         if step["rc"] != 0:
-            return check("R1", False, f"{shader}.metal did not build: {step['stderr'][-300:]}")
+            return failed(f"{shader}.metal did not build: {step['stderr'][-300:]}")
         airs.append(air)
     step = run(["xcrun", "-sdk", "macosx", "metallib", *airs, "-o", folder / "default.metallib"],
                300)
     if step["rc"] != 0:
-        return check("R1", False, f"the metallib did not build: {step['stderr'][-300:]}")
+        return failed(f"the metallib did not build: {step['stderr'][-300:]}")
     binary, answer = folder / "webm-readers-probe", folder / "answer.json"
     try:
         defines = reference_build.tree_defines(Path(sources).parent.parent,
@@ -908,15 +923,28 @@ def run_readers_probe(sources=ROOT / SOURCES):
                           defines=defines)
     except swift_build.SwiftBuildFailed as error:
         lines = [line for line in error.diagnostics if ": error:" in line]
-        return check("R1", False, "the probe did not build: "
-                     + " | ".join(lines[:3] or list(error.diagnostics[:3]) or [str(error)]))
+        return failed("the probe did not build: "
+                      + " | ".join(lines[:3] or list(error.diagnostics[:3]) or [str(error)]))
     answer.unlink(missing_ok=True)
-    ran = bounded.run([str(binary), str(av1.AV), str(answer)], 600, cwd=str(folder))
+    ran = bounded.run([str(binary), str(av1.AV), str(answer), ",".join(idents)], 600,
+                      cwd=str(folder))
     if ran["expired"] or ran["rc"] != 0 or not answer.exists():
-        return check("R1", False, "the probe did not run: "
-                     + (ran["stdout"] + ran["stderr"]).strip()[-300:])
-    row = json.loads(answer.read_text())["rows"][0]
-    check("R1", row["ok"], f"{row['name'][3:]}: {row['detail']}")
+        return failed("the probe did not run: " + (ran["stdout"] + ran["stderr"]).strip()[-300:])
+    answered = {r["name"].split(" ", 1)[0]: r for r in json.loads(answer.read_text())["rows"]}
+    out = []
+    for ident in idents:
+        row = answered.get(ident)
+        if row is None:
+            out.append((ident, False, "the probe answered no such row"))
+        else:
+            out.append((ident, row["ok"], f"{row['name'][len(ident) + 1:]}: {row['detail']}"))
+    return out
+
+
+def run_readers_probe(sources=ROOT / SOURCES):
+    """R1: two readers against one, through `readers_rows`."""
+    for ident, ok, detail in readers_rows(("R1",), sources):
+        check(ident, ok, detail)
 
 
 def run_probe_mutant(name):

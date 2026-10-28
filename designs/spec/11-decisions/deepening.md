@@ -1504,3 +1504,46 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   comes, as a running pass already did; and on a host whose cooperative
   pool is two threads or fewer, guard 2 alone would not hold, so there
   guard 1 is the only one.
+- **#378 — One reader per output in `ExportWriter`, each cancelled only by
+  its own pump on its own queue after its own last read.** It amends G-17
+  and applies CX-15 (2) and (6) to `ExportWriter`. The video composition
+  output is read through `videoReader` and the audio mix output through
+  `audioReader`. Both readers are made over the same composition and both
+  take the export's range. An audio-only row has no video reader, and a
+  silent movie (no composition audio track) has no audio reader. The plain
+  pump (`pump`) cancels its own reader in its `stop`, after its last read,
+  and only when the write is stopping, so a clean export cancels no
+  reader. The `av1` row's `ExportEncodePump` is unchanged. Its reader is
+  cancelled by a block that the writer queues on the video queue after the
+  pump's read loop, again only when stopping. `allInputsFinished` cancels
+  only the writer. `cancel()` still only sets the flag. WHY: two outputs of
+  one reader are coupled, because an output nobody reads stalls the reader.
+  On the shared reader, a stop on one pump could therefore leave the other
+  blocked in `copyNextSampleBuffer` for good. `cancelReading()` cannot wake
+  that pump: `AVAssetReader.h` forbids calling it concurrently with a read,
+  and calling it from main under a running read crashed 12 of 30
+  mid-export cancels (G-17). With a reader each, neither read waits on the
+  other. The other pump sees the recorded stop at its next check and
+  leaves, and no thread cancels a reader another thread reads. **Measured**
+  before the change (`tools/proof/webm_readers_probe.swift`, run by
+  `tools/proof/export_readers_proof.py`): A1's project read at `h264`'s
+  settings on one reader carrying both outputs and on two readers, each on
+  a thread of its own, gave the same 150 frames byte for byte (64RGBAHalf),
+  the same 240,000 frames of the 16-bit decode (R2), and the same 240,000
+  frames of the float mix a normalised export reads (R3), sample for
+  sample. **Instruments:** `-RCDevExportFault audio@N|video@N|audio-hold@N`
+  (`ExportWebMDevFault.writerKey`, dev tools only) puts a fault into an
+  `ExportWriter` export's audio pump (before its Nth read) or plain video
+  pump (before its Nth append). With a fault set, the writer logs its
+  readers' states once every pump has left (`framejob export dev readers:
+  video S, audio S`). F1–F4 export W9's 24-clip 1080p project:
+  `audio@40` on `h264`, `video@30` on `h264`, and `audio-hold@40` cancelled
+  during the hold on `h264` and on `av1`. Each ends within the 10 s bound
+  with no file at the path and both readers cancelled (status 4). The
+  three mutants are caught on exactly their rows: `shared-reader` on F1–F4,
+  `no-own-cancel` on F1–F4, and `encode-cancel-dropped` on F4. **Risks
+  accepted:** the audio tracks are decoded by a second reader, so the extra
+  cost is their decode. A read that never returns because a volume stops
+  answering is still not woken; G-17's other half stands. `video@N` does
+  not reach the `av1` row's MP4 sink, whose packets go through
+  `ExportPacketSink.swift`.
