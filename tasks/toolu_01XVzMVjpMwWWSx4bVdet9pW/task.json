@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XVzMVjpMwWWSx4bVdet9pW",
+  "agent_id": "a3efaca5eccea5265",
+  "subagent_type": "lc-fixer",
+  "task_description": "Residue+rebase pass codecs C4",
+  "token_usage": {
+    "input_tokens": 156,
+    "cache_creation_tokens": 155652,
+    "cache_read_tokens": 7408028,
+    "output_tokens": 42482,
+    "api_call_count": 78
+  },
+  "started_at": "2026-10-28T16:46:52.748135-04:00",
+  "completed_at": "2026-10-28T17:37:24.947546-04:00"
+}
