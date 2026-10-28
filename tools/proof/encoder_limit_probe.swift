@@ -104,6 +104,9 @@ func keyed(width: Int, height: Int, frames: Int = 300) -> [(String, ExportSettin
     out.append(("vp9_webm:hlg", settings(
         preset: "vp9_webm", writer: "libvpx", color: "hlg", width: width, height: height,
         frames: frames)))
+    out.append(("vp9_alpha_webm", settings(
+        preset: "vp9_alpha_webm", writer: "libvpx", width: width, height: height,
+        frames: frames)))
     return out
 }
 
@@ -134,7 +137,9 @@ answer["r1"] = r1
 
 do {
     let ledger = ExportEncoderLedger(physicalMemory: 64 * gib)
-    let alpha = settings(preset: "vp9_alpha_webm", writer: "libvpx", width: 1920, height: 1080)
+    // A writer row with no entry: every real row is measured (codec-export C5's fix pass
+    // measured vp9_alpha_webm), so the rule is read on a synthetic one.
+    let alpha = settings(preset: "unmeasured_webm", writer: "libvpx", width: 1920, height: 1080)
     let av1 = settings(preset: "av1", writer: "svt_av1", speed: .faster, width: 640, height: 360)
     let firstAlpha = ledger.admits(alpha)
     let alphaToken = ledger.begin(alpha)

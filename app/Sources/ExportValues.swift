@@ -90,7 +90,7 @@ struct ExportSettings: Decodable, Equatable {
     /// supplies 0 dBTP for it.
     let peakDbtp: Double?
     /// Whether this ENCODING carries an alpha channel — true for `prores_4444`,
-    /// `hevc_alpha` and `apng`, and for nothing else the table offers.
+    /// `hevc_alpha`, `vp9_alpha_webm` and `apng`, and for nothing else the table offers.
     ///
     /// The rows are not alike and `apng`'s is the one to remember beside it:
     /// `gif` is FALSE though a GIF can show a transparent pixel, because one
@@ -181,8 +181,8 @@ struct ExportSettings: Decodable, Equatable {
         audioBitrate = c.lenient(.audioBitrate)
         loudnessLufs = c.lenient(.loudnessLufs)
         peakDbtp = c.lenient(.peakDbtp)
-        // False is the safe default: only `prores_4444`, `hevc_alpha` and
-        // `apng` answer true, and a core that predates phase 7 does not emit
+        // False is the safe default: only `prores_4444`, `hevc_alpha`,
+        // `vp9_alpha_webm` and `apng` answer true, and a core that predates phase 7 does not emit
         // the key at all. Its silence UNDER-reports — that core has no
         // `prores_4444` row to describe, but its `apng` row wrote alpha then as it does
         // now — and under-reporting is the direction that cannot hurt: this

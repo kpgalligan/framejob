@@ -25352,9 +25352,52 @@ made of the same fixture: the control's `h7s-sdr_untagged_webm.mov`, which `capt
 --only H7s,Z1 --app <a pre-CX-16 build>` writes (C4's came from main `d0f9fe0` built in an
 isolated folder). Its mutant `sdr-copy-unlabelled` fails H7s alone.
 
+## Codec export C5 — VP9 with alpha in WebM (`vp9_alpha_export_proof.py` Z1, A1–A12, S1, P1; eight mutants; `export_offset_proof.py` E43; spec §11 CX-17)
+
+The `vp9_alpha_webm` row: `vp9_webm`'s 8-bit Profile 0 picture and a second libvpx stream of
+its alpha (`VP9AlphaEncoder`: two `VP9Encoder`s, keys forced every ⌊2·fps⌋ frames, packets
+paired by pts), each video block a BlockGroup carrying the alpha as BlockAdditional 1 with
+`AlphaMode` 1 on the TrackEntry (`rc_webm_add_video_with_alpha`); G-35's straight alpha in
+float before the conversion; always SDR; the alpha rows' shape rule.
+
+```
+python3 tools/proof/vp9_alpha_export_proof.py [--app debug|release|PATH]   # every row
+python3 tools/proof/vp9_alpha_export_proof.py --probe                      # P1 alone, no app
+python3 tools/proof/vp9_alpha_export_proof.py --mutant NAME                # exit 1 caught, 0 survived, 3 inexact, 2 control
+python3 tools/proof/export_offset_proof.py --only E43                      # clicks and flashes through vp9_alpha_webm
+python3 tools/proof/work/codec-spike/alpha_vp9.py [--app ...]              # CX-17 (6)'s calibration (gitignored)
+python3 tools/proof/work/codec-spike/alpha_vp9_ladder.py                    # its size bands (gitignored)
+```
+
+**`vp9_alpha_export_proof.py`** imports `vp9_export_proof.py`'s, `webm_export_proof.py`'s and
+`av1_export_proof.py`'s helpers and works under `work/vp9-alpha-export/`; its docstring has
+every row. Only ffmpeg's `libvpx-vp9` decoder reads the alpha, so every alpha reading names it
+(`-c:v libvpx-vp9` before `-i`). In short: A1 the streams (ffprobe's `alpha_mode=1`) and the
+walk (`MaxBlockAdditionID` 1, `AlphaMode` 1, Colour 1/1/1 8-bit, every video block a
+BlockGroup with flags 0 and one BlockAddID 1, a ReferenceBlock — the previous block's time
+less its own — exactly on the non-key frames); A2 a silent libvpx decode as `yuva420p`, 150
+frames, 240,000 samples; A3 keys at 0, 60 and 120 and each alpha payload's KEY_FRAME equal to
+its block's; A4 the alpha against the same project's `prores_4444` alpha, every frame
+≥ 48.0 dB on DISC (the spike's source as ProRes 4444) at 1920 × 1080, 1280 × 720 and
+640 × 360 (the alpha level's size bands) and TITLE at the Low and Maximum tiers, each
+export's alpha share of the video bytes printed, CLEAR's corner 0 and card 255; A5
+FAINT's colour straight and A1's picture against `vp9_webm`'s with its alpha 255; A6 chapters
+and the range; A7 a cancel with no file; A8 the silent movie; A9 the HLG doc's SDR version
+and `hlg` refused; A10 a size of another shape refused; A11 `encoder_speed` refused; A12 the
+re-import — A1's file renders as its source (≤ 8/255), CLEAR's comes back opaque (the
+accepted limit, CX-17 (7)); S1 the sheet in an HLG project (Format "VP9 with Alpha (WebM)",
+Speed and Dynamic Range disabled, footnote "VP9 · WEBM · alpha"); P1 `vp9_alpha_probe.swift`
+(no app): the pairing over stub encoders and `VP9Encoder.keyInterval`.
+
+The mutants: `not-straightened` A5; `alpha-mode-unwritten` A1, A8 and cargo `webm_writer_alpha`;
+`no-reference-block` A1, A3, A12 (every block reads as a key, so the copy marks every sample a
+sync sample); `alpha-video-range` A4, A5 (the opaque alpha reads 235); `alpha-cq-63` A4;
+`no-shape-guard` A10; `alpha-row-hdr` A9, S1 and cargo `dynamic_range`; `alpha-cq-one-band`
+(the size bands collapsed to the 1080p band's 40) A4, on DISC at 640 × 360 alone.
+
 ## Codec export C6a — the Export Queue's memory limit and the sheet's estimate (`encoder_limit_proof.py` B0, P0, R1–R3, E1–E3, Q1–Q5, S1, S2, X1, Z1; twelve mutants; `encoder_memory_measure.py`; spec §11 CX-18)
 
-A queued `av1`, `av1_webm` or `vp9_webm` job starts only while every bundled-encoder export
+A queued `av1`, `av1_webm`, `vp9_webm` or `vp9_alpha_webm` job starts only while every bundled-encoder export
 running in the app (the queue's and every Export… sheet's) fits, with it, in a quarter of
 physical memory, each costed by its resident peak measured at 1080p and 4K; a held job says
 why in its row and in `export_status`'s `waiting`. The sheet shows "Estimated time: about …"
@@ -25368,8 +25411,8 @@ python3 tools/proof/encoder_limit_proof.py --mutant NAME             # exit 1 ca
 ```
 
 **`encoder_memory_measure.py`** launches one fresh instance per key and size (av1 and
-av1_webm at faster, balanced and smaller; vp9_webm in an SDR and an HLG project; h264 as the
-AVFoundation control; 1920 × 1080 and 3840 × 2160), places AV.mov twice (10 s, 300 frames),
+av1_webm at faster, balanced and smaller; vp9_webm in an SDR and an HLG project;
+vp9_alpha_webm, added in C5's fix pass; h264 as the AVFoundation control; 1920 × 1080 and 3840 × 2160), places AV.mov twice (10 s, 300 frames),
 warms with one `render_frame`, reads the baseline `ps -o rss=`, then follows `export` to
 `done` while sampling the RSS every 0.1 s: delta = peak − baseline, seconds = the done
 answer's `elapsed`, the 1-minute load average at the start. It writes
@@ -25385,9 +25428,10 @@ no instance:** its two live projects are built in the probe from AV.mov as
 `webm_readers_probe.swift` builds A1's — A1 (640 × 360, AV.mov under a two-second text clip)
 and W9 (1920 × 1080, AV.mov 24 times at scale 3) — rather than saved over MCP. The probe's
 answer is raw; every expected value is computed in the script from P0's dump of the tables.
-P0 the eight keys, each figure sourced; R1 the budget (physical / 4) and the identical jobs
+P0 the nine keys, each figure sourced; R1 the budget (physical / 4) and the identical jobs
 admitted per key at 1080p and 4K = max(1, ⌊budget / cost⌋) on 16–128 GiB; R2 an unmeasured
-writer row (`vp9_alpha_webm`) costs the whole budget and runs alone; R3 h264 books nothing;
+writer row (a synthetic `unmeasured_webm`, every real row being measured) costs the whole
+budget and runs alone; R3 h264 books nothing;
 E1 the estimate per key at five sizes and three lengths; E2 `estimateText`'s steps; E3 none
 for h264, nor for `av1` at a rate that cannot be stepped (no frame count). Q1 the live shared queue and ledger with physical = 4 × the sheet job's cost: a
 headless Export… sheet writes W9 as `av1` Smaller while A (`av1`), B and C (`h264`) are

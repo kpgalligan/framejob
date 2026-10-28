@@ -63,15 +63,16 @@ extension AgentServer {
         // canvas and gave `ExportWriter` a refusal for one of them, and
         // neither reached the schema — so the tool promised a letterbox where
         // the build throws, and the row to ask for was named nowhere a caller
-        // could see it. There are three such rows since G-33, and the refusal
-        // is the two MOVIE rows', `prores_4444` and `hevc_alpha`: `apng`
-        // takes the ImageIO path, which FITS instead of padding.
+        // could see it. There are four such rows since CX-17, and the refusal
+        // is the MOVIE rows', `prores_4444`, `hevc_alpha` and `vp9_alpha_webm`:
+        // `apng` takes the ImageIO path, which FITS instead of padding.
         let exportPresetProperty: [String: Any] = [
             "type": "string",
             "description": "Export preset id — one per encoding, a container and a codec with "
                 + "no size of its own (that is size's). h264 is what the export sheet opens "
-                + "on. Three rows keep a transparent canvas transparent: prores_4444 and "
-                + "hevc_alpha (the movie rows — see size, which constrains them) and apng. "
+                + "on. Four rows keep a transparent canvas transparent: prores_4444, "
+                + "hevc_alpha and vp9_alpha_webm (the movie rows — see size, which constrains "
+                + "them) and apng. "
                 + "gif is not one of them: it can show a transparent pixel but has no alpha "
                 + "channel, so nothing partial survives it. prores_422, prores_4444 and "
                 + "hevc_10bit keep the compositor's 16-bit frames at 10 bits (ProRes 4444 at "
@@ -80,7 +81,9 @@ extension AgentServer {
                 + "the bundled SVT-AV1 at encoder_speed; Macs before M3 cannot play them "
                 + "back. vp9_webm is VP9 in a WebM with Opus from the bundled libvpx, at "
                 + "one speed: 8-bit (Profile 0) for an SDR picture, 10-bit (Profile 2) for "
-                + "HLG and PQ. Pass a wrong one once and the error lists them all.",
+                + "HLG and PQ. vp9_alpha_webm is that VP9 with its alpha, always 8-bit (the "
+                + "SDR version in an HLG project), the transparent movie Chrome and Firefox "
+                + "play; Safari's is hevc_alpha. Pass a wrong one and the error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
             "type": ["string", "array"],
@@ -98,12 +101,14 @@ extension AgentServer {
                 + "cap; a wrong id's error lists the ids. A movie is written at exactly the "
                 + "size asked for, letterboxed if the shape differs by more than a pixel "
                 + "(within a pixel the picture fills the frame instead) — except on "
-                + "prores_4444 and hevc_alpha, where a size of a DIFFERENT SHAPE from the "
+                + "prores_4444, hevc_alpha and vp9_alpha_webm, where a size of a DIFFERENT "
+                + "SHAPE from the "
                 + "canvas is refused rather than written, because the padding destroys the "
                 + "alpha channel those rows are chosen for; every row id is already the "
                 + "document's own shape, so this only bites on a [width, height] of another "
-                + "shape. h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm and "
-                + "prores_422 need even dimensions: an odd width or height — the document size on a canvas "
+                + "shape. h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm, "
+                + "vp9_alpha_webm and prores_422 need even dimensions: an odd width or height "
+                + "— the document size on a canvas "
                 + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
                 + "on that edge, and the width and height reported back are the file's. "
                 + "The shape is judged on that even frame: a [width, height] in the canvas's "
@@ -290,7 +295,8 @@ extension AgentServer {
                             + "times over. On vp9_webm it is a soft cap too: libvpx encodes at a "
                             + "constant quality matched to HEVC at this rate (HEVC 10-bit's in an "
                             + "HDR export), and the file usually stays under it; up to about "
-                            + "1.15 times it was measured.",
+                            + "1.15 times it was measured; on vp9_alpha_webm the cap is the "
+                            + "picture's alone, its alpha at a constant quality.",
                     ],
                     "audio_bitrate": [
                         "type": "integer", "minimum": 1,
@@ -329,7 +335,8 @@ extension AgentServer {
                             + "Range popup: hlg (the default; BT.2100 HLG, no Dolby Vision), pq (HDR10: "
                             + "BT.2100 PQ at 1,000 cd/m², mastering display P3-D65 0.005–1,000 "
                             + "cd/m², MaxCLL 1,000, MaxFALL 0) or sdr (the SDR version). Every "
-                            + "other video preset writes the SDR version; hlg and pq are refused "
+                            + "other video preset (vp9_alpha_webm too) writes the SDR version; "
+                            + "hlg and pq are refused "
                             + "there and in an SDR project, where sdr changes nothing.",
                     ],
                     // The sheet's Speed popup (spec §11 CX-2, CX-12 (2)).
@@ -339,8 +346,8 @@ extension AgentServer {
                             + "Speed popup: faster "
                             + "(SVT-AV1 preset 8), balanced (preset 6, the default) or smaller "
                             + "(preset 4, the smallest file for the picture and the slowest). "
-                            + "Refused on every other preset, vp9_webm included (libvpx has one "
-                            + "speed).",
+                            + "Refused on every other preset, vp9_webm and vp9_alpha_webm "
+                            + "included (libvpx has one speed).",
                     ],
                 ], required: ["preset", "path"]),
             // Window ▸ Export Queue's row for the job (spec §11 #326).
@@ -352,10 +359,10 @@ extension AgentServer {
                     + "cancelled), path and elapsed (seconds since export was called, or to "
                     + "the finish once it has finished). queued adds waiting, the queue row's "
                     + "sentence, while the job waits for memory behind other AV1 and VP9 "
-                    + "exports; queued and running add estimated_seconds on av1, av1_webm and "
-                    + "vp9_webm, the export sheet's estimate of the whole write, in whole seconds "
-                    + "and only an estimate. running adds progress (0 to 1) and "
-                    + "phase while the exporter names one (the loudness measurement). done "
+                    + "exports; queued and running add estimated_seconds on av1, av1_webm, "
+                    + "vp9_webm and vp9_alpha_webm, the export sheet's estimate of the whole "
+                    + "write in whole seconds, only an estimate. running adds progress (0 to 1) "
+                    + "and phase while the exporter names one (the loudness measurement). done "
                     + "adds what the file holds: ok, bytes, the settings that were used "
                     + "(preset, container, codec, width, height, fps [num, den], start, "
                     + "duration), burn_in_timecode, dynamic_range in an HLG project (the "

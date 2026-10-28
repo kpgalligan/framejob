@@ -353,10 +353,7 @@ enum ReelExport {
             throw ReelCoreError(
                 message: takeString(err) ?? "The core could not list export sizes.")
         }
-        guard let sizes = ReelJSON.decode([ExportSize].self, from: json) else {
-            throw ReelCoreError(message: "The core's export sizes could not be read.")
-        }
-        return sizes
+        return try ExportSize.list(json)
     }
 
     /// Resolves `preset` plus optional `overrides` (size, fps, range, the two
@@ -381,11 +378,7 @@ enum ReelExport {
             throw ReelCoreError(
                 message: takeErrorMessage(err, fallback: "Unknown export preset '\(preset)'."))
         }
-        guard let settings = ReelJSON.decode(ExportSettings.self, from: json) else {
-            throw ReelCoreError(
-                message: "The core returned export settings this build cannot read.")
-        }
-        return settings
+        return try ExportSettings.decoded(json)
     }
 }
 
@@ -495,13 +488,7 @@ enum ReelCube {
     /// The file's lattice; throws the core's lowercase sentence.
     static func parse(_ data: Data) throws -> CubeLattice {
         var err: UnsafeMutablePointer<CChar>? = nil
-        // An empty file still needs a non-NULL pointer (NULL is the core's
-        // "bytes is NULL"), so it lends one byte and passes a length of 0.
-        let count = data.count
-        let made: OpaquePointer? = (data.isEmpty ? Data([0]) : data).withUnsafeBytes { bytes in
-            guard let base = bytes.bindMemory(to: UInt8.self).baseAddress else { return nil }
-            return rc_cube_parse(base, count, &err)
-        }
+        let made = withNonNullBytes(data) { rc_cube_parse($0, $1, &err) }
         guard let cube = made else {
             throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
         }
@@ -579,10 +566,7 @@ enum ReelAV1 {
             throw ReelCoreError(
                 message: takeErrorMessage(err, fallback: "the av1C record could not be built"))
         }
-        guard let config = ReelJSON.decode(Config.self, from: text) else {
-            throw ReelCoreError(message: "the core's av1C answer could not be read: \(text)")
-        }
-        return config
+        return try Config.decoded(text)
     }
 
     /// `data` without its temporal delimiter OBUs; false, `data` untouched, when
@@ -629,6 +613,21 @@ final class ReelWebM {
                 rc_webm_add_packet(
                     handle, track, ptsNs, key, discardPaddingNs,
                     $0.bindMemory(to: UInt8.self).baseAddress, $0.count, err)
+            }
+        }
+    }
+
+    /// One video packet with its alpha frame (spec §11 CX-17 (5)), on a layout whose video has
+    /// `alpha_mode`.
+    func addVideo(ptsNs: Int64, key: Bool, data: Data, alpha: Data) throws {
+        try check { err in
+            data.withUnsafeBytes { picture in
+                alpha.withUnsafeBytes { plane in
+                    rc_webm_add_video_with_alpha(
+                        handle, ptsNs, key, picture.bindMemory(to: UInt8.self).baseAddress,
+                        picture.count, plane.bindMemory(to: UInt8.self).baseAddress, plane.count,
+                        err)
+                }
             }
         }
     }

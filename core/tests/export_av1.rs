@@ -135,9 +135,10 @@ fn no_other_row_names_a_writer_or_speeds() {
         if ["av1", "av1_webm"].contains(&text(&row, "/id")) {
             continue;
         }
-        // `vp9_webm` names its writer and no speeds (spec §11 CX-16); its
-        // file is `export_vp9.rs`.
-        if text(&row, "/id") == "vp9_webm" {
+        // `vp9_webm` and `vp9_alpha_webm` name their writer and no speeds
+        // (spec §11 CX-16, CX-17); their files are `export_vp9.rs` and
+        // `export_vp9_alpha.rs`.
+        if ["vp9_webm", "vp9_alpha_webm"].contains(&text(&row, "/id")) {
             assert!(row.get("encoder_speeds").is_none(), "{row}");
             assert_eq!(row.get("writer"), Some(&json!("libvpx")), "{row}");
             continue;

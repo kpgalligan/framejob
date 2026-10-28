@@ -21,6 +21,11 @@
 //  C = clamp(round(512 + 896 C′), 0, 1023), C′ the block's mean; at 8 bits
 //  Y = round(16 + 219 Y′) and C = clamp(round(128 + 224 C′), 0, 255).
 //
+//  `framejob_export_alpha8` (spec §11 CX-17 (2)) writes `vp9_alpha_webm`'s
+//  alpha picture from the same texture: one byte a pixel, full range,
+//  Y = round(255 · clamp(a, 0, 1)), at `alphaOffset`; its chroma is a constant
+//  128 the Swift side writes once.
+//
 
 #include <metal_stdlib>
 using namespace metal;
@@ -102,4 +107,24 @@ kernel void framejob_export_i420(texture2d<half, access::read> src [[texture(0)]
     uint chroma = gid.y * u.chromaStride + gid.x;
     planes[u.cbOffset + chroma] = uchar(clamp(round(128.0 + 224.0 * cb / count), 0.0, 255.0));
     planes[u.crOffset + chroma] = uchar(clamp(round(128.0 + 224.0 * cr / count), 0.0, 255.0));
+}
+
+/// Mirrored by `ExportAlphaUniforms` in `ExportI010.swift`; in samples.
+struct ExportAlphaUniforms {
+    uint width;
+    uint height;
+    uint lumaStride;
+    uint alphaOffset;
+};
+
+/// One thread per pixel: its alpha, full range, into the alpha picture's luma.
+kernel void framejob_export_alpha8(texture2d<half, access::read> src [[texture(0)]],
+                                   device uchar *planes [[buffer(0)]],
+                                   constant ExportAlphaUniforms &u [[buffer(1)]],
+                                   uint2 gid [[thread_position_in_grid]]) {
+    if (gid.x >= u.width || gid.y >= u.height) {
+        return;
+    }
+    float a = clamp(float(src.read(gid).a), 0.0, 1.0);
+    planes[u.alphaOffset + gid.y * u.lumaStride + gid.x] = uchar(round(255.0 * a));
 }

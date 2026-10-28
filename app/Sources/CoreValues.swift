@@ -12,6 +12,9 @@ import Foundation
 /// rc_*-free halves of `ReelExport.settings` (`CoreJSON.overrides`), `takeDiagnostics`
 /// (`GraphicDiagnostic.list(json:)`), `GraphicLibrary.rasterize` (`GraphicFailure.checkSides`)
 /// and `ReelSpeed.limits` (`SpeedLimits.decoded`), and `ReelHDR10.withBytes` (two pure moves).
+/// Codec-export C5's fix pass moved the decoding halves of `ReelExport.sizes`,
+/// `ReelExport.settings` and `ReelAV1.config`, and `ReelCube.parse`'s borrowed byte
+/// (`withNonNullBytes`), a pure move.
 
 /// Error thrown by the Rust core, carrying the message from `err_out`.
 struct ReelCoreError: LocalizedError {
@@ -194,6 +197,27 @@ extension ReelTime {
     }
 }
 
+/// `rc_export_sizes`' answer; throws when this build cannot read it.
+extension ExportSize {
+    static func list(_ json: String) throws -> [ExportSize] {
+        guard let sizes = ReelJSON.decode([ExportSize].self, from: json) else {
+            throw ReelCoreError(message: "The core's export sizes could not be read.")
+        }
+        return sizes
+    }
+}
+
+/// `rc_export_settings`' answer; throws when this build cannot read it.
+extension ExportSettings {
+    static func decoded(_ json: String) throws -> ExportSettings {
+        guard let settings = ReelJSON.decode(ExportSettings.self, from: json) else {
+            throw ReelCoreError(
+                message: "The core returned export settings this build cannot read.")
+        }
+        return settings
+    }
+}
+
 /// `ReelAV1`'s two decoded answers, which name no `rc_*` symbol, moved out of
 /// `ReelCore.swift` (a pure move, codec-export C1's fix pass).
 extension ReelAV1 {
@@ -231,6 +255,14 @@ extension ReelAV1 {
             monochrome = try c.decode(Bool.self, forKey: .monochrome)
             color = try c.decode(Color.self, forKey: .color)
         }
+
+        /// `rc_av1_config`'s answer `text`; throws when this build cannot read it.
+        static func decoded(_ text: String) throws -> Config {
+            guard let config = ReelJSON.decode(Config.self, from: text) else {
+                throw ReelCoreError(message: "the core's av1C answer could not be read: \(text)")
+            }
+            return config
+        }
     }
 }
 
@@ -239,4 +271,15 @@ extension ReelAV1 {
 func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
     guard let data, !data.isEmpty else { return body(nil, 0) }
     return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+}
+
+/// `data`'s bytes and count for an `rc_*` call that refuses NULL (`ReelCube.parse`'s): an
+/// empty `data` still needs a non-NULL pointer (NULL is the core's "bytes is NULL"), so it
+/// lends one byte and passes a length of 0. nil when no pointer could be had.
+func withNonNullBytes<R>(_ data: Data, _ body: (UnsafePointer<UInt8>, Int) -> R?) -> R? {
+    let count = data.count
+    return (data.isEmpty ? Data([0]) : data).withUnsafeBytes { bytes in
+        guard let base = bytes.bindMemory(to: UInt8.self).baseAddress else { return nil }
+        return body(base, count)
+    }
 }

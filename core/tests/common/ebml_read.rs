@@ -17,7 +17,7 @@ pub struct Element {
 }
 
 /// The masters this walk descends into.
-const MASTERS: [u32; 20] = [
+const MASTERS: [u32; 22] = [
     0x1A45_DFA3, // EBML
     0x1853_8067, // Segment
     0x114D_9B74, // SeekHead
@@ -35,6 +35,8 @@ const MASTERS: [u32; 20] = [
     0x80,        // ChapterDisplay
     0x1F43_B675, // Cluster
     0xA0,        // BlockGroup
+    0x75A1,      // BlockAdditions
+    0xA6,        // BlockMore
     0x1C53_BB6B, // Cues
     0xBB,        // CuePoint
     0xB7,        // CueTrackPositions
@@ -150,7 +152,9 @@ pub fn segment(bytes: &[u8]) -> (Vec<Element>, Element) {
 }
 
 /// One block as the file holds it: its track, its absolute time in ms, its
-/// flags, its frame's bytes, and the DiscardPadding of its group if any.
+/// flags, its frame's bytes, the DiscardPadding of its group if any, and its
+/// group's ReferenceBlock and BlockAdditions (each BlockMore's BlockAddID and
+/// BlockAdditional) if any.
 #[derive(Debug, Clone)]
 pub struct BlockRead {
     pub track: u64,
@@ -159,6 +163,9 @@ pub struct BlockRead {
     pub frame: Vec<u8>,
     pub discard: Option<i64>,
     pub cluster_start: usize,
+    pub group: bool,
+    pub reference: Option<i64>,
+    pub additions: Vec<(u64, Vec<u8>)>,
 }
 
 /// Every block of every Cluster, in file order.
@@ -178,6 +185,20 @@ pub fn blocks(bytes: &[u8], segment: &Element) -> Vec<BlockRead> {
                 ),
                 _ => continue,
             };
+            let reference = e.child(0xFB).map(|r| r.int(bytes));
+            let additions = e
+                .child(0x75A1)
+                .map(|adds| {
+                    adds.all(0xA6)
+                        .into_iter()
+                        .map(|more| {
+                            let id = more.child(0xEE).expect("a BlockAddID").uint(bytes);
+                            let body = more.child(0xA5).expect("a BlockAdditional");
+                            (id, body.body(bytes).to_vec())
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             let body = block.body(bytes);
             let (track, len) = read_size(body, 0);
             let rel = i16::from_be_bytes([body[len], body[len + 1]]);
@@ -188,6 +209,9 @@ pub fn blocks(bytes: &[u8], segment: &Element) -> Vec<BlockRead> {
                 frame: body[len + 3..].to_vec(),
                 discard,
                 cluster_start: cluster.start,
+                group: e.id == 0xA0,
+                reference,
+                additions,
             });
         }
     }

@@ -356,6 +356,9 @@ orchestrator's default, which the owner can still change by a new entry here).
   `writer` `libvpx` and no speeds; (2)'s `ExportWebMWriter` writes it too, its pump choosing the
   encoder by `writer`; and (3)'s Track 1 is `V_AV1` with its `av1C` or `V_VP9` with no
   CodecPrivate, BitsPerChannel 10 on AV1 and 8 or 10 on VP9 by the picture.
+  **Amended by CX-17** (C5): a `V_VP9` track may carry `alpha_mode`: its TrackEntry then has
+  `MaxBlockAdditionID` 1 and its Video `AlphaMode` 1, and each video block is a BlockGroup
+  {Block, BlockAdditions{BlockMore{BlockAddID 1, BlockAdditional}}, ReferenceBlock on non-keys}.
   4. **Interleave.** The core buffers each track the layout declares. It writes the earliest
      head only while every declared track that has not ended has a head, and `end_track`
      releases that constraint; a layout with one track writes each packet as it arrives. The
@@ -397,6 +400,8 @@ orchestrator's default, which the owner can still change by a new entry here).
      `libvpx`, with no `encoder_speeds`. It is even-sized, one of HD-5's HDR rows, and
      `optimize_for_network` has no effect on it. Its settings carry `writer` (`libvpx`) and
      no `encoder_speed`; `color` in an HLG project as every HDR row's.
+     **Amended by CX-17** (C5): the alpha row is `vp9_alpha_webm`, directly after this one,
+     an 8-bit SDR row and not an HDR row.
   2. **One speed (CX-3 binds).** libvpx runs `VPX_DL_GOOD_QUALITY` at cpu-used 4 with row-mt.
      There is no `encoder_speeds`, `encoder_speed` on the row is refused with the existing
      sentence (`vp9_webm has no encoder speed; encoder_speed applies to av1 and av1_webm`), and
@@ -525,6 +530,122 @@ orchestrator's default, which the owner can still change by a new entry here).
   than Profile 0; no player's HDR rendering was measured (CX-8); VMAF is not calibrated for
   HLG, so the 10-bit column's comparison is by the same instrument but not a perceptual
   claim; and the calibration covers four clips at 1080p.
+
+- **CX-17 — C5: `vp9_alpha_webm`, VP9 with alpha in WebM: an 8-bit SDR row, a second libvpx
+  encoder for the alpha, written as BlockAdditional 1** (default, recorded in C5 before its
+  code; amends CX-15 (3), CX-16 (1) and G-35):
+  1. **The row.** `vp9_alpha_webm` is "VP9 with Alpha (WebM)", directly after `vp9_webm`:
+     container `webm`, codec `vp9`, video, `alpha` true, `size` and `fps` null, `avf_preset`
+     `AVAssetExportPresetPassthrough` (a record, as on `vp9_webm`) and `writer` `libvpx`, with
+     no `encoder_speeds` (CX-16 (2): `encoder_speed` is refused in the existing sentence, and
+     the sheet's Speed popup is disabled). It is even-sized and `optimize_for_network` has no
+     effect on it. **It is not an HDR row** (not in HD-5's `HDR_ROWS`): always 8-bit Profile 0,
+     BT.709, as CX-16 (3)'s `sdr`. In an HLG project it writes the SDR version (settings
+     `color` `sdr`), and `hlg` or `pq` asked of it is refused by the existing 8-bit sentence.
+     WHY: the row's reason to exist is transparency in a browser, and `hevc_alpha`, the other
+     delivery alpha row, is SDR too. It is one of the four rows whose `alpha` is true
+     (`prores_4444`, `hevc_alpha`, `vp9_alpha_webm`, `apng`), so G-33's shape rule binds it:
+     a size within a pixel of the canvas's shape is filled, and any other shape is refused in
+     `alphaAspectMismatch`'s sentence before a file is made.
+  2. **Straight alpha** (G-35 extended to the row). Each composed frame (`64RGBAHalf`) is
+     straightened in place in float before its conversion, through PR-3's `prores_4444` pass
+     (`ExportStraightAlpha.straighten(half:…)`: s = min(1, c/a) for a > 0, then G-35 (d)'s
+     fill), and a frame that cannot be straightened stops the export with G-35's "A frame's
+     transparency could not be written straight." The colour plane is BT.709 video range from
+     the straight colour (CX-16 (3)'s 8-bit arithmetic); the alpha plane is a second 8-bit
+     I420 picture whose Y = round(255 · clamp(a, 0, 1)), full range, and whose chroma is a
+     constant 128.
+  3. **Two encoders.** Two `VP9Encoder`s live on the pump's encode queue. The picture is
+     exactly CX-16's 8-bit: capped CQ, CX-16 (7)'s table, the cap. The alpha runs `VPX_Q`
+     (constant quality, no cap) at `VP8E_SET_CQ_LEVEL` `alphaCQLevel(pixels:)` (6), with
+     `VP9E_SET_COLOR_RANGE` full (`VPX_CR_FULL_RANGE`), and otherwise CX-16 (6)'s settings.
+     The cap and `video_bitrate` govern the colour stream alone.
+  4. **Keys aligned by construction.** Both encoders run `kf_mode` auto with `kf_min_dist` =
+     `kf_max_dist` = ⌊2 · fps⌋ (at least 1), and each frame whose index is a multiple of it is
+     sent with `VPX_EFLAG_FORCE_KF`. Packets are paired by pts: the pump answers a packet only
+     when both encoders have answered that frame. An alpha frame at another pts fails the
+     export ("libvpx's alpha stream answered frame a where the picture's answered p."), and so
+     does a key disagreement ("libvpx's alpha frame p and picture frame p disagree on being a
+     keyframe.").
+  5. **The layout** (amends CX-15 (3)). The TrackEntry carries `MaxBlockAdditionID` 1, and its
+     Video carries `AlphaMode` 1. No `BlockAdditionMapping` is written: it is not in WebM's
+     element set, and BlockAddID 1 is VP9's alpha by the codec mapping. Each video block is a
+     BlockGroup: a Block (flags 0); BlockAdditions holding one BlockMore {BlockAddID 1,
+     BlockAdditional = the alpha frame}; and, on non-key blocks only, a ReferenceBlock equal
+     to the previous video block's ms − this block's ms. Clusters and Cues start at keys as
+     CX-15 (3) says. The core refuses `alpha_mode` on `V_AV1` ("alpha_mode needs V_VP9; V_AV1
+     carries no alpha"), a packet without its alpha on such a track, and one with alpha on a
+     track without it, each in its own sentence (`rc_webm_add_video_with_alpha`).
+  6. **The alpha's quality** (calibrated in C5). `tools/proof/work/codec-spike/alpha_vp9.py`
+     (gitignored) encodes the alpha planes of two fixtures — the spike's
+     `probe/webm/src-rgba.mov` (a moving disc over a 0–50 % ramp, 1080p30) and the proof's
+     TITLE fixture exported as `prores_4444` at 1920 × 1080 — through the spike's
+     `build/libvpx/vpxenc` with (3)'s and (4)'s flags, `--end-usage=q --cq-level=N`, N = 0, 2
+     … 48, and decodes them with ffmpeg's `libvpx-vp9` (the spike's method). The level kept is
+     the highest N at which every frame of both fixtures has an alpha PSNR of at least
+     48.0 dB against its source; if none does, STOP. If the app's own A4 row
+     (`vp9_alpha_export_proof.py`: any frame under 48.0 dB, or CLEAR's corner or card not
+     exactly 0 or 255) misses at the kept level, `alphaCQLevel` is lowered by 2 until A4
+     passes (CX-16 (7)'s rule), and each run's level and worst frame in dB, per fixture and
+     tier, is recorded here; a miss at level 0 is a STOP. **The measurements** (2026-10-28,
+     the spike's `vpxenc` v1.17.0 and ffmpeg 9.0.2's `libvpx-vp9`, rows `run` "c5" in the
+     spike's `alpha.jsonl`; worst frame / mean of the frames not exact, in dB):
+     - **DISC** (60 frames): CQ 0 exact on every frame; 2: 75.06 / 78.31; 10: 65.54 /
+       68.74; 20: 59.88 / 62.66; 30: 55.56 / 58.11; 38: 51.79 / 53.76; 40: 50.51 / 52.72;
+       **42: 48.85 / 51.22**; 44: 47.79 / 49.95; 46: 47.03 / 49.06; 48: 45.90 / 48.28.
+     - **TITLE** (60 frames, a still title): exact at CQ 0 and 2; 85.07 at 4; 75.46 at 20;
+       64.12 at 42; 60.30 at 48 — every level passes.
+
+     So **`alphaCQLevel` is 42**, DISC binding it (the first miss is 44). The alpha stream
+     at 42 is 74,933 bytes for DISC's 2 s and 5,768 for TITLE's. **The app at 42**
+     (`vp9_alpha_export_proof.py` A4, Debug, first run): DISC 1080p 48.73 dB worst (frame 7)
+     at both the Low and the Maximum tier, TITLE 64.16 dB at both — the alpha does not
+     depend on the tier, the cap being the picture's — so no lowering by 2 was needed.
+     CLEAR's corner 0 and card 255 on all 30 frames. DISC at 640 × 360 read 43.53 dB worst
+     (mean 46.84) at 42, the disc's edge being a larger share of a smaller picture.
+
+     **Amended in C5's fix pass (2026-10-28; the orchestrator's RULING-1 on the owner's
+     standing preference for quality): the 48.0 dB floor holds at every size, so the level
+     is banded by the picture's size.** `VP9Encoder.alphaCQLevel(pixels:)` answers the level
+     of the band at or below the picture's pixel count, and a picture smaller than the
+     smallest band takes the smallest band's level. Each band's level is the highest N whose
+     worst DISC frame is at least 48.0 dB, by the method above on one fixture at every size:
+     the proof's own DISC (`vp9_alpha_export_proof.disc_source`, the spike's `mkalpha.sh`
+     regenerated as ProRes 4444 at the size, 60 frames), its alpha read as 8-bit gray
+     (`work/codec-spike/alpha_vp9_ladder.py`, gitignored; rows `run` "c5-ladder"). The same
+     lower-by-2 rule binds each band the app's A4 scores. At 1920 × 1080 this fixture binds
+     lower than the spike's `src-rgba.mov` did (worst 47.91 dB at 42), so the 1080p band is
+     40, not 42. The share is the alpha stream's rate (`vpxenc`'s bytes over the 2 s) over
+     itself plus the picture's cap at 30 fps, at the Low (0.0386 bpp) and Maximum (0.1157)
+     tiers; the picture usually stays under its cap, so the share is a lower bound.
+
+     | Band (from) | Level | Worst / mean dB at the level | Next level up | Alpha kb/s | Share at Low / Maximum |
+     |---|---|---|---|---|---|
+     | 640 × 360 (and below) | **34** | 48.14 / 49.58 | 36: 47.22 | 158.3 | 37.2 % / 16.5 % |
+     | 1280 × 720 | **38** | 48.66 / 50.17 | 40: 47.83 | 238.5 | 18.3 % / 6.9 % |
+     | 1920 × 1080 | **40** | 48.91 / 50.54 | 42: 47.91 | 341.9 | 12.5 % / 4.5 % |
+     | 3840 × 2160 | **46** | 48.18 / 49.72 | 48: 47.16 | 529.2 | 5.2 % / 1.8 % |
+
+     At 640 × 360 the alpha at 34 costs half as much again as at 42 (105.2 kb/s): the size
+     cost the floor takes on a small picture. A4 scores DISC at 640 × 360, 1280 × 720 and
+     1920 × 1080 and TITLE (the 4K band is `vpxenc`'s alone: A4's PSNR is pure Python, too
+     slow over 4K frames). **The app at the bands** (`vp9_alpha_export_proof.py`'s A4 alone,
+     Release, 2026-10-28; worst frame / mean of the finite in dB, the same at the Low and
+     Maximum tiers; the alpha's share of the file's video bytes at Low / Maximum): DISC
+     640 × 360 48.79 / 50.77 (frame 27), share 38.8 % / 20.6 % (148.9 kb/s); DISC 1280 × 720
+     49.88 / 52.23, 20.6 % / 9.3 % (227.2 kb/s); DISC 1920 × 1080 50.54 / 52.77, 14.4 % / 6.4 %
+     (321.4 kb/s); TITLE 65.03 / 65.05, 43.5 % / 44.3 % (20.8 kb/s: a still title's picture is
+     nearly empty, so its small alpha is a large share). Every band passed at its level, so
+     none was lowered; CLEAR's corner 0 and card 255 on all 30 frames.
+  7. **Import.** A re-imported `vp9_alpha_webm` keeps its colour and loses its alpha: the
+     rewrap (#216-R) copies the Block and not the BlockAdditional, and Apple's VP9 decoder has
+     no alpha. Accepted as a limit, recorded in the guide; keeping the alpha on import is not
+     built.
+  8. **Risks accepted:** Safari's playback of WebM alpha is unconfirmed (a person's check,
+     `docs/manual-checks.md` SE-21; `hevc_alpha` is Safari's route); ffmpeg's native `vp9`
+     decoder ignores the alpha, so only a libvpx decoder reads it; HDR and 10-bit alpha, and
+     AV1 alpha (CX-1), are not built.
+
 - **CX-18 — C6a: the Export Queue's memory limit on bundled-encoder jobs, and the sheet's time
   estimate** (default, recorded in C6a before its code; amends #326's `queued` answer; the
   chain of road map 2's 7e and #326 is not touched):

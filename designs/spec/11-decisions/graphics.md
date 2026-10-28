@@ -1881,6 +1881,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   QuickTime Player and Final Cut is a person's check (`docs/manual-checks.md`
   SE-9). G-33 (h)'s sentence that Frame Job is a reader that ignores the
   declared mode, and its I1 figures, describe the build before this entry.
+  **Amended by CX-17** (codec-export C5): the straightening reaches a third
+  movie row, `vp9_alpha_webm`, whose 64RGBAHalf frame is straightened in
+  place in float by PR-3's `prores_4444` pass and (d)'s fill before the
+  bundled encoder's conversion; a frame that cannot be straightened stops
+  the export with (c)'s sentence. Its WebM carries no alpha-mode label:
+  VP9's alpha is straight by its codec mapping.
 - **G-36 — Playback rasterizes upcoming graphic frames ahead on worker
   threads too; the compositor stays the one consumer and the texture key
   decides** (issue #127, G6 phase 2, 2026-10-21; amends G-26 (a)).

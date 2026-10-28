@@ -386,6 +386,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the estimate's line sit well under the readout, and is the held row readable enough with the whole sentence a hover away?
 - **Source:** #377, codec-export C6a (spec §11 CX-18); `tools/proof/encoder_limit_proof.py` reads the sentence, the tooltip and the estimate's text (S1, Q4), not how they look.
 
+**SE-21 — A VP9 with Alpha (WebM) export is transparent in the browsers**
+- **Do:** 1. Make a project with a transparent background (Document tab ▸ Background), a title with soft edges and a shape that moves across it for a few seconds, and some sound. 2. Export it as **VP9 with Alpha (WebM)** from File ▸ Export…. 3. Make a web page that plays the file in a `<video autoplay loop muted controls>` over a checkerboard or a bright coloured background, and open it in Chrome, Firefox and Safari. 4. In each, watch it through, then drag the playhead to the middle and to near the end.
+- **Expect:** in Chrome and Firefox the page's background shows through wherever the canvas was transparent, the title's and the shape's edges are clean — no dark fringe, no halo, no box around them — and the picture's colour is the project's; seeking lands where it is asked with the transparency intact, and no frame flashes opaque or black. Safari is the open question: it may play the picture opaque or not at all.
+- **Answer:** is the file transparent, with clean edges, through play and seek in Chrome and in Firefox? What does Safari do with it — transparent, opaque, or not at all?
+- **Source:** #377, codec-export C5 (spec §11 CX-17 (8)); `tools/proof/vp9_alpha_export_proof.py` decodes the alpha with ffmpeg's libvpx decoder and walks the file, not how a browser composites it. Safari's answer goes into CX-17 and the guide's Limits.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

@@ -196,7 +196,7 @@ MUTANTS = {
         (f"{SOURCES}/ContainerRewrapWriter.swift",
          "            extensions.merge(sdrLabels(v)) { _, label in label }\n", "")]},
     "speed-on-vp9": {"rows": ["V7", "S1"], "cargo": "export_vp9", "anchors": [
-        ("core/src/export_table.rs", "        self.writer.is_some_and(Writer::takes_speed)\n",
+        ("core/src/export_preset.rs", "        self.writer.is_some_and(Writer::takes_speed)\n",
          "        self.writer.is_some()\n")]},
 }
 

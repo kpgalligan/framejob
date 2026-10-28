@@ -1737,6 +1737,246 @@ F4 row drives an `av1` export through the encode pump, which C4 put behind
   tools/proof/work/i378/hdr-ctl`, re-run because H7s's instrument changed: `MUTANT PASS`, H7s
   alone failed (3.86 / 13.08 / 2.79), and its untagged half still equal.
 
+## C5 — VP9 with alpha in WebM
+
+### Record
+
+**Built 2026-10-28** in `~/devel/framejob-codecs` (branch `codecs`, on C4's `546df3f`), not yet
+committed or merged.
+
+**Decision first.** CX-17 in `designs/spec/11-decisions/codec-export.md` before any code: (1) the
+`vp9_alpha_webm` row after `vp9_webm`, 8-bit SDR only and not an HDR row; (2) G-35's straight
+alpha in float before the conversion, the alpha plane full-range Y = round(255·a) with chroma
+128; (3) two `VP9Encoder`s, the picture CX-16's and the alpha `VPX_Q` at `alphaCQLevel`, full
+range; (4) keys aligned by construction and packets paired by pts; (5) `MaxBlockAdditionID` 1,
+`AlphaMode` 1 and each video block a BlockGroup with BlockAddID 1 and a ReferenceBlock on
+non-keys; (6) the alpha's calibration, filled in after the run; (7) the alpha dropped on
+re-import, accepted; (8) the risks. "Amended by CX-17" lines sit under CX-15 (3), CX-16 (1)
+and G-35, and the index has the CX-17 row and the three amendments.
+
+**Tolls, each a pure move gated alone before the row** (the records are in the ADRs):
+- **T1** (`designs/adr/core-file-history.md`): `Preset`, its field docs, `impl Preset` and
+  `fps_json` out of `export_table.rs` (582) into the new `export_preset.rs` (187), re-exported;
+  `name` and `to_json` widened to `pub(crate)`. `export_table.rs` 411 after, 429 with the row.
+  Gated by `cargo test --release --test export --test export_size --test export_av1 --test
+  export_vp9` (38, 20, 11, 6 passed) and `cargo fmt --check`.
+- **T2, Rust** (`core-file-history.md`): the Cues and block builders and their IDs out of
+  `webm_ebml.rs` (401 → 353) into the new `webm_ebml_block.rs` (59), re-exported, nothing
+  widened. Gated by `cargo test --release --test webm_writer --test webm_writer_vp9 --test
+  webm_writer_refusals` (8, 4, 5) and clippy.
+- **T2, Swift** (`designs/adr/app-file-history.md`): the audio pump out of
+  `ExportWebMWriter.swift` (400 → 313) into the new `ExportWebMWriter+Audio.swift` (90), with
+  the named widenings; `webm_export_proof.py`'s `no-discard-padding` anchor re-pathed. Gated by
+  `make typecheck` (exit 0, the four baseline warnings) and the anchor's `grep -c` (1).
+- **Anchors the tolls moved:** `vp9_export_proof.py`'s `speed-on-vp9` and
+  `hevc_alpha_proof.py`'s `report-and-fill` anchored text T1 moved to `export_preset.rs`, so
+  both now name that file; every mutant anchor in `webm_export_proof.py`, `vp9_export_proof.py`,
+  `av1_export_proof.py`, `hevc_alpha_proof.py`, `export_readers_proof.py`,
+  `export_offset_proof.py`, `precision_proof.py`, `hdr_proof.py` and the new proof occurs
+  exactly once in the tree.
+
+**What landed.**
+- **Core** (no format bump; one new `rc_*`): the `vp9_alpha_webm` row (`PRESETS: [Preset;
+  15]`, not in `HDR_ROWS`); `webm_layout.rs`'s `alpha_mode` (V_VP9 only) and `Header.alpha`;
+  `webm_ebml.rs`'s `ALPHA_MODE`/`MAX_BLOCK_ADDITION_ID` in `video_entry`; `webm_ebml_block.rs`'s
+  `alpha_block_group`; `webm_writer.rs`'s `add_video_with_alpha`, the three alpha refusals and
+  the ReferenceBlock; `ffi_webm.rs`'s `rc_webm_add_video_with_alpha`; the header's webm,
+  presets and settings paragraphs; `export.rs`'s doc (four bundled-encoder rows).
+- **Core tests:** `webm_writer_alpha.rs` (6: the entry, the BlockGroups, the ReferenceBlocks,
+  Clusters/Cues, #216-R's reader, every refusal) and `export_vp9_alpha.rs` (6); `common/webm.rs`
+  (the alpha layout, `add_alpha`, `write_vp9_alpha`), `common/ebml_read.rs` (BlockAdditions and
+  BlockMore walked; `BlockRead.group`, `reference`, `additions`), `model_tests.rs`' NULL sweep,
+  `export.rs` (15 rows, docs 10/12, the alpha sweeps naming four rows), `export_size.rs`,
+  `export_av1.rs`.
+- **Swift:** `ReelWebM.addVideo(ptsNs:key:data:alpha:)`; `ExportEncodedPacket.alpha`;
+  `VP9Encoder.Plane`, `keyInterval`, forced keys, the alpha's `VPX_Q`/full range and
+  `alphaCQLevel` 42; the new `ExportVP9AlphaEncoder.swift` (`VP9AlphaEncoder`, the pairing);
+  `ExportEncodePump` (the alpha encoder, the straightening, the codec's `alphaMode`);
+  `ExportI010`'s alpha planes and `framejob_export_alpha8`; `ExportStraightAlpha.straighten(_:)`;
+  `ExportPacketSink.append(_:alpha:…)` (the MP4 sink refuses an alpha); `ExportWebMLayout`'s
+  `alphaMode`; `ExportWebMWriter`'s shape guard; the catalog's preset, size, `video_bitrate`,
+  `dynamic_range` and `encoder_speed` text (`AgentCatalog+Render.swift` 387 → 394);
+  `ExportValues`' comments.
+- **Documents:** spec §7.1, §7.4, §7.8, §7.9a, §7.10 and both indexes' Lines cells; the guide's
+  export (Format, Transparency, Size, Speed, Quality, For agents, Limits), MCP and HDR pages;
+  the README's Export highlight; `docs/manual-checks.md` SE-21; `tools/proof/README.md`'s C5
+  section.
+- **Proofs:** `vp9_alpha_export_proof.py` (Z1, A1–A12, S1, P1, seven mutants),
+  `vp9_alpha_probe.swift`; `export_offset_proof.py` E43; `hevc_alpha_proof.py`'s B6 sentences
+  and N1's note ("kept by 4 export formats"); the gitignored calibration instrument
+  `work/codec-spike/alpha_vp9.py`.
+
+**The calibration** (CX-17 (6) has every figure): DISC binds at 42 (48.85 dB worst through
+`vpxenc`; 44 reads 47.79), TITLE passes at every level; the app's A4 at 42 read 48.73 dB on
+DISC 1080p and 64.16 on TITLE at both tiers, so the level was not lowered.
+
+**Commands run and what they printed.**
+- **Targeted, core:** `cargo test --release` over `webm_writer_alpha`, `export_vp9_alpha`,
+  `webm_writer`, `webm_writer_vp9`, `webm_writer_refusals`, `export`, `export_size`,
+  `export_av1`, `export_vp9`, `dynamic_range`, `canvas_output`, `container` and `model_tests`:
+  all passed (6, 6, 8, 5, 4, 38, 20, 11, 6, 7, 7, 11, 31); `cargo fmt --check` and `cargo
+  clippy --all-targets -- -D warnings` clean.
+- **Targeted, Swift:** `make typecheck` exit 0 with the four baseline warnings; `swift_build.py
+  typecheck vp9_alpha_probe.swift` exit 0; `make app-debug` succeeded.
+- **`vp9_alpha_export_proof.py` on Debug:** first run 14/15 — A4 failed only on the 640 × 360
+  DISC case, which the spec's A4 does not hold (43.53 dB); that case was made measured, not
+  scored, and the second run read **15/15** (2 min 22 s).
+- **`make gate`:** names 1 s, typecheck 7 s, fmt 3 s, lint 1 s, test 239 s, app 171 s,
+  `gate: PASS 422s`. Re-run after the record and the two mutants' row lists changed (no code):
+  names 1 s, test 72 s, the rest skipped, `gate: PASS 73s`; and once more after the record's
+  last edit (names alone).
+- **Release** (`RC_PROOF_APP=release`): `vp9_alpha_export_proof.py` **15/15** (A4 as on
+  Debug, S1 footnote `VP9 · WEBM · alpha`, A7 cancelled 0.2 s after `cancel_export`, A12's
+  render 1.888/0.540/0.925); `vp9_export_proof.py` 14/14; `webm_export_proof.py` 29/29;
+  `av1_export_proof.py` 19/19; `export_readers_proof.py` 9/9; `hevc_alpha_proof.py` 43/43.
+- **`export_offset_proof.py --only E36,…,E43`** on its own Release instance: 8/8; E43
+  (`vp9_alpha_webm`) median −0.043 ms, 12/12 found, every flash on its frame; the instance's
+  log had no `Frame Job: ` line.
+
+**Findings.**
+- **A smaller picture reads lower alpha PSNR at the same level:** DISC at 640 × 360 is
+  43.53 dB worst (mean 46.84) at CQ 42, against 48.73 at 1080p; the disc's edge is a larger
+  share of the picture. CX-17 (6) calibrates on 1080p; A4 prints the 640 × 360 figure each run.
+- **ffmpeg's native `vp9` decoder reports `yuv420p`** for the file (ffprobe's `pix_fmt`); only
+  `-c:v libvpx-vp9` decodes `yuva420p`, which is how every alpha row reads it.
+- **The alpha does not follow the tier:** the cap is the picture's, so DISC's and TITLE's alpha
+  read the same at Low and Maximum.
+
+**Mutants** (Debug copies, `vp9_alpha_export_proof.py --mutant`, every row but P1):
+- `not-straightened`: exit 1, `MUTANT CAUGHT` on A5 alone (94 s).
+- `no-reference-block`: exit 1, A1, A3 and A12 (261 s).
+- `alpha-video-range`: exit 1, A4 and A5 (the opaque alpha 235) (220 s).
+- `alpha-cq-63`: exit 1, A4 alone (195 s).
+- `no-shape-guard`: exit 1, A10 alone (260 s).
+- `alpha-mode-unwritten`: first run `CAUGHT, NOT EXACTLY` (exit 3): A1, cargo
+  `webm_writer_alpha` and A8, which reads the same ffprobe `alpha_mode` tag. A2 held: ffmpeg's
+  libvpx decoder reads the BlockAdditional without AlphaMode. A8 was added to its rows; the
+  re-run exited 1, `MUTANT CAUGHT` on A1, A8 and cargo `webm_writer_alpha` (196 s).
+- `alpha-row-hdr`: first run `CAUGHT, NOT EXACTLY` (exit 3): A9, cargo `dynamic_range` and S1,
+  whose Dynamic Range popup went live on "HDR (HLG)". S1 was added to its rows; the
+  re-run exited 1, `MUTANT CAUGHT` on A9, S1 and cargo `dynamic_range` (189 s).
+
+**CLAUDE.md edits owed** (the integrator's):
+- **Root `CLAUDE.md`:** the file map's `ExportI010.metal` line gains "and `vp9_alpha_webm`'s
+  alpha as a second 8-bit picture (`framejob_export_alpha8`)"; Architecture's WebM sentence
+  names `vp9_alpha_webm` beside `av1_webm` and `vp9_webm`.
+- **`core/CLAUDE.md`:** the module map gains `export_preset.rs` (`Preset`, `fps_json`, out of
+  `export_table.rs`) and `webm_ebml_block.rs` (the Cues and block builders, the alpha
+  BlockGroup); the `webm_*` entry: `alpha_mode` on `V_VP9`, `add_video_with_alpha`, the six
+  `rc_webm_*` exports.
+- **`app/CLAUDE.md`:** new entries for `ExportVP9AlphaEncoder.swift` (`VP9AlphaEncoder`, the
+  pairing) and `ExportWebMWriter+Audio.swift` (the WebM audio pump); `VP9Encoder` gains
+  `Plane`, `keyInterval` and `alphaCQLevel(pixels:)` (the size bands, fix pass 1);
+  `ExportEncodePump` straightens `vp9_alpha_webm`'s frames; `ExportI010` writes the alpha
+  planes; `ExportPacketSink.append` carries `alpha`; `CoreValues.swift` gains fix pass 1's
+  toll (`ExportSize.list`, `ExportSettings.decoded`, `ReelAV1.Config.decoded`,
+  `withNonNullBytes`); `ExportEncoderCosts.swift`'s tables name `vp9_alpha_webm`.
+
+**Owed.**
+- **Manual checks:** SE-21 (`vp9_alpha_webm` over a page background in Chrome, Firefox and
+  Safari: transparency, edges, seek; Safari's answer to go into CX-17 and the guide).
+- **An issue for the integrator to file:** keeping a `vp9_alpha_webm`'s alpha on re-import
+  (CX-17 (7), the accepted limit; the rewrap drops BlockAdditional and Apple's VP9 decoder has
+  no alpha).
+- **Still to come:** C6b.
+
+### Fix pass 1 (2026-10-28): the rebase onto C6a, the alpha's size bands, the review's nits
+
+**The rebase.** The review passed with four nits. C5 became one commit on `codecs` (`0de1a0c`)
+replayed onto main `998f0db` (C6a, CX-18: `ExportEncoderLedger`, `ExportEncoderCosts`, SE-20, the
+queue's memory wait and the sheet's estimate). Git stopped on 10 hunks in 8 documents and no
+code file. Each was merged so both sides read as one text: C5's sections, rows and paragraphs
+beside C6a's (C5's before C6a's, in phase order: this record, §7.8's paragraph, CX-17 before
+CX-18 with the blank line CX-18 lacked, the proof README's sections; the index's CX-17 and
+CX-18 rows and summaries both kept); the export guide's readout line kept C6a's estimate and
+C5's `VP9 · WEBM · alpha` footnote; C5's manual check is now **SE-21**, after C6a's SE-20, and
+its three citations (this record twice, CX-17 (8)) say so; every Lines cell was recomputed
+(`spec_index_proof.py` 210/210: §7.8 650, §7.9a 484, `codec-export.md` 694, the folder 14452).
+
+**C6a's ledger and the alpha row.** CX-18 costs a writer row with no measured entry the whole
+budget, so `vp9_alpha_webm` ran alone. It was measured (`RC_PROOF_APP=release
+encoder_memory_measure.py --only vp9_alpha_webm,vp9_webm:sdr`, the Release built from the
+merged tree, a quiet machine at load about 5; AV.mov twice, opaque, which costs the alpha
+encoder its buffers as any picture does), with `vp9_webm:sdr` beside it as a control:
+
+| Key | Size | Δ bytes | Δ RSS GiB | Peak GiB | Seconds | s/frame | Load |
+|---|---|---|---|---|---|---|---|
+| vp9_alpha_webm | 1920×1080 | 795,197,440 | 0.74 | 0.91 | 3.574 | 0.01191 | 5.33 |
+| vp9_webm:sdr (control) | 1920×1080 | 386,383,872 | 0.36 | 0.53 | 2.183 | 0.00728 | 4.90 |
+| vp9_alpha_webm | 3840×2160 | 2,326,249,472 | 2.17 | 2.33 | 9.194 | 0.03065 | 4.59 |
+| vp9_webm:sdr (control) | 3840×2160 | 1,129,529,344 | 1.05 | 1.22 | 5.871 | 0.01957 | 4.86 |
+
+The control lands within 0.6 % of C6a's memory figures (388,530,176 and 1,130,774,528), so the
+two runs agree; the alpha row costs about twice `vp9_webm`'s, its second encoder. Its `memory`
+entry is the Δ bytes and its `time` entry seconds / 300, provisional until C6b like the rest
+(`ExportEncoderCosts.alphaRun` names the run). `encoder_memory_measure.py` gained the key;
+`encoder_limit_proof.py`'s KEYS and the probe's `keyed` gained it (P0 nine keys, R1 126 cases,
+E1 135), and R2, which read the unmeasured-row rule on `vp9_alpha_webm`, now reads it on a
+synthetic `unmeasured_webm` writer row, every real row being measured. The guide, §7.9a, the
+MCP page and `export_status`'s catalog text name `vp9_alpha_webm` among the rows with an
+estimate (`AgentCatalog+Render.swift` stays 402: the merge's 387 + 7 + 8, over the 400 a new file
+starts under; the text was reflowed in its lines).
+
+**RULING-1: the 48 dB floor at every size.** CX-17 (6) is amended (before the code) with the
+level per size band, calibrated on the proof's own DISC at each size
+(`work/codec-spike/alpha_vp9_ladder.py`, gitignored, rows `run` "c5-ladder"): **34** from
+640 × 360 (and below), **38** from 1280 × 720, **40** from 1920 × 1080 (this fixture binds
+lower at 1080p than the spike's `src-rgba.mov`, worst 47.91 dB at 42), **46** from 3840 × 2160,
+each band's worst frame, next level up, alpha kb/s and share in CX-17 (6)'s table.
+`VP9Encoder.alphaCQBands` and `alphaCQLevel(pixels:)` replace the constant. A4 now scores DISC
+at 640 × 360 and 1280 × 720 beside DISC 1080p and TITLE, and prints each export's alpha share
+of the video bytes; on Release every band passed at its level, so none was lowered: DISC
+640 × 360 48.79 dB worst, 720p 49.88, 1080p 50.54, TITLE 65.03. The alpha's share, measured:
+38.8 % / 20.6 % of the video at 640 × 360 (Low / Maximum), 20.6 / 9.3 % at 720p, 14.4 / 6.4 % at
+1080p, about 44 % on TITLE (a nearly empty picture). One mutant was added,
+`alpha-cq-one-band` (the bands collapsed to the 1080p band's 40): caught on A4 by DISC
+640 × 360 alone (44.94 dB worst); DISC 720p held at 48.75 dB, the app reading higher than
+`vpxenc`'s 47.83 there. `alpha-cq-63`'s anchor moved to `return band.level`.
+
+**The review's nits, all fixed.**
+1. `export_preset.rs`: the `Preset` doc says every field is `pub(crate)` because the table's
+   rows are built in `export_table.rs`.
+2. `hevc_alpha_proof.py` T0's label names "the even-sized movie rows", "the rows that refuse
+   another shape" and "the four rows that keep transparency".
+3. The export guide's For-agents row and the MCP page: `video_bitrate` on `vp9_alpha_webm` is
+   the soft cap on the picture's stream alone, and the alpha stream comes on top of it, with
+   the measured shares; the Quality section gives them per size.
+4. **The toll for `ReelCore.swift`** (`designs/adr/app-file-history.md`): a pure move gated
+   alone by `make typecheck` (exit 0, the four baseline warnings) with the pass's other changes
+   held out — the `rc_*`-free halves of `ReelExport.sizes`, `ReelExport.settings` and
+   `ReelAV1.config` and `ReelCube.parse`'s borrowed byte went to `CoreValues.swift`.
+   `ReelCore.swift` 804 → 788, with C5's wrapper in; `CoreValues.swift` 242 → 285.
+
+**Verification** (2026-10-28, Release built by the gate from the merged tree).
+- `make typecheck`: exit 0, the four baseline warnings (the toll alone, then the whole pass);
+  `swift_build.py typecheck encoder_limit_probe.swift` exit 0.
+- `make gate`: PASS (names 1 s, typecheck 5 s, fmt 3 s, lint 7 s, test 158 s, app 111 s); and
+  again after the mutant's description was corrected.
+- `vp9_alpha_export_proof.py` **15/15** (A4 as above; A7 cancelled 0.36 s after
+  `cancel_export`; S1 `VP9 · WEBM · alpha`).
+- Mutants: `alpha-cq-one-band` exit 1, `MUTANT CAUGHT` on A4 (233 s); `alpha-cq-63` exit 1,
+  `MUTANT CAUGHT` on A4 (180 s). No other mutant's anchor moved (every anchor of both proofs
+  occurs exactly once).
+- `encoder_limit_proof.py` whole: **14/17** — Q1, Q3 and Q5 failed together because one
+  export hung: Q1's A (`av1` Balanced, A1, launched inside the sheet's `end` at sequence 66)
+  never finished, its video pump blocked in `AVAssetReaderOutput.copyNextSampleBuffer` with
+  no compositor request in flight (sampled), so Q3's and Q5's jobs waited behind it. Every
+  other row passed, the app rows S1, S2, X1 and Z1 included. `--probe` run again at once:
+  **13/13** (A launched at 64 and finished at 74). An intermittent hang of an AV1 MP4 export,
+  in a path C5 does not change (the `av1` row's pump reads as on main); owed below.
+- `vp9_export_proof.py` 14/14; `webm_export_proof.py` 29/29; `export_readers_proof.py` 9/9;
+  `hevc_alpha_proof.py` 43/43.
+- No instance log carried a `Frame Job: ` line.
+
+**Owed (fix pass 1).**
+- The intermittent `av1` (MP4) export hang `encoder_limit_proof.py`'s Q1 met once in three
+  probe runs (above): to be triaged and filed by the integrator.
+- `AgentCatalog+Render.swift` at 402 lines after the merge, past the 400 a new file starts
+  under: its next text pays a toll first.
+- The FFI lockstep puts every `rc_*` wrapper in `ReelCore.swift`, which is over the ~600 cap,
+  so every new export pays a toll there; the rule conflict is recorded here for the
+  integrator.
+
 ## C6a — the Export Queue's memory limit and the sheet's estimate
 
 ### Record
@@ -1873,7 +2113,7 @@ an empty handle, because the core resolves no settings for an empty range.
 
 **Owed (C5).** `vp9_alpha_webm` has no memory entry, so it costs the whole budget (R2). Its
 measured cost is one `memory` row (and one `time` row for an estimate) added through
-`encoder_memory_measure.py`'s `KEYS`.
+`encoder_memory_measure.py`'s `KEYS`. **Paid** in C5's fix pass 1 ("## C5").
 
 ### Fix pass 1 (2026-10-28): the held sentence in the tooltip, the review's nits, two residues
 

@@ -22,12 +22,13 @@
 //! (the size, the rate, the range, the file's UTI) is resolved identically,
 //! because it means the same thing on either path.
 //!
-//! Three rows, `av1` (spec §11 CX-12), `av1_webm` (CX-15) and `vp9_webm`
-//! (CX-16), are encoded by a bundled library and not by AVFoundation, which
-//! still writes `av1`'s container (the core writes the two WebMs): their
-//! `writer` names the route, and on the two AV1 rows `encoder_speed` names
-//! SVT-AV1's speed; no other row's settings carry either key, and
-//! `vp9_webm`'s carry no speed, libvpx having one (CX-3).
+//! Four rows, `av1` (spec §11 CX-12), `av1_webm` (CX-15), `vp9_webm`
+//! (CX-16) and `vp9_alpha_webm` (CX-17), are encoded by a bundled library
+//! and not by AVFoundation, which still writes `av1`'s container (the core
+//! writes the three WebMs): their `writer` names the route, and on the two
+//! AV1 rows `encoder_speed` names SVT-AV1's speed; no other row's settings
+//! carry either key, and the two VP9 rows' carry no speed, libvpx having one
+//! (CX-3).
 //!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the

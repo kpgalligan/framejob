@@ -47,9 +47,10 @@
 //!    when they are, accepted by presets that cannot use them, refused by
 //!    a message naming the value — with the single documented exception
 //!    that a ceiling with no target is an error rather than an inert key.
-//! 10. **The three rows with a fourth channel, and `alpha`.** The
+//! 10. **The four rows with a fourth channel, and `alpha`.** The
 //!     capability that says so is a fact about the ENCODING — true for
-//!     `hevc_alpha`, `prores_4444` and `apng` and for nothing else, the same
+//!     `hevc_alpha`, `vp9_alpha_webm`, `prores_4444` and `apng` and for
+//!     nothing else, the same
 //!     on a transparent canvas as on an opaque one, and not something an
 //!     override can ask for — so the sweep is the whole table twice over
 //!     rather than a check on the new row. `gif` is the row that makes the sweep worth
@@ -66,12 +67,14 @@
 //!     at settings they did not ask for, reported ok.
 //!
 //! 12. **The rows, in menu order:** `h264`, `hevc`, `hevc_alpha`,
-//!     `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422`,
-//!     `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`
-//!     — [`EXPECTED`] holds them; the `hevc_10bit` row (spec §11 PR-3) has
-//!     its own file, `core/tests/export_hevc_10bit.rs`, and so have the `av1`
-//!     and `av1_webm` rows (spec §11 CX-12, CX-15), `core/tests/export_av1.rs`,
-//!     and `vp9_webm` (CX-16), `core/tests/export_vp9.rs`.
+//!     `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`,
+//!     `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`,
+//!     `gif`, `apng` — [`EXPECTED`] holds them; the `hevc_10bit` row (spec
+//!     §11 PR-3) has its own file, `core/tests/export_hevc_10bit.rs`, and so
+//!     have the `av1` and `av1_webm` rows (spec §11 CX-12, CX-15),
+//!     `core/tests/export_av1.rs`, `vp9_webm` (CX-16),
+//!     `core/tests/export_vp9.rs`, and `vp9_alpha_webm` (CX-17),
+//!     `core/tests/export_vp9_alpha.rs`.
 //!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
@@ -126,7 +129,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 14] = [
+const EXPECTED: [Expected; 15] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -227,6 +230,20 @@ const EXPECTED: [Expected; 14] = [
         file_type: "org.webmproject.webm",
         avf_preset: Some("AVAssetExportPresetPassthrough"),
     },
+    // VP9 with alpha in WebM (spec §11 CX-17): `vp9_webm`'s encoding with a
+    // second stream of its alpha, after `vp9_webm`; an `alpha: true` row.
+    Expected {
+        id: "vp9_alpha_webm",
+        container: "webm",
+        codec: "vp9",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: true,
+        file_type: "org.webmproject.webm",
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+    },
     Expected {
         id: "prores_422",
         container: "mov",
@@ -239,7 +256,7 @@ const EXPECTED: [Expected; 14] = [
         file_type: "com.apple.quicktime-movie",
         avf_preset: Some("AVAssetExportPresetAppleProRes422LPCM"),
     },
-    // The master row, and one of the three `alpha: true` rows. Everything
+    // The master row, and one of the four `alpha: true` rows. Everything
     // else about it is 422's — the same container, the same UTI, the same
     // "an editing master does not stream" answer to network optimization —
     // which is exactly why it is written out here beside 422 rather than
@@ -756,13 +773,13 @@ fn alpha_is_the_only_key_the_settings_grew() {
         let mut plain: Vec<String> = KEYS_BEFORE_ALPHA.iter().map(|k| k.to_string()).collect();
         plain.push("alpha".to_string());
         // The encoder route and its speed (spec §11 CX-12, CX-15), on the two
-        // AV1 rows; the route alone on `vp9_webm`, libvpx having one speed
-        // (CX-16); on no other row.
+        // AV1 rows; the route alone on the two VP9 rows, libvpx having one
+        // speed (CX-16, CX-17); on no other row.
         if want.id == "av1" || want.id == "av1_webm" {
             plain.push("writer".to_string());
             plain.push("encoder_speed".to_string());
         }
-        if want.id == "vp9_webm" {
+        if want.id == "vp9_webm" || want.id == "vp9_alpha_webm" {
             plain.push("writer".to_string());
         }
         plain.sort();
@@ -789,8 +806,8 @@ fn alpha_is_the_only_key_the_settings_grew() {
     }
 }
 
-/// Three rows carry a fourth channel and eight do not. The sweep is the
-/// whole table rather than a spot check on three rows, because `alpha` is
+/// Four rows carry a fourth channel and the rest do not. The sweep is the
+/// whole table rather than a spot check on four rows, because `alpha` is
 /// a claim about every row at once: reported true on a row with nowhere to
 /// put it, the export sheet and the `export` tool would both promise a
 /// channel the file cannot hold, and nothing later in the pipeline is in a
@@ -811,8 +828,9 @@ fn alpha_is_the_only_key_the_settings_grew() {
 /// a `gif` of the same timeline has a hard-edged transparent index — and
 /// the flag is what stops the sheet promising a translucent GIF.
 ///
-/// The three are in the MENU's order, `hevc_alpha` first because it sits
-/// directly after `hevc` (spec §11 G-33): the order is the table's, and a
+/// The four are in the MENU's order, `hevc_alpha` first because it sits
+/// directly after `hevc` (spec §11 G-33), `vp9_alpha_webm` after `vp9_webm`
+/// (CX-17): the order is the table's, and a
 /// row that moved would fail here as well as in
 /// `hevc_alpha_sits_directly_after_hevc`.
 #[test]
@@ -825,8 +843,8 @@ fn only_prores_4444_hevc_alpha_and_apng_carry_alpha() {
         .collect();
     assert_eq!(
         carrying,
-        ["hevc_alpha", PRORES_4444, "apng"],
-        "the rows claiming an alpha channel are not the three that have one"
+        ["hevc_alpha", "vp9_alpha_webm", PRORES_4444, "apng"],
+        "the rows claiming an alpha channel are not the four that have one"
     );
 
     // And the menu offers it, so the id above is reachable from the Format
@@ -916,7 +934,7 @@ fn alpha_is_the_encodings_fact_and_never_the_canvas() {
         );
         assert_eq!(
             on_opaque,
-            want.id == "hevc_alpha" || want.id == PRORES_4444 || want.id == "apng",
+            ["hevc_alpha", "vp9_alpha_webm", PRORES_4444, "apng"].contains(&want.id),
             "{} on an opaque canvas",
             want.id
         );

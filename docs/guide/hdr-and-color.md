@@ -165,7 +165,7 @@ In an HDR (HLG) project, the export sheet gets a **Dynamic Range:** row under **
 | HDR10 (PQ) | BT.2100 PQ, mastered at 1,000 cd/m² | |
 | SDR version | The SDR version, Rec. 709 | |
 
-- The row is live only on **HEVC 10-bit (MP4)**, **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)**, **ProRes 422 (MOV)** and **ProRes 4444 (MOV)**. On every other video format it is disabled and shows **SDR version**, because those formats always write the SDR version: H.264, HEVC, HEVC with Alpha, Animated GIF and Animated PNG.
+- The row is live only on **HEVC 10-bit (MP4)**, **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)**, **ProRes 422 (MOV)** and **ProRes 4444 (MOV)**. On every other video format it is disabled and shows **SDR version**, because those formats always write the SDR version: H.264, HEVC, HEVC with Alpha, VP9 with Alpha (WebM), Animated GIF and Animated PNG.
 - **VP9 (WebM)** writes HLG and HDR10 as 10-bit VP9 Profile 2, and the SDR version as 8-bit Profile 0. VP9 itself cannot say which transfer it uses, so the WebM file's colour information is what tells a player it is HLG or PQ.
 - An HDR10 file carries fixed HDR10 metadata: a P3 D65 mastering display of 0.005–1,000 cd/m², MaxCLL 1,000 and MaxFALL 0. Its picture never goes above 1,000 cd/m², so the metadata is always accurate. The Media tab's HDR10 Peak describes a *source* file and does not change this.
 - The choice applies to that one sheet only. It is not remembered for the next export or saved in an export preset.

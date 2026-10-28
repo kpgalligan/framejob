@@ -17,6 +17,19 @@ struct I010Frame {
     let crOffset: Int
     /// 10 (I010) or 8 (I420): the bytes a sample takes are `bitDepth > 8 ? 2 : 1`.
     let bitDepth: Int
+    /// `vp9_alpha_webm`'s second picture (spec §11 CX-17 (2)), 8-bit, after the first: its
+    /// luma, Y = round(255 · clamp(a)) at `lumaStride`, then one chroma plane of a constant 128
+    /// at `chromaStride`, which stands for both Cb and Cr. In samples; nil off the alpha row.
+    let alphaOffset: Int?
+    let alphaChromaOffset: Int?
+}
+
+/// `framejob_export_alpha8`'s uniforms, field for field; in samples.
+private struct ExportAlphaUniforms {
+    var width: UInt32
+    var height: UInt32
+    var lumaStride: UInt32
+    var alphaOffset: UInt32
 }
 
 /// `ExportI010.metal`'s uniforms, field for field; strides and offsets in samples.
@@ -37,7 +50,9 @@ private struct ExportI010Uniforms {
 /// the GPU: `MPSImageLanczosScale` to the export size when it is not the canvas — the
 /// picture fitted inside with black bars, or filling a frame within a pixel of the canvas's
 /// shape (`fills`, G-33 (c)) — then `framejob_export_i010` or, at 8 bits,
-/// `framejob_export_i420`.
+/// `framejob_export_i420`. With `alpha` (`vp9_alpha_webm`, CX-17 (2)) each frame also has
+/// its alpha as a second 8-bit picture, written by `framejob_export_alpha8` from the same
+/// (scaled) texture.
 ///
 /// Called on the export's video queue alone; the planes come from a pool the encode queue
 /// gives back through `recycle` once the encoder has copied them.
@@ -48,6 +63,8 @@ final class ExportI010Converter {
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let pipeline: MTLComputePipelineState
+    /// `framejob_export_alpha8`, nil off the alpha row.
+    private let alphaPipeline: MTLComputePipelineState?
     private let cache: CVMetalTextureCache
     /// The scaler, its transform and clip, and the export-size texture it writes; nil when
     /// the export is at the canvas size.
@@ -60,15 +77,16 @@ final class ExportI010Converter {
     private let chromaStride: Int
     /// 10 or 8: the kernel and the bytes per sample.
     private let bitDepth: Int
-    /// In bytes: two per sample at 10 bits, one at 8.
+    /// In bytes: two per sample at 10 bits, one at 8; with the alpha planes on the alpha row.
     private let length: Int
+    private let alpha: Bool
 
     private let lock = NSLock()
     private var pool: [I010Frame] = []
 
     init(
         width: Int, height: Int, canvas: CGSize, fills: Bool, picture: ExportAV1Picture,
-        bitDepth: Int = 10, pool count: Int
+        bitDepth: Int = 10, alpha: Bool = false, pool count: Int
     ) throws {
         func failure(_ what: String) -> Exporter.ExportError {
             .failed("The frames could not be prepared for the encoder: \(what).")
@@ -81,6 +99,13 @@ final class ExportI010Converter {
                 name: bitDepth > 8 ? "framejob_export_i010" : "framejob_export_i420"),
             let pipeline = try? device.makeComputePipelineState(function: function)
         else { throw failure("the conversion kernel is missing") }
+        var alphaPipeline: MTLComputePipelineState?
+        if alpha {
+            guard bitDepth == 8, let function = library.makeFunction(name: "framejob_export_alpha8"),
+                let made = try? device.makeComputePipelineState(function: function)
+            else { throw failure("the alpha kernel is missing") }
+            alphaPipeline = made
+        }
         var cache: CVMetalTextureCache?
         guard CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
             == kCVReturnSuccess, let cache
@@ -90,13 +115,16 @@ final class ExportI010Converter {
         self.device = device
         self.queue = queue
         self.pipeline = pipeline
+        self.alphaPipeline = alphaPipeline
+        self.alpha = alpha
         self.cache = cache
         weights = picture.lumaWeights
         lumaStride = width
         chromaStride = (width + 1) / 2
         self.bitDepth = bitDepth
-        length = (bitDepth > 8 ? 2 : 1)
-            * (lumaStride * height + 2 * chromaStride * ((height + 1) / 2))
+        let pictureSamples = lumaStride * height + 2 * chromaStride * ((height + 1) / 2)
+        let alphaSamples = alpha ? lumaStride * height + chromaStride * ((height + 1) / 2) : 0
+        length = (bitDepth > 8 ? 2 : 1) * pictureSamples + alphaSamples
 
         let canvasWidth = Int(canvas.width.rounded())
         let canvasHeight = Int(canvas.height.rounded())
@@ -158,10 +186,17 @@ final class ExportI010Converter {
                 "The frames could not be prepared for the encoder: no plane buffer.")
         }
         let chromaSamples = chromaStride * ((height + 1) / 2)
+        let alphaOffset = lumaStride * height + 2 * chromaSamples
+        let alphaChroma = alphaOffset + lumaStride * height
+        if alpha {
+            // The alpha picture's chroma is a constant 128, written once per pooled frame.
+            memset(buffer.contents() + alphaChroma, 128, chromaSamples)
+        }
         return I010Frame(
             buffer: buffer, width: width, height: height, lumaStride: lumaStride,
             chromaStride: chromaStride, cbOffset: lumaStride * height,
-            crOffset: lumaStride * height + chromaSamples, bitDepth: bitDepth)
+            crOffset: lumaStride * height + chromaSamples, bitDepth: bitDepth,
+            alphaOffset: alpha ? alphaOffset : nil, alphaChromaOffset: alpha ? alphaChroma : nil)
     }
 
     /// One frame converted, waiting for the GPU; nil when it could not be wrapped or the
@@ -195,6 +230,16 @@ final class ExportI010Converter {
         let group = MTLSize(width: 16, height: 16, depth: 1)
         let blocks = MTLSize(width: (width + 1) / 2, height: (height + 1) / 2, depth: 1)
         encoder.dispatchThreads(blocks, threadsPerThreadgroup: group)
+        if let alphaPipeline, let alphaOffset = out.alphaOffset {
+            var alphaUniforms = ExportAlphaUniforms(
+                width: UInt32(width), height: UInt32(height), lumaStride: UInt32(lumaStride),
+                alphaOffset: UInt32(alphaOffset))
+            encoder.setComputePipelineState(alphaPipeline)
+            encoder.setBytes(
+                &alphaUniforms, length: MemoryLayout<ExportAlphaUniforms>.stride, index: 1)
+            encoder.dispatchThreads(
+                MTLSize(width: width, height: height, depth: 1), threadsPerThreadgroup: group)
+        }
         encoder.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()

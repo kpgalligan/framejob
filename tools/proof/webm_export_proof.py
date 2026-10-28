@@ -156,7 +156,7 @@ MUTANTS = {
         ("core/src/webm_ebml.rs", "            uint(CODEC_DELAY, delay_ns),\n",
          "            uint(CODEC_DELAY, 0 * delay_ns),\n")]},
     "no-discard-padding": {"rows": ["W2", "W6"], "anchors": [
-        (f"{SOURCES}/ExportWebMWriter.swift",
+        (f"{SOURCES}/ExportWebMWriter+Audio.swift",
          "                try add(packet, index == tail.count - 1 ? paddingNs : 0)\n",
          "                try add(packet, index == tail.count - 1 ? 0 * paddingNs : 0)\n")]},
     "clusters-by-time": {"rows": ["W4"], "cargo": "webm_writer", "anchors": [

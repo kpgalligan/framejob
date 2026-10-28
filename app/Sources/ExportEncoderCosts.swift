@@ -6,9 +6,9 @@ import Foundation
 ///
 /// **Both are measured, never guessed, and both are a table edit to replace.** The figures
 /// are `tools/proof/encoder_memory_measure.py`'s, recorded in `designs/codec-export.md`'s
-/// "## C6a": one fresh Release instance per key and size, AV.mov twice on the canvas (10 s,
-/// 300 frames), the resident peak above the instance's own after a warming frame, and the
-/// export's wall time. The TIME figures are provisional — one run each on a shared machine —
+/// "## C6a" (`vp9_alpha_webm`'s in "## C5"'s fix pass): one fresh Release instance per key
+/// and size, AV.mov twice on the canvas (10 s, 300 frames), the resident peak above the
+/// instance's own after a warming frame, and the export's wall time. The TIME figures are provisional — one run each on a shared machine —
 /// until C6b measures 4K on every row and the idle three-run speeds and writes them here.
 ///
 /// A figure is given at 1920 × 1080 and 3840 × 2160 and read at an export's pixels:
@@ -16,7 +16,7 @@ import Foundation
 
 /// What a cost is keyed by: the row, the AV1 speed, and the bit depth the encoder runs at.
 struct ExportEncoderKey: Hashable {
-    /// `av1`, `av1_webm` or `vp9_webm`.
+    /// `av1`, `av1_webm`, `vp9_webm` or `vp9_alpha_webm`.
     let preset: String
     /// The AV1 rows' speed (`settings.encoderSpeed ?? .balanced`); nil on every other row.
     let speed: EncoderSpeed?
@@ -74,6 +74,10 @@ enum ExportEncoderCosts {
     private static let run = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 Max, "
         + "96 GiB, one run per key and size on a machine shared with another lane's builds "
         + "and proofs; "
+    /// `vp9_alpha_webm`'s run (codec-export C5's fix pass), on a quiet machine, with
+    /// `vp9_webm:sdr` re-measured beside it as a control (within 0.6 % of the run above).
+    private static let alphaRun = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 "
+        + "Max, 96 GiB, one run per size (codec-export C5's fix pass); "
 
     /// Bytes, each job's resident peak above the instance's own.
     static let memory: [ExportEncoderKey: ExportEncoderFigure] = [
@@ -101,6 +105,9 @@ enum ExportEncoderCosts {
         ExportEncoderKey(preset: "vp9_webm", speed: nil, bits: 10): ExportEncoderFigure(
             at1080: 553811968, at2160: 1694040064,
             source: run + "vp9_webm:hlg; load 10.52 at 1080p, 30.58 at 4K"),
+        ExportEncoderKey(preset: "vp9_alpha_webm", speed: nil, bits: 8): ExportEncoderFigure(
+            at1080: 795197440, at2160: 2326249472,
+            source: alphaRun + "vp9_alpha_webm; load 5.33 at 1080p, 4.59 at 4K"),
     ]
 
     /// Seconds. `perFrame` is the measured export's wall time over its 300 frames, so it
@@ -153,6 +160,12 @@ enum ExportEncoderCosts {
             perFrame: ExportEncoderFigure(
                 at1080: 2.827 / 300, at2160: 9.078 / 300,
                 source: run + "vp9_webm:hlg; load 10.52 at 1080p, 30.58 at 4K"
+                    + "; provisional until C6b"),
+            setupSeconds: 0),
+        ExportEncoderKey(preset: "vp9_alpha_webm", speed: nil, bits: 8): ExportTimeEntry(
+            perFrame: ExportEncoderFigure(
+                at1080: 3.574 / 300, at2160: 9.194 / 300,
+                source: alphaRun + "vp9_alpha_webm; load 5.33 at 1080p, 4.59 at 4K"
                     + "; provisional until C6b"),
             setupSeconds: 0),
     ]

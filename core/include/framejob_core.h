@@ -456,7 +456,10 @@ char *rc_normalise_color(const char *text);
    records that the composition is read back through AVFoundation.
    `vp9_webm` (spec 11 CX-16) is VP9 from bundled libvpx in that WebM, 8-bit
    for an SDR picture and 10-bit for HLG and PQ: it carries `hdr` and
-   `writer` ("libvpx") and no `encoder_speeds`, libvpx having one speed. */
+   `writer` ("libvpx") and no `encoder_speeds`, libvpx having one speed.
+   `vp9_alpha_webm` (spec 11 CX-17) is the same 8-bit VP9 with a second
+   libvpx stream of its alpha in that WebM: it carries `writer` ("libvpx"),
+   no `encoder_speeds` and no `hdr` (an HLG project writes its SDR version). */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this
@@ -526,7 +529,8 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * One key of the RESOLVED settings needs its meaning stated, because the
  * obvious reading of the name is the wrong one: `alpha` is a capability of
  * the ENCODING — "this row carries an alpha channel" — and is true for
- * `prores_4444`, `hevc_alpha` and `apng`, and for nothing else. It is not
+ * `prores_4444`, `hevc_alpha`, `vp9_alpha_webm` and `apng`, and for nothing
+ * else. It is not
  * "this project's canvas is translucent". `gif` is false and `apng` is true
  * although both can show a transparent pixel: APNG has a real fourth
  * channel and a pixel may be any fraction of opaque, while a GIF
@@ -543,10 +547,11 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * writes: "hlg", "pq" or "sdr" (spec 11 HD-14); an SDR project's and an
  * audio row's never do.
  *
- * A row a bundled encoder writes (`av1`, `av1_webm`, `vp9_webm`, spec 11
- * CX-12, CX-16) adds `writer` at the end ("svt_av1" or "libvpx"), and the two
- * AV1 rows then `encoder_speed` (the speed asked, else "balanced"); no other
- * row's settings carry either key, and `vp9_webm`'s carry no speed. */
+ * A row a bundled encoder writes (`av1`, `av1_webm`, `vp9_webm`,
+ * `vp9_alpha_webm`, spec 11 CX-12, CX-16, CX-17) adds `writer` at the end
+ * ("svt_av1" or "libvpx"), and the two AV1 rows then `encoder_speed` (the
+ * speed asked, else "balanced"); no other row's settings carry either key,
+ * and the two VP9 rows' carry no speed. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 
@@ -839,7 +844,7 @@ int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
 
 /* ------------------------------------------------------------------ webm */
 
-/* The WebM writer (spec 11 CX-6, CX-15, CX-16) through `core/src/ffi_webm.rs`:
+/* The WebM writer (spec 11 CX-6, CX-15, CX-16, CX-17) through `core/src/ffi_webm.rs`:
  * one file of AV1 or VP9 video and Opus sound, written from compressed
  * packets the app hands in as opaque bytes; nothing here encodes.
  * `layout_json` fixes the file at open (serde, unknown keys refused):
@@ -849,7 +854,8 @@ int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
  *              "width": u32, "height": u32, "fps": [num, den],
  *              "colour": {"matrix", "range", "transfer", "primaries",
  *                         "bits_per_channel": 8|10, "mdcv_hex"?: 24 bytes,
- *                         "clli_hex"?: 4 bytes}}?,
+ *                         "clli_hex"?: 4 bytes},
+ *              "alpha_mode"?: bool (default false; V_VP9 only)}?,
  *    "audio": {"codec_id": "A_OPUS", "channels": 1|2, "sample_rate": 48000,
  *              "pre_skip": u16}?,
  *    "chapters": [{"start_ns", "end_ns", "name"}] (default [])}
@@ -863,7 +869,13 @@ int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
  * among equal times) is written only while every track not ended has one;
  * a layout with one track writes each packet as it arrives. A Cluster
  * starts at each video key and before 32,767 ms past its start; each
- * key-started Cluster is a CuePoint. Every call flushes before it returns. */
+ * key-started Cluster is a CuePoint. Every call flushes before it returns.
+ * With "alpha_mode" (CX-17) the video TrackEntry carries MaxBlockAdditionID
+ * 1 and its Video AlphaMode 1, its packets arrive only through
+ * rc_webm_add_video_with_alpha, and each is a BlockGroup: the Block (flags
+ * 0), BlockAdditions{BlockMore{BlockAddID 1, BlockAdditional = the alpha}}
+ * and, on a non-key only, a ReferenceBlock (the previous video block's ms
+ * less this one's). */
 #define RC_WEBM_VIDEO 1u
 #define RC_WEBM_AUDIO 2u
 
@@ -876,7 +888,8 @@ typedef struct RcWebm RcWebm; /* add/end/finish may run on several threads at on
  * not 24 bytes or a clli that is not 4, a 0 size or an fps with a 0 term, a
  * sample_rate other than 48000, channels outside 1-2, a chapter that ends at
  * or before its start or starts at or past duration_ns, unreadable JSON, or
- * a path that cannot be created. Freed with rc_webm_free. */
+ * a path that cannot be created, or alpha_mode on V_AV1 ("alpha_mode needs
+ * V_VP9; V_AV1 carries no alpha"). Freed with rc_webm_free. */
 RcWebm *rc_webm_open(const char *path, const char *layout_json, char **err_out);
 
 /* Adds one packet of `track` (RC_WEBM_VIDEO or RC_WEBM_AUDIO) presented at
@@ -884,10 +897,21 @@ RcWebm *rc_webm_open(const char *path, const char *layout_json, char **err_out);
  * `discard_padding_ns` above 0 writes the packet as a BlockGroup with that
  * DiscardPadding. False with the sentence through `err_out` for NULL, a
  * track not in the layout or ended, a negative pts or one not after the
- * track's last, a call after finish, or an I/O failure. */
+ * track's last, a call after finish, an I/O failure, or track 1 when it has
+ * alpha_mode ("track 1 has alpha_mode, so each packet carries its alpha"). */
 bool rc_webm_add_packet(RcWebm *webm, uint32_t track, int64_t pts_ns, bool key,
                         int64_t discard_padding_ns, const uint8_t *bytes, size_t len,
                         char **err_out);
+
+/* Adds one video packet with its alpha frame (spec 11 CX-17), as
+ * rc_webm_add_packet adds one to RC_WEBM_VIDEO. False with the sentence
+ * through `err_out` for NULL `webm`, `bytes` or `alpha` ("alpha is NULL"), a
+ * layout whose video has no alpha_mode ("track 1 has no alpha_mode, so a
+ * packet cannot carry alpha"), an empty alpha ("the alpha of the packet at
+ * <pts_ns> ns is empty"), and every refusal of rc_webm_add_packet. */
+bool rc_webm_add_video_with_alpha(RcWebm *webm, int64_t pts_ns, bool key, const uint8_t *bytes,
+                                  size_t len, const uint8_t *alpha, size_t alpha_len,
+                                  char **err_out);
 
 /* Ends `track`: no packet of it follows, and the others stop waiting for
  * it. False with the sentence through `err_out` for NULL, a track not in

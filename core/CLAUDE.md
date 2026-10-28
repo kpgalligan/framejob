@@ -151,16 +151,21 @@ governs a module now.
   CX-12, CX-16): `Writer` (`svt_av1`, `libvpx`; none is AVFoundation; `takes_speed`
   false for libvpx's one speed) and `EncoderSpeed`, moved whole out of
   `export_table.rs` (codec-export C3's toll, a pure move) and re-exported there.
+- `export_preset.rs` — `Preset`, its `impl` and `fps_json`, moved whole out of
+  `export_table.rs` (codec-export C5's toll T1, a pure move) and re-exported there.
 - `webm_ebml.rs` · `webm_layout.rs` · `webm_writer.rs` · `ffi_webm.rs` — the
   WebM an `av1_webm` or `vp9_webm` export writes (spec §11 CX-6, CX-15, CX-16: `V_VP9` with
-  no CodecPrivate, BitsPerChannel 8 or 10), the write side beside
+  no CodecPrivate, BitsPerChannel 8 or 10; CX-17: `alpha_mode` on `V_VP9`, MaxBlockAdditionID
+  and AlphaMode 1, `add_video_with_alpha`), the write side beside
   the importer's reader: `webm_ebml.rs` the element IDs, vints and builders
   (EBML header, Info, the TrackEntries with Colour and OpusHead, Chapters,
-  SeekHead, Cues); `webm_layout.rs` `rc_webm_open`'s JSON as `WebmLayout`, each
+  SeekHead) with `webm_ebml_block.rs` the Cues and block builders and the alpha BlockGroup
+  (BlockAdditions, BlockAddID 1, a ReferenceBlock on non-key blocks; C5's toll T2);
+  `webm_layout.rs` `rc_webm_open`'s JSON as `WebmLayout`, each
   value checked in a sentence naming it; `webm_writer.rs` `WebmWriter`, the
   interleave (earliest head, video first on a tie), Clusters at each key and
   before 32,767 ms, Cues, the SeekHead and the Segment size patched at
-  `finish`; `ffi_webm.rs` the five `rc_webm_*` exports over a
+  `finish`; `ffi_webm.rs` the six `rc_webm_*` exports over a
   `Mutex<WebmWriter>`. It writes the bytes it is handed and never decodes.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample

@@ -15,7 +15,8 @@ the record), on a scratch socket, stopped by its own PID; nothing else is ever k
   average is read at the export's start.
 
 Keys: av1 and av1_webm at faster, balanced and smaller; vp9_webm in an SDR project and in
-an HLG one; h264 as the AVFoundation control. Sizes 1920×1080 and 3840×2160.
+an HLG one; vp9_alpha_webm (codec-export C5, always 8-bit SDR) in an SDR project; h264 as the
+AVFoundation control. Sizes 1920×1080 and 3840×2160.
 
   python3 tools/proof/encoder_memory_measure.py [--app debug|release|<.app>]
                                                 [--only av1:balanced,h264] [--sizes 1080,2160]
@@ -56,9 +57,11 @@ KEYS = {
     "av1_webm:smaller": ("av1_webm", "smaller", False),
     "vp9_webm:sdr": ("vp9_webm", None, False),
     "vp9_webm:hlg": ("vp9_webm", None, True),
+    "vp9_alpha_webm": ("vp9_alpha_webm", None, False),
     "h264": ("h264", None, False),
 }
-EXTENSIONS = {"av1": "mp4", "av1_webm": "webm", "vp9_webm": "webm", "h264": "mp4"}
+EXTENSIONS = {"av1": "mp4", "av1_webm": "webm", "vp9_webm": "webm", "vp9_alpha_webm": "webm",
+              "h264": "mp4"}
 SAMPLE_EVERY = 0.1
 EXPORT_BOUND = 900
 

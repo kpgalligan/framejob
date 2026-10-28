@@ -3,16 +3,19 @@ import Foundation
 /// One packet as a bundled encoder answered it (spec §11 CX-12, CX-15 (3), CX-16 (6)): its
 /// bytes as the encoder wrote them, the `pts` the picture was sent with (its frame index),
 /// whether it is the last, and whether it is a key — a KEY_FRAME for SVT-AV1, libvpx's
-/// `VPX_FRAME_IS_KEY` for VP9 — which the WebM writer flags.
+/// `VPX_FRAME_IS_KEY` for VP9 — which the WebM writer flags. `alpha` is the same frame's
+/// alpha stream packet on `vp9_alpha_webm` (`VP9AlphaEncoder`, CX-17 (4)), nil elsewhere.
 struct ExportEncodedPacket {
     let data: Data
     let pts: Int64
     let isLast: Bool
     let isKey: Bool
+    var alpha: Data? = nil
 }
 
-/// What `ExportEncodePump` asks of a bundled encoder (spec §11 CX-12, CX-16): SVT-AV1 for the
-/// AV1 rows (`SVTAV1Encoder`), libvpx's VP9 for `vp9_webm` (`VP9Encoder`). Every call after
+/// What `ExportEncodePump` asks of a bundled encoder (spec §11 CX-12, CX-16, CX-17): SVT-AV1
+/// for the AV1 rows (`SVTAV1Encoder`), libvpx's VP9 for `vp9_webm` (`VP9Encoder`), and two of
+/// them paired for `vp9_alpha_webm` (`VP9AlphaEncoder`). Every call after
 /// `init` is made on the pump's encode queue alone.
 protocol ExportVideoEncoder: AnyObject {
     /// The library's name in a sentence ("SVT-AV1", "libvpx").

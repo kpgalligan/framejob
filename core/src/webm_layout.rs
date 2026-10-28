@@ -32,6 +32,10 @@ pub struct VideoLayout {
     pub height: u32,
     pub fps: [u32; 2],
     pub colour: ColourLayout,
+    /// True for `vp9_alpha_webm` (spec §11 CX-17 (5)): AlphaMode 1, and each
+    /// packet carries its alpha (`add_video_with_alpha`). `V_VP9` only.
+    #[serde(default)]
+    pub alpha_mode: bool,
 }
 
 #[derive(Deserialize)]
@@ -94,6 +98,9 @@ fn video_entry(v: &VideoLayout) -> Result<Vec<u8>, String> {
         ("V_VP9", Some(_)) => return Err("a V_VP9 track takes no codec_private_hex".to_string()),
         (other, _) => return Err(format!("video codec_id \"{other}\" is not V_AV1 or V_VP9")),
     };
+    if v.alpha_mode && v.codec_id != "V_VP9" {
+        return Err("alpha_mode needs V_VP9; V_AV1 carries no alpha".to_string());
+    }
     if v.width == 0 || v.height == 0 {
         return Err(format!(
             "the video size {} × {} has a side of 0",
@@ -145,6 +152,7 @@ fn video_entry(v: &VideoLayout) -> Result<Vec<u8>, String> {
         v.height,
         frame_ns,
         &colour,
+        v.alpha_mode,
     ))
 }
 
@@ -194,6 +202,8 @@ pub(crate) struct Header {
     pub(crate) chapters: Option<Vec<u8>>,
     pub(crate) video: bool,
     pub(crate) audio: bool,
+    /// The video track's `alpha_mode`: each of its packets carries its alpha.
+    pub(crate) alpha: bool,
 }
 
 impl WebmLayout {
@@ -217,6 +227,7 @@ impl WebmLayout {
             chapters: chapters(&layout.chapters, layout.duration_ns)?,
             video: layout.video.is_some(),
             audio: layout.audio.is_some(),
+            alpha: layout.video.as_ref().is_some_and(|v| v.alpha_mode),
         })
     }
 }

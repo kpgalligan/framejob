@@ -1,10 +1,12 @@
 import AVFoundation
 import os
 
-/// The WebM rows' pipeline (spec §11 CX-15, CX-16): `av1_webm` and `vp9_webm`, the composed
-/// movie read back exactly as `ExportWriter` reads it, its picture encoded by the same
-/// `ExportEncodePump` (SVT-AV1 or libvpx by `writer`) and its sound by `ExportOpusEncoder`,
-/// written into a WebM by the core (`ReelWebM`).
+/// The WebM rows' pipeline (spec §11 CX-15, CX-16, CX-17): `av1_webm`, `vp9_webm` and
+/// `vp9_alpha_webm`, the composed movie read back exactly as `ExportWriter` reads it, its
+/// picture encoded by the same `ExportEncodePump` (SVT-AV1 or libvpx by `writer`, with the
+/// alpha's second stream on `vp9_alpha_webm`) and its sound by `ExportOpusEncoder`, written
+/// into a WebM by the core (`ReelWebM`). The alpha row is held to G-33's shape rule as the
+/// other alpha movie rows are (`ExportWriter.checkAlphaSurvivesTheSize`).
 ///
 /// **A second `ExportPipeline`, and the exception to §7.8's one writer (CX-15 (2)).**
 /// `AVAssetWriter` writes no WebM, so this file is the WebM half of `ExportWriter` and
@@ -43,21 +45,21 @@ import os
 final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
     private let built: BuiltComposition
     private let destination: URL
-    private let range: CMTimeRange
+    let range: CMTimeRange
     private let totalSeconds: Double
     private let videoReader: AVAssetReader
     private let videoOutput: AVAssetReaderOutput
     /// The audio mix's own reader, nil for a silent movie; its output is added in `start`.
-    private let audioReader: AVAssetReader?
+    let audioReader: AVAssetReader?
     private var audioOutput: AVAssetReaderOutput?
-    private let fault = ExportWebMDevFault.current()
+    let fault = ExportWebMDevFault.current()
     private let pump: ExportEncodePump
     private let opus: ExportOpusEncoder?
-    private let audioEnd: ExportAudioEnd
+    let audioEnd: ExportAudioEnd
     private let layoutJSON: String
     private var webm: ReelWebM?
     /// Written once on main between `init` and `start`, then read only on `audioQueue`.
-    private var audioGain: ExportAudioGain?
+    private(set) var audioGain: ExportAudioGain?
 
     private let videoQueue = DispatchQueue(
         label: "com.kgalligan.framejob.export.webm.video", qos: .userInitiated)
@@ -94,6 +96,7 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
             throw Exporter.ExportError.emptyTimeline
         }
         let canvas = built.videoComposition.renderSize
+        try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)
         videoOutput = ExportWriter.videoReadOutput(built, settings: settings)
         guard videoReader.canAdd(videoOutput) else {
             throw Exporter.ExportError.failed("The composition could not be read for export.")
@@ -213,102 +216,15 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
         return progressValue
     }
 
-    // MARK: - The audio pump
-
-    /// Reads the mix to its end, encodes it and adds each packet, holding the newest back so
-    /// the last one can carry the tail's DiscardPadding (CX-15 (5)), or stops at the flag
-    /// before a read.
-    ///
-    /// **Times are the stamps'.** Each buffer is placed at its rebased stamp
-    /// (`ExportAudioEnd.align`: silence for a gap, the covered head cut), so the stream the
-    /// encoder is fed is the timeline's sound frame for frame from the range's start, and
-    /// packet k's first frame is the one stamped k × 960 / 48 kHz — k × 20 ms, a whole tick of
-    /// WebM's 1 ms timecode scale — which is the time it is added at.
-    private func pumpAudio(
-        _ output: AVAssetReaderOutput, into webm: ReelWebM, through opus: ExportOpusEncoder
-    ) {
-        let gain = audioGain
-        var held: Data?
-        var added: Int64 = 0
-        let packetNs = Int64(ExportOpusEncoder.framesPerPacket) * 1_000_000_000 / 48_000
-        let add = { (packet: Data, padding: Int64) throws in
-            try webm.add(
-                track: ReelWebM.audio, ptsNs: added * packetNs, key: true,
-                discardPaddingNs: padding, data: packet)
-            added += 1
-        }
-        let feed = { (packets: [Data]) throws in
-            for packet in packets {
-                if let previous = held { try add(previous, 0) }
-                held = packet
-            }
-        }
-        var reads = 0
-        do {
-            while true {
-                guard !isStopping else { return }
-                reads += 1
-                try fault?.beforeAudioRead(reads)
-                guard let decoded = output.copyNextSampleBuffer() else {
-                    if let error = readFailure(of: audioReader) {
-                        stopped(with: error)
-                        return
-                    }
-                    break
-                }
-                let time = CMSampleBufferGetPresentationTimeStamp(decoded) - range.start
-                guard time.isNumeric, time >= .zero else { continue }
-                if gain != nil, CMSampleBufferGetNumSamples(decoded) == 0 { continue }
-                guard let sample = gain == nil ? decoded : gain?.apply(to: decoded) else {
-                    stopped(with: Exporter.ExportError.failed(
-                        "The loudness gain could not be applied to a sample."))
-                    return
-                }
-                let frame = CMTimeConvertScale(
-                    time, timescale: CMTimeScale(ExportAudioEnd.sampleRate),
-                    method: .roundHalfAwayFromZero
-                ).value
-                for placed in audioEnd.align(sample, at: Int(frame)) {
-                    guard let fitted = audioEnd.fit(placed) else { continue }
-                    try feed(try opus.encode(fitted))
-                }
-            }
-            for silence in audioEnd.padding() {
-                try feed(try opus.encode(silence))
-            }
-            var tail = (held.map { [$0] } ?? []) + (try opus.finish())
-            // The decoded length is packets × 960 − pre-skip; the surplus over #337's
-            // target is cut whole packets first, then by the last one's DiscardPadding.
-            var padding = (Int(added) + tail.count) * ExportOpusEncoder.framesPerPacket
-                - opus.preSkip - audioEnd.target
-            while padding >= ExportOpusEncoder.framesPerPacket, !tail.isEmpty {
-                tail.removeLast()
-                padding -= ExportOpusEncoder.framesPerPacket
-            }
-            guard padding >= 0, padding < ExportOpusEncoder.framesPerPacket else {
-                stopped(with: Exporter.ExportError.failed(
-                    "The audio could not be encoded to its exact length."))
-                return
-            }
-            let paddingNs = (Int64(padding) * 1_000_000_000 + 24_000) / 48_000
-            for (index, packet) in tail.enumerated() {
-                try add(packet, index == tail.count - 1 ? paddingNs : 0)
-            }
-            try webm.endTrack(ReelWebM.audio)
-        } catch {
-            stopped(with: error)
-        }
-    }
-
     // MARK: - Finishing
 
-    private var isStopping: Bool {
+    var isStopping: Bool {
         lock.lock()
         defer { lock.unlock() }
         return cancelRequested || failure != nil
     }
 
-    private func stopped(with error: any Error) {
+    func stopped(with error: any Error) {
         lock.lock()
         let first = failure == nil
         if first { failure = error }
@@ -322,7 +238,7 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
 
     private static let log = Logger(subsystem: "com.kgalligan.FrameJob", category: "export.webm")
 
-    private func readFailure(of reader: AVAssetReader?) -> (any Error)? {
+    func readFailure(of reader: AVAssetReader?) -> (any Error)? {
         guard let reader, reader.status == .failed else { return nil }
         return reader.error
             ?? Exporter.ExportError.failed("The composition could not be read to the end.")

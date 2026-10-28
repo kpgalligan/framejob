@@ -108,7 +108,8 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
   include/…_core.h     export settings, the generic MCP server, the index of a
                        WebM/Matroska file being imported and the WebM file an
-                       `av1_webm` or `vp9_webm` export writes. THE FFI CONTRACT
+                       `av1_webm`, `vp9_webm` or `vp9_alpha_webm` export writes.
+                       THE FFI CONTRACT
   src/                 core/CLAUDE.md has the module map
   tests/               black-box, through the FFI
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
@@ -137,7 +138,8 @@ app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass; ExportI010.metal —
                        the bundled encoders' 64RGBAHalf → planar 10-bit I010 (or, for `vp9_webm`'s
-                       SDR picture, 8-bit I420) conversion
+                       SDR picture, 8-bit I420) conversion, and `vp9_alpha_webm`'s alpha as a
+                       second 8-bit picture (`framejob_export_alpha8`)
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/framejob_core.h
 designs/             the spec, adr/ (condensed records), the handoffs — the table above
@@ -165,7 +167,7 @@ VERSION              the base version, MAJOR.MINOR; `make project` feeds it to x
 **Rust decides, AVFoundation and Metal do** (spec §7). The core holds the
 project (JSON, spec §5.2), every edit, the composition plan, the per-frame
 recipe, the index of a WebM/Matroska file being imported and the WebM file an
-`av1_webm` or `vp9_webm` export writes (its container only; the packets come from Swift). Swift owns windows, gestures, undo, AVFoundation playback and export,
+`av1_webm`, `vp9_webm` or `vp9_alpha_webm` export writes (its container only; the packets come from Swift). Swift owns windows, gestures, undo, AVFoundation playback and export,
 the Metal compositor, media import and its caches, and agent dispatch. No
 pixel or sample work in Rust; no ffmpeg dependency in the product. The AV1 and
 VP9 encoders (SVT-AV1, libvpx; road map `designs/codec-export.md`) are

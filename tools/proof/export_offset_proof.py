@@ -111,7 +111,7 @@ Rows:
       inside the reach), never pinned to a lag; their detail names SY-37's
       class (a defect when a window has r < 0.8, |lag| > 5.0 ms or a lag at
       the edge)
-  E1–E42  one project each (`E_ROWS`), exported and located; ok when the
+  E1–E43  one project each (`E_ROWS`), exported and located; ok when the
       export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
       in-range clicks) and SY-27's pin holds (E30, E33: the MP3s, read past
       their encoder delay, SY-36; E32 the late head, SY-35). E34 (×1.1 keep
@@ -304,6 +304,9 @@ E_ROWS = {
     # same Opus sound land as av1_webm's do, through the same WebM writer.
     "E41": ("cam-pcm48", 10 * SEC, None, "vp9_webm"),
     "E42": ("cam-aac48", 10 * SEC, None, "vp9_webm"),
+    # codec-export C5 (spec §11 CX-17): E41 as vp9_alpha_webm — the picture with its alpha
+    # stream as each block's BlockAdditional, and the same Opus sound, land as vp9_webm's do.
+    "E43": ("cam-pcm48", 10 * SEC, None, "vp9_alpha_webm"),
 }
 E_IDS = list(E_ROWS)
 KEEP_ROWS = {"E9", "E11", "E12", "E29"}
@@ -311,9 +314,10 @@ KEEP_ROWS = {"E9", "E11", "E12", "E29"}
 # so these rows run every pass and print their readings, scored on the
 # instrument only (the export decoded, the clicks or windows found).
 MEASURED_ROWS = {"R4", "R5", "E34", "E35"}
-VIDEO_ROWS = {"E16", "E17", "E18", "E19", "E36", "E37", "E38", "E39", "E40", "E41", "E42"}
+VIDEO_ROWS = {"E16", "E17", "E18", "E19", "E36", "E37", "E38", "E39", "E40", "E41", "E42",
+              "E43"}
 EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4", "av1": "mp4",
-              "av1_webm": "webm", "vp9_webm": "webm"}
+              "av1_webm": "webm", "vp9_webm": "webm", "vp9_alpha_webm": "webm"}
 ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS + X_ROWS
 NO_APP = {"Z0", "Z2"} | set(L_ROWS) | set(X_ROWS)
 
@@ -852,7 +856,7 @@ def run_e(mcp, row, fixture_override=None):
     result["rate"] = rate
     result["expected"] = expected
     result["found_times"] = [f for f, _ in found]
-    if preset in ("prores_422", "h264", "av1", "av1_webm", "vp9_webm"):
+    if preset in ("prores_422", "h264", "av1", "av1_webm", "vp9_webm", "vp9_alpha_webm"):
         # The 320×180 movie sits unscaled on the 640×360 canvas, a quarter of
         # its area, so a white frame's mean over the whole picture is a
         # quarter of a full one's: the threshold is scaled by the same share.

@@ -9,6 +9,7 @@
 //! except where a size is patched later, which is always 8 bytes.
 
 use crate::container_codec::Mastering;
+pub(crate) use crate::webm_ebml_block::{alpha_block_group, block_body, block_group, cues, CUES};
 
 // ---- element IDs -----------------------------------------------------------
 
@@ -45,6 +46,8 @@ const SEEK_PRE_ROLL: u32 = 0x56BB;
 const VIDEO: u32 = 0xE0;
 const PIXEL_WIDTH: u32 = 0xB0;
 const PIXEL_HEIGHT: u32 = 0xBA;
+const ALPHA_MODE: u32 = 0x53C0;
+const MAX_BLOCK_ADDITION_ID: u32 = 0x55EE;
 const COLOUR: u32 = 0x55B0;
 const MATRIX_COEFFICIENTS: u32 = 0x55B1;
 const BITS_PER_CHANNEL: u32 = 0x55B2;
@@ -81,14 +84,6 @@ pub(crate) const CLUSTER: u32 = 0x1F43_B675;
 pub(crate) const TIMESTAMP: u32 = 0xE7;
 pub(crate) const SIMPLE_BLOCK: u32 = 0xA3;
 pub(crate) const BLOCK_GROUP: u32 = 0xA0;
-const BLOCK: u32 = 0xA1;
-const DISCARD_PADDING: u32 = 0x75A2;
-pub(crate) const CUES: u32 = 0x1C53_BB6B;
-const CUE_POINT: u32 = 0xBB;
-const CUE_TIME: u32 = 0xB3;
-const CUE_TRACK_POSITIONS: u32 = 0xB7;
-const CUE_TRACK: u32 = 0xF7;
-const CUE_CLUSTER_POSITION: u32 = 0xF1;
 
 /// The eight-byte "unknown" size, written where a size is patched later.
 pub(crate) const UNKNOWN_SIZE: [u8; 8] = [0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
@@ -219,7 +214,8 @@ pub(crate) struct ColourOut {
 
 /// The video TrackEntry (number 1, UID 1): `codec_id` with its
 /// CodecPrivate when it has one (`V_AV1`'s `av1C`; `V_VP9` has none,
-/// spec §11 CX-16 (5)).
+/// spec §11 CX-16 (5)). With `alpha` (CX-17 (5)) it carries
+/// MaxBlockAdditionID 1 and its Video AlphaMode 1.
 pub(crate) fn video_entry(
     codec_id: &str,
     private: Option<&[u8]>,
@@ -227,6 +223,7 @@ pub(crate) fn video_entry(
     height: u32,
     default_duration_ns: u64,
     colour: &ColourOut,
+    alpha: bool,
 ) -> Vec<u8> {
     let mut c = vec![
         uint(MATRIX_COEFFICIENTS, colour.matrix.into()),
@@ -254,11 +251,18 @@ pub(crate) fn video_entry(
         ];
         c.push(master(MASTERING_METADATA, &fields));
     }
+    // An empty child adds no bytes, so AlphaMode is written only with `alpha`.
+    let alpha_mode = if alpha {
+        uint(ALPHA_MODE, 1)
+    } else {
+        Vec::new()
+    };
     let video = master(
         VIDEO,
         &[
             uint(PIXEL_WIDTH, width.into()),
             uint(PIXEL_HEIGHT, height.into()),
+            alpha_mode,
             master(COLOUR, &c),
         ],
     );
@@ -273,6 +277,9 @@ pub(crate) fn video_entry(
         entry.push(binary(CODEC_PRIVATE, private));
     }
     entry.push(uint(DEFAULT_DURATION, default_duration_ns));
+    if alpha {
+        entry.push(uint(MAX_BLOCK_ADDITION_ID, 1));
+    }
     entry.push(video);
     master(TRACK_ENTRY, &entry)
 }
@@ -357,45 +364,4 @@ pub(crate) fn seek_head(entries: &[(u32, u64)]) -> Vec<u8> {
         })
         .collect();
     master(SEEK_HEAD, &seeks)
-}
-
-/// Cues of (time in ms, Cluster position in the Segment's data), track 1.
-pub(crate) fn cues(points: &[(u64, u64)]) -> Vec<u8> {
-    let points: Vec<Vec<u8>> = points
-        .iter()
-        .map(|(time, pos)| {
-            master(
-                CUE_POINT,
-                &[
-                    uint(CUE_TIME, *time),
-                    master(
-                        CUE_TRACK_POSITIONS,
-                        &[uint(CUE_TRACK, 1), uint(CUE_CLUSTER_POSITION, *pos)],
-                    ),
-                ],
-            )
-        })
-        .collect();
-    master(CUES, &points)
-}
-
-/// A block's body: the track number, the time relative to its Cluster and
-/// the flags, then the frame (no lacing).
-pub(crate) fn block_body(track: u32, relative_ms: i16, flags: u8, bytes: &[u8]) -> Vec<u8> {
-    let mut out = vint(track.into());
-    out.extend(relative_ms.to_be_bytes());
-    out.push(flags);
-    out.extend_from_slice(bytes);
-    out
-}
-
-/// A BlockGroup carrying `body` as its Block and a DiscardPadding in ns.
-pub(crate) fn block_group(body: &[u8], discard_padding_ns: i64) -> Vec<u8> {
-    master(
-        BLOCK_GROUP,
-        &[
-            binary(BLOCK, body),
-            int(DISCARD_PADDING, discard_padding_ns),
-        ],
-    )
 }

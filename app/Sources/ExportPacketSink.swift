@@ -5,11 +5,13 @@ import AVFoundation
 /// the MP4 row's passthrough `AVAssetWriterInput`, or the WebM rows' core writer. Both are called on the pump's encode
 /// queue alone, so a sink needs no lock of its own.
 protocol ExportPacketSink: AnyObject {
-    /// Writes one packet presented at `time` for `duration`; `key` is a KEY_FRAME. nil once
+    /// Writes one packet presented at `time` for `duration`; `key` is a KEY_FRAME; `alpha` is
+    /// the frame's alpha stream packet on `vp9_alpha_webm` (CX-17 (5)), else nil. nil once
     /// written; `ExportPacketSinkStopped` when the export stopped first (nothing to report);
     /// any other error fails the export.
     func append(
-        _ data: Data, at time: CMTime, duration: CMTime, key: Bool, isStopping: () -> Bool
+        _ data: Data, alpha: Data?, at time: CMTime, duration: CMTime, key: Bool,
+        isStopping: () -> Bool
     ) -> (any Error)?
     /// No packet follows: the pump's one exit calls it exactly once, clean or not.
     func finish()
@@ -36,8 +38,13 @@ final class ExportMP4PacketSink: ExportPacketSink {
     }
 
     func append(
-        _ data: Data, at time: CMTime, duration: CMTime, key: Bool, isStopping: () -> Bool
+        _ data: Data, alpha: Data?, at time: CMTime, duration: CMTime, key: Bool,
+        isStopping: () -> Bool
     ) -> (any Error)? {
+        // An MP4 has nowhere to put a VP9 alpha (CX-1: no VP9 in MP4).
+        guard alpha == nil else {
+            return Exporter.ExportError.failed("An MP4 cannot carry a packet's alpha.")
+        }
         guard let format, let sample = ExportAV1Track.sample(
             data, at: time, duration: duration, format: format)
         else {
@@ -59,7 +66,8 @@ final class ExportMP4PacketSink: ExportPacketSink {
 }
 
 /// The WebM rows' sink: each packet into the core's writer as the video track's block at its
-/// time in nanoseconds, the key flag the encoder's (spec §11 CX-15 (3), CX-16 (6)). The core queues
+/// time in nanoseconds, the key flag the encoder's (spec §11 CX-15 (3), CX-16 (6)), with its
+/// alpha on `vp9_alpha_webm` (CX-17 (5)). The core queues
 /// what the interleave holds back, so this never waits. `finish` ends the video track; a
 /// failure there is the writer's `finish`'s to report.
 final class ExportWebMPacketSink: ExportPacketSink {
@@ -78,11 +86,17 @@ final class ExportWebMPacketSink: ExportPacketSink {
     }
 
     func append(
-        _ data: Data, at time: CMTime, duration: CMTime, key: Bool, isStopping: () -> Bool
+        _ data: Data, alpha: Data?, at time: CMTime, duration: CMTime, key: Bool,
+        isStopping: () -> Bool
     ) -> (any Error)? {
         packets += 1
         if let error = fault?.videoPacket(packets) { return error }
         do {
+            if let alpha {
+                try webm.addVideo(
+                    ptsNs: Self.nanoseconds(time), key: key, data: data, alpha: alpha)
+                return nil
+            }
             try webm.add(
                 track: ReelWebM.video, ptsNs: Self.nanoseconds(time), key: key,
                 discardPaddingNs: 0, data: data)

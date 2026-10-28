@@ -1,4 +1,4 @@
-//! C FFI: the WebM writer (spec §11 CX-6, CX-15) — five `rc_webm_*`
+//! C FFI: the WebM writer (spec §11 CX-6, CX-15, CX-17) — six `rc_webm_*`
 //! exports over `webm_writer.rs`'s `WebmWriter`, each a thin shim through
 //! `ffi_util.rs`'s helpers. An `RcWebm` holds the writer behind a mutex, so
 //! the app's video and audio queues may add packets, end tracks and finish
@@ -78,6 +78,42 @@ pub unsafe extern "C" fn rc_webm_add_packet(
         }
         let data = unsafe { slice::from_raw_parts(bytes, len) };
         writer.add_packet(track, pts_ns, key, discard_padding_ns, data)
+    };
+    unsafe { fallible_op(err_out, "adding a webm packet", false, body, |()| true) }
+}
+
+/// Adds one video packet with its alpha frame (spec §11 CX-17 (5)) at
+/// `pts_ns`, written as a BlockGroup with BlockAdditional 1. False with the
+/// sentence through `err_out` for NULL `webm`, `bytes` or `alpha`, a layout
+/// without `alpha_mode`, an empty alpha, and every refusal of
+/// [`rc_webm_add_packet`].
+///
+/// # Safety
+/// `webm` must be NULL or a live handle; `bytes` and `alpha` must be NULL or
+/// point to `len` and `alpha_len` readable bytes; `err_out` as
+/// [`rc_webm_open`]'s.
+#[no_mangle]
+pub unsafe extern "C" fn rc_webm_add_video_with_alpha(
+    webm: *mut RcWebm,
+    pts_ns: i64,
+    key: bool,
+    bytes: *const u8,
+    len: usize,
+    alpha: *const u8,
+    alpha_len: usize,
+    err_out: *mut *mut c_char,
+) -> bool {
+    let body = || {
+        let mut writer = unsafe { locked(webm) }?;
+        if bytes.is_null() {
+            return Err("bytes is NULL".to_string());
+        }
+        if alpha.is_null() {
+            return Err("alpha is NULL".to_string());
+        }
+        let data = unsafe { slice::from_raw_parts(bytes, len) };
+        let alpha = unsafe { slice::from_raw_parts(alpha, alpha_len) };
+        writer.add_video_with_alpha(pts_ns, key, data, alpha)
     };
     unsafe { fallible_op(err_out, "adding a webm packet", false, body, |()| true) }
 }

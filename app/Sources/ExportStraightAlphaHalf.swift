@@ -193,6 +193,25 @@ extension ExportStraightAlpha {
             height: height, bytesPerRow: bytesPerRow, unpremultiply: unpremultiplyHalf)
     }
 
+    /// A 64RGBAHalf buffer straightened in place by `straighten(half:…)`,
+    /// `prores_4444`'s pass — `vp9_alpha_webm`'s frame before the bundled
+    /// encoder's conversion (spec §11 CX-17 (2)). False when the buffer is not
+    /// 64RGBAHalf, is planar or cannot be locked; it is not labelled, VP9's
+    /// alpha being straight by its codec mapping.
+    static func straighten(_ buffer: CVPixelBuffer) -> Bool {
+        guard CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_64RGBAHalf,
+            !CVPixelBufferIsPlanar(buffer),
+            CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess
+        else { return false }
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return false }
+        straighten(
+            half: base, width: CVPixelBufferGetWidth(buffer),
+            height: CVPixelBufferGetHeight(buffer),
+            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer))
+        return true
+    }
+
     /// Pass 1 over one half-float row, recording its visible columns in
     /// `span`.
     private static func unpremultiplyHalf(

@@ -22,6 +22,11 @@
 //! time would pass the 16-bit relative limit (32,767 ms); a Cluster's size is
 //! written unknown and patched when the next one starts. Each key-started
 //! Cluster is a CuePoint.
+//!
+//! **Alpha** (CX-17 (5)): a layout whose video has `alpha_mode` takes its
+//! video only through [`WebmWriter::add_video_with_alpha`], and each such
+//! block is a BlockGroup holding the alpha as BlockAdditional 1, with a
+//! ReferenceBlock to the previous video block on every non-key.
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -47,6 +52,8 @@ struct Packet {
     key: bool,
     discard_ns: i64,
     bytes: Vec<u8>,
+    /// The alpha frame of a video packet on an `alpha_mode` track.
+    alpha: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -72,6 +79,10 @@ pub struct WebmWriter {
     cluster: Option<Cluster>,
     cues: Vec<(u64, u64)>,
     failed: bool,
+    /// The video track's `alpha_mode`.
+    alpha: bool,
+    /// The last video block's time, for the next one's ReferenceBlock.
+    last_video_ms: Option<u64>,
 }
 
 impl WebmWriter {
@@ -93,6 +104,8 @@ impl WebmWriter {
             cluster: None,
             cues: Vec::new(),
             failed: false,
+            alpha: head.alpha,
+            last_video_ms: None,
         };
         w.put(&ebml::ebml_header())?;
         w.put(&ebml::id(ebml::SEGMENT))?;
@@ -114,6 +127,8 @@ impl WebmWriter {
 
     /// Queues one packet of `track` and writes whatever the interleave
     /// allows. `pts_ns` must be at or after 0 and after the track's last.
+    /// A video track with `alpha_mode` refuses it: its packets come through
+    /// [`WebmWriter::add_video_with_alpha`].
     pub fn add_packet(
         &mut self,
         track: u32,
@@ -121,6 +136,42 @@ impl WebmWriter {
         key: bool,
         discard_padding_ns: i64,
         bytes: &[u8],
+    ) -> Result<(), String> {
+        self.track(track)?;
+        if track == VIDEO && self.alpha {
+            return Err("track 1 has alpha_mode, so each packet carries its alpha".to_string());
+        }
+        self.queue(track, pts_ns, key, discard_padding_ns, bytes, None)
+    }
+
+    /// Queues one video packet with its alpha frame (spec §11 CX-17 (5)), as
+    /// `add_packet` queues one; the layout's video must have `alpha_mode`, and
+    /// the alpha must not be empty.
+    pub fn add_video_with_alpha(
+        &mut self,
+        pts_ns: i64,
+        key: bool,
+        bytes: &[u8],
+        alpha: &[u8],
+    ) -> Result<(), String> {
+        self.track(VIDEO)?;
+        if !self.alpha {
+            return Err("track 1 has no alpha_mode, so a packet cannot carry alpha".to_string());
+        }
+        if alpha.is_empty() {
+            return Err(format!("the alpha of the packet at {pts_ns} ns is empty"));
+        }
+        self.queue(VIDEO, pts_ns, key, 0, bytes, Some(alpha.to_vec()))
+    }
+
+    fn queue(
+        &mut self,
+        track: u32,
+        pts_ns: i64,
+        key: bool,
+        discard_padding_ns: i64,
+        bytes: &[u8],
+        alpha: Option<Vec<u8>>,
     ) -> Result<(), String> {
         let t = self.track(track)?;
         if pts_ns < 0 {
@@ -139,6 +190,7 @@ impl WebmWriter {
             key,
             discard_ns: discard_padding_ns,
             bytes: bytes.to_vec(),
+            alpha,
         });
         self.drain(false)?;
         self.flush()
@@ -249,7 +301,16 @@ impl WebmWriter {
         }
         let base = self.cluster.as_ref().map_or(p.ms, |c| c.ms);
         let relative = i16::try_from(p.ms.saturating_sub(base)).unwrap_or(i16::MAX);
-        let element = if p.discard_ns > 0 {
+        let element = if let Some(alpha) = &p.alpha {
+            // A key's group has no ReferenceBlock, which is what marks it a key.
+            let reference =
+                (!p.key).then(|| self.last_video_ms.unwrap_or(p.ms) as i64 - p.ms as i64);
+            ebml::alpha_block_group(
+                &ebml::block_body(track, relative, 0, &p.bytes),
+                alpha,
+                reference,
+            )
+        } else if p.discard_ns > 0 {
             ebml::block_group(
                 &ebml::block_body(track, relative, 0, &p.bytes),
                 p.discard_ns,
@@ -261,6 +322,9 @@ impl WebmWriter {
                 &ebml::block_body(track, relative, flags, &p.bytes),
             )
         };
+        if track == VIDEO {
+            self.last_video_ms = Some(p.ms);
+        }
         self.put(&element)
     }
 

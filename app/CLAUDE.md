@@ -63,7 +63,9 @@ detail there.
   `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
   clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll), and
   `CoreJSON` (`value`, `snapTicks`: `clipState`'s and `snapCandidates`' JSON
-  halves, clean-up round 3's toll; `array`, `overrides`, C1's tolls), and C1's
+  halves, clean-up round 3's toll; `array`, `overrides`, C1's tolls; `ExportSize.list`,
+  `ExportSettings.decoded`, `ReelAV1.Config.decoded`, `withNonNullBytes`, codec-export C5's
+  toll), and C1's
   fix-pass moves: `ReelAV1.Config` / `.Color` (an extension of `ReelCore.swift`'s
   `ReelAV1`, whose `rc_av1_*` calls stay there), `GraphicDiagnostic.list(json:)`,
   `GraphicFailure.checkSides`, `SpeedLimits.decoded` and the free `withBytes`.
@@ -1681,13 +1683,18 @@ the key map behind it.
   `ExportAV1Encoder.swift` · `ExportVideoEncoder.swift` (the `ExportVideoEncoder` protocol,
   `ExportEncodedPacket`, `ExportRateTable`, spec §11 CX-16) · `ExportVP9Encoder.swift`
   (`VP9Encoder`, libvpx through `app/Bridging/FrameJobVPX.h`'s two `static inline` shims for
-  the `vpx_codec_enc_init` macro and the variadic control) · `ExportI010.swift` (+
-  `Resources/Shaders/ExportI010.metal`; 10-bit I010, or 8-bit I420 for `vp9_webm`'s SDR picture) ·
+  the `vpx_codec_enc_init` macro and the variadic control; `Plane`, `keyInterval` and
+  `alphaCQLevel(pixels:)`, the alpha level by size band, CX-17 (6)) ·
+  `ExportVP9AlphaEncoder.swift` (`VP9AlphaEncoder`: two `VP9Encoder`s, keys forced on the same
+  frames, packets paired by pts, a mismatch refused, CX-17) · `ExportI010.swift` (+
+  `Resources/Shaders/ExportI010.metal`; 10-bit I010, or 8-bit I420 for `vp9_webm`'s SDR picture,
+  and `vp9_alpha_webm`'s alpha plane) ·
   `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
   `ExportAV1Track.swift` · `ExportEncodePump.swift` (picks SVT-AV1 or libvpx by the settings'
-  `writer`) · `ExportSheetSpeed.swift` ·
+  `writer`; straightens `vp9_alpha_webm`'s frames first, G-35) · `ExportSheetSpeed.swift` ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
-  the WebM writer) · `ExportWebMWriter.swift` · `ExportWebMLayout.swift` ·
+  the WebM writer; `append` carries the `alpha` packet) · `ExportWebMWriter.swift` ·
+  `ExportWebMWriter+Audio.swift` (the WebM audio pump, C5's toll T2) · `ExportWebMLayout.swift` ·
   `ExportOpusEncoder.swift` · `ExportWebMDevFault.swift` (`-RCDevWebMFault`, and
   `-RCDevExportFault` for `ExportWriter`'s pumps, spec §11 #378, dev only)
   — the `av1_webm` row (spec §11 CX-15): `ExportWebMWriter` gives the video output and
@@ -2311,7 +2318,8 @@ free.
 - `ExportEncoderCosts.swift` · `ExportEncoderLedger.swift` — Foundation only
   (spec §11 CX-18). Costs: `ExportEncoderKey` (row, AV1 speed, bit depth),
   the measured resident peak (`memory`) and per-frame time (`time`) at 1080p
-  and 4K, each with its source, read at an export's pixels; the sheet's
+  and 4K, each with its source, read at an export's pixels (every bundled-encoder row,
+  `vp9_alpha_webm` included); the sheet's
   estimate (`sheetLine`). Replacing a figure is a table edit (C6b owes the
   time constants). Ledger: the app-wide main-thread account the queue and
   every `ExportProgressSheetController` book into (the sheet in

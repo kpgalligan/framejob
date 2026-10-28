@@ -62,6 +62,7 @@ pub mod export;
 mod export_container;
 mod export_encoder;
 pub mod export_overrides;
+mod export_preset;
 pub mod export_size;
 pub mod export_table;
 pub mod ffi;
@@ -125,6 +126,7 @@ mod time_bounds;
 pub mod transition;
 mod transition_search;
 mod webm_ebml;
+mod webm_ebml_block;
 pub mod webm_layout;
 pub mod webm_writer;
 

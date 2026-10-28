@@ -31,8 +31,8 @@ From top to bottom:
 
 Under the controls, a readout line describes the file and a footnote names the codec, the container and the rates the file will use. Every number they show is the size, rate and duration the file will actually have.
 
-- **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`. For **AV1 (MP4)**, **AV1 (WebM)** and **VP9 (WebM)** a second line estimates how long the export will take: `Estimated time: about 25 s` (in 5-second steps under a minute, then minutes, then hours and minutes). It follows the format, Speed, size and range, and it is only an estimate: the figures behind it come from one measured export per format, so a busy Mac or a heavy timeline takes longer. The other formats show no estimate.
-- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
+- **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`. For **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)** and **VP9 with Alpha (WebM)** a second line estimates how long the export will take: `Estimated time: about 25 s` (in 5-second steps under a minute, then minutes, then hours and minutes). It follows the format, Speed, size and range, and it is only an estimate: the figures behind it come from one measured export per format, so a busy Mac or a heavy timeline takes longer. The other formats show no estimate.
+- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`, `VP9 · WEBM · alpha`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
 
 A control the chosen format cannot use is greyed out rather than hidden. Its value is not sent.
 
@@ -47,6 +47,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | AV1 (MP4) | `.mp4` | The smallest delivery file, encoded by the AV1 encoder built into Frame Job. 10-bit, and it can carry HDR. Slower to export than HEVC. See [Speed](#speed). |
 | AV1 (WebM) | `.webm` | The same AV1 picture in a WebM file, with Opus sound, for the web. Frame Job writes the WebM itself. |
 | VP9 (WebM) | `.webm` | VP9 in a WebM file, with Opus sound: the web format every browser plays, encoded by the VP9 encoder built into Frame Job. 8-bit, or 10-bit when it carries HDR. Slower to export than HEVC and larger than AV1 for the same picture. |
+| VP9 with Alpha (WebM) | `.webm` | VP9 (WebM) that keeps a transparent canvas, for a title or a lower third a web page plays over its own background in Chrome or Firefox. 8-bit, always the SDR picture. Safari's transparent movie is HEVC with Alpha. |
 | ProRes 422 (MOV) | `.mov` | An editing master for another application. 10-bit. |
 | ProRes 4444 (MOV) | `.mov` | A master that keeps the alpha channel. 12-bit. |
 | Audio only (M4A) | `.m4a` | AAC sound only. |
@@ -55,7 +56,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | Animated GIF | `.gif` | A short silent loop. Capped at 480 × 270 and 12.5 fps by default. |
 | Animated PNG | `.png` | A lossless silent loop with real transparency. Capped at 960 × 540 and 25 fps by default. |
 
-Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC, HEVC with Alpha and AV1 (MP4), Opus in AV1 (WebM) and VP9 (WebM), and 16-bit LPCM in both ProRes formats. A project with no sound exports a WebM with no sound track. GIF and APNG carry no sound. A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower.
+Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC, HEVC with Alpha and AV1 (MP4), Opus in AV1 (WebM) and both VP9 formats, and 16-bit LPCM in both ProRes formats. A project with no sound exports a WebM with no sound track. GIF and APNG carry no sound. A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower.
 
 Changing the format rebuilds the Size list and puts it back on that format's default. Your frame rate, quality, loudness and range choices stay as they were.
 
@@ -72,16 +73,16 @@ A row with the same numbers as an earlier row is hidden, so a 1920 × 1080 docum
 
 How the picture fits the frame:
 
-- **Even dimensions.** H.264, HEVC, HEVC with Alpha, HEVC 10-bit, both AV1 formats, VP9 (WebM) and ProRes 422 need them, so an odd width or height is written one pixel smaller. ProRes 4444, GIF and APNG keep an odd edge.
+- **Even dimensions.** H.264, HEVC, HEVC with Alpha, HEVC 10-bit, both AV1 formats, both VP9 formats and ProRes 422 need them, so an odd width or height is written one pixel smaller. ProRes 4444, GIF and APNG keep an odd edge.
 - **Movies** are written at exactly the size you choose. When that size is within a pixel of the canvas's shape, the picture fills the frame edge to edge. Any other shape is letterboxed with black.
-- **ProRes 4444 and HEVC with Alpha** refuse a size of a different shape instead of letterboxing it, because the padding would destroy the alpha channel. Every row in the Size popup has the canvas's shape, so this only happens with a Custom size.
+- **ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM)** refuse a size of a different shape instead of letterboxing it, because the padding would destroy the alpha channel. Every row in the Size popup has the canvas's shape, so this only happens with a Custom size.
 - **GIF and APNG** fit the picture inside the size you choose, keeping its shape and never enlarging it. The readout shows the size the file will have: a 1080 × 1920 project's GIF default is 152 × 270.
 
 The Size control is greyed out for the audio-only formats.
 
 ### Speed
 
-The **Speed** row sits under Format (under Dynamic Range in an HDR project). It is live only on **AV1 (MP4)** and **AV1 (WebM)**; on every other format it is greyed out and keeps your last choice. **VP9 (WebM)** has one speed, so the row is greyed out there too.
+The **Speed** row sits under Format (under Dynamic Range in an HDR project). It is live only on **AV1 (MP4)** and **AV1 (WebM)**; on every other format it is greyed out and keeps your last choice. **VP9 (WebM)** and **VP9 with Alpha (WebM)** have one speed, so the row is greyed out there too.
 
 | Choice | What it does |
 |---|---|
@@ -112,7 +113,7 @@ The four tiers set a video rate from the frame's size, so a tier means the same 
 - Above 30 fps, the video rate is 1.5 times higher.
 - HEVC formats, AV1 and VP9 ask for 60 % of the H.264 rate. AV1's and VP9's **Format default** is the HEVC rate too.
 - For **AV1** the rate is a soft cap. AV1 encodes at a constant quality chosen to match or beat HEVC at that rate, so it usually stays under the rate and simple footage comes out much smaller. Very detailed footage can go over: up to about 1.25 times the rate was measured. Its tier titles and footnote read `usually ≤ …`.
-- For **VP9 (WebM)** the rate is a soft cap the same way: VP9 encodes at a constant quality chosen to match or beat HEVC at that rate (HEVC 10-bit's in an HDR export), and the file usually stays under it. Up to about 1.15 times the rate was measured. Its tier titles and footnote read `usually ≤ …` too.
+- For **VP9 (WebM)** the rate is a soft cap the same way: VP9 encodes at a constant quality chosen to match or beat HEVC at that rate (HEVC 10-bit's in an HDR export), and the file usually stays under it. Up to about 1.15 times the rate was measured. Its tier titles and footnote read `usually ≤ …` too. On **VP9 with Alpha (WebM)** the rate is the picture's alone: the transparency is a second stream at a fixed quality that comes on top of it, so the file is larger than the rate says. In the measured exports of a moving soft-edged shape the transparency was about 6–15 % of the video at 1080p, about 9–21 % at 720p and about 21–39 % at 640 × 360 (the higher figure at the Low tier); a smaller picture keeps its edges clean with a larger share.
 - The WebM formats ask the same rates of their Opus sound, rounded to the nearest rate the Opus encoder offers.
 - Audio only (M4A) uses the tier's AAC rate alone.
 - Quality is greyed out for ProRes, WAV, AIFF, GIF and APNG, where the format fixes the rate.
@@ -253,13 +254,21 @@ In an HDR (HLG) project the sheet has a **Dynamic Range** row under Format:
 | **HDR10 (PQ)** | An HDR10 file with fixed mastering metadata. |
 | **SDR version** | The project converted to SDR. |
 
-Only HEVC 10-bit, both AV1 formats, VP9 (WebM), ProRes 422 and ProRes 4444 can carry HDR. VP9 (WebM) is 10-bit (VP9 Profile 2) for HLG and HDR10, and 8-bit (Profile 0, which every player decodes) for the SDR version. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
+Only HEVC 10-bit, both AV1 formats, VP9 (WebM), ProRes 422 and ProRes 4444 can carry HDR (VP9 with Alpha (WebM) is always 8-bit and writes the SDR version). VP9 (WebM) is 10-bit (VP9 Profile 2) for HLG and HDR10, and 8-bit (Profile 0, which every player decodes) for the SDR version. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
 
 ## Transparency
 
-A canvas whose background is transparent (the **Background** row in the Document tab's Appearance section; see [Projects and media](projects-and-media.md#appearance)) keeps its transparency only in **ProRes 4444**, **HEVC with Alpha** and **Animated PNG**. When the format carries an alpha channel, the footnote ends in "alpha". Every other format composites the picture onto black. A GIF can show a pixel as fully transparent but has no partial transparency, so it is not one of the three.
+A canvas whose background is transparent (the **Background** row in the Document tab's Appearance section; see [Projects and media](projects-and-media.md#appearance)) keeps its transparency only in **ProRes 4444**, **HEVC with Alpha**, **VP9 with Alpha (WebM)** and **Animated PNG**. When the format carries an alpha channel, the footnote ends in "alpha". Every other format composites the picture onto black. A GIF can show a pixel as fully transparent but has no partial transparency, so it is not one of the four.
 
-While the canvas background is transparent, the Document tab says how many formats will keep it: "Transparent — kept by 3 export formats." These are the three formats above.
+Which transparent movie to send:
+
+- **VP9 with Alpha (WebM)** plays with its transparency in Chrome and Firefox, in a web page's `<video>`. Safari has not been confirmed to show it (see Limits). Only a player that decodes VP9 with the libvpx decoder shows the transparency; others, ffmpeg's default decoder among them, show the picture opaque.
+- **HEVC with Alpha** is the transparent movie for Safari, QuickTime and Apple's apps.
+- **ProRes 4444** is the master for another editor.
+
+The colour in all three is straight, not multiplied by the transparency, so a re-imported file composites to the right colour.
+
+While the canvas background is transparent, the Document tab says how many formats will keep it: "Transparent — kept by 4 export formats." These are the four formats above.
 
 ## Chapters
 
@@ -281,16 +290,16 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 
 | Argument | The sheet's control | Notes |
 |---|---|---|
-| `preset` (required) | Format | `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`. |
+| `preset` (required) | Format | `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`. |
 | `path` (required) | Save panel | The folder must exist. An existing file is replaced. The format's extension is added when the path has none, and a different known media extension is replaced: `cut.mov` with `h264` writes `cut.mp4`. Any other suffix stays part of the name. |
 | `size` | Size | `document`, `2160p`, `1440p`, `1080p`, `720p`, `preset` (GIF and APNG only), or `[width, height]`. |
 | `range` | Range | `project` (default) or `in_out`. Refused when there is no in/out range. |
-| `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1`, `av1_webm` and `vp9_webm`, `video_bitrate` is a soft cap the file usually stays under. `audio_bitrate` is the AAC or Opus rate. |
+| `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1`, `av1_webm` and `vp9_webm`, `video_bitrate` is a soft cap the file usually stays under. On `vp9_alpha_webm` it is the same soft cap on the picture's stream alone, and the transparency's stream comes on top of it (about 6–15 % of the video at 1080p, up to about 39 % at 640 × 360, measured). `audio_bitrate` is the AAC or Opus rate. |
 | `loudness_lufs` | Loudness | −70 to 0. |
 | `peak_dbtp` | (fixed at −1 on the sheet) | −20 to 0. Refused without `loudness_lufs`. |
 | `burn_in_timecode` | Burn in timecode | |
 | `dynamic_range` | Dynamic Range | `hlg`, `pq` or `sdr`. |
-| `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` and `av1_webm` only; refused on every other format, `vp9_webm` included. |
+| `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` and `av1_webm` only; refused on every other format, `vp9_webm` and `vp9_alpha_webm` included. |
 
 There is no frame-rate argument. An agent's export uses the document's rate, or GIF's and APNG's own.
 
@@ -300,7 +309,7 @@ Every refusal comes back from `export` itself, before anything is queued: a bad 
   - Every answer has `path` and `elapsed` (seconds).
   - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp`, `capped_by_peak` and `target_lufs`.
   - `queued` adds `waiting`, the row's "Waiting for memory: …" sentence, while an AV1 or VP9 job waits for memory.
-  - `queued` and `running` add `estimated_seconds` for `av1`, `av1_webm` and `vp9_webm`: the export sheet's estimate of the whole export, in whole seconds.
+  - `queued` and `running` add `estimated_seconds` for `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`: the export sheet's estimate of the whole export, in whole seconds.
   - `failed` and `cancelled` add `reason`, the queue row's sentence.
 - `cancel_export {export_id}` is the row's Cancel.
 - An `export_id` lasts until Frame Job quits.
@@ -313,7 +322,10 @@ The full reference is [MCP](mcp.md).
 - An animated GIF or APNG holds at most **600 frames**: 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. A longer range is refused. Shorten the range or lower the frame rate.
 - Loudness normalisation is gain only, with no limiter. A target the ceiling will not allow lands quieter than asked.
 - An unnormalised mix that goes over full scale is clipped in the file.
-- ProRes 4444 and HEVC with Alpha refuse a custom size of a different shape from the canvas.
+- ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) refuse a custom size of a different shape from the canvas.
+- VP9 with Alpha (WebM) is 8-bit SDR only: an HDR project writes its SDR version, and HDR is refused on it.
+- A VP9 with Alpha (WebM) file re-imported into Frame Job keeps its picture and loses its transparency: it shows opaque, with black where it was transparent. Export ProRes 4444 or HEVC with Alpha for a transparent clip to bring back in.
+- Whether Safari shows VP9 with Alpha (WebM)'s transparency has not been confirmed; use HEVC with Alpha for Safari.
 - A Mac with no encoder for a format reports "This Mac cannot export with the “*preset*” preset." and leaves no file.
 - WAV and AIFF are 16-bit only.
 - On an M1 or M2 Mac Frame Job cannot play or re-import its own AV1 file, MP4 or WebM; QuickTime cannot either. Those Macs have no AV1 decoder. A VP9 (WebM) file re-imports on any Apple silicon Mac.

@@ -665,6 +665,18 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   alone by `make typecheck`. `wc -l app/Sources/ReelCore.swift`: 789 before, 748 after;
   `ReelWebM` then took it back to 789. No doc-only seam is left: the next payment is code, and
   every type left names an `rc_*` symbol.
+  Codec-export C5 added `ReelWebM.addVideo(ptsNs:key:data:alpha:)` (`rc_webm_add_video_with_alpha`,
+  spec §11 CX-17), taking the file to 804, and its fix pass paid it back, a pure move gated
+  alone by `make typecheck` (exit 0, the four baseline warnings) with every other change of the
+  pass held out: the `rc_*`-free halves of three members and one helper went to
+  `CoreValues.swift` — `ReelExport.sizes`' decode and its refusal as `ExportSize.list(_:)`,
+  `ReelExport.settings`' as `ExportSettings.decoded(_:)`, `ReelAV1.config`'s as
+  `ReelAV1.Config.decoded(_:)`, and `ReelCube.parse`'s borrowed byte for an empty file (with its
+  comment) as the free function `withNonNullBytes(_:_:)` — every `rc_*` call staying, the
+  sentences unchanged, nothing widened. `wc -l app/Sources/ReelCore.swift`: 804 before, 788
+  after; `CoreValues.swift` 242 → 285. The next seam: the `Data`-to-pointer bridging the
+  remaining wrappers each spell inline (`ReelAV1`, `ReelWebM.add`/`addVideo`,
+  `GraphicLibrary.addFont`/`addAsset`) as `withBytes`-style helpers, their `rc_*` calls staying.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
@@ -924,6 +936,17 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (`RecordingGrant`) to `RecordingGrant.swift`. The System Settings pane URLs are
   `RecordingGrant`'s, so `recording_probe.py`'s 10f, which holds them to `RecordingSetup.swift`,
   is re-aimed in the same move.
+- `ExportWebMWriter.swift`: at 400, the new-module cap, since codec-export C4, so C5 paid toll
+  T2 before taking the alpha row's shape guard, a pure move gated alone (`make typecheck`, its
+  four baseline warnings): `// MARK: - The audio pump` (`pumpAudio` and its doc) went whole to
+  the new `ExportWebMWriter+Audio.swift` as an `extension ExportWebMWriter`. Its widenings, for
+  the extension to reach what stays behind: `range`, `audioReader`, `audioEnd`, `fault`,
+  `isStopping`, `stopped(with:)` and `readFailure(of:)` dropped `private`, `audioGain` became
+  `private(set) var` and `pumpAudio` is internal. `webm_export_proof.py`'s `no-discard-padding`
+  anchor moved to the new file, where it occurs once. `wc -l app/Sources/ExportWebMWriter.swift`:
+  400 before, 313 after; `ExportWebMWriter+Audio.swift` is 90. The next seam: `// MARK: -
+  Finishing` (`allPumpsLeft`, `fileClosed`, `finishFailed`, `discard`, `report`) to
+  `ExportWebMWriter+Finishing.swift`.
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

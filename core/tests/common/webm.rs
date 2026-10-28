@@ -11,7 +11,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde_json::{json, Value};
 
 use framejob_core::ffi_webm::{
-    rc_webm_add_packet, rc_webm_end_track, rc_webm_finish, rc_webm_free, rc_webm_open, RcWebm,
+    rc_webm_add_packet, rc_webm_add_video_with_alpha, rc_webm_end_track, rc_webm_finish,
+    rc_webm_free, rc_webm_open, RcWebm,
 };
 
 use super::ebml_read::Element;
@@ -95,6 +96,24 @@ impl Webm {
                 discard,
                 bytes.as_ptr(),
                 bytes.len(),
+                &mut err,
+            )
+        };
+        answer(ok, err)
+    }
+
+    /// One video packet with its alpha frame (spec §11 CX-17).
+    pub fn add_alpha(&self, pts: i64, key: bool, bytes: &[u8], alpha: &[u8]) -> Result<(), String> {
+        let mut err: *mut c_char = ptr::null_mut();
+        let ok = unsafe {
+            rc_webm_add_video_with_alpha(
+                self.0,
+                pts,
+                key,
+                bytes.as_ptr(),
+                bytes.len(),
+                alpha.as_ptr(),
+                alpha.len(),
                 &mut err,
             )
         };
@@ -251,6 +270,47 @@ pub fn write_vp9(path: &Path, sdr: bool) {
         let key = k % 30 == 0;
         w.add(V, frame_ns(k, 30, 1), key, 0, &vp9_frame(k, profile, key))
             .expect("video");
+    }
+    for k in 0..100 {
+        w.add(A, k as i64 * 20_000_000, true, 0, &opus(k))
+            .expect("audio");
+    }
+    w.end(V).expect("end video");
+    w.end(A).expect("end audio");
+    w.finish().expect("finish");
+}
+
+// ---- VP9 with alpha (spec §11 CX-17) ---------------------------------------
+
+/// `vp9_layout`'s Profile 0 SDR video with `alpha_mode`.
+pub fn vp9_alpha_layout(fps: [u32; 2]) -> Value {
+    let mut video = vp9_layout(fps, true);
+    video["alpha_mode"] = json!(true);
+    video
+}
+
+/// Frame `k`'s alpha: a VP9 frame of its own, distinct from the picture's.
+pub fn vp9_alpha(k: usize, key: bool) -> Vec<u8> {
+    let mut out = vp9_frame(k, 0, key);
+    out.extend([0xA1, (k & 0xFF) as u8]);
+    out
+}
+
+/// Writes 60 VP9 frames with their alphas at 30 fps (keys at 0 and 30) and
+/// 100 Opus packets.
+pub fn write_vp9_alpha(path: &Path) {
+    let layout = json!({"duration_ns": 2 * SECOND, "video": vp9_alpha_layout([30, 1]),
+                        "audio": audio_layout()});
+    let w = Webm::open(path, &layout).expect("open");
+    for k in 0..60 {
+        let key = k % 30 == 0;
+        w.add_alpha(
+            frame_ns(k, 30, 1),
+            key,
+            &vp9_frame(k, 0, key),
+            &vp9_alpha(k, key),
+        )
+        .expect("video");
     }
     for k in 0..100 {
         w.add(A, k as i64 * 20_000_000, true, 0, &opus(k))

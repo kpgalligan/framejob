@@ -1,11 +1,16 @@
 import AVFoundation
 
 /// The video pump of a row a bundled encoder writes (`settings.writer`, spec §11 CX-12,
-/// CX-15, CX-16): the composed frames converted to I010 (I420 for `vp9_webm`'s SDR picture) on
-/// the export's video queue and encoded on a serial encode queue of its own — by SVT-AV1 for
-/// `svt_av1`, by libvpx's VP9 for `libvpx` (`ExportVideoEncoder`) — whose packets go to an
-/// `ExportPacketSink`: the `av1` row's passthrough `AVAssetWriterInput` as `av01` samples, or
-/// the WebM rows' core writer.
+/// CX-15, CX-16, CX-17): the composed frames converted to I010 (I420 for `vp9_webm`'s SDR
+/// picture) on the export's video queue and encoded on a serial encode queue of its own — by
+/// SVT-AV1 for `svt_av1`, by libvpx's VP9 for `libvpx` (`ExportVideoEncoder`) — whose packets
+/// go to an `ExportPacketSink`: the `av1` row's passthrough `AVAssetWriterInput` as `av01`
+/// samples, or the WebM rows' core writer.
+///
+/// **`vp9_alpha_webm`** (CX-17 (2)–(4)): each frame is straightened in place first (G-35's
+/// float pass, `ExportStraightAlpha.straighten`), converted with its alpha as a second 8-bit
+/// picture, and encoded by `VP9AlphaEncoder`'s two libvpx streams, whose packets carry their
+/// alpha into the WebM.
 ///
 /// **Two queues, one owner each.** The video queue reads, converts and hands each frame on,
 /// bounded to three in flight (`slots`) so a slow encoder holds the read back; the encode
@@ -35,6 +40,8 @@ final class ExportEncodePump {
     let webmCodec: ExportWebMLayout.VideoCodec
     /// The picture the frames are.
     let picture: ExportAV1Picture
+    /// True on `vp9_alpha_webm`: each frame is straightened before it is converted.
+    private let straightens: Bool
 
     private var encoder: (any ExportVideoEncoder)?
     /// The encoder's name, for a sentence after it is torn down.
@@ -59,7 +66,21 @@ final class ExportEncodePump {
         let picture = ExportAV1Picture(color: settings.color)
         let encoder: any ExportVideoEncoder
         let bitDepth: Int
-        if settings.writer == Self.vp9Writer {
+        let alpha = settings.writer == Self.vp9Writer && settings.alpha
+        straightens = alpha
+        if alpha {
+            // CX-17: always 8-bit SDR, BT.709; the cap is the picture's alone.
+            bitDepth = 8
+            encoder = try VP9AlphaEncoder.make(
+                width: frame.width, height: frame.height, fps: settings.fps,
+                bitsPerSecond: rate)
+            let cicp = ExportAV1Picture.sdr.cicp
+            webmCodec = ExportWebMLayout.VideoCodec(
+                codecId: "V_VP9", codecPrivate: nil, primaries: cicp.primaries,
+                transfer: cicp.transfer, matrix: cicp.matrix, bitsPerChannel: 8,
+                alphaMode: true)
+            formatDescription = nil
+        } else if settings.writer == Self.vp9Writer {
             bitDepth = VP9Encoder.bitDepth(for: picture)
             encoder = try VP9Encoder(
                 width: frame.width, height: frame.height, fps: settings.fps,
@@ -91,7 +112,7 @@ final class ExportEncodePump {
         converter = try ExportI010Converter(
             width: frame.width, height: frame.height, canvas: canvas,
             fills: ExportWriter.fillsTheBox(settings, canvas: canvas), picture: picture,
-            bitDepth: bitDepth, pool: 3)
+            bitDepth: bitDepth, alpha: alpha, pool: 3)
         self.encoder = encoder
         encoderName = encoder.name
         self.picture = picture
@@ -135,9 +156,20 @@ final class ExportEncodePump {
                 let time = CMSampleBufferGetPresentationTimeStamp(sample) - range.start
                 guard time.isNumeric, time >= .zero else { continue }
                 slots.wait()
-                guard let pixels = CMSampleBufferGetImageBuffer(sample),
-                    let frame = converter.convert(pixels)
-                else {
+                guard let pixels = CMSampleBufferGetImageBuffer(sample) else {
+                    slots.signal()
+                    fail(Exporter.ExportError.failed(
+                        "A frame could not be prepared for the encoder."))
+                    return finish(false)
+                }
+                // G-35's straight alpha (CX-17 (2)), in place on the reader's own copy.
+                guard !straightens || ExportStraightAlpha.straighten(pixels) else {
+                    slots.signal()
+                    fail(Exporter.ExportError.failed(
+                        "A frame's transparency could not be written straight."))
+                    return finish(false)
+                }
+                guard let frame = converter.convert(pixels) else {
                     slots.signal()
                     fail(Exporter.ExportError.failed(
                         "A frame could not be prepared for the encoder."))
@@ -204,7 +236,8 @@ final class ExportEncodePump {
         }
         lastTime = time
         if let error = sink.append(
-            data, at: time, duration: frameDuration, key: packet.isKey, isStopping: isStopping)
+            data, alpha: packet.alpha, at: time, duration: frameDuration, key: packet.isKey,
+            isStopping: isStopping)
         {
             if !(error is ExportPacketSinkStopped) { fail(error) }
             return false

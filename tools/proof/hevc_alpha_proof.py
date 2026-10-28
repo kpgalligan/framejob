@@ -91,12 +91,14 @@ Rows (◆ = also Gate A's):
   Support` is a directory (the scratch home took). When it fails no tool is
   called.
 - ◆ **T0**: `export`'s `size` description holds "written one pixel smaller
-  on that edge"; in the full rows also "h264, hevc, hevc_alpha, hevc_10bit
-  and prores_422 need even dimensions", "letterboxed if the shape differs by
-  more than a pixel (within a pixel the picture fills the frame instead)"
-  and "except on prores_4444 and hevc_alpha", and its `preset` description
-  holds "Three rows keep a transparent canvas transparent: prores_4444 and
-  hevc_alpha (the movie rows — see size, which constrains them) and apng."
+  on that edge"; in the full rows also "h264, hevc, hevc_alpha, hevc_10bit,
+  av1, av1_webm, vp9_webm, vp9_alpha_webm and prores_422 need even
+  dimensions", "letterboxed if the shape differs by more than a pixel
+  (within a pixel the picture fills the frame instead)" and "except on
+  prores_4444, hevc_alpha and vp9_alpha_webm", and its `preset` description
+  holds "Four rows keep a transparent canvas transparent: prores_4444,
+  hevc_alpha and vp9_alpha_webm (the movie rows — see size, which constrains
+  them) and apng."
 - ◆ **R1**: ODDFULL with no `size` as `h264`, `hevc` and `prores_422` (and
   `hevc_alpha` in the full rows), and `hevc` again with `size: "document"`:
   the answer's `width` × `height` is 320 × 180 and so is ffprobe's stream.
@@ -183,8 +185,8 @@ Rows (◆ = also Gate A's):
   235) — a frame typed two pixels wider than the canvas is letterboxed as
   before, where a limit of `max(cw, ch)` for every frame would fill it.
 - **N1**: `select_inspector_tab` Document on CLEAR, `snapshot_ui` of the
-  inspector: exactly one view's text is "Transparent — kept by 3 export
-  formats.", its intrinsic width is at most 244, and no `truncated` problem
+  inspector: exactly one view's text is "Transparent — kept by 4 export
+  formats." (3 before codec-export C5's `vp9_alpha_webm`), its intrinsic width is at most 244, and no `truncated` problem
   names it.
 - **E1**: File ▸ Export… on CLEAR: the Format popup reads "HEVC with Alpha
   (MOV)" with no `truncated` problem naming it, exactly one text — the
@@ -447,14 +449,15 @@ EVEN_ROWS = ["h264", "hevc", "prores_422"]
 EXTENSION = {"h264": "mp4", "hevc": "mp4", "hevc_alpha": "mov", "prores_422": "mov",
              "prores_4444": "mov", "gif": "gif", "apng": "png"}
 A6_PHRASE = "written one pixel smaller on that edge"
-# precision PR3 (spec §11 PR-3): the list gained `hevc_10bit`, the new even-sized row.
-B6_SIZE = ["h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm and prores_422 need "
-           "even dimensions",
+# precision PR3 (spec §11 PR-3): the list gained `hevc_10bit`, the new even-sized row;
+# codec-export C5 (spec §11 CX-17) `vp9_alpha_webm`, the fourth alpha row.
+B6_SIZE = ["h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm, vp9_alpha_webm and "
+           "prores_422 need even dimensions",
            "letterboxed if the shape differs by more than a pixel (within a pixel the "
            "picture fills the frame instead)",
-           "except on prores_4444 and hevc_alpha"]
-B6_PRESET = ("Three rows keep a transparent canvas transparent: prores_4444 and hevc_alpha "
-             "(the movie rows — see size, which constrains them) and apng.")
+           "except on prores_4444, hevc_alpha and vp9_alpha_webm"]
+B6_PRESET = ("Four rows keep a transparent canvas transparent: prores_4444, hevc_alpha and "
+             "vp9_alpha_webm (the movie rows — see size, which constrains them) and apng.")
 CHOICE = '<string>{"preset_id":"hevc_alpha"}</string>'
 PRESET_TABLE = ROOT / "core/src/export_table.rs"
 # E3's long launches: the footnotes a Quality tier and a loudness target
@@ -471,7 +474,7 @@ ALPHA_FORMAT = "HEVC with Alpha (MOV)"
 # exported H.264 with a pin that did not. The full rows require ALPHA_FORMAT
 # alone, which only a taken pin shows.
 EVEN_FORMATS = ("H.264 (MP4)", ALPHA_FORMAT)
-NOTE = "Transparent — kept by 3 export formats."
+NOTE = "Transparent — kept by 4 export formats."
 NOTE_WIDTH = 244          # the note's row at the inspector's narrowest, 280 pt
 UNAVAILABLE = "This Mac cannot export with the “hevc_alpha” preset."
 CARD = (220, 120, 420, 240)      # CLEAR's 200 × 120 card, centred on 640 × 360
@@ -1120,9 +1123,9 @@ def row_t0(s, full):
     missing = [p for p in [A6_PHRASE] + B6_SIZE if p not in size]
     if B6_PRESET not in preset:
         missing.append(B6_PRESET)
-    check("T0 export's size description says what an odd edge does, names the six "
-          "even-sized movie rows, the fill within a pixel and the two rows that refuse another "
-          "shape; its preset description names the three rows that keep transparency",
+    check("T0 export's size description says what an odd edge does, names the even-sized "
+          "movie rows, the fill within a pixel and the rows that refuse another shape; its "
+          "preset description names the four rows that keep transparency",
           not missing, f"missing: {missing}" if missing else "")
 
 
@@ -2151,7 +2154,7 @@ MUTANTS = {
     },
     "report-and-fill": {
         "anchors": [
-            ("core/src/export_table.rs",
+            ("core/src/export_preset.rs",
              "        self.avf_preset.is_some() && self.codec != \"prores4444\"\n",
              "        false\n"),
             (SETTINGS,

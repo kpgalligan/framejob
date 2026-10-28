@@ -1,7 +1,8 @@
 import AVFoundation
 
-/// `rc_webm_open`'s layout (spec §11 CX-15 (3), CX-16 (4), (5)), the `Encodable` mirror of
-/// the core's `WebmLayout`: what an `av1_webm` or `vp9_webm` file is before its first packet.
+/// `rc_webm_open`'s layout (spec §11 CX-15 (3), CX-16 (4), (5), CX-17 (5)), the `Encodable`
+/// mirror of the core's `WebmLayout`: what an `av1_webm`, `vp9_webm` or `vp9_alpha_webm` file
+/// is before its first packet.
 /// Built from the settings (the size `ExportWriter.encodedSize` gives the encoder, the rate),
 /// the pump's video codec (`VideoCodec`: AV1's `av1C` record and sequence-header colour, or
 /// VP9's picture CICP and depth with no CodecPrivate), its picture (HD-5's HDR10 blobs on PQ
@@ -10,7 +11,7 @@ import AVFoundation
 struct ExportWebMLayout: Encodable {
     /// The video track's codec as `ExportEncodePump` knows it: `V_AV1` with the `av1C` record
     /// as its private and 10 bits, or `V_VP9` with none and 8 or 10 bits (CX-16 (3), (5)); the
-    /// CICP the `Colour` carries.
+    /// CICP the `Colour` carries; and `alphaMode`, true on `vp9_alpha_webm` (CX-17 (5)).
     struct VideoCodec {
         let codecId: String
         let codecPrivate: Data?
@@ -18,6 +19,7 @@ struct ExportWebMLayout: Encodable {
         let transfer: Int
         let matrix: Int
         let bitsPerChannel: Int
+        var alphaMode = false
     }
 
     struct Video: Encodable {
@@ -28,6 +30,9 @@ struct ExportWebMLayout: Encodable {
         let height: Int
         let fps: [Int]
         let colour: Colour
+        /// `true` on `vp9_alpha_webm`, else nil and left out, so the other rows' layouts are
+        /// as they were.
+        let alphaMode: Bool?
     }
 
     /// The codec's CICP, video range (Matroska's Range 1), its depth, and on PQ the two blobs
@@ -75,7 +80,8 @@ struct ExportWebMLayout: Encodable {
                 matrix: codec.matrix, transfer: codec.transfer, primaries: codec.primaries,
                 bitsPerChannel: codec.bitsPerChannel,
                 mdcvHex: hdr10 ? Self.hex(OutputTransform.masteringDisplay) : nil,
-                clliHex: hdr10 ? Self.hex(OutputTransform.contentLightLevel) : nil))
+                clliHex: hdr10 ? Self.hex(OutputTransform.contentLightLevel) : nil),
+            alphaMode: codec.alphaMode ? true : nil)
         audio = preSkip.map { Audio(preSkip: $0) }
         self.chapters = ExportChapter.partition(chapters, in: range).map {
             Chapter(

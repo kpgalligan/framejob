@@ -54,7 +54,8 @@ use framejob_core::ffi_query::{
     rc_project_source_map, rc_snap_resolve, rc_speed_limits,
 };
 use framejob_core::ffi_webm::{
-    rc_webm_add_packet, rc_webm_end_track, rc_webm_finish, rc_webm_free, rc_webm_open,
+    rc_webm_add_packet, rc_webm_add_video_with_alpha, rc_webm_end_track, rc_webm_finish,
+    rc_webm_free, rc_webm_open,
 };
 use framejob_core::format::RC_FORMAT_VERSION;
 
@@ -2400,6 +2401,33 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
         )
     });
     cover("rc_webm_add_packet");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_webm_add_video_with_alpha(
+            ptr::null_mut(),
+            0,
+            true,
+            byte.as_ptr(),
+            1,
+            byte.as_ptr(),
+            1,
+            &mut err,
+        )
+    });
+    assert_eq!(take_string(err).as_deref(), Some("webm is NULL"));
+    assert!(!unsafe {
+        rc_webm_add_video_with_alpha(
+            ptr::null_mut(),
+            0,
+            true,
+            ptr::null(),
+            0,
+            ptr::null(),
+            0,
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_webm_add_video_with_alpha");
     let mut err: *mut c_char = ptr::null_mut();
     assert!(!unsafe { rc_webm_end_track(ptr::null_mut(), 1, &mut err) });
     assert_eq!(take_string(err).as_deref(), Some("webm is NULL"));

@@ -261,6 +261,19 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   and `rc_graphic_free`, which name only the two handles and `free_boxed`, out to
   `ffi_graphic_pending.rs`; `diag_json` and `diag_error` stay, since they name `Diagnostic` (road
   map 10 §10.7).
+- `webm_ebml.rs`: at 401, over the new-module cap (`webm_layout.rs`'s doc holds the WebM
+  modules to it), after codec-export C4, so C5 paid toll T2 before its alpha elements, a pure
+  move gated alone (`cargo test --release --test webm_writer --test webm_writer_vp9 --test
+  webm_writer_refusals`, clippy): the block-level IDs (`BLOCK`, `DISCARD_PADDING`, `CUES`,
+  `CUE_POINT`, `CUE_TIME`, `CUE_TRACK_POSITIONS`, `CUE_TRACK`, `CUE_CLUSTER_POSITION`) and the
+  builders `cues`, `block_body` and `block_group` with their docs went whole to the new
+  `webm_ebml_block.rs` under a module doc, which imports `binary`, `int`, `master`, `uint`,
+  `vint` and `BLOCK_GROUP` from `webm_ebml.rs`; `webm_ebml.rs` re-exports `block_body`,
+  `block_group`, `cues` and `CUES` (`pub(crate) use`), so every `ebml::` path in
+  `webm_writer.rs` holds, and `lib.rs` gained `mod webm_ebml_block;`. Nothing widened. `wc -l
+  core/src/webm_ebml.rs`: 401 before, 353 after; `webm_ebml_block.rs` is 59. C5's block-level
+  IDs and `alpha_block_group` land in the new module. The next seam: the Chapters and SeekHead
+  builders (`chapters`, `seek_head` and their IDs) out the same way.
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes
   anything on.
 - `export_table.rs`: at 584 before codec-export C1's `av1` row, it paid toll T1 first, a pure
@@ -280,6 +293,16 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   core/src/export_table.rs`: 592 before, 545 after; `export_encoder.rs` is 56. C3's row and the
   `avf_preset` doc sentence then took it to 564. No further seam is named; the next is the
   presets' long row comments, which are the table's record.
+  C4's `vp9_webm` row took it to 582. Codec-export C5 paid toll T1 before its `vp9_alpha_webm`
+  row: `Preset` (the struct and its field docs), `impl Preset` and `fps_json` went whole to the
+  new `export_preset.rs` under a module doc, re-exported by `export_table.rs` (`pub(crate) use
+  crate::export_preset::{fps_json, Preset}`), and `lib.rs` gained `mod export_preset;`. Its
+  widenings: `name` and `to_json` became `pub(crate)`, because the rows and `presets` stay
+  behind (the field doc's "stays private" now means private to the crate). A pure move gated
+  alone (`cargo test --release --test export --test export_size --test export_av1 --test
+  export_vp9`, `cargo fmt --check`). `wc -l core/src/export_table.rs`: 582 before, 411 after;
+  `export_preset.rs` is 187. What stays is the table and its two lookups; no further seam is
+  named.
 
 ## Open items
 

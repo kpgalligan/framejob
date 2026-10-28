@@ -14,14 +14,15 @@ computed HERE from P0's dump of the tables, in this file's own arithmetic.
 
   B0  the probe builds and answers (a probe that does not build is B0's FAIL, and every
       probe row's)
-  P0  both tables dumped: the eight keys (av1, av1_webm × faster/balanced/smaller at 10
-      bits; vp9_webm at 8 and 10), each figure positive with a source, 4K above 1080p
+  P0  both tables dumped: the nine keys (av1, av1_webm × faster/balanced/smaller at 10
+      bits; vp9_webm at 8 and 10; vp9_alpha_webm at 8, codec-export C5's fix pass), each
+      figure positive with a source, 4K above 1080p
   R1  physical 16, 24, 32, 48, 64, 96, 128 GiB: budget = physical / 4, and per key at
       1080p and 4K the identical jobs admitted in sequence = max(1, ⌊budget / cost⌋), the
       cost the table's figure at the size
-  R2  a writer row with no entry (`vp9_alpha_webm`, `libvpx`) costs the whole budget: it is
-      admitted alone, then neither another of it nor an av1 job; an av1 job's booking keeps
-      it out
+  R2  a writer row with no entry (a synthetic `unmeasured_webm` on `libvpx`, every real
+      row being measured) costs the whole budget: it is admitted alone, then neither another
+      of it nor an av1 job; an av1 job's booking keeps it out
   R3  an AVFoundation row (`h264`): no key, cost 0, `begin` books nothing, admitted beside a
       full ledger
   E1  `estimatedSeconds` per key at 1280×720, 1920×1080, 2560×1440, 3840×2160, 7680×4320
@@ -108,6 +109,7 @@ KEYS = {
     "av1_webm:balanced": ("av1_webm", "balanced", 10),
     "av1_webm:smaller": ("av1_webm", "smaller", 10),
     "vp9_webm:sdr": ("vp9_webm", None, 8), "vp9_webm:hlg": ("vp9_webm", None, 10),
+    "vp9_alpha_webm": ("vp9_alpha_webm", None, 8),
 }
 PROBE_ROWS = ["B0", "P0", "R1", "R2", "R3", "E1", "E2", "E3", "Q1", "Q2", "Q3", "Q4", "Q5"]
 APP_ROWS = ["S1", "S2", "X1", "Z1"]
@@ -239,6 +241,8 @@ def name_of(described):
     """The proof's key name for the probe's `describe(settings)`."""
     if described["preset"] in ("av1", "av1_webm"):
         return f"{described['preset']}:{described['speed'] or 'balanced'}"
+    if described["preset"] == "vp9_alpha_webm":
+        return "vp9_alpha_webm"
     return f"vp9_webm:{'hlg' if described['color'] in ('hlg', 'pq') else 'sdr'}"
 
 

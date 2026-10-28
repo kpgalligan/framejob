@@ -335,7 +335,7 @@ status}`, where status is `queued` or `running`. Exports run one at a time.
   one (the loudness measurement). While queued it adds `waiting`, the queue
   row's "Waiting for memory: …" sentence, when an AV1 or VP9 job waits for
   memory behind the app's other AV1 and VP9 exports; queued or running, an
-  `av1`, `av1_webm` or `vp9_webm` job adds `estimated_seconds`, the export
+  `av1`, `av1_webm`, `vp9_webm` or `vp9_alpha_webm` job adds `estimated_seconds`, the export
   sheet's estimate of the whole export. When done it adds `bytes` and what the file
   holds: the settings used (preset, container, codec, size, fps, start,
   duration), the loudness measured off the mix, and any warnings a graphic
@@ -355,18 +355,23 @@ and the reason names the graphic and the frame.
 `export` takes `preset` and `path`, plus `size`, `range` (`project` or
 `in_out`), `video_bitrate`, `audio_bitrate`, `loudness_lufs`, `peak_dbtp`,
 `burn_in_timecode`, `dynamic_range` and `encoder_speed`. The presets are `h264`, `hevc`,
-`hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422`, `prores_4444`, `audio_m4a`,
+`hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`, `prores_422`, `prores_4444`, `audio_m4a`,
 `audio_wav`, `audio_aiff`, `gif` and `apng`. There is no frame-rate
 argument: an export runs at the project's rate, or at 12.5 fps for `gif` and
 25 fps for `apng`. An existing file at the path is replaced, and the
 format's extension is added when the path has none. `peak_dbtp` without
 `loudness_lufs` is refused. `dynamic_range` `hlg` or `pq` is refused outside
-`hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422` and `prores_4444`, and in an SDR project.
+`hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422` and `prores_4444` (so on
+`vp9_alpha_webm`, always 8-bit), and in an SDR project.
 `encoder_speed` (`faster`, `balanced` or `smaller`) is `av1`'s and `av1_webm`'s
-alone and is refused on every other preset, `vp9_webm` (one speed) included;
-the done answer names it. On those two and `vp9_webm`, `video_bitrate` is a soft
+alone and is refused on every other preset, `vp9_webm` and `vp9_alpha_webm` (one speed)
+included; the done answer names it. On those two and `vp9_webm`, `video_bitrate` is a soft
 cap: the file usually comes in well under it, and very detailed footage can go
-up to about 1.25 times over it on AV1 and about 1.15 times on VP9. What each option means is in [Export](export.md).
+up to about 1.25 times over it on AV1 and about 1.15 times on VP9. On `vp9_alpha_webm` it
+is the same soft cap on the picture's stream alone, and the alpha stream comes on top of it
+(about 6–15 % of the video at 1080p, up to about 39 % at 640 × 360, measured). `vp9_alpha_webm`
+keeps a transparent canvas, as `prores_4444`, `hevc_alpha` and `apng` do, and refuses a
+`[width, height]` of another shape. What each option means is in [Export](export.md).
 
 ## Reading the project: get_project
 
