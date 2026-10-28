@@ -267,6 +267,9 @@ struct ContainerDescription: Decodable {
         let transfer: Int?
         let primaries: Int?
         let matrix: Int?
+        /// A VP9 track's first keyframe's matrix code (1, 6 or 9), the SDR label's fallback
+        /// when the Colour names none (spec §11 CX-16 (10)); nil otherwise.
+        let streamMatrix: Int?
     }
 
     struct Audio: Decodable {

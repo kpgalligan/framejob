@@ -1,9 +1,10 @@
 import AVFoundation
 import os
 
-/// The `av1_webm` row's pipeline (spec §11 CX-15): the composed movie read back exactly as
-/// `ExportWriter` reads it, its picture encoded by the same `ExportEncodePump` and its sound
-/// by `ExportOpusEncoder`, written into a WebM by the core (`ReelWebM`).
+/// The WebM rows' pipeline (spec §11 CX-15, CX-16): `av1_webm` and `vp9_webm`, the composed
+/// movie read back exactly as `ExportWriter` reads it, its picture encoded by the same
+/// `ExportEncodePump` (SVT-AV1 or libvpx by `writer`) and its sound by `ExportOpusEncoder`,
+/// written into a WebM by the core (`ReelWebM`).
 ///
 /// **A second `ExportPipeline`, and the exception to §7.8's one writer (CX-15 (2)).**
 /// `AVAssetWriter` writes no WebM, so this file is the WebM half of `ExportWriter` and
@@ -77,7 +78,9 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
     init(
         built: BuiltComposition, settings: ExportSettings, chapters: [ExportChapter], to url: URL
     ) throws {
-        guard settings.writer == ExportEncodePump.writer else {
+        guard settings.writer == ExportEncodePump.av1Writer
+            || settings.writer == ExportEncodePump.vp9Writer
+        else {
             throw Exporter.ExportError.presetUnavailable(ExportWriter.presetName(settings))
         }
         self.built = built
@@ -106,7 +109,7 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
                     ?? ExportOpusEncoder.defaultBitRate)
             : nil
         layoutJSON = try ExportWebMLayout(
-            settings: settings, range: range, config: pump.config, picture: pump.picture,
+            settings: settings, range: range, codec: pump.webmCodec, picture: pump.picture,
             preSkip: opus?.preSkip, chapters: chapters
         ).json()
     }

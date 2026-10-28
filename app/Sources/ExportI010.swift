@@ -2,10 +2,11 @@ import CoreVideo
 import Metal
 import MetalPerformanceShaders
 
-/// One picture for SVT-AV1: 10-bit planar 4:2:0 in one shared buffer (spec §11 CX-14 (3)) —
-/// luma, then Cb at `cbOffset`, then Cr at `crOffset`, each row `lumaStride` or
-/// `chromaStride` samples. Strides and offsets count 16-bit samples, each holding its 10 bits
-/// in the low bits, little-endian (yuv420p10le).
+/// One picture for a bundled encoder: planar 4:2:0 in one shared buffer (spec §11 CX-14 (3),
+/// CX-16 (3)) — luma, then Cb at `cbOffset`, then Cr at `crOffset`, each row `lumaStride` or
+/// `chromaStride` samples. Strides and offsets count samples: at a `bitDepth` of 10 each is
+/// 16 bits holding its 10 bits in the low bits, little-endian (I010, yuv420p10le); at 8 each
+/// is one byte (I420, yuv420p).
 struct I010Frame {
     let buffer: MTLBuffer
     let width: Int
@@ -14,6 +15,8 @@ struct I010Frame {
     let chromaStride: Int
     let cbOffset: Int
     let crOffset: Int
+    /// 10 (I010) or 8 (I420): the bytes a sample takes are `bitDepth > 8 ? 2 : 1`.
+    let bitDepth: Int
 }
 
 /// `ExportI010.metal`'s uniforms, field for field; strides and offsets in samples.
@@ -28,14 +31,16 @@ private struct ExportI010Uniforms {
     var kb: Float
 }
 
-/// The compositor's 64RGBAHalf frames as video-range I010 for the `av1` row (spec §11
-/// CX-12 (5), CX-14 (3)), through the picture's matrix (`ExportAV1Picture.lumaWeights`), on
+/// The compositor's 64RGBAHalf frames as video-range I010 for the AV1 rows and `vp9_webm`'s
+/// HDR pictures, or as video-range I420 for `vp9_webm`'s SDR picture (spec §11 CX-12 (5),
+/// CX-14 (3), CX-16 (3)), through the picture's matrix (`ExportAV1Picture.lumaWeights`), on
 /// the GPU: `MPSImageLanczosScale` to the export size when it is not the canvas — the
 /// picture fitted inside with black bars, or filling a frame within a pixel of the canvas's
-/// shape (`fills`, G-33 (c)) — then `framejob_export_i010`.
+/// shape (`fills`, G-33 (c)) — then `framejob_export_i010` or, at 8 bits,
+/// `framejob_export_i420`.
 ///
 /// Called on the export's video queue alone; the planes come from a pool the encode queue
-/// gives back through `recycle` once SVT has copied them.
+/// gives back through `recycle` once the encoder has copied them.
 final class ExportI010Converter {
     let width: Int
     let height: Int
@@ -53,7 +58,9 @@ final class ExportI010Converter {
     /// In samples.
     private let lumaStride: Int
     private let chromaStride: Int
-    /// In bytes: two per sample.
+    /// 10 or 8: the kernel and the bytes per sample.
+    private let bitDepth: Int
+    /// In bytes: two per sample at 10 bits, one at 8.
     private let length: Int
 
     private let lock = NSLock()
@@ -61,16 +68,17 @@ final class ExportI010Converter {
 
     init(
         width: Int, height: Int, canvas: CGSize, fills: Bool, picture: ExportAV1Picture,
-        pool count: Int
+        bitDepth: Int = 10, pool count: Int
     ) throws {
         func failure(_ what: String) -> Exporter.ExportError {
-            .failed("The frames could not be prepared for the AV1 encoder: \(what).")
+            .failed("The frames could not be prepared for the encoder: \(what).")
         }
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()
         else { throw failure("no Metal device") }
         guard let library = (try? device.makeDefaultLibrary(bundle: Bundle.main))
             ?? device.makeDefaultLibrary(),
-            let function = library.makeFunction(name: "framejob_export_i010"),
+            let function = library.makeFunction(
+                name: bitDepth > 8 ? "framejob_export_i010" : "framejob_export_i420"),
             let pipeline = try? device.makeComputePipelineState(function: function)
         else { throw failure("the conversion kernel is missing") }
         var cache: CVMetalTextureCache?
@@ -86,7 +94,9 @@ final class ExportI010Converter {
         weights = picture.lumaWeights
         lumaStride = width
         chromaStride = (width + 1) / 2
-        length = 2 * (lumaStride * height + 2 * chromaStride * ((height + 1) / 2))
+        self.bitDepth = bitDepth
+        length = (bitDepth > 8 ? 2 : 1)
+            * (lumaStride * height + 2 * chromaStride * ((height + 1) / 2))
 
         let canvasWidth = Int(canvas.width.rounded())
         let canvasHeight = Int(canvas.height.rounded())
@@ -126,7 +136,7 @@ final class ExportI010Converter {
         descriptor.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: descriptor) else {
             throw Exporter.ExportError.failed(
-                "The frames could not be prepared for the AV1 encoder: no scaling texture.")
+                "The frames could not be prepared for the encoder: no scaling texture.")
         }
         let zeros = [UInt16](repeating: 0, count: size.0 * size.1 * 4)
         texture.replace(
@@ -145,13 +155,13 @@ final class ExportI010Converter {
     private func makeFrame() throws -> I010Frame {
         guard let buffer = device.makeBuffer(length: length, options: .storageModeShared) else {
             throw Exporter.ExportError.failed(
-                "The frames could not be prepared for the AV1 encoder: no plane buffer.")
+                "The frames could not be prepared for the encoder: no plane buffer.")
         }
         let chromaSamples = chromaStride * ((height + 1) / 2)
         return I010Frame(
             buffer: buffer, width: width, height: height, lumaStride: lumaStride,
             chromaStride: chromaStride, cbOffset: lumaStride * height,
-            crOffset: lumaStride * height + chromaSamples)
+            crOffset: lumaStride * height + chromaSamples, bitDepth: bitDepth)
     }
 
     /// One frame converted, waiting for the GPU; nil when it could not be wrapped or the

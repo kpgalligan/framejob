@@ -22,11 +22,12 @@
 //! (the size, the rate, the range, the file's UTI) is resolved identically,
 //! because it means the same thing on either path.
 //!
-//! Two rows, `av1` (spec §11 CX-12) and `av1_webm` (CX-15), are encoded by
-//! a bundled library and not by AVFoundation, which still writes `av1`'s
-//! container (the core writes `av1_webm`'s): their `writer` names the route
-//! and their `encoder_speed` the library's speed, two keys no other row's
-//! settings carry.
+//! Three rows, `av1` (spec §11 CX-12), `av1_webm` (CX-15) and `vp9_webm`
+//! (CX-16), are encoded by a bundled library and not by AVFoundation, which
+//! still writes `av1`'s container (the core writes the two WebMs): their
+//! `writer` names the route, and on the two AV1 rows `encoder_speed` names
+//! SVT-AV1's speed; no other row's settings carry either key, and
+//! `vp9_webm`'s carry no speed, libvpx having one (CX-3).
 //!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
@@ -78,7 +79,7 @@ impl Project {
     /// strictly positive), the two loudness figures `loudness_lufs` /
     /// `peak_dbtp`, `dynamic_range` (`hlg`, `pq` or `sdr`, spec §11
     /// HD-14) and `encoder_speed` (`faster`, `balanced` or `smaller`, on a
-    /// row a bundled encoder writes, CX-12); anything else in the object is ignored, so a newer UI
+    /// row whose bundled encoder has speeds, CX-12, CX-16); anything else in the object is ignored, so a newer UI
     /// can send fields this build does not know. Each is read and refused
     /// by `export_overrides.rs`, which is where the spelling of every one
     /// of them lives.
@@ -274,10 +275,13 @@ impl Project {
         if let Some(picture) = picture {
             out.insert("color".to_string(), Value::from(picture.as_str()));
         }
-        // The encoder route and its speed, on a writer row only, so every
-        // other row's settings are the text they were (spec §11 CX-12).
-        if let (Some(writer), Some(speed)) = (preset.writer, speed) {
+        // The encoder route on a writer row, and its speed where the encoder
+        // has speeds, so every other row's settings are the text they were
+        // (spec §11 CX-12, CX-16 (1)).
+        if let Some(writer) = preset.writer {
             out.insert("writer".to_string(), Value::from(writer.as_str()));
+        }
+        if let Some(speed) = speed {
             out.insert("encoder_speed".to_string(), Value::from(speed.as_str()));
         }
         Ok(Value::Object(out))

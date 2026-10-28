@@ -1,29 +1,43 @@
 import AVFoundation
 
-/// `rc_webm_open`'s layout (spec §11 CX-15 (3)), the `Encodable` mirror of the core's
-/// `WebmLayout`: what the `av1_webm` file is before its first packet. Built from the
-/// settings (the size `ExportWriter.encodedSize` gives the encoder, the rate), the pump's
-/// `av1C` record and sequence-header colour, its picture (HD-5's HDR10 blobs on PQ alone),
-/// the Opus pre-skip when the composition has sound, and the chapters clamped and rebased
-/// by `ExportChapter.partition` — the MP4 writer's own rule.
+/// `rc_webm_open`'s layout (spec §11 CX-15 (3), CX-16 (4), (5)), the `Encodable` mirror of
+/// the core's `WebmLayout`: what an `av1_webm` or `vp9_webm` file is before its first packet.
+/// Built from the settings (the size `ExportWriter.encodedSize` gives the encoder, the rate),
+/// the pump's video codec (`VideoCodec`: AV1's `av1C` record and sequence-header colour, or
+/// VP9's picture CICP and depth with no CodecPrivate), its picture (HD-5's HDR10 blobs on PQ
+/// alone), the Opus pre-skip when the composition has sound, and the chapters clamped and
+/// rebased by `ExportChapter.partition` — the MP4 writer's own rule.
 struct ExportWebMLayout: Encodable {
+    /// The video track's codec as `ExportEncodePump` knows it: `V_AV1` with the `av1C` record
+    /// as its private and 10 bits, or `V_VP9` with none and 8 or 10 bits (CX-16 (3), (5)); the
+    /// CICP the `Colour` carries.
+    struct VideoCodec {
+        let codecId: String
+        let codecPrivate: Data?
+        let primaries: Int
+        let transfer: Int
+        let matrix: Int
+        let bitsPerChannel: Int
+    }
+
     struct Video: Encodable {
-        let codecId = "V_AV1"
-        let codecPrivateHex: String
+        let codecId: String
+        /// Absent on `V_VP9` (an optional the encoder leaves out).
+        let codecPrivateHex: String?
         let width: Int
         let height: Int
         let fps: [Int]
         let colour: Colour
     }
 
-    /// The sequence header's CICP, video range (Matroska's Range 1), 10 bits, and on PQ the
-    /// two blobs `OutputTransform` writes everywhere else.
+    /// The codec's CICP, video range (Matroska's Range 1), its depth, and on PQ the two blobs
+    /// `OutputTransform` writes everywhere else.
     struct Colour: Encodable {
         let matrix: Int
         let range = 1
         let transfer: Int
         let primaries: Int
-        let bitsPerChannel = 10
+        let bitsPerChannel: Int
         let mdcvHex: String?
         let clliHex: String?
     }
@@ -48,18 +62,18 @@ struct ExportWebMLayout: Encodable {
     let chapters: [Chapter]
 
     init(
-        settings: ExportSettings, range: CMTimeRange, config: ReelAV1.Config,
+        settings: ExportSettings, range: CMTimeRange, codec: VideoCodec,
         picture: ExportAV1Picture, preSkip: Int?, chapters: [ExportChapter]
     ) {
         let frame = ExportWriter.encodedSize(settings)
         let hdr10 = picture.carriesHDR10
         durationNs = ExportWebMPacketSink.nanoseconds(range.duration)
         video = Video(
-            codecPrivateHex: Self.hex(config.record), width: frame.width, height: frame.height,
-            fps: [settings.fps.num, settings.fps.den],
+            codecId: codec.codecId, codecPrivateHex: codec.codecPrivate.map(Self.hex),
+            width: frame.width, height: frame.height, fps: [settings.fps.num, settings.fps.den],
             colour: Colour(
-                matrix: config.color.matrix, transfer: config.color.transfer,
-                primaries: config.color.primaries,
+                matrix: codec.matrix, transfer: codec.transfer, primaries: codec.primaries,
+                bitsPerChannel: codec.bitsPerChannel,
                 mdcvHex: hdr10 ? Self.hex(OutputTransform.masteringDisplay) : nil,
                 clliHex: hdr10 ? Self.hex(OutputTransform.contentLightLevel) : nil))
         audio = preSkip.map { Audio(preSkip: $0) }

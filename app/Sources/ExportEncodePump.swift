@@ -1,10 +1,11 @@
 import AVFoundation
 
 /// The video pump of a row a bundled encoder writes (`settings.writer`, spec §11 CX-12,
-/// CX-15): the composed frames converted to I010 on the export's video queue and encoded by
-/// SVT-AV1 on a serial encode queue of its own, whose packets go to an `ExportPacketSink` —
-/// the `av1` row's passthrough `AVAssetWriterInput` as `av01` samples, or the `av1_webm`
-/// row's core writer.
+/// CX-15, CX-16): the composed frames converted to I010 (I420 for `vp9_webm`'s SDR picture) on
+/// the export's video queue and encoded on a serial encode queue of its own — by SVT-AV1 for
+/// `svt_av1`, by libvpx's VP9 for `libvpx` (`ExportVideoEncoder`) — whose packets go to an
+/// `ExportPacketSink`: the `av1` row's passthrough `AVAssetWriterInput` as `av01` samples, or
+/// the WebM rows' core writer.
 ///
 /// **Two queues, one owner each.** The video queue reads, converts and hands each frame on,
 /// bounded to three in flight (`slots`) so a slow encoder holds the read back; the encode
@@ -20,16 +21,24 @@ import AVFoundation
 /// group exactly once. The encoder itself is torn down by `close()`, after the writer's
 /// pumps have all left, as the reader is (G-17).
 final class ExportEncodePump {
-    /// The settings' `writer` this pump serves.
-    static let writer = "svt_av1"
+    /// The settings' `writer` values this pump serves: SVT-AV1 (the AV1 rows) and libvpx
+    /// (`vp9_webm`, CX-16).
+    static let av1Writer = "svt_av1"
+    static let vp9Writer = "libvpx"
 
-    let formatDescription: CMVideoFormatDescription
-    /// The `av1C` record and the sequence header's colour, and the picture the frames are
-    /// (the WebM layout's track, `ExportWebMLayout`).
-    let config: ReelAV1.Config
+    /// The `av01` description the MP4 sink's samples carry; nil on libvpx, which has no MP4
+    /// row (CX-1).
+    let formatDescription: CMVideoFormatDescription?
+    /// The WebM layout's video track (`ExportWebMLayout`): `V_AV1` with the `av1C` record and
+    /// the sequence header's colour at 10 bits, or `V_VP9` with no CodecPrivate, the picture's
+    /// CICP and its depth (CX-16 (4), (5)).
+    let webmCodec: ExportWebMLayout.VideoCodec
+    /// The picture the frames are.
     let picture: ExportAV1Picture
 
-    private var encoder: SVTAV1Encoder?
+    private var encoder: (any ExportVideoEncoder)?
+    /// The encoder's name, for a sentence after it is torn down.
+    private let encoderName: String
     private let converter: ExportI010Converter
     private let encodeQueue = DispatchQueue(
         label: "com.kgalligan.framejob.export.encode", qos: .userInitiated)
@@ -45,25 +54,46 @@ final class ExportEncodePump {
 
     init(settings: ExportSettings, canvas: CGSize, range: CMTimeRange) throws {
         let frame = ExportWriter.encodedSize(settings)
-        let speed = settings.encoderSpeed ?? .balanced
         let rate = settings.videoBitrate.map { max(1, $0) }
             ?? ExportWriter.defaultVideoBitrate(settings, bitsPerPixel: 0.07)
         let picture = ExportAV1Picture(color: settings.color)
-        let encoder = try SVTAV1Encoder(
-            width: frame.width, height: frame.height, fps: settings.fps, bitsPerSecond: rate,
-            speed: speed, picture: picture)
-        do {
-            config = try ReelAV1.config(sequenceHeader: encoder.sequenceHeader)
-        } catch {
-            throw Exporter.ExportError.failed(
-                "SVT-AV1's sequence header could not be read: \(error.localizedDescription)")
+        let encoder: any ExportVideoEncoder
+        let bitDepth: Int
+        if settings.writer == Self.vp9Writer {
+            bitDepth = VP9Encoder.bitDepth(for: picture)
+            encoder = try VP9Encoder(
+                width: frame.width, height: frame.height, fps: settings.fps,
+                bitsPerSecond: rate, picture: picture)
+            let cicp = picture.cicp
+            webmCodec = ExportWebMLayout.VideoCodec(
+                codecId: "V_VP9", codecPrivate: nil, primaries: cicp.primaries,
+                transfer: cicp.transfer, matrix: cicp.matrix, bitsPerChannel: bitDepth)
+            formatDescription = nil
+        } else {
+            bitDepth = 10
+            let svt = try SVTAV1Encoder(
+                width: frame.width, height: frame.height, fps: settings.fps,
+                bitsPerSecond: rate, speed: settings.encoderSpeed ?? .balanced, picture: picture)
+            let config: ReelAV1.Config
+            do {
+                config = try ReelAV1.config(sequenceHeader: svt.sequenceHeader)
+            } catch {
+                throw Exporter.ExportError.failed(
+                    "SVT-AV1's sequence header could not be read: \(error.localizedDescription)")
+            }
+            encoder = svt
+            webmCodec = ExportWebMLayout.VideoCodec(
+                codecId: "V_AV1", codecPrivate: config.record, primaries: config.color.primaries,
+                transfer: config.color.transfer, matrix: config.color.matrix, bitsPerChannel: 10)
+            formatDescription = try ExportAV1Track.formatDescription(
+                width: frame.width, height: frame.height, config: config, picture: picture)
         }
-        formatDescription = try ExportAV1Track.formatDescription(
-            width: frame.width, height: frame.height, config: config, picture: picture)
         converter = try ExportI010Converter(
             width: frame.width, height: frame.height, canvas: canvas,
-            fills: ExportWriter.fillsTheBox(settings, canvas: canvas), picture: picture, pool: 3)
+            fills: ExportWriter.fillsTheBox(settings, canvas: canvas), picture: picture,
+            bitDepth: bitDepth, pool: 3)
         self.encoder = encoder
+        encoderName = encoder.name
         self.picture = picture
         self.range = range
         self.frameDuration = CompositionBuilder.frameDuration(settings.fps)
@@ -157,17 +187,19 @@ final class ExportEncodePump {
 
     /// One packet into the file: false once the export cannot go on.
     private func write(
-        _ packet: SVTAV1Encoder.Packet, sink: any ExportPacketSink, isStopping: () -> Bool,
+        _ packet: ExportEncodedPacket, sink: any ExportPacketSink, isStopping: () -> Bool,
         fail: (any Error) -> Void
     ) -> Bool {
         guard !packet.data.isEmpty else { return true }
-        var data = packet.data
-        guard ReelAV1.stripTemporalDelimiters(&data) else {
-            fail(Exporter.ExportError.failed("SVT-AV1 wrote a packet the core could not read."))
+        let data: Data
+        do {
+            data = try encoder?.containerBytes(packet.data) ?? packet.data
+        } catch {
+            fail(error)
             return false
         }
         guard let time = times.removeValue(forKey: packet.pts), time > lastTime else {
-            fail(Exporter.ExportError.failed("SVT-AV1 wrote a frame out of order."))
+            fail(Exporter.ExportError.failed("\(encoderName) wrote a frame out of order."))
             return false
         }
         lastTime = time

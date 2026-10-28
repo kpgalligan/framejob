@@ -198,7 +198,11 @@ impl Bits<'_> {
 /// 3 for 4:4:4 — the 8-bit Profile 0 and 10-bit Profile 2 records this
 /// writes decode (measured); Profile 1 still does not, which the app's
 /// pre-check refuses first.
-pub(crate) fn vpcc(frame: &[u8], colour: &Colour) -> Option<(Vec<u8>, u8)> {
+///
+/// The third value is the header's own matrix for the copy's label (spec §11
+/// CX-16 (10)): 1 for CS_BT_709, 6 for CS_BT_601 and CS_SMPTE_170, 9 for
+/// CS_BT_2020, and `None` for every other space, CS_UNKNOWN among them.
+pub(crate) fn vpcc(frame: &[u8], colour: &Colour) -> Option<(Vec<u8>, u8, Option<u8>)> {
     let mut b = Bits { data: frame, at: 0 };
     if b.read(2)? != 2 {
         return None;
@@ -265,7 +269,13 @@ pub(crate) fn vpcc(frame: &[u8], colour: &Colour) -> Option<(Vec<u8>, u8)> {
         0,
         0,
     ];
-    Some((record, profile as u8))
+    let stream_matrix = match space {
+        2 => Some(1),
+        1 | 3 => Some(6),
+        5 => Some(9),
+        _ => None,
+    };
+    Some((record, profile as u8, stream_matrix))
 }
 
 /// An MPEG-4 descriptor: its tag, its length (one byte under 128, else the

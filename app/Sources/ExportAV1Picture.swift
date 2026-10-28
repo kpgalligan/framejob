@@ -1,8 +1,9 @@
 import CoreMedia
 
-/// The picture the `av1` row writes (spec §11 CX-14): the SDR version or BT.709 (`sdr`), the
-/// HLG master (`hlg`) or HDR10 (`pq`), read from the settings' `color` — which the core writes
-/// only in an HLG project, so an SDR project is `.sdr`.
+/// The picture the `av1`, `av1_webm` and `vp9_webm` rows write (spec §11 CX-14, CX-16): the
+/// SDR version or BT.709 (`sdr`), the HLG master (`hlg`) or HDR10 (`pq`), read from the
+/// settings' `color` — which the core writes only in an HLG project, so an SDR project is
+/// `.sdr`.
 ///
 /// One value carries everything the three places that label the picture need, so they cannot
 /// disagree: the luma weights `ExportI010.metal` converts with (CX-14 (3)), the CICP SVT-AV1
@@ -38,6 +39,17 @@ enum ExportAV1Picture: Equatable {
     /// The sequence header's `matrix_coefficients`: BT.709, or BT.2020 non-constant luminance.
     var matrix: EbMatrixCoefficients {
         self == .sdr ? EB_CICP_MC_BT_709 : EB_CICP_MC_BT_2020_NCL
+    }
+
+    /// The picture's CICP as ISO/IEC 23091-2 numbers (spec §11 CX-14 (4), CX-16 (4)): `sdr`
+    /// 1/1/1, `hlg` 9/18/9, `pq` 9/16/9 — the WebM `Colour` of a VP9 track, whose bitstream
+    /// carries no transfer function.
+    var cicp: (primaries: Int, transfer: Int, matrix: Int) {
+        switch self {
+        case .sdr: return (1, 1, 1)
+        case .hlg: return (9, 18, 9)
+        case .pq: return (9, 16, 9)
+        }
     }
 
     /// The matrix's (Kr, Kb), the weights the kernel derives Y′, Cb′ and Cr′ from.

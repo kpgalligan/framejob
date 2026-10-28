@@ -14,12 +14,24 @@
 pub(crate) enum Writer {
     /// SVT-AV1, bundled and called from Swift (CX-2, CX-4).
     SvtAv1,
+    /// libvpx's VP9, bundled and called from Swift (CX-3, CX-4, CX-16).
+    Libvpx,
 }
 
 impl Writer {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Writer::SvtAv1 => "svt_av1",
+            Writer::Libvpx => "libvpx",
+        }
+    }
+
+    /// Whether the encoder has speeds to choose from: SVT-AV1's three
+    /// (CX-2), and not libvpx's one (CX-3, CX-16 (2)).
+    pub(crate) fn takes_speed(self) -> bool {
+        match self {
+            Writer::SvtAv1 => true,
+            Writer::Libvpx => false,
         }
     }
 }

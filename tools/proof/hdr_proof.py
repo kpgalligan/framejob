@@ -334,6 +334,17 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   `{sdr_version}`'s counts (CONTROL: the exposed `{sdr_version}`'s differ); **SP** turns Show
   SDR Version on under Show Ungraded: both captions "Rec. 709 · encoded" at `{sdr_version,
   ungraded}`'s readouts, then both off and the HLG captions back (HD-15 (c)).
+- **H7s** (codec export C4, spec §11 CX-16 (10)): two 640 × 360 1 s `smptebars` VP9
+  Profile 0 WebMs by ffmpeg's libvpx-vp9, `sdr709_webm` (BT.709 ×3: the Colour and the
+  keyframe's colour space) and `sdr_untagged_webm` (no tag). Each imported alone into a
+  640 × 360 project and rendered at T: the labelled copy's colour fields read bt709 and its
+  render is within 3/255 per channel of ffmpeg's BT.709 decode of the source; the untagged
+  copy's colour fields stay unknown (no label written, as before) and its render is within
+  3/255 of the BT.601 decode, AVFoundation's reading at this size; and that copy equals the
+  copy a tree before CX-16 (10) made, `<control>/h7s-sdr_untagged_webm.mov`, byte for byte
+  but the `mvhd`/`tkhd`/`mdhd` wall-clock times (`video_configuration_proof.same_movie`).
+  `capture <folder> --only H7s,Z1 --app <a pre-CX-16 build>` writes that file. CONTROL: the
+  two decodes more than 6/255 apart. Its mutant, `sdr-copy-unlabelled`, drops the SDR labels.
 - **HI, HKh, H7h, P12, P13** (clean-up batch 2, phase 2, #311, #312, #321, spec §11 HD-19;
   the rules fixed before the phase's control ran, `tools/proof/work/cleanup2/ctl-p2`). The
   stills (`hdr_stills`, M1's fixtures, made once): `still_hlg.png` and `still_hlg.heic`, an
@@ -482,6 +493,7 @@ import proof_app  # noqa: E402
 import reference_build  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
+from video_configuration_proof import same_movie  # noqa: E402
 
 BASE = ROOT / "tools/proof/work/hdr"
 WORK = BASE / "run"
@@ -552,7 +564,7 @@ H1_SUFFIX = {"still8": ".png", "webm": ".webm"}
 PICK_POINTS = {(W, H): [[256.5, 32.5], [512.5, 96.5], [900.5, 100.5]],
                (SW, SH): [[320.5, 180.5], [100.5, 60.5], [540.5, 300.5]]}
 ROWS = ["H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5", "H6", "H7", "H7d", "H7i",
-        "H7p", "H7o", "H7r", "H7w", "H7h", "HS", "HH", "HP", "HT", "HI", "HIp", "HG0", "HG", "HGu",
+        "H7p", "H7o", "H7r", "H7w", "H7h", "H7s", "HS", "HH", "HP", "HT", "HI", "HIp", "HG0", "HG", "HGu",
         "HGk", "HL", "HW", "HK", "HKh",
         "HM", "HF", "HX", "DT",
         "DP", "DV", "DI", "DE", "DR", "DS", "DM", "DX", "DA", "SI", "SW", "SV", "SS", "SD", "SP", "LT",
@@ -676,6 +688,10 @@ AV1_READS = {"av1_pq_cll": {"file": 600, "from": "max_cll"},
 # label (HI), the key on an HDR clip read as the SDR colour an SDR project shows (HKh) and an
 # HLG WebM copy (H7h). STILL_FILES: HI's and P13's stills under MEDIA (M1's fixtures).
 C3_ROWS = {"HI", "HKh", "H7h"}
+# Codec export C4 (spec §11 CX-16 (10)): an SDR WebM copy labelled from its source (H7s).
+C4_ROWS = {"H7s"}
+SDR_WEBMS = {"sdr709_webm": "colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv",
+             "sdr_untagged_webm": "colorspace=unknown:color_primaries=unknown:color_trc=unknown"}
 STILL_FILES = {"still_hlg_png": "still_hlg.png", "still_hlg_heic": "still_hlg.heic",
                "still_pq_png": "still_pq.png", "still_hlg709_png": "still_hlg709.png",
                "still_hlg_wide": "still_hlg_wide.png", "still_hlg_avif": "still_hlg.avif",
@@ -1165,6 +1181,11 @@ MUTANTS = {
                               "InputConversion.choose(input: color) {\n",
                               "            if let color = media.color, let chosen = "
                               "InputConversion.choose(input: color), false {\n")], ["P12"]),
+    # Codec export C4 (spec §11 CX-16 (10)): an SDR copy left unlabelled, as before the
+    # ruling; also `vp9_export_proof.py`'s `sdr-copy-unlabelled` (V10).
+    "sdr-copy-unlabelled": ([(REWRAP_WRITER_SWIFT,
+                              "            extensions.merge(sdrLabels(v)) { _, label in label }\n",
+                              "")], ["H7s"]),
     # An HLG WebM copy left unlabelled (HD-19 (b)).
     "webm-hlg-unlabelled": ([(REWRAP_WRITER_SWIFT,
                               "            extensions.merge(hlgLabels(v)) { _, label in label }\n",
@@ -3927,9 +3948,9 @@ def run_dr(client, state):
     sdr.place(fixture("bt709")) if sdr.ok else None
     cases = [
         (hlg, "h264", "hlg", "h264 is 8-bit and writes the SDR version; export dynamic_range "
-         "\"hlg\" as hevc_10bit, av1, av1_webm, prores_422 or prores_4444"),
+         "\"hlg\" as hevc_10bit, av1, av1_webm, vp9_webm, prores_422 or prores_4444"),
         (hlg, "gif", "pq", "gif is 8-bit and writes the SDR version; export dynamic_range "
-         "\"pq\" as hevc_10bit, av1, av1_webm, prores_422 or prores_4444"),
+         "\"pq\" as hevc_10bit, av1, av1_webm, vp9_webm, prores_422 or prores_4444"),
         (sdr, "hevc_10bit", "pq", "dynamic_range \"pq\" needs an HLG project; set_canvas "
          "output \"hlg\" first"),
         (hlg, "hevc_10bit", "bogus", "export dynamic_range must be \"hlg\", \"pq\" or "
@@ -6622,6 +6643,128 @@ def run_h7h(client, state):
           f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
 
 
+# ---- codec export C4 (spec §11 CX-16 (10)): an SDR WebM copy's labels ---------------
+
+def sdr_webm(name):
+    """H7s's fixtures: 640 × 360, 1 s of `smptebars` as 8-bit VP9 Profile 0 by ffmpeg's
+    libvpx-vp9, `sdr709_webm` tagged BT.709 ×3 (its WebM's Colour and the keyframe's
+    colour space) and `sdr_untagged_webm` with no tag (no Colour, CS_UNKNOWN), each labelled
+    by `setparams` on the input (smptebars itself says bt470bg)."""
+    labelled = name == "sdr709_webm"
+    out = ffmpeg_make(MEDIA / f"{name}.webm", [
+        "-f", "lavfi", "-i", f"smptebars=size={SW}x{SH}:rate=30:duration=1", "-vf",
+        f"setparams={SDR_WEBMS[name]}", "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p",
+        "-b:v", "8M"], 300)
+    want = ({"codec_name": "vp9", "pix_fmt": "yuv420p", "color_space": "bt709",
+             "color_transfer": "bt709", "color_primaries": "bt709"} if labelled else
+            {"codec_name": "vp9", "pix_fmt": "yuv420p", "color_space": "unknown",
+             "color_transfer": "unknown", "color_primaries": "unknown"})
+    return checked(name, out, want)
+
+
+def rgb8(path, matrix, index=T // FRAME):
+    """Frame `index` of `path` as rgb24 bytes through `matrix` from video range."""
+    ran = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf",
+                          f"select=eq(n\\,{index}),scale=in_color_matrix={matrix}:in_range=tv:"
+                          "out_range=pc,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "-"],
+                         capture_output=True, timeout=120)
+    return ran.stdout if ran.returncode == 0 else None
+
+
+def png8(path):
+    ran = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
+                          "-pix_fmt", "rgb24", "-"], capture_output=True, timeout=120)
+    return ran.stdout if ran.returncode == 0 else None
+
+
+def mad3(a, b):
+    """Each RGB channel's mean absolute difference, or None when the sizes differ."""
+    if not a or not b or len(a) != len(b):
+        return None
+    return [sum(abs(a[i] - b[i]) for i in range(c, len(a), 3)) / (len(a) / 3)
+            for c in range(3)]
+
+
+H7S_CONTROL = "h7s-sdr_untagged_webm.mov"
+
+
+def run_h7s(client, mode, control, state):
+    """H7s (codec export C4, spec §11 CX-16 (10)): an SD BT.709-tagged VP9 WebM's copy is
+    labelled BT.709 and renders as BT.709; an untagged one's copy carries no colour, as
+    before, and renders as AVFoundation reads it at this size, BT.601; and that copy equals,
+    byte for byte but the movie, track and media headers' wall-clock times
+    (`video_configuration_proof.same_movie`), the copy a tree before CX-16 (10) made of the
+    same fixture, `control`'s `H7S_CONTROL`. `capture` writes that file from the app it
+    drives (a pre-CX-16 build, `--app`) and scores only that it was written."""
+    paths = {n: sdr_webm(n) for n in SDR_WEBMS}
+    refused = {n: REFUSED.get(n) for n, p in paths.items() if p is None}
+    state["h7s_fixture"] = not refused
+    if refused:
+        check("H7s the SD WebM fixtures were made", False, f"refused {refused}")
+        return
+    misses, figures, closed = [], [], True
+    for name, path in paths.items():
+        doc = Doc(client, f"h7s-{name}", SW, SH)
+        doc.place(path) if doc.ok else None
+        rows = doc.project().get("media") or [] if doc.ok else []
+        copy = rows[0].get("path") if rows else None
+        png = doc.render(f"h7s-{name}") if doc.ok else None
+        closed = doc.close() and closed
+        if not png or not copy:
+            misses.append(f"{name}: {doc.why or 'no render or no copy'}")
+            continue
+        labelled = name == "sdr709_webm"
+        if mode == "capture":
+            if not labelled:
+                shutil.copy2(copy, control / H7S_CONTROL)
+            continue
+        if not labelled:
+            want_copy = control / H7S_CONTROL
+            if not want_copy.is_file():
+                misses.append(f"{name}: no control copy {want_copy}")
+            else:
+                equal, detail = same_movie(copy, want_copy)
+                figures.append(f"{name}: against the pre-CX-16 copy, {detail}")
+                if not equal:
+                    misses.append(f"{name}: the copy differs from the pre-CX-16 copy")
+        fields = colour_fields(copy)
+        render = png8(png)
+        bt709, bt601 = mad3(render, rgb8(path, "bt709")), mad3(render, rgb8(path, "bt601"))
+        apart = mad3(rgb8(path, "bt709"), rgb8(path, "bt601"))
+        figures.append(f"{name}: the copy's colour fields {fields}; the render against "
+                       f"ffmpeg's BT.709 decode {fmt3(bt709)}, BT.601 {fmt3(bt601)} (the two "
+                       f"decodes {fmt3(apart)} apart)")
+        if bt709 is None or bt601 is None or apart is None or max(apart) <= 6:
+            misses.append(f"{name}: CONTROL the decodes cannot tell BT.709 from BT.601")
+            continue
+        want_fields = "color_space=bt709" in fields if labelled else (
+            "color_space=unknown" in fields and "color_primaries=unknown" in fields
+            and "color_transfer=unknown" in fields)
+        if not want_fields:
+            misses.append(f"{name}: the copy's colour fields {fields}")
+        nearest = bt709 if labelled else bt601
+        if max(nearest) > 3:
+            misses.append(f"{name}: the render is {fmt3(nearest)} from the "
+                          f"{'BT.709' if labelled else 'BT.601'} decode (≤ 3)")
+    state["h7s_closed"] = closed
+    if mode == "capture":
+        written = (control / H7S_CONTROL).is_file()
+        state["h7s_captured"] = written and not misses
+        check(f"H7s CAPTURE: sdr_untagged_webm's copy written to {control.name}/{H7S_CONTROL}",
+              written and not misses, f"failed {misses or 'none'}")
+        return
+    check("H7s SD (640 × 360) VP9 WebMs: sdr709_webm's copy labelled bt709 and its render "
+          "within 3/255 of ffmpeg's BT.709 decode; sdr_untagged_webm's copy unlabelled (colour "
+          "fields unknown) and its render within 3/255 of the BT.601 decode AVFoundation makes "
+          "at this size, and the copy byte-equal, but the headers' wall-clock times, to the "
+          f"copy a tree before CX-16 (10) made ({control.name}/{H7S_CONTROL})", not misses,
+          f"failed {misses or 'none'}\n       " + "\n       ".join(figures))
+
+
+def fmt3(values):
+    return "None" if values is None else "/".join(f"{v:.2f}" for v in values)
+
+
 # ---- clean-up 3 batch B, phase 3 (#322, spec §11 HD-22): a gain-map still ------------
 
 def gainmap_still():
@@ -7010,7 +7153,7 @@ def main():
         selected -= {"TI", "TH", "TO", "TL"}
         if args.mutant:
             selected -= ({"H1a"} | H7_ROWS | H2_ROWS | H3_ROWS | H4_ROWS | L_ROWS | C2_ROWS
-                         | C3_ROWS | B3_ROWS | B4_ROWS)
+                         | C3_ROWS | C4_ROWS | B3_ROWS | B4_ROWS)
     if args.mode == "capture":
         if not args.only:
             # SI too: a plain run and `compare` score SI against DIR/si/, which only a
@@ -7064,7 +7207,8 @@ def main():
     needs_instance = bool(selected & ({"H1", "H1m", "H1a", "H1s", "H1w", "H2", "H3", "H4", "H5",
                                        "H6", "R0"} | H7_ROWS | H2_ROWS
                                       | (H3_ROWS - {"DX"}) | H4_ROWS | L_ROWS | C2_ROWS
-                                      | C3_ROWS | B3_ROWS | B4_ROWS | {"P12", "P13", "P15"}))
+                                      | C3_ROWS | C4_ROWS | B3_ROWS | B4_ROWS
+                                      | {"P12", "P13", "P15"}))
     if needs_instance:
         launched = mcp.launch(str(binary), [],
                               env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
@@ -7122,6 +7266,8 @@ def main():
                 # the key on an HDR clip; P13's stills made here (the probe has no instance).
                 if "H7h" in selected:
                     run_h7h(client, state)
+                if "H7s" in selected:
+                    run_h7s(client, args.mode, control, state)
                 if selected & {"P12", "P13"}:
                     stills = hdr_stills(client)
                     state["p13_fixture"] = all(stills.values())
@@ -7208,7 +7354,8 @@ def main():
         print(f"captured into {args.folder}; on the control H2–H6 FAILED: {failing} "
               f"(passed, so not discriminating: {[n for n in shown if rows[n]]})")
         captured = (state.get("capture_ok") or "H1" not in selected) \
-            and state.get("si_captured", "SI" not in selected)
+            and state.get("si_captured", "SI" not in selected) \
+            and state.get("h7s_captured", "H7s" not in selected)
         return 0 if rows.get("Z1") and captured and rows.get("H7i", True) \
             and rows.get("HG0", True) else 1
     scored = [name for name in ROWS if name in rows and name not in RECORDS]

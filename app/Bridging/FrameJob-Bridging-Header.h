@@ -10,5 +10,7 @@
 #include <svt-av1/EbSvtAv1Metadata.h>
 #include <vpx/vpx_encoder.h>
 #include <vpx/vp8cx.h>
+// libvpx's macro and variadic call, wrapped for Swift (spec §11 CX-16 (9)).
+#include "FrameJobVPX.h"
 
 #endif

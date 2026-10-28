@@ -91,6 +91,8 @@ orchestrator's default, which the owner can still change by a new entry here).
   They take `hevc_10bit`'s place in H-3's rules. VP9 Profile 2 HDR is a later phase of its
   own, WebM only, because VP9's bitstream carries no transfer function and the container must.
   **Risk accepted:** no player's HDR rendering of these files was measured.
+  **Amended by CX-16** (C4): `vp9_webm` is Profile 0 8-bit for an SDR picture and Profile 2
+  10-bit for HLG and PQ, the WebM `Colour` the only transfer label, with HD-5's HDR10 on PQ.
 
 - **CX-9 — The rate model keeps the bitrate semantics on every row** (default):
   1. `video_bitrate` is the single-pass VBR target (two passes would compose every frame
@@ -350,6 +352,10 @@ orchestrator's default, which the owner can still change by a new entry here).
        time would pass 32,767 ms. The Cues hold one CuePoint per key-started Cluster
        (CueTime, track 1, CueClusterPosition from the Segment's data) and are written at
        finish.
+  **Amended by CX-16** (C4): (1)'s neighbour `vp9_webm` follows `av1_webm`, an HDR row with
+  `writer` `libvpx` and no speeds; (2)'s `ExportWebMWriter` writes it too, its pump choosing the
+  encoder by `writer`; and (3)'s Track 1 is `V_AV1` with its `av1C` or `V_VP9` with no
+  CodecPrivate, BitsPerChannel 10 on AV1 and 8 or 10 on VP9 by the picture.
   4. **Interleave.** The core buffers each track the layout declares. It writes the earliest
      head only while every declared track that has not ended has a head, and `end_track`
      releases that constraint; a layout with one track writes each packet as it arrives. The
@@ -382,3 +388,140 @@ orchestrator's default, which the owner can still change by a new entry here).
      shared reader is named every time only by the readers' log line, F1–F3's timings alone
      catching it only through G-17's crash. It stays accepted on `ExportWriter`'s shared
      reader (G-17), whose same fix is filed as #378.
+
+- **CX-16 — C4: `vp9_webm`, 8-bit Profile 0 for SDR and 10-bit Profile 2 for HLG and PQ**
+  (default, recorded in C4 before its code; amends CX-8, CX-15 (1)–(3), HD-5 and HD-14 (c)):
+  1. **The row.** `vp9_webm` is "VP9 (WebM)", directly after `av1_webm`: container `webm`,
+     codec `vp9`, video, no alpha (alpha is C5's row), `size` and `fps` null, `avf_preset`
+     `AVAssetExportPresetPassthrough` (a record, as on `av1_webm`), `"hdr": true` and `writer`
+     `libvpx`, with no `encoder_speeds`. It is even-sized, one of HD-5's HDR rows, and
+     `optimize_for_network` has no effect on it. Its settings carry `writer` (`libvpx`) and
+     no `encoder_speed`; `color` in an HLG project as every HDR row's.
+  2. **One speed (CX-3 binds).** libvpx runs `VPX_DL_GOOD_QUALITY` at cpu-used 4 with row-mt.
+     There is no `encoder_speeds`, `encoder_speed` on the row is refused with the existing
+     sentence (`vp9_webm has no encoder speed; encoder_speed applies to av1 and av1_webm`), and
+     the sheet's Speed popup is drawn disabled on it, as on every row without speeds. The
+     brief's "Speed popup mapped to cpu-used" is not built: it would re-litigate CX-3.
+  3. **The depth is the picture's.** `sdr` (an SDR project, or `sdr` asked in an HLG project)
+     is Profile 0 (`g_profile` 0): 8-bit I420, BT.709. `hlg` and `pq` are Profile 2: 10-bit
+     I010, BT.2020 non-constant, with `g_profile` 2, `VPX_CODEC_USE_HIGHBITDEPTH`,
+     `g_bit_depth` and `g_input_bit_depth` 10 and `VPX_IMG_FMT_I42016` (libvpx's
+     `validate_config` refuses a depth above 8 at a profile below 2). WHY: Profile 0 is VP9's
+     universal decode profile, VP9's reason to be on the sheet is web playback (CX-3), and
+     unlike AV1's Main profile (CX-14 (1)) Profile 0 cannot carry 10 bits, so an always-10-bit
+     row would be a Profile 2 file for every SDR export. The 8-bit samples are CX-14 (3)'s
+     arithmetic at 8 bits: Y = round(16 + 219·Y′) and each chroma sample
+     clamp(round(128 + 224·C′), 0, 255), C′ the mean of its 2 × 2 block, the matrix BT.709's.
+  4. **The tags.** libvpx's `VP9E_SET_COLOR_SPACE` is `VPX_CS_BT_709` or `VPX_CS_BT_2020` and
+     `VP9E_SET_COLOR_RANGE` studio. VP9's bitstream carries no transfer function, so the WebM
+     `Colour` is the only transfer label (CX-8): the picture's CICP (`sdr` 1/1/1, `hlg` 9/18/9,
+     `pq` 9/16/9), Range 1 and BitsPerChannel 8 or 10; on PQ alone it also carries HD-5's
+     MasteringMetadata, MaxCLL and MaxFALL from `OutputTransform`'s two blobs, as CX-15 (3)
+     writes them for `av1_webm`.
+  5. **No CodecPrivate.** Matroska's VP9 mapping makes it optional, ffmpeg writes none, and
+     #216-R's reader builds `vpcC` from the first keyframe, so the TrackEntry is `V_VP9` with
+     none. The layout's `codec_private_hex` becomes optional: required and non-empty on `V_AV1`,
+     refused on `V_VP9`; `bits_per_channel` is checked to be 8 or 10.
+  6. **Keys and packets.** `kf_mode` auto, `kf_min_dist` 0 and `kf_max_dist` ⌊2·fps⌋ (a
+     keyframe at least every 2 s, as CX-12 (3)); the block's key flag is libvpx's
+     `VPX_FRAME_IS_KEY`. `g_lag_in_frames` 25, auto-alt-ref 1, `VP9E_SET_TILE_COLUMNS` 2,
+     frame-parallel decoding 0, `g_threads` the active processor count; timebase 1/fps, a
+     frame's pts its index, duration 1. libvpx packs a hidden alt-ref into the next shown
+     frame's superframe, so each packet is one shown frame at its pts. A libvpx failure reads
+     "libvpx failed: <step> answered <code>: <detail>", and one before the first frame "libvpx
+     could not start: …".
+  7. **The rate: capped constant quality, quality first** (CX-13's model). `rc_end_usage` is
+     `VPX_CQ`, `VP8E_SET_CQ_LEVEL` the table's value and `rc_target_bitrate` the cap in kb/s
+     (rounded, at least 1), the cap CX-13 (2)'s: `video_bitrate` when asked (the Quality tiers'
+     0.6 factor, CX-9 (2)), else HEVC's 0.07 bits per pixel per frame. `rc_overshoot_pct` and
+     `rc_undershoot_pct` stay at libvpx's defaults (25 / 25), as CX-13 took SVT's own. The CQ
+     level is a function of the cap's bits per pixel per frame and the depth: linear between
+     CX-13's five points, rounded down, the end point's beyond either end. The 8-bit column is
+     the lower of two calibrations: (a) the spike's gh5, promo and real8 through the spike's
+     `vpxenc` (`--end-usage=cq`, the flags above, CQ 10–50 in steps of 2) against `crf.jsonl`'s
+     HEVC rows, and (b) the owner's IMG_0018.MOV in an SDR project through a Release copy
+     reading the CQ from a file, against `hevc`, both scored against `prores_422` as yuv420p.
+     The 10-bit column is the owner clip in an HLG project at `hlg`, against `hevc_10bit` at
+     `hlg`, scored as yuv420p10le. Each cell is the highest CQ reaching at least the
+     comparator's VMAF under the real cap; a cell that misses is lowered by 2 until it meets
+     the comparator or the cap binds. The measurements are (8).
+  8. **The calibration** (`tools/proof/work/codec-spike/crf_vp9.py`, gitignored; rows `kind`
+     "vpx" in `crf.jsonl`), 2026-10-28 on a shared machine. VMAF pairs the two files' frames
+     by INDEX (`settb=1/30,setpts=N`): a WebM's block times are whole milliseconds, and
+     libvmaf's timestamp pairing put a third of the owner clip's frames against a neighbour's
+     (the first owner run read 76.17 at CQ 30 / Low where index pairing reads about 91; its
+     rows lack `"align": "index"` and are not used). Each VMAF below is "CQ: VMAF (share of
+     the cap)", the kept cell in bold.
+     - **(a) The spike's clips** (vpxenc, 8-bit, against `crf.jsonl`'s spike HEVC rows,
+       scored against each clip's own y4m as those rows were; a search of the grid, 81
+       encodes): cells gh5 / promo / real8 — Low 46 / 34 / 36, Medium 38 / 30 / 30, Format
+       default 34 / 30 / 26, High 32 / 30 / 24, Maximum 28 / 28 / 16. The largest cap share
+       of the 81 was **1.143 ×** (gh5 at Low, at CQ 10 and 30, where the cap binds).
+     - **(b) The owner's clip at 8 bits** (an SDR project, `vp9_webm` against `hevc` —
+       91.141 / 94.415 / 95.469 / 95.777 / 96.85 — both against its `prores_422` as
+       yuv420p): Low 36: 90.871 (0.712), **34: 91.568 (0.786)**; Medium 32: 92.880, 30:
+       93.664, 28: 94.081, **26: 94.431 (0.867)**; Format default 30: 93.874, 28: 94.367,
+       26: 94.811, 24: 95.215, 22: 95.375, **20: 95.498 (0.938)**; High 30: 93.957 … 20:
+       95.753, **18: 95.882 (0.948)**; Maximum 26: 95.248 … 16: 96.844, **14: 96.993
+       (0.912)**.
+     - **(c) The owner's clip at 10 bits** (an HLG project at `hlg`, against `hevc_10bit` at
+       `hlg` — 92.064 / 94.681 / 95.620 / 95.976 / 97.133 — scored as yuv420p10le): Low
+       36: 91.907 (0.786), **34: 92.455 (0.852)**; Medium 30: 94.571 (0.790), **28: 94.897
+       (0.848)**, 26: 95.164 (0.904); Format default 28: 95.316 (0.748), 26: 95.679
+       (0.825), **24: 95.958 (0.893)** (kept after R3, below), 22: 96.066, 20: 96.145
+       (0.948); High 26: 95.868 (0.775),
+       **24: 96.198 (0.855)**, 22: 96.338, 20: 96.435, 18: 96.499 (0.946); Maximum 22:
+       97.038 (0.700), **20: 97.234 (0.754)**, 18: 97.393, 16: 97.508, 14: 97.578 (0.890).
+
+     | bits per pixel per frame (the 1080p30 rate) | 8-bit (Profile 0) | 10-bit (Profile 2) |
+     |---|---|---|
+     | 0.0386 (Low, 2.4 Mb/s) | 34 | 34 |
+     | 0.0579 (Medium, 3.6 Mb/s) | 26 | 28 |
+     | 0.0700 (Format default, 4.35 Mb/s) | 20 | 24 |
+     | 0.0772 (High, 4.8 Mb/s) | 18 | 24 |
+     | 0.1157 (Maximum, 7.2 Mb/s) | 14 | 20 |
+
+     The owner's clip binds every 8-bit point (the spike's cells are 34 / 30 / 26 / 24 /
+     16); every cell reached its comparator under the real cap, so no STOP. The guide, the
+     MCP page and `video_bitrate`'s description name the measured maximum as about 1.15 ×
+     the cap. The least margins kept: 8-bit Medium +0.016, Format default +0.029.
+     **The 10-bit Format default cell was lowered from 26 to 24 at the first `--rate` run**
+     (`vp9_export_proof.py` R3 on Release): that run's `hevc_10bit` Format default encode
+     scored 95.692 (the calibration's, 95.620) and `vp9_webm` at CQ 26 the calibration's
+     95.679, 0.013 under; by (7)'s rule the cell went down by 2, to the CQ 24 the
+     calibration had measured at 95.958 (0.893 × the cap), +0.27 over either comparator. C2
+     saw the same one-encode variance in VideoToolbox's `hevc_10bit` (CX-14 (6)).
+  9. **The C wrappers.** `vpx_codec_enc_init` is a macro and `vpx_codec_control_` is variadic,
+     neither of which Swift can call, so `app/Bridging/FrameJobVPX.h` wraps them in two
+     `static inline` functions (`framejob_vpx_vp9_enc_init`, `framejob_vpx_control_int`).
+  10. **An SDR WebM/Matroska copy is labelled too** (the orchestrator's ruling of 2026-10-28 on
+      C4's STOP; amends HD-18 (b) and HD-19 (b)). Measured in C4: Frame Job's own 640 × 360
+      SDR `vp9_webm`, re-imported, rendered as BT.601 (cyan (0, 255, 255) read back
+      (23, 255, 255); R/G/B 11.83 / 0.78 / 5.65 of 255 from the source's render), because the
+      copy's description carried no colour and AVFoundation chose the matrix by the picture's
+      size (the same round trip at 1280 × 720 read 0.53 / 0.16 / 0.30). So a copy whose
+      Colour's transfer is neither 16 nor 18 now carries the labels its source states, from
+      these sources in order, each field on its own:
+      - **The Colour element:** `YCbCrMatrix` from MatrixCoefficients 1, 5, 6 or 9 (BT.709,
+        BT.601, BT.601, BT.2020), `ColorPrimaries` from Primaries 1, 5, 6 or 9, and
+        `TransferFunction` from TransferCharacteristics 1, 6, 13, 14 or 15 (the BT.709 class
+        and sRGB), each the string Core Video names for the code
+        (`CV…GetStringForIntegerCodePoint`), and none written for any other value or a code
+        Core Video does not name.
+      - **Else, for the matrix of a VP9 track, the first keyframe's `color_space`:** CS_BT_709
+        is matrix 1, CS_BT_601 and CS_SMPTE_170 are 6, CS_BT_2020 is 9; CS_UNKNOWN and every
+        other space write nothing. The core reads it with the `vpcC` it already builds and
+        publishes it through `rc_container_describe` as `stream_matrix` (null when none); only
+        Swift writes the labels.
+      - **Neither:** the copy's description is unchanged, as before.
+
+      The PQ (transfer 16) and HLG (transfer 18) copies are labelled exactly as HD-18 (b) and
+      HD-19 (b) say. **Risk accepted:** an SDR WebM or MKV that was imported before reads
+      differently now (its old copy in `Rewrapped/` keeps the old description until the
+      source changes, the copy's name being a digest of the source); a label that lies is
+      believed, as it is for every other movie.
+  **Risks accepted:** VP9 is slow (about 39 fps at 1080p on the spike's M2 Max at cpu-used 4)
+  and needs more bits than AV1 for the same picture; Profile 2 is decoded by fewer players
+  than Profile 0; no player's HDR rendering was measured (CX-8); VMAF is not calibrated for
+  HLG, so the 10-bit column's comparison is by the same instrument but not a perceptual
+  claim; and the calibration covers four clips at 1080p.

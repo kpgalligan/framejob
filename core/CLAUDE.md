@@ -135,7 +135,7 @@ governs a module now.
   HD-14): `DynamicRange` (`hlg`, `pq`, `sdr`), spelled `dynamic_range` both
   as an export override and as a recipe option; `deliverable` answers `None`
   for an audio row and for every row of an SDR project, else the picture:
-  the five HDR rows (`hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`) carry
+  the six HDR rows (`hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422`, `prores_4444`) carry
   `hlg` (the default), `pq` or `sdr`, every other video row writes the SDR
   version, and `hlg`/`pq` are refused in an SDR project and on any other row, each in its own sentence.
 - `av1_mp4.rs` · `ffi_av1.rs` — AV1 in MP4 (spec §11 CX-12, road map
@@ -148,10 +148,12 @@ governs a module now.
   refused on any other row) are `export_table.rs`' and `export_overrides.rs`';
   `Container` is `export_container.rs`'.
 - `export_encoder.rs` — the bundled encoders' route and speeds (spec §11
-  CX-12): `Writer` (`svt_av1`; none is AVFoundation) and `EncoderSpeed`, moved whole out of
+  CX-12, CX-16): `Writer` (`svt_av1`, `libvpx`; none is AVFoundation; `takes_speed`
+  false for libvpx's one speed) and `EncoderSpeed`, moved whole out of
   `export_table.rs` (codec-export C3's toll, a pure move) and re-exported there.
 - `webm_ebml.rs` · `webm_layout.rs` · `webm_writer.rs` · `ffi_webm.rs` — the
-  WebM an `av1_webm` export writes (spec §11 CX-6, CX-15), the write side beside
+  WebM an `av1_webm` or `vp9_webm` export writes (spec §11 CX-6, CX-15, CX-16: `V_VP9` with
+  no CodecPrivate, BitsPerChannel 8 or 10), the write side beside
   the importer's reader: `webm_ebml.rs` the element IDs, vints and builders
   (EBML header, Info, the TrackEntries with Colour and OpusHead, Chapters,
   SeekHead, Cues); `webm_layout.rs` `rc_webm_open`'s JSON as `WebmLayout`, each
@@ -878,8 +880,9 @@ governs a module now.
   element's MaxCLL, MaxFALL and MasteringMetadata are read too (HD-18):
   `container_codec.rs` writes them as the `mdcv`/`clli` blobs (and reads them
   back, `mastering_from_mdcv` and `light_from_clli`, for the WebM writer) and
-  `describe` publishes `mdcv_hex`, `clli_hex`, `transfer`, `primaries` and
-  `matrix`; the app writes the blobs and the PQ label only for transfer 16. The only payload read
+  `describe` publishes `mdcv_hex`, `clli_hex`, `transfer`, `primaries`,
+  `matrix` and `stream_matrix` (the first VP9 keyframe's `color_space` as a matrix code,
+  from `vpcc`; spec §11 CX-16 (10)); the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
 - `ffi_graphic.rs` — the eleven `rc_graphic_*` exports (road map 10 §5e; the

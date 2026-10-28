@@ -63,6 +63,9 @@ struct Video {
     height: u64,
     atom: Option<(&'static str, Vec<u8>)>,
     vp9_profile: Option<u8>,
+    /// A VP9 track's first keyframe's matrix, for the copy's label (spec §11
+    /// CX-16 (10)).
+    stream_matrix: Option<u8>,
     colour: codec::Colour,
     frames: Vec<Frame>,
     ns: Vec<i64>,
@@ -151,7 +154,7 @@ impl Container {
                 "mdcv_hex": v.colour.mastering.map(|m| codec::hex(&codec::mdcv(&m))),
                 "clli_hex": hdr10_light(&v.colour),
                 "transfer": v.colour.transfer, "primaries": v.colour.primaries,
-                "matrix": v.colour.matrix,
+                "matrix": v.colour.matrix, "stream_matrix": v.stream_matrix,
             })
         });
         let audio = a.map_or(Value::Null, |a| {
@@ -241,13 +244,14 @@ fn video(src: &Source, e: &Entry, frames: Vec<Frame>, scale: u64) -> Result<Vide
     }
     let mut atom = codec::private_atom(&e.codec_id).map(|name| (name, e.private.clone()));
     let mut vp9_profile = None;
+    let mut stream_matrix = None;
     // An encoded track is not copied, so its (encrypted or stripped) keyframe
     // is never read: `precheck` refuses it by its own sentence.
     if copied && fourcc == Some("vp09") {
         let key = frames.iter().find(|f| f.key && f.lace == 0);
         let bytes = key.and_then(|f| src.read_at(f.offset, 64.min(f.size as usize)));
         let synth = bytes.and_then(|b| codec::vpcc(&b, &e.colour));
-        let (record, profile) = synth.ok_or_else(|| {
+        let (record, profile, matrix) = synth.ok_or_else(|| {
             format!(
                 "the first VP9 keyframe on track {} could not be read",
                 e.number
@@ -255,6 +259,7 @@ fn video(src: &Source, e: &Entry, frames: Vec<Frame>, scale: u64) -> Result<Vide
         })?;
         atom = Some(("vpcC", record));
         vp9_profile = Some(profile);
+        stream_matrix = matrix;
     }
     let ns = timing::video_ns(&frames, e.default_duration);
     let raw = if copied {
@@ -270,6 +275,7 @@ fn video(src: &Source, e: &Entry, frames: Vec<Frame>, scale: u64) -> Result<Vide
         height: e.height,
         atom,
         vp9_profile,
+        stream_matrix,
         colour: e.colour,
         nominal_fps: timing::nominal_fps(&ns, e.default_duration),
         frames,

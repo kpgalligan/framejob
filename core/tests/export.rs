@@ -66,11 +66,12 @@
 //!     at settings they did not ask for, reported ok.
 //!
 //! 12. **The rows, in menu order:** `h264`, `hevc`, `hevc_alpha`,
-//!     `hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`,
-//!     `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng` — [`EXPECTED`]
-//!     holds them; the `hevc_10bit` row (spec §11 PR-3) has its own file,
-//!     `core/tests/export_hevc_10bit.rs`, and so have the `av1` and
-//!     `av1_webm` rows (spec §11 CX-12, CX-15), `core/tests/export_av1.rs`.
+//!     `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422`,
+//!     `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`
+//!     — [`EXPECTED`] holds them; the `hevc_10bit` row (spec §11 PR-3) has
+//!     its own file, `core/tests/export_hevc_10bit.rs`, and so have the `av1`
+//!     and `av1_webm` rows (spec §11 CX-12, CX-15), `core/tests/export_av1.rs`,
+//!     and `vp9_webm` (CX-16), `core/tests/export_vp9.rs`.
 //!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
@@ -125,7 +126,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 13] = [
+const EXPECTED: [Expected; 14] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -204,6 +205,20 @@ const EXPECTED: [Expected; 13] = [
         id: "av1_webm",
         container: "webm",
         codec: "av1",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: false,
+        file_type: "org.webmproject.webm",
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+    },
+    // VP9 in WebM (spec §11 CX-16): libvpx's encoding in the same
+    // core-written WebM with Opus sound, after `av1_webm`.
+    Expected {
+        id: "vp9_webm",
+        container: "webm",
+        codec: "vp9",
         size: None,
         fps: None,
         video: true,
@@ -741,10 +756,14 @@ fn alpha_is_the_only_key_the_settings_grew() {
         let mut plain: Vec<String> = KEYS_BEFORE_ALPHA.iter().map(|k| k.to_string()).collect();
         plain.push("alpha".to_string());
         // The encoder route and its speed (spec §11 CX-12, CX-15), on the two
-        // rows a bundled encoder writes and on no other.
+        // AV1 rows; the route alone on `vp9_webm`, libvpx having one speed
+        // (CX-16); on no other row.
         if want.id == "av1" || want.id == "av1_webm" {
             plain.push("writer".to_string());
             plain.push("encoder_speed".to_string());
+        }
+        if want.id == "vp9_webm" {
+            plain.push("writer".to_string());
         }
         plain.sort();
         assert_eq!(

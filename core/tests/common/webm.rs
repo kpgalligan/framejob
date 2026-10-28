@@ -191,3 +191,72 @@ pub fn find(e: &Element, id: u32) -> &Element {
     e.child(id)
         .unwrap_or_else(|| panic!("no {id:#x} under {:#x}", e.id))
 }
+
+// ---- VP9 (spec §11 CX-16) --------------------------------------------------
+
+/// A VP9 frame's uncompressed header (VP9 bitstream spec §6.2) as far as the
+/// reader's `vpcC` reads it, then distinct filler: frame_marker 2, the
+/// profile, show_existing_frame 0, `frame_type` 0 (KEY) or 1, show_frame 1,
+/// error_resilient 0; a key then carries the sync code, a 10-bit flag of 0
+/// at Profile 2, the colour space (2 BT.709, 5 BT.2020) and colour_range 0
+/// (studio).
+pub fn vp9_frame(k: usize, profile: u8, key: bool) -> Vec<u8> {
+    vp9_frame_in(k, profile, key, if profile >= 2 { 5 } else { 2 })
+}
+
+/// `vp9_frame` with the keyframe's colour space `space` (0 CS_UNKNOWN … 7 CS_RGB).
+pub fn vp9_frame_in(k: usize, profile: u8, key: bool, space: u8) -> Vec<u8> {
+    let mut bits: Vec<u8> = vec![1, 0, profile & 1, profile >> 1, 0, u8::from(!key), 1, 0];
+    if key {
+        for i in (0..24).rev() {
+            bits.push(((0x49_8342u32 >> i) & 1) as u8);
+        }
+        if profile >= 2 {
+            bits.push(0);
+        }
+        bits.extend([(space >> 2) & 1, (space >> 1) & 1, space & 1, 0]);
+    }
+    while !bits.len().is_multiple_of(8) {
+        bits.push(0);
+    }
+    let mut out: Vec<u8> = bits
+        .chunks(8)
+        .map(|c| c.iter().fold(0u8, |acc, b| (acc << 1) | b))
+        .collect();
+    out.extend([(k & 0xFF) as u8, (k >> 8) as u8]);
+    out.extend((0..(12 + k % 5)).map(|i| (i * 17 + k) as u8));
+    out
+}
+
+/// A `V_VP9` video layout, no CodecPrivate: `sdr` is Profile 0's colour
+/// (BT.709 1/1/1, 8 bits), else PQ's (9/16/9, 10 bits) with HD-5's blobs.
+pub fn vp9_layout(fps: [u32; 2], sdr: bool) -> Value {
+    let colour = if sdr {
+        json!({"matrix": 1, "range": 1, "transfer": 1, "primaries": 1, "bits_per_channel": 8})
+    } else {
+        json!({"matrix": 9, "range": 1, "transfer": 16, "primaries": 9, "bits_per_channel": 10,
+               "mdcv_hex": MDCV, "clli_hex": CLLI})
+    };
+    json!({"codec_id": "V_VP9", "width": 640, "height": 360, "fps": fps, "colour": colour})
+}
+
+/// Writes 60 VP9 frames at 30 fps (keys at 0 and 30) with 100 Opus packets:
+/// Profile 0 SDR when `sdr`, else Profile 2 PQ.
+pub fn write_vp9(path: &Path, sdr: bool) {
+    let layout = json!({"duration_ns": 2 * SECOND, "video": vp9_layout([30, 1], sdr),
+                        "audio": audio_layout()});
+    let w = Webm::open(path, &layout).expect("open");
+    let profile = if sdr { 0 } else { 2 };
+    for k in 0..60 {
+        let key = k % 30 == 0;
+        w.add(V, frame_ns(k, 30, 1), key, 0, &vp9_frame(k, profile, key))
+            .expect("video");
+    }
+    for k in 0..100 {
+        w.add(A, k as i64 * 20_000_000, true, 0, &opus(k))
+            .expect("audio");
+    }
+    w.end(V).expect("end video");
+    w.end(A).expect("end audio");
+    w.finish().expect("finish");
+}

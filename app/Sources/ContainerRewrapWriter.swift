@@ -194,6 +194,11 @@ enum ContainerRewrapWriter {
         if v.transfer == hlgTransfer {
             extensions.merge(hlgLabels(v)) { _, label in label }
         }
+        // Spec §11 CX-16 (10): an SDR copy carries the colour its source states, so an SD
+        // picture is not read through the matrix AVFoundation guesses from its size.
+        if v.transfer != pqTransfer, v.transfer != hlgTransfer {
+            extensions.merge(sdrLabels(v)) { _, label in label }
+        }
         var format: CMFormatDescription?
         let status = CMVideoFormatDescriptionCreate(
             allocator: nil, codecType: ContainerRewrap.fourCharCode(v.fourcc ?? ""),
@@ -257,6 +262,40 @@ enum ContainerRewrapWriter {
         }
         return labels
     }
+
+    /// An SDR copy's labels (spec §11 CX-16 (10)), each field on its own: the Colour's
+    /// BT.709, BT.601 or BT.2020 matrix and primaries and its BT.709-class or sRGB transfer,
+    /// as Core Video names them; else, for the matrix, a VP9 keyframe's `color_space`
+    /// (`streamMatrix`). Nothing for a code outside those sets or one Core Video does not name.
+    private static func sdrLabels(_ v: ContainerDescription.Video) -> [String: Any] {
+        var labels: [String: Any] = [:]
+        let matrix = v.matrix.flatMap { sdrMatrices.contains($0) ? $0 : nil } ?? v.streamMatrix
+        if let code = matrix, sdrMatrices.contains(code),
+            let name = CVYCbCrMatrixGetStringForIntegerCodePoint(Int32(code))
+        {
+            labels[kCMFormatDescriptionExtension_YCbCrMatrix as String] =
+                name.takeUnretainedValue() as String
+        }
+        if let code = v.primaries, sdrPrimaries.contains(code),
+            let name = CVColorPrimariesGetStringForIntegerCodePoint(Int32(code))
+        {
+            labels[kCMFormatDescriptionExtension_ColorPrimaries as String] =
+                name.takeUnretainedValue() as String
+        }
+        if let code = v.transfer, sdrTransfers.contains(code),
+            let name = CVTransferFunctionGetStringForIntegerCodePoint(Int32(code))
+        {
+            labels[kCMFormatDescriptionExtension_TransferFunction as String] =
+                name.takeUnretainedValue() as String
+        }
+        return labels
+    }
+
+    /// ISO/IEC 23091-2's BT.709, BT.601 (two codes) and BT.2020 matrix and primaries codes,
+    /// and the BT.709-class and sRGB transfer codes (spec §11 CX-16 (10)).
+    private static let sdrMatrices: Set<Int> = [1, 5, 6, 9]
+    private static let sdrPrimaries: Set<Int> = [1, 5, 6, 9]
+    private static let sdrTransfers: Set<Int> = [1, 6, 13, 14, 15]
 
     private static func audioFormat(
         _ a: ContainerDescription.Audio, _ failed: (String) -> ContainerRewrapError

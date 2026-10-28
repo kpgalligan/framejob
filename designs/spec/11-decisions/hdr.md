@@ -166,6 +166,8 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     **Amended by CX-14** (codec-export C2): `av1` (10-bit) is a fourth HDR row beside the three
     10-bit rows above, writing HLG by default, `pq` or `sdr` as asked.
     **Amended by CX-15** (codec-export C3): `av1_webm` is a fifth, as `av1` is.
+    **Amended by CX-16** (codec-export C4): `vp9_webm` is a sixth, 10-bit Profile 2 at `hlg`
+    and `pq` and 8-bit Profile 0 at `sdr`.
   - **Refusals**, each in its own sentence: `hlg` or `pq` on an 8-bit row, and `hlg` or `pq` in
     an SDR project. Until H-3 lands, H-2 refuses every row but the three 10-bit ones in an HLG
     project, so a merged phase never writes HLG pixels labelled BT.709.
@@ -478,6 +480,9 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     **Amended by CX-15** (codec-export C3): `av1_webm` joins them too, so five rows carry
     `"hdr"`, and the sentence reads `… as hevc_10bit, av1, av1_webm, prores_422 or
     prores_4444`.
+    **Amended by CX-16** (codec-export C4): `vp9_webm` joins them too, so six rows carry
+    `"hdr"`, and the sentence reads `… as hevc_10bit, av1, av1_webm, vp9_webm, prores_422 or
+    prores_4444`.
   - **(d) PQ:** HLG display light at 1,000 cd/m² → ST 2084, so nothing exceeds 1,000 cd/m².
     HD-5's metadata is written as two blobs: the mastering display (ST 2086 in SEI 137's order:
     P3's G, B, R, D65, max 1,000 and min 0.005 cd/m² in 0.0001) `33c2 86c4 1d4c 0bb8 84d0 3e80
@@ -712,6 +717,10 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     description: `TransferFunction` SMPTE ST 2084, and `ColorPrimaries` and `YCbCrMatrix` from
     `CVColorPrimariesGetStringForIntegerCodePoint` and `CVYCbCrMatrixGetStringForIntegerCodePoint`
     when the Colour names them and Core Video maps the code. No other copy's description changes.
+    **Amended by CX-16** (codec-export C4, (10)): an SDR copy (its Colour's transfer neither 16
+    nor 18) is labelled too, from its Colour's BT.709, BT.601 or BT.2020 matrix and primaries
+    and BT.709-class or sRGB transfer, else a VP9 track's keyframe `color_space` for the
+    matrix; with neither its description is unchanged.
   - **(c) AV1.** The description's two extensions first (HD-12's route 1); else the stream (AV1
     §5.3, §5.8; AV1-ISOBMFF §2.3): the `av1C`'s configOBUs (bytes 4 on, when byte 0 is 0x81, the
     marker and version 1; else none), then the first sample with data. Every OBU is walked: the
@@ -792,6 +801,8 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     phase's untouched Release build, 2026-10-21): the copy was misread, its grey row as far
     as 158.27 10-bit levels from GR-15's HLG arm in an SDR project and 213.67 from the
     identity in an HLG project, so the label is written. Amends HD-18 (b).
+    **Amended by CX-16** (codec-export C4, (10)): "no other copy's description changes" no
+    longer holds for an SDR copy, which carries the labels its source states.
   - **(c) The chroma key on an HDR source, #312**, the owner's choice of 2026-10-20 ("Key means
     SDR colour (Recommended)", the designer's option (b)). In an HLG project, the key's distance
     reads the working colour, saturated, against the stored key, through:

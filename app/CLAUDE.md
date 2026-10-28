@@ -317,7 +317,8 @@ detail there.
   `AVAssetWriter` into `Rewrapped/` under `FFmpegRewrap.destination(for:)`'s
   digest name, the movie's timescale the least common multiple of 600 and
   the tracks' timescales (`ContainerRewrapWriter.movieTimeScale`, spec §11
-  #232), the free space is checked first, #216's codecs are refused
+  #232), an SDR copy labelled from its Colour element or else a VP9 keyframe's
+  `stream_matrix` (`ContainerRewrapWriter.sdrLabels`, spec §11 CX-16 (10)), the free space is checked first, #216's codecs are refused
   before the copy, and a codec the copy does not carry (`.unsupported`) alone
   falls through to the opt-in ffmpeg step. `RewrapProgress.swift` +
   `RewrapProgressWindowController.swift`: a click door's copy reports to a
@@ -1677,9 +1678,14 @@ the key map behind it.
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
-  `ExportAV1Encoder.swift` · `ExportI010.swift` (+ `Resources/Shaders/ExportI010.metal`) ·
+  `ExportAV1Encoder.swift` · `ExportVideoEncoder.swift` (the `ExportVideoEncoder` protocol,
+  `ExportEncodedPacket`, `ExportRateTable`, spec §11 CX-16) · `ExportVP9Encoder.swift`
+  (`VP9Encoder`, libvpx through `app/Bridging/FrameJobVPX.h`'s two `static inline` shims for
+  the `vpx_codec_enc_init` macro and the variadic control) · `ExportI010.swift` (+
+  `Resources/Shaders/ExportI010.metal`; 10-bit I010, or 8-bit I420 for `vp9_webm`'s SDR picture) ·
   `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
-  `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` ·
+  `ExportAV1Track.swift` · `ExportEncodePump.swift` (picks SVT-AV1 or libvpx by the settings'
+  `writer`) · `ExportSheetSpeed.swift` ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
   the WebM writer) · `ExportWebMWriter.swift` · `ExportWebMLayout.swift` ·
   `ExportOpusEncoder.swift` · `ExportWebMDevFault.swift` (`-RCDevWebMFault`, and

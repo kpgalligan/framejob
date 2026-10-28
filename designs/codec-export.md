@@ -1490,3 +1490,241 @@ one CX-15 row.
 re-import, the HDR rendering. Filed at integration: the one unreproduced hang above (#379), and G-17's starvation on
 `ExportWriter`'s shared reader, with the per-output-reader fix (#378). The re-review's nit
 on E40: no row shows the app's gap fill or head cut; the probe's A1–A5 rows are its proof. C4–C6.
+
+## C4 — VP9 in WebM, 8-bit and Profile 2 HDR
+
+### Record
+
+**Built 2026-10-28** in `~/devel/framejob-codecs` (branch `codecs`, on C3's `e759112`), not yet
+committed or merged.
+
+**Decision first.** CX-16 in `designs/spec/11-decisions/codec-export.md` before any code:
+- (1) the `vp9_webm` row after `av1_webm`: `writer` `libvpx`, no `encoder_speeds`, an HDR row, even-sized, `optimize_for_network` inert;
+- (2) one speed (CX-3 binds), so the sheet's Speed popup is disabled on it — the brief's "Speed popup mapped to cpu-used" is not built;
+- (3) the depth by picture: `sdr` Profile 0 8-bit I420 BT.709, `hlg`/`pq` Profile 2 10-bit I010 BT.2020, with `g_profile` set as `validate_config` demands;
+- (4) the WebM `Colour` as the only transfer label;
+- (5) no CodecPrivate;
+- (6) keys and packets;
+- (7) capped CQ;
+- (8) the calibration, filled in after the run;
+- (9) the C wrappers;
+- (10) the SDR rewrap labels, added by RULING-1 below.
+
+"Amended by CX-16" lines sit under CX-8, CX-15, HD-5, HD-14 (c), HD-18 (b) and HD-19 (b), and the index has the matching rows.
+
+**What landed.**
+- **Core** (no format bump, no new `rc_*`):
+  - `export_encoder.rs`: `Writer::Libvpx` and `Writer::takes_speed`.
+  - `export_table.rs` (582 lines): the row (`PRESETS: [Preset; 14]`). `takes_encoder_speed` is `writer.is_some_and(takes_speed)`, and `to_json` gives `encoder_speeds` only where speeds apply.
+  - `export.rs`: `writer` on every writer row, `encoder_speed` on the AV1 rows alone.
+  - `dynamic_range.rs`: six `HDR_ROWS`, and the 8-bit sentence names `vp9_webm`.
+  - `webm_layout.rs` (222): `codec_private_hex` optional, plus the four new refusals.
+  - `webm_ebml.rs` (401): `video_entry(codec_id, Option<private>, …)`.
+  - `container_codec.rs`'s `vpcc` answers the keyframe's matrix; `container.rs` publishes it as `describe`'s `stream_matrix` (RULING-1).
+  - The header: the presets, settings, webm and container paragraphs.
+- **Core tests:** `export_vp9.rs` (6) and `webm_writer_vp9.rs` (5, including the stream matrix per colour space); VP9 headers and layouts in `common/webm.rs`. Updated: `webm_writer_refusals.rs`, `export.rs`, `export_av1.rs`, `export_size.rs`, `dynamic_range.rs` and `canvas_output.rs`.
+- **Swift:**
+  - `app/Bridging/FrameJobVPX.h`, the two wrappers.
+  - `ExportVideoEncoder.swift`: the protocol, `ExportEncodedPacket` and `ExportRateTable`, which SVT's `crf` now goes through with the same values (P1).
+  - `ExportVP9Encoder.swift` (238 lines).
+  - `ExportEncodePump`: the encoder chosen by `writer`, `webmCodec`, an optional `formatDescription`.
+  - `ExportI010`: `bitDepth` and the `framejob_export_i420` kernel.
+  - `ExportAV1Picture.cicp` and `ExportWebMLayout.VideoCodec`.
+  - The WebM writer's guard; the MP4 sink's optional format.
+  - `ExportPreset.writer` and `Applies.softCap`; `codecFactor` takes `vp9`.
+  - The catalog's preset, size, `video_bitrate`, `dynamic_range` and `encoder_speed` descriptions.
+  - `ContainerRewrap.Video.streamMatrix` and `ContainerRewrapWriter.sdrLabels` (RULING-1).
+- **Documents:**
+  - Spec §7.1, §7.4, §7.7, §7.8, §7.9a and §7.10, and the spec index.
+  - The guide's export, HDR, MCP and projects-and-media pages, and the README.
+  - `docs/manual-checks.md`: SE-19, and HDR-2's and HDR-8's VP9 lines.
+  - `tools/proof/README.md`'s C4 section.
+- **Proofs:**
+  - `vp9_export_proof.py` (Z1, V1–V11, S1, P1, R1–R3, ten mutants) and `vp9_rate_probe.swift`.
+  - `export_offset_proof.py` E41, E42.
+  - `hdr_proof.py` H7s and its mutant `sdr-copy-unlabelled`.
+  - The sentence constants in `av1_export_proof.py` (H5), `hdr_proof.py` (DR) and `hevc_alpha_proof.py` (`B6_SIZE`).
+  - `av1_export_proof.py`'s `av1-not-hdr` re-anchored onto the six-row `HDR_ROWS`.
+
+**RULING-1 (the orchestrator, 2026-10-28): V10's STOP, option (a).**
+- **The finding.** V10 re-imported Frame Job's own 640 × 360 SDR `vp9_webm` and read R/G/B 11.83 / 0.78 / 5.65 of 255 from the source project's render: cyan (0, 255, 255) came back (23, 255, 255).
+- **The cause.** That is BT.709 decoded as BT.601. The copy's description carried no colour (HD-18 (b): "no other copy's description changes"), so AVFoundation chose the matrix by the picture's size. The same round trip at 1280 × 720 read 0.53 / 0.16 / 0.30.
+- **The ruling.** Fix the import in this phase, decision first. That is CX-16 (10): an SDR copy carries the colour its source states.
+  - From its Colour: matrix and primaries 1, 5, 6 or 9, and transfer 1, 6, 13, 14 or 15, as Core Video names them.
+  - Else, for the matrix, a VP9 keyframe's `color_space`: CS_BT_709 → 1, CS_BT_601 and CS_SMPTE_170 → 6, CS_BT_2020 → 9.
+  - With neither, nothing.
+  - The PQ and HLG rules are unchanged.
+- **After the fix.** V10 reads 1.90 / 0.55 / 0.96 (Debug). `hdr_proof.py` H7s on Debug, with two 640 × 360 `smptebars` VP9 WebMs:
+  - the BT.709-tagged copy is labelled, and renders 1.06 / 0.86 / 1.35 from ffmpeg's BT.709 decode (4.41 / 12.80 / 3.44 from the BT.601 one);
+  - the untagged copy is unlabelled and renders 0.96 / 0.81 / 1.39 from BT.601, as before.
+  - Its mutant `sdr-copy-unlabelled` exits 0 (`MUTANT PASS`, H7s alone failed: the tagged render 3.86 / 13.08 / 2.79 from BT.709). `vp9_export_proof.py`'s mutant of the same name catches V10 alone.
+- **Re-runs on Debug** (the ruling asked for them):
+  - `container_import_proof.py` 16/16 and `codec_import_proof.py` 10/10. Their VP9 fixtures (ffmpeg's `testsrc2` through libvpx-vp9) state no colour (ffprobe: unknown ×3), so their copies are unchanged.
+  - `hdr_proof.py` H7, H7d, H7p, H7o, H7r, H7w, H7h, H7s and Z1 ok.
+  - **H7i FAIL on an instrument precondition, not on this change.** Its byte half compares with a control capture (`work/t3-1/ctl/h7-pq_plain.png`) that exists on neither this worktree nor main. Its oracle half held: both files 1 level from the oracle. Its fixtures are MOVs, which the rewrap does not touch.
+- **A finding, not pinned.** H7w's two SDR WebMs (`sdr_webm_cll`, `sdr_webm_plain`, BT.709 ×3, 1024 × 128, 10-bit) are now labelled, where they were not. H7w compares them only with each other, and still passes.
+- **A note on the copy's colour fields.** The copy's ffprobe fields read BT.709 even without the label, from the `vpcC` record and the bitstream, so H7s's field check alone cannot see the label. Its render check does.
+
+**The calibration** (CX-16 (8) has every figure):
+- **Method.** VMAF pairs frames by index. The first owner run paired by timestamp and read 76.17 at CQ 30 / Low; re-scored by index, about 91.
+- **(a) Spike half.** Cells 34 / 30 / 26 / 24 / 16; the largest cap share was 1.143 ×.
+- **(b) Owner, 8-bit.** Cells 34 / 26 / 20 / 18 / 14. The owner's clip binds every cell, and every kept file is 0.79–0.95 × the cap.
+- **(c) Owner, 10-bit** (HLG at `hlg`, against `hevc_10bit`). Cells 34 / 28 / 26 / 24 / 20, every kept file 0.75–0.86 × the cap. Format default was lowered to 24 after Release R3 (below).
+- **No cell missed its comparator**, so there was no product STOP.
+- **The table** is 8-bit 34 / 26 / 20 / 18 / 14 and 10-bit 34 / 28 / 24 / 24 / 20.
+- **The guide** says about 1.15 × the cap.
+
+**Commands run and what they printed.**
+- **Targeted, core:**
+  - `cargo test --release` over `export_vp9`, `webm_writer_vp9`, `webm_writer`, `webm_writer_refusals`, `export`, `export_av1`, `export_size`, `dynamic_range` and `canvas_output` passed: canvas_output 7, dynamic_range 7, export 38, export_av1 11, export_size 20, export_vp9 6, webm_writer 8, webm_writer_refusals 4, webm_writer_vp9 4.
+  - After RULING-1, `webm_writer_vp9` 5, `container` 11, `container_timing` 15 and `webm_writer` 8 passed.
+  - `cargo fmt --check` and `make lint` were clean.
+- **Targeted, Swift:** `make typecheck` exited 0 with the four baseline warnings after each Swift step. `make app-debug` succeeded each time.
+- **`vp9_export_proof.py` on Debug:**
+  - The first run scored 12/14: V10 failed (the STOP) and P1 failed (placeholder table).
+  - After RULING-1 it scored 13/14 (V10 1.90 / 0.55 / 0.96; P1 still the placeholder).
+  - `--probe` read 1/1 after the table was filled and again after R3's change.
+- **Mutants (Debug copies):**
+  - Each of the ten exited 1 with `MUTANT CAUGHT` on exactly its rows:
+    - `vp9-not-hdr`: V8, V9 and cargo `dynamic_range`.
+    - `hdr-at-8-bits`: V8.
+    - `sdr-at-10-bits`: V1 and V8.
+    - `transfer-unlabelled`: V8.
+    - `no-hdr10-in-webm`: V8.
+    - `kf-interval-default`: V3.
+    - `full-range-8bit`: V4.
+    - `speed-on-vp9`: V7, S1 and cargo `export_vp9`.
+    - `sdr-copy-unlabelled`: V10.
+    - `all-key`: V3 and V10. Its first run was `CAUGHT, NOT EXACTLY`, because V10 failed too (R/G/B ≈ 125, the copy's every sample a sync sample). V10 was added to its rows and the re-run exited 1.
+  - `av1_export_proof.py --mutant av1-not-hdr`, re-anchored, exited 1 with `MUTANT CAUGHT` on H1, H2, H4, S3 and cargo `dynamic_range`.
+  - `hdr_proof.py --only H7s,Z1 --mutant sdr-copy-unlabelled` printed `MUTANT PASS`.
+- **Offset rows on Debug:** `export_offset_proof.py --only E38,E39,E41,E42` scored 4/4. E41 and E42 read median −0.043 ms, every flash on its frame.
+- **`make gate`:**
+  - First run: names 1 s, typecheck 12 s, fmt 3 s, lint 15 s, test 290 s, app 190 s, `gate: PASS 511s`.
+  - After R3's change: test 123 s, app 108 s, fmt and lint skipped, `gate: PASS 238s`.
+- **Release:**
+  - `vp9_export_proof.py --rate`, first run: 16/17. R3 failed: `hevc_10bit` 95.692 against `vp9_webm` at CQ 26 95.679. The cell went to 24.
+  - Second run: **17/17**.
+    - R1 (Format default): `hevc` 95.469, `vp9_webm` 95.498 at 0.938 × the cap.
+    - R2 (High): 95.777 against 95.882 at 0.948 ×.
+    - R3 (HLG): `hevc_10bit` 95.692 against 95.958 at 0.893 ×.
+    - V10: 1.89 / 0.54 / 0.93.
+  - `webm_export_proof.py` 29/29; `av1_export_proof.py` 19/19.
+  - `export_offset_proof.py --only E36,…,E42` on a Release instance: 7/7, its log free of `Frame Job: `.
+  - `hdr_proof.py --only DR,Z1` 2/2; `hevc_alpha_proof.py` 43/43.
+
+**Findings.**
+- **libvmaf pairs frames by timestamp**, and a WebM's whole-millisecond block times put a third of a 30 fps clip against neighbours. Every VMAF of a WebM here pairs by index. AV1's R rows are MP4 and unaffected.
+- **VideoToolbox's comparator moves run to run.** `hevc` at Format default read 95.338 in one Release run and 95.469 in the next; `hevc_10bit` in the HLG project read 95.620 in the calibration and 95.692 at R3. C2 saw the same. A cell kept by a few hundredths can fail its R row. 8-bit Format default (+0.029) and Medium (+0.016) are thin, and R1 passed against both readings.
+- **A copy marks sync samples by the container's key flag.** A WebM whose every block is flagged key previews garbage at a seek (`all-key`'s V10), which is why the key flag must be libvpx's.
+- **SD SDR WebM imports** (RULING-1, above).
+
+**CLAUDE.md edits owed** (the integrator's):
+- **Root `CLAUDE.md`:**
+  - The file map's `ExportI010.metal` line becomes "the bundled encoders' 64RGBAHalf → planar 10-bit I010 (or, for `vp9_webm`'s SDR picture, 8-bit I420) conversion".
+  - Architecture's WebM sentence reads "the WebM file an `av1_webm` or `vp9_webm` export writes".
+- **`core/CLAUDE.md`:**
+  - `export_encoder.rs`: `Writer::Libvpx` and `takes_speed`.
+  - The `webm_*` entry: `V_VP9` with no CodecPrivate and BitsPerChannel 8 or 10.
+  - `dynamic_range.rs`: "the six HDR rows", `vp9_webm` among them.
+  - `container_codec.rs`/`container.rs`: `vpcc`'s stream matrix and `describe`'s `stream_matrix`.
+- **`app/CLAUDE.md`:**
+  - New entries for `ExportVideoEncoder.swift` (the protocol, `ExportEncodedPacket`, `ExportRateTable`), `ExportVP9Encoder.swift` and `app/Bridging/FrameJobVPX.h`.
+  - `ExportI010` converts to 8-bit I420 too.
+  - `ExportEncodePump` picks SVT-AV1 or libvpx by `writer`.
+  - `ContainerRewrapWriter`'s entry gains the SDR labels (CX-16 (10)).
+
+**Owed.**
+- **Manual checks:** SE-19 (`vp9_webm` in Chrome, Firefox and Safari, 8-bit and HLG; re-import on another Apple silicon Mac) and HDR-8's VP9 half.
+- **Still to come:** C5 (VP9 alpha) and C6.
+
+### Fix pass 1 (2026-10-28): the rebase onto main and the review's nits
+
+**The rebase.** The review passed with four nits. C4 then became one commit on `codecs`, rebased
+onto main `d0f9fe0`, which brought:
+- `ef3414f`, the release items (PUB-10..PUB-12, `published_check` P22–P25, the codecs cache);
+- `d0f9fe0`, #378: `ExportWriter` reads through one `AVAssetReader` per output, and a block
+  queued behind `encodePump.run(…)` on the video queue cancels the `av1` row's video reader.
+
+The code merged with no conflict. C4's one line in `ExporterWriter.swift` is
+`ExportEncodePump.writer` → `av1Writer`. The two changes meet in the AV1-in-MP4 path: #378's
+F4 row drives an `av1` export through the encode pump, which C4 put behind
+`ExportVideoEncoder`.
+
+**The nits, all fixed (the owner's rule).**
+1. `ExportRateTable.value` on an empty table is now `preconditionFailure`, never 0, since 0 asks
+   for the largest file. No table is empty, and P1 still reads every value.
+2. `VP9Encoder.send`'s bit-depth guard sets `broken` and refuses in its own sentence: "The VP9
+   encoder was opened for N-bit pictures and was sent a M-bit one." The old text said "libvpx
+   failed" although libvpx was never called.
+3. `ContainerRewrapWriter` has a `sdrPrimaries` set beside `sdrMatrices`, with the same codes
+   1, 5, 6 and 9. The primaries are checked against it.
+4. **H7s now makes RULING-1's byte comparison.** The untagged SD WebM's copy is compared with a
+   copy a tree before CX-16 (10) made, `<control>/h7s-sdr_untagged_webm.mov`.
+   - The comparison is byte for byte except the `mvhd`, `tkhd` and `mdhd` wall-clock times,
+     which `AVAssetWriter` stamps (`video_configuration_proof.same_movie`).
+   - `hdr_proof.py capture DIR --only H7s,Z1 --app <app>` writes that file. In capture mode the
+     row scores only that the file was written.
+   - The control came from main `d0f9fe0`, archived (`git archive`) into an isolated scratch
+     folder and built there by its own `make app` (Release). The encoders' archives were cloned
+     in, because `tools/codecs` is identical at both commits. The control was captured into
+     `tools/proof/work/c4/h7s-ctl` and copied into the H7i control below.
+   - **A control on the old build:** H7s run against `d0f9fe0`'s app and its own copy. The
+     untagged half held: both copies were 3,544 bytes, 3 boxes masked, sha `adca300496aad871`,
+     so the masked copy is stable from run to run. The labelled half failed, as it must: 3.86 /
+     13.08 / 2.79 from the BT.709 decode, the mutant's figures.
+
+**H7i's control.** Main's `tools/proof/work/i378/hdr-ctl` was copied into this worktree with
+`cp -cR`.
+- It is a full `hdr_proof.py capture` from `e759112`'s build with SI added. Its `capture.json`
+  names `framejob-lane-b` and `debug`, the last capture's tree and configuration.
+- It holds `h7-pq_plain.png`, so H7i ran against it and passed.
+- The earlier H7i failure (no `work/t3-1/ctl` on this host) was the missing control and nothing
+  else.
+
+**Re-verification of the combined tree** (Release unless named; `make gate` first):
+- **`make gate`:** names 1 s, typecheck 6 s, fmt 3 s, lint 6 s, test 174 s, app 117 s,
+  `gate: PASS 308s`.
+- **`export_readers_proof.py`: 9/9.**
+  - C1, C2, R2, R3 and Z1 passed.
+  - F1 and F2 `failed` 0.04 s and 0.06 s after the fault.
+  - F3 `cancelled` 2.98 s after the cancel.
+  - **F4**, the `av1` row through `ExportEncodePump` behind `ExportVideoEncoder`, `cancelled`
+    3.00 s after the cancel.
+  - Every F row: readers `video 4, audio 4`, and no file.
+- **`av1_export_proof.py`: 19/19.**
+- **`vp9_export_proof.py --rate`: 17/17.** It was run with `--rate` because this pass changed
+  `ExportRateTable` and `VP9Encoder`.
+  - R1: `hevc` 95.469, `vp9_webm` 95.498 at 0.938 × the cap.
+  - R2: 95.777 and 95.882 at 0.948 ×.
+  - R3: `hevc_10bit` 95.692, `vp9_webm` 95.958 at 0.893 ×.
+  - V10: 1.888 / 0.540 / 0.925.
+  - V6: cancelled 0.33 s after `cancel_export`.
+- **`webm_export_proof.py`: 29/29.**
+- **`export_offset_proof.py --only E36,…,E42`** on its own Release instance: 7/7, and the log
+  had no `Frame Job: ` line.
+  - E36 and E37 read −0.000 ms.
+  - E38–E40 read −0.043 / −0.043 / −0.042 ms.
+  - E41 and E42 (`vp9_webm`) read −0.043 ms.
+- **`hdr_proof.py compare tools/proof/work/i378/hdr-ctl`, the whole proof: 79/79.**
+  - H1 matched `hdr-ctl`'s renders byte for byte, its WebM scene included.
+  - H7i was byte-equal to the control's `pq_plain`.
+  - H7s: the labelled copy read 1.06 / 0.86 / 1.35 from BT.709. The untagged copy was
+    masked-equal to `d0f9fe0`'s, sha `adca300496aad871`.
+- **`hevc_alpha_proof.py`: 43/43.**
+- **`export_gain_proof.py --against tools/proof/work/i378/gain-before`: not run.** Main's
+  checkout has no `gain-before`; its `work/i378/` holds only `hdr-ctl`.
+
+**Mutants** (Debug copies).
+- Every anchor in `av1_export_proof.py`, `vp9_export_proof.py`, `hdr_proof.py`,
+  `hevc_alpha_proof.py`, `webm_export_proof.py`, `export_readers_proof.py` and
+  `export_offset_proof.py` occurs exactly once in the merged tree. That includes the three
+  `export_readers_proof.py` anchors in the merged `ExporterWriter.swift`.
+- Only one anchor moved in the rebase: `av1_export_proof.py`'s `brand-unpatched`, in the
+  `ExporterWriter.swift` that #378 rewrote.
+- `av1_export_proof.py --mutant brand-unpatched`: exit 1, `MUTANT CAUGHT` on A2 alone.
+- `export_readers_proof.py --mutant encode-cancel-dropped`, the path where #378 and C4 meet:
+  exit 1, `MUTANT CAUGHT` on F4 alone (readers `video 1, audio 4`).
+- `hdr_proof.py --only H7s,Z1 --mutant sdr-copy-unlabelled --control
+  tools/proof/work/i378/hdr-ctl`, re-run because H7s's instrument changed: `MUTANT PASS`, H7s
+  alone failed (3.86 / 13.08 / 2.79), and its untagged half still equal.

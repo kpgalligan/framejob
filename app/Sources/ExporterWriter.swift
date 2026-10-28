@@ -206,7 +206,7 @@ final class ExportWriter {
         videoReader!.add(output)
 
         // An encoder row's packets go in as they are (`ExportEncodePump`).
-        let pump = settings.writer == ExportEncodePump.writer
+        let pump = settings.writer == ExportEncodePump.av1Writer
             ? try ExportEncodePump(settings: settings, canvas: canvas, range: range) : nil
         let input = try pump.map {
             AVAssetWriterInput(

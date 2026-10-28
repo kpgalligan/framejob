@@ -1,5 +1,5 @@
 //! Black-box tests for the WebM writer's edges — spec §11 CX-15 (codec-export
-//! C3), through `rc_webm_*`: a video-only layout (the silent movie) writes each
+//! C3) and CX-16 (C4's V_VP9), through `rc_webm_*`: a video-only layout (the silent movie) writes each
 //! packet as it arrives and refuses the audio track as unknown; every layout and
 //! packet refusal by its sentence, with no file made for a refused layout; and two
 //! threads adding at once, as the app's video and audio queues do. The round trips
@@ -59,9 +59,22 @@ fn every_layout_refusal_is_its_sentence() {
         "the layout has no video and no audio track".into(),
     ));
     cases.push((
-        with("codec_id", json!("V_VP9")),
-        "video codec_id \"V_VP9\" is not V_AV1".into(),
+        with("codec_id", json!("V_HEVC")),
+        "video codec_id \"V_HEVC\" is not V_AV1 or V_VP9".into(),
     ));
+    cases.push((
+        with("codec_id", json!("V_VP9")),
+        "a V_VP9 track takes no codec_private_hex".into(),
+    ));
+    let mut l = full_layout();
+    l["video"]
+        .as_object_mut()
+        .unwrap()
+        .remove("codec_private_hex");
+    cases.push((l, "the V_AV1 codec_private_hex is empty".into()));
+    let mut l = full_layout();
+    l["video"]["colour"]["bits_per_channel"] = json!(12);
+    cases.push((l, "colour bits_per_channel 12 is not 8 or 10".into()));
     cases.push((
         with("codec_private_hex", json!("")),
         "the V_AV1 codec_private_hex is empty".into(),

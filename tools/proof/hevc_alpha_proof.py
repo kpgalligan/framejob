@@ -448,7 +448,8 @@ EXTENSION = {"h264": "mp4", "hevc": "mp4", "hevc_alpha": "mov", "prores_422": "m
              "prores_4444": "mov", "gif": "gif", "apng": "png"}
 A6_PHRASE = "written one pixel smaller on that edge"
 # precision PR3 (spec §11 PR-3): the list gained `hevc_10bit`, the new even-sized row.
-B6_SIZE = ["h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm and prores_422 need even dimensions",
+B6_SIZE = ["h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm and prores_422 need "
+           "even dimensions",
            "letterboxed if the shape differs by more than a pixel (within a pixel the "
            "picture fills the frame instead)",
            "except on prores_4444 and hevc_alpha"]

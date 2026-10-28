@@ -78,7 +78,9 @@ extension AgentServer {
                 + "12); h264, hevc and hevc_alpha are 8-bit. av1 is AV1 in an MP4 with AAC "
                 + "and av1_webm the same AV1 in a WebM with Opus, both 10-bit, encoded by "
                 + "the bundled SVT-AV1 at encoder_speed; Macs before M3 cannot play them "
-                + "back. Pass a wrong one once and the error lists them all.",
+                + "back. vp9_webm is VP9 in a WebM with Opus from the bundled libvpx, at "
+                + "one speed: 8-bit (Profile 0) for an SDR picture, 10-bit (Profile 2) for "
+                + "HLG and PQ. Pass a wrong one once and the error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
             "type": ["string", "array"],
@@ -100,8 +102,8 @@ extension AgentServer {
                 + "canvas is refused rather than written, because the padding destroys the "
                 + "alpha channel those rows are chosen for; every row id is already the "
                 + "document's own shape, so this only bites on a [width, height] of another "
-                + "shape. h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm and prores_422 "
-                + "need even dimensions: an odd width or height — the document size on a canvas "
+                + "shape. h264, hevc, hevc_alpha, hevc_10bit, av1, av1_webm, vp9_webm and "
+                + "prores_422 need even dimensions: an odd width or height — the document size on a canvas "
                 + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
                 + "on that edge, and the width and height reported back are the file's. "
                 + "The shape is judged on that even frame: a [width, height] in the canvas's "
@@ -252,8 +254,8 @@ extension AgentServer {
                     + "same exporter the sheet uses, so an agent export and a menu export "
                     + "cannot disagree. An existing file at the path is replaced, and the "
                     + "container's extension is added when the path has none. In an HLG "
-                    + "project (set_canvas output) hevc_10bit, av1, av1_webm, prores_422 "
-                    + "and prores_4444 write HLG unless dynamic_range says pq or sdr, and every "
+                    + "project (set_canvas output) hevc_10bit, av1, av1_webm, vp9_webm, "
+                    + "prores_422 and prores_4444 write HLG unless dynamic_range says pq or sdr, and every "
                     + "other video preset writes the project's SDR version. What the finished "
                     + "file holds is export_status's done answer.",
                 [
@@ -281,7 +283,10 @@ extension AgentServer {
                             + "encodes at a constant quality matched to HEVC at this rate (HEVC's "
                             + "0.07 bits per pixel per frame when omitted), and the file usually "
                             + "stays under it; very detailed footage can go up to about 1.25 "
-                            + "times over.",
+                            + "times over. On vp9_webm it is a soft cap too: libvpx encodes at a "
+                            + "constant quality matched to HEVC at this rate (HEVC 10-bit's in an "
+                            + "HDR export), and the file usually stays under it; up to about "
+                            + "1.15 times it was measured.",
                     ],
                     "audio_bitrate": [
                         "type": "integer", "minimum": 1,
@@ -316,7 +321,7 @@ extension AgentServer {
                     "dynamic_range": [
                         "type": "string", "enum": ["hlg", "pq", "sdr"],
                         "description": "An HDR (HLG) project's picture on hevc_10bit, av1, "
-                            + "av1_webm, prores_422 and prores_4444 — the sheet's Dynamic "
+                            + "av1_webm, vp9_webm, prores_422 and prores_4444 — the sheet's Dynamic "
                             + "Range popup: hlg (the default; BT.2100 HLG, no Dolby Vision), pq (HDR10: "
                             + "BT.2100 PQ at 1,000 cd/m², mastering display P3-D65 0.005–1,000 "
                             + "cd/m², MaxCLL 1,000, MaxFALL 0) or sdr (the SDR version). Every "
@@ -330,7 +335,8 @@ extension AgentServer {
                             + "Speed popup: faster "
                             + "(SVT-AV1 preset 8), balanced (preset 6, the default) or smaller "
                             + "(preset 4, the smallest file for the picture and the slowest). "
-                            + "Refused on every other preset.",
+                            + "Refused on every other preset, vp9_webm included (libvpx has one "
+                            + "speed).",
                     ],
                 ], required: ["preset", "path"]),
             // Window ▸ Export Queue's row for the job (spec §11 #326).

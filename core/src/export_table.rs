@@ -129,11 +129,12 @@ pub(crate) struct Preset {
     /// it as an unknown image container and report a format this table
     /// advertises as unsupported. A name also means "the composition is
     /// read back through AVFoundation" (spec §11 CX-15), which is all it says
-    /// on `av1_webm`, whose file the core writes.
+    /// on `av1_webm` and `vp9_webm`, whose files the core writes.
     pub(crate) avf_preset: Option<&'static str>,
     /// The bundled encoder that writes the row's video, or `None` for
     /// AVFoundation's own encoders (ImageIO where `avf_preset` is null).
-    /// A row with a writer is a row that takes `encoder_speed`.
+    /// A row with a writer takes `encoder_speed` when its encoder has
+    /// speeds (`Writer::takes_speed`).
     pub(crate) writer: Option<Writer>,
 }
 
@@ -183,7 +184,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 13] = [
+const PRESETS: [Preset; 14] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -283,6 +284,21 @@ const PRESETS: [Preset; 13] = [
         fps: None,
         avf_preset: Some("AVAssetExportPresetPassthrough"),
         writer: Some(Writer::SvtAv1),
+    },
+    // VP9 in WebM (spec §11 CX-16): libvpx at its one speed (CX-3) into the
+    // same core-written WebM with Opus; Profile 0 8-bit for an SDR picture,
+    // Profile 2 10-bit for HLG and PQ, so an HDR row.
+    Preset {
+        id: "vp9_webm",
+        name: "VP9 (WebM)",
+        container: Container::Webm,
+        codec: "vp9",
+        video: true,
+        alpha: false,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+        writer: Some(Writer::Libvpx),
     },
     Preset {
         id: "prores_422",
@@ -499,10 +515,10 @@ impl Preset {
         self.avf_preset.is_some() && self.codec != "prores4444"
     }
 
-    /// True for a row a bundled encoder writes, the rows `encoder_speed`
-    /// applies to (spec §11 CX-12 (2)).
+    /// True for a row whose bundled encoder has speeds, the rows
+    /// `encoder_speed` applies to (spec §11 CX-12 (2), CX-16 (2)).
     pub(crate) fn takes_encoder_speed(&self) -> bool {
-        self.writer.is_some()
+        self.writer.is_some_and(Writer::takes_speed)
     }
 
     fn to_json(&self) -> Value {
@@ -538,8 +554,10 @@ impl Preset {
         }
         if let Some(writer) = self.writer {
             out.insert("writer".to_string(), Value::from(writer.as_str()));
-            let speeds = EncoderSpeed::ALL.iter().map(|s| Value::from(s.as_str()));
-            out.insert("encoder_speeds".to_string(), speeds.collect());
+            if writer.takes_speed() {
+                let speeds = EncoderSpeed::ALL.iter().map(|s| Value::from(s.as_str()));
+                out.insert("encoder_speeds".to_string(), speeds.collect());
+            }
         }
         Value::Object(out)
     }

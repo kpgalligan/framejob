@@ -155,6 +155,7 @@ macOS cannot play WebM or MKV directly, so Frame Job copies the video and sound 
 
 - There is no question to answer. A copy that takes more than a second shows a small **Copying Movie** window with its progress, and **Cancel** stops it and adds nothing.
 - Before copying, Frame Job checks the disk has room. If it does not: "Not enough free space to open *file*: its video and sound need about *size* on "*volume*", which has *size* free. Nothing was copied."
+- The copy keeps the colour the file states: HLG, HDR10 (PQ), or a BT.709, BT.601 or BT.2020 SDR picture, read from the file's colour information or, for VP9, from the video itself. A file that states none is shown as macOS reads it.
 - Importing the same file again reuses the copy.
 - The media keeps the original's name, and its tooltip on the Media tab says where the copy lives.
 - If the copy is later deleted, or moved to the Trash, the project makes it again from the original the next time it opens. If that copy is cancelled or fails, the file shows as missing (a slate, the **missing** badge, Relink…) until the next open tries again.

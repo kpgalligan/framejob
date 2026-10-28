@@ -474,7 +474,7 @@ extension ExportSheetController {
             if applies.videoBitrate {
                 let rate = tier.videoBitsPerSecond(
                     width: format.width, height: format.height, fps: format.fps, codec: codec)
-                let soft = applies.encoderSpeed ? "usually ≤ " : ""   // spec §11 CX-13
+                let soft = applies.softCap ? "usually ≤ " : ""   // spec §11 CX-13
                 item.title = "\(tier.name) · \(soft)\(Self.rateText(rate))"
             } else if applies.audioBitrate {
                 item.title = "\(tier.name) · \(Self.rateText(tier.audioBitsPerSecond))"

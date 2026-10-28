@@ -80,7 +80,7 @@ Rows (`<ID> ok|FAIL — <detail>`, then `scores: n/m`; exit 0 iff all passed):
 * H5 — refused by sentence, no file left: `av1` `pq` in A1's SDR project
   (`dynamic_range "pq" needs an HLG project; set_canvas output "hlg" first`) and
   `h264` `hlg` in the HLG doc (`h264 is 8-bit and writes the SDR version; export
-  dynamic_range "hlg" as hevc_10bit, av1, av1_webm, prores_422 or prores_4444`).
+  dynamic_range "hlg" as hevc_10bit, av1, av1_webm, vp9_webm, prores_422 or prores_4444`).
 * S1 — an instance pinned with `screens.py`'s PINS, `-RCDevAppearance light`
   and `FrameJobExportChoice` `{"preset_id":"av1","encoder_speed":"smaller"}`:
   File ▸ Export… shows Format "AV1 (MP4)", the popup after "Speed:" reads
@@ -184,7 +184,7 @@ MASTERING = {"red_x": 0.680, "red_y": 0.320, "green_x": 0.265, "green_y": 0.690,
              "white_point_y": 0.3290}
 REFUSED_SDR = "dynamic_range \"pq\" needs an HLG project; set_canvas output \"hlg\" first"
 REFUSED_8BIT = ("h264 is 8-bit and writes the SDR version; export dynamic_range \"hlg\" as "
-                "hevc_10bit, av1, av1_webm, prores_422 or prores_4444")
+                "hevc_10bit, av1, av1_webm, vp9_webm, prores_422 or prores_4444")
 
 ROWS = ["Z1", "A1", "A2", "A3a", "A3b", "A4", "A5", "A6", "A7", "A8", "A9", "H1", "H2", "H3",
         "H4", "H5", "S1", "S2", "S3"]
@@ -226,10 +226,8 @@ MUTANTS = {
          "        extensions.merge(picture.formatExtensions) { _, picture in picture }\n", "")]},
     "av1-not-hdr": {"rows": ["H1", "H2", "H4", "S3"], "cargo": "dynamic_range", "anchors": [
         ("core/src/dynamic_range.rs",
-         'pub(crate) const HDR_ROWS: [&str; 5] =\n'
-         '    ["hevc_10bit", "av1", "av1_webm", "prores_422", "prores_4444"];\n',
-         'pub(crate) const HDR_ROWS: [&str; 4] =\n'
-         '    ["hevc_10bit", "av1_webm", "prores_422", "prores_4444"];\n')]},
+         'pub(crate) const HDR_ROWS: [&str; 6] = [\n    "hevc_10bit",\n    "av1",\n',
+         'pub(crate) const HDR_ROWS: [&str; 5] = [\n    "hevc_10bit",\n')]},
     "matrix-709-in-hdr": {"rows": ["H4"], "anchors": [
         (f"{SOURCES}/ExportAV1Picture.swift",
          "        self == .sdr ? (0.2126, 0.0722) : (0.2627, 0.0593)\n",

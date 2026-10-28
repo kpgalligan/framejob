@@ -127,8 +127,10 @@ extension ExportSheetController {
             // the ratio between the two 1080p rungs of the same Apple
             // specification the tiers are calibrated against. AV1 takes
             // HEVC's factor (spec §11 CX-9 (2)): its efficiency goes to the
-            // picture, not the file size.
-            let codecFactor = QualityTier.isHEVC(codec) || codec.lowercased() == "av1" ? 0.6 : 1.0
+            // picture, not the file size. VP9 takes it too (CX-9 (2), CX-16 (7)).
+            let lower = codec.lowercased()
+            let codecFactor = QualityTier.isHEVC(codec) || lower == "av1" || lower == "vp9"
+                ? 0.6 : 1.0
             let bits = pixels * 30 * bitsPerPixel * rateFactor * codecFactor
             // To the nearest 100 kbps: these are estimates, and a request for
             // "7 963 200 bits" would claim a precision they do not have.
@@ -201,9 +203,13 @@ extension ExportSheetController {
         /// project's HDR picture (spec §11 HD-14 (h)).
         var dynamicRange: Bool { preset?.carriesHDR ?? false }
 
-        /// The Speed popup is live only on a row a bundled encoder writes
-        /// (spec §11 CX-12 (2)).
+        /// The Speed popup is live only on a row whose bundled encoder has
+        /// speeds (spec §11 CX-12 (2); not `vp9_webm`, CX-16 (2)).
         var encoderSpeed: Bool { !(preset?.encoderSpeeds.isEmpty ?? true) }
+
+        /// The video rate is a soft cap on every row a bundled encoder writes
+        /// (spec §11 CX-13, CX-16 (7)), whether or not it has speeds.
+        var softCap: Bool { preset?.writer != nil }
     }
 
     /// GIF and APNG. Spelled once, and taken from the container rather than

@@ -1,8 +1,8 @@
 import AVFoundation
 
-/// Where `ExportEncodePump`'s AV1 packets go, once the pump has stripped their temporal
-/// delimiters and put them in order (spec §11 CX-12, CX-15): the MP4 row's passthrough
-/// `AVAssetWriterInput`, or the WebM row's core writer. Both are called on the pump's encode
+/// Where `ExportEncodePump`'s packets go, once the pump has made them the container's bytes
+/// (AV1's temporal delimiters stripped) and put them in order (spec §11 CX-12, CX-15, CX-16):
+/// the MP4 row's passthrough `AVAssetWriterInput`, or the WebM rows' core writer. Both are called on the pump's encode
 /// queue alone, so a sink needs no lock of its own.
 protocol ExportPacketSink: AnyObject {
     /// Writes one packet presented at `time` for `duration`; `key` is a KEY_FRAME. nil once
@@ -23,9 +23,10 @@ struct ExportPacketSinkStopped: Error {}
 /// passthrough input, after waiting for it to take more; `finish` marks the input finished.
 final class ExportMP4PacketSink: ExportPacketSink {
     private let input: AVAssetWriterInput
-    private let format: CMVideoFormatDescription
+    /// The `av01` description; nil (never on the `av1` row) makes every packet unwritable.
+    private let format: CMVideoFormatDescription?
 
-    init(input: AVAssetWriterInput, format: CMVideoFormatDescription) {
+    init(input: AVAssetWriterInput, format: CMVideoFormatDescription?) {
         self.input = input
         self.format = format
     }
@@ -37,7 +38,7 @@ final class ExportMP4PacketSink: ExportPacketSink {
     func append(
         _ data: Data, at time: CMTime, duration: CMTime, key: Bool, isStopping: () -> Bool
     ) -> (any Error)? {
-        guard let sample = ExportAV1Track.sample(
+        guard let format, let sample = ExportAV1Track.sample(
             data, at: time, duration: duration, format: format)
         else {
             return Exporter.ExportError.failed("An AV1 packet could not be made a sample.")
@@ -57,8 +58,8 @@ final class ExportMP4PacketSink: ExportPacketSink {
     }
 }
 
-/// The `av1_webm` row's sink: each packet into the core's writer as the video track's block
-/// at its time in nanoseconds, the key flag from SVT (spec §11 CX-15 (3)). The core queues
+/// The WebM rows' sink: each packet into the core's writer as the video track's block at its
+/// time in nanoseconds, the key flag the encoder's (spec §11 CX-15 (3), CX-16 (6)). The core queues
 /// what the interleave holds back, so this never waits. `finish` ends the video track; a
 /// failure there is the writer's `finish`'s to report.
 final class ExportWebMPacketSink: ExportPacketSink {

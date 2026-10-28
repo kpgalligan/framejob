@@ -25301,3 +25301,53 @@ C3; `no-own-cancel` (the plain pump's own `cancelReading` gone) on F1–F4, read
 `video 1, audio 1` on F1–F3 and `video 4, audio 1` on F4; `encode-cancel-dropped` (the
 block that cancels the `av1` row's video reader gone) on F4 alone, readers
 `video 1, audio 4`.
+
+## Codec export C4 — VP9 in WebM (`vp9_export_proof.py` Z1, V1–V11, S1, P1, R1–R3; ten mutants; `export_offset_proof.py` E41, E42; `hdr_proof.py` H7s; spec §11 CX-16)
+
+The `vp9_webm` row: libvpx v1.17.0's VP9 (`VP9Encoder` behind `ExportVideoEncoder`, one speed)
+in the core's WebM with C3's Opus, chapters, range and silent movie; 8-bit Profile 0 for an
+SDR picture and 10-bit Profile 2 for HLG and PQ, the WebM `Colour` the only transfer label.
+
+```
+python3 tools/proof/vp9_export_proof.py [--app debug|release|PATH] [--rate]   # every row (R1–R3 with --rate)
+python3 tools/proof/vp9_export_proof.py --probe                               # P1 alone, no app
+python3 tools/proof/vp9_export_proof.py --mutant NAME                         # exit 1 caught, 0 survived, 3 inexact, 2 control
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E41,E42    # clicks and flashes through vp9_webm
+python3 tools/proof/hdr_proof.py --only H7s,Z1 [--mutant sdr-copy-unlabelled] # an SD SDR WebM copy's labels
+python3 tools/proof/hdr_proof.py capture DIR --only H7s,Z1 --app PRE_CX16.app  # H7s's control copy into DIR
+```
+
+**`vp9_export_proof.py`** imports `webm_export_proof.py`'s and `av1_export_proof.py`'s helpers
+and works under `work/vp9-export/`; its docstring has every row. In short: V1 the streams
+(`vp9` Profile 0 `yuv420p`, Opus) and the walk's `V_VP9` TrackEntry with no CodecPrivate and
+Colour 1/1/1/Range 1/8 bits; V2 a clean decode, 150 frames, 240,000 samples; V3 the key rule,
+each block's key flag against its first frame's VP9 header (show_existing 0, frame_type 0);
+V4 the SDR picture against `hevc` at 20 Mb/s as yuv420p (frames 0–149 and the stripes
+fixture's patches); V5 chapters and the range; V6 a cancel with no file; V7 `encoder_speed`
+refused; V8 HLG, PQ and SDR — Profile 2/2/0, the tags, `trace_headers`' `color_space`, the
+walk's Colour and PQ's HDR10; V9 the HDR pictures against `hevc_10bit` as yuv420p10le; V10
+Frame Job's re-import of V1's and V8's files, and V1's media rendered at 3 s against the
+source project's render (≤ 8/255 per channel); V11 the silent movie; S1 the sheet (Format "VP9
+(WebM)", the Speed popup drawn disabled, footnote "VP9 · WEBM"); P1 `vp9_rate_probe.swift`
+(no app): `SVTAV1Encoder.crf` and `VP9Encoder.cqLevel` against the tables, through the shared
+`ExportRateTable`; R1–R3 (`--rate`) the owner's clip, each `vp9_webm` file ≤ 1.30 × the cap
+with VMAF ≥ `hevc`'s (SDR, Format default and High) or `hevc_10bit`'s (HLG, Format default).
+**VMAF pairs frames by index** (`settb=1/30,setpts=N` on both inputs): a WebM's block times are
+whole milliseconds, and libvmaf's timestamp pairing put a third of the owner clip's frames
+against a neighbour's (measured in C4's calibration).
+
+The mutants (`--mutant`, a tree copy built as Debug, every row but P1 and R): `vp9-not-hdr`
+V8, V9 and cargo `dynamic_range`; `hdr-at-8-bits` V8; `sdr-at-10-bits` V1, V8;
+`transfer-unlabelled` (the HLG and PQ transfers 2 in the layout) V8; `no-hdr10-in-webm` V8;
+`all-key` V3, V10 (the copy's every sample a sync sample, so the 3 s render decodes an inter
+frame as a key); `kf-interval-default` V3; `full-range-8bit` V4; `speed-on-vp9` V7, S1 and
+cargo `export_vp9`; `sdr-copy-unlabelled` (the rewrap's SDR labels dropped, CX-16 (10)) V10.
+
+**`hdr_proof.py` H7s** (CX-16 (10), the ruling on C4's STOP): two 640 × 360 `smptebars` VP9
+WebMs by ffmpeg, one BT.709-tagged and one untagged; the tagged copy renders within 3/255 of
+ffmpeg's BT.709 decode, the untagged one's copy stays unlabelled and renders as AVFoundation's
+BT.601 reading at that size, and equals byte for byte, but the `mvhd`/`tkhd`/`mdhd`
+wall-clock times (`video_configuration_proof.same_movie`), the copy a tree before CX-16 (10)
+made of the same fixture: the control's `h7s-sdr_untagged_webm.mov`, which `capture DIR
+--only H7s,Z1 --app <a pre-CX-16 build>` writes (C4's came from main `d0f9fe0` built in an
+isolated folder). Its mutant `sdr-copy-unlabelled` fails H7s alone.

@@ -217,9 +217,12 @@ pub(crate) struct ColourOut {
     pub mastering: Option<Mastering>,
 }
 
-/// The video TrackEntry (number 1, UID 1).
+/// The video TrackEntry (number 1, UID 1): `codec_id` with its
+/// CodecPrivate when it has one (`V_AV1`'s `av1C`; `V_VP9` has none,
+/// spec §11 CX-16 (5)).
 pub(crate) fn video_entry(
-    private: &[u8],
+    codec_id: &str,
+    private: Option<&[u8]>,
     width: u32,
     height: u32,
     default_duration_ns: u64,
@@ -259,19 +262,19 @@ pub(crate) fn video_entry(
             master(COLOUR, &c),
         ],
     );
-    master(
-        TRACK_ENTRY,
-        &[
-            uint(TRACK_NUMBER, 1),
-            uint(TRACK_UID, 1),
-            uint(TRACK_TYPE, 1),
-            uint(FLAG_LACING, 0),
-            string(CODEC_ID, "V_AV1"),
-            binary(CODEC_PRIVATE, private),
-            uint(DEFAULT_DURATION, default_duration_ns),
-            video,
-        ],
-    )
+    let mut entry = vec![
+        uint(TRACK_NUMBER, 1),
+        uint(TRACK_UID, 1),
+        uint(TRACK_TYPE, 1),
+        uint(FLAG_LACING, 0),
+        string(CODEC_ID, codec_id),
+    ];
+    if let Some(private) = private {
+        entry.push(binary(CODEC_PRIVATE, private));
+    }
+    entry.push(uint(DEFAULT_DURATION, default_duration_ns));
+    entry.push(video);
+    master(TRACK_ENTRY, &entry)
 }
 
 /// OpusHead version 1 (RFC 7845 §5.1): 48 kHz input, gain 0, family 0.

@@ -17,19 +17,25 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     let height: Int?
     let audioOnly: Bool
     /// Whether the row carries an HLG project's HDR picture (`"hdr"`, spec §11
-    /// HD-14 (c), CX-14): the four HDR rows (`hevc_10bit`, `av1`, `prores_422`,
-    /// `prores_4444`), which offer the Dynamic Range popup.
+    /// HD-14 (c), CX-14, CX-16): the six HDR rows (`hevc_10bit`, `av1`,
+    /// `av1_webm`, `vp9_webm`, `prores_422`, `prores_4444`), which offer the
+    /// Dynamic Range popup.
     let carriesHDR: Bool
     /// The bundled encoder's speeds the row takes (`encoder_speeds`, spec §11
-    /// CX-12 (2)): `av1`'s three, which offer the Speed popup; empty elsewhere.
+    /// CX-12 (2)): the AV1 rows' three, which offer the Speed popup; empty
+    /// elsewhere, `vp9_webm` included (CX-16 (2)).
     let encoderSpeeds: [EncoderSpeed]
+    /// The bundled encoder that writes the row's video (`writer`, spec §11
+    /// CX-12 (1), CX-16): "svt_av1" or "libvpx"; nil on every row AVFoundation
+    /// encodes. A row with one has a soft-cap rate (CX-13).
+    let writer: String?
 
     /// The core spells the size as one `size: [w, h] | null` and audio-only
     /// as `video: false` (`export.rs`), so the size and the audio flag are
     /// read from those rather than from `width` / `height` / `audio_only`,
     /// which it never emits.
     private enum CodingKeys: String, CodingKey {
-        case id, name, container, codec, size, video, hdr, encoderSpeeds
+        case id, name, container, codec, size, video, hdr, encoderSpeeds, writer
     }
 
     init(from decoder: Decoder) throws {
@@ -45,6 +51,7 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
         carriesHDR = c.lenient(.hdr, false)
         let speeds: [String] = c.lenient(.encoderSpeeds, [])
         encoderSpeeds = speeds.compactMap(EncoderSpeed.init(rawValue:))
+        writer = c.lenient(.writer)
     }
 }
 
@@ -110,9 +117,10 @@ struct ExportSettings: Decodable, Equatable {
     /// nil — today's tags — for every SDR project and every audio row, whose
     /// settings carry no key.
     let color: String?
-    /// The bundled encoder that writes the video (`writer`, "svt_av1", spec
-    /// §11 CX-12) and its speed (`encoder_speed`); nil on every row
-    /// AVFoundation encodes, whose settings carry neither key.
+    /// The bundled encoder that writes the video (`writer`, "svt_av1" or
+    /// "libvpx", spec §11 CX-12, CX-16) and its speed (`encoder_speed`, on
+    /// the AV1 rows alone); nil on every row AVFoundation encodes, whose
+    /// settings carry neither key.
     let writer: String?
     let encoderSpeed: EncoderSpeed?
 

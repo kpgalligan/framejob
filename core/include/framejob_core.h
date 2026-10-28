@@ -453,7 +453,10 @@ char *rc_normalise_color(const char *text);
    (spec 11 HD-14). `av1_webm` (spec 11 CX-15) is the same encoding in a
    WebM the core writes (`rc_webm_*`), with Opus sound: it carries the same
    `writer`, `encoder_speeds` and `hdr`, and its passthrough `avf_preset`
-   records that the composition is read back through AVFoundation. */
+   records that the composition is read back through AVFoundation.
+   `vp9_webm` (spec 11 CX-16) is VP9 from bundled libvpx in that WebM, 8-bit
+   for an SDR picture and 10-bit for HLG and PQ: it carries `hdr` and
+   `writer` ("libvpx") and no `encoder_speeds`, libvpx having one speed. */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this
@@ -540,9 +543,10 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * writes: "hlg", "pq" or "sdr" (spec 11 HD-14); an SDR project's and an
  * audio row's never do.
  *
- * A row a bundled encoder writes (`av1`, `av1_webm`, spec 11 CX-12) adds two
- * keys at the end, and no other row's settings carry either: `writer` ("svt_av1")
- * and `encoder_speed` (the speed asked, else "balanced"). */
+ * A row a bundled encoder writes (`av1`, `av1_webm`, `vp9_webm`, spec 11
+ * CX-12, CX-16) adds `writer` at the end ("svt_av1" or "libvpx"), and the two
+ * AV1 rows then `encoder_speed` (the speed asked, else "balanced"); no other
+ * row's settings carry either key, and `vp9_webm`'s carry no speed. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 
@@ -651,7 +655,8 @@ size_t rc_graphic_image_cache(size_t limit_bytes);
  *      "encoded":bool,"width","height","atom":"vpcC"|"av1C"|"avcC"|"hvcC"|null,
  *      "atom_hex","vp9_profile":int|null,"nominal_fps":f64|null,"timescale",
  *      "grid":bool,"samples","bytes","mdcv_hex":null|48 hex,"clli_hex":null|8 hex,
- *      "transfer":int|null,"primaries":int|null,"matrix":int|null},
+ *      "transfer":int|null,"primaries":int|null,"matrix":int|null,
+ *      "stream_matrix":int|null},
  *    "audio":null|{"codec_id","fourcc":"opus"|"vorb"|"aac "|null,"encoded":bool,
  *      "sample_rate","channels","cookie_hex","frames_per_packet":0|1024,
  *      "timescale","samples","bytes"}}
@@ -669,7 +674,10 @@ size_t rc_graphic_image_cache(size_t limit_bytes);
  * the white point as u16 in 0.00002, then the maximum and minimum luminance
  * as u32 in 0.0001 cd/m², big-endian), `clli_hex` its MaxCLL and MaxFALL as
  * the 4-byte ContentLightLevelInfo, each null when the file has none (spec
- * §11 HD-18 (a)). A sample's times are in its track's `timescale`; samples
+ * §11 HD-18 (a)). `stream_matrix` is a VP9 track's first keyframe's
+ * color_space as a matrix code — 1 for BT.709, 6 for BT.601 and SMPTE 170M,
+ * 9 for BT.2020 — and null for any other space, CS_UNKNOWN among them, and for
+ * every other codec (spec §11 CX-16 (10)). A sample's times are in its track's `timescale`; samples
  * come in decode order. */
 #define RC_CONTAINER_VIDEO 0
 #define RC_CONTAINER_AUDIO 1
@@ -831,15 +839,16 @@ int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
 
 /* ------------------------------------------------------------------ webm */
 
-/* The WebM writer (spec 11 CX-6, CX-15) through `core/src/ffi_webm.rs`: one
- * file of AV1 video and Opus sound, written from compressed packets the app
- * hands in as opaque bytes; nothing here encodes. `layout_json` fixes the
- * file at open (serde, unknown keys refused):
+/* The WebM writer (spec 11 CX-6, CX-15, CX-16) through `core/src/ffi_webm.rs`:
+ * one file of AV1 or VP9 video and Opus sound, written from compressed
+ * packets the app hands in as opaque bytes; nothing here encodes.
+ * `layout_json` fixes the file at open (serde, unknown keys refused):
  *   {"duration_ns": u64,
- *    "video": {"codec_id": "V_AV1", "codec_private_hex": the av1C record,
+ *    "video": {"codec_id": "V_AV1" | "V_VP9",
+ *              "codec_private_hex": the av1C record on V_AV1, absent on V_VP9,
  *              "width": u32, "height": u32, "fps": [num, den],
  *              "colour": {"matrix", "range", "transfer", "primaries",
- *                         "bits_per_channel", "mdcv_hex"?: 24 bytes,
+ *                         "bits_per_channel": 8|10, "mdcv_hex"?: 24 bytes,
  *                         "clli_hex"?: 4 bytes}}?,
  *    "audio": {"codec_id": "A_OPUS", "channels": 1|2, "sample_rate": 48000,
  *              "pre_skip": u16}?,
@@ -862,7 +871,8 @@ typedef struct RcWebm RcWebm; /* add/end/finish may run on several threads at on
 
 /* Creates the file at `path` and writes its header. NULL with a lowercase
  * sentence through `err_out` naming the value for: no video and no audio,
- * another codec_id, an empty V_AV1 private, malformed hex, an mdcv that is
+ * another codec_id, an empty or absent V_AV1 private, any V_VP9 private,
+ * malformed hex, bits_per_channel other than 8 or 10, an mdcv that is
  * not 24 bytes or a clli that is not 4, a 0 size or an fps with a 0 term, a
  * sample_rate other than 48000, channels outside 1-2, a chapter that ends at
  * or before its start or starts at or past duration_ns, unreadable JSON, or

@@ -24,7 +24,10 @@ pub struct WebmLayout {
 #[serde(deny_unknown_fields)]
 pub struct VideoLayout {
     pub codec_id: String,
-    pub codec_private_hex: String,
+    /// The `av1C` record on `V_AV1`; absent on `V_VP9`, whose mapping
+    /// makes CodecPrivate optional (spec §11 CX-16 (5)).
+    #[serde(default)]
+    pub codec_private_hex: Option<String>,
     pub width: u32,
     pub height: u32,
     pub fps: [u32; 2],
@@ -78,13 +81,19 @@ fn unhex(field: &str, text: &str) -> Result<Vec<u8>, String> {
 
 /// The video TrackEntry, every value checked first.
 fn video_entry(v: &VideoLayout) -> Result<Vec<u8>, String> {
-    if v.codec_id != "V_AV1" {
-        return Err(format!("video codec_id \"{}\" is not V_AV1", v.codec_id));
-    }
-    let private = unhex("codec_private_hex", &v.codec_private_hex)?;
-    if private.is_empty() {
-        return Err("the V_AV1 codec_private_hex is empty".to_string());
-    }
+    let private = match (v.codec_id.as_str(), &v.codec_private_hex) {
+        ("V_AV1", Some(text)) => {
+            let private = unhex("codec_private_hex", text)?;
+            if private.is_empty() {
+                return Err("the V_AV1 codec_private_hex is empty".to_string());
+            }
+            Some(private)
+        }
+        ("V_AV1", None) => return Err("the V_AV1 codec_private_hex is empty".to_string()),
+        ("V_VP9", None) => None,
+        ("V_VP9", Some(_)) => return Err("a V_VP9 track takes no codec_private_hex".to_string()),
+        (other, _) => return Err(format!("video codec_id \"{other}\" is not V_AV1 or V_VP9")),
+    };
     if v.width == 0 || v.height == 0 {
         return Err(format!(
             "the video size {} × {} has a side of 0",
@@ -96,6 +105,12 @@ fn video_entry(v: &VideoLayout) -> Result<Vec<u8>, String> {
         return Err(format!("the video fps [{num}, {den}] is not a rate"));
     }
     let c = &v.colour;
+    if c.bits_per_channel != 8 && c.bits_per_channel != 10 {
+        return Err(format!(
+            "colour bits_per_channel {} is not 8 or 10",
+            c.bits_per_channel
+        ));
+    }
     let mastering = match &c.mdcv_hex {
         Some(text) => {
             let b = unhex("mdcv_hex", text)?;
@@ -124,7 +139,12 @@ fn video_entry(v: &VideoLayout) -> Result<Vec<u8>, String> {
     // round(1e9 · den / num) ns, in integers.
     let frame_ns = (1_000_000_000 * u64::from(den) + u64::from(num) / 2) / u64::from(num);
     Ok(ebml::video_entry(
-        &private, v.width, v.height, frame_ns, &colour,
+        &v.codec_id,
+        private.as_deref(),
+        v.width,
+        v.height,
+        frame_ns,
+        &colour,
     ))
 }
 

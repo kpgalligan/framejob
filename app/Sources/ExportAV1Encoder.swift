@@ -15,16 +15,12 @@ import Foundation
 /// SDR picture, BT.2020 with HLG or PQ for the HDR ones. On PQ alone, HD-5's fixed mastering
 /// display and content light level, which SVT writes as metadata OBUs on each KEY_FRAME
 /// (CX-14 (5)).
-final class SVTAV1Encoder {
-    /// One packet as SVT answered it: its bytes (temporal delimiters still in), the `pts` the
-    /// picture was sent with, whether it is the last, and whether it is a KEY_FRAME (the WebM
-    /// writer's key flag, spec §11 CX-15 (3)).
-    struct Packet {
-        let data: Data
-        let pts: Int64
-        let isLast: Bool
-        let isKey: Bool
-    }
+final class SVTAV1Encoder: ExportVideoEncoder {
+    /// A packet as SVT answered it (`ExportEncodedPacket`): its bytes with the temporal
+    /// delimiters still in (`containerBytes` strips them), the key flag a KEY_FRAME.
+    typealias Packet = ExportEncodedPacket
+
+    let name = "SVT-AV1"
 
     /// The sequence header OBU (`svt_av1_enc_stream_header`), the `av1C` record's source.
     let sequenceHeader: Data
@@ -120,6 +116,15 @@ final class SVTAV1Encoder {
         _ = svt_av1_enc_deinit_handle(handle)
     }
 
+    /// The packet with its temporal delimiters stripped by the core (spec §11 CX-12 (4)).
+    func containerBytes(_ data: Data) throws -> Data {
+        var data = data
+        guard ReelAV1.stripTemporalDelimiters(&data) else {
+            throw Exporter.ExportError.failed("SVT-AV1 wrote a packet the core could not read.")
+        }
+        return data
+    }
+
     /// Sends one picture; SVT copies its planes, so `frame` may be reused once this returns.
     /// SVT reads a 10-bit plane as `uint16_t` from the byte pointer it is given, its stride in
     /// samples (`enc_handle.c`, `copy_frame_buffer`), so each plane starts two bytes per sample
@@ -190,17 +195,11 @@ final class SVTAV1Encoder {
     ]
 
     /// The CRF for `speed` at a cap of `bitsPerPixel`: linear between the calibrated points,
-    /// rounded down, and the end point's beyond either end.
+    /// rounded down, and the end point's beyond either end (`ExportRateTable`).
     static func crf(speed: EncoderSpeed, bitsPerPixel: Double) -> UInt32 {
-        let points = calibration.map { ($0.bitsPerPixel, $0.crf[speed] ?? 32) }
-        guard let first = points.first, let last = points.last else { return 32 }
-        if !(bitsPerPixel > first.0) { return UInt32(first.1) }
-        if bitsPerPixel >= last.0 { return UInt32(last.1) }
-        for (low, high) in zip(points, points.dropFirst()) where bitsPerPixel < high.0 {
-            let share = (bitsPerPixel - low.0) / (high.0 - low.0)
-            return UInt32((low.1 + share * (high.1 - low.1)).rounded(.down))
-        }
-        return UInt32(last.1)
+        ExportRateTable.value(
+            at: bitsPerPixel,
+            points: calibration.map { (bitsPerPixel: $0.bitsPerPixel, value: $0.crf[speed] ?? 32) })
     }
 
     // MARK: - Errors and the log
