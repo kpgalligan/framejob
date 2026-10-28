@@ -25351,3 +25351,60 @@ wall-clock times (`video_configuration_proof.same_movie`), the copy a tree befor
 made of the same fixture: the control's `h7s-sdr_untagged_webm.mov`, which `capture DIR
 --only H7s,Z1 --app <a pre-CX-16 build>` writes (C4's came from main `d0f9fe0` built in an
 isolated folder). Its mutant `sdr-copy-unlabelled` fails H7s alone.
+
+## Codec export C6a — the Export Queue's memory limit and the sheet's estimate (`encoder_limit_proof.py` B0, P0, R1–R3, E1–E3, Q1–Q5, S1, S2, X1, Z1; twelve mutants; `encoder_memory_measure.py`; spec §11 CX-18)
+
+A queued `av1`, `av1_webm` or `vp9_webm` job starts only while every bundled-encoder export
+running in the app (the queue's and every Export… sheet's) fits, with it, in a quarter of
+physical memory, each costed by its resident peak measured at 1080p and 4K; a held job says
+why in its row and in `export_status`'s `waiting`. The sheet shows "Estimated time: about …"
+on those rows.
+
+```
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py   # the per-key measurement
+python3 tools/proof/encoder_limit_proof.py --probe                   # B0–Q5, no app
+python3 tools/proof/encoder_limit_proof.py [--app debug|release|PATH] # adds S1, S2, X1, Z1
+python3 tools/proof/encoder_limit_proof.py --mutant NAME             # exit 1 caught, 0 survived, 2 control
+```
+
+**`encoder_memory_measure.py`** launches one fresh instance per key and size (av1 and
+av1_webm at faster, balanced and smaller; vp9_webm in an SDR and an HLG project; h264 as the
+AVFoundation control; 1920 × 1080 and 3840 × 2160), places AV.mov twice (10 s, 300 frames),
+warms with one `render_frame`, reads the baseline `ps -o rss=`, then follows `export` to
+`done` while sampling the RSS every 0.1 s: delta = peak − baseline, seconds = the done
+answer's `elapsed`, the 1-minute load average at the start. It writes
+`work/encoder-memory/<date>/memory.json` and prints the table `ExportEncoderCosts.swift`'s two
+tables are transcribed from; the road map's "## C6a" records the run. A run that fails is a
+row with its error and the script exits 1; a baseline RSS that cannot be read fails its row
+rather than counting the whole peak as the delta.
+
+**`encoder_limit_proof.py`**'s probe rows run `encoder_limit_probe.swift`, built through
+`swift_build.build()` over `app/Sources` with `Blank.mp4`, `Fonts` and a `default.metallib` of
+`Compositor.metal` and `ExportI010.metal` beside it in `work/encoder-limit/probe/`. **It needs
+no instance:** its two live projects are built in the probe from AV.mov as
+`webm_readers_probe.swift` builds A1's — A1 (640 × 360, AV.mov under a two-second text clip)
+and W9 (1920 × 1080, AV.mov 24 times at scale 3) — rather than saved over MCP. The probe's
+answer is raw; every expected value is computed in the script from P0's dump of the tables.
+P0 the eight keys, each figure sourced; R1 the budget (physical / 4) and the identical jobs
+admitted per key at 1080p and 4K = max(1, ⌊budget / cost⌋) on 16–128 GiB; R2 an unmeasured
+writer row (`vp9_alpha_webm`) costs the whole budget and runs alone; R3 h264 books nothing;
+E1 the estimate per key at five sizes and three lengths; E2 `estimateText`'s steps; E3 none
+for h264, nor for `av1` at a rate that cannot be stepped (no frame count). Q1 the live shared queue and ledger with physical = 4 × the sheet job's cost: a
+headless Export… sheet writes W9 as `av1` Smaller while A (`av1`), B and C (`h264`) are
+enqueued — A held with the exact sentence, B then C passing it and finishing before the
+sheet, A launched only at the sheet's finish (each event stamped with a sequence number;
+the sheet's finish is read at every queue and ledger notification, so a launch inside the
+sheet's `end` reads after it); Q2 `export_status` for held A; Q3 at 1 TiB A runs beside a
+sheet; Q4 the row's status line for held A and waiting C, and the
+row's tooltip ending with A's whole sentence (the status label truncates its tail); Q5 the ledger empty after Q1, Q3,
+two `av1` jobs back to back, and the queue's and a sheet's synchronous refusal of an empty
+project (A1's `av1` settings over an empty handle; the core resolves none for an empty
+range). S1/S2 read File ▸ Export… on `av1_export_proof.sheet_reading`'s pinned instance (the
+summary label's second line; no "Estimated" on h264); X1 `export_status` right after
+`export`. Instances live under `work/encoder-limit/`.
+
+Mutants (each a copy of `app/Sources` with one anchor replaced; the probe rows alone):
+`no-hold` (R1, Q1), `strict-order` (Q1), `sheet-uncounted` (Q1), `no-wake` (Q1),
+`budget-half` (R1), `estimate-flat` (E1), `no-waiting-key` (Q2), `row-says-waiting` (Q4),
+`begin-late` (Q5), `token-overwrite` (Q5), `tip-drops-hold` (Q4), `estimate-no-count` (E3). A mutant is CAUGHT (exit 1) when every row it
+names fails; other rows failing beside them are reported, not scored.

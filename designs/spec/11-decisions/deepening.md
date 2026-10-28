@@ -1327,6 +1327,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   every proof that expected the file on return follows the job through
   `MCP.export_with` in `tools/proof/mcp.py`, which returns an older build's
   blocking answer as it is.
+  **Amended by CX-18** (codec-export C6a): `queued` adds `waiting`, the
+  held job's "Waiting for memory: …" sentence, while the memory limit holds
+  an `av1`, `av1_webm` or `vp9_webm` job, and `queued` and `running` add
+  `estimated_seconds` on those rows; `export`'s answer is unchanged.
 - **#336 — A composition audio track none of whose segments has a source
   (missing media, a pending reverse, a pending ramp render) holds bundled
   silence over [0, its last segment's end).** Measured at bb73b35

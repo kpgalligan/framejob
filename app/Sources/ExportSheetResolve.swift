@@ -502,6 +502,8 @@ extension ExportSheetController {
             // worth saying before the export rather than after it.
             text += " · \(settings.sequenceFrameCount ?? 0) frames, no audio"
         }
+        // A bundled encoder's estimate (spec §11 CX-18 (9)).
+        if let line = ExportEncoderCosts.sheetLine(for: settings) { text += "\n" + line }
         return text
     }
 

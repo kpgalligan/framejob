@@ -395,7 +395,9 @@ final class ExportSheetController: NSViewController {
                 + "at 00:00 with a burn-in reading 00:00:10:00, which is what a review "
                 + "copy wants. Add to Queue writes the same file without the wait — the "
                 + "job keeps this project as it is now and runs behind the editor, one at "
-                + "a time, in Window ▸ Export Queue.",
+                + "a time, in Window ▸ Export Queue; an AV1 or VP9 job there also waits "
+                + "while the app's other AV1 and VP9 exports would hold more than a quarter "
+                + "of this Mac's memory with it.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: exportButton, secondary: queueButton),

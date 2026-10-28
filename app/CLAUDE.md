@@ -2300,7 +2300,24 @@ free.
   `mediaURLs()` AND the document's compiled graphics (`Job.graphics`)
   captured at ENQUEUE. The agent's `export` enqueues here too (spec §11
   #326): its job shows in the window with its progress and Cancel, and
-  `export_status` / `cancel_export` read and cancel it by the job's id.
+  `export_status` / `cancel_export` read and cancel it by the job's id. A
+  bundled-encoder job waits while `ExportEncoderLedger` does not admit it
+  (spec §11 CX-18): `start()` launches the first waiting job the ledger
+  admits, passing over a held one, sets each held job's `message` to the
+  ledger's sentence, and re-runs on the ledger's notification; `launch`
+  books BEFORE `exporter.export` (an early refusal finishes inside it) and
+  `finished` takes its token, clears it, THEN ends it (the end's post can
+  launch and book the next job).
+- `ExportEncoderCosts.swift` · `ExportEncoderLedger.swift` — Foundation only
+  (spec §11 CX-18). Costs: `ExportEncoderKey` (row, AV1 speed, bit depth),
+  the measured resident peak (`memory`) and per-frame time (`time`) at 1080p
+  and 4K, each with its source, read at an export's pixels; the sheet's
+  estimate (`sheetLine`). Replacing a figure is a table edit (C6b owes the
+  time constants). Ledger: the app-wide main-thread account the queue and
+  every `ExportProgressSheetController` book into (the sheet in
+  `viewDidAppear` before `export`, ended in `finished` and `deinit`), its
+  budget a quarter of physical memory, the admission rule and the held
+  sentence; a writer row with no entry costs the whole budget.
 - `SettingsInfoButton.swift` — Settings' ⓘ: an image-only `NSButton` whose
   `NSPopover` shows a pane's explanation on hover (0.35 s) or press (SH-5),
   its `infoState` (closed/hover/held) deciding a press and its

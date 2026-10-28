@@ -525,3 +525,49 @@ orchestrator's default, which the owner can still change by a new entry here).
   than Profile 0; no player's HDR rendering was measured (CX-8); VMAF is not calibrated for
   HLG, so the 10-bit column's comparison is by the same instrument but not a perceptual
   claim; and the calibration covers four clips at 1080p.
+- **CX-18 — C6a: the Export Queue's memory limit on bundled-encoder jobs, and the sheet's time
+  estimate** (default, recorded in C6a before its code; amends #326's `queued` answer; the
+  chain of road map 2's 7e and #326 is not touched):
+  1. **The queue stays one job at a time** (#326, 7e): one `Exporter` on the main thread, a
+     fresh one per job, `ReverseSource.pin` at most one. The limit is not a pool size; it is
+     a hold on a queued job while OTHER bundled-encoder exports in the app already use the
+     memory it needs.
+  2. **The limit is app-wide over bundled-encoder exports** — every export whose settings
+     carry a `writer` (`svt_av1`, `libvpx`; `av1`, `av1_webm`, `vp9_webm`, and C5's alpha row
+     on arrival, since the rule keys on `writer` and not on a row id): the queue's running job
+     and every Export… progress sheet's. They are booked in one main-thread ledger
+     (`ExportEncoderLedger`) from just before the exporter starts to its finish.
+  3. **The budget is a quarter of physical memory** (`ProcessInfo.physicalMemory / 4`), the
+     share G-37 gives graphic rasters, so an export's two large consumers together stay within
+     half the Mac. Relative to physical RAM, never a fixed figure (the owner's standing rule).
+  4. **Each job costs its resident peak**, measured per key — preset, AV1 speed, bit depth
+     (10 on `svt_av1`, CX-14; on `libvpx` 10 for `hlg`/`pq`, else 8) — at 1920 × 1080 and
+     3840 × 2160 (`tools/proof/encoder_memory_measure.py`, the road map's "## C6a" record),
+     and scaled by the export's pixels: proportionally below 1080p, linearly through both
+     points above it, extrapolated past 4K. **A writer row with no measured cost costs the
+     whole budget**, so it runs alone and nothing joins it, until it is measured.
+  5. **A queued job is admitted** when nothing is booked, or when the booked costs and its own
+     fit the budget. Otherwise it waits, and its row and `export_status` say why, in one
+     sentence: "Waiting for memory: AV1 and VP9 exports running now hold about X GB of the
+     Y GB this Mac allows them, and this one needs about Z GB." A booking's end re-runs the
+     queue.
+  6. **An Export… sheet is counted but never held**: a person who chose Export… asked to
+     write now, and waiting behind a hidden queue job would contradict the sheet's own bar.
+  7. **A held job is passed over** by a later job the ledger admits — an AVFoundation job
+     always — so a waiting AV1 job does not stall an H.264 one behind it; among AVFoundation
+     jobs the chain's order is today's.
+  8. **`export_status`**: `queued` adds `waiting` (the held sentence, present only while
+     held); `queued` and `running` add `estimated_seconds` on a writer row. `export`'s answer
+     is unchanged.
+  9. **The estimate.** The export sheet's summary gains "Estimated time: about …" on a writer
+     row: setup seconds plus the range's frames times a per-frame time scaled by pixels as in
+     (4), from a per-key table whose every constant names its source. Rounded to 5 s under a
+     minute, whole minutes under an hour, then hours and minutes. The constants are
+     PROVISIONAL (one run each, on a shared machine) until C6b measures 4K on every row and
+     the idle three-run speeds, which replace them by a table edit. No estimate on an
+     AVFoundation row, in a queue row or in `export`'s answer, nor when the rate cannot be
+     stepped (no frame count: no estimate rather than one for 0 frames).
+  10. No format bump, no op, no `rc_*` export.
+  **Risks accepted:** the cost is a measured peak on one machine and one picture, not a
+  bound — a heavier timeline can exceed it; a sheet export can take the app past the budget
+  (6); the estimate is a single-run figure until C6b.

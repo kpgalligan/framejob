@@ -229,13 +229,24 @@ INSPECTOR_X = WIDTH - INSPECTOR_W                        # 1136
 LABEL_X0 = INSPECTOR_X + INSET                           # 1146
 CONTROL_X1 = INSPECTOR_X + INSPECTOR_W - INSET - SCROLLER_W
 
-# The band the shift is solved over: the Markers section, which is the only
-# thing BELOW Appearance in the Document tab (`DocumentPane.sections` is
-# Summary, Canvas, Frame Rate, Appearance, Markers). It starts below the
-# Appearance section's open body in both renders and ends well above the
-# timeline, so a shift cannot be measured against content that was pushed out
-# of the pane.
-BELOW_Y0 = 615
+# The band the shift is solved over: everything under the Appearance section's
+# Background row — its Timecode row and Fit checkbox, then the Markers section,
+# the only thing BELOW Appearance in the Document tab (`DocumentPane.sections`
+# is Summary, Canvas, Frame Rate, Appearance, Markers). It starts below the
+# Background swatch, which a background change redraws, in every render, and
+# ends well above the timeline, so a shift cannot be measured against content
+# that was redrawn or pushed out of the pane.
+#
+# Re-measured 2026-10-28 (codec-export C6a's fix pass), from this script's own
+# renders: the summary's Colour row (spec §11 HD-2) and the Canvas section's
+# Dynamic Range and Blending rows (HD-2, HD-16) moved Appearance down about
+# 95 pt, so the old band (615) lay across the Background swatch and the four
+# checks that read it failed on an unchanged tree. Markers alone is too short
+# now to clear SHIFT_MARGIN in the opaque control (its header's top is above
+# the band there: runner-up 23 rows), so the band takes in the two rows above
+# it, which the note pushes down exactly as far: at 660 the translucent
+# render's runner-up is 100 rows and the opaque control's 74.
+BELOW_Y0 = 660
 BELOW_H = 135
 # What "an exact shift" means: the winner must leave NO row of the band
 # unexplained, and the runner-up must be far worse — the half that says a
@@ -247,8 +258,10 @@ SHIFT_MARGIN = 40
 # "Black · 50%").
 SUMMARY_Y0, SUMMARY_H = 222, 22
 # Everything above this belongs to the sections ABOVE Appearance, which a note
-# inside Appearance must not move.
-ABOVE_Y1 = 500
+# inside Appearance must not move. It cuts through the Appearance header's
+# Reset button (584–606 pt since 2026-10-28; see BELOW_Y0), which is how the
+# Reset is recognised and excused below.
+ABOVE_Y1 = 595
 # A patch of the toolbar's Export button, which is an `AccentButton` filled
 # with `DS.accent` — the same ink `InspectorNoteLabel` draws its text in. No
 # colour is written down anywhere in this file: the note's ink is compared
@@ -2170,7 +2183,7 @@ def main():
                    CONTROL_X1 - LABEL_X0, SUMMARY_H)
     above = Rect("everything above the Appearance section", INSPECTOR_X, 0, INSPECTOR_W,
                  ABOVE_Y1)
-    band = Rect("the Markers section under Appearance", INSPECTOR_X, BELOW_Y0, INSPECTOR_W,
+    band = Rect("the rows under the Background row", INSPECTOR_X, BELOW_Y0, INSPECTOR_W,
                 BELOW_H)
 
     opaque_diff = inside(changed_pixels(black, images["doc-white"]), inspector, scale)

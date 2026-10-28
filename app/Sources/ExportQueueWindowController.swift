@@ -394,19 +394,24 @@ final class ExportQueueRowView: NSView {
 
     /// The full path and what the file will be — the row is narrow and the
     /// name alone cannot say which of two exports of one project this is —
-    /// then each graphic warning a completed job gave, one per line.
+    /// then the memory hold's whole sentence while a job waits on it (the status label
+    /// truncates its tail, so the row alone may cut it short; CX-18), then each graphic
+    /// warning a completed job gave, one per line.
     static func toolTip(for job: ExportQueueController.Job) -> String {
-        let tip =
+        var tip =
             job.destination.path + "\n"
             + "\(job.settings.container.uppercased()) · \(job.settings.width) × "
             + "\(job.settings.height) · \(job.settings.fps.displayName) fps"
+        if job.state == .waiting, let held = job.message { tip += "\n" + held }
         return Exporter.graphicWarningDetails(job.graphicWarnings).map { tip + "\n" + $0 } ?? tip
     }
 
-    private static func status(_ job: ExportQueueController.Job) -> String {
+    /// The row's status line; internal so a probe reads it (CX-18).
+    static func status(_ job: ExportQueueController.Job) -> String {
         switch job.state {
         case .waiting:
-            return "Waiting"
+            // The memory hold's sentence when the encoder ledger holds it (CX-18).
+            return job.message ?? "Waiting"
         case .running:
             // A message set mid-flight ("Stopping…") is the person's own
             // request and outranks the percentage they stopped watching.

@@ -118,9 +118,17 @@ budget; memory limits relative to physical RAM; person-only checks go in
   as BlockAdditional 1 with `AlphaMode`; G-35's straight alpha and the shape rule.
   **Acceptance and proof:** the libvpx decoder's alpha against the source's (the spike's PSNR
   method); manual-checks rows for Chrome and Firefox.
-- **C6 — 4K and memory.** 4K measured on every row; the export queue's limit on concurrent
-  encoder jobs, relative to physical RAM; the sheet's time estimate. **Acceptance and proof:**
-  the measurements recorded here, and the limit's rule in §11.
+- **C6a — the Export Queue's memory limit and the sheet's estimate (CX-18).** Each
+  bundled-encoder key's resident peak and wall time measured at 1080p and 4K
+  (`encoder_memory_measure.py`); an app-wide ledger of the running encoder exports (the
+  queue's and every Export… sheet's) admitting a queued job while the sum fits a quarter of
+  physical memory, a held job passed over and saying why in its row and `export_status`; the
+  sheet's "Estimated time: about …" from a per-key table. **Acceptance and proof:**
+  `encoder_limit_proof.py` (the rule over simulated RAM sizes, a live queue run, the estimate's
+  arithmetic) and its ten mutants; the measurements recorded here.
+- **C6b — 4K speed on every row and the final time constants.** 4K measured on every row, the
+  idle three-run speed figures on a quiet machine, and `ExportEncoderCosts.time`'s constants
+  replaced by them (a table edit). **Acceptance and proof:** the measurements recorded here.
 
 ## S — the spike
 
@@ -1728,3 +1736,211 @@ F4 row drives an `av1` export through the encode pump, which C4 put behind
 - `hdr_proof.py --only H7s,Z1 --mutant sdr-copy-unlabelled --control
   tools/proof/work/i378/hdr-ctl`, re-run because H7s's instrument changed: `MUTANT PASS`, H7s
   alone failed (3.86 / 13.08 / 2.79), and its untagged half still equal.
+
+## C6a — the Export Queue's memory limit and the sheet's estimate
+
+### Record
+
+**Decision.** CX-18, recorded before the code (`designs/spec/11-decisions/codec-export.md`;
+amends #326's `queued` answer). The queue stays one job at a time; a bundled-encoder export
+(settings with a `writer`) is booked in `ExportEncoderLedger` from just before its
+`Exporter.export` call to its finish — the queue's running job and every Export… progress
+sheet's; a queued encoder job is admitted when nothing is booked or the booked costs and its
+own fit a quarter of physical memory; a held job is passed over by a later admitted one and
+says why; a sheet is counted, never held; a writer row with no measured entry (C5's alpha row
+until it is measured) costs the whole budget. No format bump, op or `rc_*`.
+
+**What landed.**
+- `app/Sources/ExportEncoderCosts.swift` (new): `ExportEncoderKey` (row, AV1 speed, bit
+  depth), `ExportEncoderFigure` (1080p and 4K, proportional below 1080p, linear above),
+  `ExportTimeEntry`, the `memory` and `time` tables with their sources, `memoryBytes`,
+  `estimatedSeconds`, `estimateText` and `sheetLine`.
+- `app/Sources/ExportEncoderLedger.swift` (new): the shared main-thread ledger, its
+  notification, the budget (physical / 4), the admission rule, the held sentence, `begin`
+  and `end`.
+- `ExportQueueController.swift`: admission through the ledger with pass-over, each held
+  job's `message`, the ledger observer re-running `start()`, `begin` before
+  `exporter.export` in `launch`, and `finished` clearing its token before `end`.
+- `ExportProgressSheetController.swift`: `begin` in `viewDidAppear` before `export`; `end`
+  first in `finished` and in `deinit`, the token cleared first.
+- `ExportQueueWindowController.swift`: `ExportQueueRowView.status(_:)` internal, `.waiting`
+  reading `job.message ?? "Waiting"`.
+- `ExportSheetResolve.swift`: the summary's second line (two lines added; 581).
+- `ExportSheetController.swift`: the hint's queue sentence names the memory wait.
+- `AgentServer+ExportStatus.swift`: `queued` adds `waiting`; `queued` and `running` add
+  `estimated_seconds`. `AgentCatalog+Render.swift`: `export`'s and `export_status`'s text.
+- Spec §7.4, §7.8, §7.9a; the guide's export page; `app/CLAUDE.md`'s map;
+  `tools/proof/README.md`.
+
+**The measurement** (`RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py`,
+2026-10-28, Release built from the tree before any C6a code, Apple M2 Max, 96 GiB; one fresh
+instance per row; AV.mov twice, 10 s, 300 frames; Δ = peak − baseline RSS sampled every
+0.1 s; seconds the done answer's `elapsed`; load the 1-minute average at the export's start).
+**Taken on a shared machine**: the C5 lane (`~/devel/framejob-codecs`) was building and
+running proofs at the same time, which is why the load rose from about 9 in the first half
+to about 33 in the second. The JSON is `tools/proof/work/encoder-memory/2026-10-28/memory.json`
+(gitignored). Every instance log was free of `Frame Job: ` lines.
+
+| Key | Size | Δ RSS GiB | Δ bytes | Baseline GiB | Peak GiB | Seconds | s/frame | Load |
+|---|---|---|---|---|---|---|---|---|
+| av1 faster | 1920×1080 | 1.26 | 1,354,825,728 | 0.17 | 1.43 | 1.342 | 0.00447 | 10.47 |
+| av1 balanced | 1920×1080 | 2.02 | 2,172,993,536 | 0.17 | 2.19 | 2.088 | 0.00696 | 9.79 |
+| av1 smaller | 1920×1080 | 2.25 | 2,419,654,656 | 0.17 | 2.42 | 2.614 | 0.00871 | 9.72 |
+| av1_webm faster | 1920×1080 | 1.24 | 1,331,265,536 | 0.17 | 1.41 | 1.296 | 0.00432 | 9.03 |
+| av1_webm balanced | 1920×1080 | 2.01 | 2,158,755,840 | 0.17 | 2.18 | 2.038 | 0.00679 | 9.03 |
+| av1_webm smaller | 1920×1080 | 2.22 | 2,378,907,648 | 0.17 | 2.38 | 2.661 | 0.00887 | 10.14 |
+| vp9_webm SDR (8-bit) | 1920×1080 | 0.36 | 388,530,176 | 0.17 | 0.53 | 2.061 | 0.00687 | 10.21 |
+| vp9_webm HLG (10-bit) | 1920×1080 | 0.52 | 553,811,968 | 0.18 | 0.70 | 2.827 | 0.00942 | 10.52 |
+| h264 (control) | 1920×1080 | 0.07 | 72,925,184 | 0.17 | 0.23 | 1.145 | 0.00382 | 9.91 |
+| av1 faster | 3840×2160 | 4.60 | 4,941,070,336 | 0.17 | 4.77 | 3.621 | 0.01207 | 9.36 |
+| av1 balanced | 3840×2160 | 6.58 | 7,060,766,720 | 0.17 | 6.74 | 8.403 | 0.02801 | 8.77 |
+| av1 smaller | 3840×2160 | 7.87 | 8,450,867,200 | 0.17 | 8.04 | 8.043 | 0.02681 | 34.83 |
+| av1_webm faster | 3840×2160 | 4.43 | 4,758,519,808 | 0.17 | 4.60 | 3.795 | 0.01265 | 32.63 |
+| av1_webm balanced | 3840×2160 | 6.70 | 7,193,591,808 | 0.17 | 6.87 | 6.163 | 0.02054 | 33.14 |
+| av1_webm smaller | 3840×2160 | 7.66 | 8,229,683,200 | 0.17 | 7.83 | 7.792 | 0.02597 | 33.16 |
+| vp9_webm SDR (8-bit) | 3840×2160 | 1.05 | 1,130,774,528 | 0.17 | 1.22 | 5.533 | 0.01844 | 31.35 |
+| vp9_webm HLG (10-bit) | 3840×2160 | 1.58 | 1,694,040,064 | 0.23 | 1.81 | 9.078 | 0.03026 | 30.58 |
+| h264 (control) | 3840×2160 | 0.25 | 271,679,488 | 0.17 | 0.42 | 3.284 | 0.01095 | 26.72 |
+
+`ExportEncoderCosts.memory` is the Δ bytes column, transcribed exactly; `time`'s per-frame
+seconds are each row's `seconds / 300`, `setupSeconds` 0. What the figures are and are not:
+- The picture is AV.mov (640 × 360) scaled to the canvas, which is easy to encode: these
+  speeds are far above the spike's `real8` (SVT preset 6 at about 75 fps at 1080p, here
+  about 144 fps including the composition), and the per-frame time carries the
+  composition, the loudness pass and the container besides the encoder. The memory is the
+  encoder's lookahead and reference buffers at the size, which depend on the picture far
+  less, and the 1080p AV1 figures sit beside the spike's 1,149–1,567 MB maximum RSS.
+- One run each, the samples 13–81 per export (0.1 s apart); a peak between samples is
+  missed, so a figure can be low by a sample's worth of growth.
+- The 4K `smaller` rows were slower than `balanced` on `av1` (8.043 against 8.403 s) under
+  very different loads (34.8 against 8.8): the time figures are PROVISIONAL, and C6b owes
+  4K on every row and the idle three-run speeds that replace them.
+- What the limit means on real Macs: a quarter of 32 GiB (8 GiB) admits one AV1 job at 4K
+  at any speed, three at 1080p Balanced, and seven VP9 SDR jobs at 4K; on 16 GiB (4 GiB) one
+  AV1 4K job always runs alone (CX-18 (5)) and nothing joins it. Since the queue runs one
+  job at a time, the hold bites only beside Export… sheets.
+
+**The probe needs no instance.** The spec had the probe open packages the proof saved over
+MCP, so `--probe` would have needed an app; instead `encoder_limit_probe.swift` builds A1's
+and W9's projects in process from AV.mov, as `webm_readers_probe.swift` builds A1's, and
+`--probe` runs with no app at all. Q5's empty-project refusals use A1's `av1` settings over
+an empty handle, because the core resolves no settings for an empty range.
+
+**Proof** (2026-10-28, the same shared machine, load 30–100 from the C5 lane).
+- `make gate`: PASS on the second attempt. The first stopped at `test` on
+  `graphic/tests/path.rs`'s `a_path_over_the_memos_cost_bound_measures_the_same_twice` ("over
+  the 250 ms budget at frame 7") with a load average near 100. No graphic file changed; the
+  re-run passed `test` (155 s) and `app` (160 s), the earlier steps skipped as unchanged.
+- `RC_PROOF_APP=release python3 tools/proof/encoder_limit_proof.py`: **17/17**.
+  - Q1: the sheet (W9 as `av1` Smaller, 3,600 frames at 1080p) cost 2,419,654,656 bytes and
+    the budget was set equal to it. A (`av1` Balanced, A1, 241,443,726) was held: "Waiting
+    for memory: AV1 and VP9 exports running now hold about 2.3 GB of the 2.3 GB this Mac
+    allows them, and this one needs about 0.2 GB." B ran and finished at sequence 5–61 and C
+    at 62–136. The sheet finished at 137, A launched at 137 inside the sheet's `end`, and A
+    finished at 147.
+  - Q3, at 1 TiB: A was running at sequence 3 and the sheet finished at 13.
+  - Q5: the ledger was empty at all five points.
+  - S1 read "640 × 360 · 30 fps · 00:00:05:00\nEstimated time: about 5 s".
+  - X1's `estimated_seconds` was 0, as the table gives: 150 frames at 640 × 360 come to
+    about 0.12 s, and the sheet's floor is "about 5 s".
+- The same proof against Debug: 17/17. `--probe`: 13/13.
+- **Mutants** (`--mutant`, a probe over a copy of `app/Sources`): **10/10 caught**.
+
+  | Mutant | Rows failing |
+  |---|---|
+  | no-hold | R1, Q1, and Q2, Q4, R2 besides |
+  | strict-order | Q1, and Q4 |
+  | sheet-uncounted | Q1, and Q2, Q4 |
+  | no-wake | Q1 |
+  | budget-half | R1, and Q1, Q2, Q4, R2 |
+  | estimate-flat | E1, and R1, Q1, Q2, Q4 (the shared `value(pixels:)` moves the costs too) |
+  | no-waiting-key | Q2 |
+  | row-says-waiting | Q4 |
+  | begin-late | Q5 |
+  | token-overwrite | Q5 |
+
+- `phase7_chrome.py`: 75/79. That is the same as the unchanged tree at `546df3f`, run on
+  this machine the same day with C6a's changes stashed. Both runs fail the same four
+  Document-pane translucent-canvas render checks; the queue's sections pass in both.
+- `RC_PROOF_APP=release python3 tools/proof/export_status_proof.py`: 9/9.
+- No instance log carried a `Frame Job: ` line.
+
+**Owed (C6b).**
+- 4K on every row.
+- Idle three-run speed figures on a quiet machine.
+- `ExportEncoderCosts.time` replaced by them, with `setupSeconds` separated from the
+  per-frame time if the runs show one.
+
+**Owed (C5).** `vp9_alpha_webm` has no memory entry, so it costs the whole budget (R2). Its
+measured cost is one `memory` row (and one `time` row for an estimate) added through
+`encoder_memory_measure.py`'s `KEYS`.
+
+### Fix pass 1 (2026-10-28): the held sentence in the tooltip, the review's nits, two residues
+
+**The should-fix: the held sentence was unreadable.** The queue row's status label is one
+mono line that truncates its tail, so at the window's width the held sentence lost its GB
+figures, and the tooltip did not carry them either. `ExportQueueRowView.toolTip(for:)` now
+ends with `job.message` while the job waits, so the whole sentence is a hover away. The row
+stays one line: its height is fixed (52 pt) and a wrapped status label in its stack would
+need its own width solving, so wrapping was not taken. The guide's export page says what the
+window shows: one line, cut with "…" where it does not fit, and the whole sentence in the
+tooltip; spec §7.8 says the same.
+
+**The nits, all fixed (the owner's residue rule).**
+1. `ExportEncoderCosts.estimatedSeconds` answers nil when `sequenceFrameCount` is nil (a rate
+   that cannot be stepped), so the sheet shows no estimate line and `export_status` has no
+   `estimated_seconds`, where before it estimated 0 frames as "about 5 s" and 0. CX-18 (9)
+   and §7.8 say so.
+2. `encoder_memory_measure.py` fails a case whose baseline RSS cannot be read, instead of
+   recording the whole peak as its delta.
+3. `docs/manual-checks.md` SE-20: the sheet's estimate line on each AV1 and VP9 choice, and
+   a held queue row and its tooltip, in both appearances.
+
+**The proof.** Q4 also reads `toolTip(for:)`: A's ends with the whole sentence, and C's has
+no "Waiting for memory" line. E3 also takes `av1` at fps 0/1 (no frame count): no line, no
+seconds. Two mutants were added, one per new branch: `tip-drops-hold` (Q4) and
+`estimate-no-count` (E3).
+
+**Residue 1: `phase7_chrome.py`'s four Document-pane failures, fixed in the instrument.**
+Section 5 solves the translucent note's shift over a band written down in points. The
+summary's Colour row (HD-2) and the Canvas section's Dynamic Range and Blending rows (HD-2,
+HD-16) moved the Appearance section down about 95 pt, so the band (y 615) lay across the
+Background swatch, which a background change redraws. The opaque control's winning shift
+then left 35 rows unexplained. The note row was found at the Appearance header's Reset (y
+584) instead of under it, and read white ink. Every check that read the band failed, on
+main as on C6a. The constants were re-measured from the script's own renders: `ABOVE_Y1`
+500 → 595, which cuts through the Reset (584–606 pt), so the Reset is recognised and
+excused; `BELOW_Y0` 615 → 660, the rows under the Background row (Timecode, Fit, Markers).
+Markers alone is now too short to clear `SHIFT_MARGIN` in the opaque control: a band at 724
+gave a runner-up of 23 rows against the 40 required. At 660 the translucent render's
+runner-up is 100 rows and the control's 74. No app file changed for this.
+
+**Residue 2: `graphic/tests/path.rs`'s timing budget, made robust.** R2, R4 and R5 ran their
+render under the 250 ms preview budget as the engine's wall-clock call deadline. A load
+average near 100 stretched R4's wall time past it, and the engine interrupted the call ("over
+the 250 ms budget at frame 7"). That is a flaky gate, not a slow path. `timed` now runs the
+call under a 10 s deadline (`HANG_MS`, which only a hang trips) and asserts the calling
+thread's CPU time (`clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)`; the engine is
+`thread_local!`, so the render runs on that thread) under `BUDGET_MS`. It is still a real
+check. The claim is what the path costs to measure, and CPU time counts exactly that work
+while leaving out the time a busy host kept the thread off a core. On an idle host the two
+agree. At a load average of 94, R2 took 17.3 ms of CPU (17.8 wall) and R4 68.4 ms (68.5
+wall). A regression that made the memo re-measure, or made the measuring slower, still
+fails it at the same 250 ms.
+
+**Verification.**
+- `make typecheck`: 0 errors, exactly the four baseline warnings. The probe typecheck: ok.
+- `encoder_limit_proof.py --probe`: 13/13. Mutants `tip-drops-hold`, `estimate-no-count`
+  and `row-says-waiting` (Q4 widened): each CAUGHT, failing only the row it names. The
+  other nine mutants' anchors and rows were untouched and were not re-run: **12 mutants,
+  12 caught**.
+- `cd graphic && cargo test --release --test path`: 6/6 at a load average of 94.
+- `spec_index_proof.py`: 210/210 (§7.8 614 → 616, `codec-export.md` 572 → 573, the folder
+  14323 → 14324).
+- `phase7_chrome.py`: **79/79** (was 75/79). The opaque control's winner was 0 pt with 0
+  rows, runner-up 74; the translucent note was 22 pt with 0 of 270 rows, runner-up 100; the
+  note's ink was the accent (52, 120, 246); 0.99 → 22 pt, 0.999 → 0 pt.
+- `make gate`: PASS (test 171 s, app 187 s), at a load of about 70–95 from the C5 lane.
+- `RC_PROOF_APP=release python3 tools/proof/encoder_limit_proof.py`: 17/17.
+  `RC_PROOF_APP=release python3 tools/proof/export_status_proof.py`: 9/9. No instance log
+  carried a `Frame Job: ` line.

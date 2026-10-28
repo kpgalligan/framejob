@@ -55,6 +55,10 @@ final class ExportProgressSheetController: NSViewController {
 
     private var didStart = false
     private var didFinish = false
+    /// This export's booking in the encoder ledger (spec §11 CX-18): counted, never held —
+    /// a person who chose Export… asked to write now. nil on an AVFoundation row and once
+    /// it is over.
+    private var ledgerToken: UInt64?
 
     init(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
@@ -72,6 +76,12 @@ final class ExportProgressSheetController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("ExportProgressSheetController does not support NSCoder")
+    }
+
+    deinit {
+        let token = ledgerToken
+        ledgerToken = nil
+        ExportEncoderLedger.shared.end(token)
     }
 
     override func loadView() {
@@ -102,6 +112,8 @@ final class ExportProgressSheetController: NSViewController {
         super.viewDidAppear()
         guard !didStart else { return }
         didStart = true
+        // Booked BEFORE `export`, whose early refusals finish synchronously inside it.
+        ledgerToken = ExportEncoderLedger.shared.begin(settings)
         exporter.export(
             project: project, urls: urls, settings: settings, to: destination, options: options,
             graphics: graphics,
@@ -132,6 +144,10 @@ final class ExportProgressSheetController: NSViewController {
     /// into its own result panel rather than trading it for an alert.
     private func finished(_ result: Result<URL, any Error>) {
         didFinish = true
+        // Cleared before `end`, whose post may launch a held queue job.
+        let token = ledgerToken
+        ledgerToken = nil
+        ExportEncoderLedger.shared.end(token)
         stopButton.isEnabled = true
         switch result {
         case .success(let url):

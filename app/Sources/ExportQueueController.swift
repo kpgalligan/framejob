@@ -76,6 +76,15 @@ import Foundation
 /// the URLs are, and PINNED to this job's own handle for the length of its
 /// write (`ReverseSource.pin`). Anything else the picture depends on that is
 /// neither in the handle nor derivable from it joins that list.
+///
+/// **A bundled-encoder job also waits for memory (spec §11 CX-18).** An AV1 or VP9 job
+/// starts only while `ExportEncoderLedger` admits it: nothing else booked, or the running
+/// encoder exports — an Export… sheet's beside this queue's — fitting with it in a quarter
+/// of physical memory. A held job says why in its `message` and is PASSED OVER by a later
+/// job the ledger admits, an AVFoundation job always; the chain stays one job at a time.
+/// The running job is booked from just before its `export` call to its finish, and a
+/// booking's end — the queue's own or a sheet's — re-runs `start()` through the ledger's
+/// notification.
 final class ExportQueueController {
     /// The app's one queue: the export sheet's Add to Queue fills it and
     /// Window ▸ Export Queue shows it.
@@ -152,7 +161,8 @@ final class ExportQueueController {
         var progress: Double = 0
         /// The line a person reads when it is over: what was written and what
         /// the file measured, or why it stopped — plus the one thing worth
-        /// saying mid-flight, that a cancel is in hand. nil while it waits.
+        /// saying mid-flight, that a cancel is in hand. While it waits, the
+        /// ledger's sentence when the memory limit holds it (CX-18), else nil.
         var message: String?
         /// What the exporter says it is doing right now, or nil for "writing",
         /// which is the caller's own wording. Today the only phase is the
@@ -218,6 +228,13 @@ final class ExportQueueController {
     /// pin and one release, whatever happens to the list in between.
     private var pinnedProject: ReelProject?
 
+    /// The running job's booking in the encoder ledger (CX-18), nil whenever nothing runs
+    /// or the running job is an AVFoundation one. Taken BEFORE `end` in `finished`: the
+    /// ledger's post can launch — and book — the next job inside that call.
+    private var ledgerToken: UInt64?
+
+    private let ledger = ExportEncoderLedger.shared
+
     /// True only while `start()` is inside `Exporter.export`. An early refusal
     /// — `noPlan`, `emptyTimeline` — completes SYNCHRONOUSLY, so `finished`
     /// can run before `export` has returned; without this flag the next job
@@ -234,7 +251,14 @@ final class ExportQueueController {
     /// jobs in a script cannot disturb — or be disturbed by — the app's shared
     /// one. It is the same reason `ExportPresetsStore` is a value a test can
     /// make.
-    init() {}
+    init() {
+        // A booking's end — a sheet's as much as this queue's — may admit a held job.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(ledgerChanged(_:)),
+            name: ExportEncoderLedger.didChangeNotification, object: ledger)
+    }
+
+    @objc private func ledgerChanged(_ note: Notification) { start() }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
@@ -308,9 +332,10 @@ final class ExportQueueController {
 
     // MARK: - Running
 
-    /// Runs the first waiting job, if nothing is running already. Idempotent
+    /// Runs the first waiting job the encoder ledger admits, if nothing is
+    /// running already — passing over a held one (CX-18 (7)). Idempotent
     /// and safe to call at any time: `enqueue` calls it, every completion
-    /// calls it, and a caller may call it itself.
+    /// calls it, the ledger's change calls it, and a caller may call it itself.
     ///
     /// The loop is for the synchronous-refusal case `isLaunching` describes: a
     /// job the exporter refuses without ever going asynchronous has already
@@ -320,9 +345,27 @@ final class ExportQueueController {
         guard !isLaunching else { return }
         isLaunching = true
         defer { isLaunching = false }
-        while exporter == nil, let index = jobs.firstIndex(where: { $0.state == .waiting }) {
+        while exporter == nil, let index = jobs.firstIndex(where: {
+            $0.state == .waiting && ledger.admits($0.settings)
+        }) {
             launch(at: index)
         }
+        noteHeld()
+    }
+
+    /// Every waiting encoder job's `message` set to why it is held, or cleared when it is
+    /// not — leaving out this queue's own running booking, which it waits behind anyway.
+    private func noteHeld() {
+        var changed = false
+        for index in jobs.indices
+        where jobs[index].state == .waiting && jobs[index].settings.writer != nil {
+            let sentence = ledger.waitingSentence(for: jobs[index].settings, ignoring: ledgerToken)
+            if jobs[index].message != sentence {
+                jobs[index].message = sentence
+                changed = true
+            }
+        }
+        if changed { didChange() }
     }
 
     /// One job handed to one fresh `Exporter`. The exporter is stored BEFORE
@@ -353,6 +396,8 @@ final class ExportQueueController {
         // which this class keeps for free by running one job at a time.
         ReverseSource.shared.pin(job.reverse, for: job.project)
         pinnedProject = job.project
+        // Booked BEFORE `export`, whose early refusals finish synchronously inside it.
+        ledgerToken = ledger.begin(job.settings)
         let exporter = Exporter()
         self.exporter = exporter
         didChange()
@@ -441,6 +486,10 @@ final class ExportQueueController {
             }
         }
         didChange()
+        // Cleared before `end`, whose post may launch and book the next job.
+        let token = ledgerToken
+        ledgerToken = nil
+        ledger.end(token)
         start()
     }
 

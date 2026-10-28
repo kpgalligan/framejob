@@ -332,7 +332,11 @@ status}`, where status is `queued` or `running`. Exports run one at a time.
   `cancelled`. It always carries `export_id`, `status`, `path` and
   `elapsed` (seconds since `export` was called, or to the finish). While
   running it adds `progress` (0 to 1), and `phase` while the exporter names
-  one (the loudness measurement). When done it adds `bytes` and what the file
+  one (the loudness measurement). While queued it adds `waiting`, the queue
+  row's "Waiting for memory: …" sentence, when an AV1 or VP9 job waits for
+  memory behind the app's other AV1 and VP9 exports; queued or running, an
+  `av1`, `av1_webm` or `vp9_webm` job adds `estimated_seconds`, the export
+  sheet's estimate of the whole export. When done it adds `bytes` and what the file
   holds: the settings used (preset, container, codec, size, fps, start,
   duration), the loudness measured off the mix, and any warnings a graphic
   gave. `failed` and `cancelled` add the `reason`.

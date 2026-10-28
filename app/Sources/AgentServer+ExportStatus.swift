@@ -171,7 +171,13 @@ final class AgentExports {
         case .failed, .cancelled:
             answer["reason"] = record.message ?? ""
         case .waiting:
-            break
+            // The memory hold's sentence, present only while held (spec §11 CX-18).
+            if let held = record.message { answer["waiting"] = held }
+        }
+        if record.state == .waiting || record.state == .running,
+            let seconds = ExportEncoderCosts.estimatedSeconds(for: record.settings)
+        {
+            answer["estimated_seconds"] = Int(seconds.rounded())
         }
         answer["export_id"] = id
         answer["status"] = AgentServer.exportStatusWord(record.state)

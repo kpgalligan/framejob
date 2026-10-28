@@ -1,8 +1,8 @@
 //! The path helpers (spec §11 G-31) where JavaScript alone cannot answer:
 //! what `evolvePath`'s dash DRAWS, pixel by pixel (R1); what a fresh path
 //! of 200 cubics and 1,000 points costs (R2) and a path over the memo's
-//! cost bound (R4), each one render under the preview budget, its
-//! milliseconds printed; that a parse error is reported at the module's own
+//! cost bound (R4), each one render whose CPU time is under the preview
+//! budget, its milliseconds printed; that a parse error is reported at the module's own
 //! line (R3); and the reference shapes' relative errors, printed (R5).
 //! The lengths, points and sentences themselves are `tests/js/path.test.js`.
 
@@ -13,6 +13,27 @@ use std::time::Instant;
 use graphic::Module;
 
 use common::{pixel, shared, BUDGET_MS};
+
+/// R2's and R4's call deadline: long enough that only a hang trips it. Their
+/// cost claim is the CPU time `timed` measures, not this wall-clock deadline,
+/// which a loaded host (a load average near 100 during `make gate`) stretched
+/// past 250 ms and turned into a budget error.
+const HANG_MS: u64 = 10_000;
+
+/// `CLOCK_THREAD_CPUTIME_ID` in Darwin's `<_time.h>`.
+const CLOCK_THREAD_CPUTIME_ID: u32 = 16;
+
+extern "C" {
+    fn clock_gettime_nsec_np(clock: u32) -> u64;
+}
+
+/// The calling thread's CPU time in nanoseconds. A render runs on the calling
+/// thread (the engine is `thread_local!`), so the difference over a call is
+/// the work it did, whatever else the host is running.
+fn thread_cpu_ns() -> u64 {
+    // SAFETY: a libSystem call with no pointer arguments.
+    unsafe { clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) }
+}
 
 const RED: [u8; 4] = [0, 0, 255, 255];
 const CLEAR: [u8; 4] = [0, 0, 0, 0];
@@ -92,17 +113,27 @@ fn desc(svg: &str) -> &str {
     &svg[svg.find("<desc>").expect("a desc") + 6..svg.find("</desc>").expect("its end")]
 }
 
-/// One render of `source` at frame 7 under the preview budget: its
-/// `<desc>` and the milliseconds it took.
+/// One render of `source` at frame 7: its `<desc>` and the CPU milliseconds
+/// it took, which must be under the preview budget. CPU time and not wall
+/// time: the claim is what the path costs to measure, and the wall clock
+/// also counts the time a busy host kept the thread off a core. On an idle
+/// host the two agree; the wall time is printed beside it.
 fn timed(source: &str) -> (String, f64) {
     let module = compile(source);
     let ctx = common::ctx(7, 30.0, 150, 1920, 1080);
     let started = Instant::now();
-    let answer = graphic::svg(&module, 7, &serde_json::json!({}), &ctx, BUDGET_MS);
-    let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+    let cpu_started = thread_cpu_ns();
+    let answer = graphic::svg(&module, 7, &serde_json::json!({}), &ctx, HANG_MS);
+    let cpu = (thread_cpu_ns() - cpu_started) as f64 / 1e6;
+    let wall = started.elapsed().as_secs_f64() * 1000.0;
     let (svg, warnings) = answer.unwrap_or_else(|d| panic!("{}", d.message));
     assert!(warnings.is_empty(), "{warnings:?}");
-    (desc(&svg).to_string(), elapsed)
+    assert!(
+        cpu < BUDGET_MS as f64,
+        "{cpu:.1} ms of CPU time, over the {BUDGET_MS} ms budget (wall {wall:.1} ms)"
+    );
+    println!("  {}: {cpu:.1} ms CPU, {wall:.1} ms wall", desc(&svg));
+    (desc(&svg).to_string(), cpu)
 }
 
 /// R2. The path is built from the frame, so nothing measured it before.
@@ -126,7 +157,7 @@ fn a_fresh_path_of_200_cubics_and_1000_points_fits_the_budget() {
          }\n",
     );
     assert_eq!(answer, "true 1000");
-    println!("R2: 200 cubic segments measured and 1,000 points taken in {elapsed:.1} ms (budget {BUDGET_MS} ms)");
+    println!("R2: 200 cubic segments measured and 1,000 points taken in {elapsed:.1} ms of CPU time (budget {BUDGET_MS} ms)");
 }
 
 /// R3.
@@ -166,7 +197,7 @@ fn a_path_over_the_memos_cost_bound_measures_the_same_twice() {
          }\n",
     );
     assert_eq!(answer, "34005 17000 5 17000 8500.5");
-    println!("R4: a 17,000-segment path measured twice with a point taken in {elapsed:.1} ms (budget {BUDGET_MS} ms)");
+    println!("R4: a 17,000-segment path measured twice with a point taken in {elapsed:.1} ms of CPU time (budget {BUDGET_MS} ms)");
 }
 
 /// R5. The reference shapes of G-31 (f) against their closed forms, the
