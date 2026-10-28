@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_014Y5hL5T6WboDfTUJFgnFU1",
+  "agent_id": "a6e3f207f66c23fa2",
+  "subagent_type": "lc-reviewer",
+  "task_description": "Review release items lane",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 126389,
+    "cache_read_tokens": 1357852,
+    "output_tokens": 19541,
+    "api_call_count": 16
+  },
+  "started_at": "2026-10-28T16:11:53.454006-04:00",
+  "completed_at": "2026-10-28T16:15:16.732515-04:00"
+}

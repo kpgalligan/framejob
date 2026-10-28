@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01AmAuJxzmqxupjaXThDfAem",
+  "agent_id": "a446bba495e94dc28",
+  "subagent_type": "lc-designer",
+  "task_description": "Final design codecs C4",
+  "token_usage": {
+    "input_tokens": 10,
+    "cache_creation_tokens": 46017,
+    "cache_read_tokens": 159222,
+    "output_tokens": 2461,
+    "api_call_count": 5
+  },
+  "started_at": "2026-10-28T14:04:37.875151-04:00",
+  "completed_at": "2026-10-28T14:05:03.451371-04:00"
+}

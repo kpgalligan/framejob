@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01JpCU66UZb9STGUtJS1Ze22",
+  "agent_id": "ade92907a569f5a2b",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage codecs C4",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 30638,
+    "cache_read_tokens": 56635,
+    "output_tokens": 590,
+    "api_call_count": 3
+  },
+  "started_at": "2026-10-28T13:45:40.303815-04:00",
+  "completed_at": "2026-10-28T13:45:47.251626-04:00"
+}

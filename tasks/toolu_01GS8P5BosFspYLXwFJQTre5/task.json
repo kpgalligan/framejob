@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01GS8P5BosFspYLXwFJQTre5",
+  "agent_id": "a0b0b044d6ad030a0",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage #378 lane",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 30173,
+    "cache_read_tokens": 56198,
+    "output_tokens": 568,
+    "api_call_count": 3
+  },
+  "started_at": "2026-10-28T15:12:50.245734-04:00",
+  "completed_at": "2026-10-28T15:12:57.70773-04:00"
+}

@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01EDSxpuc6epKDMTgpvUTUin",
+  "agent_id": "acc4e153f70033bb1",
+  "subagent_type": "lc-reviewer",
+  "task_description": "Re-review release items",
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 77335,
+    "cache_read_tokens": 463802,
+    "output_tokens": 6077,
+    "api_call_count": 10
+  },
+  "started_at": "2026-10-28T16:22:34.375131-04:00",
+  "completed_at": "2026-10-28T16:23:39.299414-04:00"
+}

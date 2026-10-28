@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XL4TV1kZazgc6nBMJcVmSU",
+  "agent_id": "a399285593e6cd507",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary release items lane",
+  "token_usage": {
+    "input_tokens": 74,
+    "cache_creation_tokens": 122023,
+    "cache_read_tokens": 3152522,
+    "output_tokens": 31582,
+    "api_call_count": 37
+  },
+  "started_at": "2026-10-28T15:21:40.998597-04:00",
+  "completed_at": "2026-10-28T15:27:33.905652-04:00"
+}

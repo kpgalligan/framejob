@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Y1pC2jc3HbCYo31G3WEkf9",
+  "agent_id": "a279d2225f5c67e21",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary #378 lane",
+  "token_usage": {
+    "input_tokens": 46,
+    "cache_creation_tokens": 116588,
+    "cache_read_tokens": 1858410,
+    "output_tokens": 26881,
+    "api_call_count": 23
+  },
+  "started_at": "2026-10-28T15:22:10.861521-04:00",
+  "completed_at": "2026-10-28T15:26:52.262643-04:00"
+}
