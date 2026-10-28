@@ -125,8 +125,10 @@ extension ExportSheetController {
             let rateFactor = fps.double > 30.5 ? 1.5 : 1.0
             // HEVC reaches the same picture at roughly 60 % of H.264's rate —
             // the ratio between the two 1080p rungs of the same Apple
-            // specification the tiers are calibrated against.
-            let codecFactor = QualityTier.isHEVC(codec) ? 0.6 : 1.0
+            // specification the tiers are calibrated against. AV1 takes
+            // HEVC's factor (spec §11 CX-9 (2)): its efficiency goes to the
+            // picture, not the file size.
+            let codecFactor = QualityTier.isHEVC(codec) || codec.lowercased() == "av1" ? 0.6 : 1.0
             let bits = pixels * 30 * bitsPerPixel * rateFactor * codecFactor
             // To the nearest 100 kbps: these are estimates, and a request for
             // "7 963 200 bits" would claim a precision they do not have.
@@ -198,6 +200,10 @@ extension ExportSheetController {
         /// The Dynamic Range popup is live only on a row that carries an HLG
         /// project's HDR picture (spec §11 HD-14 (h)).
         var dynamicRange: Bool { preset?.carriesHDR ?? false }
+
+        /// The Speed popup is live only on a row a bundled encoder writes
+        /// (spec §11 CX-12 (2)).
+        var encoderSpeed: Bool { !(preset?.encoderSpeeds.isEmpty ?? true) }
     }
 
     /// GIF and APNG. Spelled once, and taken from the container rather than

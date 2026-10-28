@@ -362,6 +362,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** after the brief silence, does the ×4 speech sound clean, and does the export match?
 - **Source:** #334, spec §11 SR-28.
 
+**SE-17 — An AV1 export plays and comes back in**
+- **Do:** on a Mac with an M3 or later, export a project with sound and motion as AV1 (MP4) at each Speed; play each file in QuickTime Player; import one into a new Frame Job project and play it.
+- **Expect:** each file plays in QuickTime with its picture and sound in sync and no corruption, and Frame Job imports it, previews it and plays its sound in sync.
+- **Answer:** does the AV1 export play in QuickTime and come back into Frame Job, picture and sound in sync?
+- **Source:** #377, codec-export C1 (spec §11 CX-10, CX-12).
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

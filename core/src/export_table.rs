@@ -48,88 +48,54 @@
 
 use serde_json::{Map, Value};
 
+pub(crate) use crate::export_container::Container;
 use crate::time::Fps;
 
-/// The containers Frame Job writes. Kept as an enum rather than a string so
-/// the container, its UTI, its network-optimization default and whether it
-/// can hold sound at all are decided in exactly one exhaustive place.
+/// The route a row's video takes when it is not AVFoundation's own
+/// encoder (spec §11 CX-12 (1)): `None` on a row means VideoToolbox or
+/// ProRes through `AVAssetWriter`, or ImageIO where `avf_preset` is null.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Container {
-    Mov,
-    Mp4,
-    M4a,
-    Wav,
-    Aiff,
-    Gif,
-    Apng,
+pub(crate) enum Writer {
+    /// SVT-AV1, bundled and called from Swift (CX-2, CX-4).
+    SvtAv1,
 }
 
-impl Container {
+impl Writer {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
-            Container::Mov => "mov",
-            Container::Mp4 => "mp4",
-            Container::M4a => "m4a",
-            Container::Wav => "wav",
-            Container::Aiff => "aiff",
-            Container::Gif => "gif",
-            Container::Apng => "apng",
+            Writer::SvtAv1 => "svt_av1",
         }
     }
+}
 
-    /// The output file's UTI. On the AVFoundation path Swift passes this
-    /// straight to `outputFileType`, whose raw values ARE UTIs; on the
-    /// ImageIO path it is the destination type
-    /// `CGImageDestinationCreateWithURL` takes. Either way it is what the
-    /// save panel's content type and file extension are derived from, which
-    /// is why the two image formats name a real UTI here rather than
-    /// nothing — an export that could not tell the panel it writes a `.gif`
-    /// would be worse off than one whose type string a session would
-    /// reject, and a session is never built for them.
-    ///
-    /// An APNG is written to an ordinary PNG destination — the animation
-    /// lives in `acTL`/`fcTL` chunks inside a file that is still a PNG — so
-    /// its type identifier is PNG's, not one of its own.
-    ///
-    /// The two LPCM rows' identifiers are exactly `AVFileType.wav` and
-    /// `AVFileType.aiff`'s raw values, which is what lets
-    /// `Exporter.fileType(for:)` resolve them from this string alone
-    /// rather than growing a container list of its own.
-    pub(crate) fn file_type(self) -> &'static str {
+/// A bundled encoder's speed (spec §11 CX-2, CX-12 (2)): Faster, Balanced
+/// and Smaller file are SVT-AV1's presets 8, 6 and 4 — the number is the
+/// app's to map, the word is the vocabulary the sheet and `export` share.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EncoderSpeed {
+    Faster,
+    Balanced,
+    Smaller,
+}
+
+impl EncoderSpeed {
+    /// Every speed, in the sheet's order.
+    pub(crate) const ALL: [EncoderSpeed; 3] = [
+        EncoderSpeed::Faster,
+        EncoderSpeed::Balanced,
+        EncoderSpeed::Smaller,
+    ];
+
+    pub(crate) fn parse(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|speed| speed.as_str() == text)
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
-            Container::Mov => "com.apple.quicktime-movie",
-            Container::Mp4 => "public.mpeg-4",
-            Container::M4a => "com.apple.m4a-audio",
-            Container::Wav => "com.microsoft.waveform-audio",
-            Container::Aiff => "public.aiff-audio",
-            Container::Gif => "com.compuserve.gif",
-            Container::Apng => "public.png",
+            EncoderSpeed::Faster => "faster",
+            EncoderSpeed::Balanced => "balanced",
+            EncoderSpeed::Smaller => "smaller",
         }
-    }
-
-    /// Whether `shouldOptimizeForNetworkUse` defaults on. MP4 and M4A are
-    /// the delivery containers people upload, and a leading `moov` atom
-    /// lets a player start before the file is fully fetched. A ProRes MOV
-    /// is an editing master handed to another application, where the
-    /// rewrite pass buys nothing. An HEVC-with-alpha MOV is a delivery file
-    /// too, and its default stays off all the same: that was the owner's
-    /// choice for the row (spec §11 G-33), and the override turns it on. GIF
-    /// and APNG have no `moov` atom and nothing to move: a viewer already
-    /// starts on the first frame, and
-    /// neither do WAV and AIFF — a RIFF or an IFF file is a header
-    /// followed by samples, with no index to relocate, so the flag would
-    /// be a request the writer has nothing to do about.
-    pub(crate) fn optimizes_for_network(self) -> bool {
-        matches!(self, Container::Mp4 | Container::M4a)
-    }
-
-    /// Whether the container can hold sound. Every movie container can,
-    /// and M4A, WAV and AIFF are nothing else; GIF and APNG are picture
-    /// formats with no audio track in the file format at all, so
-    /// `audio: false` for those is a fact about the container rather than
-    /// a decision about the project.
-    pub(crate) fn carries_audio(self) -> bool {
-        !matches!(self, Container::Gif | Container::Apng)
     }
 }
 
@@ -210,6 +176,10 @@ pub(crate) struct Preset {
     /// it as an unknown image container and report a format this table
     /// advertises as unsupported.
     pub(crate) avf_preset: Option<&'static str>,
+    /// The bundled encoder that writes the row's video, or `None` for
+    /// AVFoundation's own encoders (ImageIO where `avf_preset` is null).
+    /// A row with a writer is the one row that takes `encoder_speed`.
+    pub(crate) writer: Option<Writer>,
 }
 
 /// The §7.8 set: one row per ENCODING, in menu order. A row is a container
@@ -258,7 +228,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 11] = [
+const PRESETS: [Preset; 12] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -273,6 +243,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetHighestQuality"),
+        writer: None,
     },
     Preset {
         id: "hevc",
@@ -284,6 +255,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
+        writer: None,
     },
     // HEVC with an alpha channel (spec §11 G-33), directly after the row it
     // is a variant of. It is the DELIVERY row that keeps transparency — a
@@ -304,6 +276,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetHEVCHighestQualityWithAlpha"),
+        writer: None,
     },
     // HEVC Main 10 (spec §11 PR-3): `hevc`'s MP4 from the compositor's
     // 16-bit frames, so a 10-bit source survives to a 10-bit delivery file.
@@ -321,6 +294,23 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
+        writer: None,
+    },
+    // AV1 in MP4 (spec §11 CX-1, CX-12), after the HEVC rows it is the
+    // smaller sibling of. SVT-AV1 encodes (`writer`); AVFoundation still
+    // writes the container, which is what the passthrough name records,
+    // so the row is even-sized and routed as every AVFoundation row is.
+    Preset {
+        id: "av1",
+        name: "AV1 (MP4)",
+        container: Container::Mp4,
+        codec: "av1",
+        video: true,
+        alpha: false,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+        writer: Some(Writer::SvtAv1),
     },
     Preset {
         id: "prores_422",
@@ -332,6 +322,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetAppleProRes422LPCM"),
+        writer: None,
     },
     // The MASTERING row that keeps transparency (road map 2, phase 7) —
     // one of the three rows with a fourth channel and not the only one:
@@ -385,6 +376,7 @@ const PRESETS: [Preset; 11] = [
         // writes the row, nothing more — nothing has run a session since
         // M2.
         avf_preset: Some("AVAssetExportPresetAppleProRes4444LPCM"),
+        writer: None,
     },
     Preset {
         id: "audio_m4a",
@@ -396,6 +388,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
+        writer: None,
     },
     // The two uncompressed audio rows (road map 2, phase 5). M4A is what
     // you send; these are what you hand to someone else's tool — a mix
@@ -429,6 +422,7 @@ const PRESETS: [Preset; 11] = [
         // Not a lie the resolver tells: see `avf_preset`'s field doc. The
         // name says "AVFoundation writes this row", and nothing more.
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
+        writer: None,
     },
     Preset {
         id: "audio_aiff",
@@ -440,6 +434,7 @@ const PRESETS: [Preset; 11] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
+        writer: None,
     },
     Preset {
         id: "gif",
@@ -467,6 +462,7 @@ const PRESETS: [Preset; 11] = [
         size: Some((480, 270)),
         fps: Some(Fps { num: 25, den: 2 }),
         avf_preset: None,
+        writer: None,
     },
     Preset {
         id: "apng",
@@ -489,6 +485,7 @@ const PRESETS: [Preset; 11] = [
         size: Some((960, 540)),
         fps: Some(Fps { num: 25, den: 1 }),
         avf_preset: None,
+        writer: None,
     },
 ];
 
@@ -530,6 +527,12 @@ impl Preset {
         self.avf_preset.is_some() && self.codec != "prores4444"
     }
 
+    /// True for a row a bundled encoder writes, the rows `encoder_speed`
+    /// applies to (spec §11 CX-12 (2)).
+    pub(crate) fn takes_encoder_speed(&self) -> bool {
+        self.writer.is_some()
+    }
+
     fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("id".to_string(), Value::from(self.id));
@@ -560,6 +563,11 @@ impl Preset {
         );
         if crate::dynamic_range::HDR_ROWS.contains(&self.id) {
             out.insert("hdr".to_string(), Value::from(true));
+        }
+        if let Some(writer) = self.writer {
+            out.insert("writer".to_string(), Value::from(writer.as_str()));
+            let speeds = EncoderSpeed::ALL.iter().map(|s| Value::from(s.as_str()));
+            out.insert("encoder_speeds".to_string(), speeds.collect());
         }
         Value::Object(out)
     }

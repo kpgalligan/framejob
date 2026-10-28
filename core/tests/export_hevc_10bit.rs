@@ -151,9 +151,9 @@ fn its_resolved_settings_are_written_out_whole() {
     );
 }
 
-/// After `hevc_alpha` and before `prores_422`: G-33 keeps `hevc_alpha`
-/// directly after `hevc`, so the 10-bit row is the third HEVC row, and the
-/// ProRes pair still follows the HEVC rows.
+/// After `hevc_alpha` and before `av1`: G-33 keeps `hevc_alpha`
+/// directly after `hevc`, so the 10-bit row is the third HEVC row, and
+/// `av1` (spec §11 CX-12) sits between it and the ProRes pair.
 #[test]
 fn it_sits_directly_after_hevc_alpha() {
     let ids: Vec<String> = preset_rows()
@@ -171,8 +171,8 @@ fn it_sits_directly_after_hevc_alpha() {
     );
     assert_eq!(
         ids.get(alpha + 2).map(String::as_str),
-        Some("prores_422"),
-        "the row after hevc_10bit is not prores_422: {ids:?}"
+        Some("av1"),
+        "the row after hevc_10bit is not av1: {ids:?}"
     );
 }
 

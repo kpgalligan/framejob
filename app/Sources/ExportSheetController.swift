@@ -173,6 +173,9 @@ final class ExportSheetController: NSViewController {
     /// (`ExportSheetDynamicRange.swift`, spec §11 HD-14 (h)).
     let dynamicRangePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     var dynamicRangeChoice: DynamicRange = .hlg
+    /// The Speed row and its choice (`ExportSheetSpeed.swift`, spec §11 CX-12 (2)).
+    let speedPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var encoderSpeedChoice: EncoderSpeed = .balanced
     let summaryLabel = NSTextField(wrappingLabelWithString: "")
     let footnote = sheetFootnote("")
     var exportButton: NSButton!
@@ -316,6 +319,7 @@ final class ExportSheetController: NSViewController {
         buildPresetMenuButton()
         rebuildPresetPopup(selecting: nil)
         configureDynamicRange()
+        configureSpeed()
 
         // THE ORDER BELOW IS LOAD-BEARING and `apply(_:)` is where it is
         // written down. The remembered choice has to reach the format popup
@@ -363,6 +367,7 @@ final class ExportSheetController: NSViewController {
         if isHLGProject {
             rows.insert([fieldLabel("Dynamic Range:"), dynamicRangePopup], at: 2)
         }
+        rows.insert([fieldLabel("Speed:"), speedPopup], at: isHLGProject ? 3 : 2)
         let grid = makeSheetGrid(rows)
 
         // The readout and the footnote sit UNDER the grid, each on a line of

@@ -108,6 +108,10 @@ final class ExportWriter {
     /// `start`; nil hands each frame on as drawn.
     private var frames: ExportFrames?
 
+    /// The encoder row's video pump (`settings.writer`, spec §11 CX-12), set by `addVideo`;
+    /// nil on every row AVFoundation encodes.
+    private var encodePump: ExportEncodePump?
+
     /// The audio pump's `end`: the sound cut at the range, padded to it (#337).
     private let audioEnd: ExportAudioEnd
 
@@ -200,7 +204,13 @@ final class ExportWriter {
         }
         reader.add(output)
 
-        let input = AVAssetWriterInput(
+        // An encoder row's packets go in as they are (`ExportEncodePump`).
+        let pump = settings.writer == ExportEncodePump.writer
+            ? try ExportEncodePump(settings: settings, canvas: canvas, range: range) : nil
+        let input = try pump.map {
+            AVAssetWriterInput(
+                mediaType: .video, outputSettings: nil, sourceFormatHint: $0.formatDescription)
+        } ?? AVAssetWriterInput(
             mediaType: .video, outputSettings: try Self.videoSettings(settings, canvas: canvas))
         input.expectsMediaDataInRealTime = false
         guard writer.canAdd(input) else {
@@ -209,6 +219,7 @@ final class ExportWriter {
         writer.add(input)
         videoOutput = output
         videoInput = input
+        encodePump = pump
         frames = Self.frameForm(settings).map { ExportFrames(form: $0) }
     }
 
@@ -313,7 +324,14 @@ final class ExportWriter {
         writer.startSession(atSourceTime: .zero)
 
         let group = DispatchGroup()
-        if let input = videoInput, let output = videoOutput {
+        if let input = videoInput, let output = videoOutput, let encodePump {
+            encodePump.run(
+                input: input, output: output, on: videoQueue, group: group,
+                isStopping: { [weak self] in self?.isStopping ?? true },
+                readFailure: { [weak self] in self?.readFailure },
+                fail: { [weak self] error in self?.stopped(with: error) },
+                advance: { [weak self] time in self?.advance(to: time) })
+        } else if let input = videoInput, let output = videoOutput {
             pump(
                 input, from: output, on: videoQueue, group: group, tracksProgress: true,
                 frames: frames)
@@ -483,6 +501,14 @@ final class ExportWriter {
         lock.unlock()
     }
 
+    /// The reader's error once its read failed, else nil — the encoder pump's question
+    /// at the end of its read, worded as `pump`'s.
+    private var readFailure: (any Error)? {
+        guard reader.status == .failed else { return nil }
+        return reader.error
+            ?? Exporter.ExportError.failed("The composition could not be read to the end.")
+    }
+
     private func advance(to time: CMTime) {
         guard totalSeconds > 0 else { return }
         let fraction = CMTimeGetSeconds(time) / totalSeconds
@@ -499,6 +525,7 @@ final class ExportWriter {
         let cancelled = cancelRequested
         lock.unlock()
         if error != nil || cancelled { reader.cancelReading() }
+        encodePump?.close()
         if let error = error {
             writer.cancelWriting()
             report(.failure(error))
@@ -536,6 +563,15 @@ final class ExportWriter {
                         ?? Exporter.ExportError.failed("The export stopped before it finished.")))
             return
         }
+        // The `av01` brand AVAssetWriter leaves out (spec §11 CX-12 (4)).
+        if encodePump != nil {
+            do {
+                try ExportAV1Track.brandFile(destination)
+            } catch {
+                report(.failure(error))
+                return
+            }
+        }
         lock.lock()
         progressValue = 1
         lock.unlock()
@@ -547,40 +583,5 @@ final class ExportWriter {
         guard let completion = completion else { return }
         self.completion = nil
         completion(result)
-    }
-
-    // MARK: - Time
-
-    /// The same sample, `delta` earlier. Every timing entry moves, decode
-    /// stamps included, so a codec that reorders frames stays coherent.
-    private static func retimed(_ sample: CMSampleBuffer, by delta: CMTime) -> CMSampleBuffer? {
-        guard delta.isNumeric, delta != .zero else { return sample }
-        var count: CMItemCount = 0
-        guard CMSampleBufferGetSampleTimingInfoArray(
-            sample, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count) == noErr,
-            count > 0
-        else { return nil }
-        var timings = [CMSampleTimingInfo](
-            repeating: CMSampleTimingInfo(
-                duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid),
-            count: Int(count))
-        guard CMSampleBufferGetSampleTimingInfoArray(
-            sample, entryCount: count, arrayToFill: &timings, entriesNeededOut: nil) == noErr
-        else { return nil }
-        for index in timings.indices {
-            if timings[index].presentationTimeStamp.isNumeric {
-                timings[index].presentationTimeStamp =
-                    timings[index].presentationTimeStamp - delta
-            }
-            if timings[index].decodeTimeStamp.isNumeric {
-                timings[index].decodeTimeStamp = timings[index].decodeTimeStamp - delta
-            }
-        }
-        var copy: CMSampleBuffer?
-        guard CMSampleBufferCreateCopyWithNewTiming(
-            allocator: kCFAllocatorDefault, sampleBuffer: sample, sampleTimingEntryCount: count,
-            sampleTimingArray: &timings, sampleBufferOut: &copy) == noErr
-        else { return nil }
-        return copy
     }
 }

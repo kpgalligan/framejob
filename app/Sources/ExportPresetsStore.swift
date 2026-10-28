@@ -90,6 +90,10 @@ struct ExportChoice: Codable, Equatable {
     /// be a preset that quietly stopped burning in.
     var burnInTimecode: Bool = false
 
+    /// The Speed popup's last word (`EncoderSpeed`, spec §11 CX-12 (2)), stored on every
+    /// row so the popup keeps it across formats; only `av1` sends it.
+    var encoderSpeed: String?
+
     /// The file's spelling. Snake case because a person can open
     /// `ExportPresets.json` in an editor, and because `burn_in_timecode` is
     /// then the same string the core's recipe options use — one name for one
@@ -104,12 +108,14 @@ struct ExportChoice: Codable, Equatable {
         case loudness
         case inOutRange = "in_out_range"
         case burnInTimecode = "burn_in_timecode"
+        case encoderSpeed = "encoder_speed"
     }
 
     init(
         name: String = "", presetID: String = "", sizeRow: String? = nil,
         customSize: [Int]? = nil, fps: [Int]? = nil, qualityTier: String? = nil,
-        loudness: Double? = nil, inOutRange: Bool = false, burnInTimecode: Bool = false
+        loudness: Double? = nil, inOutRange: Bool = false, burnInTimecode: Bool = false,
+        encoderSpeed: String? = nil
     ) {
         self.name = name
         self.presetID = presetID
@@ -120,6 +126,7 @@ struct ExportChoice: Codable, Equatable {
         self.loudness = loudness
         self.inOutRange = inOutRange
         self.burnInTimecode = burnInTimecode
+        self.encoderSpeed = encoderSpeed
     }
 
     /// Every key optional, every absence a default.
@@ -141,6 +148,7 @@ struct ExportChoice: Codable, Equatable {
         loudness = try? c.decodeIfPresent(Double.self, forKey: .loudness)
         inOutRange = (try? c.decodeIfPresent(Bool.self, forKey: .inOutRange)) ?? false
         burnInTimecode = (try? c.decodeIfPresent(Bool.self, forKey: .burnInTimecode)) ?? false
+        encoderSpeed = try? c.decodeIfPresent(String.self, forKey: .encoderSpeed)
     }
 }
 

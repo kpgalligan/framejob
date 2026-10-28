@@ -75,8 +75,9 @@ extension AgentServer {
                 + "gif is not one of them: it can show a transparent pixel but has no alpha "
                 + "channel, so nothing partial survives it. prores_422, prores_4444 and "
                 + "hevc_10bit keep the compositor's 16-bit frames at 10 bits (ProRes 4444 at "
-                + "12); h264, hevc and hevc_alpha are 8-bit. Pass a wrong one once and the "
-                + "error lists them all.",
+                + "12); h264, hevc and hevc_alpha are 8-bit. av1 is AV1 in an MP4 with AAC, "
+                + "8-bit, encoded by the bundled SVT-AV1 at encoder_speed; Macs before M3 "
+                + "cannot play it back. Pass a wrong one once and the error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
             "type": ["string", "array"],
@@ -98,7 +99,7 @@ extension AgentServer {
                 + "canvas is refused rather than written, because the padding destroys the "
                 + "alpha channel those rows are chosen for; every row id is already the "
                 + "document's own shape, so this only bites on a [width, height] of another "
-                + "shape. h264, hevc, hevc_alpha, hevc_10bit and prores_422 need "
+                + "shape. h264, hevc, hevc_alpha, hevc_10bit, av1 and prores_422 need "
                 + "even dimensions: an odd width or height — the document size on a canvas "
                 + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
                 + "on that edge, and the width and height reported back are the file's. "
@@ -163,7 +164,7 @@ extension AgentServer {
                     "sdr_version": [
                         "type": "boolean",
                         "description": "Draw an HDR (HLG) project's SDR version — what h264, "
-                            + "hevc, hevc_alpha, gif, apng, JPEG frames and dynamic_range "
+                            + "hevc, hevc_alpha, av1, gif, apng, JPEG frames and dynamic_range "
                             + "\"sdr\" write: the inverse of the lift, white titles near white, "
                             + "highlights above reference white rolled off. View ▸ Show SDR "
                             + "Version's picture; the switch itself never reaches this tool or "
@@ -274,7 +275,11 @@ extension AgentServer {
                             + "8 Mbps) — the sheet's Quality popup. Omit to let the preset's "
                             + "own encoder settings decide. Ignored by presets that carry no "
                             + "rate of their own: ProRes is fixed by its profile, and GIF and "
-                            + "APNG have no bitrate at all.",
+                            + "APNG have no bitrate at all. On av1 it is a soft cap: SVT-AV1 "
+                            + "encodes at a constant quality matched to HEVC at this rate (HEVC's "
+                            + "0.07 bits per pixel per frame when omitted), and the file usually "
+                            + "stays under it; very detailed footage can go up to about 1.25 "
+                            + "times over.",
                     ],
                     "audio_bitrate": [
                         "type": "integer", "minimum": 1,
@@ -316,6 +321,14 @@ extension AgentServer {
                             + "other video preset writes the SDR version; hlg and pq are refused "
                             + "there and in an SDR project, where sdr changes nothing.",
                     ],
+                    // The sheet's Speed popup (spec §11 CX-2, CX-12 (2)).
+                    "encoder_speed": [
+                        "type": "string", "enum": ["faster", "balanced", "smaller"],
+                        "description": "av1's encoder speed — the sheet's Speed popup: faster "
+                            + "(SVT-AV1 preset 8), balanced (preset 6, the default) or smaller "
+                            + "(preset 4, the smallest file for the picture and the slowest). "
+                            + "Refused on every other preset.",
+                    ],
                 ], required: ["preset", "path"]),
             // Window ▸ Export Queue's row for the job (spec §11 #326).
             tool(
@@ -329,8 +342,9 @@ extension AgentServer {
                     + "adds what the file holds: ok, bytes, the settings that were used "
                     + "(preset, container, codec, width, height, fps [num, den], start, "
                     + "duration), burn_in_timecode, dynamic_range in an HLG project (the "
-                    + "picture written), loudness for every format that carries sound, "
-                    + "normalised or not — summary, integrated_lufs, true_peak_dbtp, "
+                    + "picture written), encoder_speed on av1, loudness for every format "
+                    + "that carries sound, normalised or not — summary, integrated_lufs, "
+                    + "true_peak_dbtp, "
                     + "sample_peak_dbfs, gain_db, ceiling_dbtp, capped_by_peak and target_lufs "
                     + "when one was asked, read off the mix that was written — and "
                     + "graphic_warnings [{name, frame, message}], each distinct warning a "

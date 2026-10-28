@@ -134,7 +134,8 @@ agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool 
                        and `make test`'s prices_proof.py (`test`)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
-  Resources/Shaders/   Compositor.metal — the per-layer compositing pass
+  Resources/Shaders/   Compositor.metal — the per-layer compositing pass; ExportI420.metal —
+                       the AV1 export's 64RGBAHalf → planar I420 conversion
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/framejob_core.h
 designs/             the spec, adr/ (condensed records), the handoffs — the table above

@@ -263,6 +263,15 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes
   anything on.
+- `export_table.rs`: at 584 before codec-export C1's `av1` row, it paid toll T1 first, a pure
+  move gated alone (`cargo test --release --test export --test export_size`, clippy): `Container`
+  and its `impl` (the four questions a container answers about itself) went whole to the new
+  `export_container.rs`, re-exported by `export_table.rs` (`pub(crate) use
+  crate::export_container::Container`), so every `crate::export_table::Container` path holds;
+  nothing widened. `wc -l core/src/export_table.rs`: 584 before, 502 after; `export_container.rs`
+  is 91. C1 then added `Writer`, `EncoderSpeed`, the `writer` field on every row, the `av1` row
+  and its `to_json` keys (502 → 592). The next seam: `Writer` and `EncoderSpeed` with their
+  `impl`s out to an `export_encoder.rs`, re-exported the same way.
 
 ## Open items
 

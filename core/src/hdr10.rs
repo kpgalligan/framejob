@@ -288,7 +288,7 @@ impl Readings {
 
 /// An unsigned leb128 (AV1 §4.10.5): its value and its length in bytes;
 /// `None` when it is cut short or longer than 8 bytes.
-fn leb128(bytes: &[u8]) -> Option<(u64, usize)> {
+pub(crate) fn leb128(bytes: &[u8]) -> Option<(u64, usize)> {
     let mut value = 0u64;
     for (i, byte) in bytes.iter().take(LEB128_MAX_BYTES).enumerate() {
         value |= u64::from(byte & 0x7f) << (7 * i);

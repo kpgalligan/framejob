@@ -41,6 +41,7 @@
 use serde_json::Value;
 
 use crate::dynamic_range::DynamicRange;
+use crate::export_table::EncoderSpeed;
 use crate::time::{Fps, Ticks};
 
 // ---- the shared front door -----------------------------------------------
@@ -211,6 +212,23 @@ pub(crate) fn dynamic_range(overrides: Option<&Value>) -> Result<Option<DynamicR
         Some(range) => Ok(Some(range)),
         None => Err(format!(
             "export dynamic_range must be \"hlg\", \"pq\" or \"sdr\", not {}",
+            describe(value)
+        )),
+    }
+}
+
+/// The `encoder_speed` override (spec §11 CX-12 (2)): `faster`, `balanced`
+/// or `smaller`, `None` when absent or null. Whether the row takes one is
+/// the resolver's question; this answers only whether it is one of the
+/// three words, so a misspelling is refused by name on any row.
+pub(crate) fn encoder_speed(overrides: Option<&Value>) -> Result<Option<EncoderSpeed>, String> {
+    let Some(value) = field(overrides, "encoder_speed") else {
+        return Ok(None);
+    };
+    match value.as_str().and_then(EncoderSpeed::parse) {
+        Some(speed) => Ok(Some(speed)),
+        None => Err(format!(
+            "export encoder_speed must be \"faster\", \"balanced\" or \"smaller\", not {}",
             describe(value)
         )),
     }

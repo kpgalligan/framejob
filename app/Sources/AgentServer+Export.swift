@@ -117,6 +117,11 @@ extension AgentServer {
             if let range = a["dynamic_range"] {
                 overrides["dynamic_range"] = range
             }
+            // The sheet's Speed popup (spec §11 CX-12 (2)), forwarded unread on the
+            // same terms: the core reads the three words and refuses a row without one.
+            if let speed = a["encoder_speed"] {
+                overrides["encoder_speed"] = speed
+            }
             let settings: ExportSettings
             do {
                 settings = try ReelExport.settings(

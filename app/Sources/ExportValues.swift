@@ -19,13 +19,16 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     /// Whether the row carries an HLG project's HDR picture (`"hdr"`, spec §11
     /// HD-14 (c)): the three 10-bit rows, which offer the Dynamic Range popup.
     let carriesHDR: Bool
+    /// The bundled encoder's speeds the row takes (`encoder_speeds`, spec §11
+    /// CX-12 (2)): `av1`'s three, which offer the Speed popup; empty elsewhere.
+    let encoderSpeeds: [EncoderSpeed]
 
     /// The core spells the size as one `size: [w, h] | null` and audio-only
     /// as `video: false` (`export.rs`), so the size and the audio flag are
     /// read from those rather than from `width` / `height` / `audio_only`,
     /// which it never emits.
     private enum CodingKeys: String, CodingKey {
-        case id, name, container, codec, size, video, hdr
+        case id, name, container, codec, size, video, hdr, encoderSpeeds
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +42,8 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
         height = size?.count == 2 ? size?[1] : nil
         audioOnly = !c.lenient(.video, true)
         carriesHDR = c.lenient(.hdr, false)
+        let speeds: [String] = c.lenient(.encoderSpeeds, [])
+        encoderSpeeds = speeds.compactMap(EncoderSpeed.init(rawValue:))
     }
 }
 
@@ -104,6 +109,11 @@ struct ExportSettings: Decodable, Equatable {
     /// nil — today's tags — for every SDR project and every audio row, whose
     /// settings carry no key.
     let color: String?
+    /// The bundled encoder that writes the video (`writer`, "svt_av1", spec
+    /// §11 CX-12) and its speed (`encoder_speed`); nil on every row
+    /// AVFoundation encodes, whose settings carry neither key.
+    let writer: String?
+    let encoderSpeed: EncoderSpeed?
 
     /// `color` as the picture it names; nil when the settings carry none.
     var dynamicRange: DynamicRange? { color.flatMap(DynamicRange.init(rawValue:)) }
@@ -137,7 +147,7 @@ struct ExportSettings: Decodable, Equatable {
         case preset, container, codec, width, height, fps, range
         case avPreset = "avfPreset"
         case fileType, optimizeForNetwork, videoBitrate, audioBitrate
-        case loudnessLufs, peakDbtp, alpha, color
+        case loudnessLufs, peakDbtp, alpha, color, writer, encoderSpeed
     }
 
     private enum RangeKeys: String, CodingKey {
@@ -172,6 +182,9 @@ struct ExportSettings: Decodable, Equatable {
         // than the file holds where true would promise more.
         alpha = c.lenient(.alpha, false)
         color = c.lenient(.color)
+        writer = c.lenient(.writer)
+        let speed: String? = c.lenient(.encoderSpeed)
+        encoderSpeed = speed.flatMap(EncoderSpeed.init(rawValue:))
     }
 
     var renderSize: CGSize { CGSize(width: width, height: height) }
@@ -186,6 +199,28 @@ extension ExportSettings {
     static func carriesLinearPCM(codec: String) -> Bool {
         let c = codec.lowercased()
         return c == "lpcm" || c.hasPrefix("prores")
+    }
+}
+
+/// A bundled encoder's speed (spec §11 CX-2, CX-12 (2)): the core's word, the
+/// sheet's name and SVT-AV1's preset.
+enum EncoderSpeed: String, CaseIterable {
+    case faster, balanced, smaller
+
+    var menuName: String {
+        switch self {
+        case .faster: return "Faster"
+        case .balanced: return "Balanced"
+        case .smaller: return "Smaller file"
+        }
+    }
+
+    var svtPreset: Int8 {
+        switch self {
+        case .faster: return 8
+        case .balanced: return 6
+        case .smaller: return 4
+        }
     }
 }
 

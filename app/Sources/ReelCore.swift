@@ -62,13 +62,6 @@ private func takeString(_ s: UnsafeMutablePointer<CChar>?) -> String? {
     return String(cString: s)
 }
 
-/// A JSON array of integers, built by hand rather than through
-/// `JSONSerialization` because the core's parsers want plain `[1,2,3]` and
-/// this cannot fail.
-private func jsonArray<T: FixedWidthInteger>(_ values: [T]) -> String {
-    "[" + values.map { String($0) } .joined(separator: ",") + "]"
-}
-
 // MARK: - The project handle
 
 /// Owning Swift wrapper around an `RcProject *`. Immutable: nothing here
@@ -276,7 +269,7 @@ final class ReelProject {
         if clips.isEmpty {
             raw = rc_project_snap_candidates(ptr, nil)
         } else {
-            raw = rc_project_snap_candidates(ptr, jsonArray(clips))
+            raw = rc_project_snap_candidates(ptr, CoreJSON.array(clips))
         }
         guard let o = CoreJSON.value(takeString(raw)) else { return [] }
         return CoreJSON.snapTicks(o)
@@ -328,7 +321,7 @@ enum ReelSnap {
     static func resolve(_ candidates: [Ticks], _ t: Ticks, threshold: Ticks) -> (Ticks, Bool) {
         guard !candidates.isEmpty, threshold > 0 else { return (t, false) }
         var snapped = false
-        let resolved = rc_snap_resolve(jsonArray(candidates), t, threshold, &snapped)
+        let resolved = rc_snap_resolve(CoreJSON.array(candidates), t, threshold, &snapped)
         return (resolved, snapped)
     }
 }
@@ -417,15 +410,7 @@ enum ReelExport {
     static func settings(
         _ p: ReelProject, preset: String, overrides: [String: Any]? = nil
     ) throws -> ExportSettings {
-        var overridesJSON: String?
-        if let overrides = overrides, !overrides.isEmpty {
-            guard JSONSerialization.isValidJSONObject(overrides),
-                  let data = try? JSONSerialization.data(
-                    withJSONObject: overrides, options: [.sortedKeys]),
-                  let text = String(data: data, encoding: .utf8)
-            else { throw ReelCoreError(message: "The export overrides are not valid JSON.") }
-            overridesJSON = text
-        }
+        let overridesJSON = try CoreJSON.overrides(overrides)
         var err: UnsafeMutablePointer<CChar>? = nil
         let raw: UnsafeMutablePointer<CChar>?
         if let overridesJSON = overridesJSON {
@@ -491,16 +476,8 @@ extension ReelOp {
 // MARK: - Speed limits
 
 enum ReelSpeed {
-    /// Read once from the core. An answer that does not decode is a broken
-    /// build, not a state the app can carry on in, so it stops here. A plain
-    /// decoder, not `ReelJSON`'s: its snake-case conversion would turn
-    /// `audio_max` into a key the explicit `CodingKeys` do not name.
-    static let limits: SpeedLimits = {
-        guard let json = takeString(rc_speed_limits()),
-            let limits = try? JSONDecoder().decode(SpeedLimits.self, from: Data(json.utf8))
-        else { preconditionFailure("rc_speed_limits did not answer its documented JSON") }
-        return limits
-    }()
+    /// Read once from the core (`SpeedLimits.decoded` says why it traps).
+    static let limits = SpeedLimits.decoded(takeString(rc_speed_limits()))
 }
 
 // MARK: - Containers
@@ -588,12 +565,6 @@ enum ReelCube {
 /// the format description's two extensions when either is present, else the
 /// first sample's prefix SEI, its NAL units prefixed by `nalLength` bytes.
 enum ReelHDR10 {
-    /// `data`'s bytes and count for the call, or NULL and 0 when absent or empty.
-    private static func withBytes<R>(_ data: Data?, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
-        guard let data, !data.isEmpty else { return body(nil, 0) }
-        return data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
-    }
-
     /// What the core read; an empty `PQColor` when it read nothing (the core
     /// answers NULL only on a caught panic, read as nothing too).
     static func peak(mastering: Data?, contentLight: Data?, sample: Data?, nalLength: Int)
@@ -634,18 +605,52 @@ enum ReelHDR10 {
     }
 }
 
+/// AV1 in MP4's container bytes, decided in the core (spec §11 CX-12 (4)): the
+/// `av1C` record from SVT-AV1's sequence header, each packet's temporal
+/// delimiters stripped, and the written file's `ftyp` branded `av01`.
+enum ReelAV1 {
+    /// The record for the first sequence header OBU in `sequenceHeader`; throws
+    /// the core's sentence when there is none or it ends early.
+    static func config(sequenceHeader: Data) throws -> Config {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let raw: UnsafeMutablePointer<CChar>? = sequenceHeader.withUnsafeBytes {
+            rc_av1_config($0.bindMemory(to: UInt8.self).baseAddress, $0.count, &err)
+        }
+        guard let text = takeString(raw) else {
+            throw ReelCoreError(
+                message: takeErrorMessage(err, fallback: "the av1C record could not be built"))
+        }
+        guard let config = ReelJSON.decode(Config.self, from: text) else {
+            throw ReelCoreError(message: "the core's av1C answer could not be read: \(text)")
+        }
+        return config
+    }
+
+    /// `data` without its temporal delimiter OBUs; false, `data` untouched, when
+    /// it is not a run of whole OBUs (or is empty).
+    static func stripTemporalDelimiters(_ data: inout Data) -> Bool {
+        let kept = data.withUnsafeMutableBytes {
+            rc_av1_strip_temporal_delimiters($0.bindMemory(to: UInt8.self).baseAddress, $0.count)
+        }
+        guard kept > 0 else { return false }
+        data.removeSubrange(data.startIndex.advanced(by: kept)...)
+        return true
+    }
+
+    /// `rc_av1_ftyp_brand` over a file's first bytes, in place: 1 rewritten, 0
+    /// already carried, -1 no `ftyp` box or no `mp41` brand.
+    static func brandAV01(_ head: inout Data) -> Int32 {
+        head.withUnsafeMutableBytes {
+            rc_av1_ftyp_brand($0.bindMemory(to: UInt8.self).baseAddress, $0.count)
+        }
+    }
+}
+
 // MARK: - Graphics
 
 /// Decodes and frees a `diag_out`. An unreadable one is one error saying so.
 private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDiagnostic] {
-    guard let text = takeString(raw) else { return [] }
-    guard let list = try? JSONDecoder().decode([GraphicDiagnostic].self, from: Data(text.utf8))
-    else {
-        return [GraphicDiagnostic(
-            level: "error", message: "The core's diagnostics could not be read: \(text)",
-            line: nil, column: nil, frame: nil)]
-    }
-    return list
+    takeString(raw).map(GraphicDiagnostic.list(json:)) ?? []
 }
 
 /// The engine's fonts and assets (`RcGraphicLibrary`). Filled with
@@ -695,12 +700,7 @@ final class GraphicLibrary {
 
     /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
     func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
-        let sides = 0...Self.maxSide
-        guard sides.contains(width), sides.contains(height) else {
-            throw GraphicFailure(diagnostics: [GraphicDiagnostic(
-                level: "error", message: "\(width)×\(height) is outside 0…\(Self.maxSide)",
-                line: nil, column: nil, frame: nil)])
-        }
+        try GraphicFailure.checkSides(width, height, max: Self.maxSide)
         let stride = width * 4
         var bgra = [UInt8](repeating: 0, count: max(height * stride, 1))
         var diag: UnsafeMutablePointer<CChar>? = nil

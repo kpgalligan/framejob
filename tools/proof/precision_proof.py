@@ -468,7 +468,8 @@ HEVC10_ROW = ('    Preset {\n        id: "hevc_10bit",\n        name: "HEVC 10-b
               '        container: Container::Mp4,\n        codec: "hevc_10bit",\n'
               '        video: true,\n        alpha: false,\n        size: None,\n'
               '        fps: None,\n'
-              '        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),\n    },\n')
+              '        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),\n'
+              '        writer: None,\n    },\n')
 HEVC_DEEP = (SETTINGS, "        return codec == .h264 || codec == .hevc ? .eightBit : nil\n",
              "        return codec == .h264 ? .eightBit : nil\n")
 MUTANTS = {

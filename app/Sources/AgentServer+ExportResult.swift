@@ -43,6 +43,10 @@ extension AgentServer {
         if let color = settings.color {
             result["dynamic_range"] = color
         }
+        // The speed the `av1` row was encoded at (spec §11 CX-12 (2)); absent elsewhere.
+        if let speed = settings.encoderSpeed {
+            result["encoder_speed"] = speed.rawValue
+        }
         if let measured = loudnessResult(loudness) {
             result["loudness"] = measured
         }

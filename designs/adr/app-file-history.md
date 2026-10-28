@@ -643,6 +643,22 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `rc_op_schemas()` call staying; a pure move gated alone, nothing widened. `wc -l
   app/Sources/ReelCore.swift`: 803 before, 774 after; `CoreValues.swift` is 116. The next seam is
   still `jsonArray`.
+  Codec-export C1 paid it (toll T2) before `ReelAV1` (`rc_av1_*`, spec §11 CX-12 (4)) landed:
+  `jsonArray` went whole to `CoreJSON.array` in `CoreValues.swift` (internal where it was
+  `private`; its two callers, `snapCandidates(excluding:)` and `ReelSnap.resolve`, renamed),
+  a pure move gated alone by `make typecheck`. `wc -l app/Sources/ReelCore.swift`: 789 before, 782
+  after; `CoreValues.swift` 138 → 147. `ReelAV1` then took ReelCore to 859, over the cap.
+  C1's fix pass paid that back before merge in two pure moves, each gated alone by `make
+  typecheck` (exit 0, the four baseline warnings): first `ReelAV1.Config` (with its hex decoder)
+  and `ReelAV1.Color` went whole to an `extension ReelAV1` in `CoreValues.swift` (859 → 823;
+  `CoreValues.swift` 147 → 187); then the `rc_*`-free halves of five members went there too —
+  `ReelExport.settings`' overrides encoding as `CoreJSON.overrides(_:)`, `takeDiagnostics`'
+  decode as `GraphicDiagnostic.list(json:)`, `GraphicLibrary.rasterize`'s side refusal as
+  `GraphicFailure.checkSides(_:_:max:)`, `ReelSpeed.limits`' decode and its trap as
+  `SpeedLimits.decoded(_:)`, and `ReelHDR10`'s private `withBytes` whole as an internal free
+  function — every `rc_*` call staying (823 → 789; `CoreValues.swift` 187 → 242). The next seam:
+  the header's list of where each earlier payment went (it repeats this entry) and
+  `ReelProject.scoped(_:)`'s long doc, neither code; no `rc_*`-free type is left in the file.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
@@ -670,7 +686,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   the alpha rows' straightening landed (`addChapters`, `pumpChapters`, `videoInput`,
   `audioInput`, `writer`, `range`, `chapterInput`, `chapterSamples` and `isStopping` lost
   `private`). `wc -l app/Sources/ExporterWriter.swift`: 782 before, 543 after;
-  `ExporterWriter+Chapters.swift` is 248. No next seam is named.
+  `ExporterWriter+Chapters.swift` is 248. Codec-export C1 paid toll T3 before its encoder
+  pump's wiring: `retimed(_:by:)` (`// MARK: - Time`) went whole to `ExporterWriter+Time.swift`
+  as an `extension ExportWriter`, `private` becoming internal so `pump` still reaches it, a pure
+  move gated alone by `make typecheck`. `wc -l app/Sources/ExporterWriter.swift`: 586 before, 551
+  after; `ExporterWriter+Time.swift` is 38. C1's wiring (`encodePump`, the `addVideo` and `start`
+  branches, `readFailure`, `close()` in `allInputsFinished`, the `av01` brand in
+  `writingFinished`) took it to 587. The next seam: the audio half (`addAudio`,
+  `addAudioOutput`) out to an `ExporterWriter+Audio.swift`.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`. The
   grading road map's GR1 moved `// MARK: Colour` and `colorSection()` to `VideoPane+Color.swift`

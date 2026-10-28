@@ -63,7 +63,10 @@ detail there.
   `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
   clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll), and
   `CoreJSON` (`value`, `snapTicks`: `clipState`'s and `snapCandidates`' JSON
-  halves, clean-up round 3's toll).
+  halves, clean-up round 3's toll; `array`, `overrides`, C1's tolls), and C1's
+  fix-pass moves: `ReelAV1.Config` / `.Color` (an extension of `ReelCore.swift`'s
+  `ReelAV1`, whose `rc_av1_*` calls stay there), `GraphicDiagnostic.list(json:)`,
+  `GraphicFailure.checkSides`, `SpeedLimits.decoded` and the free `withBytes`.
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
   `revealURL(for:)` (the original, else the copy), `isTrashed` and
   `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element
@@ -1673,7 +1676,9 @@ the key map behind it.
   `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
-  `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
+  `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
+  `ExportAV1Encoder.swift` · `ExportI420.swift` (+ `Resources/Shaders/ExportI420.metal`) ·
+  `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
@@ -3147,7 +3152,9 @@ a main hop. `DispatchQueue`
 only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the cache lane's
 queue (`MediaImporter.CacheLane`, spec §11 #367), the export
-progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
+progress timer, the AV1 encode queue (`ExportEncodePump`'s
+`com.kgalligan.framejob.export.encode`, with its `DispatchSemaphore(3)` between the
+video pump and the encoder, spec §11 CX-12), `Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`

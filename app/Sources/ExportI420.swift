@@ -1,0 +1,210 @@
+import CoreVideo
+import Metal
+import MetalPerformanceShaders
+
+/// One picture for SVT-AV1: 8-bit planar 4:2:0 in one shared buffer — luma, then Cb at
+/// `cbOffset`, then Cr at `crOffset`, each row `lumaStride` or `chromaStride` bytes.
+struct I420Frame {
+    let buffer: MTLBuffer
+    let width: Int
+    let height: Int
+    let lumaStride: Int
+    let chromaStride: Int
+    let cbOffset: Int
+    let crOffset: Int
+}
+
+/// `ExportI420.metal`'s uniforms, field for field.
+private struct ExportI420Uniforms {
+    var width: UInt32
+    var height: UInt32
+    var lumaStride: UInt32
+    var chromaStride: UInt32
+    var cbOffset: UInt32
+    var crOffset: UInt32
+}
+
+/// The compositor's 64RGBAHalf frames as BT.709 video-range I420 for the `av1` row (spec
+/// §11 CX-12 (5)), on the GPU: `MPSImageLanczosScale` to the export size when it is not the
+/// canvas — the picture fitted inside with black bars, or filling a frame within a pixel of
+/// the canvas's shape (`fills`, G-33 (c)) — then `framejob_export_i420`.
+///
+/// Called on the export's video queue alone; the planes come from a pool the encode queue
+/// gives back through `recycle` once SVT has copied them.
+final class ExportI420Converter {
+    let width: Int
+    let height: Int
+
+    private let device: MTLDevice
+    private let queue: MTLCommandQueue
+    private let pipeline: MTLComputePipelineState
+    private let cache: CVMetalTextureCache
+    /// The scaler, its transform and clip, and the export-size texture it writes; nil when
+    /// the export is at the canvas size.
+    private let scaler: MPSImageLanczosScale?
+    private let scaled: MTLTexture?
+    private var transform = MPSScaleTransform(scaleX: 1, scaleY: 1, translateX: 0, translateY: 0)
+    private let lumaStride: Int
+    private let chromaStride: Int
+    private let length: Int
+
+    private let lock = NSLock()
+    private var pool: [I420Frame] = []
+
+    init(width: Int, height: Int, canvas: CGSize, fills: Bool, pool count: Int) throws {
+        func failure(_ what: String) -> Exporter.ExportError {
+            .failed("The frames could not be prepared for the AV1 encoder: \(what).")
+        }
+        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()
+        else { throw failure("no Metal device") }
+        guard let library = (try? device.makeDefaultLibrary(bundle: Bundle.main))
+            ?? device.makeDefaultLibrary(),
+            let function = library.makeFunction(name: "framejob_export_i420"),
+            let pipeline = try? device.makeComputePipelineState(function: function)
+        else { throw failure("the conversion kernel is missing") }
+        var cache: CVMetalTextureCache?
+        guard CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
+            == kCVReturnSuccess, let cache
+        else { throw failure("no texture cache") }
+        self.width = width
+        self.height = height
+        self.device = device
+        self.queue = queue
+        self.pipeline = pipeline
+        self.cache = cache
+        lumaStride = width
+        chromaStride = (width + 1) / 2
+        length = lumaStride * height + 2 * chromaStride * ((height + 1) / 2)
+
+        let canvasWidth = Int(canvas.width.rounded())
+        let canvasHeight = Int(canvas.height.rounded())
+        if canvasWidth == width && canvasHeight == height || canvasWidth < 1 || canvasHeight < 1 {
+            scaler = nil
+            scaled = nil
+        } else {
+            let made = try Self.scaling(
+                device: device, size: (width, height), canvas: canvas, fills: fills)
+            scaler = made.scaler
+            scaled = made.texture
+            transform = made.transform
+        }
+        for _ in 0..<max(1, count) {
+            pool.append(try makeFrame())
+        }
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) {
+        fatalError("ExportI420Converter does not support NSCoder")
+    }
+
+    /// The Lanczos scaler, its transform and clip, and a destination cleared to black once:
+    /// a fit writes only the picture's rectangle, so the bars stay black on every frame.
+    private static func scaling(
+        device: MTLDevice, size: (Int, Int), canvas: CGSize, fills: Bool
+    ) throws -> (scaler: MPSImageLanczosScale, texture: MTLTexture, transform: MPSScaleTransform) {
+        let (w, h) = (Double(size.0), Double(size.1))
+        let (cw, ch) = (Double(canvas.width), Double(canvas.height))
+        let s = fills ? max(w / cw, h / ch) : min(w / cw, h / ch)
+        let (pw, ph) = (cw * s, ch * s)
+        let transform = MPSScaleTransform(
+            scaleX: s, scaleY: s, translateX: (w - pw) / 2, translateY: (h - ph) / 2)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba16Float, width: size.0, height: size.1, mipmapped: false)
+        descriptor.usage = [.shaderRead, .shaderWrite]
+        descriptor.storageMode = .shared
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw Exporter.ExportError.failed(
+                "The frames could not be prepared for the AV1 encoder: no scaling texture.")
+        }
+        let zeros = [UInt16](repeating: 0, count: size.0 * size.1 * 4)
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, size.0, size.1), mipmapLevel: 0, withBytes: zeros,
+            bytesPerRow: size.0 * 8)
+        let scaler = MPSImageLanczosScale(device: device)
+        if !fills {
+            let x = max(0, Int(((w - pw) / 2).rounded()))
+            let y = max(0, Int(((h - ph) / 2).rounded()))
+            scaler.clipRect = MTLRegionMake2D(
+                x, y, min(size.0 - x, Int(pw.rounded())), min(size.1 - y, Int(ph.rounded())))
+        }
+        return (scaler, texture, transform)
+    }
+
+    private func makeFrame() throws -> I420Frame {
+        guard let buffer = device.makeBuffer(length: length, options: .storageModeShared) else {
+            throw Exporter.ExportError.failed(
+                "The frames could not be prepared for the AV1 encoder: no plane buffer.")
+        }
+        let chromaBytes = chromaStride * ((height + 1) / 2)
+        return I420Frame(
+            buffer: buffer, width: width, height: height, lumaStride: lumaStride,
+            chromaStride: chromaStride, cbOffset: lumaStride * height,
+            crOffset: lumaStride * height + chromaBytes)
+    }
+
+    /// One frame converted, waiting for the GPU; nil when it could not be wrapped or the
+    /// GPU failed.
+    func convert(_ frame: CVPixelBuffer) -> I420Frame? {
+        guard let source = wrap(frame), let texture = CVMetalTextureGetTexture(source),
+            let out = take(), let commands = queue.makeCommandBuffer()
+        else { return nil }
+        var input = texture
+        if let scaler, let scaled {
+            withUnsafePointer(to: &transform) { pointer in
+                scaler.scaleTransform = pointer
+                scaler.encode(
+                    commandBuffer: commands, sourceTexture: texture, destinationTexture: scaled)
+                scaler.scaleTransform = nil
+            }
+            input = scaled
+        }
+        guard let encoder = commands.makeComputeCommandEncoder() else {
+            recycle(out)
+            return nil
+        }
+        var uniforms = ExportI420Uniforms(
+            width: UInt32(width), height: UInt32(height), lumaStride: UInt32(lumaStride),
+            chromaStride: UInt32(chromaStride), cbOffset: UInt32(out.cbOffset),
+            crOffset: UInt32(out.crOffset))
+        encoder.setComputePipelineState(pipeline)
+        encoder.setTexture(input, index: 0)
+        encoder.setBuffer(out.buffer, offset: 0, index: 0)
+        encoder.setBytes(&uniforms, length: MemoryLayout<ExportI420Uniforms>.stride, index: 1)
+        let group = MTLSize(width: 16, height: 16, depth: 1)
+        let blocks = MTLSize(width: (width + 1) / 2, height: (height + 1) / 2, depth: 1)
+        encoder.dispatchThreads(blocks, threadsPerThreadgroup: group)
+        encoder.endEncoding()
+        commands.commit()
+        commands.waitUntilCompleted()
+        withExtendedLifetime(source) {}
+        guard commands.status == .completed else {
+            recycle(out)
+            return nil
+        }
+        return out
+    }
+
+    /// Gives a frame's planes back to the pool.
+    func recycle(_ frame: I420Frame) {
+        lock.lock()
+        pool.append(frame)
+        lock.unlock()
+    }
+
+    private func take() -> I420Frame? {
+        lock.lock()
+        let frame = pool.popLast()
+        lock.unlock()
+        return frame ?? (try? makeFrame())
+    }
+
+    /// The frame as a Metal texture over the same IOSurface.
+    private func wrap(_ frame: CVPixelBuffer) -> CVMetalTexture? {
+        CVMetalTextureCacheFlush(cache, 0)
+        var wrapper: CVMetalTexture?
+        let status = CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault, cache, frame, nil, .rgba16Float,
+            CVPixelBufferGetWidth(frame), CVPixelBufferGetHeight(frame), 0, &wrapper)
+        return status == kCVReturnSuccess ? wrapper : nil
+    }
+}

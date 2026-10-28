@@ -138,6 +138,15 @@ governs a module now.
   the three 10-bit rows carry `hlg` (the default), `pq` or `sdr`, every
   other video row writes the SDR version, and `hlg`/`pq` are refused in an
   SDR project and on a row that is not 10-bit, each in its own sentence.
+- `av1_mp4.rs` · `ffi_av1.rs` — AV1 in MP4 (spec §11 CX-12, road map
+  codec-export C1): `av1C` built from a full parse of the sequence header OBU,
+  temporal delimiters stripped in place, and the `av01` brand put into `ftyp`
+  (no `mp41` to replace is an error, never a file without `av01`); the three
+  `rc_av1_*` exports. `leb128` is shared with `hdr10.rs`. The export table's
+  `writer` field (`svt_av1` on `av1` only; `avf_preset` stays the ImageIO
+  switch) and the `encoder_speed` override (`faster` | `balanced` | `smaller`,
+  refused on any other row) are `export_table.rs`' and `export_overrides.rs`';
+  `Container` is `export_container.rs`'.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,
@@ -783,7 +792,8 @@ governs a module now.
   `RC_MAX_*` in the header), read-any-version / write-current, the migration
   hook; a file numbered 1015 (the grading branch's builds) is read as 15
   (spec §11 GR-9).
-- `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs`
+- `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs` ·
+  `export_container.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
   a canvas, a duration, a rate and an override against a preset row; in an
   HLG project a video row's settings name the picture it writes as `color`,

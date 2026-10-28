@@ -34,6 +34,7 @@ use framejob_core::ffi::{
 use framejob_core::ffi_agent::{
     rc_agent_socket_release, rc_agent_socket_start, rc_agent_string_create,
 };
+use framejob_core::ffi_av1::{rc_av1_config, rc_av1_ftyp_brand, rc_av1_strip_temporal_delimiters};
 use framejob_core::ffi_container::{
     rc_container_describe, rc_container_free, rc_container_open, rc_container_retime,
     rc_container_sample, rc_container_sample_count,
@@ -2352,6 +2353,23 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let read = unsafe { rc_hdr10_still_peak(ptr::null(), 64) };
     assert_eq!(take_string(read).as_deref(), Some("{}"));
     cover("rc_hdr10_still_peak");
+
+    // rc_av1_config — NULL bytes are refused through err_out, and tolerated
+    // with no channel.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_av1_config(ptr::null(), 16, &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("bytes is NULL"));
+    assert!(unsafe { rc_av1_config(ptr::null(), 0, ptr::null_mut()) }.is_null());
+    cover("rc_av1_config");
+    // rc_av1_strip_temporal_delimiters — NULL keeps nothing.
+    assert_eq!(
+        unsafe { rc_av1_strip_temporal_delimiters(ptr::null_mut(), 16) },
+        0
+    );
+    cover("rc_av1_strip_temporal_delimiters");
+    // rc_av1_ftyp_brand — NULL has no ftyp.
+    assert_eq!(unsafe { rc_av1_ftyp_brand(ptr::null_mut(), 32) }, -1);
+    cover("rc_av1_ftyp_brand");
 
     swept.sort();
     swept.dedup();

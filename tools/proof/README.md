@@ -25014,3 +25014,66 @@ tree's encoders and never fetches them.
 `libSvtAv1Enc.a`, 178 in `libvpx.a`). Selftest 12/12; the three mutants each
 failed exactly their rows. `codecs_proof.py` 3/3 on Debug and on Release
 (`svt-av1 v4.2.0`, `libvpx v1.17.0 (WebM Project VP9 Encoder v1.17.0)`).
+
+## Codec export C1 — AV1 in MP4 (`av1_export_proof.py` Z1, A1–A9, S1, S2, R1, R2; eight mutants; `export_offset_proof.py` E36, E37; spec §11 CX-12, CX-13)
+
+The `av1` row: the compositor's frames converted to BT.709 video-range I420 on
+the GPU (`ExportI420.metal`), encoded by the bundled SVT-AV1 on a serial encode
+queue (`ExportEncodePump`), its packets stripped of temporal delimiters and
+written through a passthrough `AVAssetWriterInput` whose `av01` format
+description holds the core's `av1C` (`rc_av1_config`), and the finished file's
+`ftyp` branded `av01` (`rc_av1_ftyp_brand`).
+
+```
+python3 tools/proof/av1_export_proof.py [--app debug|release|PATH]          # Z1, A1–A9, S1, S2
+python3 tools/proof/av1_export_proof.py --rate                              # also R1, R2 (CX-13's cap and quality)
+python3 tools/proof/av1_export_proof.py --mutant NAME                       # exit 1 caught, 0 survived, 3 inexact, 2 control
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E36,E37  # clicks and flashes through av1
+```
+
+**`av1_export_proof.py`** launches its own instances (scratch sockets, stopped
+by their own PIDs) and works under `work/av1-export/`. ffprobe and ffmpeg
+(Homebrew, libdav1d) only read the files: this Mac (an M2) has no AV1 decoder,
+so no row imports or plays one through Frame Job. Its docstring has every row;
+in short: Z1 the logs carry no `Frame Job: `, `Svt[` or `SVT-AV1: ` line; A1 the
+stream kinds (`av1`/`av01`/Main/`yuv420p`/640 × 360, `aac`/`mp4a`); A2 the
+`av01` brand; A3a the sequence header's colour (1/1/1, video range); A3b the
+`colr` box read from the MP4's bytes (`nclx` 1/1/1, full_range 0); A4 a clean
+decode of 150 frames and no temporal delimiter; A5 the keyframes (first K, gap
+≤ 2 s, count bound, K flag = shown KEY_FRAME both ways, no hidden intra frame);
+A6 a 1080p, 120 s
+export cancelled within 10 s with no file; A7 the three speeds echoed and
+their sizes pairwise more than 1 % apart (two encodes at one speed differ by a
+few hundred bytes, so "different" alone would not see a speed ignored), and
+`"fast"` and `encoder_speed` on `h264` refused naming the key; A8 a letterboxed
+640 × 480 and a 1280 × 720; A9 an in/out export of 60 frames; S1, S2 the
+sheet's Speed row on an instance pinned to `av1` at `smaller` and to `h264`
+(enabled and disabled read off the popup's darkest pixel against the Format
+popup's, the layout dump having no enabled flag). R1, R2 (`--rate`) export the
+owner's 55 s 1080p clip as ProRes 422 (the reference), then at "Format default"
+and at High as `hevc` and as `av1` at each speed: each `av1` file averages at
+most 1.25 × the cap (CX-13's soft cap) and scores a VMAF against the reference
+(ffmpeg's libvmaf) at or above the `hevc` file's; a missing fixture skips them
+by name. CX-13's calibration itself is `work/codec-spike/crf.py` (gitignored,
+beside the spike's `run.py`): HEVC at five rates and SVT-AV1's CRF sweep and
+capped checks on the spike's three 1080p clips, into `crf.jsonl`.
+
+The mutants (`--mutant`, a tree copy, `core/` the copy's own for the two core
+ones) and their rows: `td-kept` A4 and `cargo test --test av1_mp4`;
+`brand-unpatched` A2; `open-gop` A5 and Z1; `speed-ignored` A7;
+`encode-ignores-cancel` A6; `speed-on-any-row` A7 and `cargo test --test
+export_av1`; `colour-untagged-bitstream` A3a; `colour-untagged-container` A3b.
+
+**Runs (2026-10-27).** Debug and Release 13/13; `--rate` on Release 15/15 (the
+undershoot printed: 0.667–0.670 of the target in all six runs). Seven mutants
+were caught exactly; `all-sync` and `open-gop` survived, recorded in
+`designs/codec-export.md`'s C1 findings. `encode-ignores-cancel` was caught
+only after A6 waited for the loudness measurement to end before cancelling.
+**Fix pass 1** (the same day, capped CRF, CX-13): `all-sync` and its inverse
+`no-sync` (every sample `NotSync`) both survived — the passthrough writer reads
+the sync samples from the bitstream — so the pump's attachment and both mutants
+went; `open-gop` is caught (exit 1, A5 and Z1) now that the rate is CRF, since
+SVT-AV1 forces KF refresh only under single-pass VBR. Under a strict 12 % cap
+`--rate` failed R1 and R2 (the owner's clip under `hevc`'s VMAF); the owner chose a
+soft cap (SVT's 50 %, each file at most 1.25 × the cap), and on the final tree
+`--rate` on Release scored 15/15 (`designs/codec-export.md`'s C1 fix pass 1).

@@ -441,7 +441,13 @@ char *rc_normalise_color(const char *text);
    the frame-by-frame ImageIO writer (the two image formats), and since
    AVFoundation publishes no LPCM export preset the two new rows repeat the
    M4A row's name rather than carrying a null that would hand a WAV to the
-   image writer. Read it as a record, never as an instruction. */
+   image writer. Read it as a record, never as an instruction.
+
+   One row, `av1` (spec 11 CX-12), is encoded by a library bundled in the
+   app rather than by AVFoundation, which still writes its MP4 (its
+   `avf_preset` is the passthrough name, a record): it alone carries
+   `writer` ("svt_av1", the encoder route) and `encoder_speeds` (["faster",
+   "balanced", "smaller"], the speeds its `encoder_speed` override takes). */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this
@@ -475,7 +481,10 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * -70..0; `peak_dbtp`, the true-peak ceiling the gain is capped against,
  * -20..0) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
  * HLG project's 10-bit rows default to hlg, its other video rows write sdr
- * and refuse hlg and pq, and an SDR project refuses hlg and pq). Absent
+ * and refuse hlg and pq, and an SDR project refuses hlg and pq) and
+ * `encoder_speed` ("faster", "balanced" or "smaller", spec 11 CX-12: taken
+ * only by a row whose preset lists encoder speeds, balanced there when
+ * absent, and an error naming the row on any other). Absent
  * and explicit null both mean "use the preset", an unknown key is ignored
  * so a newer UI still gets an export, and a value out of range or of the
  * wrong type is an error naming the key and the value. One pairing rule,
@@ -523,7 +532,11 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  *
  * In an HLG project every video row's settings carry `color`, the picture it
  * writes: "hlg", "pq" or "sdr" (spec 11 HD-14); an SDR project's and an
- * audio row's never do. */
+ * audio row's never do.
+ *
+ * A row a bundled encoder writes (`av1`, spec 11 CX-12) adds two keys at
+ * the end, and no other row's settings carry either: `writer` ("svt_av1")
+ * and `encoder_speed` (the speed asked, else "balanced"). */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 
@@ -776,6 +789,39 @@ char *rc_hdr10_av1_peak(const uint8_t *config, size_t config_len, const uint8_t 
  * a NULL pointer or 0 length reads {}; NULL only on a caught panic. Freed
  * with rc_string_free. */
 char *rc_hdr10_still_peak(const uint8_t *file, size_t file_len);
+
+/* ------------------------------------------------------------------- av1 */
+
+/* An AV1 encoder's container bytes, decided in the core (spec 11 CX-12 (4));
+ * the encoder itself is the app's (CX-4) and nothing here encodes.
+ *
+ * rc_av1_config: the `av1C` record (AV1-ISOBMFF 2.3) for `obus`, an OBU run
+ * holding a sequence header OBU (type 1; the first one is used), parsed per
+ * AV1 5.5 through color_config. JSON {"av1c_hex": the record as lowercase
+ * hex, "seq_profile", "seq_level_idx" (operating point 0's), "seq_tier",
+ * "bit_depth", "monochrome", "color": {"primaries", "transfer", "matrix",
+ * "full_range"}} (2/2/2 when the header describes no colour). The record is
+ * 0x81, profile << 5 | level, tier << 7 | high_bitdepth << 6 | twelve_bit
+ * << 5 | monochrome << 4 | subsampling_x << 3 | subsampling_y << 2 |
+ * chroma_sample_position, 0x00, then the sequence header OBU with its size
+ * field. NULL with a message through `err_out` when there is no sequence
+ * header or it ends early (naming the byte or the bit and the field), or on
+ * a caught panic. Freed with rc_string_free. */
+char *rc_av1_config(const uint8_t *obus, size_t len, char **err_out);
+
+/* Removes every temporal delimiter OBU (type 2) from the AV1 packet in
+ * `bytes`, in place, and answers the length kept (AV1-ISOBMFF 2.4: a sample
+ * carries none). 0 for a NULL pointer, a 0 length, a run that is not
+ * whole OBUs (one without a size field runs to the end; the bytes
+ * untouched), a packet of temporal delimiters only, or a caught panic. */
+size_t rc_av1_strip_temporal_delimiters(uint8_t *bytes, size_t len);
+
+/* Makes the `ftyp` box at the start of `head` (a written MP4's first
+ * bytes) carry `av01` (AV1-ISOBMFF 2.1): 0 when it is already a compatible
+ * brand, 1 when the first `mp41` compatible brand was rewritten `av01` in
+ * place, -1 when there is no `ftyp` box at byte 0, it runs past `len`, or
+ * it has neither (the bytes untouched), or on a caught panic. */
+int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
 
 /* ----------------------------------------------------------------- agent */
 

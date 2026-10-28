@@ -22,6 +22,11 @@
 //! (the size, the rate, the range, the file's UTI) is resolved identically,
 //! because it means the same thing on either path.
 //!
+//! One row, `av1` (spec §11 CX-12), is encoded by a bundled library and
+//! not by AVFoundation, which still writes its container: its `writer`
+//! names the route and its `encoder_speed` the library's speed, two keys
+//! no other row's settings carry.
+//!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
 //! same rows, so a preset cannot exist in the menu and not in the resolver.
@@ -35,10 +40,10 @@
 use serde_json::{Map, Value};
 
 use crate::export_overrides::{
-    boolean, dynamic_range, fps as fps_override, loudness, object, positive_u32,
+    boolean, dynamic_range, encoder_speed, fps as fps_override, loudness, object, positive_u32,
     range as range_override,
 };
-use crate::export_table::fps_json;
+use crate::export_table::{fps_json, EncoderSpeed};
 use crate::model::Project;
 use crate::time;
 
@@ -70,8 +75,9 @@ impl Project {
     /// (`{"start", "duration"}` in ticks), `optimize_for_network`, the two
     /// bitrates `video_bitrate` / `audio_bitrate` (bits per second,
     /// strictly positive), the two loudness figures `loudness_lufs` /
-    /// `peak_dbtp` and `dynamic_range` (`hlg`, `pq` or `sdr`, spec §11
-    /// HD-14); anything else in the object is ignored, so a newer UI
+    /// `peak_dbtp`, `dynamic_range` (`hlg`, `pq` or `sdr`, spec §11
+    /// HD-14) and `encoder_speed` (`faster`, `balanced` or `smaller`, on a
+    /// row a bundled encoder writes, CX-12); anything else in the object is ignored, so a newer UI
     /// can send fields this build does not know. Each is read and refused
     /// by `export_overrides.rs`, which is where the spelling of every one
     /// of them lives.
@@ -112,6 +118,19 @@ impl Project {
         // read before anything else, so a mistyped value is refused by name
         // whatever the row, and resolved against the canvas and the row.
         let picture = self.deliverable(preset, dynamic_range(overrides)?)?;
+        // The bundled encoder's speed (spec §11 CX-12 (2)): read on any row
+        // so a misspelling is named, then refused on a row it cannot apply
+        // to, and Balanced when a writer row was not asked.
+        let speed = match (encoder_speed(overrides)?, preset.takes_encoder_speed()) {
+            (Some(_), false) => {
+                return Err(format!(
+                    "{} has no encoder speed; encoder_speed applies to av1",
+                    preset.id
+                ))
+            }
+            (asked, true) => Some(asked.unwrap_or(EncoderSpeed::Balanced)),
+            (None, false) => None,
+        };
 
         // Size: the preset's cap if it has one, else the canvas — a movie
         // preset renders at whatever the project composites at, and a size
@@ -253,6 +272,12 @@ impl Project {
         // settings are the text they were and an audio row is unchanged.
         if let Some(picture) = picture {
             out.insert("color".to_string(), Value::from(picture.as_str()));
+        }
+        // The encoder route and its speed, on a writer row only, so every
+        // other row's settings are the text they were (spec §11 CX-12).
+        if let (Some(writer), Some(speed)) = (preset.writer, speed) {
+            out.insert("writer".to_string(), Value::from(writer.as_str()));
+            out.insert("encoder_speed".to_string(), Value::from(speed.as_str()));
         }
         Ok(Value::Object(out))
     }

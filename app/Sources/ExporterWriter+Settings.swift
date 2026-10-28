@@ -149,7 +149,7 @@ extension ExportWriter {
     /// (`shapeGap`). No codec is asked — an opaque row fills where it used to
     /// write a black line, an alpha row where it used to write an edge at the
     /// wrong alpha.
-    private static func fillsTheBox(_ settings: ExportSettings, canvas: CGSize) -> Bool {
+    static func fillsTheBox(_ settings: ExportSettings, canvas: CGSize) -> Bool {
         let shape = shapeGap(encodedSize(settings), canvas: canvas)
         return shape.gap > 0 && shape.gap <= shape.limit
     }
@@ -187,7 +187,7 @@ extension ExportWriter {
     /// included — it does not need it either (measured: 1001 × 667 survives
     /// as `yuv422p10le`), but changing the bytes a shipped row writes for a
     /// case no proof covers is not this guard's business.
-    private static func encodedSize(_ settings: ExportSettings) -> (width: Int, height: Int) {
+    static func encodedSize(_ settings: ExportSettings) -> (width: Int, height: Int) {
         guard codecType(for: settings.codec) == .proRes4444 else {
             return (evenDimension(settings.width), evenDimension(settings.height))
         }
@@ -381,10 +381,16 @@ extension ExportWriter {
     private static func defaultVideoBitrate(
         _ settings: ExportSettings, codec: AVVideoCodecType
     ) -> Int {
+        let perPixel = (codec == .hevc || codec == .hevcWithAlpha) ? 0.07 : 0.14
+        return defaultVideoBitrate(settings, bitsPerPixel: perPixel)
+    }
+
+    /// The same rate at `bitsPerPixel` per frame — the AV1 row's "Format
+    /// default" is HEVC's 0.07 (spec §11 CX-9 (2)).
+    static func defaultVideoBitrate(_ settings: ExportSettings, bitsPerPixel: Double) -> Int {
         let pixels = Double(max(1, settings.width)) * Double(max(1, settings.height))
         let rate = settings.fps.double > 0 ? settings.fps.double : 30
-        let perPixel = (codec == .hevc || codec == .hevcWithAlpha) ? 0.07 : 0.14
-        return Int(min(max(pixels * rate * perPixel, 1_000_000), 200_000_000))
+        return Int(min(max(pixels * rate * bitsPerPixel, 1_000_000), 200_000_000))
     }
 
     /// Even, and never zero — H.264 and HEVC macroblocks come in pairs.

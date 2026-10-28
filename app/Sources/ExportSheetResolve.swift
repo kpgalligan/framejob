@@ -144,6 +144,7 @@ extension ExportSheetController {
         choice.loudness = currentLoudness
         choice.inOutRange = rangePopup.indexOfSelectedItem == 1
         choice.burnInTimecode = currentApplies.burnIn && recipeOptions.burnInTimecode
+        choice.encoderSpeed = encoderSpeedChoice.rawValue
         return choice
     }
 
@@ -196,6 +197,7 @@ extension ExportSheetController {
         applyLoudness(choice)
         rangePopup.selectItem(at: choice.inOutRange && range != nil ? 1 : 0)
         burnInCheckbox.state = choice.burnInTimecode ? .on : .off
+        applySpeed(choice)
     }
 
     /// Step 2, after the listing. A row whose id this format does not offer —
@@ -384,6 +386,7 @@ extension ExportSheetController {
         // spelled at the top level exported the whole project instead of the
         // in/out range, silently.
         if let picture = dynamicRangeOverride() { overrides["dynamic_range"] = picture }
+        if let speed = encoderSpeedOverride() { overrides["encoder_speed"] = speed }
         if rangePopup.indexOfSelectedItem == 1, let range = range {
             overrides["range"] = [
                 "start": range.start,
@@ -438,6 +441,7 @@ extension ExportSheetController {
         // with no picture to write it into.
         burnInCheckbox.isEnabled = applies.burnIn
         syncDynamicRange(applies)
+        syncSpeed(applies)
 
         guard let settings = resolved else {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."
@@ -470,7 +474,8 @@ extension ExportSheetController {
             if applies.videoBitrate {
                 let rate = tier.videoBitsPerSecond(
                     width: format.width, height: format.height, fps: format.fps, codec: codec)
-                item.title = "\(tier.name) · \(Self.rateText(rate))"
+                let soft = applies.encoderSpeed ? "usually ≤ " : ""   // spec §11 CX-13
+                item.title = "\(tier.name) · \(soft)\(Self.rateText(rate))"
             } else if applies.audioBitrate {
                 item.title = "\(tier.name) · \(Self.rateText(tier.audioBitsPerSecond))"
             } else {
@@ -515,8 +520,10 @@ extension ExportSheetController {
         let container = settings.container.uppercased()
         // A frame-sequence preset's codec IS its container: "GIF · GIF".
         if container != parts[0] { parts.append(container) }
+        if let speed = settings.encoderSpeed { parts.append(speed.menuName) }
         if let rate = settings.videoBitrate {
-            parts.append(Self.rateText(rate))
+            // A bundled encoder's rate is a soft cap (spec §11 CX-13).
+            parts.append((settings.writer == nil ? "" : "usually ≤ ") + Self.rateText(rate))
         }
         if let rate = settings.audioBitrate {
             parts.append("\(Self.rateText(rate)) audio")

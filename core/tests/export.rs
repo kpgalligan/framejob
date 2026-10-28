@@ -66,10 +66,11 @@
 //!     at settings they did not ask for, reported ok.
 //!
 //! 12. **The rows, in menu order:** `h264`, `hevc`, `hevc_alpha`,
-//!     `hevc_10bit`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`,
-//!     `audio_aiff`, `gif`, `apng` — [`EXPECTED`] holds them; the
-//!     `hevc_10bit` row (spec §11 PR-3) has its own file,
-//!     `core/tests/export_hevc_10bit.rs`.
+//!     `hevc_10bit`, `av1`, `prores_422`, `prores_4444`, `audio_m4a`,
+//!     `audio_wav`, `audio_aiff`, `gif`, `apng` — [`EXPECTED`] holds them;
+//!     the `hevc_10bit` row (spec §11 PR-3) has its own file,
+//!     `core/tests/export_hevc_10bit.rs`, and so has the `av1` row (spec
+//!     §11 CX-12), `core/tests/export_av1.rs`.
 //!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
@@ -124,7 +125,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 11] = [
+const EXPECTED: [Expected; 12] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -180,6 +181,21 @@ const EXPECTED: [Expected; 11] = [
         alpha: false,
         file_type: "public.mpeg-4",
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
+    },
+    // AV1 in MP4 (spec §11 CX-12): SVT-AV1 encodes and AVFoundation writes
+    // the MP4, so it is an AVFoundation row whose session name is the
+    // passthrough one, a record only.
+    Expected {
+        id: "av1",
+        container: "mp4",
+        codec: "av1",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: false,
+        file_type: "public.mpeg-4",
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
     },
     Expected {
         id: "prores_422",
@@ -709,11 +725,17 @@ fn alpha_is_the_only_key_the_settings_grew() {
     for want in EXPECTED.iter() {
         let mut plain: Vec<String> = KEYS_BEFORE_ALPHA.iter().map(|k| k.to_string()).collect();
         plain.push("alpha".to_string());
+        // The encoder route and its speed (spec §11 CX-12), on the one row
+        // a bundled encoder writes and on no other.
+        if want.id == "av1" {
+            plain.push("writer".to_string());
+            plain.push("encoder_speed".to_string());
+        }
         plain.sort();
         assert_eq!(
             keys_of(&settings(&handle, want.id, None)),
             plain,
-            "{}'s settings are not the pre-phase keys plus alpha",
+            "{}'s settings are not the pre-phase keys plus alpha (and av1's writer keys)",
             want.id
         );
 
