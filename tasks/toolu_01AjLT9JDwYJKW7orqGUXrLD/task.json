@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01AjLT9JDwYJKW7orqGUXrLD",
+  "agent_id": "a097f137ecb30bc0b",
+  "subagent_type": "lc-reviewer",
+  "task_description": "Review codecs C2",
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 138988,
+    "cache_read_tokens": 1920693,
+    "output_tokens": 14385,
+    "api_call_count": 22
+  },
+  "started_at": "2026-10-28T11:07:42.191425-04:00",
+  "completed_at": "2026-10-28T11:10:31.548209-04:00"
+}

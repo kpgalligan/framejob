@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_016cf35SFhuXQ86DacykEh4B",
+  "agent_id": "a2658c97041932452",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary review codecs C2",
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 129534,
+    "cache_read_tokens": 4269797,
+    "output_tokens": 31525,
+    "api_call_count": 47
+  },
+  "started_at": "2026-10-28T01:37:09.800213-04:00",
+  "completed_at": "2026-10-28T01:42:57.180855-04:00"
+}
