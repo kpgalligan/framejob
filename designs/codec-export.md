@@ -135,7 +135,7 @@ spike's phase split became the Phases above, and its eight owner questions were 
 defaults (CX-4, CX-5, CX-7..CX-10).
 
 Date: 2026-10-27. Host: M2 Max (12 cores: 8 P + 4 E), macOS 26.5.1, AC power, Apple clang 17.0.0.
-Worktree: `/Users/kevingalligan/devel/framejob-codecs` (branch `codecs`), no product code
+Worktree: `~/devel/framejob-codecs` (branch `codecs`), no product code
 touched, nothing committed. Every instrument, log and output is under
 `tools/proof/work/codec-spike/` (gitignored):
 
@@ -1241,3 +1241,252 @@ the shortfall** (2026-10-28, "Best CRF, accept 0.06"): the cell is 12, the best 
 **Owed.** HDR-8 (`docs/manual-checks.md`): HLG and PQ `av1`
 exports played on an M3 or later beside `hevc_10bit`'s, and the HDR10 metadata read by a
 player. The spike half of CX-13's calibration was not re-run at 10 bits (CX-14 (6)). C3–C6.
+
+## C3 — AV1 in WebM, with Opus
+
+### Record
+
+**Built 2026-10-28** in `~/devel/framejob-codecs` (branch `codecs`, on C2's `5228645`), not yet
+committed or merged.
+
+**Decision first.** CX-15 in `designs/spec/11-decisions/codec-export.md` before any code: the
+`av1_webm` row (after `av1`, sharing its encoder, speeds, cap, CRF table, I010, CICP and HDR10,
+an HDR row, `optimize_for_network` inert); `ExportWebMWriter` as a second `ExportPipeline`, the
+exception to §7.8's one writer, sharing the reader outputs, the pump, the gain, #337's end, the
+chapter partition, the size and the rates, with no audio track a silent movie; the WebM layout
+(EBML 4/2, a SeekHead over a Void, Info, the two TrackEntries, Chapters, ms block times, a
+Cluster per video key, Cues); the interleave (a queue per declared track, no back-pressure on
+the audio pump); Opus at 192 kb/s in 20 ms packets with its tail; the risks. "Amended by CX-15"
+under CX-6, CX-7, CX-12 (1), CX-14 (2), HD-5's row list and HD-14 (c); the index's file row and
+one CX-15 row.
+
+**Tolls**, each gated alone before any feature code:
+- T1 `core/src/export_table.rs` → `export_encoder.rs`: `Writer` and `EncoderSpeed` with their
+  docs and `impl`s, re-exported (`pub(crate) use`); `lib.rs` `mod export_encoder;`. Gated by
+  `cargo fmt --check` (exit 0), `cargo test --release --test export --test export_size --test
+  export_av1` (export 38, export_av1 9, export_size 20 passed; the counts before C3's row) and
+  `make lint` (exit 0).
+  `wc -l`: 592 → 545; `export_encoder.rs` 56.
+- T2 `app/Sources/ReelCore.swift`: the header's payment list (lines 14–37) one sentence
+  pointing at `designs/adr/app-file-history.md`, `scoped(_:)`'s doc cut to its first and nil
+  paragraphs. `make typecheck` exit 0, the four baseline warnings. 789 → 748.
+- T3 `ExporterWriter.swift` → `ExporterWriter+Settings.swift`: `videoReadOutput(_:settings:)`
+  and `audioReadOutput(_:gained:)`, both callers using them. `make typecheck` exit 0, the four
+  warnings. `ExporterWriter.swift` 587 → 567; `+Settings` 474 → 513.
+
+**What landed.**
+- Core: `webm_ebml.rs` (398 lines; the IDs, vints, element writers and builders),
+  `webm_layout.rs` (202; `WebmLayout` and its checks, each refusal a sentence naming the value),
+  `webm_writer.rs` (314; `WebmWriter`: the reserved Void, the per-track queues and interleave,
+  Clusters with patched sizes, CuePoints, a BlockGroup with DiscardPadding, the finish
+  patches), `ffi_webm.rs` (120; the five `rc_webm_*` over a `Mutex<WebmWriter>`);
+  `container_codec.rs` `mastering_from_mdcv` and `light_from_clli`; `export_table.rs` the
+  `av1_webm` row (`PRESETS: [Preset; 13]`, 564 lines) and the `avf_preset` doc sentence;
+  `export_container.rs` `Container::Webm`; `dynamic_range.rs` five `HDR_ROWS` and the 8-bit
+  sentence naming `av1_webm`; `export.rs` the `encoder_speed` sentence (`… applies to av1 and
+  av1_webm`); the header's `webm` section and presets paragraph. No format bump.
+- Tests: `core/tests/webm_writer.rs` (the round trips through `Container` and the walk),
+  `webm_writer_refusals.rs` (the video-only layout, every refusal, two threads),
+  `common/webm.rs` (the helpers) and `common/ebml_read.rs` (the independent EBML walk);
+  `export.rs`, `export_size.rs`, `export_av1.rs`, `dynamic_range.rs`, `canvas_output.rs` and
+  `model_tests.rs`'s null sweep updated.
+- Swift: `ReelWebM` (`ReelCore.swift`, back to 789); `ExportPacketSink.swift` (97:
+  `ExportMP4PacketSink` with the readiness wait, `ExportAV1Track.sample` and the append taken
+  out of the pump, and `ExportWebMPacketSink`); `ExportEncodePump` runs into a sink, exposes
+  `config` and `picture` and passes `Packet.isKey` (`pic_type == EB_AV1_KEY_PICTURE`);
+  `ExportOpusEncoder.swift` (170), `ExportWebMLayout.swift` (86), `ExportWebMWriter.swift`
+  (351); `ExportChapter.partition`; `Exporter.pipeline` routes `webm`; `ExportAudioNormalizing`;
+  `Exporter.swift` line 364's cast (598 lines, unchanged); the prefetch for both writers;
+  `contentType(for:)`'s extension fallback; the catalog's lists and `audio_bitrate`.
+- Documents: §7.8, §7.1, §7.10, §7.4, §7.9a and the spec index; the guide's export, MCP and HDR
+  pages and the README; `docs/manual-checks.md` SE-18 and HDR-2's and HDR-8's lists; the two
+  ADR entries; `tools/proof/README.md`'s C3 section.
+- Proofs: `webm_export_proof.py` (Z1, W1–W13, S4, eight mutants); `export_offset_proof.py` E38,
+  E39; the sentence constants in `av1_export_proof.py` (H5's), `hdr_proof.py` (DR) and
+  `hevc_alpha_proof.py` (`B6_SIZE`); `av1_export_proof.py`'s `av1-not-hdr` and
+  `encode-ignores-cancel` anchors re-pointed (the array moved lines; the readiness wait moved
+  to `ExportPacketSink.swift`).
+
+**Commands run and what they printed.**
+- T1: `cargo fmt --check` exit 0; `cargo test --release --test export --test export_size
+  --test export_av1`: export 38, export_av1 9, export_size 20 passed; `make lint` exit 0. T2 and T3: `make typecheck`
+  exit 0 with the four baseline warnings, each run alone (T3's files reverted for T2's run).
+- Targeted, after the core and the row: `cargo test --release --test webm_writer --test
+  export --test export_size --test export_av1 --test dynamic_range --test canvas_output
+  --test export_hevc_10bit --test container`: webm_writer 12, export 38, export_size 20,
+  export_av1 11, dynamic_range 7, canvas_output 7, export_hevc_10bit 4, container 11 passed;
+  after the test file was split under the 400-line cap, `--test webm_writer --test
+  webm_writer_refusals` 8 and 4 passed; `cargo test --release --test model_tests null_safety` 1
+  passed; `make lint` exit 0 (after two clippy fixes: `is_multiple_of`, a needless lifetime).
+- `make typecheck` exit 0, the four warnings, after each Swift step.
+- `make app-debug`, then `av1_export_proof.py` on Debug after the sink refactor, before any
+  WebM code: 19/19 (the MP4 path unchanged).
+- `webm_export_proof.py` on Debug, eight runs: first 14/15 — W8 failed because ffmpeg's
+  Matroska demuxer exports no content-light-level side data when MaxFALL is 0 (below); after
+  W8 read the light level from the walk, 15/15 four times; after W2 gained its start check,
+  14/15 (the instrument's own rounding: Python's `round(6.5)` is 6, the writer's ms are half
+  up), then 15/15; after W3 read the walk's key flags, 15/15 on the final instrument. `export_offset_proof.py --only E36,E37,E38,E39` on a Debug instance:
+  4/4 (E38 and E39 median −0.043 ms, spread 0.000 / 0.001 ms; every flash on its frame).
+- The eight mutants (Debug copies), each exit 1, `MUTANT CAUGHT`, exactly its rows:
+  `codec-delay-zero` W2 and `cargo-webm_writer` (`audio_is_timed_from_the_codec_delay`,
+  `the_walk_finds_the_header_info_and_track_timing`); `no-discard-padding` W2 (240,648
+  samples) and W6 (96,648); `clusters-by-time` W4 and cargo
+  (`a_cluster_starts_before_its_relative_time_passes_32767_ms`,
+  `the_walk_finds_chapters_cues_and_the_seek_head`); `no-cues` W4; `colour-unwritten` W8 and
+  cargo (`a_file_reads_back_through_the_216r_reader`,
+  `the_walk_finds_the_header_info_and_track_timing`); `chapters-unclamped` W6; `all-key` W3;
+  `gain-skipped` W11. Three needed the instrument fixed first (below): `codec-delay-zero` was
+  `CAUGHT, NOT EXACTLY` with its spec rows (E38, E39 passed), `clusters-by-time` at a 1 s
+  interval lined up with the fixtures' keys, and `all-key` survived W3 as first written.
+- `make gate`: names 1 s, typecheck 7 s, fmt 3 s, lint 1 s, test 186 s, app 114 s, `gate: PASS
+  313s`.
+- Release: `RC_PROOF_APP=release python3 tools/proof/webm_export_proof.py` 15/15 (W1 145,776
+  bytes, W9 cancelled 0.50 s after `cancel_export`, W10 2.60 ×, W11 −16.0 LUFS);
+  `av1_export_proof.py` 19/19; `export_offset_proof.py --only
+  E16,E17,E18,E19,E36,E37,E38,E39` on a Release instance 8/8, its log free of `Frame Job: `;
+  `hdr_proof.py --only DR,Z1` 2/2 (DR's two 8-bit sentences name `av1_webm`);
+  `hevc_alpha_proof.py` 43/43 (B6's size list names `av1_webm`).
+
+**Findings.**
+- **ffmpeg reads AV1 key flags in Matroska from the bitstream.** ffprobe's and
+  `trace_headers`' packet flags are its AV1 parser's, so a container flag that lies is
+  invisible to them; W3 reads the SimpleBlocks' flags through the walk instead, and `all-key`
+  (every video block flagged key) is caught there.
+- **ffmpeg trims OpusHead's pre-skip whatever CodecDelay says.** With CodecDelay 0 the decoded
+  count is still 240,000 and E38/E39's clicks land the same (they are placed by sample in the
+  decoded stream); only the packets' times move (the first audio packet at 0 rather than
+  −7 ms, `initial_padding` 0 rather than 312). W2 checks that time, so `codec-delay-zero` is
+  W2's and cargo's, not E38's or E39's as the spec named them.
+- **ffmpeg's Matroska demuxer exports a content-light-level side data only when MaxCLL and
+  MaxFALL are both non-zero**, and HD-5's MaxFALL is 0: the PQ file's Colour carries MaxCLL
+  1000 / MaxFALL 0 (the walk and the core tests read it), but ffprobe shows only the mastering
+  display. A player that reads the light level the same way will see none (HDR-8 asks a person
+  to read the metadata).
+- **Opus.** AudioToolbox's pre-skip is 312 frames; at 192 kb/s A1's 5 s of sound is 74,132
+  bytes (about 119 kb/s; CX-7's undershoot), at 64 kb/s 28,560 (2.60 ×). The tail rule gave the
+  exact 240,000 and 96,000 samples on every run.
+- **One hang, not reproduced.** In the first mutant pass, while a `cargo test` ran on the same
+  machine, the `codec-delay-zero` copy's W8 `sdr` export stopped at progress 0.718 with the
+  file at its 430-byte header: `sample` showed the video pump blocked in
+  `copyNextSampleBuffer` and the audio pump gone, with no packet written (SVT-AV1 had not yet
+  emitted one). That is G-17's starvation: a reader output nobody reads stalls the other. The
+  writer now drains the audio output until the video pump has left whenever the audio pump
+  stops early (`ExportWebMWriter.drain`). That only narrowed G-17's window; fix pass 1
+  replaced it with one reader per output, which closes it for WebM (below). What
+  stopped the audio pump was not found: 42 exports of the same project at all three pictures
+  (24 on an idle machine, 18 under a CPU load), three whole proof runs logging every stop, and
+  every later run (Debug, every mutant copy, Release) showed no failure and no hang. Filed
+  below as owed.
+- The proof's own first mutant runner ran the whole `export_offset_proof.py` for every mutant
+  (an empty `--only` is every row); the offset path was dropped with `codec-delay-zero`'s E38
+  and E39.
+
+**CLAUDE.md edits owed** (the integrator's):
+- Root `CLAUDE.md`, the file map's `core/` line (line 110) and Architecture (line 162): the
+  core also writes the WebM an export makes ("… the index of a WebM/Matroska file being
+  imported and the WebM file an `av1_webm` export writes").
+- `core/CLAUDE.md`: new entries for `export_encoder.rs` (`Writer`, `EncoderSpeed`, re-exported
+  by `export_table.rs`) and `webm_ebml.rs` · `webm_layout.rs` · `webm_writer.rs` ·
+  `ffi_webm.rs` (§7.10's row); `dynamic_range.rs` (line 138) "the four HDR rows" → the five,
+  `av1_webm` among them; `av1_mp4.rs` (line 146) "`svt_av1` on `av1` only" → on `av1` and
+  `av1_webm`; `container_codec.rs`'s mention gains `mastering_from_mdcv` and
+  `light_from_clli`.
+- `app/CLAUDE.md`: the export entry (lines 1674–1682) gains `ExportWebMWriter.swift`,
+  `ExportWebMLayout.swift`, `ExportOpusEncoder.swift` and `ExportPacketSink.swift`, and
+  `ExporterImageSequence.swift`'s `ExportAudioNormalizing`; the `ReelCore` entry (line 25)
+  gains `ReelWebM` (`rc_webm_*`); the `DispatchQueue` seams (line 3156) gain the WebM writer's
+  two queues (`com.kgalligan.framejob.export.webm.video` and `.audio`), beside
+  `ExportWriter`'s; `ExportAudioEnd.swift`'s entry gains `align` (the WebM writer's
+  placement by stamp, fix pass 1); the export entry also gains `ExportWebMDevFault.swift`
+  (`-RCDevWebMFault`, dev only), and the WebM writer's line says one `AVAssetReader` per
+  output, each cancelled by its own pump (CX-15 (2)).
+- Root `CLAUDE.md`, "Verifying a build"'s list of dev-only launch defaults (beside
+  `-RCDevSyncHold` and `-RCDevRampRenderHold`): `-RCDevWebMFault audio@N|video@N|audio-hold@N`,
+  which puts a fault in an `av1_webm` export's audio pump or video sink so a proof can time
+  the stop (fix pass 1).
+
+**Fix pass 1 (the review and the orchestrator's ruling, 2026-10-28).**
+- **G-17 on the WebM path: closed, by one `AVAssetReader` per output (ruling 2).** Ruling 1
+  first asked for `reader.cancelReading()` from the stopping thread; that was stopped:
+  AVFoundation's `AVAssetReader.h` says of `cancelReading` "This method should not be called
+  concurrently with any calls to -[AVAssetReaderOutput copyNextSampleBuffer]", and G-17
+  measured exactly that call crashing 12 of 30 mid-export cancels (road map 10 §10.6 G3c).
+  Ruling 2 took the fix this pass proposed instead. `ExportWebMWriter` now gives the video
+  composition output and the audio mix output each a reader of its own over the same
+  composition and range (a silent movie has the video reader alone); each pump, after its
+  own last read on a stop, cancels its own reader on its own queue (the video reader's
+  cancel is a block on `videoQueue` after `ExportEncodePump`'s read loop, inside the pumps'
+  group; the audio pump's follows `pumpAudio`). No thread cancels another's reader, and
+  `allPumpsLeft` cancels none. `drain` and `videoLeft` are gone: they existed only for the
+  shared reader's coupling. `ExportEncodePump` and the MP4 path are untouched.
+  - **Measured first (R1):** `webm_readers_probe.swift` read A1's project through one reader
+    with both outputs and through two readers, each from its own build, its reads on two
+    threads at once: 150 frames each, every frame's 64RGBAHalf bytes equal (150 distinct
+    frames), the I010 of frames 0, 75 and 149 byte-equal (691,200 bytes each), and 240,000
+    frames of 16-bit sound equal sample for sample.
+  - **The windows (F1–F3):** `-RCDevWebMFault` (`ExportWebMDevFault.swift`, dev tools only)
+    over W9's 24-clip 1080p project: `audio@40` failed 0.44 s after the fault, `video@30`
+    0.56 s, and `audio-hold@40` (the audio pump held 3 s before a real read, then
+    `cancel_export`) cancelled 3.01 s after the cancel; each named its fault, left no file,
+    and logged both readers at status 4 (cancelled) — on Debug.
+  - **Mutants:** `audio-cancel-dropped` (the audio pump's own cancel gone) exit 1, `MUTANT
+    CAUGHT`, F1–F3: each export still ended in time, but its audio reader was left reading
+    (status 1). `shared-reader` (the audio output back on the video's reader): first run,
+    with the readers' line not yet naming a shared reader, `CAUGHT, NOT EXACTLY` — F1 took
+    the instance down (connection refused: a pump cancelling the shared reader while the other
+    was inside its read, G-17's crash again), while F2 and F3 ended in time (0.68 s; 5.27 s
+    against 3.01 s with two readers), the stopping pump's cancel of the shared reader having
+    woken the other read in those two runs. The readers' line then gained ` (one reader)` when
+    the two are one object; second run exit 1, `MUTANT CAUGHT`, F1–F3 (F3 again 5.22 s).
+    The timing rows alone therefore catch a shared reader only by its crash; the line is what
+    names it every time.
+- **Every stop is logged.** `stopped(with:)` writes the unified log (`Logger`, subsystem
+  `com.kgalligan.FrameJob`, category `export.webm`, public): "WebM export stopped
+  (first|later): <the error>". Nothing goes to stdout or the proofs' log.
+- **The Opus FIFO is fed by bytes.** `ExportOpusEncoder.encode` counted a buffer's frames as
+  its sample count and refused any buffer whose bytes were not exactly that × 4 — the
+  reviewer's candidate for the hang's early audio stop. It now counts the frames from the
+  bytes (4 a frame), so a buffer of any length, one cut short included, goes through the
+  FIFO whole; bytes that are not whole frames fail the export in a sentence ("A sound buffer
+  of N bytes is not a whole number of 16-bit stereo frames, so it could not be encoded to
+  Opus.").
+- **The sound is placed at its stamps.** It was placed by count (packet k at k × 20 ms
+  whatever the stamps said), so a straddling buffer dropped at the range's start, or a hole
+  in the stamps, moved all later sound earlier. `ExportAudioEnd.align` now puts each buffer
+  at its rebased stamp before `fit`: zeros for a gap (never past the target), the frames
+  already covered cut from its head, a buffer covered whole dropped. The stream the encoder
+  is fed is then the timeline's frame for frame, so packet k's first frame is the one stamped
+  k × 20 ms, the time it is written at; #337's length and the tail rule are unchanged
+  (CX-15 (5)).
+- **A failed open removes the file.** The core creates the file before it writes the
+  header, so the catch around `ReelWebM(path:layoutJSON:)` now calls `discard()`.
+- **Instruments.** `tools/proof/webm_readers_probe.swift` (R1, above); F1–F3 and
+  `ExportWebMDevFault.swift` (above); `tools/proof/webm_audio_probe.swift` (P1–P5 the FIFO by bytes: a short
+  last buffer, a `fit` cut, 404 and 396 bytes over 100 samples, 402 bytes refused; A1–A5
+  `align`), run by `webm_export_proof.py` (and `--probe` alone); three probe mutants,
+  `opus-length-exact` (P3, P4), `gap-unfilled` (A1, A5), `head-uncut` (A2); E40 in
+  `export_offset_proof.py`, an `av1_webm` in/out export from one frame past 11 s to 20 s
+  (no multiple of 1,024 or 4,096 frames from the start). E40 does not show whether the
+  read's first buffer straddled the in point; the probe's A rows are what pin `align`.
+- **Commands.** `make typecheck` exit 0, the four warnings, after each Swift step;
+  `webm_export_proof.py --probe` 10/10 and `--readers` (R1) 1/1 before any reader change;
+  the five new mutants each exit 1, `MUTANT CAUGHT`, exactly their rows (`opus-length-exact`
+  P3, P4; `gap-unfilled` A1, A5; `head-uncut` A2; `audio-cancel-dropped` F1–F3;
+  `shared-reader` F1–F3 on its second run, above); the eight earlier mutants' anchors each
+  still found once (none of their lines changed, so they were not re-run);
+  `spec_index_proof.py` 210/210 after the Lines cells; `make app-debug`, then Debug
+  `webm_export_proof.py` 29/29 (`--faults` 3/3 first) and `export_offset_proof.py --only
+  E38,E39,E40` 3/3; `make gate`: names 1 s, typecheck 6 s, fmt and lint skipped, test 129 s,
+  app 111 s, `gate: PASS 247s`; Release `webm_export_proof.py` 29/29 (W9 cancelled 0.56 s
+  after `cancel_export`; F1 0.22 s, F2 0.67 s, F3 3.01 s, each with both readers cancelled),
+  `av1_export_proof.py` 19/19, and `export_offset_proof.py --only
+  E16,E17,E18,E19,E36,E37,E38,E39,E40` on a Release instance 9/9, its log free of `Frame
+  Job: ` (the MP4 rows at median ±0.000 ms as before; E38/E39 −0.043 ms; E40 −0.042 ms,
+  11/11, every flash on its frame, click − flash −0.375 ms: the video's whole-ms block times
+  put a frame at 8/30 s at 267 ms). `ExportEncodePump`, `ExporterWriter*` and
+  `ExportMP4PacketSink` are unchanged by the pass.
+
+**Owed.** SE-18 and HDR-8's WebM half (`docs/manual-checks.md`): browser playback, an M3
+re-import, the HDR rendering. Filed at integration: the one unreproduced hang above (#379), and G-17's starvation on
+`ExportWriter`'s shared reader, with the per-output-reader fix (#378). The re-review's nit
+on E40: no row shows the app's gap fill or head cut; the probe's A1–A5 rows are its proof. C4–C6.

@@ -70,14 +70,16 @@ extension Exporter {
     }
 
     /// Starts the export's graphic prefetch (spec §11 G-26) — only for the
-    /// `ExportWriter` path, with a pinned set and a graphic in range — over
-    /// the range the writer reads at the frame duration it reads at.
+    /// `ExportWriter` and `ExportWebMWriter` paths, with a pinned set and a
+    /// graphic in range — over the range the writer reads at the frame
+    /// duration it reads at.
     /// `finish` and `deinit` stop it beside the unpin. Main thread.
     static func startGraphicPrefetch(
         key: Int?, project: ReelProject, graphics: GraphicSet?, built: BuiltComposition,
         settings: ExportSettings, pipeline: any ExportPipeline
     ) {
-        guard let key = key, graphics != nil, pipeline is ExportWriter, !settings.isAudioOnly,
+        guard let key = key, graphics != nil,
+            pipeline is ExportWriter || pipeline is ExportWebMWriter, !settings.isAudioOnly,
             !graphicNames(project: project, settings: settings).isEmpty
         else { return }
         GraphicPrefetch.shared.start(

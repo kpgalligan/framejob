@@ -126,7 +126,9 @@ fn each_export_row_in_both_outputs() {
                 Ok(&plain),
                 "{id}: an audio row is unchanged"
             );
-        } else if ["hevc_10bit", "av1", "prores_422", "prores_4444"].contains(&id.as_str()) {
+        } else if ["hevc_10bit", "av1", "av1_webm", "prores_422", "prores_4444"]
+            .contains(&id.as_str())
+        {
             let mut want = plain.clone();
             want["color"] = json!("hlg");
             assert_eq!(answer, Ok(want), "{id}");

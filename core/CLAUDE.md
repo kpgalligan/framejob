@@ -135,7 +135,7 @@ governs a module now.
   HD-14): `DynamicRange` (`hlg`, `pq`, `sdr`), spelled `dynamic_range` both
   as an export override and as a recipe option; `deliverable` answers `None`
   for an audio row and for every row of an SDR project, else the picture:
-  the four HDR rows (`hevc_10bit`, `av1`, `prores_422`, `prores_4444`) carry
+  the five HDR rows (`hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`) carry
   `hlg` (the default), `pq` or `sdr`, every other video row writes the SDR
   version, and `hlg`/`pq` are refused in an SDR project and on any other row, each in its own sentence.
 - `av1_mp4.rs` · `ffi_av1.rs` — AV1 in MP4 (spec §11 CX-12, road map
@@ -143,10 +143,23 @@ governs a module now.
   temporal delimiters stripped in place, and the `av01` brand put into `ftyp`
   (no `mp41` to replace is an error, never a file without `av01`); the three
   `rc_av1_*` exports. `leb128` is shared with `hdr10.rs`. The export table's
-  `writer` field (`svt_av1` on `av1` only; `avf_preset` stays the ImageIO
+  `writer` field (`svt_av1` on `av1` and `av1_webm`; `avf_preset` stays the ImageIO
   switch) and the `encoder_speed` override (`faster` | `balanced` | `smaller`,
   refused on any other row) are `export_table.rs`' and `export_overrides.rs`';
   `Container` is `export_container.rs`'.
+- `export_encoder.rs` — the bundled encoders' route and speeds (spec §11
+  CX-12): `Writer` (`svt_av1`; none is AVFoundation) and `EncoderSpeed`, moved whole out of
+  `export_table.rs` (codec-export C3's toll, a pure move) and re-exported there.
+- `webm_ebml.rs` · `webm_layout.rs` · `webm_writer.rs` · `ffi_webm.rs` — the
+  WebM an `av1_webm` export writes (spec §11 CX-6, CX-15), the write side beside
+  the importer's reader: `webm_ebml.rs` the element IDs, vints and builders
+  (EBML header, Info, the TrackEntries with Colour and OpusHead, Chapters,
+  SeekHead, Cues); `webm_layout.rs` `rc_webm_open`'s JSON as `WebmLayout`, each
+  value checked in a sentence naming it; `webm_writer.rs` `WebmWriter`, the
+  interleave (earliest head, video first on a tie), Clusters at each key and
+  before 32,767 ms, Cues, the SeekHead and the Segment size patched at
+  `finish`; `ffi_webm.rs` the five `rc_webm_*` exports over a
+  `Mutex<WebmWriter>`. It writes the bytes it is handed and never decodes.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,
@@ -863,7 +876,8 @@ governs a module now.
   audio track and `describe`/`retime`/`sample_count`/`sample`;
   `ffi_container.rs` the six `rc_container_*` exports. The Colour
   element's MaxCLL, MaxFALL and MasteringMetadata are read too (HD-18):
-  `container_codec.rs` writes them as the `mdcv`/`clli` blobs and
+  `container_codec.rs` writes them as the `mdcv`/`clli` blobs (and reads them
+  back, `mastering_from_mdcv` and `light_from_clli`, for the WebM writer) and
   `describe` publishes `mdcv_hex`, `clli_hex`, `transfer`, `primaries` and
   `matrix`; the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis

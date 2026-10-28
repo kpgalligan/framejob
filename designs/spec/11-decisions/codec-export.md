@@ -72,6 +72,8 @@ orchestrator's default, which the owner can still change by a new entry here).
   against the reader in `make test`. **Risk accepted:** a new writer to maintain instead of
   Google's proven muxer, and the reader's grid rule and the writer's timing must agree (the
   spike saw libwebm's millisecond times read back off the grid).
+  **Amended by CX-15** (C3): the writer is `rc_webm_*` (`webm_ebml.rs`, `webm_writer.rs`), its
+  layout and interleave as CX-15 (3) and (4) say, and the app's second `ExportPipeline`.
 
 - **CX-7 — Opus comes from AudioToolbox** (default), not libopus. It sits where AAC does:
   after the mix and the loudness gain (`ExportAudioGain`, `ExporterLoudness`). The writer
@@ -79,6 +81,8 @@ orchestrator's default, which the owner can still change by a new entry here).
   (312 frames measured), because Apple's 28-byte cookie is not OpusHead. AV1 in MP4 keeps AAC.
   **Risk accepted:** Apple's VBR came in under the asked rate (72 kb/s for 128 k on a test
   tone), and libopus (+0.32 MB) is the fallback only if a quality or control gap shows up.
+  **Amended by CX-15** (C3): 192 kb/s by default, 20 ms packets behind a 960-frame FIFO, the
+  pre-skip `primeInfo.leadingFrames`, and the tail cut to #337's length by DiscardPadding.
 
 - **CX-8 — HDR** (default): the AV1 rows are 10-bit, with HLG or PQ tagged in both the
   bitstream (the sequence header's colour config) and the container (`colr` in MP4, `Colour`
@@ -145,6 +149,9 @@ orchestrator's default, which the owner can still change by a new entry here).
      existing rule for an SDR row; 10-bit and HDR AV1 are C2's (CX-8).
   **Amended by CX-14** (C2): the row is 10-bit (I010, not (5)'s 8-bit I420, the matrix per
   picture) and, replacing (7), one of HD-5's HDR rows.
+  **Amended by CX-15** (C3): (1)'s `writer` is no longer one row's: `av1_webm` carries
+  `svt_av1` too, with the same speeds, and its `avf_preset` name also means "the composition
+  is read back through AVFoundation".
 
 - **CX-13 — AV1's rate is a soft cap: capped constant quality, quality first** (owner,
   2026-10-27, "Capped constant quality", chosen after C1 measured single-pass VBR at
@@ -232,6 +239,8 @@ orchestrator's default, which the owner can still change by a new entry here).
      dynamic_range "{x}" as hevc_10bit, av1, prores_422 or prores_4444`. Replaces CX-12 (7);
      amends HD-14 (c)'s sentence and its "three 10-bit rows". An SDR project's settings are
      unchanged; an HLG project's `av1` settings gain only `color`.
+     **Amended by CX-15** (C3): `av1_webm` is a fifth HDR row, and the sentence reads `… as
+     hevc_10bit, av1, av1_webm, prores_422 or prores_4444`.
   3. **The frames: I010.** The compositor's frame (scaled first as CX-12 (5) says) becomes
      video-range 10-bit 4:2:0 in 16-bit little-endian samples: Y′ = kr·R + (1−kr−kb)·G + kb·B,
      Cb′ = (B−Y′)/(2(1−kb)), Cr′ = (R−Y′)/(2(1−kr)), RGB clamped to 0…1 and read premultiplied;
@@ -285,3 +294,90 @@ orchestrator's default, which the owner can still change by a new entry here).
      accept 0.06"):** the cell is 12, the best measured, at 97.376 — 0.059 under
      `hevc_10bit`'s 97.435 and still 0.53 above C1's 8-bit `hevc` comparator (96.85) —
      because below CRF 12 the cap binds and a lower CRF gains nothing.
+
+- **CX-15 — C3: `av1_webm`, the core's WebM writer and Opus** (default, recorded in C3 before
+  its code; amends CX-6, CX-7, CX-12 (1), CX-14 (2), HD-5 and HD-14 (c)):
+  1. **The row.** `av1_webm` is "AV1 (WebM)", directly after `av1`: container `webm`
+     (`org.webmproject.webm`), codec `av1`, video, no alpha, `size` and `fps` null,
+     `avf_preset` `AVAssetExportPresetPassthrough`, `"hdr": true`, `writer` `svt_av1` and
+     `av1`'s `encoder_speeds`. It is even-sized and one of HD-5's HDR rows. It shares `av1`'s
+     speeds, CX-13's cap and CRF table, and CX-14's I010, CICP and PQ HDR10, all through the
+     same `SVTAV1Encoder`. `optimize_for_network` defaults to false and has no effect on this
+     row, as it has none on WAV.
+  2. **The writer is a second `ExportPipeline`, an exception to §7.8's one-writer argument.**
+     `Exporter.pipeline` chooses `ExportWebMWriter` for the `webm` container. It reads through
+     the same reader outputs as `ExportWriter` and the same `ExportEncodePump`, and uses the
+     same `ExportAudioGain`, `ExportAudioEnd`, `ExportChapter.partition`,
+     `encodedSize`/`fillsTheBox` and bitrate resolution, so chapters, rates, size, range and
+     #337 are one decision each. **A composition with no audio track is a silent movie, as in
+     `ExportWriter.addAudio`:** the layout has no `audio`, and no audio reader output, Opus
+     encoder or audio queue is made. **One `AVAssetReader` per output** (fix pass 1): the
+     video composition output on a reader of its own, the audio mix output on another, both
+     over the same composition and range (a silent movie has the video reader alone). WHY:
+     two outputs of one reader are coupled — an output nobody reads stalls the reader — so
+     on a shared reader a stop on one pump could leave the other blocked in
+     `copyNextSampleBuffer` for good (G-17's starvation, seen once in C3), and
+     `cancelReading()` cannot wake it: AVFoundation's header forbids calling it concurrently
+     with a read, and G-17 measured it crashing. With a reader each, neither read waits on
+     the other; the other pump sees a recorded stop at its next check and leaves, and each
+     pump, after its own last read, cancels its own reader on its own queue — G-17's rule,
+     no thread cancelling another's reader. Two readers read what one did: the same 150
+     frames byte for byte (I010 of the first, middle and last too) and the same 240,000
+     frames of sound (`webm_export_proof.py` R1, measured before the change).
+  3. **The layout.**
+     - The header is EBML with DocType `webm`, DocTypeVersion 4 and DocTypeReadVersion 2. The
+       Segment size is written as 8 bytes and patched at finish. A Void reserved after the
+       Segment header is overwritten at finish by a SeekHead (Info, Tracks, Chapters when
+       present, Cues).
+     - Info has TimestampScale 1,000,000, Duration = duration_ns / 1e6, and MuxingApp and
+       WritingApp "Frame Job".
+     - Track 1 (UID 1) carries `V_AV1` with the `av1C` record as CodecPrivate, DefaultDuration
+       round(1e9 · den / num) ns, PixelWidth and PixelHeight, and Colour (the sequence
+       header's CICP, Range 1, BitsPerChannel 10). On PQ alone, Colour also carries MaxCLL,
+       MaxFALL and MasteringMetadata decoded from `OutputTransform`'s two blobs.
+     - Track 2 (UID 2), when the layout has audio, carries `A_OPUS` with OpusHead version 1 as
+       CodecPrivate (channels, pre-skip, 48,000, gain 0, mapping family 0), CodecDelay
+       round(pre_skip · 1e9 / 48,000) ns, SeekPreRoll 80,000,000 ns, and Audio at 48,000.0 Hz
+       with its channel count.
+     - Chapters are one EditionEntry (UID 1) holding one ChapterAtom per chapter (UID i + 1,
+       start, end), each with a ChapterDisplay (ChapString, ChapLanguage `und`).
+     - Block times are round-half-up(pts_ns / 1e6) ms. SimpleBlocks are written in
+       nondecreasing time, video first among equal times, with the key flag on video keys and
+       on every audio block. A packet with a DiscardPadding above 0 is written as a BlockGroup
+       with DiscardPadding.
+     - A new Cluster starts before each video key block, and before any block whose relative
+       time would pass 32,767 ms. The Cues hold one CuePoint per key-started Cluster
+       (CueTime, track 1, CueClusterPosition from the Segment's data) and are written at
+       finish.
+  4. **Interleave.** The core buffers each track the layout declares. It writes the earliest
+     head only while every declared track that has not ended has a head, and `end_track`
+     releases that constraint; a layout with one track writes each packet as it arrives. The
+     memory bound accepted is the whole Opus track at worst, about 1.4 MB a minute at
+     192 kb/s. Back-pressure on the audio pump is not used, because a stalled output starves
+     the shared reader (G-17's note).
+  5. **Opus.** AudioToolbox (CX-7) at 48 kHz stereo in 20 ms packets. The default is
+     192 kb/s, the AAC rows' own number, so the more efficient codec matches or beats AAC at
+     the same rate. `audio_bitrate` and the Quality tiers pass through, snapped to the
+     converter's `applicableEncodeBitRates`. The pre-skip is `primeInfo.leadingFrames`.
+     **The tail:** the encoder's `finish()` feeds pre-skip frames of silence before the end
+     of stream, so that packets × 960 ≥ pre-skip + `ExportAudioEnd.target` holds by
+     construction. The writer computes padding = packets × 960 − pre-skip − target frames,
+     drops whole trailing packets while the padding is 960 or more, and fails the export
+     ("The audio could not be encoded to its exact length.") if it is below 0. The last
+     packet carries the padding (in ns) as DiscardPadding, so the decoded length is #337's
+     exactly. **The sound is placed at its stamps** (fix pass 1): each buffer's rebased
+     stamp decides where it goes (`ExportAudioEnd.align`) — zeros for a gap before it (a
+     straddling buffer dropped at the range's start, a hole in the stamps), the frames
+     already covered cut from its head — so packet k's first frame is the one stamped
+     k × 20 ms, the time it is written at. The encoder's FIFO counts a buffer's frames from
+     its bytes; bytes that are not whole 16-bit stereo frames fail the export in a sentence.
+  6. **Risks accepted:** a second writer to keep in step with `ExportWriter`; no player's HDR
+     rendering of WebM was measured; CX-10 holds (no re-import on an M1 or M2); and the
+     composition decoded by two readers, not one (the audio reader reads only the audio
+     tracks, so the extra cost is their decode). **G-17's starvation is closed for WebM**
+     by (2)'s per-output readers: an audio-pump failure, a video-sink failure and a cancel
+     while the audio read is held each end within 10 s with no file and both readers
+     cancelled by their own pumps (`webm_export_proof.py` F1–F3, `-RCDevWebMFault`); a
+     shared reader is named every time only by the readers' log line, F1–F3's timings alone
+     catching it only through G-17's crash. It stays accepted on `ExportWriter`'s shared
+     reader (G-17), whose same fix is filed as #378.

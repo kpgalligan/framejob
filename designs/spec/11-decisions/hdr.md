@@ -165,6 +165,7 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     SDR version (HD-4).
     **Amended by CX-14** (codec-export C2): `av1` (10-bit) is a fourth HDR row beside the three
     10-bit rows above, writing HLG by default, `pq` or `sdr` as asked.
+    **Amended by CX-15** (codec-export C3): `av1_webm` is a fifth, as `av1` is.
   - **Refusals**, each in its own sentence: `hlg` or `pq` on an 8-bit row, and `hlg` or `pq` in
     an SDR project. Until H-3 lands, H-2 refuses every row but the three 10-bit ones in an HLG
     project, so a merged phase never writes HLG pixels labelled BT.709.
@@ -474,6 +475,9 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     **Amended by CX-14** (codec-export C2): `av1` joins them, so four rows carry `"hdr"` and
     default to `hlg`, and the sentence reads `… export dynamic_range "{x}" as hevc_10bit, av1,
     prores_422 or prores_4444`.
+    **Amended by CX-15** (codec-export C3): `av1_webm` joins them too, so five rows carry
+    `"hdr"`, and the sentence reads `… as hevc_10bit, av1, av1_webm, prores_422 or
+    prores_4444`.
   - **(d) PQ:** HLG display light at 1,000 cd/m² → ST 2084, so nothing exceeds 1,000 cd/m².
     HD-5's metadata is written as two blobs: the mastering display (ST 2086 in SEI 137's order:
     P3's G, B, R, D65, max 1,000 and min 0.005 cd/m² in 0.0001) `33c2 86c4 1d4c 0bb8 84d0 3e80

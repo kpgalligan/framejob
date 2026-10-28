@@ -351,15 +351,15 @@ and the reason names the graphic and the frame.
 `export` takes `preset` and `path`, plus `size`, `range` (`project` or
 `in_out`), `video_bitrate`, `audio_bitrate`, `loudness_lufs`, `peak_dbtp`,
 `burn_in_timecode`, `dynamic_range` and `encoder_speed`. The presets are `h264`, `hevc`,
-`hevc_alpha`, `hevc_10bit`, `av1`, `prores_422`, `prores_4444`, `audio_m4a`,
+`hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`, `audio_m4a`,
 `audio_wav`, `audio_aiff`, `gif` and `apng`. There is no frame-rate
 argument: an export runs at the project's rate, or at 12.5 fps for `gif` and
 25 fps for `apng`. An existing file at the path is replaced, and the
 format's extension is added when the path has none. `peak_dbtp` without
 `loudness_lufs` is refused. `dynamic_range` `hlg` or `pq` is refused outside
-`hevc_10bit`, `av1`, `prores_422` and `prores_4444`, and in an SDR project.
-`encoder_speed` (`faster`, `balanced` or `smaller`) is `av1`'s alone and is
-refused on every other preset; the done answer names it. On `av1`,
+`hevc_10bit`, `av1`, `av1_webm`, `prores_422` and `prores_4444`, and in an SDR project.
+`encoder_speed` (`faster`, `balanced` or `smaller`) is `av1`'s and `av1_webm`'s
+alone and is refused on every other preset; the done answer names it. On both,
 `video_bitrate` is a soft cap: the file usually comes in well under it, and
 very detailed footage can go up to about 1.25 times over it. What each option means is in [Export](export.md).
 

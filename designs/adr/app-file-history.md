@@ -659,6 +659,12 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   function — every `rc_*` call staying (823 → 789; `CoreValues.swift` 187 → 242). The next seam:
   the header's list of where each earlier payment went (it repeats this entry) and
   `ReelProject.scoped(_:)`'s long doc, neither code; no `rc_*`-free type is left in the file.
+  Codec-export C3 paid that seam (toll T2) before `ReelWebM` (`rc_webm_*`, spec §11 CX-15): the
+  header's payment list (lines 13–37) became one sentence pointing at this entry, and `scoped`'s
+  doc was cut to its contract — the first paragraph and the nil paragraph — a doc-only cut gated
+  alone by `make typecheck`. `wc -l app/Sources/ReelCore.swift`: 789 before, 748 after;
+  `ReelWebM` then took it back to 789. No doc-only seam is left: the next payment is code, and
+  every type left names an `rc_*` symbol.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
@@ -693,7 +699,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   after; `ExporterWriter+Time.swift` is 38. C1's wiring (`encodePump`, the `addVideo` and `start`
   branches, `readFailure`, `close()` in `allInputsFinished`, the `av01` brand in
   `writingFinished`) took it to 587. The next seam: the audio half (`addAudio`,
-  `addAudioOutput`) out to an `ExporterWriter+Audio.swift`.
+  `addAudioOutput`) out to an `ExporterWriter+Audio.swift`. Codec-export C3 paid a different cut
+  (toll T3) before the WebM writer, which reads through the same outputs: the reader output
+  `addVideo` built went to `ExportWriter.videoReadOutput(_:settings:)` and the one
+  `addAudioOutput` built to `ExportWriter.audioReadOutput(_:gained:)`, both static in
+  `ExporterWriter+Settings.swift` with their comments, both callers using them; behaviour
+  preserving, gated alone by `make typecheck` (exit 0, the four baseline warnings). `wc -l`:
+  `ExporterWriter.swift` 587 before, 567 after; `ExporterWriter+Settings.swift` 474 → 513. C3's
+  wiring (the `ExportMP4PacketSink` at the pump's call site) took it to 568. The next seam is
+  still the audio half.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`. The
   grading road map's GR1 moved `// MARK: Colour` and `colorSection()` to `VideoPane+Color.swift`

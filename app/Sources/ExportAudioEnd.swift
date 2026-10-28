@@ -15,7 +15,9 @@ import AVFoundation
 /// read is dry. A read that already ended exactly on the target passes
 /// through untouched, so its bytes are what they were.
 ///
-/// One instance per export, used only on `ExportWriter`'s audio queue.
+/// One instance per export, used only on its writer's audio queue — `ExportWriter`'s, or
+/// `ExportWebMWriter`'s, whose Opus tail is cut to `target` and whose sound is placed at its
+/// stamps through `align` first (spec §11 CX-15 (5)).
 final class ExportAudioEnd {
 
     static let sampleRate = 48_000
@@ -70,6 +72,47 @@ final class ExportAudioEnd {
         else { return nil }
         written = target
         return cut
+    }
+
+    /// The WebM writer's placement by stamp (spec §11 CX-15 (5)): `sample`, whose first
+    /// frame is at stream frame `frame` (its rebased stamp at 48 kHz), answered as the
+    /// buffers that carry the sound on from `written`, each still to go through `fit` —
+    /// zeros for a gap before it (a straddling buffer dropped, a hole in the stamps), then
+    /// `sample` itself; or, when it starts before `written`, `sample` with the frames already
+    /// covered cut from its head, and nothing when it is covered whole. So every frame
+    /// handed on sits at its own stamp, and `written` stays the stream's position. The gap
+    /// is never filled past `target`.
+    func align(_ sample: CMSampleBuffer, at frame: Int) -> [CMSampleBuffer] {
+        if frame > written {
+            let end = min(frame, target)
+            var gap: [CMSampleBuffer] = []
+            if end > written, let format = Self.padFormat() {
+                var at = written
+                while at < end {
+                    let count = min(Self.padChunk, end - at)
+                    guard let buffer = Self.silence(
+                        frames: count,
+                        at: CMTime(value: CMTimeValue(at), timescale: CMTimeScale(Self.sampleRate)),
+                        format: format)
+                    else { break }
+                    gap.append(buffer)
+                    at += count
+                }
+            }
+            return gap + [sample]
+        }
+        let covered = written - frame
+        guard covered > 0 else { return [sample] }
+        let frames = CMSampleBufferGetNumSamples(sample)
+        guard covered < frames else { return [] }
+        var cut: CMSampleBuffer?
+        guard CMSampleBufferCopySampleBufferForRange(
+            allocator: kCFAllocatorDefault, sampleBuffer: sample,
+            sampleRange: CFRange(location: covered, length: frames - covered),
+            sampleBufferOut: &cut) == noErr,
+            let cut = cut
+        else { return [] }
+        return [cut]
     }
 
     /// Zero buffers from `written` to `target` in the shape of

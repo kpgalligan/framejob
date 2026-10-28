@@ -86,13 +86,15 @@ const MOVIE_FORMATS: [&str; 9] = [
 /// every row AVFoundation writes but ProRes 4444, the three audio-only rows
 /// among them, which have no picture and report what `h264` reports. On
 /// these an odd edge is listed and resolved one pixel smaller.
-const EVEN_SIZED: [&str; 9] = [
+const EVEN_SIZED: [&str; 10] = [
     "h264",
     "hevc",
     "hevc_alpha",
     "hevc_10bit",
     // AV1 in MP4 (spec §11 CX-12): 4:2:0, written by AVFoundation.
     "av1",
+    // AV1 in WebM (spec §11 CX-15): the same 4:2:0 encoding.
+    "av1_webm",
     "prores_422",
     "audio_m4a",
     "audio_wav",

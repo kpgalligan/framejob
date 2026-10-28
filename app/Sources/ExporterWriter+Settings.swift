@@ -33,6 +33,45 @@ extension ExportWriter {
         return AVVideoComposition(configuration: configuration)
     }
 
+    /// The reader output the video pump reads: the composition's video tracks
+    /// through the video composition (`videoComposition`), in the one format
+    /// the compositor produces. `ExportWebMWriter` reads through it too.
+    static func videoReadOutput(
+        _ built: BuiltComposition, settings: ExportSettings
+    ) -> AVAssetReaderVideoCompositionOutput {
+        let output = AVAssetReaderVideoCompositionOutput(
+            videoTracks: built.composition.tracks(withMediaType: .video),
+            videoSettings: [
+                // The one format the compositor produces (`Compositor.
+                // outputPixelFormat`, 64RGBAHalf). Asking for it here means no
+                // conversion between the render context and the encoder.
+                kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.outputPixelFormat),
+                kCVPixelBufferMetalCompatibilityKey as String: true,
+            ])
+        output.videoComposition = videoComposition(built, settings: settings)
+        // AVFoundation's default, kept explicit: `ExportStraightAlpha` rewrites an
+        // alpha row's frame in place, which is safe only on the reader's own copy.
+        output.alwaysCopiesSampleData = true
+        return output
+    }
+
+    /// The mix's reader output: every composition audio track through the
+    /// plan's mix, as the 16-bit decode, or `gained` the float mix the
+    /// measurement read (`ExportAudioGain.floatMixSettings`).
+    /// `ExportWebMWriter` reads through it too.
+    static func audioReadOutput(
+        _ built: BuiltComposition, gained: Bool
+    ) -> AVAssetReaderAudioMixOutput {
+        let output = AVAssetReaderAudioMixOutput(
+            audioTracks: built.composition.tracks(withMediaType: .audio),
+            audioSettings: gained ? ExportAudioGain.floatMixSettings : decodedAudioSettings)
+        output.audioMix = built.audioMix
+        // AVFoundation's own default, kept explicit because the other reader
+        // in this tree (`MediaImporter.peaks`) turns it off.
+        output.alwaysCopiesSampleData = true
+        return output
+    }
+
     /// Refuses an alpha-carrying export whose size would have to be PADDED
     /// (road map 2, phase 7b; `Exporter.ExportError.alphaAspectMismatch`
     /// carries the argument and the measurement).

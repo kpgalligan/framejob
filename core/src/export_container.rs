@@ -19,6 +19,9 @@ pub(crate) enum Container {
     Aiff,
     Gif,
     Apng,
+    /// WebM, written by the core's own writer (`webm_writer.rs`, spec §11
+    /// CX-15), not by AVFoundation.
+    Webm,
 }
 
 impl Container {
@@ -31,6 +34,7 @@ impl Container {
             Container::Aiff => "aiff",
             Container::Gif => "gif",
             Container::Apng => "apng",
+            Container::Webm => "webm",
         }
     }
 
@@ -61,6 +65,7 @@ impl Container {
             Container::Aiff => "public.aiff-audio",
             Container::Gif => "com.compuserve.gif",
             Container::Apng => "public.png",
+            Container::Webm => "org.webmproject.webm",
         }
     }
 
@@ -75,7 +80,9 @@ impl Container {
     /// starts on the first frame, and
     /// neither do WAV and AIFF — a RIFF or an IFF file is a header
     /// followed by samples, with no index to relocate, so the flag would
-    /// be a request the writer has nothing to do about.
+    /// be a request the writer has nothing to do about. A WebM's index (its
+    /// SeekHead) is already at the front, so the flag is off and inert there
+    /// too (spec §11 CX-15 (1)).
     pub(crate) fn optimizes_for_network(self) -> bool {
         matches!(self, Container::Mp4 | Container::M4a)
     }

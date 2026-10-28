@@ -22,10 +22,11 @@
 //! (the size, the rate, the range, the file's UTI) is resolved identically,
 //! because it means the same thing on either path.
 //!
-//! One row, `av1` (spec §11 CX-12), is encoded by a bundled library and
-//! not by AVFoundation, which still writes its container: its `writer`
-//! names the route and its `encoder_speed` the library's speed, two keys
-//! no other row's settings carry.
+//! Two rows, `av1` (spec §11 CX-12) and `av1_webm` (CX-15), are encoded by
+//! a bundled library and not by AVFoundation, which still writes `av1`'s
+//! container (the core writes `av1_webm`'s): their `writer` names the route
+//! and their `encoder_speed` the library's speed, two keys no other row's
+//! settings carry.
 //!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
@@ -124,7 +125,7 @@ impl Project {
         let speed = match (encoder_speed(overrides)?, preset.takes_encoder_speed()) {
             (Some(_), false) => {
                 return Err(format!(
-                    "{} has no encoder speed; encoder_speed applies to av1",
+                    "{} has no encoder speed; encoder_speed applies to av1 and av1_webm",
                     preset.id
                 ))
             }

@@ -111,7 +111,7 @@ Rows:
       inside the reach), never pinned to a lag; their detail names SY-37's
       class (a defect when a window has r < 0.8, |lag| > 5.0 ms or a lag at
       the edge)
-  E1–E37  one project each (`E_ROWS`), exported and located; ok when the
+  E1–E40  one project each (`E_ROWS`), exported and located; ok when the
       export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
       in-range clicks) and SY-27's pin holds (E30, E33: the MP3s, read past
       their encoder delay, SY-36; E32 the late head, SY-35). E34 (×1.1 keep
@@ -291,6 +291,15 @@ E_ROWS = {
     # as h264's do, through SVT-AV1 and the passthrough writer.
     "E36": ("cam-pcm48", 10 * SEC, None, "av1"),
     "E37": ("cam-aac48", 10 * SEC, None, "av1"),
+    # codec-export C3 (spec §11 CX-15): the av1_webm row's picture and Opus
+    # sound land as av1's do, through the core's WebM writer and its CodecDelay.
+    "E38": ("cam-pcm48", 10 * SEC, None, "av1_webm"),
+    "E39": ("cam-aac48", 10 * SEC, None, "av1_webm"),
+    # C3 fix pass 1: an in/out range starting one frame past 11 s (529,600 frames, no
+    # multiple of 1,024 or 4,096 from the timeline's start), so the read's first buffer can
+    # straddle it: the Opus sound is placed at its stamps, and every click and flash after
+    # the in point lands where the timeline has it.
+    "E40": ("cam-pcm48", 10 * SEC, ("range", 11 * SEC + SEC // 30, 20 * SEC), "av1_webm"),
 }
 E_IDS = list(E_ROWS)
 KEEP_ROWS = {"E9", "E11", "E12", "E29"}
@@ -298,8 +307,9 @@ KEEP_ROWS = {"E9", "E11", "E12", "E29"}
 # so these rows run every pass and print their readings, scored on the
 # instrument only (the export decoded, the clicks or windows found).
 MEASURED_ROWS = {"R4", "R5", "E34", "E35"}
-VIDEO_ROWS = {"E16", "E17", "E18", "E19", "E36", "E37"}
-EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4", "av1": "mp4"}
+VIDEO_ROWS = {"E16", "E17", "E18", "E19", "E36", "E37", "E38", "E39", "E40"}
+EXTENSIONS = {"audio_wav": "wav", "prores_422": "mov", "h264": "mp4", "av1": "mp4",
+              "av1_webm": "webm"}
 ALL_ROWS = Z_ROWS + R_ROWS + E_IDS + L_ROWS + X_ROWS
 NO_APP = {"Z0", "Z2"} | set(L_ROWS) | set(X_ROWS)
 
@@ -616,7 +626,7 @@ def stream_rate(path):
 
 def read_ffmpeg(path: Path) -> tuple[list[float], int]:
     """ffmpeg to mono float32 at the stream's own rate (edit lists honoured as
-    ffmpeg does by default); for `.mov` / `.mp4` only."""
+    ffmpeg does by default); for `.mov`, `.mp4` and `.webm`."""
     rate = stream_rate(path)
     out = path.with_name(path.name + ".f32")
     run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", "0:a:0", "-ac", "1", "-ar",
@@ -838,7 +848,7 @@ def run_e(mcp, row, fixture_override=None):
     result["rate"] = rate
     result["expected"] = expected
     result["found_times"] = [f for f, _ in found]
-    if preset in ("prores_422", "h264", "av1"):
+    if preset in ("prores_422", "h264", "av1", "av1_webm"):
         # The 320×180 movie sits unscaled on the 640×360 canvas, a quarter of
         # its area, so a white frame's mean over the whole picture is a
         # quarter of a full one's: the threshold is scaled by the same share.

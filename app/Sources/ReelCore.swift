@@ -11,30 +11,8 @@ import AppKit
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/framejob_core.h` is the contract itself.
 ///
-/// `ReelOp` and its one static factory per row of the op table are next door
-/// in `ReelOps.swift`, the size payment this file owed at 2242 lines, and
-/// what an op ANSWERS is in `ReelEdit.swift`, the payment it owed at 1507.
-/// The compositor's recipe registry is in `RecipeSource.swift`, the payment
-/// it owed at 1440 before road map 10's graphics wrappers, for the same
-/// reason: it names no `rc_*` symbol. `MediaDescriptor`, `mediaURL(for:)`
-/// and `bookmarkString(for:)` are in `MediaDescriptor.swift`, the payment it
-/// owed at 1440 again before the engine's family list, for the same reason.
-/// `ShapePatch` is in `ShapePatch.swift` (as `TextPatch` is in
-/// `TextPatch.swift`), the payment it owed at 1280 before `ReelColor`. The
-/// other typed patches are in `TypedPatches.swift`, the payment it owed at
-/// 1211 before `ReelContainer`. `ReelCoreError` and `Fps.ffiPair` are in
-/// `CoreValues.swift`, the payment it owed at 817 before the engine's image
-/// cache, for the same reason. The JSON-reading halves of `clipState(_:at:)`
-/// and `snapCandidates(excluding:)` are `CoreJSON` there, the payment it owed
-/// at 810 before `ReelHDR10.stillPeak(file:)`; their `rc_*` calls stayed.
-/// `ReelTime.perSecond`, `ticks(seconds:)` and `seconds(_:)` are an extension
-/// there too, and `coreSchemas()`'s map-reading half is
-/// `ReelOpSchema.table(from:)`, the payment it owed at 803 before
-/// `rc_project_source_map`'s wrapper; its `rc_op_schemas()` call stayed.
-/// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
-/// op table read BACK, its names and its arguments — because they read
-/// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
-/// file.
+/// Where each earlier size payment went, and why, is the `ReelCore.swift`
+/// entry of `designs/adr/app-file-history.md`.
 ///
 /// Three conventions carried from Rasterize's `RasterCore.swift`:
 ///
@@ -120,25 +98,6 @@ final class ReelProject {
     /// The project INSIDE nest `id` — its tracks and clips at the top level,
     /// its frozen size as the canvas, this document's rate, media, nests and
     /// next id, and no markers (`core/src/scope.rs`, spec §7.4).
-    ///
-    /// **The READ half of a scope, and the reason the whole feature is
-    /// possible.** An edit inside a nest goes to THIS handle with the op
-    /// carrying `scope` (`ReelOp.scoped(_:)`), and what comes back is a whole
-    /// parent project, so undo is still a stack of parent handles. But the
-    /// timeline, the canvas, the player and every snapshot read need a
-    /// project whose top level IS the nest, and that is this. The core builds
-    /// both out of one function, so what the app draws and what its edits
-    /// land in cannot drift apart — a second view builder on this side would
-    /// be exactly that drift.
-    ///
-    /// The answer is an ordinary immutable handle, memoised the same way, and
-    /// **it is for reading**. Applying an op to it would edit the VIEW and
-    /// throw the parent away; nothing enforces that, and
-    /// `ProjectDocument.editedProject` is the one place it is held.
-    /// The exception is a PROBE — `applying` on a scoped handle with plain
-    /// ops is how a gesture learns the ids the core is about to mint inside a
-    /// nest, and it is legitimate for the reason every probe is: the result
-    /// is dropped (`EditorViewController+Timeline.swift`).
     ///
     /// nil for a nest id this project has not got. The core's message
     /// (`no nest with id N`) is dropped rather than thrown, because every
@@ -643,6 +602,47 @@ enum ReelAV1 {
         head.withUnsafeMutableBytes {
             rc_av1_ftyp_brand($0.bindMemory(to: UInt8.self).baseAddress, $0.count)
         }
+    }
+}
+
+/// The core's WebM writer (`RcWebm`, spec §11 CX-15), `ExportWebMWriter`'s file. `add`,
+/// `endTrack` and `finish` may come from several threads; each throws the core's sentence.
+final class ReelWebM {
+    static let video = UInt32(RC_WEBM_VIDEO)
+    static let audio = UInt32(RC_WEBM_AUDIO)
+    private let handle: OpaquePointer
+
+    /// Creates the file at `path` and writes its header from `layoutJSON`.
+    init(path: String, layoutJSON: String) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        guard let made = rc_webm_open(path, layoutJSON, &err) else {
+            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be made"))
+        }
+        handle = made
+    }
+
+    deinit { rc_webm_free(handle) }
+
+    func add(track: UInt32, ptsNs: Int64, key: Bool, discardPaddingNs: Int64, data: Data) throws {
+        try check { err in
+            data.withUnsafeBytes {
+                rc_webm_add_packet(
+                    handle, track, ptsNs, key, discardPaddingNs,
+                    $0.bindMemory(to: UInt8.self).baseAddress, $0.count, err)
+            }
+        }
+    }
+
+    func endTrack(_ track: UInt32) throws { try check { rc_webm_end_track(handle, track, $0) } }
+
+    func finish() throws { try check { rc_webm_finish(handle, $0) } }
+
+    private func check(
+        _ call: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Bool
+    ) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        guard !call(&err) else { return }
+        throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be written"))
     }
 }
 

@@ -53,6 +53,9 @@ use framejob_core::ffi_query::{
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
     rc_project_source_map, rc_snap_resolve, rc_speed_limits,
 };
+use framejob_core::ffi_webm::{
+    rc_webm_add_packet, rc_webm_end_track, rc_webm_finish, rc_webm_free, rc_webm_open,
+};
 use framejob_core::format::RC_FORMAT_VERSION;
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
@@ -2370,6 +2373,45 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     // rc_av1_ftyp_brand — NULL has no ftyp.
     assert_eq!(unsafe { rc_av1_ftyp_brand(ptr::null_mut(), 32) }, -1);
     cover("rc_av1_ftyp_brand");
+
+    // rc_webm_* — a NULL path or handle is refused through err_out, and
+    // tolerated with no channel; free is a no-op.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_webm_open(ptr::null(), ptr::null(), &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("path is NULL"));
+    assert!(unsafe { rc_webm_open(ptr::null(), ptr::null(), ptr::null_mut()) }.is_null());
+    cover("rc_webm_open");
+    let byte = [0u8; 1];
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_webm_add_packet(ptr::null_mut(), 1, 0, true, 0, byte.as_ptr(), 1, &mut err)
+    });
+    assert_eq!(take_string(err).as_deref(), Some("webm is NULL"));
+    assert!(!unsafe {
+        rc_webm_add_packet(
+            ptr::null_mut(),
+            1,
+            0,
+            true,
+            0,
+            ptr::null(),
+            0,
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_webm_add_packet");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe { rc_webm_end_track(ptr::null_mut(), 1, &mut err) });
+    assert_eq!(take_string(err).as_deref(), Some("webm is NULL"));
+    assert!(!unsafe { rc_webm_end_track(ptr::null_mut(), 1, ptr::null_mut()) });
+    cover("rc_webm_end_track");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe { rc_webm_finish(ptr::null_mut(), &mut err) });
+    assert_eq!(take_string(err).as_deref(), Some("webm is NULL"));
+    assert!(!unsafe { rc_webm_finish(ptr::null_mut(), ptr::null_mut()) });
+    cover("rc_webm_finish");
+    unsafe { rc_webm_free(ptr::null_mut()) };
+    cover("rc_webm_free");
 
     swept.sort();
     swept.dedup();

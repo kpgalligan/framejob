@@ -49,55 +49,8 @@
 use serde_json::{Map, Value};
 
 pub(crate) use crate::export_container::Container;
+pub(crate) use crate::export_encoder::{EncoderSpeed, Writer};
 use crate::time::Fps;
-
-/// The route a row's video takes when it is not AVFoundation's own
-/// encoder (spec §11 CX-12 (1)): `None` on a row means VideoToolbox or
-/// ProRes through `AVAssetWriter`, or ImageIO where `avf_preset` is null.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Writer {
-    /// SVT-AV1, bundled and called from Swift (CX-2, CX-4).
-    SvtAv1,
-}
-
-impl Writer {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Writer::SvtAv1 => "svt_av1",
-        }
-    }
-}
-
-/// A bundled encoder's speed (spec §11 CX-2, CX-12 (2)): Faster, Balanced
-/// and Smaller file are SVT-AV1's presets 8, 6 and 4 — the number is the
-/// app's to map, the word is the vocabulary the sheet and `export` share.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum EncoderSpeed {
-    Faster,
-    Balanced,
-    Smaller,
-}
-
-impl EncoderSpeed {
-    /// Every speed, in the sheet's order.
-    pub(crate) const ALL: [EncoderSpeed; 3] = [
-        EncoderSpeed::Faster,
-        EncoderSpeed::Balanced,
-        EncoderSpeed::Smaller,
-    ];
-
-    pub(crate) fn parse(text: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|speed| speed.as_str() == text)
-    }
-
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            EncoderSpeed::Faster => "faster",
-            EncoderSpeed::Balanced => "balanced",
-            EncoderSpeed::Smaller => "smaller",
-        }
-    }
-}
 
 /// One row of the table. Crate-visible so `export_size.rs` can read the
 /// cap and the codec of the row it lists sizes for, and so `export.rs`'s
@@ -174,11 +127,13 @@ pub(crate) struct Preset {
     /// available — "an audio-only file AVFoundation writes" — and a null
     /// there would hand a WAV to `ImageSequenceWriter`, which would refuse
     /// it as an unknown image container and report a format this table
-    /// advertises as unsupported.
+    /// advertises as unsupported. A name also means "the composition is
+    /// read back through AVFoundation" (spec §11 CX-15), which is all it says
+    /// on `av1_webm`, whose file the core writes.
     pub(crate) avf_preset: Option<&'static str>,
     /// The bundled encoder that writes the row's video, or `None` for
     /// AVFoundation's own encoders (ImageIO where `avf_preset` is null).
-    /// A row with a writer is the one row that takes `encoder_speed`.
+    /// A row with a writer is a row that takes `encoder_speed`.
     pub(crate) writer: Option<Writer>,
 }
 
@@ -228,7 +183,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 12] = [
+const PRESETS: [Preset; 13] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -304,6 +259,23 @@ const PRESETS: [Preset; 12] = [
         id: "av1",
         name: "AV1 (MP4)",
         container: Container::Mp4,
+        codec: "av1",
+        video: true,
+        alpha: false,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+        writer: Some(Writer::SvtAv1),
+    },
+    // AV1 in WebM (spec §11 CX-15): `av1`'s encoding — the same encoder,
+    // speeds, cap and HDR — in a WebM the core writes (`webm_writer.rs`),
+    // with Opus sound. The passthrough name records that the composition is
+    // read back through AVFoundation, so the row is even-sized and routed as
+    // every AVFoundation row is until `Exporter.pipeline` reads the container.
+    Preset {
+        id: "av1_webm",
+        name: "AV1 (WebM)",
+        container: Container::Webm,
         codec: "av1",
         video: true,
         alpha: false,

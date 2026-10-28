@@ -445,11 +445,15 @@ char *rc_normalise_color(const char *text);
 
    One row, `av1` (spec 11 CX-12, CX-14), is encoded at 10 bits by a library
    bundled in the app rather than by AVFoundation, which still writes its
-   MP4 (its `avf_preset` is the passthrough name, a record): it alone carries
-   `writer` ("svt_av1", the encoder route) and `encoder_speeds` (["faster",
+   MP4 (its `avf_preset` is the passthrough name, a record): it and
+   `av1_webm` alone carry `writer` ("svt_av1", the encoder route) and
+   `encoder_speeds` (["faster",
    "balanced", "smaller"], the speeds its `encoder_speed` override takes),
    and like `hevc_10bit`, `prores_422` and `prores_4444` it carries `hdr`
-   (spec 11 HD-14). */
+   (spec 11 HD-14). `av1_webm` (spec 11 CX-15) is the same encoding in a
+   WebM the core writes (`rc_webm_*`), with Opus sound: it carries the same
+   `writer`, `encoder_speeds` and `hdr`, and its passthrough `avf_preset`
+   records that the composition is read back through AVFoundation. */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this
@@ -536,8 +540,8 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * writes: "hlg", "pq" or "sdr" (spec 11 HD-14); an SDR project's and an
  * audio row's never do.
  *
- * A row a bundled encoder writes (`av1`, spec 11 CX-12) adds two keys at
- * the end, and no other row's settings carry either: `writer` ("svt_av1")
+ * A row a bundled encoder writes (`av1`, `av1_webm`, spec 11 CX-12) adds two
+ * keys at the end, and no other row's settings carry either: `writer` ("svt_av1")
  * and `encoder_speed` (the speed asked, else "balanced"). */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
@@ -824,6 +828,70 @@ size_t rc_av1_strip_temporal_delimiters(uint8_t *bytes, size_t len);
  * place, -1 when there is no `ftyp` box at byte 0, it runs past `len`, or
  * it has neither (the bytes untouched), or on a caught panic. */
 int32_t rc_av1_ftyp_brand(uint8_t *head, size_t len);
+
+/* ------------------------------------------------------------------ webm */
+
+/* The WebM writer (spec 11 CX-6, CX-15) through `core/src/ffi_webm.rs`: one
+ * file of AV1 video and Opus sound, written from compressed packets the app
+ * hands in as opaque bytes; nothing here encodes. `layout_json` fixes the
+ * file at open (serde, unknown keys refused):
+ *   {"duration_ns": u64,
+ *    "video": {"codec_id": "V_AV1", "codec_private_hex": the av1C record,
+ *              "width": u32, "height": u32, "fps": [num, den],
+ *              "colour": {"matrix", "range", "transfer", "primaries",
+ *                         "bits_per_channel", "mdcv_hex"?: 24 bytes,
+ *                         "clli_hex"?: 4 bytes}}?,
+ *    "audio": {"codec_id": "A_OPUS", "channels": 1|2, "sample_rate": 48000,
+ *              "pre_skip": u16}?,
+ *    "chapters": [{"start_ns", "end_ns", "name"}] (default [])}
+ * The file is EBML DocType webm 4/2: a SeekHead (patched over a Void at
+ * finish), Info (ms timestamps, the duration, "Frame Job"), Tracks (video
+ * track 1 with DefaultDuration and Colour, MasteringMetadata and MaxCLL /
+ * MaxFALL from the two blobs; audio track 2 with OpusHead v1, CodecDelay
+ * round(pre_skip / 48 kHz) and an 80 ms SeekPreRoll), Chapters (one edition,
+ * language "und"), Clusters, Cues. A block's time is pts_ns rounded half up
+ * to ms. Each declared track is queued, and the earliest head (video first
+ * among equal times) is written only while every track not ended has one;
+ * a layout with one track writes each packet as it arrives. A Cluster
+ * starts at each video key and before 32,767 ms past its start; each
+ * key-started Cluster is a CuePoint. Every call flushes before it returns. */
+#define RC_WEBM_VIDEO 1u
+#define RC_WEBM_AUDIO 2u
+
+typedef struct RcWebm RcWebm; /* add/end/finish may run on several threads at once */
+
+/* Creates the file at `path` and writes its header. NULL with a lowercase
+ * sentence through `err_out` naming the value for: no video and no audio,
+ * another codec_id, an empty V_AV1 private, malformed hex, an mdcv that is
+ * not 24 bytes or a clli that is not 4, a 0 size or an fps with a 0 term, a
+ * sample_rate other than 48000, channels outside 1-2, a chapter that ends at
+ * or before its start or starts at or past duration_ns, unreadable JSON, or
+ * a path that cannot be created. Freed with rc_webm_free. */
+RcWebm *rc_webm_open(const char *path, const char *layout_json, char **err_out);
+
+/* Adds one packet of `track` (RC_WEBM_VIDEO or RC_WEBM_AUDIO) presented at
+ * `pts_ns`; `key` marks a video key (every audio block is a key). A
+ * `discard_padding_ns` above 0 writes the packet as a BlockGroup with that
+ * DiscardPadding. False with the sentence through `err_out` for NULL, a
+ * track not in the layout or ended, a negative pts or one not after the
+ * track's last, a call after finish, or an I/O failure. */
+bool rc_webm_add_packet(RcWebm *webm, uint32_t track, int64_t pts_ns, bool key,
+                        int64_t discard_padding_ns, const uint8_t *bytes, size_t len,
+                        char **err_out);
+
+/* Ends `track`: no packet of it follows, and the others stop waiting for
+ * it. False with the sentence through `err_out` for NULL, a track not in
+ * the layout or already ended, or a call after finish. */
+bool rc_webm_end_track(RcWebm *webm, uint32_t track, char **err_out);
+
+/* Writes every queued packet, the Cues, the SeekHead and the Segment's size;
+ * then the file is closed. False with the sentence through `err_out` for
+ * NULL, a second finish, or an I/O failure. */
+bool rc_webm_finish(RcWebm *webm, char **err_out);
+
+/* Releases a writer. NULL-tolerant. An unfinished file is left as it is, for
+ * the app to remove. */
+void rc_webm_free(RcWebm *webm);
 
 /* ----------------------------------------------------------------- agent */
 

@@ -102,6 +102,40 @@ pub(crate) fn clli(max_cll: Option<u64>, max_fall: Option<u64>) -> [u8; 4] {
     out
 }
 
+/// The inverse of [`mdcv`]: a 24-byte `MasteringDisplayColorVolume` blob as
+/// the MasteringMetadata floats (G, B, R, the white point, each x and y in
+/// 0.00002; the maximum and minimum luminance in 0.0001 cd/m²). `None` for
+/// any other length. The WebM writer's Colour (spec §11 CX-15 (3)).
+pub(crate) fn mastering_from_mdcv(b: &[u8]) -> Option<Mastering> {
+    let b: &[u8; 24] = b.try_into().ok()?;
+    let u16_at = |i: usize| f64::from(u16::from_be_bytes([b[i], b[i + 1]]));
+    let u32_at = |i: usize| f64::from(u32::from_be_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]));
+    let point = |i: usize| {
+        (
+            u16_at(i) / CHROMATICITY_UNITS,
+            u16_at(i + 2) / CHROMATICITY_UNITS,
+        )
+    };
+    Some(Mastering {
+        green: point(0),
+        blue: point(4),
+        red: point(8),
+        white: point(12),
+        luminance_max: u32_at(16) / LUMINANCE_UNITS,
+        luminance_min: u32_at(20) / LUMINANCE_UNITS,
+    })
+}
+
+/// The inverse of [`clli`]: a 4-byte `ContentLightLevelInfo` blob as
+/// (MaxCLL, MaxFALL). `None` for any other length.
+pub(crate) fn light_from_clli(b: &[u8]) -> Option<(u64, u64)> {
+    let b: &[u8; 4] = b.try_into().ok()?;
+    Some((
+        u64::from(u16::from_be_bytes([b[0], b[1]])),
+        u64::from(u16::from_be_bytes([b[2], b[3]])),
+    ))
+}
+
 /// A video codec's four-character code, or `None` when it is not copied.
 /// The three whose CodecPrivate IS their record need one.
 pub(crate) fn video_fourcc(codec_id: &str, private: &[u8]) -> Option<&'static str> {

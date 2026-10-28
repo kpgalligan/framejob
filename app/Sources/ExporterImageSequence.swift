@@ -33,6 +33,15 @@ protocol ExportPipeline: AnyObject {
 /// that makes it, `Exporter.pipeline`.
 extension ExportWriter: ExportPipeline {}
 
+/// A pipeline the loudness normalisation's gain is handed to after the pick (`Exporter`'s
+/// one caller): the `AVAssetWriter` path and the WebM one (spec §11 CX-15 (2)), each
+/// applying it with `ExportAudioGain` before the end of the sound is cut.
+protocol ExportAudioNormalizing: AnyObject {
+    func normalizeAudio(byLinearGain gain: Float)
+}
+
+extension ExportWriter: ExportAudioNormalizing {}
+
 extension ExportSettings {
     /// True when the core resolved a format AVFoundation cannot write, and
     /// the file is to be assembled frame by frame instead.
@@ -60,7 +69,8 @@ extension ExportSettings {
 
 extension Exporter {
     /// The pipeline for these settings: the `AVAssetWriter` path for every
-    /// movie preset, the ImageIO path for the two image ones.
+    /// movie preset, the core's WebM writer for a `webm` container, the
+    /// ImageIO path for the two image ones.
     ///
     /// `built` reaches only the writer, which reads the whole composition
     /// back through it; the image path renders each frame from the project
@@ -91,6 +101,11 @@ extension Exporter {
         settings: ExportSettings, chapters: [ExportChapter], options: RecipeOptions,
         graphics: GraphicSet?, to url: URL
     ) throws -> any ExportPipeline {
+        // A WebM is the core's to write (spec §11 CX-15 (2)): the second writer.
+        if settings.container.lowercased() == "webm" {
+            return try ExportWebMWriter(
+                built: built, settings: settings, chapters: chapters, to: url)
+        }
         guard settings.isImageSequence else {
             return try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
         }

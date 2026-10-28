@@ -185,19 +185,7 @@ final class ExportWriter {
         guard !tracks.isEmpty else { throw Exporter.ExportError.emptyTimeline }
         let canvas = built.videoComposition.renderSize
         try Self.checkAlphaSurvivesTheSize(settings, canvas: canvas)
-        let output = AVAssetReaderVideoCompositionOutput(
-            videoTracks: tracks,
-            videoSettings: [
-                // The one format the compositor produces (`Compositor.
-                // outputPixelFormat`, 64RGBAHalf). Asking for it here means no
-                // conversion between the render context and the encoder.
-                kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.outputPixelFormat),
-                kCVPixelBufferMetalCompatibilityKey as String: true,
-            ])
-        output.videoComposition = Self.videoComposition(built, settings: settings)
-        // AVFoundation's default, kept explicit: `ExportStraightAlpha` rewrites an
-        // alpha row's frame in place, which is safe only on the reader's own copy.
-        output.alwaysCopiesSampleData = true
+        let output = Self.videoReadOutput(built, settings: settings)
         guard reader.canAdd(output) else {
             throw Exporter.ExportError.failed(
                 "The composition could not be read for export.")
@@ -268,19 +256,11 @@ final class ExportWriter {
         audioInput = input
     }
 
-    /// The mix's reader output: the 16-bit decode, or with a gain the float
-    /// mix the measurement read (`ExportAudioGain.floatMixSettings`). False
-    /// when the reader refuses it; there is no 16-bit fallback for a gained
-    /// export, because the gain would then meet a decode that already clipped.
+    /// The mix's reader output (`audioReadOutput`). False when the reader
+    /// refuses it; there is no 16-bit fallback for a gained export, because
+    /// the gain would then meet a decode that already clipped.
     private func addAudioOutput() -> Bool {
-        let output = AVAssetReaderAudioMixOutput(
-            audioTracks: built.composition.tracks(withMediaType: .audio),
-            audioSettings: audioGain == nil
-                ? Self.decodedAudioSettings : ExportAudioGain.floatMixSettings)
-        output.audioMix = built.audioMix
-        // AVFoundation's own default, kept explicit because the other reader
-        // in this tree (`MediaImporter.peaks`) turns it off.
-        output.alwaysCopiesSampleData = true
+        let output = Self.audioReadOutput(built, gained: audioGain != nil)
         guard reader.canAdd(output) else { return false }
         reader.add(output)
         audioOutput = output
@@ -326,7 +306,8 @@ final class ExportWriter {
         let group = DispatchGroup()
         if let input = videoInput, let output = videoOutput, let encodePump {
             encodePump.run(
-                input: input, output: output, on: videoQueue, group: group,
+                sink: ExportMP4PacketSink(input: input, format: encodePump.formatDescription),
+                output: output, on: videoQueue, group: group,
                 isStopping: { [weak self] in self?.isStopping ?? true },
                 readFailure: { [weak self] in self?.readFailure },
                 fail: { [weak self] error in self?.stopped(with: error) },

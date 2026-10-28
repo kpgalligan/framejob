@@ -23,7 +23,7 @@ detail there.
   core's speed range and audio ceiling, typed as `SpeedLimits` in
   `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
-  #216-R) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
+  #216-R) and `ReelWebM` (`rc_webm_*`, the `av1_webm` writer, spec §11 CX-15) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
   `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
   (`rc_graphic_image_cache`, G-39); `ReelCoreError`, `Fps.ffiPair` and `ReelTime`'s
   seconds conversions are `CoreValues.swift`'s (G6 phase 5's toll T2 and speed ramps SR4-0,
@@ -1679,7 +1679,15 @@ the key map behind it.
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
   `ExportAV1Encoder.swift` · `ExportI010.swift` (+ `Resources/Shaders/ExportI010.metal`) ·
   `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
-  `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` — the writer
+  `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` ·
+  `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
+  the WebM writer) · `ExportWebMWriter.swift` · `ExportWebMLayout.swift` ·
+  `ExportOpusEncoder.swift` · `ExportWebMDevFault.swift` (`-RCDevWebMFault`, dev only)
+  — the `av1_webm` row (spec §11 CX-15): `ExportWebMWriter` gives the video output and
+  the audio mix output ONE `AVAssetReader` EACH, and each pump cancels only its own,
+  on its own queue, after its own last read (G-17; CX-15 (2)); it adopts
+  `ExporterImageSequence.swift`'s `ExportAudioNormalizing`, places sound by its stamps
+  (`ExportAudioEnd.align`) and logs every stop (`Logger`, category `export.webm`) — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
@@ -3155,7 +3163,8 @@ compositor's render queue, the composition rebuild, import, the cache lane's
 queue (`MediaImporter.CacheLane`, spec §11 #367), the export
 progress timer, the AV1 encode queue (`ExportEncodePump`'s
 `com.kgalligan.framejob.export.encode`, with its `DispatchSemaphore(3)` between the
-video pump and the encoder, spec §11 CX-12), `Transcriber`'s serial queue, `CloudTranscriber`'s serial
+video pump and the encoder, spec §11 CX-12), the WebM writer's two pump queues
+(`com.kgalligan.framejob.export.webm.video` and `.audio`, CX-15), `Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`

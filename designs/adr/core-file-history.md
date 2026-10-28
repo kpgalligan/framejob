@@ -271,7 +271,15 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   nothing widened. `wc -l core/src/export_table.rs`: 584 before, 502 after; `export_container.rs`
   is 91. C1 then added `Writer`, `EncoderSpeed`, the `writer` field on every row, the `av1` row
   and its `to_json` keys (502 → 592). The next seam: `Writer` and `EncoderSpeed` with their
-  `impl`s out to an `export_encoder.rs`, re-exported the same way.
+  `impl`s out to an `export_encoder.rs`, re-exported the same way. Codec-export C3 paid it (toll
+  T1) before its `av1_webm` row: `Writer` and `EncoderSpeed`, their docs and `impl`s went whole
+  to the new `export_encoder.rs` under a module doc, re-exported by `export_table.rs`
+  (`pub(crate) use crate::export_encoder::{EncoderSpeed, Writer}`), and `lib.rs` gained `mod
+  export_encoder;`; nothing widened. A pure move gated alone (`cargo fmt --check`, `cargo test
+  --release --test export --test export_size --test export_av1`, `make lint`). `wc -l
+  core/src/export_table.rs`: 592 before, 545 after; `export_encoder.rs` is 56. C3's row and the
+  `avf_preset` doc sentence then took it to 564. No further seam is named; the next is the
+  presets' long row comments, which are the table's record.
 
 ## Open items
 

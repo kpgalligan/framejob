@@ -66,9 +66,12 @@ extension Exporter {
 
     /// The save panel's allowed type. `AVFileType`'s raw values ARE UTIs, so
     /// this is the same decision as `fileType(for:)` and cannot drift from it.
+    /// A UTI this Mac has not declared (WebM's, `org.webmproject.webm`) falls
+    /// back to the container's extension.
     static func contentType(for settings: ExportSettings) -> UTType? {
         guard let type = fileType(for: settings) else { return nil }
         return UTType(type.rawValue)
+            ?? UTType(filenameExtension: settings.container.lowercased())
     }
 
     /// The extension the save panel appends.

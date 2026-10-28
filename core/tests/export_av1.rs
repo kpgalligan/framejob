@@ -20,6 +20,9 @@
 //! 4. **HDR** (spec §11 CX-14). The row is one of HD-5's HDR rows: `"hdr"`
 //!    on the row, and in an HLG project its settings carry `color` `hlg` by
 //!    default and `pq` or `sdr` as asked, written out whole.
+//! 5. **`av1_webm`** (spec §11 CX-15). The same encoding in a WebM the core
+//!    writes: its row and settings written out whole, the same writer keys
+//!    and speeds, even-sized, HDR, and `optimize_for_network` off.
 
 mod common;
 
@@ -101,9 +104,35 @@ fn the_row_is_written_out_whole() {
 }
 
 #[test]
+fn the_webm_row_is_written_out_whole_directly_after_av1() {
+    let rows = preset_rows();
+    let at = rows
+        .iter()
+        .position(|row| text(row, "/id") == "av1_webm")
+        .expect("the menu has no av1_webm row");
+    assert_eq!(text(&rows[at - 1], "/id"), "av1");
+    assert_eq!(
+        rows[at],
+        json!({
+            "id": "av1_webm",
+            "name": "AV1 (WebM)",
+            "container": "webm",
+            "codec": "av1",
+            "video": true,
+            "size": null,
+            "fps": null,
+            "avf_preset": "AVAssetExportPresetPassthrough",
+            "hdr": true,
+            "writer": "svt_av1",
+            "encoder_speeds": ["faster", "balanced", "smaller"]
+        })
+    );
+}
+
+#[test]
 fn no_other_row_names_a_writer_or_speeds() {
     for row in preset_rows() {
-        if text(&row, "/id") == "av1" {
+        if ["av1", "av1_webm"].contains(&text(&row, "/id")) {
             continue;
         }
         assert!(
@@ -139,15 +168,41 @@ fn its_resolved_settings_are_written_out_whole() {
 }
 
 #[test]
+fn the_webm_rows_resolved_settings_are_written_out_whole() {
+    assert_eq!(
+        settings(&project(), "av1_webm", None),
+        json!({
+            "preset": "av1_webm",
+            "avf_preset": "AVAssetExportPresetPassthrough",
+            "container": "webm",
+            "file_type": "org.webmproject.webm",
+            "codec": "av1",
+            "width": 1600,
+            "height": 900,
+            "fps": [30, 1],
+            "range": {"start": 0, "duration": 6_000_000},
+            "audio": true,
+            "video": true,
+            "alpha": false,
+            "optimize_for_network": false,
+            "writer": "svt_av1",
+            "encoder_speed": "balanced"
+        })
+    );
+}
+
+#[test]
 fn each_speed_comes_back_as_asked_and_null_is_balanced() {
     let handle = project();
-    for word in ["faster", "balanced", "smaller"] {
-        let out = settings(&handle, "av1", Some(&json!({"encoder_speed": word})));
-        assert_eq!(out["encoder_speed"], json!(word), "{word}");
-        assert_eq!(out["writer"], json!("svt_av1"), "{word}");
+    for preset in ["av1", "av1_webm"] {
+        for word in ["faster", "balanced", "smaller"] {
+            let out = settings(&handle, preset, Some(&json!({"encoder_speed": word})));
+            assert_eq!(out["encoder_speed"], json!(word), "{preset} {word}");
+            assert_eq!(out["writer"], json!("svt_av1"), "{preset} {word}");
+        }
+        let out = settings(&handle, preset, Some(&json!({"encoder_speed": null})));
+        assert_eq!(out["encoder_speed"], json!("balanced"), "{preset}");
     }
-    let out = settings(&handle, "av1", Some(&json!({"encoder_speed": null})));
-    assert_eq!(out["encoder_speed"], json!("balanced"));
 }
 
 #[test]
@@ -157,6 +212,7 @@ fn a_word_that_is_not_a_speed_is_refused_naming_the_key_and_the_value() {
         ("av1", json!("fast")),
         ("av1", json!(6)),
         ("av1", json!("Balanced")),
+        ("av1_webm", json!("fast")),
         ("h264", json!("fast")),
     ] {
         let msg = refusal(&handle, preset, &json!({"encoder_speed": value}));
@@ -184,7 +240,7 @@ fn a_speed_on_a_row_without_one_is_refused_naming_the_row() {
         let msg = refusal(&handle, preset, &json!({"encoder_speed": "faster"}));
         assert_eq!(
             msg,
-            format!("{preset} has no encoder speed; encoder_speed applies to av1")
+            format!("{preset} has no encoder speed; encoder_speed applies to av1 and av1_webm")
         );
         assert_contains(&msg, "encoder_speed");
     }
@@ -215,11 +271,14 @@ fn h264s_settings_are_what_they_were() {
 #[test]
 fn an_odd_canvas_is_evened_on_av1() {
     let handle = project();
-    let out = settings(&handle, "av1", Some(&json!({"width": 641, "height": 361})));
-    assert_eq!(
-        (out["width"].clone(), out["height"].clone()),
-        (json!(640), json!(360))
-    );
+    for preset in ["av1", "av1_webm"] {
+        let out = settings(&handle, preset, Some(&json!({"width": 641, "height": 361})));
+        assert_eq!(
+            (out["width"].clone(), out["height"].clone()),
+            (json!(640), json!(360)),
+            "{preset}"
+        );
+    }
 }
 
 #[test]
@@ -251,6 +310,16 @@ fn an_hlg_project_writes_hlg_by_default_and_pq_or_sdr_as_asked() {
             settings(&hlg, "av1", Some(&json!({"dynamic_range": color}))),
             whole(color),
             "{color}"
+        );
+        let mut webm = whole(color);
+        webm["preset"] = json!("av1_webm");
+        webm["container"] = json!("webm");
+        webm["file_type"] = json!("org.webmproject.webm");
+        webm["optimize_for_network"] = json!(false);
+        assert_eq!(
+            settings(&hlg, "av1_webm", Some(&json!({"dynamic_range": color}))),
+            webm,
+            "av1_webm {color}"
         );
     }
 }

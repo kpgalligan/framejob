@@ -66,11 +66,11 @@
 //!     at settings they did not ask for, reported ok.
 //!
 //! 12. **The rows, in menu order:** `h264`, `hevc`, `hevc_alpha`,
-//!     `hevc_10bit`, `av1`, `prores_422`, `prores_4444`, `audio_m4a`,
-//!     `audio_wav`, `audio_aiff`, `gif`, `apng` — [`EXPECTED`] holds them;
-//!     the `hevc_10bit` row (spec §11 PR-3) has its own file,
-//!     `core/tests/export_hevc_10bit.rs`, and so has the `av1` row (spec
-//!     §11 CX-12), `core/tests/export_av1.rs`.
+//!     `hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`,
+//!     `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng` — [`EXPECTED`]
+//!     holds them; the `hevc_10bit` row (spec §11 PR-3) has its own file,
+//!     `core/tests/export_hevc_10bit.rs`, and so have the `av1` and
+//!     `av1_webm` rows (spec §11 CX-12, CX-15), `core/tests/export_av1.rs`.
 //!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
@@ -125,7 +125,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 12] = [
+const EXPECTED: [Expected; 13] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -195,6 +195,21 @@ const EXPECTED: [Expected; 12] = [
         audio: true,
         alpha: false,
         file_type: "public.mpeg-4",
+        avf_preset: Some("AVAssetExportPresetPassthrough"),
+    },
+    // AV1 in WebM (spec §11 CX-15): `av1`'s encoding in a WebM the core
+    // writes, with Opus sound; the passthrough name records that the
+    // composition is read back through AVFoundation.
+    Expected {
+        id: "av1_webm",
+        container: "webm",
+        codec: "av1",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: false,
+        file_type: "org.webmproject.webm",
         avf_preset: Some("AVAssetExportPresetPassthrough"),
     },
     Expected {
@@ -725,9 +740,9 @@ fn alpha_is_the_only_key_the_settings_grew() {
     for want in EXPECTED.iter() {
         let mut plain: Vec<String> = KEYS_BEFORE_ALPHA.iter().map(|k| k.to_string()).collect();
         plain.push("alpha".to_string());
-        // The encoder route and its speed (spec §11 CX-12), on the one row
-        // a bundled encoder writes and on no other.
-        if want.id == "av1" {
+        // The encoder route and its speed (spec §11 CX-12, CX-15), on the two
+        // rows a bundled encoder writes and on no other.
+        if want.id == "av1" || want.id == "av1_webm" {
             plain.push("writer".to_string());
             plain.push("encoder_speed".to_string());
         }

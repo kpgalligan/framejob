@@ -34,10 +34,14 @@
 
 /// The EBML / Matroska writer the container tests build their files with.
 pub mod ebml;
+/// The EBML walk the WebM writer's tests read its files back with.
+pub mod ebml_read;
 /// The Vorbis header and packet writer the Vorbis container tests use.
 pub mod vorbis;
 /// Its setup header's sections.
 pub mod vorbis_setup;
+/// The WebM writer's FFI wrapper, layouts and packets.
+pub mod webm;
 
 use std::ffi::{c_char, CStr, CString};
 use std::ptr;

@@ -60,6 +60,7 @@ pub mod edit_zoom;
 pub mod evaluate;
 pub mod export;
 mod export_container;
+mod export_encoder;
 pub mod export_overrides;
 pub mod export_size;
 pub mod export_table;
@@ -73,6 +74,7 @@ pub mod ffi_graphic;
 pub mod ffi_graphic_pending;
 pub mod ffi_hdr10;
 pub mod ffi_query;
+pub mod ffi_webm;
 pub mod format;
 pub mod frame_grid;
 mod grade_check;
@@ -122,6 +124,9 @@ pub mod time;
 mod time_bounds;
 pub mod transition;
 mod transition_search;
+mod webm_ebml;
+pub mod webm_layout;
+pub mod webm_writer;
 
 mod ffi_util;
 

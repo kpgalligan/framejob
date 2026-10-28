@@ -337,7 +337,7 @@ final class Exporter {
 
         // Which pipeline writes it is the settings' decision rather than this
         // file's: `Exporter.pipeline` reads the core's `avf_preset` and hands
-        // back either the `AVAssetWriter` path or the ImageIO one.
+        // back the `AVAssetWriter` path, the WebM writer or the ImageIO one.
         //
         // The recipe options are read back off the KEY rather than carried
         // down from `export` as a second copy, so the export has exactly one
@@ -361,7 +361,7 @@ final class Exporter {
         // `AVAssetWriter` path — `measuresLoudness` refuses the image rows,
         // which are the only ones it does not.
         if let loudness = loudness, !loudness.isUnity {
-            (writer as? ExportWriter)?.normalizeAudio(byLinearGain: Float(loudness.linearGain))
+            (writer as? any ExportAudioNormalizing)?.normalizeAudio(byLinearGain: Float(loudness.linearGain))
         }
         Exporter.startGraphicPrefetch(key: recipeKey, project: project, graphics: graphics,
             built: built, settings: settings, pipeline: writer)

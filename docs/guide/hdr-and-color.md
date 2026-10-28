@@ -165,7 +165,7 @@ In an HDR (HLG) project, the export sheet gets a **Dynamic Range:** row under **
 | HDR10 (PQ) | BT.2100 PQ, mastered at 1,000 cd/m² | |
 | SDR version | The SDR version, Rec. 709 | |
 
-- The row is live only on **HEVC 10-bit (MP4)**, **AV1 (MP4)**, **ProRes 422 (MOV)** and **ProRes 4444 (MOV)**. On every other video format it is disabled and shows **SDR version**, because those formats always write the SDR version: H.264, HEVC, HEVC with Alpha, Animated GIF and Animated PNG.
+- The row is live only on **HEVC 10-bit (MP4)**, **AV1 (MP4)**, **AV1 (WebM)**, **ProRes 422 (MOV)** and **ProRes 4444 (MOV)**. On every other video format it is disabled and shows **SDR version**, because those formats always write the SDR version: H.264, HEVC, HEVC with Alpha, Animated GIF and Animated PNG.
 - An HDR10 file carries fixed HDR10 metadata: a P3 D65 mastering display of 0.005–1,000 cd/m², MaxCLL 1,000 and MaxFALL 0. Its picture never goes above 1,000 cd/m², so the metadata is always accurate. The Media tab's HDR10 Peak describes a *source* file and does not change this.
 - The choice applies to that one sheet only. It is not remembered for the next export or saved in an export preset.
 - An SDR project's export sheet has no Dynamic Range row.
@@ -177,7 +177,7 @@ For formats, sizes and the export queue, see [Export](export.md).
 ## Precision and bit depth
 
 - **16-bit float compositing.** Every frame is composited at 16-bit float, and every video source is decoded at full depth. Gradients from a 10-bit camera file survive grading.
-- **10-bit exports.** HEVC 10-bit (Main 10), AV1, ProRes 422 and ProRes 4444 keep that depth. H.264, HEVC and HEVC with Alpha are 8-bit.
+- **10-bit exports.** HEVC 10-bit (Main 10), both AV1 formats, ProRes 422 and ProRes 4444 keep that depth. H.264, HEVC and HEVC with Alpha are 8-bit.
 - **Deep stills.** A still deeper than 8 bits per channel, such as a 16-bit PNG or TIFF or a 10-bit HEIC, is drawn at 16-bit float. An 8-bit still is drawn as before.
 - **Saved and rendered frames.** **File ▸ Save Frame…** writes a 16-bit PNG or a 10-bit HEIC when the frame shows a deep still or deep video, and in every HDR (HLG) project. JPEG, Animated GIF and Animated PNG are always 8-bit.
 - **Reversed clips.** A reversed clip's backwards copy is rendered at 10 bits, at the source's exact size, with the source's own colour labels. That means an HDR or log clip still reads correctly when reversed. See [Speed](speed.md).

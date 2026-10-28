@@ -17,11 +17,13 @@ import Foundation
 /// (CX-14 (5)).
 final class SVTAV1Encoder {
     /// One packet as SVT answered it: its bytes (temporal delimiters still in), the `pts` the
-    /// picture was sent with, and whether it is the last.
+    /// picture was sent with, whether it is the last, and whether it is a KEY_FRAME (the WebM
+    /// writer's key flag, spec §11 CX-15 (3)).
     struct Packet {
         let data: Data
         let pts: Int64
         let isLast: Bool
+        let isKey: Bool
     }
 
     /// The sequence header OBU (`svt_av1_enc_stream_header`), the `av1C` record's source.
@@ -165,7 +167,8 @@ final class SVTAV1Encoder {
         let length = Int(header.n_filled_len)
         let data = header.p_buffer.map { Data(bytes: $0, count: length) } ?? Data()
         return Packet(
-            data: data, pts: header.pts, isLast: header.flags & UInt32(EB_BUFFERFLAG_EOS) != 0)
+            data: data, pts: header.pts, isLast: header.flags & UInt32(EB_BUFFERFLAG_EOS) != 0,
+            isKey: header.pic_type == EB_AV1_KEY_PICTURE)
     }
 
     // MARK: - The rate (CX-13)

@@ -4690,7 +4690,7 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyl
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-any-cache
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-omits-deferred
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-late-cancel
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources /Users/kevingalligan/.codex/litecode/reelcut/fix-remaining-bugs-series/03-issue-30/baseline/app/Sources --only stamp
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources ~/.codex/litecode/reelcut/fix-remaining-bugs-series/03-issue-30/baseline/app/Sources --only stamp
 ```
 
 Every run first takes the cloud instruments' lock (row L, issue batch B43):
@@ -15060,7 +15060,7 @@ None, None)".
 `~/Library/Application Support/Reelcut/` were saved before the first run
 and compared (`cmp`) after each of the eight runs above: every comparison
 was silent, `Rewrapped/`'s own line included, which still reads
-`drwxr-xr-x@ 8 kevingalligan  staff  256 Oct  3 22:51:21 2026 .` over its
+`drwxr-xr-x@ 8 <user>  staff  256 Oct  3 22:51:21 2026 .` over its
 six files dated Sep 5. Another session's Frame Job (an Xcode build) was
 running throughout and was not this batch's.
 
@@ -25112,3 +25112,62 @@ failed against a `hevc_10bit` at 96.075 where the 10-bit calibration's single en
 had read 95.828; seven re-encodes read 96.075 each, Format default's three CRFs were
 lowered against it, and the second Release `--rate` scored 21/21
 (`designs/codec-export.md`'s C2).
+
+## Codec export C3 — AV1 in WebM, with Opus (`webm_export_proof.py` Z1, W1–W13, S4, R1, F1–F3, P1–P5, A1–A5; thirteen mutants; `export_offset_proof.py` E38–E40; spec §11 CX-6, CX-7, CX-15)
+
+The `av1_webm` row: `av1`'s picture (the same `ExportEncodePump` and SVT-AV1) and Opus sound
+from AudioToolbox (`ExportOpusEncoder`), written into a WebM by the core's own writer
+(`rc_webm_*`: `webm_ebml.rs`, `webm_layout.rs`, `webm_writer.rs`) through `ExportWebMWriter`,
+the second `ExportPipeline`.
+
+```
+python3 tools/proof/webm_export_proof.py [--app debug|release|PATH]          # every row
+python3 tools/proof/webm_export_proof.py --probe                             # P1–P5, A1–A5 alone, no app
+python3 tools/proof/webm_export_proof.py --readers                           # R1 alone, no app
+python3 tools/proof/webm_export_proof.py --faults                            # F1–F3 alone
+python3 tools/proof/webm_export_proof.py --mutant NAME                       # exit 1 caught, 0 survived, 3 inexact, 2 control
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E38,E39,E40  # clicks and flashes through av1_webm
+```
+
+**`webm_export_proof.py`** imports `av1_export_proof.py`'s helpers (the instance, the
+documents, `export`, the ffprobe readers, `sheet_reading`, the mutant builder) and works
+under `work/webm-export/`. ffprobe and ffmpeg (Homebrew, libdav1d, Opus) only read the
+files, and its own Python EBML walk reads what they do not. Its docstring has every row; in
+short: W1 the streams (`matroska,webm`, `av1` Main `yuv420p10le` 640 × 360, `opus` 48 kHz
+stereo, 5.0 s); W2 a clean decode of 150 frames and exactly 240,000 samples, and the first
+audio packet at −CodecDelay (ffmpeg trims OpusHead's pre-skip whatever CodecDelay says, so
+the count alone cannot see it); W3 A5's key rule, the key flags read from the file's blocks
+(ffprobe's for AV1 in Matroska are ffmpeg's parser's, from the bitstream); W4 the walk (the Segment's size, the
+SeekHead resolving, every video key starting a Cluster, a CuePoint per key-started Cluster);
+W5, W6 the chapters whole and clamped into a 1–3 s range (60 frames, 96,000 samples); W7
+the letterbox; W8 HLG, PQ and SDR — tags, CICP, the walk's Colour, and on PQ the mastering
+display ffprobe reads (ffmpeg's Matroska demuxer exports a light level only when MaxCLL and
+MaxFALL are both non-zero, and HD-5's MaxFALL is 0, so MaxCLL 1000 / MaxFALL 0 are read from
+the walk); W9 a cancel with no file; W10 the default Opus rate against 64 kb/s; W11 −16 LUFS;
+W12 the import on this M2 (refused in `codec_import_proof.av1_sentence`'s words) or on an
+M3; W13 the silent movie (a text-only project: one stream, one TrackEntry); S4 the sheet's
+Format and footnote; P1–P5 and A1–A5 the probe `webm_audio_probe.swift` (no app): the Opus
+FIFO fed by the buffer's bytes (a short last buffer, a `fit` cut, bytes past or short of the
+sample count, 402 bytes refused in a sentence) and `ExportAudioEnd.align` placing the sound
+at its stamps (a gap's zeros, a covered head cut, a covered buffer dropped, the zeros
+stopped at the target). R1 (`webm_readers_probe.swift`, no app, the tree's two export
+shaders compiled as its `default.metallib`) is the measurement behind one `AVAssetReader` per
+output: A1's project read through one reader with both outputs and through two readers, each
+from a build of its own, gives the same 150 frames byte for byte (and byte-equal I010 for
+frames 0, 75 and 149) and the same 240,000 frames of sound. F1–F3 launch an instance each
+with `-RCDevWebMFault` (`audio@40`, `video@30`, `audio-hold@40` then `cancel_export`) over
+W9's long project: each export ends within 10 s of the fault (or the cancel), failed naming
+the dev fault or cancelled, with no file, and the writer's `framejob webm dev readers:` line
+shows both readers cancelled by their own pumps. E40 in the offset proof is an `av1_webm`
+in/out export starting one frame past 11 s.
+
+The mutants (`--mutant`, a tree copy, `core/` the copy's own for the three core ones, the
+cargo rows `cargo test --test webm_writer` in the copy): `codec-delay-zero` W2 and cargo
+(not E38/E39: the offset proof places clicks by sample in the decoded stream, and ffmpeg
+trims OpusHead's pre-skip whatever CodecDelay says); `no-discard-padding` W2, W6;
+`clusters-by-time` (a Cluster every 1.5 s, not at keys) W4 and cargo; `no-cues` W4;
+`colour-unwritten` W8 and cargo; `chapters-unclamped` W6; `all-key` W3; `gain-skipped` W11;
+and three probe mutants (a copy of `app/Sources` alone, the probe built over it, no app):
+`opus-length-exact` P3, P4; `gap-unfilled` A1, A5; `head-uncut` A2; and two fault mutants
+(the copy's app built, F1–F3 alone run): `shared-reader` (the audio output back on the
+video's reader) and `audio-cancel-dropped` (the audio pump's own `cancelReading` gone).

@@ -42,6 +42,44 @@ struct ExportChapter: Equatable {
     }
 }
 
+extension ExportChapter {
+    /// The chapters clamped into `range` and rebased to zero, each with its span in the file:
+    /// the one rule both writers write chapters by (`ExportWriter`'s text track,
+    /// `ExportWebMWriter`'s Chapters element, spec §11 CX-15 (2)).
+    ///
+    /// Each chapter runs until the next one, and the last until the end of
+    /// the range — a chapter list is a partition of the movie, not a set of
+    /// points. A chapter that began BEFORE an in/out range is not dropped:
+    /// the last of them is pinned to the start of the range, because the
+    /// exported piece really is inside that chapter and a file whose first
+    /// minutes belong to no chapter reads as a bug.
+    static func partition(
+        _ chapters: [ExportChapter], in range: CMTimeRange
+    ) -> [(name: String, range: CMTimeRange)] {
+        let start = CompositionBuilder.ticks(range.start)
+        let end = start + CompositionBuilder.ticks(range.duration)
+        guard end > start else { return [] }
+
+        var inside: [ExportChapter] = []
+        for chapter in chapters where chapter.start < end {
+            if chapter.start <= start {
+                inside = [ExportChapter(start: start, name: chapter.name)]
+            } else {
+                inside.append(chapter)
+            }
+        }
+        var parts: [(name: String, range: CMTimeRange)] = []
+        for (index, chapter) in inside.enumerated() {
+            let next = index + 1 < inside.count ? inside[index + 1].start : end
+            guard next > chapter.start else { continue }
+            parts.append((chapter.name, CMTimeRange(
+                start: CompositionBuilder.time(chapter.start - start),
+                duration: CompositionBuilder.time(next - chapter.start))))
+        }
+        return parts
+    }
+}
+
 extension ExportWriter {
 
     /// The chapter track: a text track carrying one sample per chapter,
@@ -170,43 +208,14 @@ extension ExportWriter {
         return status == noErr ? format : nil
     }
 
-    /// The chapters as samples, clamped into `range` and rebased to zero.
-    ///
-    /// Each chapter runs until the next one, and the last until the end of
-    /// the range — a chapter list is a partition of the movie, not a set of
-    /// points. A chapter that began BEFORE an in/out range is not dropped:
-    /// the last of them is pinned to the start of the range, because the
-    /// exported piece really is inside that chapter and a file whose first
-    /// minutes belong to no chapter reads as a bug.
+    /// The chapters as samples, clamped into `range` and rebased to zero
+    /// (`ExportChapter.partition`).
     private static func chapterSamples(
         _ chapters: [ExportChapter], in range: CMTimeRange, format: CMFormatDescription
     ) -> [CMSampleBuffer] {
-        let start = CompositionBuilder.ticks(range.start)
-        let end = start + CompositionBuilder.ticks(range.duration)
-        guard end > start else { return [] }
-
-        var inside: [ExportChapter] = []
-        for chapter in chapters where chapter.start < end {
-            if chapter.start <= start {
-                inside = [ExportChapter(start: start, name: chapter.name)]
-            } else {
-                inside.append(chapter)
-            }
+        ExportChapter.partition(chapters, in: range).compactMap {
+            chapterSample($0.name, timeRange: $0.range, format: format)
         }
-        guard !inside.isEmpty else { return [] }
-
-        var samples: [CMSampleBuffer] = []
-        for (index, chapter) in inside.enumerated() {
-            let next = index + 1 < inside.count ? inside[index + 1].start : end
-            guard next > chapter.start else { continue }
-            let timeRange = CMTimeRange(
-                start: CompositionBuilder.time(chapter.start - start),
-                duration: CompositionBuilder.time(next - chapter.start))
-            guard let sample = chapterSample(chapter.name, timeRange: timeRange, format: format)
-            else { continue }
-            samples.append(sample)
-        }
-        return samples
     }
 
     /// One text sample: a 16-bit big-endian byte count followed by the UTF-8

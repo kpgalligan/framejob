@@ -32,7 +32,7 @@ From top to bottom:
 Under the controls, a readout line describes the file and a footnote names the codec, the container and the rates the file will use. Every number they show is the size, rate and duration the file will actually have.
 
 - **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`.
-- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
+- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
 
 A control the chosen format cannot use is greyed out rather than hidden. Its value is not sent.
 
@@ -45,6 +45,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | HEVC with Alpha (MOV) | `.mov` | A small delivery file that keeps a transparent canvas, for laying over another background. 8-bit. |
 | HEVC 10-bit (MP4) | `.mp4` | Keeps a 10-bit source's gradients (Main 10). |
 | AV1 (MP4) | `.mp4` | The smallest delivery file, encoded by the AV1 encoder built into Frame Job. 10-bit, and it can carry HDR. Slower to export than HEVC. See [Speed](#speed). |
+| AV1 (WebM) | `.webm` | The same AV1 picture in a WebM file, with Opus sound, for the web. Frame Job writes the WebM itself. |
 | ProRes 422 (MOV) | `.mov` | An editing master for another application. 10-bit. |
 | ProRes 4444 (MOV) | `.mov` | A master that keeps the alpha channel. 12-bit. |
 | Audio only (M4A) | `.m4a` | AAC sound only. |
@@ -53,7 +54,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | Animated GIF | `.gif` | A short silent loop. Capped at 480 × 270 and 12.5 fps by default. |
 | Animated PNG | `.png` | A lossless silent loop with real transparency. Capped at 960 × 540 and 25 fps by default. |
 
-Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC, HEVC with Alpha and AV1, and 16-bit LPCM in both ProRes formats. GIF and APNG carry no sound. A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower.
+Sound in the movie formats is stereo at 48 kHz: AAC in H.264, HEVC, HEVC with Alpha and AV1 (MP4), Opus in AV1 (WebM), and 16-bit LPCM in both ProRes formats. A project with no sound exports a WebM with no sound track. GIF and APNG carry no sound. A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower.
 
 Changing the format rebuilds the Size list and puts it back on that format's default. Your frame rate, quality, loudness and range choices stay as they were.
 
@@ -70,7 +71,7 @@ A row with the same numbers as an earlier row is hidden, so a 1920 × 1080 docum
 
 How the picture fits the frame:
 
-- **Even dimensions.** H.264, HEVC, HEVC with Alpha, HEVC 10-bit, AV1 and ProRes 422 need them, so an odd width or height is written one pixel smaller. ProRes 4444, GIF and APNG keep an odd edge.
+- **Even dimensions.** H.264, HEVC, HEVC with Alpha, HEVC 10-bit, both AV1 formats and ProRes 422 need them, so an odd width or height is written one pixel smaller. ProRes 4444, GIF and APNG keep an odd edge.
 - **Movies** are written at exactly the size you choose. When that size is within a pixel of the canvas's shape, the picture fills the frame edge to edge. Any other shape is letterboxed with black.
 - **ProRes 4444 and HEVC with Alpha** refuse a size of a different shape instead of letterboxing it, because the padding would destroy the alpha channel. Every row in the Size popup has the canvas's shape, so this only happens with a Custom size.
 - **GIF and APNG** fit the picture inside the size you choose, keeping its shape and never enlarging it. The readout shows the size the file will have: a 1080 × 1920 project's GIF default is 152 × 270.
@@ -79,7 +80,7 @@ The Size control is greyed out for the audio-only formats.
 
 ### Speed
 
-The **Speed** row sits under Format (under Dynamic Range in an HDR project). It is live only on **AV1 (MP4)**; on every other format it is greyed out and keeps your last choice.
+The **Speed** row sits under Format (under Dynamic Range in an HDR project). It is live only on **AV1 (MP4)** and **AV1 (WebM)**; on every other format it is greyed out and keeps your last choice.
 
 | Choice | What it does |
 |---|---|
@@ -95,7 +96,7 @@ AV1 is encoded in software, so it takes longer than the HEVC formats, which use 
 
 ### Quality
 
-**Format default** lets the encoder choose the video rate. The sound uses 192 kbps AAC.
+**Format default** lets the encoder choose the video rate. The sound uses 192 kbps AAC, or 192 kbps Opus in AV1 (WebM).
 
 The four tiers set a video rate from the frame's size, so a tier means the same picture quality at every size. Each tier's title shows the rate it would ask for at the size and frame rate now chosen.
 
@@ -110,6 +111,7 @@ The four tiers set a video rate from the frame's size, so a tier means the same 
 - Above 30 fps, the video rate is 1.5 times higher.
 - HEVC formats and AV1 ask for 60 % of the H.264 rate. AV1's **Format default** is the HEVC rate too.
 - For **AV1** the rate is a soft cap. AV1 encodes at a constant quality chosen to match or beat HEVC at that rate, so it usually stays under the rate and simple footage comes out much smaller. Very detailed footage can go over: up to about 1.25 times the rate was measured. Its tier titles and footnote read `usually ≤ …`.
+- AV1 (WebM) asks the same rates of its Opus sound, rounded to the nearest rate the Opus encoder offers.
 - Audio only (M4A) uses the tier's AAC rate alone.
 - Quality is greyed out for ProRes, WAV, AIFF, GIF and APNG, where the format fixes the rate.
 
@@ -248,7 +250,7 @@ In an HDR (HLG) project the sheet has a **Dynamic Range** row under Format:
 | **HDR10 (PQ)** | An HDR10 file with fixed mastering metadata. |
 | **SDR version** | The project converted to SDR. |
 
-Only HEVC 10-bit, AV1, ProRes 422 and ProRes 4444 can carry HDR. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
+Only HEVC 10-bit, both AV1 formats, ProRes 422 and ProRes 4444 can carry HDR. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
 
 ## Transparency
 
@@ -258,7 +260,7 @@ While the canvas background is transparent, the Document tab says how many forma
 
 ## Chapters
 
-Chapter markers on the timeline (see [Timeline](timeline.md)) become chapters in MP4, MOV and M4A files, in time order. A chapter's name is the marker's name, or "Chapter *n*" for an unnamed one. A range export keeps the chapters inside the range, with their times counted from the start of the file, and the chapter already running when the range starts opens the file. WAV, AIFF, GIF and APNG have no chapters.
+Chapter markers on the timeline (see [Timeline](timeline.md)) become chapters in MP4, MOV, M4A and WebM files, in time order. A chapter's name is the marker's name, or "Chapter *n*" for an unnamed one. A range export keeps the chapters inside the range, with their times counted from the start of the file, and the chapter already running when the range starts opens the file. WAV, AIFF, GIF and APNG have no chapters.
 
 MP4 and M4A files are written with their index at the front, so a player can start before the whole file has downloaded.
 
@@ -276,16 +278,16 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 
 | Argument | The sheet's control | Notes |
 |---|---|---|
-| `preset` (required) | Format | `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`. |
+| `preset` (required) | Format | `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`. |
 | `path` (required) | Save panel | The folder must exist. An existing file is replaced. The format's extension is added when the path has none, and a different known media extension is replaced: `cut.mov` with `h264` writes `cut.mp4`. Any other suffix stays part of the name. |
 | `size` | Size | `document`, `2160p`, `1440p`, `1080p`, `720p`, `preset` (GIF and APNG only), or `[width, height]`. |
 | `range` | Range | `project` (default) or `in_out`. Refused when there is no in/out range. |
-| `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1`, `video_bitrate` is a soft cap the file usually stays under. |
+| `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1` and `av1_webm`, `video_bitrate` is a soft cap the file usually stays under. `audio_bitrate` is the AAC or Opus rate. |
 | `loudness_lufs` | Loudness | −70 to 0. |
 | `peak_dbtp` | (fixed at −1 on the sheet) | −20 to 0. Refused without `loudness_lufs`. |
 | `burn_in_timecode` | Burn in timecode | |
 | `dynamic_range` | Dynamic Range | `hlg`, `pq` or `sdr`. |
-| `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` only; refused on every other format. |
+| `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` and `av1_webm` only; refused on every other format. |
 
 There is no frame-rate argument. An agent's export uses the document's rate, or GIF's and APNG's own.
 
@@ -293,7 +295,7 @@ Every refusal comes back from `export` itself, before anything is queued: a bad 
 
 - `export_status {export_id}` answers the job's row without waiting: `queued`, `running` (with `progress` from 0 to 1 and `phase`), `done`, `failed` or `cancelled`. Call it again after a pause until the job finishes.
   - Every answer has `path` and `elapsed` (seconds).
-  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1, any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp`, `capped_by_peak` and `target_lufs`.
+  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp`, `capped_by_peak` and `target_lufs`.
   - `failed` and `cancelled` add `reason`, the queue row's sentence.
 - `cancel_export {export_id}` is the row's Cancel.
 - An `export_id` lasts until Frame Job quits.
@@ -309,7 +311,7 @@ The full reference is [MCP](mcp.md).
 - ProRes 4444 and HEVC with Alpha refuse a custom size of a different shape from the canvas.
 - A Mac with no encoder for a format reports "This Mac cannot export with the “*preset*” preset." and leaves no file.
 - WAV and AIFF are 16-bit only.
-- On an M1 or M2 Mac Frame Job cannot play or re-import its own AV1 file; QuickTime cannot either. Those Macs have no AV1 decoder.
+- On an M1 or M2 Mac Frame Job cannot play or re-import its own AV1 file, MP4 or WebM; QuickTime cannot either. Those Macs have no AV1 decoder.
 - AV1's file size is not known in advance: the file usually comes in well under the rate, but very detailed footage can go up to about 1.25 times over it.
 - Captions are burned in, never a switchable subtitle track.
 - Queued jobs run one at a time. **Export…** does not join the queue: it writes straight away, behind its own progress sheet.
