@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01SYrJBitV4xGF6Nip6T6zHy",
+  "agent_id": "a2d9c042e23ae9924",
+  "subagent_type": "lc-fixer",
+  "task_description": "Residue fix pass #378 lane",
+  "token_usage": {
+    "input_tokens": 116,
+    "cache_creation_tokens": 244148,
+    "cache_read_tokens": 5014509,
+    "output_tokens": 26143,
+    "api_call_count": 56
+  },
+  "started_at": "2026-10-28T16:25:13.936608-04:00",
+  "completed_at": "2026-10-28T16:29:22.955097-04:00"
+}
