@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road map "codec-export" C1 — the `av1` row: AV1 in MP4 through the bundled
-SVT-AV1 (spec §11 CX-1, CX-2, CX-9, CX-10, CX-12, CX-13).
+"""Road map "codec-export" C1 and C2 — the `av1` row: AV1 in MP4 through the bundled
+SVT-AV1, 10-bit, with HLG, PQ and HDR10 in an HLG project (spec §11 CX-1, CX-2, CX-9,
+CX-10, CX-12, CX-13, CX-14).
 
     python3 tools/proof/av1_export_proof.py [--app debug|release|PATH] [--rate]
     python3 tools/proof/av1_export_proof.py --mutant NAME
@@ -18,7 +19,7 @@ Rows (`<ID> ok|FAIL — <detail>`, then `scores: n/m`; exit 0 iff all passed):
   no `Svt[` line (SVT's own banner, which CX-12 (6) routes away) and no
   `SVT-AV1: ` line (a warning or error it passed on).
 * A1 — `export {preset: av1}` of AV.mov (640 × 360, 30 fps, 5 s) under a text
-  clip is done; ffprobe reads video `av1` / `av01` / Main / `yuv420p` /
+  clip is done; ffprobe reads video `av1` / `av01` / Main / `yuv420p10le` /
   640 × 360 and audio `aac` / `mp4a`, and the video lasts 5.0 s ± one frame.
 * A2 — the file's compatible brands include `av01`.
 * A3a — the bitstream: `-bsf:v trace_headers`' every sequence header has
@@ -50,6 +51,36 @@ Rows (`<ID> ok|FAIL — <detail>`, then `scores: n/m`; exit 0 iff all passed):
   picture letterboxed (the top 56 rows' luma ≤ 20, the middle rows' mean above
   20, frame 0's Y plane); `size: "720p"` decodes at 1280 × 720.
 * A9 — an in/out export of 1 s to 3 s holds 60 frames.
+* H1 — A1's project made HLG (`set_canvas output "hlg"`, "the HLG doc"), `av1` with
+  no `dynamic_range`: the answer's `dynamic_range` is `hlg`; ffprobe reads
+  `yuv420p10le` / Main and the tags `bt2020nc/arib-std-b67/bt2020`; `trace_headers`'
+  CICP is 9/18/9 with `color_range` 0; the `av01` entry's `colr` is `nclx` 9/18/9/0;
+  the entry holds no `mdcv` or `clli` box; the stream carries no mastering or light
+  level side data, and neither does frame 0 of the raw OBU stream copied out of the
+  file (`-c:v copy -f obu`, no container to borrow from) decoded by libdav1d.
+* H2 — the HLG doc at `pq`: the answer says `pq`; tags `bt2020nc/smpte2084/bt2020`,
+  CICP 9/16/9, `colr` `nclx` 9/16/9/0. The container: the stream's side data is
+  `hdr_proof.py`'s HDR10_SIDE strings, and the `av01` entry holds an `mdcv` and a
+  `clli` box, `clli` (1000, 0). The bitstream: frame 0 of the raw OBU stream
+  decoded by libdav1d carries a mastering display (each chromaticity within
+  1/50000 of P3-D65's, max 1000 ± 1/256, min 0.005 ± 1/16384) and a content light
+  level (MaxCLL 1000, MaxFALL 0).
+* H3 — the HLG doc at `sdr`: the answer says `sdr`; `yuv420p10le`, bt709 × 3,
+  CICP 1/1/1, `colr` `nclx` 1/1/1/0, no `mdcv`/`clli` box and no HDR10 side data.
+* H4 — the code values against `hevc_10bit`, each export made as `av1` and as
+  `hevc_10bit` at `video_bitrate` 20,000,000 and decoded by ffmpeg as
+  `yuv420p10le`: (a) A1's SDR project and the HLG doc at hlg, pq and sdr, frames
+  0–149, each plane's mean absolute difference ≤ 6 codes (twelve numbers); (b) a
+  fixture made here, `WORK/stripes.mov` (640 × 360 ProRes 422 HQ, three 120-row
+  stripes of 100 % red, green and blue, BT.709), alone in an SDR project exported
+  at the default and in an HLG project at hlg and at pq: frame 30, each stripe's
+  inner patch (luma rows 120k+30…120k+89 × columns 64…575, chroma rows
+  60k+15…60k+44 × columns 32…287), |mean(av1) − mean(hevc_10bit)| ≤ 4 codes per
+  plane (27 numbers). A failed export, decode or fixture fails H4.
+* H5 — refused by sentence, no file left: `av1` `pq` in A1's SDR project
+  (`dynamic_range "pq" needs an HLG project; set_canvas output "hlg" first`) and
+  `h264` `hlg` in the HLG doc (`h264 is 8-bit and writes the SDR version; export
+  dynamic_range "hlg" as hevc_10bit, av1, prores_422 or prores_4444`).
 * S1 — an instance pinned with `screens.py`'s PINS, `-RCDevAppearance light`
   and `FrameJobExportChoice` `{"preset_id":"av1","encoder_speed":"smaller"}`:
   File ▸ Export… shows Format "AV1 (MP4)", the popup after "Speed:" reads
@@ -60,15 +91,18 @@ Rows (`<ID> ok|FAIL — <detail>`, then `scores: n/m`; exit 0 iff all passed):
   flag, so the popup's darkest pixel is compared with the Format popup's in
   the same light capture — within 40 levels is enabled, more than 60 lighter
   is disabled.
+* S3 — as S1, pinned to `{"preset_id":"av1"}`, on an HLG project: the popup
+  after "Dynamic Range:" reads "HDR (HLG)" and is drawn enabled by S1's rule.
 * R1, R2 — only with `--rate` (CX-13's soft-capped CRF): the owner's full-length
   clip `tools/proof/media/owner-sync/IMG_0018.MOV` (1920 × 1080, 30 fps,
   55.27 s) exported once as `prores_422` (the reference), then, R1 at "Format
   default" (no `video_bitrate`: the cap is HEVC's 0.07 bits per pixel per
   frame) and R2 at the sheet's High tier (`video_bitrate` 0.129 × 0.6 to the
-  nearest 100 kbps, asked of both), as `hevc` and as `av1` at each speed:
-  each `av1` file's video bit rate (ffprobe, the whole file's average) is at
-  most 1.25 × the cap (CX-13's soft cap) and its VMAF against the reference
-  (ffmpeg's libvmaf, both as 8-bit 4:2:0) is at or above the `hevc` file's.
+  nearest 100 kbps, asked of both), as `hevc_10bit` and as `av1` at each speed
+  (CX-14 (6)): each `av1` file's video bit rate (ffprobe, the whole file's
+  average) is at most 1.30 × the cap (CX-13's soft cap) and its VMAF against
+  the reference (ffmpeg's libvmaf, both as 10-bit 4:2:0) is at or above the
+  `hevc_10bit` file's.
   Prints each rate, its share of the cap, each VMAF and each encode's frames
   per second. A missing fixture skips R by name; a libvmaf that cannot run is
   a FAIL.
@@ -92,9 +126,20 @@ copy, an anchor, a build or a launch).
   encode-ignores-cancel      every `isStopping()` in `ExportEncodePump` removed: A6
   speed-on-any-row           the core takes `encoder_speed` on any row: A7 and
                              `cargo test --test export_av1`
-  colour-untagged-bitstream  SVT's CICP left unset: A3a
-  colour-untagged-container  the format description's colour extensions
-                             dropped: A3b
+  colour-untagged-bitstream  SVT's CICP left unset (the encoder's three
+                             `picture.` lines): A3a, H1, H2, H3
+  colour-untagged-container  the picture's extensions never merged into the
+                             format description: A3b, H1, H2, H3
+  av1-not-hdr                `av1` out of the core's HDR_ROWS: H1, H2, H4, S3 and
+                             `cargo test --test dynamic_range`
+  matrix-709-in-hdr          the HLG and PQ pictures' luma weights BT.709's: H4
+  full-range-samples         the kernel's Y = round(1023·Y′), C = round(512 +
+                             1023·C′): H4
+  pq-tagged-hlg              SVT's transfer HLG on PQ: H2
+  pq-no-container-metadata   the mastering and light-level extensions dropped
+                             from PQ: H2
+  pq-no-bitstream-metadata   SVT's two parse calls never made: H2
+  metadata-on-hlg            `carriesHDR10` true for HLG: H1
 
 An instrument that cannot run is a FAIL, never an exit.
 """
@@ -103,6 +148,7 @@ import argparse
 import atexit
 import json
 import math
+import operator
 import os
 import re
 import shutil
@@ -110,6 +156,7 @@ import struct
 import subprocess
 import sys
 import time
+from array import array
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -128,8 +175,19 @@ SEC = 600_000
 FRAMES = 150                     # AV.mov's 5 s at 30 fps
 CANCEL_BOUND = 10.0
 CAP_TOLERANCE = 1.30             # CX-13 (1): a soft cap; hard footage measured up to 1.254 ×
+H4_RATE = 20_000_000
+H4_FRAME_BOUND = 6               # H4 (a): each plane's mean absolute difference, in codes
+H4_PATCH_BOUND = 4               # H4 (b): each patch's mean difference, in codes; fixed
+# H2's bitstream reading: P3-D65 as SVT writes it (0.16 fixed point) within 1/50000.
+MASTERING = {"red_x": 0.680, "red_y": 0.320, "green_x": 0.265, "green_y": 0.690,
+             "blue_x": 0.150, "blue_y": 0.060, "white_point_x": 0.3127,
+             "white_point_y": 0.3290}
+REFUSED_SDR = "dynamic_range \"pq\" needs an HLG project; set_canvas output \"hlg\" first"
+REFUSED_8BIT = ("h264 is 8-bit and writes the SDR version; export dynamic_range \"hlg\" as "
+                "hevc_10bit, av1, prores_422 or prores_4444")
 
-ROWS = ["Z1", "A1", "A2", "A3a", "A3b", "A4", "A5", "A6", "A7", "A8", "A9", "S1", "S2"]
+ROWS = ["Z1", "A1", "A2", "A3a", "A3b", "A4", "A5", "A6", "A7", "A8", "A9", "H1", "H2", "H3",
+        "H4", "H5", "S1", "S2", "S3"]
 
 SOURCES = "app/Sources"
 MUTANTS = {
@@ -157,20 +215,50 @@ MUTANTS = {
         ("core/src/export.rs",
          "        let speed = match (encoder_speed(overrides)?, preset.takes_encoder_speed()) {\n",
          "        let speed = match (encoder_speed(overrides)?, true) {\n")]},
-    "colour-untagged-bitstream": {"rows": ["A3a"], "anchors": [
+    "colour-untagged-bitstream": {"rows": ["A3a", "H1", "H2", "H3"], "anchors": [
         (f"{SOURCES}/ExportAV1Encoder.swift",
-         "        config.color_primaries = EB_CICP_CP_BT_709\n"
-         "        config.transfer_characteristics = EB_CICP_TC_BT_709\n"
-         "        config.matrix_coefficients = EB_CICP_MC_BT_709\n", "")]},
-    "colour-untagged-container": {"rows": ["A3b"], "anchors": [
+         "        config.color_primaries = picture.primaries\n"
+         "        config.transfer_characteristics = picture.transfer\n"
+         "        config.matrix_coefficients = picture.matrix\n", "")]},
+    "colour-untagged-container": {"rows": ["A3b", "H1", "H2", "H3"], "anchors": [
         (f"{SOURCES}/ExportAV1Track.swift",
-         "            kCMFormatDescriptionExtension_ColorPrimaries as String:\n"
-         "                kCMFormatDescriptionColorPrimaries_ITU_R_709_2,\n"
-         "            kCMFormatDescriptionExtension_TransferFunction as String:\n"
-         "                kCMFormatDescriptionTransferFunction_ITU_R_709_2,\n"
-         "            kCMFormatDescriptionExtension_YCbCrMatrix as String:\n"
-         "                kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2,\n"
-         "            kCMFormatDescriptionExtension_FullRangeVideo as String: false,\n", "")]},
+         "        extensions.merge(picture.formatExtensions) { _, picture in picture }\n", "")]},
+    "av1-not-hdr": {"rows": ["H1", "H2", "H4", "S3"], "cargo": "dynamic_range", "anchors": [
+        ("core/src/dynamic_range.rs",
+         'pub(crate) const HDR_ROWS: [&str; 4] = ["hevc_10bit", "av1", "prores_422", '
+         '"prores_4444"];\n',
+         'pub(crate) const HDR_ROWS: [&str; 3] = ["hevc_10bit", "prores_422", "prores_4444"];\n')]},
+    "matrix-709-in-hdr": {"rows": ["H4"], "anchors": [
+        (f"{SOURCES}/ExportAV1Picture.swift",
+         "        self == .sdr ? (0.2126, 0.0722) : (0.2627, 0.0593)\n",
+         "        (0.2126, 0.0722)\n")]},
+    "full-range-samples": {"rows": ["H4"], "anchors": [
+        ("app/Resources/Shaders/ExportI010.metal",
+         "            planes[at.y * u.lumaStride + at.x] = ushort(round(64.0 + 876.0 * luma));\n",
+         "            planes[at.y * u.lumaStride + at.x] = ushort(round(1023.0 * luma));\n"),
+        ("app/Resources/Shaders/ExportI010.metal",
+         "    planes[u.cbOffset + chroma] = ushort(clamp(round(512.0 + 896.0 * cb / count), 0.0, "
+         "1023.0));\n",
+         "    planes[u.cbOffset + chroma] = ushort(clamp(round(512.0 + 1023.0 * cb / count), 0.0, "
+         "1023.0));\n"),
+        ("app/Resources/Shaders/ExportI010.metal",
+         "    planes[u.crOffset + chroma] = ushort(clamp(round(512.0 + 896.0 * cr / count), 0.0, "
+         "1023.0));\n",
+         "    planes[u.crOffset + chroma] = ushort(clamp(round(512.0 + 1023.0 * cr / count), 0.0, "
+         "1023.0));\n")]},
+    "pq-tagged-hlg": {"rows": ["H2"], "anchors": [
+        (f"{SOURCES}/ExportAV1Picture.swift", "        case .pq: return EB_CICP_TC_SMPTE_2084\n",
+         "        case .pq: return EB_CICP_TC_HLG\n")]},
+    "pq-no-container-metadata": {"rows": ["H2"], "anchors": [
+        (f"{SOURCES}/ExportAV1Picture.swift", "        if carriesHDR10 {\n",
+         "        if carriesHDR10 && false {\n")]},
+    "pq-no-bitstream-metadata": {"rows": ["H2"], "anchors": [
+        (f"{SOURCES}/ExportAV1Encoder.swift",
+         "            if picture.carriesHDR10 {\n"
+         "                try Self.setHDR10(&config)\n"
+         "            }\n", "")]},
+    "metadata-on-hlg": {"rows": ["H1"], "anchors": [
+        (f"{SOURCES}/ExportAV1Picture.swift", "        self == .pq\n", "        self != .sdr\n")]},
 }
 
 results = {}
@@ -304,9 +392,9 @@ def boxes(data, start, end):
         at += size
 
 
-def colr_of(path):
-    """The `av01` sample entry's `colr` box: (type, primaries, transfer, matrix,
-    full_range) or None, read from the file's bytes."""
+def av01_children(path):
+    """The `av01` sample entry's child boxes as [(type, body bytes)], or None when the
+    file has no `av01` entry, read from the file's bytes."""
     data = Path(path).read_bytes()
 
     def find(start, end, chain):
@@ -331,12 +419,97 @@ def colr_of(path):
                 continue
             # VisualSampleEntry: 6 reserved + 2 index + 16 pre_defined/reserved + 4 size
             # + 8 resolution + 4 reserved + 2 frame count + 32 compressor + 2 depth + 2 -1.
-            for child, cbody, cstop in boxes(data, entry[0] + 78, entry[1]):
-                if child == "colr" and data[cbody:cbody + 4] == b"nclx":
-                    p, t, m = struct.unpack(">HHH", data[cbody + 4:cbody + 10])
-                    return ("nclx", p, t, m, data[cbody + 10] >> 7)
-            return None
+            return [(child, data[cbody:cstop])
+                    for child, cbody, cstop in boxes(data, entry[0] + 78, entry[1])]
     return None
+
+
+def colr_of(path):
+    """The `av01` sample entry's `colr` box: (type, primaries, transfer, matrix,
+    full_range) or None, read from the file's bytes."""
+    for child, body in av01_children(path) or []:
+        if child == "colr" and body[:4] == b"nclx" and len(body) >= 11:
+            p, t, m = struct.unpack(">HHH", body[4:10])
+            return ("nclx", p, t, m, body[10] >> 7)
+    return None
+
+
+def hdr_boxes(path):
+    """(the `av01` entry's child box types, `clli`'s body as (MaxCLL, MaxFALL) or None);
+    None when the file has no `av01` entry."""
+    children = av01_children(path)
+    if children is None:
+        return None
+    clli = next((struct.unpack(">HH", body[:4]) for kind, body in children
+                 if kind == "clli" and len(body) >= 4), None)
+    return [kind for kind, _ in children], clli
+
+
+def obu_of(path):
+    """The video copied out of `path` as a raw OBU stream (`<path>.obu`), which has no
+    container to borrow side data from; None when ffmpeg could not."""
+    obu = Path(f"{path}.obu")
+    obu.unlink(missing_ok=True)
+    ran = run(["ffmpeg", "-v", "error", "-i", path, "-map", "0:v:0", "-c:v", "copy", "-f",
+               "obu", obu])
+    return obu if ran["rc"] == 0 and obu.exists() and obu.stat().st_size > 0 else None
+
+
+def side_pairs(text):
+    """`key=value` lines of ffprobe's default output, and the side data types named."""
+    pairs, kinds = {}, []
+    for line in text.splitlines():
+        key, _, value = line.strip().partition("=")
+        if key == "side_data_type":
+            kinds.append(value)
+        elif value and key not in pairs:
+            pairs[key] = value
+    return pairs, kinds
+
+
+def stream_side(path):
+    """The video stream's side data (the container's `mdcv`/`clli` as ffprobe reads them):
+    (pairs, types) or None when ffprobe failed."""
+    ran = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+               "stream_side_data_list", path])
+    return side_pairs(ran["stdout"]) if ran["rc"] == 0 else None
+
+
+def bitstream_side(obu):
+    """Frame 0 of a raw OBU stream decoded by libdav1d: its side data as (pairs, types),
+    or None when no frame was decoded."""
+    ran = run(["ffprobe", "-v", "error", "-c:v", "libdav1d", "-read_intervals", "%+#1",
+               "-show_frames", "-show_entries", "frame=pix_fmt,side_data_list", obu])
+    text = ran["stdout"]
+    if ran["rc"] != 0 or "[FRAME]" not in text:
+        return None
+    return side_pairs(text.split("[FRAME]", 1)[1].split("[/FRAME]", 1)[0])
+
+
+def colour_tags(path):
+    ran = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+               "stream=pix_fmt,profile,color_space,color_transfer,color_primaries", "-of",
+               "json", path])
+    got = (json.loads(ran["stdout"] or "{}").get("streams") or [{}])[0]
+    return (got.get("pix_fmt"), got.get("profile"),
+            f"{got.get('color_space')}/{got.get('color_transfer')}/{got.get('color_primaries')}")
+
+
+def cicp_of(path):
+    """Every value `trace_headers` reads for the sequence headers' colour fields."""
+    head, per_packet = trace(path)
+    every = head + [f for p in per_packet for f in p["fields"]]
+    names = ("color_description_present_flag", "color_primaries", "transfer_characteristics",
+             "matrix_coefficients", "color_range")
+    return {n: sorted({v for k, v in every if k == n}) for n in names}
+
+
+def fraction(text):
+    try:
+        top, _, bottom = text.partition("/")
+        return float(top) / float(bottom or 1)
+    except (ValueError, ZeroDivisionError, AttributeError):
+        return None
 
 
 # ---- the instance ----------------------------------------------------------------
@@ -443,7 +616,7 @@ def rows_a1_a5(doc, out):
     seen = (video.get("codec_name"), video.get("codec_tag_string"), video.get("profile"),
             video.get("pix_fmt"), video.get("width"), video.get("height"),
             audio.get("codec_name"), audio.get("codec_tag_string"))
-    want = ("av1", "av01", "Main", "yuv420p", 640, 360, "aac", "mp4a")
+    want = ("av1", "av01", "Main", "yuv420p10le", 640, 360, "aac", "mp4a")
     length = float(video.get("duration") or 0)
     check("A1", done.get("status") == "done" and seen == want and abs(length - 5) <= 1 / 30,
           f"status {done.get('status')}, {done.get('bytes')} bytes; read {seen} (want {want}); "
@@ -653,6 +826,289 @@ def run_a_rows(app, logs):
         instance.stop()
 
 
+# ---- HDR (CX-14) -----------------------------------------------------------------
+
+def hlg_doc(instance, name):
+    """A1's project made an HLG project ("the HLG doc")."""
+    doc = av_doc(instance, name)
+    doc.call("set_canvas", output="hlg")
+    return doc
+
+
+def hdr10_misses(stream, boxes_seen, frame):
+    """What H2's container and bitstream readings lack of HD-5's HDR10 metadata."""
+    misses = []
+    try:
+        from hdr_proof import HDR10_SIDE
+    except ImportError as error:
+        return [f"hdr_proof's HDR10_SIDE could not be read: {error}"]
+    pairs = stream[0] if stream else {}
+    seen = {k: pairs.get(k) for k in HDR10_SIDE}
+    if seen != HDR10_SIDE:
+        misses.append(f"stream side data {seen}")
+    types, clli = boxes_seen or ([], None)
+    if "mdcv" not in types or "clli" not in types or clli != (1000, 0):
+        misses.append(f"av01 children {types}, clli {clli}")
+    if frame is None:
+        return misses + ["the OBU stream's frame 0 could not be decoded"]
+    values, kinds = frame
+    off = {k: values.get(k) for k, want in MASTERING.items()
+           if fraction(values.get(k)) is None or abs(fraction(values[k]) - want) > 1 / 50000}
+    peak, floor = fraction(values.get("max_luminance")), fraction(values.get("min_luminance"))
+    if (off or peak is None or abs(peak - 1000) > 1 / 256 or floor is None
+            or abs(floor - 0.005) > 1 / 16384 or values.get("max_content") != "1000"
+            or values.get("max_average") != "0"
+            or "Mastering display metadata" not in kinds
+            or "Content light level metadata" not in kinds):
+        misses.append(f"the bitstream's frame 0: {kinds}, off {off}, max {values.get('max_luminance')}, "
+                      f"min {values.get('min_luminance')}, MaxCLL {values.get('max_content')}, "
+                      f"MaxFALL {values.get('max_average')}")
+    return misses
+
+
+def row_picture(ident, doc, out, asked, cicp, tags, hdr10):
+    """H1–H3: one `av1` export of the HLG doc, its tags in both places and its HDR10."""
+    path = out / f"{ident.lower()}.mp4"
+    try:
+        done = export(doc, path, preset="av1",
+                      **({} if asked is None else {"dynamic_range": asked}))
+    except mcp.ToolError as error:
+        check(ident, False, f"the export failed: {error}")
+        return
+    want = asked or "hlg"
+    misses = []
+    said = done.get("dynamic_range")
+    if done.get("status") != "done" or said != want:
+        misses.append(f"status {done.get('status')}, dynamic_range {said!r}")
+    pix, profile, seen_tags = colour_tags(path)
+    if (pix, profile, seen_tags) != ("yuv420p10le", "Main", tags):
+        misses.append(f"read {pix} / {profile} / {seen_tags}")
+    values = cicp_of(path)
+    want_cicp = {"color_description_present_flag": [1], "color_primaries": [cicp[0]],
+                 "transfer_characteristics": [cicp[1]], "matrix_coefficients": [cicp[2]],
+                 "color_range": [0]}
+    if values != want_cicp:
+        misses.append(f"CICP {values}")
+    colr = colr_of(path)
+    if colr != ("nclx", *cicp, 0):
+        misses.append(f"colr {colr}")
+    boxes_seen = hdr_boxes(path)
+    stream = stream_side(path)
+    obu = obu_of(path)
+    frame = bitstream_side(obu) if obu else None
+    if boxes_seen is None or stream is None:
+        misses.append(f"the container could not be read: boxes {boxes_seen}, side {stream}")
+    elif hdr10:
+        misses += hdr10_misses(stream, boxes_seen, frame)
+    else:
+        hdr_kinds = {"Mastering display metadata", "Content light level metadata"}
+        types = boxes_seen[0]
+        if "mdcv" in types or "clli" in types or hdr_kinds & set(stream[1]):
+            misses.append(f"av01 children {types}, stream side data {stream[1]}")
+        if frame is None:
+            misses.append("the OBU stream's frame 0 could not be decoded")
+        elif hdr_kinds & set(frame[1]):
+            misses.append(f"the bitstream's frame 0 carries {frame[1]}")
+    check(ident, not misses,
+          f"answer {said!r} (want {want!r}); {pix} / {profile} / {seen_tags}; CICP "
+          f"{[v for v in values.values()]}; colr {colr}; av01 children "
+          f"{boxes_seen and boxes_seen[0]}, clli {boxes_seen and boxes_seen[1]}; stream side "
+          f"data {stream and stream[1]}; the OBU stream's frame 0 {frame and frame[1]}"
+          + (f"; misses {misses}" if misses else ""))
+
+
+def plane_spans(width, height):
+    """Each plane's (start, end) in one yuv420p10le frame, in samples, and the frame's."""
+    luma = width * height
+    chroma = ((width + 1) // 2) * ((height + 1) // 2)
+    return [(0, luma), (luma, luma + chroma), (luma + chroma, luma + 2 * chroma)], \
+        luma + 2 * chroma
+
+
+def samples(data):
+    """yuv420p10le bytes as 16-bit samples."""
+    out = array("H")
+    out.frombytes(data)
+    if sys.byteorder != "little":
+        out.byteswap()
+    return out
+
+
+def decode10(path, frames=None, index=None):
+    """The video decoded by ffmpeg as yuv420p10le, frames 0…frames−1 or frame `index`;
+    None when ffmpeg failed."""
+    argv = ["ffmpeg", "-v", "error", "-i", str(path)]
+    argv += (["-vf", f"select=eq(n\\,{index})", "-frames:v", "1"] if index is not None
+             else ["-frames:v", str(frames)])
+    try:
+        ran = subprocess.run(argv + ["-f", "rawvideo", "-pix_fmt", "yuv420p10le", "-"],
+                             capture_output=True, timeout=600)
+    except subprocess.TimeoutExpired:
+        return None
+    return ran.stdout if ran.returncode == 0 and ran.stdout else None
+
+
+def frame_differences(a, b, width, height, frames):
+    """Each plane's mean absolute difference over `frames` frames, or None when either
+    decode is short."""
+    spans, per = plane_spans(width, height)
+    one, two = samples(a), samples(b)
+    if len(one) != per * frames or len(two) != per * frames:
+        return None
+    totals = [0, 0, 0]
+    for f in range(frames):
+        base = f * per
+        for k, (start, end) in enumerate(spans):
+            totals[k] += sum(map(abs, map(operator.sub, one[base + start:base + end],
+                                          two[base + start:base + end])))
+    return [totals[k] / ((end - start) * frames) for k, (start, end) in enumerate(spans)]
+
+
+def patch_means(data, width, height, stripe):
+    """Stripe `stripe`'s inner patch: each plane's mean, or None when the decode is short."""
+    spans, per = plane_spans(width, height)
+    values = samples(data)
+    if len(values) != per:
+        return None
+    half = (width + 1) // 2
+
+    def mean(start, stride, rows, cols):
+        total = sum(sum(values[start + r * stride + cols[0]:start + r * stride + cols[1] + 1])
+                    for r in range(rows[0], rows[1] + 1))
+        return total / ((rows[1] - rows[0] + 1) * (cols[1] - cols[0] + 1))
+
+    return [mean(0, width, (120 * stripe + 30, 120 * stripe + 89), (64, 575)),
+            mean(spans[1][0], half, (60 * stripe + 15, 60 * stripe + 44), (32, 287)),
+            mean(spans[2][0], half, (60 * stripe + 15, 60 * stripe + 44), (32, 287))]
+
+
+def stripes_fixture():
+    """WORK/stripes.mov: 640 × 360, three 120-row stripes of 100 % red, green and blue,
+    ProRes 422 HQ tagged BT.709; None when ffmpeg failed."""
+    path = WORK / "stripes.mov"
+    path.unlink(missing_ok=True)
+    ran = run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0xFF0000:s=640x120:r=30:d=5",
+               "-f", "lavfi", "-i", "color=c=0x00FF00:s=640x120:r=30:d=5", "-f", "lavfi",
+               "-i", "color=c=0x0000FF:s=640x120:r=30:d=5", "-filter_complex",
+               "[0][1][2]vstack=inputs=3,scale=out_color_matrix=bt709:out_range=tv,"
+               "format=yuv422p10le", "-c:v", "prores_ks", "-profile:v", "3",
+               "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", path])
+    return path if ran["rc"] == 0 and path.exists() else None
+
+
+def row_h4(instance, sdr, hlg, out):
+    """H4: av1's code values against hevc_10bit's, whole frames and saturated patches."""
+    lines, ok = [], True
+    stripes_docs = []
+    try:
+        for label, doc, extra in (("SDR project", sdr, {}),
+                                  ("hlg", hlg, {"dynamic_range": "hlg"}),
+                                  ("pq", hlg, {"dynamic_range": "pq"}),
+                                  ("sdr", hlg, {"dynamic_range": "sdr"})):
+            decoded = {}
+            for preset in ("av1", "hevc_10bit"):
+                path = out / f"h4a-{label.replace(' ', '-')}-{preset}.mp4"
+                export(doc, path, preset=preset, video_bitrate=H4_RATE, **extra)
+                decoded[preset] = decode10(path, frames=FRAMES)
+            diffs = (frame_differences(decoded["av1"], decoded["hevc_10bit"], 640, 360, FRAMES)
+                     if decoded["av1"] and decoded["hevc_10bit"] else None)
+            good = diffs is not None and all(d <= H4_FRAME_BOUND for d in diffs)
+            ok = ok and good
+            lines.append(f"(a) {label}: Y/Cb/Cr "
+                         + ("decode failed" if diffs is None
+                            else "/".join(f"{d:.3f}" for d in diffs)) + ("" if good else " ✗"))
+        fixture = stripes_fixture()
+        if fixture is None:
+            check("H4", False, "; ".join(lines) + "; the stripes fixture could not be made")
+            return
+        cases = []
+        for name, hdr in (("stripes-sdr", False), ("stripes-hlg", True)):
+            doc = Doc(instance, name)
+            stripes_docs.append(doc)
+            if hdr:
+                doc.call("set_canvas", output="hlg")
+            doc.call("add_clip", track=doc.track(), media=doc.media(fixture), at=0)
+            cases += ([("sdr", doc, {})] if not hdr else
+                      [("hlg", doc, {"dynamic_range": "hlg"}),
+                       ("pq", doc, {"dynamic_range": "pq"})])
+        for label, doc, extra in cases:
+            decoded = {}
+            for preset in ("av1", "hevc_10bit"):
+                path = out / f"h4b-{label}-{preset}.mp4"
+                export(doc, path, preset=preset, video_bitrate=H4_RATE, **extra)
+                decoded[preset] = decode10(path, index=30)
+            for stripe, colour in enumerate(("red", "green", "blue")):
+                means = {preset: patch_means(data, 640, 360, stripe) if data else None
+                         for preset, data in decoded.items()}
+                if means["av1"] is None or means["hevc_10bit"] is None:
+                    ok = False
+                    lines.append(f"(b) {label} {colour}: decode failed ✗")
+                    continue
+                parts = []
+                for plane, a, b in zip(("Y", "Cb", "Cr"), means["av1"], means["hevc_10bit"]):
+                    good = abs(a - b) <= H4_PATCH_BOUND
+                    ok = ok and good
+                    parts.append(f"{plane} {a:.2f}/{b:.2f} ({a - b:+.2f})" + ("" if good else " ✗"))
+                lines.append(f"(b) {label} {colour}: " + ", ".join(parts))
+    except (mcp.ToolError, KeyError, IndexError, OSError) as error:
+        ok = False
+        lines.append(f"{type(error).__name__}: {error}")
+    finally:
+        for doc in stripes_docs:
+            doc.close()
+    check("H4", ok, f"av1 against hevc_10bit at {H4_RATE} b/s, (a) each plane's mean absolute "
+          f"difference ≤ {H4_FRAME_BOUND} over frames 0–{FRAMES - 1}, (b) av1/hevc_10bit patch "
+          f"means at frame 30, each within {H4_PATCH_BOUND}: " + "; ".join(lines))
+
+
+def row_h5(sdr, hlg, out):
+    pq_path, h264_path = out / "h5-pq.mp4", out / "h5-h264.mp4"
+    one = refusal(sdr, pq_path, preset="av1", dynamic_range="pq")
+    two = refusal(hlg, h264_path, preset="h264", dynamic_range="hlg")
+    left = [p.name for p in (pq_path, h264_path) if p.exists()]
+    check("H5", one is not None and REFUSED_SDR in one and two is not None
+          and REFUSED_8BIT in two and not left,
+          f"av1 pq in an SDR project → {one!r}; h264 hlg in an HLG project → {two!r}; files "
+          f"left {left}")
+
+
+def run_h_rows(app, logs):
+    out = WORK / "hdr"
+    tree_copy.remove_tree(str(out))
+    out.mkdir(parents=True)
+    instance = Instance("h", app)
+    logs.append(instance)
+    idents = ("H1", "H2", "H3", "H4", "H5")
+    try:
+        if instance.client is None:
+            for ident in idents:
+                check(ident, False, f"the app did not listen ({instance.log})")
+            return
+        docs = []
+        try:
+            sdr = av_doc(instance, "h-sdr")
+            docs.append(sdr)
+            hlg = hlg_doc(instance, "h-hlg")
+            docs.append(hlg)
+        except (mcp.ToolError, KeyError, IndexError) as error:
+            for ident in idents:
+                check(ident, False, f"the projects could not be made: {error}")
+            for doc in docs:
+                doc.close()
+            return
+        try:
+            row_picture("H1", hlg, out, None, (9, 18, 9), "bt2020nc/arib-std-b67/bt2020", False)
+            row_picture("H2", hlg, out, "pq", (9, 16, 9), "bt2020nc/smpte2084/bt2020", True)
+            row_picture("H3", hlg, out, "sdr", (1, 1, 1), "bt709/bt709/bt709", False)
+            row_h4(instance, sdr, hlg, out)
+            row_h5(sdr, hlg, out)
+        finally:
+            for doc in docs:
+                doc.close()
+    finally:
+        instance.stop()
+
+
 # ---- the sheet -------------------------------------------------------------------
 
 def popup_darkest(png, views, scale, popup):
@@ -668,8 +1124,9 @@ def popup_darkest(png, views, scale, popup):
     return min(pixels) if pixels else None
 
 
-def sheet_reading(app, label, choice):
-    """One pinned instance: File ▸ Export… on a project, the sheet read and cancelled."""
+def sheet_reading(app, label, choice, hlg=False):
+    """One pinned instance: File ▸ Export… on a project (an HLG one when `hlg`), the sheet
+    read and cancelled."""
     from screens import PINS
     arguments = ["-RCDevAppearance", "light"]
     for key, value in PINS:
@@ -681,7 +1138,7 @@ def sheet_reading(app, label, choice):
         if instance.client is None:
             reading["error"] = "the app did not listen"
             return reading
-        doc = av_doc(instance, "sheet")
+        doc = hlg_doc(instance, "sheet") if hlg else av_doc(instance, "sheet")
         png = instance.dir / "sheet.png"
         try:
             doc.call("perform_menu_item", path=["File", "Export…"])
@@ -701,8 +1158,11 @@ def sheet_reading(app, label, choice):
                          and v.get("class") == "NSPopUpButton"), None)
 
         speed, fmt = popup_after("Speed:"), popup_after("Format:")
+        dynamic = popup_after("Dynamic Range:")
         reading.update({
             "format": fmt and fmt.get("text"), "speed": speed and speed.get("text"),
+            "range": dynamic and dynamic.get("text"),
+            "range_dark": dynamic and popup_darkest(png, views, scale, dynamic),
             "footnote": [v["text"] for v in views
                          if v.get("text") and v.get("tooltip") == v["text"]],
             "speed_dark": speed and popup_darkest(png, views, scale, speed),
@@ -717,12 +1177,13 @@ def sheet_reading(app, label, choice):
 def run_s_rows(app, logs):
     one = sheet_reading(app, "s1", '{"preset_id":"av1","encoder_speed":"smaller"}')
     two = sheet_reading(app, "s2", '{"preset_id":"h264"}')
-    logs += [one["instance"], two["instance"]]
+    three = sheet_reading(app, "s3", '{"preset_id":"av1"}', hlg=True)
+    logs += [one["instance"], two["instance"], three["instance"]]
 
-    def drawn(reading):
-        if reading.get("speed_dark") is None or reading.get("format_dark") is None:
+    def drawn(reading, popup="speed"):
+        if reading.get(f"{popup}_dark") is None or reading.get("format_dark") is None:
             return None
-        lighter = reading["speed_dark"] - reading["format_dark"]
+        lighter = reading[f"{popup}_dark"] - reading["format_dark"]
         return "enabled" if lighter <= 40 else "disabled" if lighter > 60 else "unclear"
 
     check("S1", not one.get("error") and one.get("format") == "AV1 (MP4)"
@@ -736,14 +1197,20 @@ def run_s_rows(app, logs):
           f"{two.get('error') or ''} format {two.get('format')!r}, Speed {two.get('speed')!r} "
           f"drawn {drawn(two)} (darkest {two.get('speed_dark')} against Format's "
           f"{two.get('format_dark')}), footnote {two.get('footnote')}")
+    check("S3", not three.get("error") and three.get("format") == "AV1 (MP4)"
+          and three.get("range") == "HDR (HLG)" and drawn(three, "range") == "enabled",
+          f"{three.get('error') or ''} format {three.get('format')!r}, Dynamic Range "
+          f"{three.get('range')!r} drawn {drawn(three, 'range')} (darkest "
+          f"{three.get('range_dark')} against Format's {three.get('format_dark')})")
 
 
 # ---- the rate (CX-13) ------------------------------------------------------------
 
 def vmaf(distorted, reference, log):
-    """libvmaf's pooled mean of `distorted` against `reference`, both as 8-bit 4:2:0
-    (ffmpeg's libvmaf filter, as the spike scored); None when it cannot run."""
-    lavfi = ("[0:v]format=yuv420p,setpts=PTS-STARTPTS[d];[1:v]format=yuv420p,setpts=PTS-STARTPTS[r];"
+    """libvmaf's pooled mean of `distorted` against `reference`, both as 10-bit 4:2:0
+    (ffmpeg's libvmaf filter, CX-14 (6)); None when it cannot run."""
+    lavfi = ("[0:v]format=yuv420p10le,setpts=PTS-STARTPTS[d];"
+             "[1:v]format=yuv420p10le,setpts=PTS-STARTPTS[r];"
              f"[d][r]libvmaf=log_fmt=json:log_path={log}:n_threads=12")
     ran = run(["ffmpeg", "-hide_banner", "-v", "error", "-i", distorted, "-i", reference,
                "-lavfi", lavfi, "-f", "null", "-"], 1200)
@@ -790,13 +1257,13 @@ def run_r_rows(app, logs):
                 cap = asked or default
                 extra = {"video_bitrate": asked} if asked else {}
                 lines, ok = [], True
-                hevc = out / f"{ident}-hevc.mp4"
+                hevc = out / f"{ident}-hevc_10bit.mp4"
                 try:
-                    export(doc, hevc, preset="hevc", **extra)
+                    export(doc, hevc, preset="hevc_10bit", **extra)
                 except mcp.ToolError as error:
-                    check(ident, False, f"the hevc export failed: {error}")
+                    check(ident, False, f"the hevc_10bit export failed: {error}")
                     continue
-                floor = vmaf(hevc, reference, out / f"{ident}-hevc.vmaf.json")
+                floor = vmaf(hevc, reference, out / f"{ident}-hevc_10bit.vmaf.json")
                 hevc_rate = int(video_stream(hevc).get("bit_rate") or 0)
                 ok = floor is not None
                 for speed in ("faster", "balanced", "smaller"):
@@ -821,7 +1288,7 @@ def run_r_rows(app, logs):
                                  f"in {took:.1f} s = {frames / took:.1f} fps"
                                  + ("" if good else " ✗"))
                 check(ident, ok, f"cap {cap} b/s (each file ≤ {CAP_TOLERANCE} × it) "
-                      f"({'video_bitrate ' + str(asked) if asked else 'Format default'}); hevc "
+                      f"({'video_bitrate ' + str(asked) if asked else 'Format default'}); hevc_10bit "
                       f"{hevc_rate} b/s, VMAF {floor if floor is None else round(floor, 3)} "
                       "against the ProRes 422 reference; av1 — " + "; ".join(lines))
         finally:
@@ -907,6 +1374,7 @@ def run_mutant(name):
 
 def run_rows(app, logs, rate=False):
     run_a_rows(app, logs)
+    run_h_rows(app, logs)
     run_s_rows(app, logs)
     if rate:
         run_r_rows(app, logs)
@@ -915,7 +1383,7 @@ def run_rows(app, logs, rate=False):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="the av1 row (codec-export C1)")
+    parser = argparse.ArgumentParser(description="the av1 row (codec-export C1, C2)")
     parser.add_argument("--app", help="debug, release or a .app path (default RC_PROOF_APP)")
     parser.add_argument("--rate", action="store_true", help="also R1 and R2 (CX-13)")
     parser.add_argument("--mutant", help="one of " + ", ".join(MUTANTS))

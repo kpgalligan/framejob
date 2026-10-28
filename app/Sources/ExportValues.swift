@@ -17,7 +17,8 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     let height: Int?
     let audioOnly: Bool
     /// Whether the row carries an HLG project's HDR picture (`"hdr"`, spec §11
-    /// HD-14 (c)): the three 10-bit rows, which offer the Dynamic Range popup.
+    /// HD-14 (c), CX-14): the four HDR rows (`hevc_10bit`, `av1`, `prores_422`,
+    /// `prores_4444`), which offer the Dynamic Range popup.
     let carriesHDR: Bool
     /// The bundled encoder's speeds the row takes (`encoder_speeds`, spec §11
     /// CX-12 (2)): `av1`'s three, which offer the Speed popup; empty elsewhere.
@@ -104,7 +105,7 @@ struct ExportSettings: Decodable, Equatable {
     /// would keep it.
     let alpha: Bool
     /// The picture the file is written as and tagged with (spec §11 HD-14
-    /// (c), `export.rs`): in an HLG project `"hlg"` (a 10-bit row's default),
+    /// (c), `export.rs`): in an HLG project `"hlg"` (an HDR row's default),
     /// `"pq"` (HDR10) or `"sdr"` (the SDR version, every other video row's);
     /// nil — today's tags — for every SDR project and every audio row, whose
     /// settings carry no key.

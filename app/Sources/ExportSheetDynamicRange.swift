@@ -2,8 +2,8 @@ import AppKit
 
 /// The export card's Dynamic Range row (hdr H-3, spec §11 HD-5, HD-14 (h)):
 /// "Dynamic Range:" under Format, only in an HLG project, so an SDR project's
-/// card is the card it was. On a row that carries HDR (`ExportPreset.carriesHDR`:
-/// `hevc_10bit`, `prores_422`, `prores_4444`) it offers HDR (HLG), HDR10 (PQ)
+/// card is the card it was. On a row that carries HDR (`ExportPreset.carriesHDR`,
+/// the four: `hevc_10bit`, `av1`, `prores_422`, `prores_4444`) it offers HDR (HLG), HDR10 (PQ)
 /// and SDR version, HDR (HLG) first and the default; on every other row it is
 /// disabled and shows "SDR version", the picture that row writes, and sends no
 /// override (the core's default for it). The choice lives for the sheet alone:

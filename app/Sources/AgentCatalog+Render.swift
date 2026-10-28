@@ -76,7 +76,7 @@ extension AgentServer {
                 + "channel, so nothing partial survives it. prores_422, prores_4444 and "
                 + "hevc_10bit keep the compositor's 16-bit frames at 10 bits (ProRes 4444 at "
                 + "12); h264, hevc and hevc_alpha are 8-bit. av1 is AV1 in an MP4 with AAC, "
-                + "8-bit, encoded by the bundled SVT-AV1 at encoder_speed; Macs before M3 "
+                + "10-bit, encoded by the bundled SVT-AV1 at encoder_speed; Macs before M3 "
                 + "cannot play it back. Pass a wrong one once and the error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
@@ -164,7 +164,7 @@ extension AgentServer {
                     "sdr_version": [
                         "type": "boolean",
                         "description": "Draw an HDR (HLG) project's SDR version — what h264, "
-                            + "hevc, hevc_alpha, av1, gif, apng, JPEG frames and dynamic_range "
+                            + "hevc, hevc_alpha, gif, apng, JPEG frames and dynamic_range "
                             + "\"sdr\" write: the inverse of the lift, white titles near white, "
                             + "highlights above reference white rolled off. View ▸ Show SDR "
                             + "Version's picture; the switch itself never reaches this tool or "
@@ -251,10 +251,10 @@ extension AgentServer {
                     + "same exporter the sheet uses, so an agent export and a menu export "
                     + "cannot disagree. An existing file at the path is replaced, and the "
                     + "container's extension is added when the path has none. In an HLG "
-                    + "project (set_canvas output) hevc_10bit, prores_422 and prores_4444 "
-                    + "write HLG unless dynamic_range says pq or sdr, and every other video "
-                    + "preset writes the project's SDR version. What the finished file holds "
-                    + "is export_status's done answer.",
+                    + "project (set_canvas output) hevc_10bit, av1, prores_422 and "
+                    + "prores_4444 write HLG unless dynamic_range says pq or sdr, and every "
+                    + "other video preset writes the project's SDR version. What the finished "
+                    + "file holds is export_status's done answer.",
                 [
                     "preset": exportPresetProperty,
                     "path": [
@@ -313,7 +313,7 @@ extension AgentServer {
                     // The sheet's Dynamic Range popup (spec §11 HD-5, HD-14).
                     "dynamic_range": [
                         "type": "string", "enum": ["hlg", "pq", "sdr"],
-                        "description": "An HDR (HLG) project's picture on hevc_10bit, "
+                        "description": "An HDR (HLG) project's picture on hevc_10bit, av1, "
                             + "prores_422 and prores_4444 — the sheet's Dynamic Range popup: "
                             + "hlg (the default; BT.2100 HLG, no Dolby Vision), pq (HDR10: "
                             + "BT.2100 PQ at 1,000 cd/m², mastering display P3-D65 0.005–1,000 "

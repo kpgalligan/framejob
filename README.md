@@ -91,8 +91,8 @@ on its own or beside the screen as a corner talking head; or a
 microphone-only voice-over.
 → [Screen recording](docs/guide/screen-recording.md)
 
-**Export.** H.264, HEVC (8-bit, 10-bit, with alpha), AV1 (with its own
-encoder built in, at three speeds), ProRes 422 and 4444,
+**Export.** H.264, HEVC (8-bit, 10-bit, with alpha), AV1 (10-bit, with HDR,
+from its own encoder built in, at three speeds), ProRes 422 and 4444,
 M4A, WAV, AIFF, GIF and animated PNG; loudness targets, presets, an Export
 Queue that runs while you edit, and single frames as stills.
 → [Exporting](docs/guide/export.md)

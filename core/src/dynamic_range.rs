@@ -50,9 +50,10 @@ impl DynamicRange {
     }
 }
 
-/// The rows that carry an HDR picture (spec §11 HD-5): the three 10-bit ones.
-/// Every other video row of an HLG project writes the SDR version.
-pub(crate) const HDR_ROWS: [&str; 3] = ["hevc_10bit", "prores_422", "prores_4444"];
+/// The rows that carry an HDR picture (spec §11 HD-5, CX-14): the four HDR
+/// rows, all 10-bit. Every other video row of an HLG project writes the SDR
+/// version.
+pub(crate) const HDR_ROWS: [&str; 4] = ["hevc_10bit", "av1", "prores_422", "prores_4444"];
 
 impl Project {
     /// What `preset` writes for this project when `asked` was requested
@@ -85,7 +86,7 @@ impl Project {
         match hdr_asked {
             Some(range) => Err(format!(
                 "{} is 8-bit and writes the SDR version; export dynamic_range \"{}\" as \
-                 hevc_10bit, prores_422 or prores_4444",
+                 hevc_10bit, av1, prores_422 or prores_4444",
                 preset.id,
                 range.as_str()
             )),

@@ -143,6 +143,8 @@ orchestrator's default, which the owner can still change by a new entry here).
      warnings and errors become `NSLog("SVT-AV1: …")`.
   7. **HDR projects.** In an HLG project the `av1` row writes the SDR version, by HD-14's
      existing rule for an SDR row; 10-bit and HDR AV1 are C2's (CX-8).
+  **Amended by CX-14** (C2): the row is 10-bit (I010, not (5)'s 8-bit I420, the matrix per
+  picture) and, replacing (7), one of HD-5's HDR rows.
 
 - **CX-13 — AV1's rate is a soft cap: capped constant quality, quality first** (owner,
   2026-10-27, "Capped constant quality", chosen after C1 measured single-pass VBR at
@@ -212,3 +214,74 @@ orchestrator's default, which the owner can still change by a new entry here).
      it; the calibration is four clips at 1080p (other sizes are placed by bits per pixel
      alone), one of them the binding one, so other footage can land a little under HEVC; and
      the owner clip's grid is coarse (Balanced and Smaller file at Low: 36 passed, 44 did not).
+  **Amended by CX-14** (C2): R1 and R2 compare `av1` with `hevc_10bit`, both scored as
+  10-bit 4:2:0, and the owner-clip half of (3)'s calibration is re-checked at 10 bits against
+  `hevc_10bit` (CX-14 (6)).
+
+- **CX-14 — C2: one `av1` row, always 10-bit, among HD-5's HDR rows** (default, recorded in C2
+  before its code; amends CX-12 (5) and (7), CX-13 (3) and HD-14 (c)):
+  1. **One row, always 10-bit.** `av1` encodes 10-bit Main 4:2:0 in SDR and HLG projects alike;
+     there is no `av1_10bit` and no 8-bit AV1 path. CX-1 fixed four rows; CX-8 makes the AV1
+     rows 10-bit and puts them in `hevc_10bit`'s place in H-3's rules. `hevc` stays an 8-bit
+     row (PR-3) for decoders that take HEVC Main alone; AV1 has no such split, since Main
+     profile decodes 8 and 10 bits alike, and the owner's rule is that only the higher-quality
+     export matters.
+  2. **An HDR row.** `av1` joins HD-5's HDR rows (`HDR_ROWS`): `"hdr": true` in
+     `rc_export_presets`, `hlg` by default in an HLG project, `pq` or `sdr` as asked, and the
+     8-bit refusal now names it: `{id} is 8-bit and writes the SDR version; export
+     dynamic_range "{x}" as hevc_10bit, av1, prores_422 or prores_4444`. Replaces CX-12 (7);
+     amends HD-14 (c)'s sentence and its "three 10-bit rows". An SDR project's settings are
+     unchanged; an HLG project's `av1` settings gain only `color`.
+  3. **The frames: I010.** The compositor's frame (scaled first as CX-12 (5) says) becomes
+     video-range 10-bit 4:2:0 in 16-bit little-endian samples: Y′ = kr·R + (1−kr−kb)·G + kb·B,
+     Cb′ = (B−Y′)/(2(1−kb)), Cr′ = (R−Y′)/(2(1−kr)), RGB clamped to 0…1 and read premultiplied;
+     Y = round(64 + 876·Y′) and each chroma sample clamp(round(512 + 896·C′), 0, 1023), C′ the
+     mean of its 2 × 2 block. The matrix is the picture's: BT.709 (0.2126, 0.0722) for `sdr`,
+     BT.2020 non-constant (0.2627, 0.0593) for `hlg` and `pq`.
+  4. **The tags, in both places.** The sequence header's colour config and the `av01` entry's
+     `colr` (`nclx`) carry the same CICP, video range: `sdr` 1/1/1, `hlg` 9/18/9, `pq` 9/16/9.
+  5. **HDR10 on PQ only, in both places.** HD-5's fixed metadata (P3-D65, 0.005–1,000 cd/m²,
+     MaxCLL 1,000, MaxFALL 0) goes into SVT-AV1's `mastering_display` and
+     `content_light_level`, set by `svt_aom_parse_mastering_display` and
+     `svt_aom_parse_content_light_level` from `G(0.265,0.690)B(0.150,0.060)R(0.680,0.320)
+     WP(0.3127,0.3290)L(1000,0.005)` and `1000,0`, which SVT-AV1 v4.2.0 writes as HDR_MDCV and
+     HDR_CLL metadata OBUs on each KEY_FRAME (`packetization_process.c` 678–688); and into the
+     `av01` entry's `mdcv` and `clli` boxes from OutputTransform's two blobs (HD-14 (d)). Both
+     carry the same values, as AV1-ISOBMFF requires. `hlg` and `sdr` carry neither.
+  **Risks accepted:** 10-bit SVT-AV1 is about 15 % slower and needs about 40 % more memory (the
+  spike: Balanced at 1080p 75 → 64 fps, 1.15 → 1.61 GB); the CRF table is calibrated in SDR
+  only (VMAF is not calibrated for HLG or PQ); and no player's HDR rendering was measured (CX-8).
+  6. **The CRF comparator** (amends CX-13 (3)): the owner-clip half of each point is
+     re-calibrated at 10 bits against `hevc_10bit`; the spike half (gh5, promo and real8 through
+     ffmpeg at 8 bits against 8-bit VideoToolbox HEVC) is not re-run and stands as CX-13
+     recorded it, so each point is still the lower of the two. The run
+     (`crf_owner.py --ten-bit`, 2026-10-28, 02:02–03:28 on a shared machine, one run): a
+     Release copy at the table's own CRF, IMG_0018.MOV exported as `prores_422` (the
+     reference), `hevc_10bit` at the five rates and `av1` at each speed and rate under the
+     real cap (`video_bitrate` the rate, 50 % overshoot), all scored as `yuv420p10le`; a cell
+     under `hevc_10bit` lowered by 2 until it reached it (`via: "app-10bit"` in `crf.jsonl`).
+     `hevc_10bit` scored 92.723 / 95.246 / 96.075 / 96.367 / 97.435 at Low / Medium / Format
+     default / High / Maximum (8-bit `hevc` scored 95.469 at Format default and 95.777 at High
+     in CX-13). That run's one Format default `hevc_10bit` encode came out at 4,215,901 b/s
+     and 95.828, and `av1_export_proof.py` R1 then failed against a 96.075; seven later
+     encodes of the same export (four runs, 03:45–04:20) were each 4,342,949 b/s and 96.075,
+     the other four rates matched the first run exactly, and Format default was calibrated
+     again against 96.075 (`--tiers default`, 04:14–04:49). Each `av1` VMAF, CRF in brackets, the kept one
+     last:
+
+     | Rate | Faster | Balanced | Smaller file |
+     |---|---|---|---|
+     | Low | 91.611 (40), 92.235 (38), **92.828 (36)** | **93.351 (36)** | **93.316 (36)** |
+     | Medium | 95.165 (28), **95.471 (26)** | 95.203 (30), **95.617 (28)** | 95.103 (30), **95.498 (28)** |
+     | Format default | 95.982 (24), **96.193 (22)** | 96.048 (26), **96.487 (24)** | 95.924 (26), **96.377 (24)** |
+     | High | 96.278 (22), **96.447 (20)** | **96.505 (24)** | **96.385 (24)** |
+     | Maximum | 97.282 (14), **97.376 (12)**, 97.296 (10), 97.325 (8), 97.298 (6), 97.266 (4) | **97.568 (16)** | **97.492 (16)** |
+
+     So the table became Low 36 / 36 / 36, Medium 26 / 28 / 28, Format default 22 / 24 / 24,
+     High 20 / 24 / 24 and Maximum 12 / 16 / 16. Faster's Medium, which the promo half bound
+     in CX-13 (28), is now bound by the owner clip at 10 bits (26). **Faster at Maximum
+     reached no CRF:** from 12 down the cap binds (0.93–1.03 × it) and the VMAF stays
+     0.06–0.17 under `hevc_10bit`'s 97.435. **Accepted (owner, 2026-10-28, "Best CRF,
+     accept 0.06"):** the cell is 12, the best measured, at 97.376 — 0.059 under
+     `hevc_10bit`'s 97.435 and still 0.53 above C1's 8-bit `hevc` comparator (96.85) —
+     because below CRF 12 the cap binds and a lower CRF gains nothing.

@@ -1,26 +1,22 @@
 import AVFoundation
 
-/// The `av1` row's track in the MP4 (spec §11 CX-12 (4)): the `av01` format description
-/// holding the core's `av1C` record and the BT.709 video-range colour tags (the `colr`
-/// box), one sample per SVT-AV1 packet, and the written file's `ftyp` branded `av01`
-/// (AV1-ISOBMFF §2.1), which `AVAssetWriter` leaves out.
+/// The `av1` row's track in the MP4 (spec §11 CX-12 (4), CX-14): the `av01` format
+/// description holding the core's `av1C` record and the picture's video-range colour tags
+/// (the `colr` box), with HDR10's `mdcv` and `clli` on PQ, one sample per SVT-AV1 packet,
+/// and the written file's `ftyp` branded `av01` (AV1-ISOBMFF §2.1), which `AVAssetWriter`
+/// leaves out.
 enum ExportAV1Track {
-    /// `av01` at `width` × `height` with `config`'s record and BT.709 tags.
+    /// `av01` at `width` × `height` with `config`'s record and `picture`'s extensions: its
+    /// colour tags, and on PQ its mastering display and content light level.
     static func formatDescription(
-        width: Int, height: Int, config: ReelAV1.Config
+        width: Int, height: Int, config: ReelAV1.Config, picture: ExportAV1Picture
     ) throws -> CMVideoFormatDescription {
-        let extensions: [String: Any] = [
+        var extensions: [String: Any] = [
             kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms as String: [
                 "av1C": config.record
-            ],
-            kCMFormatDescriptionExtension_ColorPrimaries as String:
-                kCMFormatDescriptionColorPrimaries_ITU_R_709_2,
-            kCMFormatDescriptionExtension_TransferFunction as String:
-                kCMFormatDescriptionTransferFunction_ITU_R_709_2,
-            kCMFormatDescriptionExtension_YCbCrMatrix as String:
-                kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2,
-            kCMFormatDescriptionExtension_FullRangeVideo as String: false,
+            ]
         ]
+        extensions.merge(picture.formatExtensions) { _, picture in picture }
         var description: CMVideoFormatDescription?
         let status = CMVideoFormatDescriptionCreate(
             allocator: kCFAllocatorDefault, codecType: kCMVideoCodecType_AV1,

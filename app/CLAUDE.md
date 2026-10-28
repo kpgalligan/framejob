@@ -1677,7 +1677,8 @@ the key map behind it.
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
-  `ExportAV1Encoder.swift` · `ExportI420.swift` (+ `Resources/Shaders/ExportI420.metal`) ·
+  `ExportAV1Encoder.swift` · `ExportI010.swift` (+ `Resources/Shaders/ExportI010.metal`) ·
+  `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
   `ExportAV1Track.swift` · `ExportEncodePump.swift` · `ExportSheetSpeed.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or

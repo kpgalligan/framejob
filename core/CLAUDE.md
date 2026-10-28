@@ -135,9 +135,9 @@ governs a module now.
   HD-14): `DynamicRange` (`hlg`, `pq`, `sdr`), spelled `dynamic_range` both
   as an export override and as a recipe option; `deliverable` answers `None`
   for an audio row and for every row of an SDR project, else the picture:
-  the three 10-bit rows carry `hlg` (the default), `pq` or `sdr`, every
-  other video row writes the SDR version, and `hlg`/`pq` are refused in an
-  SDR project and on a row that is not 10-bit, each in its own sentence.
+  the four HDR rows (`hevc_10bit`, `av1`, `prores_422`, `prores_4444`) carry
+  `hlg` (the default), `pq` or `sdr`, every other video row writes the SDR
+  version, and `hlg`/`pq` are refused in an SDR project and on any other row, each in its own sentence.
 - `av1_mp4.rs` · `ffi_av1.rs` — AV1 in MP4 (spec §11 CX-12, road map
   codec-export C1): `av1C` built from a full parse of the sequence header OBU,
   temporal delimiters stripped in place, and the `av01` brand put into `ftyp`

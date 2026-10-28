@@ -443,11 +443,13 @@ char *rc_normalise_color(const char *text);
    M4A row's name rather than carrying a null that would hand a WAV to the
    image writer. Read it as a record, never as an instruction.
 
-   One row, `av1` (spec 11 CX-12), is encoded by a library bundled in the
-   app rather than by AVFoundation, which still writes its MP4 (its
-   `avf_preset` is the passthrough name, a record): it alone carries
+   One row, `av1` (spec 11 CX-12, CX-14), is encoded at 10 bits by a library
+   bundled in the app rather than by AVFoundation, which still writes its
+   MP4 (its `avf_preset` is the passthrough name, a record): it alone carries
    `writer` ("svt_av1", the encoder route) and `encoder_speeds` (["faster",
-   "balanced", "smaller"], the speeds its `encoder_speed` override takes). */
+   "balanced", "smaller"], the speeds its `encoder_speed` override takes),
+   and like `hevc_10bit`, `prores_422` and `prores_4444` it carries `hdr`
+   (spec 11 HD-14). */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this

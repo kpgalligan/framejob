@@ -296,10 +296,10 @@ const PRESETS: [Preset; 12] = [
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
         writer: None,
     },
-    // AV1 in MP4 (spec §11 CX-1, CX-12), after the HEVC rows it is the
-    // smaller sibling of. SVT-AV1 encodes (`writer`); AVFoundation still
-    // writes the container, which is what the passthrough name records,
-    // so the row is even-sized and routed as every AVFoundation row is.
+    // AV1 in MP4 (spec §11 CX-1, CX-12, CX-14), 10-bit, an HDR row through
+    // `HDR_ROWS`. SVT-AV1 encodes (`writer`); AVFoundation still writes the
+    // container, which is what the passthrough name records, so the row is
+    // even-sized and routed as every AVFoundation row is.
     Preset {
         id: "av1",
         name: "AV1 (MP4)",

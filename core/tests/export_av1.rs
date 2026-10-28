@@ -17,6 +17,9 @@
 //! 3. **The refusals.** A word that is not a speed is refused naming the
 //!    key and the value on any row; a speed on a row without one is
 //!    refused naming the row and the key; `h264`'s settings are unchanged.
+//! 4. **HDR** (spec §11 CX-14). The row is one of HD-5's HDR rows: `"hdr"`
+//!    on the row, and in an HLG project its settings carry `color` `hlg` by
+//!    default and `pq` or `sdr` as asked, written out whole.
 
 mod common;
 
@@ -90,6 +93,7 @@ fn the_row_is_written_out_whole() {
             "size": null,
             "fps": null,
             "avf_preset": "AVAssetExportPresetPassthrough",
+            "hdr": true,
             "writer": "svt_av1",
             "encoder_speeds": ["faster", "balanced", "smaller"]
         })
@@ -216,4 +220,37 @@ fn an_odd_canvas_is_evened_on_av1() {
         (out["width"].clone(), out["height"].clone()),
         (json!(640), json!(360))
     );
+}
+
+#[test]
+fn an_hlg_project_writes_hlg_by_default_and_pq_or_sdr_as_asked() {
+    let hlg = project().apply(&json!({"op": "set_canvas", "output": "hlg"}));
+    let whole = |color: &str| {
+        json!({
+            "preset": "av1",
+            "avf_preset": "AVAssetExportPresetPassthrough",
+            "container": "mp4",
+            "file_type": "public.mpeg-4",
+            "codec": "av1",
+            "width": 1600,
+            "height": 900,
+            "fps": [30, 1],
+            "range": {"start": 0, "duration": 6_000_000},
+            "audio": true,
+            "video": true,
+            "alpha": false,
+            "optimize_for_network": true,
+            "color": color,
+            "writer": "svt_av1",
+            "encoder_speed": "balanced"
+        })
+    };
+    assert_eq!(settings(&hlg, "av1", None), whole("hlg"));
+    for color in ["hlg", "pq", "sdr"] {
+        assert_eq!(
+            settings(&hlg, "av1", Some(&json!({"dynamic_range": color}))),
+            whole(color),
+            "{color}"
+        );
+    }
 }

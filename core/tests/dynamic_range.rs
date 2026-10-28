@@ -8,7 +8,7 @@
 //! two refusals' sentences and the reader's; an SDR project's settings and
 //! recipe text unchanged by `dynamic_range: "sdr"`; the recipe's
 //! `dynamic_range` present only for an HLG canvas asked `sdr` or `pq`; an
-//! audio row unchanged; `hdr` on the three 10-bit rows alone; and a nest's
+//! audio row unchanged; `hdr` on the four HDR rows alone; and a nest's
 //! scoped view of an HLG project carrying the key.
 
 mod common;
@@ -19,7 +19,7 @@ use common::{at, expect_string, parse_json, text, Handle};
 use framejob_core::ffi_query::rc_export_presets;
 
 const SECOND: i64 = 600_000;
-const HDR_ROWS: [&str; 3] = ["hevc_10bit", "prores_422", "prores_4444"];
+const HDR_ROWS: [&str; 4] = ["hevc_10bit", "av1", "prores_422", "prores_4444"];
 
 /// One video media on one track, and a nest (5) of a second clip, shown by a
 /// nest clip after it.
@@ -79,7 +79,7 @@ fn sdr_needs_hlg(range: &str) -> String {
 fn eight_bit(id: &str, range: &str) -> String {
     format!(
         "{id} is 8-bit and writes the SDR version; export dynamic_range \"{range}\" as \
-         hevc_10bit, prores_422 or prores_4444"
+         hevc_10bit, av1, prores_422 or prores_4444"
     )
 }
 
@@ -192,7 +192,7 @@ fn the_reader_refuses_anything_but_the_three_words() {
 }
 
 #[test]
-fn the_presets_name_hdr_on_the_three_ten_bit_rows_alone() {
+fn the_presets_name_hdr_on_the_four_hdr_rows_alone() {
     let presets = preset_rows();
     for row in &presets {
         let id = text(row, "/id");
@@ -207,7 +207,7 @@ fn the_presets_name_hdr_on_the_three_ten_bit_rows_alone() {
             .iter()
             .filter(|row| row.get("hdr").is_some())
             .count(),
-        3
+        4
     );
 }
 

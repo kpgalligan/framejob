@@ -3925,9 +3925,9 @@ def run_dr(client, state):
     sdr.place(fixture("bt709")) if sdr.ok else None
     cases = [
         (hlg, "h264", "hlg", "h264 is 8-bit and writes the SDR version; export dynamic_range "
-         "\"hlg\" as hevc_10bit, prores_422 or prores_4444"),
+         "\"hlg\" as hevc_10bit, av1, prores_422 or prores_4444"),
         (hlg, "gif", "pq", "gif is 8-bit and writes the SDR version; export dynamic_range "
-         "\"pq\" as hevc_10bit, prores_422 or prores_4444"),
+         "\"pq\" as hevc_10bit, av1, prores_422 or prores_4444"),
         (sdr, "hevc_10bit", "pq", "dynamic_range \"pq\" needs an HLG project; set_canvas "
          "output \"hlg\" first"),
         (hlg, "hevc_10bit", "bogus", "export dynamic_range must be \"hlg\", \"pq\" or "

@@ -1081,3 +1081,163 @@ and to score a VMAF at or above `hevc`'s.
 **CLAUDE.md edits owed** (in addition to C1's): `app/CLAUDE.md`'s `CoreValues.swift` entry
 gains `ReelAV1.Config`/`.Color`, `CoreJSON.overrides`, `GraphicDiagnostic.list(json:)`,
 `GraphicFailure.checkSides`, `SpeedLimits.decoded` and the free `withBytes`.
+
+## C2 — AV1 at 10 bits, with HLG, PQ and HDR10
+
+### Record
+
+**Built 2026-10-28** in `~/devel/framejob-codecs` (branch `codecs`, on C1's `3e80381`), not yet
+committed or merged.
+
+**Decision first.** CX-14 in `designs/spec/11-decisions/codec-export.md` before any code: one
+`av1` row, always 10-bit Main 4:2:0 (no `av1_10bit`: CX-1's four rows, CX-8's "the AV1 rows are
+10-bit", AV1's Main profile decoding 8 and 10 bits alike, the owner's "only higher-quality
+exports matter"); the row among HD-5's HDR rows with the new refusal sentence; the I010
+arithmetic with the matrix per picture; CICP and `colr` per picture (sdr 1/1/1, hlg 9/18/9, pq
+9/16/9, video range); HDR10 on PQ only, in SVT-AV1's metadata OBUs and the `mdcv`/`clli` boxes;
+the risks; and (6), the CRF comparator, filled in after the calibration below. "Amended by
+CX-14" under CX-12, CX-13, HD-5's row list and HD-14 (c); the index rows.
+
+**What landed.**
+- Core: `HDR_ROWS` in `dynamic_range.rs` is the four rows (`hevc_10bit`, `av1`, `prores_422`,
+  `prores_4444`), so `rc_export_presets` gives `av1` `"hdr": true` and an HLG project's `av1`
+  settings gain `color` (`hlg` by default, `pq` or `sdr` as asked); the 8-bit refusal names
+  `av1`. `export_table.rs`: the `av1` row's comment only (592 lines, unchanged). The header's
+  presets paragraph. No field, op, export or format change. Tests: `dynamic_range.rs` (four
+  rows, the sentence, `the_presets_name_hdr_on_the_four_hdr_rows_alone`), `canvas_output.rs`
+  (`av1` among the rows resolving `hlg`), `export_av1.rs` (the row with `"hdr": true`, doc point
+  4, `an_hlg_project_writes_hlg_by_default_and_pq_or_sdr_as_asked`; 9 tests).
+- Swift: new `ExportAV1Picture.swift` (95 lines), the picture (`sdr`, `hlg`, `pq`) read from
+  the settings' `color`, carrying the CICP, the luma weights, the format description's
+  extensions (with OutputTransform's two blobs on PQ) and SVT's two metadata strings.
+  `ExportI420.swift` → `ExportI010.swift` and `ExportI420.metal` → `ExportI010.metal` (`git
+  mv`): 16-bit samples, strides and offsets in samples, the kernel `framejob_export_i010`
+  with `kr`/`kb` uniforms. `ExportAV1Encoder.swift`: `encoder_bit_depth` 10, `MAIN_PROFILE`,
+  the picture's CICP, `svt_aom_parse_mastering_display`/`svt_aom_parse_content_light_level`
+  on PQ (a 0 answer throws "SVT-AV1 could not start: the HDR10 metadata could not be set."),
+  and `send` pointing the planes two bytes per sample in (SVT reads `uint16_t` with strides in
+  samples, `enc_handle.c` `copy_frame_buffer`) with `n_filled_len` in bytes; the calibration
+  table (below). `ExportAV1Track.formatDescription` merges the picture's extensions in one
+  line; `ExportEncodePump` builds the picture from `settings.color`. The bridging header
+  includes `EbSvtAv1Metadata.h`. Doc comments in `ExportValues.swift` and
+  `ExportSheetDynamicRange.swift`; three tool descriptions in `AgentCatalog+Render.swift`
+  (`preset`, `export`, `dynamic_range`) and `render_frame`'s `sdr_version`, which listed
+  `av1` among the SDR-version writers. No sheet code: the Dynamic Range row follows
+  `carriesHDR`.
+- Documents: spec §7.8 (the AV1 paragraph and the deliverables), §7.1, §7.10, the spec
+  index's Lines cells; `docs/guide/export.md`, `hdr-and-color.md`, `mcp.md`, `README.md`;
+  `docs/manual-checks.md` HDR-8 (and HDR-2's list of HDR rows).
+- Proof: `av1_export_proof.py` A1 at `yuv420p10le`; H1–H5 and S3 (its docstring has each);
+  R1/R2 against `hevc_10bit`, VMAF as 10-bit; seven new mutants and the two
+  `colour-untagged-*` ones re-anchored. `hdr_proof.py`'s DR sentences name `av1`.
+  `tools/proof/README.md`'s section is now "C1 and C2".
+
+**The calibration** (`tools/proof/work/codec-spike/crf_owner.py --ten-bit`, gitignored; its
+rows `via: "app-10bit"` in `crf.jsonl`). One run, 02:02–03:28 on a shared machine (load
+averages 25–200, so its `wall_s` figures are not speed measurements): a Release copy built
+at the table's own CRF, the owner's IMG_0018.MOV as `prores_422` (the reference),
+`hevc_10bit` at the five rates and `av1` at each speed and rate with `video_bitrate` the rate,
+all scored by libvmaf as `yuv420p10le`, a short cell lowered by 2 under the same cap.
+`hevc_10bit`: 92.723 / 95.246 / 95.828 / 96.367 / 97.435 (Low / Medium / Format default / High
+/ Maximum). Lowered: Faster Low 40 → 36, Faster Medium 28 → 26, Faster High 22 → 20, Balanced
+Medium 30 → 28, Smaller file Medium 30 → 28. **That run's Format default `hevc_10bit` was an
+outlier:** 4,215,901 b/s and 95.828, where `av1_export_proof.py` R1 on Release then read
+4,342,949 b/s and 96.075 and failed all three speeds (95.993 / 96.047 / 95.924). Seven more
+encodes of that export in four runs (03:45–04:20; with and without `video_bitrate`) were each
+4,342,949 b/s and 96.075 (the files' sizes within 110 bytes), and the other four rates
+re-measured exactly as in the first run (2,428,465 … 7,119,269 b/s, 92.723 … 97.435). Format
+default was calibrated again against 96.075 (`crf_owner.py --ten-bit --tiers default`,
+04:14–04:49): Faster 24 → 22 (96.193), Balanced 26 → 24 (96.487), Smaller file 26 → 24
+(96.377). The table is now Low 36 / 36 / 36, Medium 26 / 28 / 28, Format default 22 / 24 / 24,
+High 20 / 24 / 24, Maximum 12 / 16 / 16; every `av1` VMAF is in CX-14 (6). `hevc_10bit` at
+Format default scores 0.61 over C1's 8-bit `hevc` (95.469). The least margins kept: Smaller
+file High +0.018, Smaller file Maximum +0.057, Faster High +0.080. **Faster at Maximum
+reached no CRF**: 97.282 (14), 97.376 (12), 97.296 (10), 97.325 (8), 97.298 (6), 97.266 (4)
+against 97.435, the cap binding from CRF 12 down (0.926–1.026 × it). **The owner accepted
+the shortfall** (2026-10-28, "Best CRF, accept 0.06"): the cell is 12, the best measured —
+97.376, 0.059 under `hevc_10bit`'s 97.435 and still 0.53 above C1's 8-bit `hevc` comparator
+(96.85) — because below CRF 12 the cap binds. Recorded in CX-14 (6).
+
+**Commands run and what they printed.**
+- `cargo test --release --test dynamic_range --test export_av1 --test canvas_output --test
+  export --test av1_mp4 --test export_hevc_10bit`: `av1_mp4` 8, `canvas_output` 7,
+  `dynamic_range` 7, `export` 38, `export_av1` 9 and `export_hevc_10bit` 4 passed. `cargo fmt
+  --check` and `make lint` clean.
+- `make typecheck`: exit 0, the four baseline warnings (three runs, after the Swift edits,
+  the catalog text and the calibration).
+- `spec_index_proof.py`: 210/210 (Lines: 07.8 506, `11-decisions/` 13915 in 33 files,
+  `codec-export.md` 280, `hdr.md` 975).
+- `make app-debug`, then `av1_export_proof.py` on Debug (before the calibration changed any
+  cell, as were the mutants): 19/19. H4's numbers on Debug: (a)
+  mean absolute differences Y/Cb/Cr — SDR project 0.800/2.828/4.273, hlg 0.868/1.742/1.586,
+  pq 0.548/1.166/0.769, sdr 0.706/2.864/4.638; (b) every patch within 1 code (e.g. hlg red Y
+  372/371, pq red Y 378/377, Cb 441/442). `hdr_proof.py --only DR,Z1` on Debug: 2/2.
+- The nine mutants (Debug copies; each copy built in about 23 s): `av1-not-hdr` (H1, H2, H4,
+  S3, `cargo-dynamic_range`), `matrix-709-in-hdr` (H4: hlg red Y 352 against 371, Cb 412
+  against 403; pq red Y 368 against 377), `full-range-samples` (H4: SDR project Y 51.561),
+  `pq-tagged-hlg` (H2: CICP 9/18/9 while ffprobe's tags, from `colr`, still read
+  `smpte2084`), `pq-no-container-metadata` (H2: no `mdcv`/`clli`, no stream side data, the
+  OBUs still there), `pq-no-bitstream-metadata` (H2: the boxes there, the OBU stream's frame 0
+  bare), `metadata-on-hlg` (H1), `colour-untagged-bitstream` (A3a, H1, H2, H3) and
+  `colour-untagged-container` (A3b, H1, H2, H3): each exit 1, `MUTANT CAUGHT`, exactly its
+  rows.
+- `make gate`: names 1 s, typecheck 5 s, fmt 2 s, lint 2 s, test 152 s, app 105 s, `gate:
+  PASS 267s`.
+- `RC_PROOF_APP=release python3 tools/proof/hdr_proof.py --only DR,Z1`: 2/2.
+- `RC_PROOF_APP=release python3 tools/proof/av1_export_proof.py --rate`, first run (on the
+  table before Format default's recalibration): 20/21. Z1, A1–A9, H1–H5, S1–S3 ok; R2 ok
+  (`hevc_10bit` 4,792,823 b/s, 96.367; `av1` 96.452 / 96.504 / 96.385 at 0.799 / 0.563 /
+  0.505 of the cap); **R1 FAIL** (`hevc_10bit` 96.075; `av1` 95.993 / 96.047 / 95.924) — the
+  outlier above. The fix: Format default's three cells lowered; `make typecheck` exit 0, the
+  four warnings; `spec_index_proof.py` 210/210.
+- `make gate` after the fix: names 1 s, typecheck 5 s, fmt and lint skipped (unchanged), test
+  119 s, app 103 s, `gate: PASS 229s`.
+- `RC_PROOF_APP=release python3 tools/proof/av1_export_proof.py --rate`, second run: **21/21**.
+  A1 `yuv420p10le`/Main; H1 `hlg`, `bt2020nc/arib-std-b67/bt2020`, CICP 9/18/9/0, `colr`
+  9/18/9/0, no `mdcv`/`clli`, no side data in the container or the OBUs; H2 `pq`,
+  `bt2020nc/smpte2084/bt2020`, CICP and `colr` 9/16/9/0, the container's side data HDR10_SIDE,
+  `mdcv` and `clli` (1000, 0) in the `av01` entry, the OBU stream's frame 0 with both;
+  H3 `sdr`, bt709 × 3, 1/1/1/0, no HDR10; H4 as on Debug, to the code; H5 both sentences, no
+  file; S3 "HDR (HLG)" drawn enabled (darkest 36 against Format's 36); R1 (Format default,
+  cap 4,354,560): `hevc_10bit` 4,342,949 b/s, 96.075; `av1` 96.203 / 96.492 / 96.379 at 0.790
+  / 0.617 / 0.556 of the cap; R2 (High, 4,800,000): `hevc_10bit` 96.367; `av1` 96.454 / 96.504
+  / 96.385 at 0.799 / 0.563 / 0.505 of the cap; Z1 six logs, no complaint. The printed
+  frames per second (3.2–12.9) are the loaded machine's, not a speed measurement.
+- After the owner's ruling (Faster at Maximum 14 → 12): `make typecheck` exit 0, the four
+  warnings; `spec_index_proof.py` 210/210; `make app-debug`, then `av1_export_proof.py` on
+  Debug 19/19; `make gate`: test 128 s, app 108 s, `gate: PASS 244s`. No new `--rate` run:
+  R1 and R2 do not reach Maximum.
+
+**Findings.**
+- The 10-bit comparator is harder than C1's: `hevc_10bit` scores above 8-bit `hevc` at each
+  rate on the owner's clip (Format default 96.075 against 95.469), so eight cells moved and one
+  cannot follow under the cap.
+- VideoToolbox's `hevc_10bit` encode is repeatable run to run (seven of eight encodes of the
+  Format default export identical in rate and VMAF, every other rate identical across runs),
+  but the calibration's one encode at Format default came out 3 % smaller and 0.25 VMAF lower,
+  during load averages of 150–200; a one-encode comparator can be wrong, which is how R1
+  found it. Not explained; the calibration instrument records each comparator it uses.
+- H4 (b)'s bound held with room: the honest run's patches differ by at most 1 code, and
+  `matrix-709-in-hdr` moved the red patch by 19 Y and 9 Cb codes at `hlg` and 9 Y at `pq`,
+  as the spec predicted (about 20, 10 and 11).
+- ffprobe's colour tags on the MP4 come from `colr`, not the sequence header: under
+  `pq-tagged-hlg` they still read `smpte2084`, so H2's `trace_headers` CICP is what catches a
+  mislabelled bitstream.
+- FFmpeg reads AV1's metadata OBUs in 0.16 fixed point (`red_x=44564/65536`, `max_luminance
+  =256000/256`, `min_luminance=82/16384`) and the `mdcv` box in SEI units (`34000/50000`); both
+  equal HD-5's values within their quantisation.
+- No 10-bit speed measurement was made (C6's); the calibration's wall times swung from 34 s to
+  476 s per export with the machine's load.
+
+**CLAUDE.md edits owed** (the integrator's):
+- Root `CLAUDE.md` file map (lines 137–138): `ExportI420.metal` → `ExportI010.metal`, "the
+  AV1 export's 64RGBAHalf → planar 10-bit I010 conversion".
+- `app/CLAUDE.md` file map (line 1680): `ExportI420.swift` (+ `ExportI420.metal`) →
+  `ExportI010.swift` (+ `Resources/Shaders/ExportI010.metal`), and `ExportAV1Picture.swift`
+  (the `av1` row's picture: CICP, luma weights, format extensions, HDR10 strings).
+- `core/CLAUDE.md` line 138 (`dynamic_range.rs`): "the three 10-bit rows carry `hlg`…" → "the
+  four HDR rows (`hevc_10bit`, `av1`, `prores_422`, `prores_4444`) carry `hlg`…".
+
+**Owed.** HDR-8 (`docs/manual-checks.md`): HLG and PQ `av1`
+exports played on an M3 or later beside `hevc_10bit`'s, and the HDR10 metadata read by a
+player. The spike half of CX-13's calibration was not re-run at 10 bits (CX-14 (6)). C3–C6.

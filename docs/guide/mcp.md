@@ -357,7 +357,7 @@ argument: an export runs at the project's rate, or at 12.5 fps for `gif` and
 25 fps for `apng`. An existing file at the path is replaced, and the
 format's extension is added when the path has none. `peak_dbtp` without
 `loudness_lufs` is refused. `dynamic_range` `hlg` or `pq` is refused outside
-`hevc_10bit`, `prores_422` and `prores_4444`, and in an SDR project.
+`hevc_10bit`, `av1`, `prores_422` and `prores_4444`, and in an SDR project.
 `encoder_speed` (`faster`, `balanced` or `smaller`) is `av1`'s alone and is
 refused on every other preset; the done answer names it. On `av1`,
 `video_bitrate` is a soft cap: the file usually comes in well under it, and

@@ -6,7 +6,7 @@
 //! Pinned here: `set_canvas {output: "hlg"}` applies and the same output is
 //! an identity; an unknown value is invalid input naming serde's list; the
 //! recipe's canvas and the plan carry `"output": "hlg"` only in an HLG
-//! project; in an HLG project the three 10-bit rows gain `"color": "hlg"`,
+//! project; in an HLG project the four HDR rows gain `"color": "hlg"`,
 //! every other video row `"color": "sdr"` (H-3's SDR version, spec §11
 //! HD-14, where H-2 refused it) and an audio row is unchanged, while an SDR
 //! project's settings are the text they were; `set_canvas` inside a scope
@@ -126,7 +126,7 @@ fn each_export_row_in_both_outputs() {
                 Ok(&plain),
                 "{id}: an audio row is unchanged"
             );
-        } else if ["hevc_10bit", "prores_422", "prores_4444"].contains(&id.as_str()) {
+        } else if ["hevc_10bit", "av1", "prores_422", "prores_4444"].contains(&id.as_str()) {
             let mut want = plain.clone();
             want["color"] = json!("hlg");
             assert_eq!(answer, Ok(want), "{id}");

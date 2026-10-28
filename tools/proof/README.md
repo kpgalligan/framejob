@@ -25015,17 +25015,20 @@ tree's encoders and never fetches them.
 failed exactly their rows. `codecs_proof.py` 3/3 on Debug and on Release
 (`svt-av1 v4.2.0`, `libvpx v1.17.0 (WebM Project VP9 Encoder v1.17.0)`).
 
-## Codec export C1 — AV1 in MP4 (`av1_export_proof.py` Z1, A1–A9, S1, S2, R1, R2; eight mutants; `export_offset_proof.py` E36, E37; spec §11 CX-12, CX-13)
+## Codec export C1 and C2 — AV1 in MP4, 10-bit with HDR (`av1_export_proof.py` Z1, A1–A9, H1–H5, S1–S3, R1, R2; fifteen mutants; `export_offset_proof.py` E36, E37; spec §11 CX-12, CX-13, CX-14)
 
-The `av1` row: the compositor's frames converted to BT.709 video-range I420 on
-the GPU (`ExportI420.metal`), encoded by the bundled SVT-AV1 on a serial encode
+The `av1` row: the compositor's frames converted to video-range 10-bit I010 on
+the GPU (`ExportI010.metal`, C2: the matrix the picture's, BT.709 or BT.2020),
+encoded by the bundled SVT-AV1 on a serial encode
 queue (`ExportEncodePump`), its packets stripped of temporal delimiters and
 written through a passthrough `AVAssetWriterInput` whose `av01` format
 description holds the core's `av1C` (`rc_av1_config`), and the finished file's
-`ftyp` branded `av01` (`rc_av1_ftyp_brand`).
+`ftyp` branded `av01` (`rc_av1_ftyp_brand`). In an HLG project (C2, CX-14) it
+writes HLG by default, PQ with HD-5's HDR10 metadata in both the metadata OBUs and
+the `mdcv`/`clli` boxes, or the SDR version, tagged in the sequence header and `colr`.
 
 ```
-python3 tools/proof/av1_export_proof.py [--app debug|release|PATH]          # Z1, A1–A9, S1, S2
+python3 tools/proof/av1_export_proof.py [--app debug|release|PATH]          # Z1, A1–A9, H1–H5, S1–S3
 python3 tools/proof/av1_export_proof.py --rate                              # also R1, R2 (CX-13's cap and quality)
 python3 tools/proof/av1_export_proof.py --mutant NAME                       # exit 1 caught, 0 survived, 3 inexact, 2 control
 python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E36,E37  # clicks and flashes through av1
@@ -25036,7 +25039,7 @@ by their own PIDs) and works under `work/av1-export/`. ffprobe and ffmpeg
 (Homebrew, libdav1d) only read the files: this Mac (an M2) has no AV1 decoder,
 so no row imports or plays one through Frame Job. Its docstring has every row;
 in short: Z1 the logs carry no `Frame Job: `, `Svt[` or `SVT-AV1: ` line; A1 the
-stream kinds (`av1`/`av01`/Main/`yuv420p`/640 × 360, `aac`/`mp4a`); A2 the
+stream kinds (`av1`/`av01`/Main/`yuv420p10le`/640 × 360, `aac`/`mp4a`); A2 the
 `av01` brand; A3a the sequence header's colour (1/1/1, video range); A3b the
 `colr` box read from the MP4's bytes (`nclx` 1/1/1, full_range 0); A4 a clean
 decode of 150 frames and no temporal delimiter; A5 the keyframes (first K, gap
@@ -25046,15 +25049,30 @@ export cancelled within 10 s with no file; A7 the three speeds echoed and
 their sizes pairwise more than 1 % apart (two encodes at one speed differ by a
 few hundred bytes, so "different" alone would not see a speed ignored), and
 `"fast"` and `encoder_speed` on `h264` refused naming the key; A8 a letterboxed
-640 × 480 and a 1280 × 720; A9 an in/out export of 60 frames; S1, S2 the
+640 × 480 and a 1280 × 720; A9 an in/out export of 60 frames; H1–H3 (C2) A1's
+project made HLG and exported at no `dynamic_range`, `pq` and `sdr`: the answer's
+picture, `yuv420p10le`/Main, ffprobe's tags, `trace_headers`' CICP (9/18/9, 9/16/9,
+1/1/1, video range), the `colr` box, and HDR10 on PQ alone — the container's
+side data (`hdr_proof.py`'s HDR10_SIDE) and the `av01` entry's `mdcv` and `clli`
+(1000, 0) boxes, and the bitstream's mastering display and light level read from
+frame 0 of a raw OBU stream copied out of the file (`-c:v copy -f obu`, so no
+container to borrow from) and decoded by libdav1d (each chromaticity within
+1/50000, max 1000 ± 1/256, min 0.005 ± 1/16384); H4 the code values against
+`hevc_10bit` at 20 Mb/s, decoded as `yuv420p10le` — (a) whole frames of A1's SDR
+project and the HLG project at each picture, each plane's mean absolute
+difference ≤ 6 codes, (b) the inner patches of a red, green and blue stripes
+fixture the proof makes under `work/av1-export/` (`stripes.mov`, ProRes 422 HQ;
+nothing added to `media/`) at frame 30, each plane within 4 codes, the bound
+fixed; H5 the two refusals by sentence with no file left; S1, S2 the
 sheet's Speed row on an instance pinned to `av1` at `smaller` and to `h264`
 (enabled and disabled read off the popup's darkest pixel against the Format
-popup's, the layout dump having no enabled flag). R1, R2 (`--rate`) export the
+popup's, the layout dump having no enabled flag); S3 the Dynamic Range row on
+an HLG project pinned to `av1`, "HDR (HLG)" and drawn enabled. R1, R2 (`--rate`) export the
 owner's 55 s 1080p clip as ProRes 422 (the reference), then at "Format default"
-and at High as `hevc` and as `av1` at each speed: each `av1` file averages at
-most 1.25 × the cap (CX-13's soft cap) and scores a VMAF against the reference
-(ffmpeg's libvmaf) at or above the `hevc` file's; a missing fixture skips them
-by name. CX-13's calibration itself is `work/codec-spike/crf.py` (gitignored,
+and at High as `hevc_10bit` (C2; `hevc` in C1) and as `av1` at each speed: each
+`av1` file averages at most 1.30 × the cap (CX-13's soft cap) and scores a VMAF
+against the reference (ffmpeg's libvmaf, both as 10-bit 4:2:0 since C2) at or
+above the `hevc_10bit` file's; a missing fixture skips them by name. CX-13's calibration itself is `work/codec-spike/crf.py` (gitignored,
 beside the spike's `run.py`): HEVC at five rates and SVT-AV1's CRF sweep and
 capped checks on the spike's three 1080p clips, into `crf.jsonl`.
 
@@ -25062,7 +25080,15 @@ The mutants (`--mutant`, a tree copy, `core/` the copy's own for the two core
 ones) and their rows: `td-kept` A4 and `cargo test --test av1_mp4`;
 `brand-unpatched` A2; `open-gop` A5 and Z1; `speed-ignored` A7;
 `encode-ignores-cancel` A6; `speed-on-any-row` A7 and `cargo test --test
-export_av1`; `colour-untagged-bitstream` A3a; `colour-untagged-container` A3b.
+export_av1`; `colour-untagged-bitstream` (C2: the encoder's three `picture.` CICP
+lines deleted) A3a, H1, H2, H3; `colour-untagged-container` (C2: the merge of the
+picture's extensions deleted) A3b, H1, H2, H3. C2's seven: `av1-not-hdr` H1, H2,
+H4, S3 and `cargo test --test dynamic_range`; `matrix-709-in-hdr` H4;
+`full-range-samples` H4; `pq-tagged-hlg` H2; `pq-no-container-metadata` H2;
+`pq-no-bitstream-metadata` H2; `metadata-on-hlg` H1. C2's owner-clip
+recalibration at 10 bits is `work/codec-spike/crf_owner.py --ten-bit`
+(gitignored): `hevc_10bit` and each speed's table CRF at the five rates under the
+real cap, a short cell lowered by 2, `via: "app-10bit"` rows in `crf.jsonl`.
 
 **Runs (2026-10-27).** Debug and Release 13/13; `--rate` on Release 15/15 (the
 undershoot printed: 0.667–0.670 of the target in all six runs). Seven mutants
@@ -25075,5 +25101,14 @@ the sync samples from the bitstream — so the pump's attachment and both mutant
 went; `open-gop` is caught (exit 1, A5 and Z1) now that the rate is CRF, since
 SVT-AV1 forces KF refresh only under single-pass VBR. Under a strict 12 % cap
 `--rate` failed R1 and R2 (the owner's clip under `hevc`'s VMAF); the owner chose a
-soft cap (SVT's 50 %, each file at most 1.25 × the cap), and on the final tree
+soft cap (SVT's 50 %, each file at most 1.25 × the cap, raised to 1.30 × at C1's integration), and on the final tree
 `--rate` on Release scored 15/15 (`designs/codec-export.md`'s C1 fix pass 1).
+
+**Runs (C2, 2026-10-28).** Debug 19/19 (on the table before C2's calibration, and again
+after the owner's Faster-at-Maximum ruling, CRF 12);
+`hdr_proof.py --only DR,Z1` 2/2 on Debug and on Release; the nine C2-touched mutants
+each `MUTANT CAUGHT` with exactly their rows. Release `--rate` first scored 20/21: R1
+failed against a `hevc_10bit` at 96.075 where the 10-bit calibration's single encode
+had read 95.828; seven re-encodes read 96.075 each, Format default's three CRFs were
+lowered against it, and the second Release `--rate` scored 21/21
+(`designs/codec-export.md`'s C2).

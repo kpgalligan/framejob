@@ -44,7 +44,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | HEVC (MP4) | `.mp4` | A smaller file at the same picture. 8-bit (Main profile). |
 | HEVC with Alpha (MOV) | `.mov` | A small delivery file that keeps a transparent canvas, for laying over another background. 8-bit. |
 | HEVC 10-bit (MP4) | `.mp4` | Keeps a 10-bit source's gradients (Main 10). |
-| AV1 (MP4) | `.mp4` | The smallest delivery file, encoded by the AV1 encoder built into Frame Job. 8-bit. Slower to export than HEVC. See [Speed](#speed). |
+| AV1 (MP4) | `.mp4` | The smallest delivery file, encoded by the AV1 encoder built into Frame Job. 10-bit, and it can carry HDR. Slower to export than HEVC. See [Speed](#speed). |
 | ProRes 422 (MOV) | `.mov` | An editing master for another application. 10-bit. |
 | ProRes 4444 (MOV) | `.mov` | A master that keeps the alpha channel. 12-bit. |
 | Audio only (M4A) | `.m4a` | AAC sound only. |
@@ -248,7 +248,7 @@ In an HDR (HLG) project the sheet has a **Dynamic Range** row under Format:
 | **HDR10 (PQ)** | An HDR10 file with fixed mastering metadata. |
 | **SDR version** | The project converted to SDR. |
 
-Only HEVC 10-bit, ProRes 422 and ProRes 4444 can carry HDR. On every other video format, AV1 included, the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
+Only HEVC 10-bit, AV1, ProRes 422 and ProRes 4444 can carry HDR. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
 
 ## Transparency
 
@@ -310,7 +310,7 @@ The full reference is [MCP](mcp.md).
 - A Mac with no encoder for a format reports "This Mac cannot export with the “*preset*” preset." and leaves no file.
 - WAV and AIFF are 16-bit only.
 - On an M1 or M2 Mac Frame Job cannot play or re-import its own AV1 file; QuickTime cannot either. Those Macs have no AV1 decoder.
-- AV1 is 8-bit only. Its file size is not known in advance: the file usually comes in well under the rate, but very detailed footage can go up to about 1.25 times over it.
+- AV1's file size is not known in advance: the file usually comes in well under the rate, but very detailed footage can go up to about 1.25 times over it.
 - Captions are burned in, never a switchable subtitle track.
 - Queued jobs run one at a time. **Export…** does not join the queue: it writes straight away, behind its own progress sheet.
 - Quitting during an **Export…** progress-sheet export does not ask and leaves a half-written file. Only the Export Queue is guarded at quit.

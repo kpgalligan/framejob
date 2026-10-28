@@ -2,9 +2,11 @@ import CoreVideo
 import Metal
 import MetalPerformanceShaders
 
-/// One picture for SVT-AV1: 8-bit planar 4:2:0 in one shared buffer — luma, then Cb at
-/// `cbOffset`, then Cr at `crOffset`, each row `lumaStride` or `chromaStride` bytes.
-struct I420Frame {
+/// One picture for SVT-AV1: 10-bit planar 4:2:0 in one shared buffer (spec §11 CX-14 (3)) —
+/// luma, then Cb at `cbOffset`, then Cr at `crOffset`, each row `lumaStride` or
+/// `chromaStride` samples. Strides and offsets count 16-bit samples, each holding its 10 bits
+/// in the low bits, little-endian (yuv420p10le).
+struct I010Frame {
     let buffer: MTLBuffer
     let width: Int
     let height: Int
@@ -14,24 +16,27 @@ struct I420Frame {
     let crOffset: Int
 }
 
-/// `ExportI420.metal`'s uniforms, field for field.
-private struct ExportI420Uniforms {
+/// `ExportI010.metal`'s uniforms, field for field; strides and offsets in samples.
+private struct ExportI010Uniforms {
     var width: UInt32
     var height: UInt32
     var lumaStride: UInt32
     var chromaStride: UInt32
     var cbOffset: UInt32
     var crOffset: UInt32
+    var kr: Float
+    var kb: Float
 }
 
-/// The compositor's 64RGBAHalf frames as BT.709 video-range I420 for the `av1` row (spec
-/// §11 CX-12 (5)), on the GPU: `MPSImageLanczosScale` to the export size when it is not the
-/// canvas — the picture fitted inside with black bars, or filling a frame within a pixel of
-/// the canvas's shape (`fills`, G-33 (c)) — then `framejob_export_i420`.
+/// The compositor's 64RGBAHalf frames as video-range I010 for the `av1` row (spec §11
+/// CX-12 (5), CX-14 (3)), through the picture's matrix (`ExportAV1Picture.lumaWeights`), on
+/// the GPU: `MPSImageLanczosScale` to the export size when it is not the canvas — the
+/// picture fitted inside with black bars, or filling a frame within a pixel of the canvas's
+/// shape (`fills`, G-33 (c)) — then `framejob_export_i010`.
 ///
 /// Called on the export's video queue alone; the planes come from a pool the encode queue
 /// gives back through `recycle` once SVT has copied them.
-final class ExportI420Converter {
+final class ExportI010Converter {
     let width: Int
     let height: Int
 
@@ -44,14 +49,20 @@ final class ExportI420Converter {
     private let scaler: MPSImageLanczosScale?
     private let scaled: MTLTexture?
     private var transform = MPSScaleTransform(scaleX: 1, scaleY: 1, translateX: 0, translateY: 0)
+    private let weights: (kr: Float, kb: Float)
+    /// In samples.
     private let lumaStride: Int
     private let chromaStride: Int
+    /// In bytes: two per sample.
     private let length: Int
 
     private let lock = NSLock()
-    private var pool: [I420Frame] = []
+    private var pool: [I010Frame] = []
 
-    init(width: Int, height: Int, canvas: CGSize, fills: Bool, pool count: Int) throws {
+    init(
+        width: Int, height: Int, canvas: CGSize, fills: Bool, picture: ExportAV1Picture,
+        pool count: Int
+    ) throws {
         func failure(_ what: String) -> Exporter.ExportError {
             .failed("The frames could not be prepared for the AV1 encoder: \(what).")
         }
@@ -59,7 +70,7 @@ final class ExportI420Converter {
         else { throw failure("no Metal device") }
         guard let library = (try? device.makeDefaultLibrary(bundle: Bundle.main))
             ?? device.makeDefaultLibrary(),
-            let function = library.makeFunction(name: "framejob_export_i420"),
+            let function = library.makeFunction(name: "framejob_export_i010"),
             let pipeline = try? device.makeComputePipelineState(function: function)
         else { throw failure("the conversion kernel is missing") }
         var cache: CVMetalTextureCache?
@@ -72,9 +83,10 @@ final class ExportI420Converter {
         self.queue = queue
         self.pipeline = pipeline
         self.cache = cache
+        weights = picture.lumaWeights
         lumaStride = width
         chromaStride = (width + 1) / 2
-        length = lumaStride * height + 2 * chromaStride * ((height + 1) / 2)
+        length = 2 * (lumaStride * height + 2 * chromaStride * ((height + 1) / 2))
 
         let canvasWidth = Int(canvas.width.rounded())
         let canvasHeight = Int(canvas.height.rounded())
@@ -94,7 +106,7 @@ final class ExportI420Converter {
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
-        fatalError("ExportI420Converter does not support NSCoder")
+        fatalError("ExportI010Converter does not support NSCoder")
     }
 
     /// The Lanczos scaler, its transform and clip, and a destination cleared to black once:
@@ -130,21 +142,21 @@ final class ExportI420Converter {
         return (scaler, texture, transform)
     }
 
-    private func makeFrame() throws -> I420Frame {
+    private func makeFrame() throws -> I010Frame {
         guard let buffer = device.makeBuffer(length: length, options: .storageModeShared) else {
             throw Exporter.ExportError.failed(
                 "The frames could not be prepared for the AV1 encoder: no plane buffer.")
         }
-        let chromaBytes = chromaStride * ((height + 1) / 2)
-        return I420Frame(
+        let chromaSamples = chromaStride * ((height + 1) / 2)
+        return I010Frame(
             buffer: buffer, width: width, height: height, lumaStride: lumaStride,
             chromaStride: chromaStride, cbOffset: lumaStride * height,
-            crOffset: lumaStride * height + chromaBytes)
+            crOffset: lumaStride * height + chromaSamples)
     }
 
     /// One frame converted, waiting for the GPU; nil when it could not be wrapped or the
     /// GPU failed.
-    func convert(_ frame: CVPixelBuffer) -> I420Frame? {
+    func convert(_ frame: CVPixelBuffer) -> I010Frame? {
         guard let source = wrap(frame), let texture = CVMetalTextureGetTexture(source),
             let out = take(), let commands = queue.makeCommandBuffer()
         else { return nil }
@@ -162,14 +174,14 @@ final class ExportI420Converter {
             recycle(out)
             return nil
         }
-        var uniforms = ExportI420Uniforms(
+        var uniforms = ExportI010Uniforms(
             width: UInt32(width), height: UInt32(height), lumaStride: UInt32(lumaStride),
             chromaStride: UInt32(chromaStride), cbOffset: UInt32(out.cbOffset),
-            crOffset: UInt32(out.crOffset))
+            crOffset: UInt32(out.crOffset), kr: weights.kr, kb: weights.kb)
         encoder.setComputePipelineState(pipeline)
         encoder.setTexture(input, index: 0)
         encoder.setBuffer(out.buffer, offset: 0, index: 0)
-        encoder.setBytes(&uniforms, length: MemoryLayout<ExportI420Uniforms>.stride, index: 1)
+        encoder.setBytes(&uniforms, length: MemoryLayout<ExportI010Uniforms>.stride, index: 1)
         let group = MTLSize(width: 16, height: 16, depth: 1)
         let blocks = MTLSize(width: (width + 1) / 2, height: (height + 1) / 2, depth: 1)
         encoder.dispatchThreads(blocks, threadsPerThreadgroup: group)
@@ -185,13 +197,13 @@ final class ExportI420Converter {
     }
 
     /// Gives a frame's planes back to the pool.
-    func recycle(_ frame: I420Frame) {
+    func recycle(_ frame: I010Frame) {
         lock.lock()
         pool.append(frame)
         lock.unlock()
     }
 
-    private func take() -> I420Frame? {
+    private func take() -> I010Frame? {
         lock.lock()
         let frame = pool.popLast()
         lock.unlock()

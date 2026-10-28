@@ -1,7 +1,7 @@
 import AVFoundation
 
 /// The video pump of a row a bundled encoder writes (`settings.writer`, spec §11 CX-12):
-/// the composed frames converted to I420 on the export's video queue and encoded by SVT-AV1
+/// the composed frames converted to I010 on the export's video queue and encoded by SVT-AV1
 /// on a serial encode queue of its own, whose packets go to a passthrough
 /// `AVAssetWriterInput` as `av01` samples.
 ///
@@ -25,7 +25,7 @@ final class ExportEncodePump {
     let formatDescription: CMVideoFormatDescription
 
     private var encoder: SVTAV1Encoder?
-    private let converter: ExportI420Converter
+    private let converter: ExportI010Converter
     private let encodeQueue = DispatchQueue(
         label: "com.kgalligan.framejob.export.encode", qos: .userInitiated)
     private let range: CMTimeRange
@@ -43,9 +43,10 @@ final class ExportEncodePump {
         let speed = settings.encoderSpeed ?? .balanced
         let rate = settings.videoBitrate.map { max(1, $0) }
             ?? ExportWriter.defaultVideoBitrate(settings, bitsPerPixel: 0.07)
+        let picture = ExportAV1Picture(color: settings.color)
         let encoder = try SVTAV1Encoder(
             width: frame.width, height: frame.height, fps: settings.fps, bitsPerSecond: rate,
-            speed: speed)
+            speed: speed, picture: picture)
         let config: ReelAV1.Config
         do {
             config = try ReelAV1.config(sequenceHeader: encoder.sequenceHeader)
@@ -54,10 +55,10 @@ final class ExportEncodePump {
                 "SVT-AV1's sequence header could not be read: \(error.localizedDescription)")
         }
         formatDescription = try ExportAV1Track.formatDescription(
-            width: frame.width, height: frame.height, config: config)
-        converter = try ExportI420Converter(
+            width: frame.width, height: frame.height, config: config, picture: picture)
+        converter = try ExportI010Converter(
             width: frame.width, height: frame.height, canvas: canvas,
-            fills: ExportWriter.fillsTheBox(settings, canvas: canvas), pool: 3)
+            fills: ExportWriter.fillsTheBox(settings, canvas: canvas), picture: picture, pool: 3)
         self.encoder = encoder
         self.range = range
         self.frameDuration = CompositionBuilder.frameDuration(settings.fps)
@@ -127,7 +128,7 @@ final class ExportEncodePump {
     // MARK: - The encode queue
 
     private func encode(
-        _ frame: I420Frame, index: Int64, time: CMTime, input: AVAssetWriterInput,
+        _ frame: I010Frame, index: Int64, time: CMTime, input: AVAssetWriterInput,
         isStopping: () -> Bool, fail: (any Error) -> Void
     ) {
         defer {

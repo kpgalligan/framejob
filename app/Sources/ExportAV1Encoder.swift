@@ -1,7 +1,7 @@
 import Foundation
 
-/// SVT-AV1 v4.2.0, the `av1` row's encoder (spec §11 CX-2, CX-4, CX-12): one handle per
-/// export, configured once, fed BT.709 video-range I420 pictures and drained of packets.
+/// SVT-AV1 v4.2.0, the `av1` row's encoder (spec §11 CX-2, CX-4, CX-12, CX-14): one handle
+/// per export, configured once, fed video-range I010 pictures and drained of packets.
 ///
 /// **Owned by one serial queue.** `ExportEncodePump`'s encode queue makes every call after
 /// `init` — `send`, `sendEndOfStream`, `nextPacket` and the `deinit` — so the handle is
@@ -10,8 +10,11 @@ import Foundation
 /// **The configuration** (CX-12 (2), (3); CX-13): the sheet's speed as SVT's preset (8, 6 or
 /// 4), capped CRF — a constant quality matched to HEVC's at the cap, which is the settings'
 /// rate or HEVC's 0.07 bits per pixel per frame — a closed GOP (`SVT_AV1_KF_REFRESH`) with a
-/// keyframe at least every 2 s, 8-bit 4:2:0, and BT.709 primaries, transfer and matrix in
-/// video range written into the sequence header.
+/// keyframe at least every 2 s, 10-bit Main 4:2:0, and the picture's primaries, transfer
+/// and matrix in video range written into the sequence header (CX-14 (4)): BT.709's for the
+/// SDR picture, BT.2020 with HLG or PQ for the HDR ones. On PQ alone, HD-5's fixed mastering
+/// display and content light level, which SVT writes as metadata OBUs on each KEY_FRAME
+/// (CX-14 (5)).
 final class SVTAV1Encoder {
     /// One packet as SVT answered it: its bytes (temporal delimiters still in), the `pts` the
     /// picture was sent with, and whether it is the last.
@@ -28,7 +31,10 @@ final class SVTAV1Encoder {
     /// Set after the first failed call: nothing more is asked of the handle but its teardown.
     private var broken = false
 
-    init(width: Int, height: Int, fps: Fps, bitsPerSecond: Int, speed: EncoderSpeed) throws {
+    init(
+        width: Int, height: Int, fps: Fps, bitsPerSecond: Int, speed: EncoderSpeed,
+        picture: ExportAV1Picture
+    ) throws {
         _ = Self.installLogCallback
         var config = EbSvtAv1EncConfiguration()
         var opened: UnsafeMutablePointer<EbComponentType>?
@@ -41,8 +47,9 @@ final class SVTAV1Encoder {
         config.source_height = UInt32(clamping: height)
         config.frame_rate_numerator = UInt32(clamping: fps.num)
         config.frame_rate_denominator = UInt32(clamping: fps.den)
-        config.encoder_bit_depth = 8
+        config.encoder_bit_depth = 10
         config.encoder_color_format = EB_YUV420
+        config.profile = MAIN_PROFILE
         // Capped CRF (CX-13): what SVT's own `--crf` sets, and the cap as `max_bit_rate`.
         let cap = min(max(1, bitsPerSecond), Self.maxCap)
         config.rate_control_mode = UInt8(SVT_AV1_RC_MODE_CQP_OR_CRF.rawValue)
@@ -57,11 +64,14 @@ final class SVTAV1Encoder {
         config.intra_refresh_type = SVT_AV1_KF_REFRESH
         let perSecond = fps.den > 0 ? Double(fps.num) / Double(fps.den) : 30
         config.intra_period_length = Int32(max(1, (2 * perSecond).rounded(.down))) - 1
-        config.color_primaries = EB_CICP_CP_BT_709
-        config.transfer_characteristics = EB_CICP_TC_BT_709
-        config.matrix_coefficients = EB_CICP_MC_BT_709
+        config.color_primaries = picture.primaries
+        config.transfer_characteristics = picture.transfer
+        config.matrix_coefficients = picture.matrix
         config.color_range = EB_CR_STUDIO_RANGE
         do {
+            if picture.carriesHDR10 {
+                try Self.setHDR10(&config)
+            }
             sequenceHeader = try Self.start(opened, &config)
         } catch {
             _ = svt_av1_enc_deinit(opened)
@@ -69,6 +79,18 @@ final class SVTAV1Encoder {
             throw error
         }
         handle = opened
+    }
+
+    /// HD-5's fixed HDR10 metadata into the configuration, from `ExportAV1Picture`'s strings.
+    private static func setHDR10(_ config: inout EbSvtAv1EncConfiguration) throws {
+        guard svt_aom_parse_mastering_display(
+            &config.mastering_display, ExportAV1Picture.masteringDisplay) != 0,
+            svt_aom_parse_content_light_level(
+                &config.content_light_level, ExportAV1Picture.contentLightLevel) != 0
+        else {
+            throw Exporter.ExportError.failed(
+                "SVT-AV1 could not start: the HDR10 metadata could not be set.")
+        }
     }
 
     /// Configures and starts the handle, answering its sequence header.
@@ -97,11 +119,14 @@ final class SVTAV1Encoder {
     }
 
     /// Sends one picture; SVT copies its planes, so `frame` may be reused once this returns.
-    func send(_ frame: I420Frame, index: Int64) throws {
+    /// SVT reads a 10-bit plane as `uint16_t` from the byte pointer it is given, its stride in
+    /// samples (`enc_handle.c`, `copy_frame_buffer`), so each plane starts two bytes per sample
+    /// in and the strides go as they are.
+    func send(_ frame: I010Frame, index: Int64) throws {
         guard let handle, !broken else { throw Self.stopped }
         let base = frame.buffer.contents().assumingMemoryBound(to: UInt8.self)
         var planes = EbSvtIOFormat(
-            luma: base, cb: base + frame.cbOffset, cr: base + frame.crOffset,
+            luma: base, cb: base + 2 * frame.cbOffset, cr: base + 2 * frame.crOffset,
             y_stride: UInt32(frame.lumaStride), cr_stride: UInt32(frame.chromaStride),
             cb_stride: UInt32(frame.chromaStride))
         try withUnsafeMutablePointer(to: &planes) { io in
@@ -109,7 +134,7 @@ final class SVTAV1Encoder {
             picture.size = UInt32(MemoryLayout<EbBufferHeaderType>.size)
             picture.p_buffer = UnsafeMutableRawPointer(io).assumingMemoryBound(to: UInt8.self)
             let chroma = frame.chromaStride * ((frame.height + 1) / 2)
-            picture.n_filled_len = UInt32(frame.lumaStride * frame.height + 2 * chroma)
+            picture.n_filled_len = UInt32(2 * (frame.lumaStride * frame.height + 2 * chroma))
             picture.n_alloc_len = picture.n_filled_len
             picture.pts = index
             picture.pic_type = EB_AV1_INVALID_PICTURE
@@ -148,16 +173,17 @@ final class SVTAV1Encoder {
     /// SVT-AV1's largest `max_bit_rate`, 100,000 kb/s.
     private static let maxCap = 100_000_000
 
-    /// CX-13 (3)'s calibration: at each cap in bits per pixel per frame (the Quality tiers'
-    /// and "Format default"'s at 1080p30), the highest CRF at which each speed reached VMAF
-    /// ≥ HEVC's at that rate on every calibration clip — the spike's three 8-bit clips and
-    /// the owner's 55 s clip through this app — Faster, Balanced, Smaller file.
+    /// CX-13 (3)'s calibration, CX-14 (6)'s at 10 bits: at each cap in bits per pixel per
+    /// frame (the Quality tiers' and "Format default"'s at 1080p30), the highest CRF at which
+    /// each speed reached VMAF ≥ HEVC's at that rate on every calibration clip — the spike's
+    /// three 8-bit clips against 8-bit HEVC, and the owner's 55 s clip through this app at
+    /// 10 bits against `hevc_10bit` — Faster, Balanced, Smaller file.
     private static let calibration: [(bitsPerPixel: Double, crf: [EncoderSpeed: Double])] = [
-        (0.0386, [.faster: 40, .balanced: 36, .smaller: 36]),
-        (0.0579, [.faster: 28, .balanced: 30, .smaller: 30]),
-        (0.0700, [.faster: 24, .balanced: 26, .smaller: 26]),
-        (0.0772, [.faster: 22, .balanced: 24, .smaller: 24]),
-        (0.1157, [.faster: 14, .balanced: 16, .smaller: 16]),
+        (0.0386, [.faster: 36, .balanced: 36, .smaller: 36]),
+        (0.0579, [.faster: 26, .balanced: 28, .smaller: 28]),
+        (0.0700, [.faster: 22, .balanced: 24, .smaller: 24]),
+        (0.0772, [.faster: 20, .balanced: 24, .smaller: 24]),
+        (0.1157, [.faster: 12, .balanced: 16, .smaller: 16]),
     ]
 
     /// The CRF for `speed` at a cap of `bitsPerPixel`: linear between the calibrated points,

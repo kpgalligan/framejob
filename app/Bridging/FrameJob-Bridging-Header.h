@@ -7,6 +7,7 @@
 // directly, never through an rc_* export. Their headers are build/codecs/include,
 // from tools/codecs/build_codecs.py (`make codecs`).
 #include <svt-av1/EbSvtAv1Enc.h>
+#include <svt-av1/EbSvtAv1Metadata.h>
 #include <vpx/vpx_encoder.h>
 #include <vpx/vp8cx.h>
 
