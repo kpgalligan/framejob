@@ -358,6 +358,22 @@ targets:
           if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
           codesign --force --options runtime $TIMESTAMP \
             --sign "$IDENTITY" "$HELPERS/framejob-mcp"
+      # The third-party notices (#376, spec §11 PUB-10): every shipped crate,
+      # npm package, Bun, Sparkle, the encoders, the model and the fonts, into
+      # Contents/Resources/Acknowledgements.txt (not Licenses/, which Copy Codec
+      # Licences empties). After Build Agent Helper (its `bun install` makes
+      # agent/node_modules) and before Write Agent Catalog, which reseals the
+      # bundle. Distribution fails on a Bun other than the vendored licence's
+      # (--strict-bun); the others note it. tools/proof/dist_check.py D42/D43.
+      - name: Write Acknowledgements
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$HOME/.local/share/mise/shims:/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          STRICT=""
+          if [ "$CONFIGURATION" = Distribution ]; then STRICT="--strict-bun"; fi
+          python3 "$PROJECT_DIR/tools/licenses/acknowledgements.py" $STRICT \
+            --out "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Acknowledgements.txt"
       # The catalog snapshot framejob-mcp lists from while no Frame Job runs
       # (MC-4; MC1 q1): the just-linked executable, ad-hoc signed alone in place
       # because the linker leaves it unsigned and arm64 kills an unsigned exec,

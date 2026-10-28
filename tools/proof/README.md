@@ -1889,8 +1889,10 @@ files among `git ls-files -co --exclude-standard` and a tool fingerprint
 `gate.py` and the `Makefile` are in every step's files. `typecheck`:
 `app/Sources`, `app/Bridging`, `core/include`, `agent`, `tools/codecs`. `fmt`,
 `lint`: `core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
-`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/codecs`, `project.yml`,
-`VERSION`,
+`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/codecs`,
+`tools/licenses` (the acknowledgements' generator and its vendored texts, spec
+§11 PUB-10; Bun's licence is vendored as `LICENSE.txt` because a `*.md` there
+would not count), `project.yml`, `VERSION`,
 `docs/graphics-api.md`, `docs/graphics-api.d.ts` and
 `tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
 `docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); `.secrets/`
@@ -1918,7 +1920,8 @@ header folder, the C header, the helper; a crate's source and `Cargo.toml`;
 `project.yml`, `VERSION`, a shader, the graphics reference, dist_check, a
 proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
 `CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all;
-M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app); H2
+M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app, and
+`tools/licenses/acknowledgements.py` names, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
 hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; W0
 (CONTROL) the four baseline warnings at other line numbers, each with its
@@ -7116,15 +7119,34 @@ and prints the needle and both paths before its rows:
   so no codec dylib — nor any other non-system library — is ever loaded;
   **D40 / D41** the bundle holds
   `Contents/Resources/Licenses/<library>/<file>` for every licence text every
-  pin names (`tools/codecs/build_codecs.py`'s `PINS`: SVT-AV1's five, libvpx's
-  three), byte-identical to `build/codecs/licenses/` (#376 lists them).
+  pin names (`tools/codecs/build_codecs.py`'s `PINS`: SVT-AV1's six since
+spec §11 PUB-10 added `vector.c-LICENSE`, libvpx's three), byte-identical to
+`build/codecs/licenses/`.
+- **D42 / D43** (the acknowledgements, #376, spec §11 PUB-10) — the Release /
+  Distribution bundle's `Contents/Resources/Acknowledgements.txt` (written each
+  build by `tools/licenses/acknowledgements.py`) has an `== <kind> <name>
+  <version> ==` header for every shipped crate and npm package, name and
+  version, each pin (`library <name> <version>`), `framework sparkle` at
+  `project.yml`'s `exactVersion`, and `runtime bun`, `model silero-vad` and
+  `font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/`
+  at any version. The shipped sets come from readers of dist_check's own,
+  never the generator's code: `shipped_crates()` runs `cargo metadata
+  --format-version 1 --locked --offline --filter-platform aarch64-apple-darwin`
+  in `core/` and `mcp-proxy/` and walks every non-dev edge from the root
+  (Frame Job's three crates left out); `shipped_npm()` reads `agent/bun.lock`
+  from the workspace's `dependencies` through each package's own, each
+  resolved as Node does (bun's nested key under the dependent's chain, else a
+  shorter one, else the hoisted name), so a nested version is expected at its
+  own version. A missing file, `cargo`, metadata or lock FAILs the row with
+  the reason.
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/41`; the exit is 0 only at 41/41.
-`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38,
-D40 and D41 fail on purpose; the A4 and MC3 sections of this file have its
-cases.
+line is `dist_check: <passed>/43`; the exit is 0 only at 43/43.
+`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38
+and D40–D43 fail on purpose; the A4 and MC3 sections of this file have its
+cases. `codec_strings()` (each encoder's own string literal in the binary's
+bytes) is no row here: it is `published_check.py`'s P22.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
@@ -7137,7 +7159,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 40/41 (D31) until the owner's key lands, then 41/41
+make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands, then 43/43
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -7148,7 +7170,7 @@ only ever read, never used to verify anything):
 ```sh
 make app && xcodebuild -project FrameJob.xcodeproj -scheme FrameJob -configuration Distribution \
   -derivedDataPath build RC_SPARKLE_PUBLIC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= build
-python3 tools/proof/dist_check.py                          # → dist_check: 41/41
+python3 tools/proof/dist_check.py                          # → dist_check: 43/43
 ```
 
 **Made to fail by hand (2026-09-26, when there were five rows)**, each
@@ -8304,11 +8326,12 @@ bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Frame Job` a
 symlink to the real app's untouched binary and the helper a COPY, mutated
 and re-signed ad hoc; nothing is written into `build/`. A case passes iff
 the FAIL ids equal its expected set exactly, the last line is
-`dist_check: <41 − |set|>/41` and the exit is 0 for an empty set, 1
+`dist_check: <43 − |set|>/43` and the exit is 0 for an empty set, 1
 otherwise; a failed setup step is a scored FAIL naming it. Since Sparkle
 (spec §11 PUB-7) every skeleton also carries a `ditto` copy of the real
-`Sparkle.framework`, and since codec-export C0 (spec §11 CX-5) a copy of the
-real `Contents/Resources/Licenses/`.
+`Sparkle.framework`, since codec-export C0 (spec §11 CX-5) a copy of the
+real `Contents/Resources/Licenses/`, and since the acknowledgements (spec §11
+PUB-10) a copy of the real `Contents/Resources/Acknowledgements.txt`.
 
 | Case | The mutation | Expected FAIL |
 |---|---|---|
@@ -8334,12 +8357,21 @@ real `Contents/Resources/Licenses/`.
 | `codec-dylib-release` (CX-4) | the whole Release app `ditto`ed, `install_name_tool -change` turning the first of its load commands at least as long as `@rpath/libvpx.dylib` into it, then re-signed the same way | D38 |
 | `licence-missing-dist` (CX-5) | the Distribution skeleton's `Licenses/` copy without `libvpx/LICENSE` | D41 |
 | `licence-changed-release` (CX-5) | the Release skeleton's `Licenses/` copy with a byte appended to `svt-av1/PATENTS.md` | D40 |
+| `acknowledgements-missing-release` (PUB-10) | no `Acknowledgements.txt` in the Release skeleton | D42 |
+| `acknowledgements-crate-dropped-dist` (PUB-10) | the Distribution skeleton's `Acknowledgements.txt` copy with its first `== crate ` header line deleted (`crate adler2 2.0.1` today) | D43 |
 
 ```sh
-make dist                                                  # → dist_check: 40/41 (D31) until the owner's key lands
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 34/34 (a stand-in-key Distribution, V0's section)
-python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 D28 D29 D30 D31 D33 D37 D39 D41 FAIL, 20/41, exit 1
+make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 36/36 (a stand-in-key Distribution, V0's section)
+python3 tools/proof/dist_check.py --dist "/nonexistent/Frame Job.app"    # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 D28 D29 D30 D31 D33 D37 D39 D41 D43 FAIL, 21/43, exit 1
 ```
+
+**Measured 2026-10-28 (the acknowledgements, spec §11 PUB-10, the stand-in-key
+Distribution build):** `dist_check.py` 43/43 (D42/D43: 115 entries, 94 crates,
+7 npm packages, 9 fonts; D40/D41 9 texts each); `dist_check_mutants.py` 36/36,
+each of the two new cases failing exactly its row (42/43); `--dist` at a
+missing path 21/43, exit 1, the FAIL set above. `make dist` alone: 42/43 (D31)
+and `published_check` 24/25 (P20).
 
 **Measured 2026-10-27 (codec export C0, the stand-in-key Distribution build):**
 `dist_check.py` 41/41 (D38 read 47 Release and 48 Distribution load commands,
@@ -16892,7 +16924,7 @@ python3 tools/proof/hevc_alpha_proof.py --mutant shape-and-note      # MUTANT PA
 python3 tools/proof/hevc_alpha_proof.py --rows size                  # 10/11, exit 1: G1 red by design on a build with phase B
 ```
 
-## Publishing — the app the workflow is about to pack (`published_check.py` P1–P21; spec §11 PUB-1..PUB-9)
+## Publishing — the app the workflow is about to pack (`published_check.py` P1–P25; spec §11 PUB-1..PUB-12)
 
 `.github/workflows/publish.yml` archives the Distribution configuration with a
 Developer ID identity, exports the archive (which signs the app a second
@@ -16927,15 +16959,59 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   base64 of 32 bytes; **P21** the binary holds `SPUStandardUpdaterController`.
   Until the owner's public key lands P20 FAILs, in `make dist` and in the
   workflow, so nothing is published without it (PUB-8).
+- **P22–P25** the encoders and the acknowledgements (spec §11 PUB-10,
+  PUB-11): **P22** the binary's bytes hold each encoder's own string literal
+  (`dist_check.codec_strings`: `SVT-AV1 Encoder Lib`, `WebM Project VP9
+  Encoder`). Not D37's `nm -j`: `xcodebuild archive` strips the executable's
+  symbol table (`DEPLOYMENT_POSTPROCESSING`), so a symbol row would fail every
+  publish, while a string literal survives the strip; no P row reads `nm`.
+  **P23** every load command is a system library or Sparkle's (D39's);
+  **P24** the bundle holds every pin's licence texts, byte-identical to the
+  checkout's `build/codecs/licenses/` (D41's); **P25**
+  `Acknowledgements.txt` names every shipped component (D43's; its `cargo
+  metadata --offline` relies on the Archive having fetched the crates).
 
-No row is skipped; the last line is `published_check: <passed>/21` and the
-exit is 0 only at 21/21. `make dist` runs it even when `dist_check.py`
+No row is skipped; the last line is `published_check: <passed>/25` and the
+exit is 0 only at 25/25. `make dist` runs it even when `dist_check.py`
 failed, and fails if either did.
 
 ```sh
-make dist                                                   # → dist_check: 34/35, published_check: 20/21 (D31, P20) until the owner's key lands
+make dist                                                   # → dist_check: 42/43, published_check: 24/25 (D31, P20) until the owner's key lands
 python3 tools/proof/published_check.py --app APP [--version V --build N]
 ```
+
+**Measured 2026-10-28 (P22–P25, spec §11 PUB-10..PUB-12).** `make dist`:
+`dist_check` 42/43 (D31) and `published_check` 24/25 (P20). The stand-in-key
+Distribution build: 43/43 and 25/25. The workflow's archive line run locally,
+ad hoc (`make project`, then `xcodebuild archive … -configuration Distribution
+-destination 'generic/platform=macOS' -derivedDataPath build -archivePath
+"$TMPDIR/framejob-release-items/FrameJob.xcarchive" MARKETING_VERSION=0.2.999
+CURRENT_PROJECT_VERSION=999` with the stand-in key), exits 0; the archived
+executable is stripped — `nm -j` lists 2021 symbols and
+`_svt_av1_enc_init_handle` 0 times, where the Distribution build's lists
+89275 and it once — and `published_check.py --version 0.2.999 --build 999`
+scores 25/25 over it, P22 finding both strings, P25 115 entries. The archive's
+`Acknowledgements.txt` is byte-identical to the Distribution build's, and two
+generator runs over the same Release build give byte-identical files (`cmp`).
+Both `CODEC_STRINGS` were confirmed with `grep -c -a -F` in the Release binary
+(1 each) before P22 relied on them.
+
+**The encoders' Actions cache (spec §11 PUB-12).** `publish.yml`'s "Read the
+pins" step (`id: pins`) runs `build_codecs.py --print-key` and
+`acknowledgements.py --print-bun-version` under the "Build Codecs" step's
+PATH prefix; `actions/cache/restore@v4` restores `build/codecs` under
+`codecs-<key>` (no `restore-keys`) before Archive; after it, `codecs-stamp`
+(`if: always()`) compares `build/codecs/stamp.json`'s key with the pins key and
+writes `save=true` only when they are equal (otherwise a `::warning::` naming
+both, never a failure); `actions/cache/save@v4` runs on `always() &&` a miss
+`&& save == 'true'`. Measured locally: after `make codecs` the pins step's
+command, `PATH="/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" python3
+tools/codecs/build_codecs.py --print-key`, prints the stamp's own key, and the
+workflow parses as YAML. First shown by the next publish: a cache save on its
+first run; on the second, a hit, `codecs: reused <key>` and no stamp warning;
+the Developer ID export keeping `Acknowledgements.txt`; setup-bun installing
+the pinned Bun (1.3.6). `actionlint` was not run on this change (not
+installed).
 
 **Measured, 2026-10-04.** The workflow's own archive line, run locally with
 the ad-hoc identity and `MARKETING_VERSION=0.2.999 CURRENT_PROJECT_VERSION=999`

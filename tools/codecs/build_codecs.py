@@ -5,6 +5,7 @@ encoder-only at the app's deployment target, and installed into `build/codecs/`.
 
     python3 tools/codecs/build_codecs.py              # build or reuse
     python3 tools/codecs/build_codecs.py --selftest   # no network, no cmake
+    python3 tools/codecs/build_codecs.py --print-key  # this run's key alone, on stdout
     python3 tools/codecs/build_codecs.py --mutant key-no-tools|reuse-unchecked|sha-unchecked
 
 `make codecs` and project.yml's "Build Codecs" pre-build step both run it. It prints
@@ -21,9 +22,14 @@ Every build line, and `tool_versions()`, runs under `build_env()`, so a shell's
 `build/codecs-downloads/`; a download whose digest is not the pin's is deleted and the
 build fails, naming both digests. `tools/codecs/PROVENANCE.md` records each pin.
 
+A licence entry naming a `.c` file installs its leading comment (`leading_comment()`):
+SVT-AV1's `vector.c` carries its own MIT notice (spec §11 PUB-10, amending CX-5).
+`--print-key` is what the publish workflow caches `build/codecs` under (PUB-12).
+
 A `--mutant` runs the selftest alone and must fail exactly its rows: `key-no-tools` (the
 tool versions left out of the key) K1; `reuse-unchecked` (a stamp reused without hashing
 its outputs) R1 R2; `sha-unchecked` (a download kept without comparing its digest) S1.
+E0/E1 are `leading_comment()`'s control and its refusal.
 Stdlib only, Python 3.9 (`/usr/bin/python3`, which Xcode's step finds first).
 """
 
@@ -60,7 +66,8 @@ PINS = (
         (("LICENSE.md", "LICENSE.md"), ("LICENSE-BSD2.md", "LICENSE-BSD2.md"),
          ("PATENTS.md", "PATENTS.md"),
          ("third_party/fastfeat/LICENSE", "fastfeat-LICENSE"),
-         ("third_party/safestringlib/LICENSE", "safestringlib-LICENSE"))),
+         ("third_party/safestringlib/LICENSE", "safestringlib-LICENSE"),
+         ("Source/Lib/Codec/vector.c", "vector.c-LICENSE"))),
     Pin("libvpx", "1.17.0",
         "https://github.com/webmproject/libvpx/archive/refs/tags/v1.17.0.tar.gz",
         "1020f184046187baa2985dbde38e0691f49c44088bca7a1842b0236c6081dc0a",
@@ -178,6 +185,23 @@ def check_download(path, expected):
                           f"{expected}; it was deleted")
 
 
+def leading_comment(path):
+    """The text between the file's leading `/*` and its first `*/`, blank edge lines
+    stripped, with one final newline; BuildFailed naming the file when it has none."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace").lstrip()
+    end = text.find("*/")
+    if not text.startswith("/*") or end < 0:
+        raise BuildFailed(f"codecs: {path} has no leading /* … */ comment to install")
+    lines = text[2:end].split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines:
+        raise BuildFailed(f"codecs: {path}'s leading comment is empty")
+    return "\n".join(lines) + "\n"
+
+
 def _fetch(pin):
     DOWNLOADS.mkdir(parents=True, exist_ok=True)
     path = DOWNLOADS / pin.url.rsplit("/", 1)[1]
@@ -250,7 +274,11 @@ def _assemble(built, target):
         licences = target / "licenses" / pin.name
         licences.mkdir(parents=True, exist_ok=True)
         for inside, installed in pin.licenses:
-            shutil.copyfile(source / inside, licences / installed)
+            if inside.endswith(".c"):
+                (licences / installed).write_text(leading_comment(source / inside),
+                                                  encoding="utf-8")
+            else:
+                shutil.copyfile(source / inside, licences / installed)
 
 
 def _outputs(top):
@@ -404,6 +432,20 @@ def selftest(mutant=None):
             row("C2", False, "no cmake anywhere, and find_cmake answered one")
         except BuildFailed as error:
             row("C2", "brew install cmake" in str(error), f"no cmake raises: {error}")
+
+        excerpt = "The MIT License(MIT)\nCopyright(c) 2016 Someone\n\nPermission is granted."
+        header = scratch / "header.c"
+        header.write_text(f"/*\n\n{excerpt}\n\n*/\n\n#include <x.h>\n/* later */\n")
+        got = leading_comment(header)
+        row("E0", got == excerpt + "\n",
+            f"CONTROL: a .c file's leading comment is excerpted exactly: {got!r}")
+        bare = scratch / "bare.c"
+        bare.write_text("#include <x.h>\n/* not leading */\n")
+        try:
+            got = leading_comment(bare)
+            row("E1", False, f"a file with no leading comment answered {got!r}")
+        except BuildFailed as error:
+            row("E1", str(bare) in str(error), f"no leading comment raises: {error}")
     finally:
         os.environ["PATH"], CMAKE_DIRS = saved_path, saved_dirs
         shutil.rmtree(scratch, ignore_errors=True)
@@ -418,11 +460,21 @@ def selftest(mutant=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="the encoder build (codec-export C0)")
-    parser.add_argument("--selftest", action="store_true", help="K0–K2, R0–R3, S0–S1, P1, C1–C2")
+    parser.add_argument("--selftest", action="store_true",
+                        help="K0–K2, R0–R3, S0–S1, P1, C1–C2, E0–E1")
     parser.add_argument("--mutant", choices=sorted(EXPECTED))
+    parser.add_argument("--print-key", action="store_true",
+                        help="print this run's key alone (the publish workflow's cache key)")
     args = parser.parse_args(argv)
     if args.selftest or args.mutant:
         return selftest(args.mutant)
+    if args.print_key:
+        try:
+            print(key(gather_inputs()), flush=True)
+            return 0
+        except (BuildFailed, OSError, subprocess.SubprocessError) as error:
+            print(f"error: {error}", file=sys.stderr, flush=True)
+            return 1
     try:
         return build_or_reuse()
     except (BuildFailed, OSError, subprocess.SubprocessError) as error:

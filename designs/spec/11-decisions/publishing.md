@@ -100,3 +100,43 @@ where Frame Job's differs, and why.
   automatically; `SUEnableAutomaticChecks` is not set, because no Settings toggle exists to turn
   checks off, and `SUAutomaticallyUpdate` is not set. The interval is Sparkle's default of a day.
   No delta updates. Release notes are only a `sparkle:fullReleaseNotesLink` to the release page.
+- **PUB-10 — Every configuration carries `Contents/Resources/Acknowledgements.txt`, the
+  third-party notices, written each build by `tools/licenses/acknowledgements.py` (#376).**
+  Project.yml's "Write Acknowledgements" step runs it after "Build MCP Proxy" and before "Write
+  Agent Catalog", which reseals the bundle. Crates come from `cargo metadata --format-version 1
+  --locked --offline --filter-platform aarch64-apple-darwin` in `core/` and `mcp-proxy/`, over
+  every non-dev edge (build dependencies and proc macros included), Frame Job's own three crates
+  left out. npm packages come from `agent/bun.lock`, from the workspace's `dependencies` through
+  each package's own (never `devDependencies` or an optional peer), each version confirmed
+  against `agent/node_modules/<name>/package.json`. Each package gets its root licence files;
+  without one, the canonical SPDX text of its declared licence under its declared authors, and
+  the build fails naming the package when no canonical text is vendored. A licence file nested
+  inside a package must be listed in the generator's `NESTED` (to include or to exclude), or the
+  build fails naming it. Sparkle gets its own `LICENSE` from the resolved package. Bun's
+  `LICENSE.md` is vendored at `BUN_LICENSE_VERSION` (`tools/licenses/bun/LICENSE.txt`): a
+  different `bun --version` fails a Distribution build (`--strict-bun`) and is a note in the
+  file in the others. The encoders' texts come from `build/codecs/licenses/` (CX-5 (4), which
+  this amends with SVT-AV1's `vector.c-LICENSE`); the voice-activity model and each bundled font
+  are listed too, the fonts with their OFL text. The file is byte-identical for identical inputs
+  (no timestamp). It has no About-panel entry, so no §9 row and no guide line. `dist_check.py`'s
+  D42/D43 hold the Release and Distribution bundles to a header for every shipped crate and npm
+  package, each pin, Sparkle at `project.yml`'s version, Bun, the model and each bundled font,
+  with readers of their own (no code shared with the generator, so the check is not
+  tautological). Risk accepted: Bun's notice names the libraries it embeds, JavaScriptCore
+  (LGPL-2) among them, by link and not by full text, as Bun publishes it.
+- **PUB-11 — `published_check.py` carries the encoders' rows P22–P24 and the
+  acknowledgements' P25.** P22 looks for each encoder's own string literal (`SVT-AV1 Encoder
+  Lib`, `WebM Project VP9 Encoder`) in the app binary's bytes, not D37's `nm -j`, because
+  `xcodebuild archive` strips the symbol table D37 reads, and the bytes survive the strip. P23
+  is D39 (every load command a system library or Sparkle's), P24 D41 (the pins' licence texts,
+  byte-identical to the checkout's `build/codecs/licenses/`) and P25 D43. No P row reads `nm`.
+- **PUB-12 — The publish workflow restores `build/codecs` from the Actions cache under
+  `codecs-<build_codecs.py --print-key>`, with no `restore-keys`.** The key is computed under the
+  "Build Codecs" step's PATH prefix, because `find_cmake()` follows the caller's PATH and cmake's
+  version is in the key. After Archive, whatever its outcome, a step compares
+  `build/codecs/stamp.json`'s key with that key: a mismatch or a missing stamp is a `::warning::`
+  naming both keys, and the folder is then never saved. On a cache miss with equal keys the
+  folder is saved, so a later failed step does not lose the build. The stamp, not the cache,
+  still decides reuse. `oven-sh/setup-bun` installs `BUN_LICENSE_VERSION`, the Bun whose licence
+  is vendored. Risk accepted: the first run after a change to the script, the pins, cmake or the
+  SDK builds the encoders from source again.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The app the publish workflow is about to pack: what notarization does not look at.
 
-`.github/workflows/publish.yml` (spec §11 PUB-1..PUB-9) archives the
+`.github/workflows/publish.yml` (spec §11 PUB-1..PUB-12) archives the
 Distribution configuration with a Developer ID identity, EXPORTS the archive
 — which signs the app again — and runs this over the exported `Frame Job.app`
 before it builds the DMG. Apple's notary refuses a missing hardened runtime,
@@ -25,7 +25,10 @@ broken or wrong app in a DMG that notarizes cleanly:
   it), a helper inside it without the hardened runtime, the feed not the one
   `project.yml` sets for Distribution, the EdDSA public key not 32 bytes of
   base64 (empty until the owner's key lands, PUB-8), or the updater's code
-  not compiled in.
+  not compiled in;
+* the bundled encoders (spec §11 CX-4, CX-5, PUB-11) not linked in, a
+  non-system library loaded, or their licence texts missing or changed;
+* the acknowledgements (spec §11 PUB-10) missing a shipped component.
 
 `make dist` runs it too, over the Distribution build and with no `--version`
 or `--build` (P15 and P16 then hold the SHAPE of the two numbers), so the
@@ -35,8 +38,8 @@ needle, `codesign`, the snapshot — so the two scripts cannot disagree about
 what a row means. It has no positive control for the needle (P3): that is
 `dist_check.py`'s D4, which needs a Release bundle the workflow never builds.
 
-Rows, none ever skipped; the last line is `published_check: <passed>/21`
-and the exit is 0 only at 21/21:
+Rows, none ever skipped; the last line is `published_check: <passed>/25`
+and the exit is 0 only at 25/25:
 
 * P1  the needle reads from the seam (`dist_check.read_needle`);
 * P2  the app's binary exists; P3 it does not hold the needle;
@@ -57,7 +60,21 @@ and the exit is 0 only at 21/21:
 * P19 `SUFeedURL` is Distribution's `RC_SPARKLE_FEED_URL` in `project.yml`
   (D30's);
 * P20 `SUPublicEDKey` is strict base64 of exactly 32 bytes (D31's);
-* P21 the binary holds `SPUStandardUpdaterController` (D33's).
+* P21 the binary holds `SPUStandardUpdaterController` (D33's);
+* P22 the binary's bytes hold each encoder's own string literal
+  (`dist_check.codec_strings`, CODEC_STRINGS). Not D37's `nm -j`: the
+  workflow's `xcodebuild archive` strips the executable's symbol table
+  (`DEPLOYMENT_POSTPROCESSING`), so a symbol check would fail every publish,
+  and a string literal survives the strip (spec §11 PUB-11). No row here
+  reads `nm`;
+* P23 every load command is a system library or Sparkle's
+  (`dist_check.system_loads`, D39's);
+* P24 the bundle holds every pin's licence texts, byte-identical to the
+  checkout's `build/codecs/licenses/` (`dist_check.codec_licences`, D41's);
+* P25 `Contents/Resources/Acknowledgements.txt` names every shipped crate, npm
+  package, pin, Sparkle, Bun, the model and each font
+  (`dist_check.acknowledgements`, D43's; `cargo metadata --offline` relies on
+  the archive having fetched the crates).
 
 Made to fail on purpose: `tools/proof/README.md`'s section for this script.
 
@@ -73,7 +90,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dist_check  # noqa: E402  (its readers; its rows are not run)
 
-TOTAL = 21
+TOTAL = 25
 SHORT_VERSION = re.compile(r"^[0-9]+\.[0-9]+(\.[0-9]+)?$")
 BUILD = re.compile(r"^[0-9]+$")
 
@@ -113,9 +130,9 @@ def main():
     app = arguments.app
 
     needle, needle_reason = dist_check.read_needle()
-    print("spec §11 PUB-4 and PUB-6..PUB-9 — the app about to be packed: no dev tools, each "
+    print("spec §11 PUB-4, PUB-6..PUB-11 — the app about to be packed: no dev tools, each "
           "binary's entitlements, the MCP proxy and its snapshot, the version numbers, the "
-          "updater\n")
+          "updater, the encoders and the acknowledgements\n")
     print(f"  needle: {needle.decode('ascii') if needle else '(none)'}")
     print(f"  app:    {os.path.abspath(app)}\n")
 
@@ -248,6 +265,26 @@ def main():
     else:
         count = binary.count(dist_check.UPDATER_NEEDLE)
         check(name, count > 0, f"0 occurrences in {where}")
+
+    name = ("P22 the app's binary holds each encoder's own string ("
+            + " and ".join(needle.decode("ascii") for needle in dist_check.CODEC_STRINGS) + ")")
+    if binary is None:
+        check(name, False, "no binary (P2)")
+    else:
+        ok, detail = dist_check.codec_strings(where)
+        check(name, ok, detail)
+    name = "P23 every load command is a system library or Sparkle's"
+    if binary is None:
+        check(name, False, "no binary (P2)")
+    else:
+        ok, detail = dist_check.system_loads(where)
+        check(f"{name} ({detail})" if ok else name, ok, "" if ok else detail)
+    ok, detail = dist_check.codec_licences(app)
+    check("P24 the bundle holds the encoders' licence texts" + (f" ({detail})" if ok else ""),
+          ok, "" if ok else detail)
+    ok, detail = dist_check.acknowledgements(app)
+    check("P25 Acknowledgements.txt names every shipped crate, npm package, pin, Sparkle, Bun, "
+          "the model and each font" + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
 
     print(f"\npublished_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

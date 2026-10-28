@@ -8,6 +8,12 @@
 # installed copy's Sparkle reads from the latest release (spec §11
 # PUB-6..PUB-9, tools/proof/appcast.py).
 #
+# The encoders' build (build/codecs, spec §11 CX-5) is kept in the Actions
+# cache under tools/codecs/build_codecs.py's own key, computed under the
+# "Build Codecs" step's PATH, and saved only when the folder's stamp carries
+# that key; the stamp, not the cache, decides reuse. setup-bun installs the
+# Bun whose licence the acknowledgements vendor (spec §11 PUB-10..PUB-12).
+#
 # Version: "<VERSION file>.<run number>", build number = run number. The run
 # counter belongs to this file — renaming or recreating it restarts numbering,
 # so leave the name alone. A re-run keeps its run number and replaces the
@@ -71,8 +77,26 @@ jobs:
           fi
           xcrun metal --version
 
-      # Builds the assistant's agent helper (agent/) in the Xcode post-build step.
+      # The pins later steps need (spec §11 PUB-12): the encoders' cache key
+      # and the Bun whose licence is vendored. Under the "Build Codecs" step's
+      # PATH prefix (project.yml), so find_cmake() and python3 resolve as they
+      # do inside Xcode and the key is the one the Archive computes; each value
+      # on its own line, so bash -e stops on a failure.
+      - name: Read the pins
+        id: pins
+        run: |
+          export PATH="/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          CODECS="$(python3 tools/codecs/build_codecs.py --print-key)"
+          BUN="$(python3 tools/licenses/acknowledgements.py --print-bun-version)"
+          echo "codecs=$CODECS" >> "$GITHUB_OUTPUT"
+          echo "bun=$BUN" >> "$GITHUB_OUTPUT"
+
+      # Builds the assistant's agent helper (agent/) in the Xcode post-build
+      # step, with the Bun the acknowledgements' vendored licence is for (a
+      # Distribution build refuses another, spec §11 PUB-10).
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ steps.pins.outputs.bun }}
 
       # core/ builds graphic/ as a path dependency; mcp-proxy/ is framejob-mcp.
       - uses: Swatinem/rust-cache@v2
@@ -122,6 +146,16 @@ jobs:
           rm "$P12"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
+      # The encoders built by an earlier run under the same key (spec §11
+      # PUB-12); no restore-keys, so another key never restores. Build Codecs
+      # still reuses them only by its stamp.
+      - name: Restore the encoders
+        id: codecs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/codecs
+          key: codecs-${{ steps.pins.outputs.codecs }}
+
       # Distribution is the configuration that ships (spec §11 V-1): Release
       # without FRAMEJOB_DEV_TOOLS, and without the get-task-allow notarization
       # refuses. The two helpers are signed by their own build steps with the
@@ -143,11 +177,40 @@ jobs:
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
+      # Whatever the Archive's outcome: the folder is saved only when its
+      # stamp carries the pins step's key (spec §11 PUB-12). A missing stamp
+      # or another key is a warning naming both, and nothing is saved; this
+      # step never fails the run.
+      - name: Check the encoders' stamp
+        id: codecs-stamp
+        if: always()
+        env:
+          WANT: ${{ steps.pins.outputs.codecs }}
+        run: |
+          HAVE="$(python3 -c 'import json; print(json.load(open("build/codecs/stamp.json"))["key"])' 2> /dev/null || true)"
+          if [ -n "$HAVE" ] && [ "$HAVE" = "$WANT" ]; then
+            echo "save=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::build/codecs/stamp.json's key is '${HAVE:-(no stamp)}', the pins step's is '${WANT:-(none)}'; build/codecs is not saved to the cache (spec §11 PUB-12)"
+            echo "save=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Saved on a miss even when a later step fails, so the next run does not
+      # build the encoders again.
+      - name: Save the encoders
+        if: always() && steps.codecs-cache.outputs.cache-hit != 'true' && steps.codecs-stamp.outputs.save == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/codecs
+          key: codecs-${{ steps.pins.outputs.codecs }}
+
       # published_check.py holds what notarization does not look at: no dev
       # tools, each binary's exact entitlements after the export's re-sign, the
       # catalog snapshot, the two version numbers, and the updater: Sparkle's
       # framework and helpers signed with the app's team and the hardened
-      # runtime, the feed and a 32-byte EdDSA public key (spec §11 PUB-6..PUB-8).
+      # runtime, the feed and a 32-byte EdDSA public key (spec §11 PUB-6..PUB-8);
+      # and the encoders' strings, load commands and licences, and the
+      # acknowledgements (P22–P25, spec §11 PUB-10, PUB-11).
       - name: Export
         run: |
           xcodebuild -exportArchive \

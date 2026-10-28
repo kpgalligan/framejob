@@ -11,7 +11,8 @@ outside its allow-list; every file is its input, `*.md` included), `typecheck` (
 typecheck`, which builds or reuses the bundled encoders first, `make codecs`, spec §11
 CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
-`cmake --version` in the tool fingerprint), `fmt` (`cargo fmt --check` in core, graphic,
+`cmake --version` in the tool fingerprint; `tools/licenses`, the acknowledgements' generator
+and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not), `fmt` (`cargo fmt --check` in core, graphic,
 mcp-proxy), `lint` (`make lint`), `test` (`make test`) and `app` (`make app`,
 then dist_check's D25 and D26 over the Release app: its entitlements and its
 seal, the defect a no-op build once shipped and only `make dist` read).
@@ -66,8 +67,8 @@ STEP_INPUTS = {
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
     "test": (("",), ("designs/spec/", "docs/")),
-    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "project.yml",
-             "VERSION",
+    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "tools/licenses",
+             "project.yml", "VERSION",
              "docs/graphics-api.md", "docs/graphics-api.d.ts", "tools/proof/dist_check.py"),
             ("docs/graphics-api.md",)),
 }
@@ -324,6 +325,7 @@ def selftest(mutant=None):
         ("M1", "core/include/framejob_core.h", every),
         ("M1", "agent/src/agent.ts", {"names", "typecheck", "test", "app"}),
         ("M8", "tools/codecs/build_codecs.py", {"names", "typecheck", "test", "app"}),
+        ("M8", "tools/licenses/acknowledgements.py", {"names", "test", "app"}),
         ("M2", "core/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
         ("M2", "graphic/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
         ("M2", "mcp-proxy/Cargo.toml", {"names", "fmt", "lint", "test", "app"}),

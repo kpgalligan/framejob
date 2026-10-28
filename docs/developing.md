@@ -46,7 +46,7 @@ this page points to them rather than repeating them.
 | `make app-debug` | The same (the Rust core and `make codecs` first) with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
 | `make run` | `make app`, then opens it. |
 | `make typecheck` | `make codecs` first (the bridging header includes the encoders' headers, found with `-Xcc -Ibuild/codecs/include`), then typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
-| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the encoder build, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
+| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the encoder build, the acknowledgements' generator, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
 | `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
 | `make fmt` | `cargo fmt` in the same three crates. |
 | `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
@@ -102,6 +102,10 @@ docs/            guide/ (the user guide), graphics-api.md, manual-checks.md,
                  agents/ (what the engineering skills read), this file.
 tools/codecs/    build_codecs.py (`make codecs`: the bundled encoders' pins, their
                  fetch, digest check, build and stamp) and PROVENANCE.md.
+tools/licenses/  acknowledgements.py (every build's third-party notices,
+                 Contents/Resources/Acknowledgements.txt) and its selftest
+                 (acknowledgements_selftest.py), the vendored texts it needs
+                 (bun/LICENSE.txt, spdx/MIT.txt) and PROVENANCE.md.
 tools/proof/     The verification scripts: mcp.py (the MCP client), the
                  per-feature proofs and probes, harness/ (the offscreen chrome
                  capture), swift_build.py, proof_app.py, gate.py.
@@ -190,6 +194,48 @@ The workflow runs no tests: run `make gate` and `make dist` on what you push.
 The runner builds the bundled encoders itself: the workflow installs cmake
 when the image lacks it, and the archive's "Build Codecs" step fetches the
 pinned tarballs and builds them, as a local build does.
+
+**The encoders' cache (spec §11 PUB-12).** A "Read the pins" step computes
+`tools/codecs/build_codecs.py --print-key` under the "Build Codecs" step's
+PATH prefix (`/usr/bin:/opt/homebrew/bin:/usr/local/bin`), so cmake and
+`python3` resolve as they do inside Xcode, and `build/codecs` is restored from
+the Actions cache under `codecs-<key>`, with no `restore-keys`. After the
+Archive, whatever its outcome, a step compares `build/codecs/stamp.json`'s key
+with that key: a missing stamp or another key is a `::warning::` naming both,
+and the folder is not saved; on a cache miss with equal keys it is saved, so a
+later failed step does not lose the build. The stamp, not the cache, decides
+whether Build Codecs reuses the folder, so a stale cache can never ship. A
+change to the script, the pins, cmake or the SDK changes the key and builds
+the encoders again once.
+
+**The acknowledgements (spec §11 PUB-10, PUB-11).** Every build writes
+`Contents/Resources/Acknowledgements.txt` (project.yml's "Write
+Acknowledgements", `tools/licenses/acknowledgements.py`): each shipped crate
+(`cargo metadata` over every non-dev edge of `core/` and `mcp-proxy/`), each npm
+package the helper bundles (`agent/bun.lock`, a nested version read from its
+own `node_modules/<parent>/node_modules/` folder), Bun, Sparkle, the encoders, the
+voice-activity model and each font, each with its full licence text. A crate
+or package with no licence file gets the canonical SPDX text from
+`tools/licenses/spdx/` under its authors, and the build fails naming it when
+that text is not vendored; a licence file nested in a package must be listed
+in the generator's `NESTED`, or the build fails naming it. `make dist`'s
+`dist_check.py` D42/D43 and the workflow's `published_check.py` P25 hold the
+file to every shipped component; P22–P24 hold the encoders (each one's own
+string in the binary, which the archive's strip keeps; the load commands; the
+licence texts).
+
+**The Bun pin.** The helper is compiled by Bun, whose own licence
+(`tools/licenses/bun/LICENSE.txt`) is vendored at `BUN_LICENSE_VERSION` in
+`acknowledgements.py`. A Distribution build whose `bun --version` differs
+fails, and Debug and Release builds write a note into the file instead, so the
+workflow's setup-bun installs exactly that version
+(`acknowledgements.py --print-bun-version`). After upgrading Bun locally,
+re-vendor its licence as `tools/licenses/PROVENANCE.md` says.
+
+What only a real publish shows: a cache save on its first run, and on the
+second a hit, `codecs: reused <key>` in the Archive's log and no stamp
+warning; the Developer ID export keeping `Acknowledgements.txt` (P25 over the
+exported app); and setup-bun installing the pinned Bun.
 
 The signing and notarization credentials are secrets in the repository's
 `publish` environment (Settings ▸ Environments), whose deployment branches are

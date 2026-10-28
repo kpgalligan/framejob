@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3, build velocity, Sparkle and codec export — the binary check `make dist` runs.
+"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3, build velocity, Sparkle, codec export and the acknowledgements — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
 `FRAMEJOB_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
@@ -94,9 +94,27 @@ under `/usr/lib/` or `/System/Library/`, or an `@rpath/Sparkle.framework/` path
 (whose presence in Release stays D35's), so no codec dylib, nor any other
 non-system library, is ever loaded; D40 / D41 want every licence text the pins
 name (`build_codecs.PINS`) in each bundle, byte-identical to
-`build/codecs/licenses/`.
+`build/codecs/licenses/`. `codec_strings()` is published_check's P22 (spec §11 PUB-11),
+not a row here: each encoder's own string literal (CODEC_STRINGS) in the binary's bytes,
+which survive the `strip` an `xcodebuild archive` applies and D37's symbol table does
+not. Both literals were confirmed with `grep -c -a -F` in the built Release binary and
+in `build/codecs/lib/`'s archives (`SVT-AV1 Encoder Lib %s`, the library's version
+banner; `WebM Project VP9 Encoder v1.17.0`, libvpx's interface name).
 
-The forty-one rows, none ever skipped:
+**The acknowledgements (#376, spec §11 PUB-10).** Every configuration carries
+`Contents/Resources/Acknowledgements.txt`, written by `tools/licenses/acknowledgements.py`.
+D42 / D43 read it with readers of their own — this script never imports the generator,
+so the check is not the generator agreeing with itself: `shipped_crates()` runs `cargo
+metadata --format-version 1 --locked --offline --filter-platform aarch64-apple-darwin` in
+`core/` and `mcp-proxy/` and walks every non-dev edge from the root, Frame Job's own
+crates left out; `shipped_npm()` reads `agent/bun.lock` from the workspace's
+`dependencies` through each package's own. The file must hold an `== <kind> <name>
+<version> ==` header for each of those, `library <name> <version>` for each pin,
+`framework sparkle <project.yml's exactVersion>`, `runtime bun`, `model silero-vad` and
+`font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/` (any version
+for those four).
+
+The forty-three rows, none ever skipped:
 
 * D1 — the needle is read from the seam file: exactly one bare declaration
   line, ASCII, at least 16 UTF-8 bytes;
@@ -151,7 +169,11 @@ The forty-one rows, none ever skipped:
   `@rpath/Sparkle.framework/` path;
 * D40 / D41 — the Release / Distribution bundle holds
   `Contents/Resources/Licenses/<library>/<file>` for every licence text of
-  every pin, byte-identical to `build/codecs/licenses/<library>/<file>`.
+  every pin, byte-identical to `build/codecs/licenses/<library>/<file>`;
+* D42 / D43 — the Release / Distribution bundle's
+  `Contents/Resources/Acknowledgements.txt` has a header for every shipped crate
+  and npm package (name and version), each pin, Sparkle at `project.yml`'s
+  version, Bun, the model and each bundled font.
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
 or helper is missing; D14 FAILs when the Distribution binary is, D25 and
@@ -159,13 +181,14 @@ D26 when the Release binary is, and D27 when the Distribution binary is; D33
 and D34 FAIL when their binary is missing, and D35 when the Release binary
 is, or `otool` is missing or fails; D36–D39 FAIL when their binary is missing
 or `nm`/`otool` is missing or fails, and D40 / D41 when `build/codecs/` has no
-licences to compare. D17–D20
+licences to compare; D42 / D43 FAIL when the file, `cargo`, its metadata or
+`agent/bun.lock` is missing or unreadable, naming which. D17–D20
 FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
 `tools/proof/dist_check_mutants.py` makes each helper row, D14 and each of
-D15–D32, D35, D36, D38, D40 and D41 fail on purpose. The last line is
-`dist_check: <passed>/41`; the exit is 0 only at 41/41.
+D15–D32, D35, D36, D38 and D40–D43 fail on purpose. The last line is
+`dist_check: <passed>/43`; the exit is 0 only at 43/43.
 """
 
 import argparse
@@ -232,7 +255,20 @@ SYSTEM_LOADS = ("/usr/lib/", "/System/Library/")
 SPARKLE_RPATH = "@rpath/Sparkle.framework/"
 LICENSES = os.path.join("Contents", "Resources", "Licenses")
 CODEC_LICENSES = os.path.join(ROOT, "build", "codecs", "licenses")
-TOTAL = 41
+# Each encoder's own string literal (spec §11 PUB-11): bytes `strip` keeps, unlike D37's symbols.
+CODEC_STRINGS = (b"SVT-AV1 Encoder Lib", b"WebM Project VP9 Encoder")
+# The acknowledgements (spec §11 PUB-10): the file, its entry headers, Frame Job's own crates,
+# the cargo roots the shipped crates are read from, and the bundle's fonts.
+ACKNOWLEDGEMENTS = os.path.join("Contents", "Resources", "Acknowledgements.txt")
+ACK_HEADER = re.compile(r"^== (crate|npm|runtime|framework|library|model|font) (\S+) (\S+) ==$",
+                        re.M)
+FIRST_PARTY = ("framejob-core", "graphic", "framejob-mcp")
+CARGO_ROOTS = ("core", "mcp-proxy")
+BUN_LOCK = os.path.join(ROOT, "agent", "bun.lock")
+FONTS = os.path.join("Contents", "Resources", "Fonts")
+SPARKLE_VERSION = re.compile(r"^  Sparkle:\s*\n(?:    .*\n)*?    exactVersion:\s*\"?([^\"\s]+)\"?\s*$",
+                             re.M)
+TOTAL = 43
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -657,6 +693,131 @@ def codec_licences(app):
     return True, f"{len(wanted)} texts"
 
 
+def codec_strings(binary):
+    """Whether the executable's bytes hold every CODEC_STRINGS literal (P22; `strip` keeps
+    them, unlike the symbols D36/D37 read)."""
+    try:
+        with open(os.path.realpath(binary), "rb") as handle:
+            data = handle.read()
+    except OSError as error:
+        return False, f"{binary}: {error}"
+    missing = [needle.decode("ascii") for needle in CODEC_STRINGS if needle not in data]
+    if missing:
+        return False, f"{missing} not in the bytes of {binary}"
+    return True, ""
+
+
+def shipped_crates():
+    """({(name, version)} of every crate reachable from core/'s and mcp-proxy/'s roots over a
+    non-dev edge, Frame Job's own left out) or None, with the reason."""
+    shipped = set()
+    for folder in CARGO_ROOTS:
+        try:
+            shown = subprocess.run(["cargo", "metadata", "--format-version", "1", "--locked",
+                                    "--offline", "--filter-platform", "aarch64-apple-darwin"],
+                                   cwd=os.path.join(ROOT, folder), capture_output=True,
+                                   timeout=TIMEOUT, env=child_env())
+        except FileNotFoundError:
+            return None, "cargo is not on PATH"
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return None, f"cargo metadata in {folder}/: {error}"
+        if shown.returncode != 0:
+            return None, (f"cargo metadata in {folder}/ exit {shown.returncode}: "
+                          f"{shown.stderr.decode('utf-8', 'replace').strip()[-300:]}")
+        try:
+            metadata = json.loads(shown.stdout)
+            names = {p["id"]: (p["name"], p["version"]) for p in metadata["packages"]}
+            edges = {n["id"]: [d["pkg"] for d in n["deps"]
+                               if {k["kind"] for k in d["dep_kinds"]} != {"dev"}]
+                     for n in metadata["resolve"]["nodes"]}
+            reached, frontier = set(), {metadata["resolve"]["root"]}
+            while frontier:
+                reached |= frontier
+                frontier = {c for i in frontier for c in edges[i]} - reached
+        except (ValueError, KeyError, TypeError) as error:
+            return None, f"cargo metadata in {folder}/ does not parse: {error!r}"
+        shipped |= {names[i] for i in reached if names[i][0] not in FIRST_PARTY}
+    return shipped, ""
+
+
+def shipped_npm():
+    """({(name, version)} of every npm package agent/bun.lock reaches from the workspace's
+    dependencies through each package's own) or None, with the reason. A dependency is bun's
+    nested key under its dependent's chain (`a/b/c`), else under a shorter one, else hoisted."""
+    try:
+        with open(BUN_LOCK, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError as error:
+        return None, f"{BUN_LOCK}: {error}"
+    try:
+        lock = json.loads(re.sub(r",\s*([}\]])", r"\1", text))
+        packages = lock["packages"]
+        todo = [((), name) for name in lock["workspaces"][""].get("dependencies", {})]
+        shipped, seen = set(), set()
+        while todo:
+            chain, name = todo.pop()
+            level = next((i for i in range(len(chain), -1, -1)
+                          if "/".join(chain[:i] + (name,)) in packages), 0)
+            path = chain[:level] + (name,)
+            key = "/".join(path)
+            if key in seen:
+                continue
+            seen.add(key)
+            spec = packages[key]
+            shipped.add((name, spec[0][spec[0].rindex("@") + 1:]))
+            extra = spec[2] if len(spec) > 2 and isinstance(spec[2], dict) else {}
+            todo.extend((path, dep) for dep in extra.get("dependencies", {}))
+    except (ValueError, KeyError, TypeError, IndexError) as error:
+        return None, f"{BUN_LOCK} does not read as a lock: {error!r}"
+    return shipped, ""
+
+
+def sparkle_version():
+    """Sparkle's exactVersion in project.yml, or None with the reason."""
+    try:
+        with open(PROJECT_YML, encoding="utf-8") as handle:
+            found = SPARKLE_VERSION.findall(handle.read())
+    except OSError as error:
+        return None, f"cannot read {PROJECT_YML}: {error}"
+    if len(found) != 1:
+        return None, f"{len(found)} Sparkle exactVersion lines in {PROJECT_YML}"
+    return found[0], ""
+
+
+def acknowledgements(app):
+    """Whether the bundle's Acknowledgements.txt has a header for every shipped crate and npm
+    package, each pin, Sparkle at project.yml's version, Bun, the model and each font."""
+    path = os.path.join(app, ACKNOWLEDGEMENTS)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            headers = ACK_HEADER.findall(handle.read())
+    except (OSError, UnicodeDecodeError) as error:
+        return False, f"{path}: {error}"
+    crates, reason = shipped_crates()
+    if crates is None:
+        return False, reason
+    npm, reason = shipped_npm()
+    if npm is None:
+        return False, reason
+    sparkle, reason = sparkle_version()
+    if sparkle is None:
+        return False, reason
+    held = set(headers)
+    named = {(kind, name) for kind, name, _ in headers}
+    exact = ({("crate",) + c for c in crates} | {("npm",) + n for n in npm}
+             | {("library", pin.name, pin.version) for pin in build_codecs.PINS}
+             | {("framework", "sparkle", sparkle)})
+    fonts = os.path.join(app, FONTS)
+    stems = sorted(f[:-4] for f in (os.listdir(fonts) if os.path.isdir(fonts) else [])
+                   if f.endswith(".ttf"))
+    anyversion = {("runtime", "bun"), ("model", "silero-vad")} | {("font", s) for s in stems}
+    missing = sorted(" ".join(e) for e in exact - held)
+    missing += sorted(" ".join(e) + " <any>" for e in anyversion - named)
+    if missing:
+        return False, f"{len(missing)} missing from {path}: {missing[:8]}"
+    return True, f"{len(headers)} entries, {len(crates)} crates, {len(npm)} npm, {len(stems)} fonts"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--release", default=DEFAULT_RELEASE, help="the Release Frame Job.app")
@@ -664,10 +825,11 @@ def main():
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()
-    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-9 "
+    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-10 "
           "and CX-4, CX-5 — no dev tools in Distribution; the helper signed in both; both apps' "
           "entitlements and seals; the MCP proxy and its snapshot in both; the updater in "
-          "Distribution alone; the encoders static in both, with their licences\n")
+          "Distribution alone; the encoders static in both, with their licences; the "
+          "acknowledgements in both\n")
     print(f"  needle:       {needle.decode('ascii') if needle else '(none)'}")
     print(f"  release:      {os.path.abspath(arguments.release)}")
     print(f"  distribution: {os.path.abspath(arguments.dist)}\n")
@@ -896,6 +1058,12 @@ def main():
     for side, _, _, licences_id, _, _, _, app in encoder_sides:
         ok, detail = codec_licences(app)
         check(f"{licences_id} the {side} bundle holds the encoders' licence texts"
+              + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+    for side, row_id, app in (("Release", "D42", arguments.release),
+                              ("Distribution", "D43", arguments.dist)):
+        ok, detail = acknowledgements(app)
+        check(f"{row_id} the {side} bundle's Acknowledgements.txt names every shipped crate, "
+              "npm package, pin, Sparkle, Bun, the model and each font"
               + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
 
     print(f"\ndist_check: {passed}/{TOTAL}")

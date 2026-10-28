@@ -56,6 +56,8 @@ codecs:
 # network, no key. `build_codecs.py --selftest` (codec-export C0) is the
 # encoder build's key, reuse and digest rules, no network and no cmake; `codecs`
 # first, because swift_build.py's selftest links the archives.
+# `acknowledgements.py --selftest` (spec §11 PUB-10) is the third-party notices'
+# generator over synthetic metadata, locks and package folders: no cargo, no network.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -67,6 +69,7 @@ test: rust codecs
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
 	python3 tools/codecs/build_codecs.py --selftest
+	python3 tools/licenses/acknowledgements.py --selftest
 	python3 tools/proof/swift_build.py --selftest
 	python3 tools/proof/proof_app.py --selftest
 	python3 tools/proof/gate.py --selftest
@@ -122,7 +125,10 @@ app-debug: rust codecs project
 # app's team and its helpers with the hardened runtime, its feed and a 32-byte
 # EdDSA public key, Release's both empty, the updater's code
 # (FRAMEJOB_UPDATER, compiled by this target alone) in Distribution's binary
-# and not in Release's, and no Sparkle load command in Release's. Until the owner's public key lands, D31 and P20 fail
+# and not in Release's, and no Sparkle load command in Release's; and both
+# bundles' Contents/Resources/Acknowledgements.txt naming every shipped crate,
+# npm package, pin, Sparkle, Bun, the model and each font (spec §11 PUB-10,
+# D42/D43). Until the owner's public key lands, D31 and P20 fail
 # by the owner's choice (PUB-8). The file-wide `unexport RC_ASSEMBLYAI_KEY`
 # above covers this recipe too. `published_check.py` is the check the publish
 # workflow runs over the app it is about to pack (spec §11 PUB-4), run here over

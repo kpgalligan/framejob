@@ -34,12 +34,15 @@ clone of the same tag, `designs/codec-export.md` §S). The SHA-256 is the downlo
   legal notices; it terminates for a party that sues over AV1 patents.
 - Shipped texts (`Contents/Resources/Licenses/svt-av1/`): `LICENSE.md`, `LICENSE-BSD2.md`,
   `PATENTS.md`, `fastfeat-LICENSE` (`third_party/fastfeat/LICENSE`),
-  `safestringlib-LICENSE` (`third_party/safestringlib/LICENSE`).
+  `safestringlib-LICENSE` (`third_party/safestringlib/LICENSE`), `vector.c-LICENSE` (MIT,
+  Peter Goldsborough: `Source/Lib/Codec/vector.c`'s leading comment, excerpted from the
+  pinned source by `leading_comment()`, spec §11 PUB-10).
 - Third-party code in `libSvtAv1Enc.a` (read with `ar t` on this build, 235 members):
   - fastfeat, BSD (Edward Rosten): `fast.c.o`, `fast_9.c.o`;
   - `vector.c.o` (`Source/Lib/Codec/vector.c`), MIT, Copyright (c) 2016 Peter
     Goldsborough: its notice is only in the source file's header, not in a LICENSE file,
-    so it is not among the shipped texts — the acknowledgements (#376) must reproduce it;
+    so the build installs that header as `vector.c-LICENSE` (spec §11 PUB-10), and the
+    acknowledgements reproduce it;
   - `aom_dsp`'s and `aom_convolve8`'s members, AOM's BSD 2-Clause with the AOM patent
     licence (the texts above);
   - safestringlib is NOT in this archive: SVT's CMakeLists compiles it only where the

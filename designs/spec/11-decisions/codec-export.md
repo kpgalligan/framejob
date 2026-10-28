@@ -60,6 +60,7 @@ orchestrator's default, which the owner can still change by a new entry here).
   4. Each library's licence and patent texts ship in the bundle at
      `Contents/Resources/Licenses/<library>/`, copied from the source tree; the
      acknowledgements (#376) list them.
+     **Amended by PUB-10**: SVT-AV1's `vector.c` notice is installed as `vector.c-LICENSE`.
 
   **Risk accepted:** cmake on every build machine and the publish runner, network for the
   first fetch, and a clean build of about one to two minutes.
