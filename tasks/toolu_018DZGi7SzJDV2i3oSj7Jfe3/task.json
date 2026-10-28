@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_018DZGi7SzJDV2i3oSj7Jfe3",
+  "agent_id": "a57adbdff74780dfd",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary codecs C6a",
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 71780,
+    "cache_read_tokens": 764846,
+    "output_tokens": 18294,
+    "api_call_count": 15
+  },
+  "started_at": "2026-10-28T17:51:13.504418-04:00",
+  "completed_at": "2026-10-28T17:54:27.282435-04:00"
+}

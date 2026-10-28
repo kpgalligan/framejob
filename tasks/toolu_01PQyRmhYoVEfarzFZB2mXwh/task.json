@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01PQyRmhYoVEfarzFZB2mXwh",
+  "agent_id": "a7c4e2a5eafa02eee",
+  "subagent_type": "lc-designer",
+  "task_description": "Design codecs C5",
+  "token_usage": {
+    "input_tokens": 88,
+    "cache_creation_tokens": 240395,
+    "cache_read_tokens": 6122964,
+    "output_tokens": 56421,
+    "api_call_count": 44
+  },
+  "started_at": "2026-10-28T17:39:29.819854-04:00",
+  "completed_at": "2026-10-28T17:49:05.161271-04:00"
+}
