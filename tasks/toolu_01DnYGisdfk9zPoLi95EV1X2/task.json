@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01DnYGisdfk9zPoLi95EV1X2",
+  "agent_id": "ab7c50f797de3f023",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage graphic browser",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 30660,
+    "cache_read_tokens": 26343,
+    "output_tokens": 668,
+    "api_call_count": 2
+  },
+  "started_at": "2026-10-29T13:51:34.295871-04:00",
+  "completed_at": "2026-10-29T13:51:40.255132-04:00"
+}

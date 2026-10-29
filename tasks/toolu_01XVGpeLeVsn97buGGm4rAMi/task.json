@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XVGpeLeVsn97buGGm4rAMi",
+  "agent_id": "a18673e8f923396c8",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary graphic browser",
+  "token_usage": {
+    "input_tokens": 72,
+    "cache_creation_tokens": 115254,
+    "cache_read_tokens": 2762417,
+    "output_tokens": 23355,
+    "api_call_count": 36
+  },
+  "started_at": "2026-10-29T14:02:20.718707-04:00",
+  "completed_at": "2026-10-29T14:06:47.915418-04:00"
+}
