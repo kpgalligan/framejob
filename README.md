@@ -4,7 +4,25 @@
 
 # Frame Job
 
-[![Frame Job in 90 seconds: watch on YouTube](https://img.youtube.com/vi/An7KjPoofzI/maxresdefault.jpg)](https://www.youtube.com/watch?v=Uftht-HkKy8)
+[![Frame Job in 90 seconds: watch on YouTube](https://img.youtube.com/vi/An7KjPoofzI/maxresdefault.jpg)](https://www.youtube.com/watch?v=_xkkMhgNRQU)
+
+| Language   |    Code |    Test |
+|------------|--------:|--------:|
+| Swift      |  80,760 |  52,303 |
+| Rust       |  22,400 |  54,131 |
+| Metal      |   1,682 |       — |
+| JavaScript |     755 |   2,669 |
+| TypeScript |     754 |     238 |
+| Python     |     739 | 131,328 |
+| C header   |     144 |       6 |
+| Shell      |      46 |     109 |
+| **Total**  | **107,280** | **240,784** |
+
+Non-blank, non-comment lines counted by `cloc` over the tracked files
+(2026-10-29), vendored third-party code left out. Test is `core/tests`,
+`graphic/tests`, `mcp-proxy/tests`, the assistant helper's `*.test.ts`, the
+licence generator's self-test and `tools/proof/` (the proof scripts, probes,
+offscreen harness and spikes).
 
 A native macOS video editor. Open a movie, arrange it on layered tracks over a
 fixed canvas, then trim, cut, grade, caption, animate and export it. Every edit
