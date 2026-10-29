@@ -25171,7 +25171,7 @@ real cap, a short cell lowered by 2, `via: "app-10bit"` rows in `crf.jsonl`.
 **Runs (2026-10-27).** Debug and Release 13/13; `--rate` on Release 15/15 (the
 undershoot printed: 0.667–0.670 of the target in all six runs). Seven mutants
 were caught exactly; `all-sync` and `open-gop` survived, recorded in
-`designs/codec-export.md`'s C1 findings. `encode-ignores-cancel` was caught
+`archive/codec-export.md`'s C1 findings. `encode-ignores-cancel` was caught
 only after A6 waited for the loudness measurement to end before cancelling.
 **Fix pass 1** (the same day, capped CRF, CX-13): `all-sync` and its inverse
 `no-sync` (every sample `NotSync`) both survived — the passthrough writer reads
@@ -25180,7 +25180,7 @@ went; `open-gop` is caught (exit 1, A5 and Z1) now that the rate is CRF, since
 SVT-AV1 forces KF refresh only under single-pass VBR. Under a strict 12 % cap
 `--rate` failed R1 and R2 (the owner's clip under `hevc`'s VMAF); the owner chose a
 soft cap (SVT's 50 %, each file at most 1.25 × the cap, raised to 1.30 × at C1's integration), and on the final tree
-`--rate` on Release scored 15/15 (`designs/codec-export.md`'s C1 fix pass 1).
+`--rate` on Release scored 15/15 (`archive/codec-export.md`'s C1 fix pass 1).
 
 **Runs (C2, 2026-10-28).** Debug 19/19 (on the table before C2's calibration, and again
 after the owner's Faster-at-Maximum ruling, CRF 12);
@@ -25189,7 +25189,7 @@ each `MUTANT CAUGHT` with exactly their rows. Release `--rate` first scored 20/2
 failed against a `hevc_10bit` at 96.075 where the 10-bit calibration's single encode
 had read 95.828; seven re-encodes read 96.075 each, Format default's three CRFs were
 lowered against it, and the second Release `--rate` scored 21/21
-(`designs/codec-export.md`'s C2).
+(`archive/codec-export.md`'s C2).
 
 ## Codec export C3 — AV1 in WebM, with Opus (`webm_export_proof.py` Z1, W1–W13, S4, R1, F1–F3, P1–P5, A1–A5; thirteen mutants; `export_offset_proof.py` E38–E40; spec §11 CX-6, CX-7, CX-15)
 

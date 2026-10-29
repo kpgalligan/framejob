@@ -8,7 +8,7 @@ Licences"; `tools/proof/dist_check.py` D40/D41). No library source is in git.
 
 Fetched and recorded 2026-10-27. The commit is `git get-tar-commit-id` read from the
 downloaded tarball (gunzipped), and it equals the commit the spike built from (a shallow
-clone of the same tag, `designs/codec-export.md` §S). The SHA-256 is the downloaded
+clone of the same tag, `archive/codec-export.md`'s spike, "S"). The SHA-256 is the downloaded
 `.tar.gz`'s.
 
 ## SVT-AV1 v4.2.0

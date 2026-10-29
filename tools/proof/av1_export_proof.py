@@ -42,7 +42,7 @@ Rows (`<ID> ok|FAIL — <detail>`, then `scores: n/m`; exit 0 iff all passed):
   first share, so the cancel meets the encoder and not the measurement: the
   status reads `cancelled` within 10 s of `cancel_export`, and no file is at
   the path. (Uncancelled, its 3,600 frames take far longer than 10 s at
-  SVT-AV1's ~41–148 fps at 1080p, `designs/codec-export.md`'s spike.)
+  SVT-AV1's ~41–148 fps at 1080p, `archive/codec-export.md`'s spike.)
 * A7 — A1's project at each `encoder_speed` (faster, balanced, smaller): each
   done, its answer's `encoder_speed` the one asked, and the three files' sizes
   pairwise more than 1 % apart; `encoder_speed: "fast"` and `encoder_speed` on `h264`

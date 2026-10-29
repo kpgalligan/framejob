@@ -3,10 +3,12 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is `designs/codec-export.md` (in progress); its spike record
-(`## S — the spike`) holds every measurement cited here. CX-1..CX-11 were recorded in C0,
-before any code. Each is marked "owner" (the owner's choice, 2026-10-27) or "default" (the
-orchestrator's default, which the owner can still change by a new entry here).
+The road map that made these is closed (2026-10-29): its condensed record is
+`designs/adr/codec-export.md`, the original `archive/codec-export.md`, whose spike record
+(`## S — the spike`) holds every measurement cited here, and whose phase records hold the
+rest. CX-1..CX-11 were recorded in C0, before any code. Each is marked "owner" (the owner's
+choice, 2026-10-27) or "default" (the orchestrator's default, which the owner can still
+change by a new entry here).
 
 - **CX-1 — The road map: bundled software encoders, four export rows** (owner, 2026-10-27:
   "It is super valuable to me. Bundle the encoders."). Frame Job exports AV1 and VP9 with
@@ -105,7 +107,7 @@ orchestrator's default, which the owner can still change by a new entry here).
      5 s clips (libvpx overshot by 5–7 %). C1 re-measures on a full-length export. *Result
      (C1):* on the owner's 55 s 1080p30 clip single-pass VBR at Balanced came in at
      0.667–0.670 of the target in six runs, at "Format default" and at High
-     (`designs/codec-export.md`, C1); the owner then chose capped constant quality for the
+     (`archive/codec-export.md`, C1); the owner then chose capped constant quality for the
      AV1 rows, CX-13, which replaces (1) and this item there.
 
 - **CX-10 — On an M1 or M2 the AV1 export still works, but Frame Job cannot preview or

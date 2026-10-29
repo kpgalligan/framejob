@@ -2,7 +2,7 @@
 """Codec export C6a and C6b (spec §11 CX-18): what one export costs — its resident peak
 above the instance's own, and its wall time — measured over MCP, per Export Queue key and
 size. `ExportEncoderCosts.swift`'s two tables are transcribed from its runs, and
-`designs/codec-export.md`'s "## C6a" and "## C6b" record them.
+`archive/codec-export.md`'s "## C6a" and "## C6b" record them.
 
 Every run is one fresh instance of the app `proof_app` chooses (`RC_PROOF_APP`, Release for
 the record), on a scratch socket, stopped by its own PID; nothing else is ever killed. Each:

@@ -5,7 +5,7 @@ import Foundation
 /// sheet's estimate reads. Two tables keyed alike, each figure carrying its source.
 ///
 /// **Both are measured, never guessed, and both are a table edit to replace.** The figures
-/// are `tools/proof/encoder_memory_measure.py`'s, recorded in `designs/codec-export.md`'s
+/// are `tools/proof/encoder_memory_measure.py`'s, recorded in `archive/codec-export.md`'s
 /// "## C6a" and "## C6b" (`vp9_alpha_webm`'s first in "## C5"'s fix pass): one fresh Release
 /// instance per key and size, the resident peak above the instance's own after a warming
 /// frame, and the export's wall time. The TIME figures are C6b's: on an idle machine, the
@@ -72,13 +72,13 @@ enum ExportEncoderCosts {
     static let pixels1080 = 1920 * 1080
     static let pixels2160 = 3840 * 2160
 
-    /// C6b's run (`designs/codec-export.md`'s "## C6b", spec §11 CX-18's amendment): every
+    /// C6b's run (`archive/codec-export.md`'s "## C6b", spec §11 CX-18's amendment): every
     /// time figure, and each memory figure whose C6b peak passed the earlier one. Each adds
     /// its key and the loads read during its runs (its own encoders' threads).
     private static let run = "encoder_memory_measure.py, Release, 2026-10-29, Apple M2 Max "
         + "(Mac14,6), 96 GiB, idle (load 3.22–3.67 at each batch's start), GH5 borough market "
         + "4K 25p, median of three runs per key and size, C6b; "
-    /// C6a's run (`designs/codec-export.md`'s "## C6a"): the memory figures it still wins.
+    /// C6a's run (`archive/codec-export.md`'s "## C6a"): the memory figures it still wins.
     private static let c6aRun = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 "
         + "Max, 96 GiB, one run per key and size on a machine shared with another lane's "
         + "builds and proofs; "
