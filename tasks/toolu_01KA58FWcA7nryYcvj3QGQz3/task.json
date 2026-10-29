@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01KA58FWcA7nryYcvj3QGQz3",
+  "agent_id": "afa3879631bb2d54c",
+  "subagent_type": "lc-reviewer",
+  "task_description": "Review fjgraphic export",
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 153584,
+    "cache_read_tokens": 1655691,
+    "output_tokens": 15771,
+    "api_call_count": 19
+  },
+  "started_at": "2026-10-29T16:15:31.846318-04:00",
+  "completed_at": "2026-10-29T16:18:32.378977-04:00"
+}

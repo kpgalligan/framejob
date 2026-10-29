@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_011t9jfJco7NpTotT2DmMpUE",
+  "agent_id": "a7c7e81f7816cd6af",
+  "subagent_type": "lc-designer",
+  "task_description": "Final spec fjgraphic export",
+  "token_usage": {
+    "input_tokens": 46,
+    "cache_creation_tokens": 95856,
+    "cache_read_tokens": 1462314,
+    "output_tokens": 21902,
+    "api_call_count": 23
+  },
+  "started_at": "2026-10-29T15:33:13.373237-04:00",
+  "completed_at": "2026-10-29T15:37:06.98071-04:00"
+}
