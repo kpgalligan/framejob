@@ -16,7 +16,8 @@ computed HERE from P0's dump of the tables, in this file's own arithmetic.
       probe row's)
   P0  both tables dumped: the nine keys (av1, av1_webm × faster/balanced/smaller at 10
       bits; vp9_webm at 8 and 10; vp9_alpha_webm at 8, codec-export C5's fix pass), each
-      figure positive with a source, 4K above 1080p
+      figure positive with a source, 4K above 1080p, every time source naming C6b (the
+      idle three-run medians) and none "provisional"
   R1  physical 16, 24, 32, 48, 64, 96, 128 GiB: budget = physical / 4, and per key at
       1080p and 4K the identical jobs admitted in sequence = max(1, ⌊budget / cost⌋), the
       cost the table's figure at the size
@@ -319,7 +320,8 @@ def score_probe(answer):
             problems.append(f"memory {key} {figure}")
     for key, entry in tables.time.items():
         f = entry["perFrame"]
-        if not (0 < f["at1080"] < f["at2160"]) or "provisional" not in f["source"]:
+        if (not (0 < f["at1080"] < f["at2160"]) or "C6b" not in f["source"]
+                or "provisional" in f["source"]):
             problems.append(f"time {key} {f}")
     check("P0", not problems, f"{len(tables.memory)} memory and {len(tables.time)} time "
           f"entries; {problems or 'all positive, 4K above 1080p, sourced'}")

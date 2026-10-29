@@ -692,3 +692,47 @@ orchestrator's default, which the owner can still change by a new entry here).
   **Risks accepted:** the cost is a measured peak on one machine and one picture, not a
   bound — a heavier timeline can exceed it; a sheet export can take the app past the budget
   (6); the estimate is a single-run figure until C6b.
+  **Amended by C6b** (2026-10-29): the time constants are final, and (9)'s PROVISIONAL and
+  the risk's "single-run figure" no longer hold. **Method:** `encoder_memory_measure.py`
+  against Release, Apple M2 Max (Mac14,6), 96 GiB, on AC, on a machine idle before each
+  batch (no other Frame Job, build or compiler; 1-minute load ≤ 4 at the batch's start; the
+  load read during a batch is its own encoders' threads). The picture is real camera
+  footage: the owner's GH5 borough-market clip (H.264 8-bit 3840 × 2160 25p) on a 25 fps
+  canvas, its in/out range exported. Each writer key ran three rounds at 1920 × 1080 and
+  3840 × 2160 over 10 s (250 frames, batch "long") and again over 2 s (50 frames, "short"),
+  every key once per round so drift spreads across keys. Per key and size the intercept
+  s = e_S − n_S·(e_L − e_S)/(n_L − n_S) on the median wall times; `setupSeconds` is the
+  smaller of the two sizes' intercepts when both pass 0.5 s, else 0, and `perFrame` is
+  (median e_L − setupSeconds) / 250. **Rules:** `av1_webm`'s three time entries copy `av1`'s
+  at the same speed, because `av1_webm:balanced`'s median was within 10 % of `av1:balanced`'s
+  at both sizes (−1.9 % at 1080p, −0.1 % at 4K; same encoder, speeds and CRFs, CX-15). Each
+  memory figure is max(the C6a or C5 figure, C6b's largest Δ at that size), so no figure is
+  lowered below a measured peak, and its source names the run that won, size by size. The
+  estimate's formula (9) and the ledger (1)–(8) are unchanged. **Medians** (long, short in
+  seconds; the bytes are the long batch's median file; Δ the largest across both batches):
+
+  | Key | Size | Long s (min–max) | Short s | setup s | s/frame | MB | Δ GiB |
+  |---|---|---|---|---|---|---|---|
+  | av1 faster | 1080p | 2.380 (2.352–2.446) | 0.895 | 0.524 | 0.007425 | 5.60 | 1.32 |
+  | av1 balanced | 1080p | 4.175 (4.107–4.194) | 1.425 | 0.738 | 0.013750 | 5.39 | 2.22 |
+  | av1 smaller | 1080p | 5.792 (5.756–5.808) | 1.747 | 0.736 | 0.020225 | 5.10 | 2.43 |
+  | av1_webm balanced | 1080p | 4.096 (4.063–4.174) | 1.422 | 0.753 | 0.013370 | 5.30 | 2.18 |
+  | vp9_webm SDR | 1080p | 7.020 (6.988–7.074) | 1.761 | 0 | 0.028080 | 5.19 | 0.37 |
+  | vp9_webm HLG | 1080p | 9.043 (8.994–9.049) | 2.031 | 0 | 0.036172 | 5.07 | 0.50 |
+  | vp9_alpha_webm | 1080p | 7.889 (7.877–7.905) | 1.935 | 0 | 0.031556 | 5.21 | 0.75 |
+  | av1 faster | 4K | 7.127 (7.059–7.188) | 1.995 | 0.524 | 0.026413 | 20.92 | 4.49 |
+  | av1 balanced | 4K | 13.971 (13.863–14.064) | 3.803 | 0.738 | 0.052934 | 16.53 | 7.48 |
+  | av1 smaller | 4K | 19.887 (19.764–20.191) | 5.124 | 0.736 | 0.076605 | 14.61 | 8.10 |
+  | av1_webm balanced | 4K | 13.953 (13.889–14.127) | 3.772 | 0.753 | 0.052798 | 16.51 | 7.63 |
+  | vp9_webm SDR | 4K | 23.549 (23.263–23.610) | 4.846 | 0 | 0.094196 | 18.55 | 1.04 |
+  | vp9_webm HLG | 4K | 31.237 (31.128–31.488) | 6.202 | 0 | 0.124948 | 17.33 | 1.56 |
+  | vp9_alpha_webm | 4K | 26.286 (26.190–26.401) | 5.422 | 0 | 0.105144 | 18.58 | 2.14 |
+
+  The setup column is the key's `setupSeconds` (the smaller intercept), the same at both
+  sizes; the two `av1_webm balanced` rows show its own fit, while the shipped entries copy
+  `av1`'s (within the 10 % rule). Memory raised by C6b: `av1` balanced and smaller and `av1_webm` balanced at both
+  sizes; `av1` faster, `vp9_webm` SDR and `vp9_alpha_webm` at 1080p only. Every other figure
+  keeps its C6a or C5 value and source. The estimate was checked on an export it was not
+  fitted on: 30 s from 20 s at 2560 × 1440 (road map "## C6b").
+  **Risk accepted:** the figures are one machine and one picture's medians; harder footage,
+  a heavier timeline or a busy Mac takes longer.

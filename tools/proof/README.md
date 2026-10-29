@@ -25404,7 +25404,7 @@ why in its row and in `export_status`'s `waiting`. The sheet shows "Estimated ti
 on those rows.
 
 ```
-RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py   # the per-key measurement
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py   # the per-key measurement (C6b's flags below)
 python3 tools/proof/encoder_limit_proof.py --probe                   # B0–Q5, no app
 python3 tools/proof/encoder_limit_proof.py [--app debug|release|PATH] # adds S1, S2, X1, Z1
 python3 tools/proof/encoder_limit_proof.py --mutant NAME             # exit 1 caught, 0 survived, 2 control
@@ -25420,6 +25420,36 @@ answer's `elapsed`, the 1-minute load average at the start. It writes
 tables are transcribed from; the road map's "## C6a" records the run. A run that fails is a
 row with its error and the script exits 1; a baseline RSS that cannot be read fails its row
 rather than counting the whole peak as the delta.
+
+C6b extended it (the defaults still reproduce C6a's run exactly). The AVFoundation rows
+(hevc, hevc_alpha, hevc_10bit, prores_422, prores_4444) and gif and apng are keys too; gif
+and apng pass `size: [w, h]`, because their default is the format's cap. `--sizes` adds 1440
+(2560 × 1440). `--media gh5` is the owner's GH5 borough-market clip,
+`media/log-samples/panasonic_lumix_gh5_sample_movie__borough_market___4k_uhd___25p___10_bit___800_iso___v_log_l_photo_style_v1 (2160p).mp4`
+(H.264 8-bit 3840 × 2160 25p, 55.21 s; gitignored, the codec spike's `gh5` source, asked of
+the owner). Any media but `av` goes once at 0 with `set_range` `--from` … `--from` +
+`--seconds` and `export` `range: "in_out"`; `--media av` refuses any other `--seconds` or
+`--from`. `--fps` sets the canvas rate, `--runs N` runs N rounds of every size × key, and
+`--label` names `work/encoder-memory/<date>/<label>.json` (with `uptime` at the start and end,
+and the argv) and the instance folders `<label>/<key>-<size>-r<run>/`. Each row adds
+`estimated_seconds` (one `export_status` right after `export`), `settings_frames`,
+`expected_frames` and `written_frames`, the video packets `ffprobe -count_packets` counts in
+the file after the timing (an APNG's `fcTL` chunks instead, which must equal its `acTL`:
+ffprobe's APNG demuxer stops near 2 GiB, 218 of a 4K APNG's 250 frames). Either count more
+than 1 off `expected_frames` is the row's error. The output is deleted once its row is
+recorded. A medians table per key and size follows the per-run one. `--derive LONG SHORT`
+launches nothing: from two batches of one frame count each (a pre-C6b row's `frames`), it
+prints each writer key's intercept, `setupSeconds`, per-frame seconds, largest Δ and the Swift
+literals for `ExportEncoderCosts.time`, and exits 2 when the counts are mixed or equal. The
+C6b record's four batches, each started on an idle machine (1-minute load ≤ 4):
+
+```
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py --media gh5 --fps 25 --sizes 2160 --only h264,hevc,hevc_alpha,hevc_10bit,prores_422,prores_4444,gif,apng --label c6b-4k-rows
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py --media gh5 --fps 25 --sizes 1080,2160 --only av1:faster,av1:balanced,av1:smaller,av1_webm:balanced,vp9_webm:sdr,vp9_webm:hlg,vp9_alpha_webm --runs 3 --label c6b-long
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py --media gh5 --fps 25 --sizes 1080,2160 --only av1:faster,av1:balanced,av1:smaller,av1_webm:balanced,vp9_webm:sdr,vp9_webm:hlg,vp9_alpha_webm --runs 3 --seconds 2 --label c6b-short
+RC_PROOF_APP=release python3 tools/proof/encoder_memory_measure.py --media gh5 --fps 25 --sizes 1440 --seconds 30 --from 20 --only av1:smaller,av1_webm:faster,vp9_webm:sdr,vp9_alpha_webm --label c6b-validate
+python3 tools/proof/encoder_memory_measure.py --derive tools/proof/work/encoder-memory/<date>/c6b-long.json tools/proof/work/encoder-memory/<date>/c6b-short.json
+```
 
 **`encoder_limit_proof.py`**'s probe rows run `encoder_limit_probe.swift`, built through
 `swift_build.build()` over `app/Sources` with `Blank.mp4`, `Fonts` and a `default.metallib` of

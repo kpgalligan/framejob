@@ -2184,3 +2184,196 @@ fails it at the same 250 ms.
 - `RC_PROOF_APP=release python3 tools/proof/encoder_limit_proof.py`: 17/17.
   `RC_PROOF_APP=release python3 tools/proof/export_status_proof.py`: 9/9. No instance log
   carried a `Frame Job: ` line.
+
+## C6b — 4K on every row and the final time constants
+
+### Record
+
+**Decision.** CX-18's amendment "**Amended by C6b**", recorded before the table edit
+(`designs/spec/11-decisions/codec-export.md`): the time constants are the idle three-run
+medians on real 4K footage, with a fixed start fitted from a long and a short batch.
+`av1_webm` copies `av1`'s times (within 10 %). Each memory figure is the larger of the
+earlier run's and C6b's peak. Nothing else in CX-18 moves: no change to the formula, the
+ledger, the budget or `estimateText`.
+
+**What landed.**
+- `tools/proof/encoder_memory_measure.py` gained the AVFoundation rows, gif and apng as keys,
+  size 1440 and `--media av|gh5|<path>`. It also takes `--fps`, `--seconds`, `--from`,
+  `--runs`, `--label` and `--derive LONG SHORT`. Each row now records `estimated_seconds`,
+  `settings_frames`, `expected_frames` and `written_frames`, the last counted by ffprobe from
+  the file, or from an APNG's `fcTL` chunks. The JSON holds `uptime` at the start and end and
+  the argv; outputs are deleted after their row; a medians table follows the per-run one. The
+  defaults reproduce C6a's run.
+- `app/Sources/ExportEncoderCosts.swift`: `run` is C6b's. `c6aRun` holds C6a's text verbatim
+  for the memory figures C6a still wins. Every time constant and `setupSeconds` comes from the
+  derive. Memory is raised where C6b's peak passed the earlier figure. The comments no longer
+  say "provisional".
+- `tools/proof/encoder_limit_proof.py` P0 requires every time source to name C6b and none to
+  say "provisional".
+- Spec §11 CX-18's amendment, its index rows and §7.8. The guide's export page: the readout's
+  estimate sentence, the Speed table's measured times and sizes, the AV1 memory range and the
+  estimate's limit. `docs/manual-checks.md` SE-20's per-sheet figure, 7.9 → 8.1 GB. The proof
+  README's `encoder_memory_measure.py` paragraph.
+
+**The machine.** Apple M2 Max (Mac14,6), 96 GiB, on AC, `powermode 0`, Release built from the
+tree.
+- **The first attempt stopped.** It began 2026-10-28 23:07. A's first run went through at a
+  load of 2.22, but its APNG row hit the instrument bug below. Before A's re-run the 1-minute
+  load stayed above 4 for the whole 15-minute wait (23:11–23:26; 8.02 at the end). The load
+  came from Spotlight's `spotlightknowledged.updater` and `corespotlightd`, another session's
+  Doctored Debug app, XProtect and a VM. Nothing was run past that point.
+- **The second attempt** (2026-10-29) waited for a 1-minute load ≤ 4 before every batch, with
+  no other Frame Job and no cargo, rustc, xcodebuild, swift-frontend or clang running. The
+  `uptime` at each batch's start and end:
+
+| Batch | Start | End |
+|---|---|---|
+| A (4K rows) | 1:39, load 3.74 4.43 4.56 | 1:42, 3.20 3.80 4.27 |
+| B (long) | 1:42, 3.67 3.88 4.29 | 1:53, 21.48 23.14 15.35 |
+| S (short) | 1:56, 3.22 13.95 12.98 | 2:00, 16.18 13.87 13.10 |
+| V (validate) | 2:06, 3.90 8.95 11.09 | 2:08, 11.30 10.41 11.41 |
+
+  The loads read during a batch, up to about 40, are the batch's own encoders: SVT-AV1 and
+  libvpx run a thread per core, and the 1-minute average carries one export's threads into
+  the next one's start. B's three runs of each key and size agree within 0.4–3.9 % (min to
+  max), which no outside load would leave.
+
+**The fixture.** The owner's GH5 borough-market clip, `tools/proof/media/log-samples/` (H.264
+High 8-bit 3840 × 2160 25p, 55.21 s, gitignored), on a 25 fps canvas at each size, one clip
+at 0 and its in/out range exported. For A, B and S that is 0–10 s (250 frames) or 0–2 s (50
+frames). For V it is 20–50 s (750 frames).
+
+**A — 4K on every AVFoundation and image row** (`work/encoder-memory/2026-10-29/c6b-4k-rows.json`,
+one run each, 3840 × 2160, 10 s):
+
+| Key | Δ RSS GiB | Seconds | Frames written / expected | s/frame | MB | Load |
+|---|---|---|---|---|---|---|
+| h264 | 0.27 | 3.008 | 250 / 250 | 0.01203 | 36.92 | 3.52 |
+| hevc | 0.26 | 2.730 | 250 / 250 | 0.01092 | 18.61 | 3.88 |
+| hevc_alpha | 0.26 | 5.092 | 250 / 250 | 0.02037 | 18.74 | 4.37 |
+| hevc_10bit | 0.02 | 2.820 | 250 / 250 | 0.01128 | 18.73 | 4.02 |
+| prores_422 | 0.18 | 1.074 | 250 / 250 | 0.00430 | 572.33 | 3.70 |
+| prores_4444 | 0.59 | 1.782 | 250 / 250 | 0.00713 | 1424.17 | 4.04 |
+| gif (12.5 fps) | 11.48 | 35.310 | 125 / 125 | 0.28248 | 498.19 | 3.80 |
+| apng | 7.85 | 94.137 | 250 / 250 | 0.37655 | 2443.58 | 3.41 |
+
+Every row finished with the right frame count, none near the 900 s bound, and no instance log
+had a `Frame Job: ` line. `hevc_10bit`'s 0.02 GiB is its sampled peak barely above baseline,
+as in A's first run (0.02). The AVFoundation rows book nothing in the ledger (CX-18 (2)).
+
+**B — the long batch** (`c6b-long.json`, 3 runs × 7 keys × 2 sizes, 250 frames; 42/42 ok,
+every file 250 frames). **S — the short batch** (`c6b-short.json`, the same at 50 frames;
+42/42 ok, every file 50 frames). The medians, ranges, the derive's setup and per-frame
+seconds, the median files and the largest Δ are the table in CX-18's amendment. The loads
+during each key and size:
+
+| Key | Size | B loads | S loads | B median est. (old table) | Old error |
+|---|---|---|---|---|---|
+| av1 faster | 1080p | 3.86–27.94 | 3.22–8.65 | 1 s | +58 % |
+| av1 balanced | 1080p | 4.19–26.91 | 3.52–8.68 | 2 s | +52 % |
+| av1 smaller | 1080p | 6.34–26.43 | 3.52–8.26 | 2 s | +66 % |
+| av1_webm balanced | 1080p | 7.14–25.20 | 8.06–9.17 | 2 s | +51 % |
+| vp9_webm SDR | 1080p | 6.57–26.06 | 8.46–14.14 | 2 s | +72 % |
+| vp9_webm HLG | 1080p | 7.35–23.50 | 9.05–14.77 | 2 s | +78 % |
+| vp9_alpha_webm | 1080p | 7.40–22.15 | 8.48–14.15 | 3 s | +62 % |
+| av1 faster | 4K | 6.64–20.78 | 8.20–13.98 | 3 s | +58 % |
+| av1 balanced | 4K | 9.29–22.85 | 8.35–13.26 | 7 s | +50 % |
+| av1 smaller | 4K | 19.44–28.90 | 7.68–12.60 | 7 s | +65 % |
+| av1_webm balanced | 4K | 24.43–32.50 | 8.26–13.56 | 5 s | +64 % |
+| vp9_webm SDR | 4K | 29.91–39.50 | 8.32–12.71 | 5 s | +79 % |
+| vp9_webm HLG | 4K | 23.05–32.01 | 8.57–11.81 | 8 s | +74 % |
+| vp9_alpha_webm | 4K | 16.50–30.28 | 7.96–16.54 | 8 s | +70 % |
+
+The old (C6a) table's estimates were 50–79 % short of real footage: AV.mov at 640 × 360
+scaled up is far easier to encode than camera footage. That gap is what C6b replaced.
+
+**The derive** (`--derive c6b-long.json c6b-short.json`; n_L 250, n_S 50). The intercepts at
+1080p and 4K:
+- `av1` faster: 0.524 and 0.712 s, so setup 0.524.
+- `av1` balanced: 0.738 and 1.261 s, so setup 0.738.
+- `av1` smaller: 0.736 and 1.433 s, so setup 0.736.
+- `av1_webm` balanced: 0.753 and 1.227 s (not used: it copies `av1`).
+- `vp9_webm` SDR: 0.446 and 0.170 s, so setup 0, because the 4K intercept is under 0.5 s.
+- `vp9_webm` HLG: 0.278 and −0.057 s, so setup 0.
+- `vp9_alpha_webm`: 0.446 and 0.206 s, so setup 0.
+
+The per-frame seconds and the literals are the table's. `av1_webm:balanced`'s medians were
+−1.9 % (1080p) and −0.1 % (4K) of `av1:balanced`'s, inside the 10 % rule, so `av1_webm`'s
+three time entries copy `av1`'s, and its Faster and Smaller were not run in B or S.
+
+**Memory** (max of the earlier figure and C6b's largest Δ across B and S):
+- **C6b won at both sizes:**
+  - `av1` balanced: 2,386,313,216 and 8,030,453,760.
+  - `av1` smaller: 2,613,837,824 and 8,696,889,344.
+  - `av1_webm` balanced: 2,342,584,320 and 8,196,833,280.
+- **C6b won at 1080p; the earlier figure kept 4K:**
+  - `av1` faster: 1,420,640,256 (4K C6a's 4,941,070,336).
+  - `vp9_webm` SDR: 397,574,144 (4K C6a's 1,130,774,528).
+  - `vp9_alpha_webm`: 802,816,000 (4K C5's 2,326,249,472).
+- **Unchanged under `c6aRun`:**
+  - `vp9_webm` HLG, whose C6b peaks of 532,463,616 and 1,674,248,192 sit below C6a's.
+  - `av1_webm` faster and smaller, which were not run.
+
+The S batch's peaks are lower than B's (a 2 s export does not fill the lookahead), so every
+C6b win came from B.
+
+**The speed claims hold** at both sizes for `av1`:
+- **Time:** Faster < Balanced < Smaller, at 2.380 < 4.175 < 5.792 s (1080p) and 7.127 < 13.971
+  < 19.887 s (4K).
+- **File size:** Smaller < Balanced < Faster, at 5.10 < 5.39 < 5.60 MB (1080p) and 14.61 <
+  16.53 < 20.92 MB (4K).
+
+The guide's Speed table now gives those measurements. CX-2's names stay. No issue was filed.
+
+**V — the held-out check** (`c6b-validate.json`; 2560 × 1440, 20–50 s of the clip, 750
+frames, one run; built with the new constants and never fed back into them). The estimate is
+`export_status`'s `estimated_seconds`, and the tolerance is |elapsed − estimate| ≤ 25 % of
+elapsed:
+
+| Key | Elapsed s | Estimate s | Error | Δ GiB | MB | Load |
+|---|---|---|---|---|---|---|
+| av1:smaller | 28.171 | 27 | +4.2 % | 4.03 | 23.41 | 5.67 |
+| av1_webm:faster | 9.699 | 10 | −3.1 % | 2.27 | 28.54 | 10.18 |
+| vp9_webm:sdr | 30.306 | 34 | −12.2 % | 0.58 | 25.38 | 11.01 |
+| vp9_alpha_webm | 33.493 | 38 | −13.5 % | 1.15 | 25.43 | 11.10 |
+
+All four are within 25 %, every file had 750 frames, and no log had a `Frame Job: ` line.
+VP9 is over-estimated by 12–14 % at 1440p. That fits its per-frame time growing slower than
+the pixel count between 1080p and 4K, which the straight line through the two points does
+not follow. Not re-tuned (out of scope).
+
+**Findings.**
+1. **The instrument: APNG's path and count, both fixed in `encoder_memory_measure.py`.** The
+   app writes an APNG with PNG's UTI, so `out.apng` is written as `out.apng.png` (the
+   destination rule appends the extension). The script now counts and deletes the done
+   answer's `path`. Then ffprobe's APNG demuxer counted 218 packets in the 2.4 GB 4K file,
+   whose `acTL` declares 250 frames, with 250 `fcTL` chunks to the end. A 960 × 540 APNG
+   counted 250 in both. The demuxer stops near 2 GiB (218 × 9.8 MB ≈ 2.13 GB), so an APNG is
+   now counted by its chunks, cross-checked against `acTL`. **Not an app defect; no issue.**
+2. **A 4K GIF or APNG is heavy:** 11.48 GiB above baseline for a 4K GIF and 7.85 GiB for a 4K
+   APNG, neither booked by the ledger (they are not writer rows). Both are custom sizes far
+   above the presets' own (480 × 270 and 960 × 540). Recorded here, not filed: step 4 files a
+   failed, timed-out, wrong-count or complaining row, and none was.
+3. No A, B, S or V row failed, timed out or wrote the wrong count, and no instance log
+   carried a `Frame Job: ` line. No issue was filed.
+
+**Proof** (2026-10-29, after V).
+- `make typecheck`: 0 errors, exactly the four baseline warnings.
+- `encoder_limit_proof.py --probe`: 13/13.
+- `spec_index_proof.py`: 210/210 (§7.8 650 → 651, `codec-export.md` 694 → 737, the folder
+  14452 → 14495).
+- `make gate`: **PASS** in 134 s, at 2:10–2:13: names 1 s, typecheck 5 s, fmt and lint
+  skipped (no Rust changed), test 123 s, app 4 s (the Release app was already built from the
+  new constants for V).
+- `RC_PROOF_APP=release python3 tools/proof/encoder_limit_proof.py`: **17/17**.
+  - P0 now holds every time source to C6b and none to "provisional".
+  - R1 at 32 GiB and 4K admits one AV1 job at any speed, 7 `vp9_webm` SDR, 5 HLG and 3
+    `vp9_alpha_webm`.
+  - Q1's sheet (`av1` Smaller at 1080p) cost 2,613,837,824 bytes, C6b's figure.
+  - E1's 1,800 frames at 4K read: Faster "about 50 s", Balanced "about 2 min", Smaller "about
+    2 min".
+  - X1's `estimated_seconds` was 1, as wanted; Z1 found no complaints.
+- No mutant anchor line (`value(pixels:)`, the ledger) was touched, so no mutant re-ran.
+
+**Machine time.** The first attempt took about 20 min, 15 of them the wait. The second took
+about 46 min (1:28–2:14), including two diagnostic APNG exports, the gate and the proof.

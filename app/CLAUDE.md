@@ -2320,8 +2320,8 @@ free.
   the measured resident peak (`memory`) and per-frame time (`time`) at 1080p
   and 4K, each with its source, read at an export's pixels (every bundled-encoder row,
   `vp9_alpha_webm` included); the sheet's
-  estimate (`sheetLine`). Replacing a figure is a table edit (C6b owes the
-  time constants). Ledger: the app-wide main-thread account the queue and
+  estimate (`sheetLine`). Replacing a figure is a table edit (C6b measured the
+  final time constants and setup times on an idle machine, CX-18's C6b amendment). Ledger: the app-wide main-thread account the queue and
   every `ExportProgressSheetController` book into (the sheet in
   `viewDidAppear` before `export`, ended in `finished` and `deinit`), its
   budget a quarter of physical memory, the admission rule and the held

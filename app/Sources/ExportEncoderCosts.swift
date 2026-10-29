@@ -6,10 +6,12 @@ import Foundation
 ///
 /// **Both are measured, never guessed, and both are a table edit to replace.** The figures
 /// are `tools/proof/encoder_memory_measure.py`'s, recorded in `designs/codec-export.md`'s
-/// "## C6a" (`vp9_alpha_webm`'s in "## C5"'s fix pass): one fresh Release instance per key
-/// and size, AV.mov twice on the canvas (10 s, 300 frames), the resident peak above the
-/// instance's own after a warming frame, and the export's wall time. The TIME figures are provisional — one run each on a shared machine —
-/// until C6b measures 4K on every row and the idle three-run speeds and writes them here.
+/// "## C6a" and "## C6b" (`vp9_alpha_webm`'s first in "## C5"'s fix pass): one fresh Release
+/// instance per key and size, the resident peak above the instance's own after a warming
+/// frame, and the export's wall time. The TIME figures are C6b's: on an idle machine, the
+/// GH5 4K clip on a 25 fps canvas, the median of three runs per key and size over 250 and
+/// 50 frames, which separate the fixed start from the per-frame time. A MEMORY figure is the
+/// larger of C6a's (C5's) single run and C6b's peaks, its source naming the run that won.
 ///
 /// A figure is given at 1920 × 1080 and 3840 × 2160 and read at an export's pixels:
 /// proportionally below 1080p, linearly through both points above it, extrapolated past 4K.
@@ -70,103 +72,109 @@ enum ExportEncoderCosts {
     static let pixels1080 = 1920 * 1080
     static let pixels2160 = 3840 * 2160
 
-    /// The run every figure below comes from; each adds its key and the load at its start.
-    private static let run = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 Max, "
-        + "96 GiB, one run per key and size on a machine shared with another lane's builds "
-        + "and proofs; "
+    /// C6b's run (`designs/codec-export.md`'s "## C6b", spec §11 CX-18's amendment): every
+    /// time figure, and each memory figure whose C6b peak passed the earlier one. Each adds
+    /// its key and the loads read during its runs (its own encoders' threads).
+    private static let run = "encoder_memory_measure.py, Release, 2026-10-29, Apple M2 Max "
+        + "(Mac14,6), 96 GiB, idle (load 3.22–3.67 at each batch's start), GH5 borough market "
+        + "4K 25p, median of three runs per key and size, C6b; "
+    /// C6a's run (`designs/codec-export.md`'s "## C6a"): the memory figures it still wins.
+    private static let c6aRun = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 "
+        + "Max, 96 GiB, one run per key and size on a machine shared with another lane's "
+        + "builds and proofs; "
     /// `vp9_alpha_webm`'s run (codec-export C5's fix pass), on a quiet machine, with
-    /// `vp9_webm:sdr` re-measured beside it as a control (within 0.6 % of the run above).
+    /// `vp9_webm:sdr` re-measured beside it as a control (within 0.6 % of C6a's).
     private static let alphaRun = "encoder_memory_measure.py, Release, 2026-10-28, Apple M2 "
         + "Max, 96 GiB, one run per size (codec-export C5's fix pass); "
 
-    /// Bytes, each job's resident peak above the instance's own.
+    /// Bytes, each job's resident peak above the instance's own: the larger of the earlier
+    /// run's figure and C6b's largest peak at the size, never lowered below a measured one.
     static let memory: [ExportEncoderKey: ExportEncoderFigure] = [
         ExportEncoderKey(preset: "av1", speed: .faster, bits: 10): ExportEncoderFigure(
-            at1080: 1354825728, at2160: 4941070336,
-            source: run + "av1:faster; load 10.47 at 1080p, 9.36 at 4K"),
+            at1080: 1420640256, at2160: 4941070336,
+            source: "1080p: " + run + "av1:faster; load 3.22–27.94 — 4K: " + c6aRun
+                + "av1:faster; load 9.36"),
         ExportEncoderKey(preset: "av1", speed: .balanced, bits: 10): ExportEncoderFigure(
-            at1080: 2172993536, at2160: 7060766720,
-            source: run + "av1:balanced; load 9.79 at 1080p, 8.77 at 4K"),
+            at1080: 2386313216, at2160: 8030453760,
+            source: run + "av1:balanced; load 3.52–26.91 at 1080p, 8.35–22.85 at 4K"),
         ExportEncoderKey(preset: "av1", speed: .smaller, bits: 10): ExportEncoderFigure(
-            at1080: 2419654656, at2160: 8450867200,
-            source: run + "av1:smaller; load 9.72 at 1080p, 34.83 at 4K"),
+            at1080: 2613837824, at2160: 8696889344,
+            source: run + "av1:smaller; load 3.52–26.43 at 1080p, 7.68–28.90 at 4K"),
         ExportEncoderKey(preset: "av1_webm", speed: .faster, bits: 10): ExportEncoderFigure(
             at1080: 1331265536, at2160: 4758519808,
-            source: run + "av1_webm:faster; load 9.03 at 1080p, 32.63 at 4K"),
+            source: c6aRun + "av1_webm:faster; load 9.03 at 1080p, 32.63 at 4K"),
         ExportEncoderKey(preset: "av1_webm", speed: .balanced, bits: 10): ExportEncoderFigure(
-            at1080: 2158755840, at2160: 7193591808,
-            source: run + "av1_webm:balanced; load 9.03 at 1080p, 33.14 at 4K"),
+            at1080: 2342584320, at2160: 8196833280,
+            source: run + "av1_webm:balanced; load 7.14–25.20 at 1080p, 8.26–32.50 at 4K"),
         ExportEncoderKey(preset: "av1_webm", speed: .smaller, bits: 10): ExportEncoderFigure(
             at1080: 2378907648, at2160: 8229683200,
-            source: run + "av1_webm:smaller; load 10.14 at 1080p, 33.16 at 4K"),
+            source: c6aRun + "av1_webm:smaller; load 10.14 at 1080p, 33.16 at 4K"),
         ExportEncoderKey(preset: "vp9_webm", speed: nil, bits: 8): ExportEncoderFigure(
-            at1080: 388530176, at2160: 1130774528,
-            source: run + "vp9_webm:sdr; load 10.21 at 1080p, 31.35 at 4K"),
+            at1080: 397574144, at2160: 1130774528,
+            source: "1080p: " + run + "vp9_webm:sdr; load 6.57–26.06 — 4K: " + c6aRun
+                + "vp9_webm:sdr; load 31.35"),
         ExportEncoderKey(preset: "vp9_webm", speed: nil, bits: 10): ExportEncoderFigure(
             at1080: 553811968, at2160: 1694040064,
-            source: run + "vp9_webm:hlg; load 10.52 at 1080p, 30.58 at 4K"),
+            source: c6aRun + "vp9_webm:hlg; load 10.52 at 1080p, 30.58 at 4K"),
         ExportEncoderKey(preset: "vp9_alpha_webm", speed: nil, bits: 8): ExportEncoderFigure(
-            at1080: 795197440, at2160: 2326249472,
-            source: alphaRun + "vp9_alpha_webm; load 5.33 at 1080p, 4.59 at 4K"),
+            at1080: 802816000, at2160: 2326249472,
+            source: "1080p: " + run + "vp9_alpha_webm; load 7.40–22.15 — 4K: " + alphaRun
+                + "vp9_alpha_webm; load 4.59"),
     ]
 
-    /// Seconds. `perFrame` is the measured export's wall time over its 300 frames, so it
-    /// carries the composition, the loudness pass and the container besides the encoder;
-    /// `setupSeconds` is 0 until C6b separates them.
+    /// Seconds. `perFrame` is the 250-frame export's median wall time less `setupSeconds`,
+    /// over its frames, so it carries the composition, the loudness pass and the container
+    /// besides the encoder; `setupSeconds` is the fixed start the 50-frame runs separate
+    /// (the smaller of the two sizes' intercepts, 0 when either is under 0.5 s).
     static let time: [ExportEncoderKey: ExportTimeEntry] = [
         ExportEncoderKey(preset: "av1", speed: .faster, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 1.342 / 300, at2160: 3.621 / 300,
-                source: run + "av1:faster; load 10.47 at 1080p, 9.36 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 1.856 / 250, at2160: 6.603 / 250,
+                source: run + "av1:faster; load 3.22–27.94 at 1080p, 6.64–20.78 at 4K; C6b"),
+            setupSeconds: 0.524),
         ExportEncoderKey(preset: "av1", speed: .balanced, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.088 / 300, at2160: 8.403 / 300,
-                source: run + "av1:balanced; load 9.79 at 1080p, 8.77 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 3.438 / 250, at2160: 13.233 / 250,
+                source: run + "av1:balanced; load 3.52–26.91 at 1080p, 8.35–22.85 at 4K; C6b"),
+            setupSeconds: 0.738),
         ExportEncoderKey(preset: "av1", speed: .smaller, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.614 / 300, at2160: 8.043 / 300,
-                source: run + "av1:smaller; load 9.72 at 1080p, 34.83 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 5.056 / 250, at2160: 19.151 / 250,
+                source: run + "av1:smaller; load 3.52–26.43 at 1080p, 7.68–28.90 at 4K; C6b"),
+            setupSeconds: 0.736),
         ExportEncoderKey(preset: "av1_webm", speed: .faster, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 1.296 / 300, at2160: 3.795 / 300,
-                source: run + "av1_webm:faster; load 9.03 at 1080p, 32.63 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 1.856 / 250, at2160: 6.603 / 250,
+                source: run + "av1_webm:faster; copied from av1:faster (CX-15, within 10 %); "
+                    + "load 3.22–27.94 at 1080p, 6.64–20.78 at 4K; C6b"),
+            setupSeconds: 0.524),
         ExportEncoderKey(preset: "av1_webm", speed: .balanced, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.038 / 300, at2160: 6.163 / 300,
-                source: run + "av1_webm:balanced; load 9.03 at 1080p, 33.14 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 3.438 / 250, at2160: 13.233 / 250,
+                source: run + "av1_webm:balanced; copied from av1:balanced (CX-15, within "
+                    + "10 %: av1_webm's own median −1.9 % at 1080p, −0.1 % at 4K); load "
+                    + "3.52–26.91 at 1080p, 8.35–22.85 at 4K; C6b"),
+            setupSeconds: 0.738),
         ExportEncoderKey(preset: "av1_webm", speed: .smaller, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.661 / 300, at2160: 7.792 / 300,
-                source: run + "av1_webm:smaller; load 10.14 at 1080p, 33.16 at 4K"
-                    + "; provisional until C6b"),
-            setupSeconds: 0),
+                at1080: 5.056 / 250, at2160: 19.151 / 250,
+                source: run + "av1_webm:smaller; copied from av1:smaller (CX-15, within "
+                    + "10 %); load 3.52–26.43 at 1080p, 7.68–28.90 at 4K; C6b"),
+            setupSeconds: 0.736),
         ExportEncoderKey(preset: "vp9_webm", speed: nil, bits: 8): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.061 / 300, at2160: 5.533 / 300,
-                source: run + "vp9_webm:sdr; load 10.21 at 1080p, 31.35 at 4K"
-                    + "; provisional until C6b"),
+                at1080: 7.020 / 250, at2160: 23.549 / 250,
+                source: run + "vp9_webm:sdr; load 6.57–26.06 at 1080p, 8.32–39.50 at 4K; C6b"),
             setupSeconds: 0),
         ExportEncoderKey(preset: "vp9_webm", speed: nil, bits: 10): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 2.827 / 300, at2160: 9.078 / 300,
-                source: run + "vp9_webm:hlg; load 10.52 at 1080p, 30.58 at 4K"
-                    + "; provisional until C6b"),
+                at1080: 9.043 / 250, at2160: 31.237 / 250,
+                source: run + "vp9_webm:hlg; load 7.35–23.50 at 1080p, 8.57–32.01 at 4K; C6b"),
             setupSeconds: 0),
         ExportEncoderKey(preset: "vp9_alpha_webm", speed: nil, bits: 8): ExportTimeEntry(
             perFrame: ExportEncoderFigure(
-                at1080: 3.574 / 300, at2160: 9.194 / 300,
-                source: alphaRun + "vp9_alpha_webm; load 5.33 at 1080p, 4.59 at 4K"
-                    + "; provisional until C6b"),
+                at1080: 7.889 / 250, at2160: 26.286 / 250,
+                source: run + "vp9_alpha_webm; load 7.40–22.15 at 1080p, 7.96–30.28 at 4K; C6b"),
             setupSeconds: 0),
     ]
 
