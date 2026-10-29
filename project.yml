@@ -145,7 +145,7 @@ targets:
           # and dist_check.py's D31 and published_check.py's P20 refuse it.
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_UPDATER"
           RC_SPARKLE_FEED_URL: https://github.com/kpgalligan/framejob/releases/latest/download/appcast.xml
-          RC_SPARKLE_PUBLIC_KEY: ""
+          RC_SPARKLE_PUBLIC_KEY: "v0qZeH0YUq+E1zznO2RjbaKZcIMuKSWM1hfEAuz7otI="
     info:
       path: app/Info.plist
       properties:
