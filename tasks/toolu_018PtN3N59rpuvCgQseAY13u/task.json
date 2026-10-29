@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_018PtN3N59rpuvCgQseAY13u",
+  "agent_id": "a749d733cd4b81141",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary export hang",
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 105943,
+    "cache_read_tokens": 1440320,
+    "output_tokens": 25184,
+    "api_call_count": 20
+  },
+  "started_at": "2026-10-28T20:23:01.625081-04:00",
+  "completed_at": "2026-10-28T20:27:30.509313-04:00"
+}

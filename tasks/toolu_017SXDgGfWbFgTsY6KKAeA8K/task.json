@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_017SXDgGfWbFgTsY6KKAeA8K",
+  "agent_id": "af905eab2315e1051",
+  "subagent_type": "lc-designer",
+  "task_description": "Design export hang diagnosis",
+  "token_usage": {
+    "input_tokens": 112,
+    "cache_creation_tokens": 213293,
+    "cache_read_tokens": 7340383,
+    "output_tokens": 51313,
+    "api_call_count": 56
+  },
+  "started_at": "2026-10-28T20:13:35.349851-04:00",
+  "completed_at": "2026-10-28T20:22:58.198667-04:00"
+}

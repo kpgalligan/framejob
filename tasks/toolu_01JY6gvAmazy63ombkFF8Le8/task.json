@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01JY6gvAmazy63ombkFF8Le8",
+  "agent_id": "ab5d009cfec839255",
+  "subagent_type": "lc-designer",
+  "task_description": "Final design export hang",
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 55664,
+    "cache_read_tokens": 448696,
+    "output_tokens": 12598,
+    "api_call_count": 11
+  },
+  "started_at": "2026-10-28T20:27:33.924442-04:00",
+  "completed_at": "2026-10-28T20:29:21.106576-04:00"
+}

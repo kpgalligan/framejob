@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01PG8AegizcxcXYiLgUyund1",
+  "agent_id": "a4c522a0fff1456a5",
+  "subagent_type": "lc-designer",
+  "task_description": "Final design codecs C6b",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 40521,
+    "cache_read_tokens": 192970,
+    "output_tokens": 5267,
+    "api_call_count": 6
+  },
+  "started_at": "2026-10-28T23:04:37.990027-04:00",
+  "completed_at": "2026-10-28T23:05:28.517028-04:00"
+}
