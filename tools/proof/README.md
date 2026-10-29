@@ -405,8 +405,10 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **97** since cut-by-transcript CT-4's
-`get_transcript` (96 from CT-3's `transcribe_for_fillers`, 95 from CT-2's
+`op_argument_proof.py` asserts **100** since the graphic browser's
+`list_graphics` and `insert_graphic` (spec §11 G-45; 98 from #340's
+`add_speed_ramp`, 97 from cut-by-transcript CT-4's `get_transcript`, 96 from
+CT-3's `transcribe_for_fillers`, 95 from CT-2's
 `detect_fillers`, 94 from #326's `export_status` and `cancel_export`, 92 from
 road map audio-sync AS-1's `sync_audio`, 91 from grading-3 T3-2's `set_media_color`, 90 from grading
 GR4a's `add_adjustment_clip`, 89 from issue batch B84's three
@@ -12485,9 +12487,10 @@ its line; `inventory.py --check` 5/5.
     and `addMediaFiles:` validates true.
   - **V1** with E1 attached, each of `exportCaptions: importCaptions:
     addImageBackground: addMediaFiles: consolidateMedia:
-    insertGraphicFromFile: addGraphicFont: addGraphicImage:
-    insertGraphicTemplate: setTransitionKind: saveFrame: removeTrack:`
-    validates false.
+    showGraphicBrowser: addGraphicFont: addGraphicImage:
+    setTransitionKind: saveFrame: removeTrack:` validates false (since spec
+    §11 G-45 `showGraphicBrowser:` stands for the old submenu's
+    `insertGraphicFromFile:` and `insertGraphicTemplate:`).
   - **P1 / P2** a stand-in `NSOpenPanel` (P1) or `NSSavePanel` (P2) is
     attached, then E1 is presented and waits. The panel is ended with
     `.cancel`. Its completion handler records whether E1 is attached and
@@ -12536,7 +12539,7 @@ B: synchronous inside the completion handler of a panel on the editor
 window. Class C: after an async hop. V1 tests that ONE guard
 (`EditorViewController.swift:1042`, which refuses every action before its
 switch while a sheet is attached); C0 controls it through `addMediaFiles:`
-alone, since the other eleven may validate false on an empty document
+alone, since the other ten may validate false on an empty document
 regardless of any sheet.
 
 | Site | Class | Reason | Row |
@@ -12554,9 +12557,9 @@ regardless of any sheet.
 | `EditorViewController+Consolidate.swift:37` (`offerSaveBeforeConsolidating`) | A | reached from `consolidateMedia:` only | V1 |
 | `EditorViewController+Consolidate.swift:67` (`beginConsolidate`) | C (A from the menu) | after NSDocument's save callback (`consolidateAfterSave`); AppKit queues it behind the queue's alert, order kept | S4 |
 | `EditorViewController+Consolidate.swift:81` (`beginConsolidate`) | C (A from the menu) | the same function and hop as :67; S4 reaches :67, not :81 | S4 (shared) |
-| `EditorViewController+GraphicMenus.swift:45` (`insertGraphicFromFile:`) | A | the action itself | V1 |
+| `EditorViewController+GraphicMenus.swift:45` (`insertGraphicFromFile`; since G-45 :50) | A | since G-45 reached only from the graphic browser's From File…, in the browser's `viewDidDisappear` (`showGraphicBrowser:` validates false while any sheet is attached) | V1 (`showGraphicBrowser:`); `graphics_menu_proof.py` M32 |
 | `EditorViewController+GraphicMenus.swift:157` (`chooseGraphicFile`) | A | reached from `addGraphicFont:` / `addGraphicImage:` only | V1 |
-| `EditorViewController+GraphicMenus.swift:174` (`reportingGraphicFailure`) | A via `insertGraphicTemplate:`; B via a panel | synchronous in the action or in the open panel's completion | V1, P1 (stand-in panel) |
+| `EditorViewController+GraphicMenus.swift:174` (`reportingGraphicFailure`; since G-45 :162) | B via a panel | synchronous in the open panel's completion (since G-45 the browser's Insert shows a refusal in its own message line, not here) | P1 (stand-in panel) |
 | `EditorViewController+Inspector.swift:283` (`presentNoFootageForTransition`) | A | the menu (`setTransitionKind:`) and the Clip tab's controls | V1 (the menu); the tab's controls by event routing |
 | `EditorViewController+SaveFrame.swift:130` (`saveFrameCommand`) | A | reached from `saveFrame:` only | V1 |
 | `EditorViewController+SaveFrame.swift:209` (`frameSaved`) | C | after the frame grab queue's hop; AppKit queues it behind the queue's alert, order kept | S1 |
@@ -25482,3 +25485,79 @@ Mutants (each a copy of `app/Sources` with one anchor replaced; the probe rows a
 `budget-half` (R1), `estimate-flat` (E1), `no-waiting-key` (Q2), `row-says-waiting` (Q4),
 `begin-late` (Q5), `token-overwrite` (Q5), `tip-drops-hold` (Q4), `estimate-no-count` (E3). A mutant is CAUGHT (exit 1) when every row it
 names fails; other rows failing beside them are reported, not scored.
+
+## The graphic browser, phase 1 — Insert ▸ Graphic… (`graphics_menu_proof.py` M2–M7, M21–M32 and seven mutants; `graphic_browser_proof.py` S0, L1, L2, I1–I5, U1, Z1 and one mutant; `graphic/tests/template_meta.rs`; spec §11 G-45)
+
+Spec §11 G-45 replaced the Insert ▸ Graphic submenu with one item, Graphic…,
+which puts up `GraphicBrowserSheetController`: the categories, the chosen
+category's graphics, and a looping preview (`GraphicPreviewPlayer`, one 8 MiB
+`Thread`), From File… at the bottom left. Every bundled template declares
+`meta.category` and `meta.description`, held by
+`graphic/tests/template_meta.rs` to G-45 (c)'s table; the agent has the
+dialog's two acts, `list_graphics` and `insert_graphic`, so the product
+catalog is **100** tools.
+
+**`graphics_menu_proof.py`'s probe**, re-aimed (the G5b section above keeps
+the rows as they were): M2 is Insert holding Adjustment Clip then Graphic…,
+one item with no submenu whose action is `showGraphicBrowser:`; M3 counts four
+items (Graphic…, the two Adds, Graphics Reference) with no key equivalent; M4
+and M5 the three editor selectors. M21–M23 hold `GraphicCatalog` over fixture
+items: the Other fallback (M21), no This Project with no project item (M22),
+This Project first and "<title> — <name>" for a shared title (M23). M24–M32
+drive the browser through its own controls, found by accessibility identifier
+(`graphicbrowser.*`), on the module-less copy of GM: it opens on Data & Time's
+first graphic and its two tables equal `GraphicCatalog.categories(for:)`
+(M24); the preview has a picture within 3 s, drawn on the player's thread
+(M25); deselecting disables Insert (M26); Cancel (Esc) writes nothing (M27);
+Titles & Text ▸ Lower third through Insert (M6, the old row's numbers) and
+the render thread finished within 2 s of it (M28); again → `lower-third-2`
+(M7); This Project first with "Lower third — lower-third" and "Lower third —
+lower-third-2" (M29); lower-third-2 inserted from This Project writes no file
+(M30); after M9, This Project's `broken` leaves `graphicClipMaker`'s sentence
+word for word in `graphicbrowser.message` with the sheet up (M31); From File…
+leaves an `NSOpenPanel` attached within 2 s and the browser gone (M32). The
+seven `browser-*` `PROBE_MUTANTS` are held to Rule R1 (the docstring has the
+table).
+
+**`graphic_browser_proof.py`** launches its own instance in a scratch home
+(`work/graphic-browser/home`), once `-RCDevAppearance light` for every row
+and once dark for U1's dark capture, over a module-less `new_project`: L1
+`list_graphics` is exactly G-45 (c)'s four categories in G-45 (d)'s order,
+every graphic a template, ok, titled by its `meta.name`, described; I1
+`insert_graphic {lower-third, template}` writes the template byte-equal and
+places a clip; L2 This Project then comes first with lower-third alone; I2 the
+same name from project places a clip and writes no file; I3 a project module
+that does not compile is refused in `graphicClipMaker`'s sentence; I4 an
+unknown name is refused naming it and listing that origin's names; I5 a `from`
+of `file`, and none, are refused by name; U1 `perform_menu_item ["Insert",
+"Graphic…"]`, `snapshot_ui {window: sheet}` holding the nine identifiers with
+no layout problem, `cancel_sheet`. Its one `APP_MUTANTS` entry,
+`list-templates-only`, builds a tree copy whose `list_graphics` drops This
+Project (Rule R, L2).
+
+`sheet_queue_probe.swift`'s V1 lists `showGraphicBrowser:` in place of
+`insertGraphicFromFile:` and `insertGraphicTemplate:`; `op_argument_proof.py`
+asserts `PRODUCT_TOOLS = 100`, and `phase9_proof.py`, `recording_proof.py`
+and `recording_probe.py` list both tools among the thirty-eight app-state
+tools; `assistant_prompt_proof.py`'s F4 finds both in the graphics topic and
+F6 holds its guide to 1496 of 1500.
+
+**The recorded run (2026-10-29, Release after `make gate`):**
+`RC_PROOF_APP=release graphics_menu_proof.py` 39/39;
+`RC_PROOF_APP=release graphic_browser_proof.py` 15/15; `op_argument_proof.py`
+170/170 and `phase9_proof.py` 237/237 on one Release instance, its log
+clean; `sheet_queue_probe.py --only V1` 1/1. Mutants (Debug): each of the
+seven `browser-*` caught with its row the first failure — `browser-fallback`
+M21, `browser-project-empty` M22, `browser-project-last` M23,
+`browser-insert-enabled` M26, `browser-project-copies` M30,
+`browser-skip-unique` M7, `browser-player-kept` M28 — and
+`list-templates-only` caught at L2.
+
+```sh
+cd graphic && cargo test --release --test template_meta --test templates
+make app-debug
+python3 tools/proof/graphics_menu_proof.py              # → 39/39
+python3 tools/proof/graphic_browser_proof.py            # → 15/15
+python3 tools/proof/graphics_menu_proof.py --mutant browser-fallback
+python3 tools/proof/graphic_browser_proof.py --mutant list-templates-only
+```

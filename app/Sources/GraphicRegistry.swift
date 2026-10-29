@@ -247,7 +247,7 @@ final class GraphicRegistry {
     }
 
     /// One module file compiled against `library`, its `describe` parsed.
-    private static func compile(_ file: GraphicModuleFile, library: GraphicLibrary) -> Entry {
+    static func compile(_ file: GraphicModuleFile, library: GraphicLibrary) -> Entry {
         let source = String(decoding: file.bytes, as: UTF8.self)
         do {
             let module = try GraphicModule.compile(

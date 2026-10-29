@@ -24,7 +24,7 @@ import Foundation
 
 extension AgentServer {
 
-    /// `add_graphic_clip` — UI path: Insert ▸ Graphic, which is
+    /// `add_graphic_clip` — UI path: Insert ▸ Graphic…'s Insert, which is
     /// `write_graphic` of a template (or a chosen `.js`) then this op
     /// (`EditorViewController+GraphicMenus.swift`).
     ///
@@ -95,7 +95,7 @@ extension AgentServer {
     static let notUndoableNote = "not undoable; keep your own copy if you want the old one back"
 
     /// `write_graphic` — UI path: the file on disk (an external editor);
-    /// Insert ▸ Graphic, which writes a template or a chosen `.js` through
+    /// Insert ▸ Graphic…'s sheet, which writes a template or a chosen `.js` through
     /// the same `store.write` then places it (`add_graphic_clip`); and
     /// Duplicate as New Graphic…, which writes the copy through the same
     /// `store.write` then repoints with `set_graphic {name}`.

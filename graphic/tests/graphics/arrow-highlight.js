@@ -3,6 +3,8 @@
 // frame's centre, with a label at the arrow's tail.
 export const meta = {
   name: "Arrow highlight",
+  category: "Screencast",
+  description: "A box drawn round a spot, an arrow and a label pointing at it.",
   durationInFrames: 90,
 };
 

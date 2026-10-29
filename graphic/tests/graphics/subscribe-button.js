@@ -5,6 +5,8 @@
 // vector shape.
 export const meta = {
   name: "Subscribe button",
+  category: "Social & YouTube",
+  description: "A subscribe button clicked by a cursor, with a bell.",
   durationInFrames: 150,
 };
 

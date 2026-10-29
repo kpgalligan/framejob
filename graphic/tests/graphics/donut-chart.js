@@ -3,6 +3,8 @@
 // slice's share counting up in the centre and a staggered legend.
 export const meta = {
   name: "Donut chart",
+  category: "Data & Time",
+  description: "Slices sweeping round a donut, a share and a legend.",
   durationInFrames: 150,
 };
 

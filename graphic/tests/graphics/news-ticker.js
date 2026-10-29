@@ -3,6 +3,8 @@
 // separated by accent bullets.
 export const meta = {
   name: "News ticker",
+  category: "Titles & Text",
+  description: "A headline box and items crawling along the foot of the frame.",
   durationInFrames: 300,
 };
 

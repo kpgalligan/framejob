@@ -2,6 +2,8 @@
 // scaled in by a spring, wrapped with wrapText.
 export const meta = {
   name: "Kinetic type",
+  category: "Titles & Text",
+  description: "A sentence shown word by word, each word springing in.",
   durationInFrames: 150,
 };
 

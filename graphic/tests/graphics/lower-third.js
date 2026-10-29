@@ -2,6 +2,8 @@
 // staggered subtitle, and an outro keyed to durationInFrames.
 export const meta = {
   name: "Lower third",
+  category: "Titles & Text",
+  description: "A name and a subtitle sliding in on a bar.",
   durationInFrames: 150,
 };
 

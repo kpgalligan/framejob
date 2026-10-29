@@ -3,6 +3,8 @@
 // the value counting in the dial's open foot.
 export const meta = {
   name: "Gauge",
+  category: "Data & Time",
+  description: "A dial whose needle swings to a value, the value counting.",
   durationInFrames: 120,
 };
 

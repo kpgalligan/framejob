@@ -3,6 +3,8 @@
 // expands from behind it. No platform's own mark is drawn.
 export const meta = {
   name: "Handle tag",
+  category: "Social & YouTube",
+  description: "An @handle in a pill beside a glyph tile, at a corner.",
   durationInFrames: 120,
 };
 

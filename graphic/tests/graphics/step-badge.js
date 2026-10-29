@@ -2,6 +2,8 @@
 // popping in at a corner, with a label panel wiping out from behind it.
 export const meta = {
   name: "Step badge",
+  category: "Screencast",
+  description: "A numbered badge at a corner, with a label panel.",
   durationInFrames: 90,
 };
 

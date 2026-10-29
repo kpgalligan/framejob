@@ -45,71 +45,93 @@ the fonts installed on your Mac, so a project draws the same everywhere.
 
 ## Adding a graphic
 
-**Insert ▸ Graphic** lists the bundled templates, then **From File…**:
+**Insert ▸ Graphic…** opens the Graphic dialog. On the left are the
+categories: **This Project** first, when the project's `graphics/` folder
+holds a module (every module in it, whatever its own category), then the
+bundled templates' categories, in alphabetical order. In the middle are the
+chosen category's graphics, by name. On the right a preview plays the chosen
+graphic over a checkerboard, looping, at the project's canvas shape, with its
+name and a one-line description under it. A module that doesn't compile is
+listed in grey and its preview is the red error card.
 
-| Item | What you get | Default length |
-|---|---|---|
-| Arrow Highlight | A rounded box drawn on around a spot, an arrow growing toward it from the side nearer the frame's centre, and a label at the arrow's tail | 90 frames |
-| Bar Chart | A titled bar chart whose bars grow in turn, from comma-separated values and labels | 150 frames |
-| Callout | A circle that draws itself on, with an arrow and a label, at a position on the frame | 90 frames |
-| Chapter Card | A full-frame card: a large outlined chapter number, a kicker, an accent rule drawing across and the title rising into view | 120 frames |
-| Countdown | A timer counting down (or up) one step a second inside a ring that empties or fills, pulsing on each tick and flashing at the end | 330 frames |
-| Counter | A number counting from one value to another with thousands separators, a prefix and a label | 90 frames |
-| Donut Chart | A titled donut whose slices sweep in turn from comma-separated values and labels, the first slice's share counting up in the centre, with a legend beside it (below it in portrait) | 150 frames |
-| End Screen | A full-frame card with a title, two 16:9 placeholders for the videos you link, side by side, and a subscribe circle centred under them (a column in portrait) | 300 frames |
-| Gauge | A dial with ticks whose accent arc and needle swing to a value, with the value counting up and its units and label | 120 frames |
-| Handle Tag | An accent tile holding a generic glyph (play, camera, speech bubble, note or globe) and a pill with your @handle, at a corner | 120 frames |
-| Keyboard Keys | A shortcut such as cmd+shift+4 as keycaps popping in, each pressed in turn, with ⌘ ⇧ ⌥ ⌃ and the arrows drawn as symbols, and a label under them | 90 frames |
-| Kinetic Type | A sentence shown word by word, each word springing in, with an accent colour | 150 frames |
-| Line Chart | A titled line drawn on through comma-separated values, a dot popping at each point, an optional area fill and the last value called out | 150 frames |
-| Logo Reveal | A full-frame card on which an accent bar sweeps across, revealing your logo image (or a text mark), then becomes a rule over a tagline | 120 frames |
-| Lower Third | A name and subtitle that slide in and fade out, boxed or not, aligned left, centre or right | 150 frames |
-| News Ticker | A band along the foot of the frame with a headline box and items, separated by "\|", crawling right to left | 300 frames |
-| Progress Bar | A labelled bar on a plate whose fill grows to a percentage, the figure counting, with a shine across it, at the bottom, centre or top | 120 frames |
-| Quote Card | A full-frame card with a large quote mark, the quote's lines fading up in turn, and the attribution sliding in | 150 frames |
-| Social Popup | A notification card at a corner with a generic avatar and a handle (and, for a comment, its text), its heart, speech bubble or share arrow popping as the count ticks up by one | 120 frames |
-| Step Badge | A numbered accent circle popping in at a corner, with a label panel wiping out from behind it | 90 frames |
-| Subscribe Button | A subscribe button a cursor clicks: it turns to its done label with a check, and a bell pops in beside it and rings after a second click | 150 frames |
-| Title Card | A title fitted to the frame and a kicker over a two-colour gradient, fading in and out | 120 frames |
-| Window Frame | A browser or app window's frame — title bar, three dots, a title or an address field, an outline — to put over a screen recording on the track below; the window's inside stays clear | 150 frames |
-| From File… | Asks for a `.js` module and copies it into the project | the module's own |
+The dialog opens on the first category's first graphic. **Insert** (Return,
+or a double-click on a graphic) adds the chosen graphic; **Cancel** (Esc)
+closes the dialog; **From File…** closes it and asks for a `.js` module to
+copy into the project instead.
+
+A module of your own goes into a category by giving its `meta` a `category`
+(and a `description` for the line under the preview); one without a category
+is listed under **Other**, last (see the [graphics reference](../graphics-api.md)).
+
+The bundled templates:
+
+| Template | Category | What you get | Default length |
+|---|---|---|---|
+| Arrow highlight | Screencast | A rounded box drawn on around a spot, an arrow growing toward it from the side nearer the frame's centre, and a label at the arrow's tail | 90 frames |
+| Bar chart | Data & Time | A titled bar chart whose bars grow in turn, from comma-separated values and labels | 150 frames |
+| Callout | Screencast | A circle that draws itself on, with an arrow and a label, at a position on the frame | 90 frames |
+| Chapter card | Titles & Text | A full-frame card: a large outlined chapter number, a kicker, an accent rule drawing across and the title rising into view | 120 frames |
+| Countdown | Data & Time | A timer counting down (or up) one step a second inside a ring that empties or fills, pulsing on each tick and flashing at the end | 330 frames |
+| Counter | Data & Time | A number counting from one value to another with thousands separators, a prefix and a label | 90 frames |
+| Donut chart | Data & Time | A titled donut whose slices sweep in turn from comma-separated values and labels, the first slice's share counting up in the centre, with a legend beside it (below it in portrait) | 150 frames |
+| End screen | Social & YouTube | A full-frame card with a title, two 16:9 placeholders for the videos you link, side by side, and a subscribe circle centred under them (a column in portrait) | 300 frames |
+| Gauge | Data & Time | A dial with ticks whose accent arc and needle swing to a value, with the value counting up and its units and label | 120 frames |
+| Handle tag | Social & YouTube | An accent tile holding a generic glyph (play, camera, speech bubble, note or globe) and a pill with your @handle, at a corner | 120 frames |
+| Keyboard keys | Screencast | A shortcut such as cmd+shift+4 as keycaps popping in, each pressed in turn, with ⌘ ⇧ ⌥ ⌃ and the arrows drawn as symbols, and a label under them | 90 frames |
+| Kinetic type | Titles & Text | A sentence shown word by word, each word springing in, with an accent colour | 150 frames |
+| Line chart | Data & Time | A titled line drawn on through comma-separated values, a dot popping at each point, an optional area fill and the last value called out | 150 frames |
+| Logo reveal | Titles & Text | A full-frame card on which an accent bar sweeps across, revealing your logo image (or a text mark), then becomes a rule over a tagline | 120 frames |
+| Lower third | Titles & Text | A name and subtitle that slide in and fade out, boxed or not, aligned left, centre or right | 150 frames |
+| News ticker | Titles & Text | A band along the foot of the frame with a headline box and items, separated by "\|", crawling right to left | 300 frames |
+| Progress bar | Data & Time | A labelled bar on a plate whose fill grows to a percentage, the figure counting, with a shine across it, at the bottom, centre or top | 120 frames |
+| Quote card | Titles & Text | A full-frame card with a large quote mark, the quote's lines fading up in turn, and the attribution sliding in | 150 frames |
+| Social popup | Social & YouTube | A notification card at a corner with a generic avatar and a handle (and, for a comment, its text), its heart, speech bubble or share arrow popping as the count ticks up by one | 120 frames |
+| Step badge | Screencast | A numbered accent circle popping in at a corner, with a label panel wiping out from behind it | 90 frames |
+| Subscribe button | Social & YouTube | A subscribe button a cursor clicks: it turns to its done label with a check, and a bell pops in beside it and rings after a second click | 150 frames |
+| Title card | Titles & Text | A title fitted to the frame and a kicker over a two-colour gradient, fading in and out | 120 frames |
+| Window frame | Screencast | A browser or app window's frame — title bar, three dots, a title or an address field, an outline — to put over a screen recording on the track below; the window's inside stays clear | 150 frames |
 
 Each template's properties, as the Graphic sub-tab shows them:
 
 | Template | Properties |
 |---|---|
-| Arrow Highlight | x and y (sliders from 0 to 1, the spot as a fraction of the frame), boxWidth and boxHeight (0.02–0.8 of the frame), shape (a pop-up: box+arrow, box, arrow), label, accent |
-| Bar Chart | values and labels (comma-separated text), title, color |
+| Arrow highlight | x and y (sliders from 0 to 1, the spot as a fraction of the frame), boxWidth and boxHeight (0.02–0.8 of the frame), shape (a pop-up: box+arrow, box, arrow), label, accent |
+| Bar chart | values and labels (comma-separated text), title, color |
 | Callout | x and y (sliders from 0 to 1, a fraction of the frame's width and height), label, color |
-| Chapter Card | number (0–99), kicker, title, background, accent |
+| Chapter card | number (0–99), kicker, title, background, accent |
 | Countdown | from, to, format (a pop-up: seconds, m:ss, h:mm:ss), label, ring (a checkbox), accent |
 | Counter | from, to, prefix, label, color |
-| Donut Chart | values and labels (comma-separated text; a value below 0 counts as 0), title, accent |
-| End Screen | title, videoA, videoB, subscribe (the three labels), background, accent |
+| Donut chart | values and labels (comma-separated text; a value below 0 counts as 0), title, accent |
+| End screen | title, videoA, videoB, subscribe (the three labels), background, accent |
 | Gauge | value (held between min and max), min, max, label, units, accent |
-| Handle Tag | handle, glyph (a pop-up: play, camera, bubble, note, globe), position (a pop-up of the four corners), accent |
-| Keyboard Keys | keys (keys joined by "+": cmd, shift, opt or alt, ctrl, up, down, left, right, or any other key's name or character), label (empty hides it), theme (a pop-up: light, dark), position (a pop-up: bottom, center, top), accent |
-| Kinetic Type | text, stagger (1–30), color, accent |
-| Line Chart | values and labels (comma-separated text), title, area (a checkbox), accent |
-| Logo Reveal | logo (an image from the project's graphic assets; none draws the mark), mark, tagline, background, accent |
-| Lower Third | Title, subtitle, accent, size (12–200), boxed (a checkbox), align (a pop-up: left, center, right) |
-| News Ticker | headline, items (separated by "\|"), speed (40–600, pixels a second at 1080p), background, accent |
-| Progress Bar | value (0–100), label, showPercent (a checkbox), position (a pop-up: bottom, center, top), accent |
-| Quote Card | quote (a text area), attribution, background, accent |
-| Social Popup | kind (a pop-up: like, comment, share), handle, text (shown for a comment), count, position (a pop-up of the four corners), accent |
-| Step Badge | number (0–99), label, position (a pop-up of the four corners), accent |
-| Subscribe Button | label, doneLabel, bell (a checkbox), position (a pop-up: bottom, center, top), accent |
-| Title Card | title, kicker, from and to (the gradient's two colours) |
-| Window Frame | style (a pop-up: browser, window), title (window), url (browser), theme (a pop-up: dark, light), scale (0.5–1, the share of the title-safe area it covers), shadow (a checkbox), accent |
+| Handle tag | handle, glyph (a pop-up: play, camera, bubble, note, globe), position (a pop-up of the four corners), accent |
+| Keyboard keys | keys (keys joined by "+": cmd, shift, opt or alt, ctrl, up, down, left, right, or any other key's name or character), label (empty hides it), theme (a pop-up: light, dark), position (a pop-up: bottom, center, top), accent |
+| Kinetic type | text, stagger (1–30), color, accent |
+| Line chart | values and labels (comma-separated text), title, area (a checkbox), accent |
+| Logo reveal | logo (an image from the project's graphic assets; none draws the mark), mark, tagline, background, accent |
+| Lower third | Title, subtitle, accent, size (12–200), boxed (a checkbox), align (a pop-up: left, center, right) |
+| News ticker | headline, items (separated by "\|"), speed (40–600, pixels a second at 1080p), background, accent |
+| Progress bar | value (0–100), label, showPercent (a checkbox), position (a pop-up: bottom, center, top), accent |
+| Quote card | quote (a text area), attribution, background, accent |
+| Social popup | kind (a pop-up: like, comment, share), handle, text (shown for a comment), count, position (a pop-up of the four corners), accent |
+| Step badge | number (0–99), label, position (a pop-up of the four corners), accent |
+| Subscribe button | label, doneLabel, bell (a checkbox), position (a pop-up: bottom, center, top), accent |
+| Title card | title, kicker, from and to (the gradient's two colours) |
+| Window frame | style (a pop-up: browser, window), title (window), url (browser), theme (a pop-up: dark, light), scale (0.5–1, the share of the title-safe area it covers), shadow (a checkbox), accent |
 
-Choosing one:
+Inserting a template:
 
 1. Copies the module into the project's `graphics/` folder under a free name
-   (a second Lower Third becomes `lower-third-2`, and so on).
+   (a second Lower third becomes `lower-third-2`, and so on). The two then
+   show under This Project as "Lower third — lower-third" and "Lower third —
+   lower-third-2".
 2. Places one graphic clip at the playhead, on the front track if it fits
    there, otherwise on a new track above everything. With a nest open, the
    clip goes on the nest's front track, or a new track inside the nest.
 3. Selects the new clip so the inspector shows its Graphic sub-tab.
+
+Inserting a graphic from **This Project** places a clip drawn by that module
+as it is, the same way, and copies nothing.
 
 **From File…** names the module after the chosen file: the name is
 lowercased, each run of characters other than a–z and 0–9 becomes one `-`,
@@ -126,14 +148,17 @@ The clip's length and size come from the module's own `meta`
 shape.
 
 Placing the clip is one undo step, **Insert Graphic**. Copying the file into
-the project is not undone. If the module doesn't compile, the file stays in
-`graphics/`, no clip is placed, and an alert gives the first error and its
-line. A file that isn't UTF-8 text is refused.
+the project is not undone. If the module doesn't compile, no clip is placed:
+the dialog stays open with the first error and its line under the lists (for
+From File…, an alert says it); a template's copy stays in `graphics/`. A file
+that isn't UTF-8 text is refused.
 
-The menu items are greyed until the project's window is open.
+Insert ▸ Graphic… is greyed until the project's window is open.
 
-*Agents:* `write_graphic` then `add_graphic_clip` (`track`, `at`, `name`, and
-optionally `duration`, `width`, `height`, `props`).
+*Agents:* `list_graphics` lists what the dialog shows, and `insert_graphic`
+(`name`, `from`: `template` or `project`) is its Insert; or `write_graphic`
+then `add_graphic_clip` (`track`, `at`, `name`, and optionally `duration`,
+`width`, `height`, `props`).
 
 ## The Graphic sub-tab
 
@@ -311,8 +336,8 @@ can take the paste, it beeps.
 Copying and pasting a graphic clip (⌘C, ⌘V) pastes a clip that names its
 module; the module's `.js` file, fonts and pictures are not copied. In a
 project without that module, the pasted clip draws the red error card until
-you add the module under the same name, for example with **Insert ▸ Graphic ▸
-From File…** on a file of that name.
+you add the module under the same name, for example with **Insert ▸ Graphic…**'s
+**From File…** on a file of that name.
 
 *Agents:* `paste_attributes` with `groups: ["graphic"]`.
 

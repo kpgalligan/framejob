@@ -40,6 +40,10 @@ interface Meta {
   name?: string;
   /** The default length of a new clip, in frames. */
   durationInFrames?: number;
+  /** The Insert ▸ Graphic… dialog's category for it; else "Other". */
+  category?: string;
+  /** One line shown under the dialog's preview. */
+  description?: string;
 }
 
 interface SchemaCommon {

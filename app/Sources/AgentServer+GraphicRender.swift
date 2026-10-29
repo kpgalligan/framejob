@@ -227,7 +227,7 @@ extension AgentServer {
     }
 
     /// `recipe_graphic.rs`'s ctx for `frame` of a `length`-frame graphic.
-    private static func graphicContext(
+    static func graphicContext(
         frame: Int, fps: Fps, length: Int, width: Int, height: Int, canvas: CanvasSnapshot
     ) -> [String: Any] {
         let rate = fps.double

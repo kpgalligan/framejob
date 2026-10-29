@@ -143,7 +143,7 @@ enum GraphicContactSheet {
     }
 
     /// 16 px squares of (128,128,128) and (192,192,192), from the top left.
-    private static func paintChecker(_ context: CGContext, width: Int, height: Int) {
+    static func paintChecker(_ context: CGContext, width: Int, height: Int) {
         let side = 16
         context.setFillColor(CGColor(srgbRed: 128 / 255, green: 128 / 255, blue: 128 / 255, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))

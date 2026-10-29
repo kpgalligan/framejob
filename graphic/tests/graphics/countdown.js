@@ -4,6 +4,8 @@
 // the end.
 export const meta = {
   name: "Countdown",
+  category: "Data & Time",
+  description: "A timer counting down or up inside a ring, flashing at the end.",
   durationInFrames: 330,
 };
 

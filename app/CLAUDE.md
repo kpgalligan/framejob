@@ -491,8 +491,10 @@ detail there.
   — `GraphicFontIdentity`, `GraphicFontVerdict` and the scan's font pass,
   `validatedFonts(_:)`, queue only. `GraphicTemplates.swift` — pure: the
   bundled `GraphicTemplates/` modules (copied by `project.yml`'s post-build
-  script), their titles from the file stem (never compiled — every chrome
-  probe builds the menu bar) and a stem sanitised to a legal module name.
+  script), their titles from the file stem (never compiled by the menu bar —
+  every chrome probe builds it; the browser's titles come from `meta.name`
+  through `GraphicCatalog`, with `title(for:)` the fallback) and a stem
+  sanitised to a legal module name.
   `GraphicStore+Manual.swift` — the
   manual: `manualNames` (`API.md`, `API.d.ts`), `bundledManualNames`
   (`GraphicsAPI.md`, `GraphicsAPI.d.ts`, copied into Resources by
@@ -595,11 +597,17 @@ the key map behind it.
   appends the plan too.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one;
   `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
-  when the edit lands outside the menu's event, as a panel's completion does),
-  `+GraphicMenus` (Insert ▸ Graphic's templates and From File…, File ▸ Add
-  Font/Image to Graphics…; the template item runs in-event through
-  `applyEdit`, the panels through `performGroupedEdit`; the shared body
-  `insertGraphic(from:grouped:) throws` shows no dialog, and a module that
+  when the edit lands outside the menu's event, as a panel's completion does;
+  `static generatedClipOps(in:_:)` is the track choice alone, which
+  `insert_graphic` uses),
+  `+GraphicMenus` (Insert ▸ Graphic… — `showGraphicBrowser`, the ONE
+  `presentAsSheet` of `GraphicBrowserSheetController` — and the browser's
+  From File…, File ▸ Add Font/Image to Graphics…; `insertGraphicFromFile` is
+  no longer an action, the browser calls it; the sheet's Insert runs in-event
+  through `applyEdit`, the panels through `performGroupedEdit`; the shared
+  bodies `insertGraphic(from:grouped:) throws` and
+  `insertProjectGraphic(named:grouped:) throws` delegate to
+  `ProjectDocument+GraphicInsert.swift` and show no dialog, and a module that
   does not compile stays on disk and places nothing — G-16; a file that is not
   UTF-8 is refused by name before anything is written (#75); Add Image to
   Graphics…'s body is `addGraphicImage(from:) throws` (no panel), which
@@ -1352,7 +1360,8 @@ the key map behind it.
   `.graphicsDidChange` — a NEW library and every module recompiled only when
   `library` is true (or the last library failed to build), else just the
   named modules against the existing (frozen) library. `install`/`update`/
-  `remove`/`entry` are main-only; `resolve` is the one cross-thread read of
+  `remove`/`entry` are main-only (`compile` is internal: the browser's
+  `GraphicTemplateLibrary` compiles the templates with it); `resolve` is the one cross-thread read of
   the set: a document's own key at the 250 ms preview budget, a PINNED
   offline key at 2 s, else nil — the slate. **An offline key draws only what
   its caller pinned** (`pin(set, for: key)` with the document's
@@ -2300,7 +2309,27 @@ free.
   unchanged name, nothing to list). The pop-up's rows are `NSMenuItem`s
   carrying the name in `representedObject`. `graphics_menu_proof.py`'s ten
   phase-2 mutants each replace one of its lines (or of `+GraphicFiles`' and
-  `AppDelegate+GraphicMenu`'s), asserted to occur once.
+  `AppDelegate+GraphicMenu`'s), asserted to occur once; its seven browser
+  mutants replace lines of `GraphicCatalog.swift`,
+  `GraphicBrowserSheetController.swift`, `+GraphicMenus` and
+  `ProjectDocument+GraphicInsert.swift` the same way.
+- `GraphicCatalog.swift` — spec §11 G-45's list: categories, titles,
+  descriptions and This Project, in ONE order for the sheet and
+  `list_graphics`, a title another This Project item shares shown
+  `<title> — <name>`; and `GraphicTemplateLibrary`, the templates compiled
+  once per process, first read on main, `NSLock`-memoised (the menu bar never
+  reads it). `GraphicBrowserSheetController.swift` — Insert ▸ Graphic…'s
+  sheet: categories, graphics, the preview, From File… at the far left,
+  Cancel and Insert. Insert calls the editor's bodies in-event
+  (`applyEdit`) and shows a throw word for word in
+  `graphicbrowser.message`; `viewDidDisappear` stops the player and begins
+  From File…'s panel there (a sheet just dismissed is still the window's
+  `attachedSheet` a turn later — `ReverseProgressSheetController`'s reason).
+  `GraphicPreviewPlayer.swift` — one 8 MiB `Thread` per player and an
+  `NSCondition`; no AppKit or document off main; a main hop per frame for the
+  newest subject only. `ProjectDocument+GraphicInsert.swift` —
+  `writeGraphicModule`, `graphicClipMaker` and `noGraphicsFolderSentence`,
+  the bodies the sheet and `insert_graphic` share.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
@@ -2575,10 +2604,13 @@ free.
   `graphic_reference` (the bundled `GraphicsAPI.md`; it calls `target(a)` only
   when given a non-null `project`, so it answers with no project open and
   refuses a path no open project is at, G-20 (e)) — and `graphicsSummary`,
-  `get_project`'s `graphics`. `+GraphicRender` is `render_graphic`, an
+  `get_project`'s `graphics`. `+GraphicBrowser` is `list_graphics` and
+  `insert_graphic` (spec §11 G-45), thin over `GraphicCatalog` and
+  `ProjectDocument+GraphicInsert.swift`. `+GraphicRender` is `render_graphic`, an
   `offMainTools` member: one `onMain` for the target, the registry's
   compiled module, the canvas and `meta`; then, off main, the ctx built by
-  hand (`recipe_graphic.rs`'s keys) and a contact sheet or one frame's SVG;
+  hand in `graphicContext` (`recipe_graphic.rs`'s keys; internal, the
+  browser preview builds its ctx with it) and a contact sheet or one frame's SVG;
   `format` is read first, and svg refuses a non-null `path`, `background` or
   `max_width` by name (G-19 (a)); a frame past `durationInFrames` is drawn,
   `progress` clamped at 1 (G-19 (b)); a png sheet past
@@ -2604,7 +2636,8 @@ free.
   `notUndoableNote` stays for the two imports. `GraphicContactSheet.swift` is pure: the
   layout (the scale is over the cells alone, so the sheet is exactly
   `width × height ≤ max_width × maxSide`, `maxSide` being
-  `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
+  `GraphicLibrary.maxSide`), `maxCellPixels`, the painter (its
+  `paintChecker` internal, the browser preview's checker too) and
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
   +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0 —, +`Graphics`,
@@ -2650,7 +2683,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all ninety-eight
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -3224,7 +3257,10 @@ and the only place the armed writer and the warm-up are touched), the screen
 frame watch's sample handler queue (`ScreenFrameWatch.queue`, the `.screen`
 output's, with everything it shares with main under its `lock`; CAM-9), and — not a
 queue but a seam all the same — the graphic
-prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36). Beyond the camera's
+prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36), and the
+graphic browser's preview player — one `Thread` per player
+(`GraphicPreviewPlayer.swift`, G-45) and its `DispatchQueue.main.async`
+frame hop. Beyond the camera's
 two and the frame watch's, the recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

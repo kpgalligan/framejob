@@ -81,7 +81,8 @@ deliverables, with Show SDR Version to preview the last.
 → [HDR and colour management](docs/guide/hdr-and-color.md)
 
 **Motion graphics.** Graphic clips drawn every frame by a small JavaScript
-module: 23 built-ins: charts, a gauge and timers, screencast keys and window
+module: 23 built-ins, browsed by category with a live looping preview in the
+Graphic dialog: charts, a gauge and timers, screencast keys and window
 frames, title, quote and logo cards, and social pop-ups; properties as
 inspector controls, your own modules too.
 → [Motion graphics](docs/guide/graphics.md)

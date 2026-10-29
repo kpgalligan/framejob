@@ -170,13 +170,16 @@ AppKit would otherwise list it a second time under its own title — Bring All
 to Front), Help (Frame Job Help, Graphics Reference — road map 10's G5b: the
 bundled `GraphicsAPI.md` opened in the person's own app, live while the
 bundle holds it, with no document needed).
-Road map 10's G5b adds **Insert**, right after Edit, holding **Graphic ▸**:
-one item per bundled template (the twenty-three of `graphic/tests/graphics/`, copied
-into the app's `GraphicTemplates/`, titled from the file stem —
-`lower-third.js` is Lower Third — never by compiling it), a separator and
-From File…; and File gains **Add Font to Graphics…** and **Add Image to
-Graphics…** right after Consolidate Media…. None of the twenty-seven items takes a
-key equivalent, for the caption items' reason; §11 G-16 has the rules.
+Road map 10's G5b adds **Insert**, right after Edit, and File gains **Add
+Font to Graphics…** and **Add Image to Graphics…** right after Consolidate
+Media…. Since §11 G-45 Insert holds one graphics item, **Graphic…**, which
+puts up the graphic browser: a sheet listing This Project (when the package
+holds a module) and the bundled templates by category, the chosen
+graphic's looping preview, title and description, From File… at the bottom
+left (a `.js` chosen in an open panel once the sheet is down), and Cancel
+(Esc) and Insert (Return; a double-click on a graphic is Insert) at the
+right. None of these items takes a key equivalent, for the caption items'
+reason; §11 G-16 and G-45 have the rules.
 Issue batch B84 (#103) adds, after a separator straight under Add Image to
 Graphics… and before the separator above Export…, **Rename Graphic…**,
 **Delete Graphic…** and **Restore Graphic Version…**, in that order and
@@ -186,7 +189,7 @@ Delete are greyed in a project with no graphics, Restore when no version
 of any graphic is kept, and Rename also while a nest is open; §11 G-30 has
 the rules.
 Grading GR4b puts **Adjustment Clip** first in Insert, above
-Graphic ▸, with no key equivalent: one adjustment clip over the In/Out range,
+Graphic…, with no key equivalent: one adjustment clip over the In/Out range,
 else the selected clips' span, else the whole timeline, on the front track
 when it takes the clip and is not a matte, else on a new front track named
 "Adjustment"; one undo step, "Add Adjustment Clip", the new clip selected and

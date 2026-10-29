@@ -187,9 +187,8 @@ row("C0", c0Window && c0Clear && c0Add,
 // MARK: - V1 — with E1 attached, every editor door to a site validates false
 
 let actions = ["exportCaptions:", "importCaptions:", "addImageBackground:", "addMediaFiles:",
-               "consolidateMedia:", "insertGraphicFromFile:", "addGraphicFont:",
-               "addGraphicImage:", "insertGraphicTemplate:", "setTransitionKind:", "saveFrame:",
-               "removeTrack:"]
+               "consolidateMedia:", "showGraphicBrowser:", "addGraphicFont:",
+               "addGraphicImage:", "setTransitionKind:", "saveFrame:", "removeTrack:"]
 fresh()
 doc.present(probeError("probe alert one"))
 if let e1 = newSheet(5, after: []) {

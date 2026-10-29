@@ -1,13 +1,15 @@
 // app/Sources/GraphicTemplates.swift — the graphic modules the app bundles
 // as templates (road map 10's G5b): `graphic/tests/graphics/*.js`, copied
 // into `Contents/Resources/GraphicTemplates/` by project.yml's "Copy Graphic
-// Templates" script. Insert ▸ Graphic lists them; choosing one writes it into
-// the package's `graphics/` under a free name and places a clip drawn by it.
+// Templates" script. Insert ▸ Graphic… lists them by category
+// (`GraphicCatalog.swift`, spec §11 G-45); inserting one writes it into the
+// package's `graphics/` under a free name and places a clip drawn by it.
 //
-// **A template's title comes from its FILE STEM, never from compiling it**:
-// the menu bar is built by chrome probes that instantiate
-// `AppDelegate()` with no engine work in sight, and a stem is always there.
-// A missing folder lists nothing.
+// **`list(in:)` compiles nothing**: it reads the folder, and a template's
+// `title` here is its FILE STEM's. The browser's titles come from each
+// template's `meta.name` (`GraphicTemplateLibrary` compiles them once, when
+// the browser first opens); `title(for:)` is the fallback for a module with
+// no `meta.name`. A missing folder lists nothing.
 
 import Foundation
 

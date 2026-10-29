@@ -3,6 +3,8 @@
 // fading up in turn, and a rule and attribution sliding in.
 export const meta = {
   name: "Quote card",
+  category: "Titles & Text",
+  description: "A full card with a quote fading up line by line, attributed.",
   durationInFrames: 150,
 };
 

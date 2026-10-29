@@ -19,7 +19,9 @@ import Foundation
 /// `get_graphic` and `graphic_reference`; G4b three more the same way:
 /// `render_graphic`, `import_graphic_font` and `import_graphic_asset`; and
 /// issue batch B84 (#103) three more after those: `delete_graphic`,
-/// `rename_graphic` and `restore_graphic` (spec §11 G-27, G-28, G-29).
+/// `rename_graphic` and `restore_graphic` (spec §11 G-27, G-28, G-29); and
+/// the graphic browser two after those, the Insert ▸ Graphic… sheet's acts:
+/// `list_graphics` and `insert_graphic` (spec §11 G-45).
 extension AgentServer {
     /// The graphic rows, given the sentences the clip group already hoisted.
     func graphicTools(
@@ -36,7 +38,8 @@ extension AgentServer {
                     + "is now; a key the schema lacks, a wrong type or a value out of range "
                     + "is refused by its dotted path. Like a shape it has no source: "
                     + "set_graphic changes what it is drawn from, set_video places it. "
-                    + "Insert ▸ Graphic is write_graphic of a template then this op.",
+                    + "Insert ▸ Graphic… (insert_graphic) is write_graphic of a template "
+                    + "then this op.",
                 [
                     "track": trackDescription,
                     "at": "Start, \(ticks)",
@@ -300,6 +303,42 @@ extension AgentServer {
                             + "lists them). Default: the newest kept.",
                     ],
                 ], required: ["name"]),
+            tool(
+                "list_graphics",
+                "Lists the graphics Insert ▸ Graphic… offers, in the dialog's order: "
+                    + "categories [{name, graphics: [{name, title, description, category, from, "
+                    + "ok}]}]. \"This Project\" comes first when the project's graphics/ holds a "
+                    + "module, listing every one of them whatever its own category; then the app's "
+                    + "bundled templates by category (each module's meta.category, else "
+                    + "\"Other\", which is last). title is the module's meta.name, else its name "
+                    + "made a title; two This Project graphics with one title are shown as "
+                    + "\"<title> — <name>\". from is template or project — what insert_graphic "
+                    + "takes with name; ok is false for a module that does not compile.",
+                [:]),
+            tool(
+                "insert_graphic",
+                "Places a graphic clip at the playhead, as Insert ▸ Graphic…'s Insert does: on "
+                    + "the front track when it fits there, else on a new track above everything, "
+                    + "at the module's meta duration and size, as ONE undo step (Insert Graphic). "
+                    + "A template (from template) is first copied into graphics/ under a free "
+                    + "name (lower-third, lower-third-2, …), which is not undoable; a project "
+                    + "module (from project) is placed as it is, with no copy. name in the "
+                    + "reply is the module the clip is drawn by. A module that does not compile "
+                    + "places nothing and is refused with its first error; the template's copy "
+                    + "stays in graphics/. With a nest open the clip lands inside it. "
+                    + "list_graphics lists what there is.",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The graphic's name as list_graphics gives it: a template's "
+                            + "or a module's.",
+                    ],
+                    "from": [
+                        "type": "string", "enum": ["template", "project"],
+                        "description": "template: one of the app's bundled templates. project: a "
+                            + "module already in the project's graphics/.",
+                    ],
+                ], required: ["name", "from"]),
         ]
     }
 }

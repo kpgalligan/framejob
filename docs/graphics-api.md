@@ -44,7 +44,11 @@ export function render(frame, props, ctx) {
 - `render(frame, props, ctx)` is required. It must return a string that
   starts with `<svg`; use `svg(ctx, body)` to write the root element.
 - `meta` is optional (`{}` when absent). `name` and `durationInFrames` are
-  read from it.
+  read from it, and two keys only the Insert ▸ Graphic… dialog reads:
+  `category`, the list the graphic is filed under (a string; "Other" when
+  absent or blank), and `description`, one line shown under the dialog's
+  preview. A module in the project's `graphics/` is listed under This
+  Project whatever its `category`.
 - `schema` is optional (`{}` when absent). It declares the props (below).
 - The module is the only source of code: no `import`, no `eval`, no
   `Function`. The standard library below is already global.

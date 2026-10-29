@@ -4,6 +4,8 @@
 // arrow — popping as its count ticks up by one.
 export const meta = {
   name: "Social popup",
+  category: "Social & YouTube",
+  description: "A like, comment or share notification rising in at a corner.",
   durationInFrames: 120,
 };
 

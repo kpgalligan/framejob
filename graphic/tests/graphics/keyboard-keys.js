@@ -4,6 +4,8 @@
 // vector glyphs, never taken from a font.
 export const meta = {
   name: "Keyboard keys",
+  category: "Screencast",
+  description: "A keyboard shortcut as keycaps pressed in turn, with a label.",
   durationInFrames: 90,
 };
 

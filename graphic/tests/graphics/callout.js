@@ -2,6 +2,8 @@
 // stroke-dasharray draw-on) and an arrow, over a transparent background.
 export const meta = {
   name: "Callout",
+  category: "Screencast",
+  description: "A circle drawing itself round a spot, with an arrow and a label.",
   durationInFrames: 90,
 };
 

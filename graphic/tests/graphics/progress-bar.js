@@ -3,6 +3,8 @@
 // percentage counting and one shine sweeping across.
 export const meta = {
   name: "Progress bar",
+  category: "Data & Time",
+  description: "A labelled bar filling to a value, the percentage counting.",
   durationInFrames: 120,
 };
 

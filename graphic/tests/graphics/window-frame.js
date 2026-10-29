@@ -4,6 +4,8 @@
 // outline. The content area stays transparent.
 export const meta = {
   name: "Window frame",
+  category: "Screencast",
+  description: "A browser or window frame to sit over a screen recording.",
   durationInFrames: 150,
 };
 

@@ -4,6 +4,8 @@
 // centred under them in landscape and square, a column in portrait, under a title.
 export const meta = {
   name: "End screen",
+  category: "Social & YouTube",
+  description: "An end screen card with two video spaces and a subscribe circle.",
   durationInFrames: 300,
 };
 

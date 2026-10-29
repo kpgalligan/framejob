@@ -3,6 +3,8 @@
 // rule drawing across and the title revealed upward.
 export const meta = {
   name: "Chapter card",
+  category: "Titles & Text",
+  description: "A full card with a large chapter number and a title.",
   durationInFrames: 120,
 };
 

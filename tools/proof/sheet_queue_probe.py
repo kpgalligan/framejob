@@ -20,7 +20,7 @@ Rows:
   B0   the probe builds.
   C0   CONTROL: `windowForSheet` is the window, no sheet is attached, and
        `addMediaFiles:` validates true.
-  V1   with E1 attached, each of the twelve editor actions that lead to a
+  V1   with E1 attached, each of the eleven editor actions that lead to a
        site validates false.
   P1   an `NSOpenPanel` sheet is up, E1 is presented and waits; the panel is
        cancelled, and its completion handler records whether E1 is attached

@@ -2,6 +2,8 @@
 // thousands separator, in IBM Plex Mono.
 export const meta = {
   name: "Counter",
+  category: "Data & Time",
+  description: "A number counting up, with a prefix and a label.",
   durationInFrames: 90,
 };
 

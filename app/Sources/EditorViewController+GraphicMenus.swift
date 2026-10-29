@@ -1,38 +1,43 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// The graphics menu commands (road map 10's G5b): Insert ▸ Graphic ▸ a
-/// bundled template or From File…, and File ▸ Add Font to Graphics… and Add
-/// Image to Graphics…. Each is the same code its MCP tool runs.
+/// The graphics menu commands (road map 10's G5b; spec §11 G-45): Insert ▸
+/// Graphic…, the sheet (`GraphicBrowserSheetController.swift`) and its From
+/// File…, and File ▸ Add Font to Graphics… and Add Image to Graphics…. Each
+/// is the same code its MCP tool runs.
 ///
-/// **Insert ▸ Graphic is `write_graphic` then `add_graphic_clip`** (spec
-/// §7.9): the module is written into the package's `graphics/` under a free
-/// name (`GraphicStore.uniqueModuleName`, spec §11 G-16 (b)), the folder is
-/// rescanned so the registry has compiled THAT text, and one clip is placed
-/// by `addGeneratedClip`'s rule — the front track if it fits, else a new track
-/// above everything, Add Text's rule (G-16 (a)) — at the module's `meta`
-/// duration and size. A module that does not compile stays on disk and
-/// places nothing (G-16 (c)); the file write is not undoable (G-3) and the
-/// clip is one undo step, "Insert Graphic".
+/// **Insert is `write_graphic` then `add_graphic_clip`** (spec §7.9) for a
+/// template or a chosen `.js`: the module is written into the package's
+/// `graphics/` under a free name and the folder rescanned
+/// (`ProjectDocument.writeGraphicModule`, G-16 (b)), and one clip is placed
+/// by `addGeneratedClip`'s rule — the front track if it fits, else a new
+/// track above everything, Add Text's rule (G-16 (a)) — at the module's
+/// `meta` duration and size (`ProjectDocument.graphicClipMaker`). A This
+/// Project graphic is the clip alone, no copy (G-45 (f)). A module that does
+/// not compile places nothing (G-16 (c)); the file write is not undoable
+/// (G-3) and the clip is one undo step, "Insert Graphic". `insert_graphic`
+/// calls the same two document bodies.
 ///
-/// The template item runs INSIDE its menu event, so `applyEdit`; the two
+/// The sheet's Insert runs INSIDE its button's event, so `applyEdit`; the
 /// panels' completions are OFF-EVENT, so `performGroupedEdit` (app/CLAUDE.md's
-/// undo pitfall). `rescan()` is called here, from the command, never from a
+/// undo pitfall). `rescan()` is called from the command, never from a
 /// `.graphicsDidChange` observer.
 extension EditorViewController {
 
-    /// Insert ▸ Graphic ▸ <template>: the item's `representedObject` is the
-    /// template's URL (`AppDelegate+GraphicMenu.swift`).
-    @objc func insertGraphicTemplate(_ sender: Any?) {
-        guard let url = (sender as? NSMenuItem)?.representedObject as? URL else {
+    /// Insert ▸ Graphic…: the browser, as a sheet on the editor's window.
+    @objc func showGraphicBrowser(_ sender: Any?) {
+        guard let document = document, document.graphicStore != nil else {
             NSSound.beep()
             return
         }
-        reportingGraphicFailure { try insertGraphic(from: url, grouped: false) }
+        let sheet = GraphicBrowserSheetController(document: document, editor: self)
+        presentAsSheet(sheet)
     }
 
-    /// Insert ▸ Graphic ▸ From File…: a `.js` chosen in a panel.
-    @objc func insertGraphicFromFile(_ sender: Any?) {
+    /// The sheet's From File…: a `.js` chosen in a panel. Called from the
+    /// browser's `viewDidDisappear`, once the browser is down, so the panel
+    /// is the sheet that follows it.
+    func insertGraphicFromFile(_ sender: Any?) {
         guard document?.graphicStore != nil, let window = view.window else {
             NSSound.beep()
             return
@@ -84,58 +89,26 @@ extension EditorViewController {
     /// The body, no dialog: write `url`'s module under a free name, rescan,
     /// and place a clip drawn by it — or throw the sentence saying why not.
     func insertGraphic(from url: URL, grouped: Bool) throws {
-        guard let document = document, let store = document.graphicStore else {
-            throw ReelCoreError(
-                message: "This project has no graphics folder open (its window has not been made)")
+        guard let document = document else {
+            throw ReelCoreError(message: ProjectDocument.noGraphicsFolderSentence)
         }
-        let bytes: Data
-        do {
-            bytes = try Data(contentsOf: url)
-        } catch {
-            throw ReelCoreError(
-                message: "\(url.path) could not be read: \(error.localizedDescription)")
-        }
-        guard let source = String(data: bytes, encoding: .utf8) else {
-            throw ReelCoreError(
-                message: "\(url.path) is not UTF-8 text — a graphic module must be UTF-8 "
-                    + "JavaScript")
-        }
-        let name = store.uniqueModuleName(
-            GraphicTemplates.moduleName(from: url.deletingPathExtension().lastPathComponent))
-        try store.write(name: name, source: source)
-        store.rescan()
-        let entry = GraphicRegistry.shared.entry(named: name, for: document.recipeKey)
-        guard case .compiled(_, _, let meta, let schema)? = entry else {
-            var first: GraphicDiagnostic?
-            if case .failed(let diagnostics, _)? = entry { first = diagnostics.first }
-            let line = first?.line.map { " (line \($0))" } ?? ""
-            throw ReelCoreError(
-                message: "graphics/\(name).js was written but does not compile: "
-                    + (first?.message ?? "no diagnostic") + line)
-        }
-        let frame = max(document.project.snapshot.canvas.fps.frameDuration, 1)
-        let duration: Ticks?
-        let width: UInt32?
-        let height: UInt32?
-        do {
-            duration = try AgentServer.metaWhole(
-                meta, "durationInFrames", name, in: 1...Int.max / Int(frame)
-            ).map { Ticks($0) * frame }
-            width = try AgentServer.metaWhole(meta, "width", name, in: AgentServer.sides)
-                .map(UInt32.init)
-            height = try AgentServer.metaWhole(meta, "height", name, in: AgentServer.sides)
-                .map(UInt32.init)
-        } catch let error as AgentServer.ToolError {
-            throw ReelCoreError(message: error.message)
-        }
-        addGeneratedClip(named: "Insert Graphic", grouped: grouped) { track, at in
-            .addGraphicClipRaw(
-                track: track, at: at, duration: duration, name: name, width: width,
-                height: height, props: nil, schema: schema)
-        }
+        let written = try document.writeGraphicModule(from: url)
+        let make = try document.graphicClipMaker(named: written)
+        addGeneratedClip(named: "Insert Graphic", grouped: grouped, make)
     }
 
-    /// The menu arms for the four, answered from `validateUserInterfaceItem`'s
+    /// A This Project graphic placed: a clip drawn by `graphics/<name>.js`
+    /// as it is, no copy written (spec §11 G-45 (f)) — or the sentence
+    /// saying why not.
+    func insertProjectGraphic(named name: String, grouped: Bool) throws {
+        guard let document = document else {
+            throw ReelCoreError(message: ProjectDocument.noGraphicsFolderSentence)
+        }
+        let make = try document.graphicClipMaker(named: name)
+        addGeneratedClip(named: "Insert Graphic", grouped: grouped, make)
+    }
+
+    /// The menu arms for the three, answered from `validateUserInterfaceItem`'s
     /// default case: each needs the document's graphics store, which
     /// `startGraphicStore()` makes with the window. Any other action is
     /// forwarded to `validateGraphicFileAction`, the arm for File ▸ Rename
@@ -144,8 +117,8 @@ extension EditorViewController {
     /// an action that is none of the three.
     func validateGraphicMenuAction(_ action: Selector) -> Bool? {
         switch action {
-        case #selector(insertGraphicTemplate(_:)), #selector(insertGraphicFromFile(_:)),
-            #selector(addGraphicFont(_:)), #selector(addGraphicImage(_:)):
+        case #selector(showGraphicBrowser(_:)), #selector(addGraphicFont(_:)),
+            #selector(addGraphicImage(_:)):
             return document?.graphicStore != nil
         default:
             return validateGraphicFileAction(action)

@@ -152,7 +152,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+GraphicMenus.swift `func addGraphicFont(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:157"
+    "app/Sources/EditorViewController+GraphicMenus.swift:145"
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
   },
@@ -160,7 +160,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+GraphicMenus.swift `@objc func addGraphicImage(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:157"
+    "app/Sources/EditorViewController+GraphicMenus.swift:145"
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
   },
@@ -316,20 +316,13 @@
    ],
    "note": "an edit"
   },
-  "insertGraphicTemplate:": {
-   "verdict": "none",
-   "code": [
-    "app/Sources/EditorViewController+GraphicMenus.swift `func insertGraphicTemplate(`"
-   ],
-   "note": "an edit; a template that fails to compile or place raises an alert SHEET (:169) inside the call"
-  },
-  "insertGraphicFromFile:": {
+  "showGraphicBrowser:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController+GraphicMenus.swift `func insertGraphicFromFile(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:45"
+    "app/Sources/EditorViewController+GraphicMenus.swift `@objc func showGraphicBrowser(`",
+    "app/Sources/EditorViewController+GraphicMenus.swift:34"
    ],
-   "note": "NSOpenPanel.beginSheetModal"
+   "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:50) from its viewDidDisappear"
   },
   "splitAtPlayhead:": {
    "verdict": "none",
@@ -1031,16 +1024,29 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:45": {
-   "token": "beginSheetModal",
-   "func": "insertGraphicFromFile",
+  "app/Sources/EditorViewController+GraphicMenus.swift:34": {
+   "token": "presentAsSheet",
+   "func": "showGraphicBrowser",
    "reached_from": [
-    "insertGraphicFromFile:"
+    "showGraphicBrowser:"
    ],
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:157": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:50": {
+   "token": "beginSheetModal",
+   "func": "insertGraphicFromFile",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showGraphicBrowser:",
+     "via": "app/Sources/GraphicBrowserSheetController.swift `editor?.insertGraphicFromFile(nil)`",
+     "gate": "app/Sources/GraphicBrowserSheetController.swift `if fromFilePending {` — the sheet's From File… was pressed, and the browser is down"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:145": {
    "token": "beginSheetModal",
    "func": "chooseGraphicFile",
    "reached_from": [
@@ -1050,17 +1056,15 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:174": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:162": {
    "token": "beginSheetModal",
    "func": "reportingGraphicFailure",
-   "reached_from": [
-    "insertGraphicTemplate:"
-   ],
+   "reached_from": [],
    "reached_after": [
     {
-     "selector": "insertGraphicFromFile:",
+     "selector": "showGraphicBrowser:",
      "via": "app/Sources/EditorViewController+GraphicMenus.swift `self?.reportingGraphicFailure { try self?.insertGraphic(from: url, grouped: true) }`",
-     "gate": "app/Sources/EditorViewController+GraphicMenus.swift `try body()` — the insert throws"
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift `try body()` — the From File… insert throws"
     },
     {
      "selector": "addGraphicFont:",
@@ -1075,7 +1079,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:195": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:172": {
    "token": "beginSheetModal",
    "func": "showGraphicNotice",
    "reached_from": [],

@@ -3,6 +3,8 @@
 // a text mark) that settles to size; the bar becomes a rule and a tagline fades up.
 export const meta = {
   name: "Logo reveal",
+  category: "Titles & Text",
+  description: "A full card wiping in a logo or text mark, and a tagline.",
   durationInFrames: 120,
 };
 

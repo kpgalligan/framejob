@@ -2,6 +2,8 @@
 // with a fade in and out.
 export const meta = {
   name: "Title card",
+  category: "Titles & Text",
+  description: "A long title fitted over a gradient, with a kicker.",
   durationInFrames: 120,
 };
 

@@ -2325,3 +2325,46 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   degenerate data (one point, an all-zero series, `max ≤ min`); and
   `project.yml`'s "Copy Graphic Templates" lists exactly the folder's
   `*.js` files.
+
+- **G-45 — Insert ▸ Graphic… is a dialog: categories, the graphics of
+  one, and a looping preview; a template declares its category and a
+  one-line description** (owner, 2026-10-29: a graphic browser in place of
+  the Insert ▸ Graphic submenu; phase 1 of 2, `.fjgraphic` export being
+  the second). Amends G-16.
+  (a) **A module's category** is `meta.category` when it is a string that
+  is not empty after trimming (trimmed), else "Other".
+  (b) **Every bundled template declares one** of Data & Time,
+  Screencast, Social & YouTube and Titles & Text, and a one-line
+  `meta.description` of at most 120 characters, held by
+  `graphic/tests/template_meta.rs` to (c)'s table.
+  (c) **The table.** Data & Time: bar-chart, counter, countdown,
+  donut-chart, gauge, line-chart, progress-bar. Screencast:
+  arrow-highlight, callout, keyboard-keys, step-badge, window-frame.
+  Titles & Text: chapter-card, kinetic-type, logo-reveal, lower-third,
+  news-ticker, quote-card, title-card. Social & YouTube: end-screen,
+  handle-tag, social-popup, subscribe-button.
+  (d) **The list.** This Project first, and only when the package's
+  `graphics/` holds a module: every project module, whatever its own
+  category. Then the templates' categories by case-insensitive name, Other
+  last. Within a category the graphics go by title case-insensitively,
+  then by name. `list_graphics` answers the same order.
+  (e) **The title** is `meta.name` when it is a non-empty string, else the
+  stem's title (`lower-third` → "Lower Third"). A This Project graphic whose
+  title equals another This Project graphic's, case-insensitively, is shown
+  as "<title> — <module name>", in the dialog and in `list_graphics` alike,
+  so two copies of one template can be told apart. The templates are now
+  COMPILED to read their `meta`, once per process, against the bundled
+  fonts; the menu bar still compiles nothing (chrome probes instantiate
+  `AppDelegate()`).
+  (f) **The door** is Insert ▸ Graphic…, a sheet (the submenu and its From
+  File… item are gone; From File… is the sheet's bottom-left button, and
+  its open panel follows once the sheet is down). Insert is G-16's act for
+  a template: the module written under a free name (G-16 (b)), then one
+  clip. For a This Project graphic it places a clip drawn by that module
+  and writes no copy. Either is one undo step "Insert Graphic". A module
+  that does not compile places nothing, and its sentence is
+  "graphics/<name>.js does not compile: <the first diagnostic> (line N)" — in the
+  dialog's message line, which stays up, or, for From File…, in a sheet
+  (G-16 (c)'s "was written but" is gone, since a This Project graphic was
+  not written). The agent's mirror is `list_graphics` and
+  `insert_graphic {name, from}`.

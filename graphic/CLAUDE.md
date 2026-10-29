@@ -126,7 +126,11 @@ The crate's record is road map 10 §10.4.
   --release --test pins`, only after looking at the PNGs a mismatch
   writes to `target/pins/`.
 - **The modules of `tests/graphics/` are the bundled templates** (Insert ▸
-  Graphic; project.yml's "Copy Graphic Templates" lists each). Every one
+  Graphic…; project.yml's "Copy Graphic Templates" lists each). Every one,
+  the six fixtures included, declares `meta.category` (one of spec §11
+  G-45 (c)'s four) and a one-line `meta.description` of at most 120
+  characters, held by `tests/template_meta.rs`, where a new template needs a
+  row in its `TABLE`. Every one
   except `common::FIXTURES` is held to spec §11 G-44 by
   `tests/templates.rs`: inside title-safe at every frame at 1920×1080,
   1080×1920 and 1080×1080, with defaults, every combination of `enum` options

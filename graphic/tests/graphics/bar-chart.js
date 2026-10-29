@@ -2,6 +2,8 @@
 // growing in sequence, labels.
 export const meta = {
   name: "Bar chart",
+  category: "Data & Time",
+  description: "Bars growing one after another, with labels and a title.",
   durationInFrames: 150,
 };
 

@@ -194,16 +194,16 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the thirty-six tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty-eight tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
     /// `detect_silence`, `transcribe`, `get_transcript`, `import_captions`, `export_captions`,
     /// `normalize_clip`, `sync_audio` — road map 3's `record_screen`, and road map 10's
-    /// nine graphics tools (`write_graphic`, `get_graphic`,
+    /// eleven graphics tools (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
-    /// `restore_graphic`). The count is
+    /// `restore_graphic`, `list_graphics`, `insert_graphic`). The count is
     /// not decoration: `prepareCatalog()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
@@ -270,6 +270,8 @@ final class AgentServer {
         "delete_graphic": { $0.deleteGraphic },
         "rename_graphic": { $0.renameGraphic },
         "restore_graphic": { $0.restoreGraphic },
+        "list_graphics": { $0.listGraphics },  // AgentServer+GraphicBrowser.swift
+        "insert_graphic": { $0.insertGraphic },
         "set_clip": { $0.setClip },
         "set_enabled": { $0.setEnabled },
         "set_transition": { $0.setTransition },

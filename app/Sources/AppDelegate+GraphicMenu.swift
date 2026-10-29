@@ -1,47 +1,31 @@
 import AppKit
 
-/// The menu bar's graphics rows (road map 10's G5b): the Insert menu and its
-/// Graphic submenu, and Help ▸ Graphics Reference's action; and File's three
+/// The menu bar's graphics rows (road map 10's G5b; spec §11 G-45): the
+/// Insert menu, and Help ▸ Graphics Reference's action; and File's three
 /// graphic-file items (spec §11 G-30, issue batch B84). Insert holds
-/// Adjustment Clip first, above Graphic (spec §11 GR-6): a nil-target
-/// selector the editor implements and validates
-/// (`EditorViewController+Adjustment.swift`), with no key equivalent.
+/// Adjustment Clip first (spec §11 GR-6), then one item, Graphic…, which
+/// puts up the graphic browser (`GraphicBrowserSheetController.swift`), whose
+/// From File… button replaced the old submenu's item. Both are nil-target
+/// selectors the editor implements and validates
+/// (`EditorViewController+Adjustment.swift`,
+/// `EditorViewController+GraphicMenus.swift`), with no key equivalent: every
+/// bare letter belongs to the editor's own `keyDown` (spec §9).
 ///
-/// **Insert ▸ Graphic lists the BUNDLED templates by file stem** —
-/// `GraphicTemplates.list(in:)`, never a compile, because chrome probes build
-/// this menu bar by instantiating `AppDelegate()` — then a separator and From
-/// File…. A missing `GraphicTemplates/` lists only From File…. Every item is
-/// a nil-target selector the editor implements and validates
-/// (`EditorViewController+GraphicMenus.swift`); a template item carries its
-/// URL in `representedObject`. No key equivalents: every bare letter belongs
-/// to the editor's own `keyDown` (spec §9).
+/// **The menu bar compiles nothing and lists no template**: chrome probes
+/// build it by instantiating `AppDelegate()`, and the browser compiles the
+/// templates (`GraphicTemplateLibrary`) only when it is opened.
 ///
 /// `showGraphicsReference` lives on the delegate, like `showSettings`, so it
 /// resolves with no document open; `AppDelegate.validateMenuItem` enables it
 /// while the bundled `GraphicsAPI.md` is there.
 extension AppDelegate {
 
-    /// "Insert", holding Adjustment Clip, then Graphic.
+    /// "Insert", holding Adjustment Clip, then Graphic….
     func insertMenu() -> NSMenu {
         let menu = NSMenu(title: "Insert")
         menu.addItem(
             item("Adjustment Clip", #selector(EditorViewController.insertAdjustmentClip(_:))))
-        menu.addItem(submenuItem(graphicMenu()))
-        return menu
-    }
-
-    /// "Graphic": one item per bundled template, a separator, From File….
-    func graphicMenu() -> NSMenu {
-        let menu = NSMenu(title: "Graphic")
-        for template in GraphicTemplates.list(in: GraphicTemplates.bundledDirectory) {
-            let row = item(
-                template.title, #selector(EditorViewController.insertGraphicTemplate(_:)))
-            row.representedObject = template.url
-            menu.addItem(row)
-        }
-        menu.addItem(.separator())
-        menu.addItem(
-            item("From File…", #selector(EditorViewController.insertGraphicFromFile(_:))))
+        menu.addItem(item("Graphic…", #selector(EditorViewController.showGraphicBrowser(_:))))
         return menu
     }
 

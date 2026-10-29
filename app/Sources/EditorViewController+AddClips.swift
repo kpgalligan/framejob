@@ -63,29 +63,37 @@ extension EditorViewController {
         // nest's (road map 2's phase 9). `add_media` is the one exception and
         // is called out where it happens.
         let before = document.editedProject.snapshot
-        let at = document.playhead
-
-        var ops: [ReelOp] = []
-        // `.project` on a `try?` collapses three answers into one nil: a
-        // throw, an identity and a rule's refusal. Either way the front track
-        // will not take this clip, so all of them take the new-track path.
-        if let front = before.tracks.last?.id,
-            (try? document.editedProject.applying(make(front, at))).project != nil
-        {
-            ops = [make(front, at)]
-        } else {
-            // The id of a newly added track is `next_id` from BEFORE the op —
-            // the documented contract of the one JSON op entry point, since
-            // `rc_project_apply` returns a project rather than an id.
-            // Index 0 is the BACK of the stack (§6), so the count is the front.
-            ops = [.addTrack(index: before.tracks.count), make(before.nextId, at)]
-        }
+        let ops = Self.generatedClipOps(in: document, make)
         if grouped {
             document.performGroupedEdit(name, ops)
         } else {
             document.applyEdit(name, ops)
         }
         selectClips(addedSince: before, in: document)
+    }
+
+    /// The track choice alone, no edit: `make` at the playhead on the
+    /// edited project's front track when it fits there, else a new track
+    /// above everything and `make` on it. `insert_graphic` places its clip
+    /// by it too (spec §11 G-16 (a), G-45 (f)).
+    static func generatedClipOps(
+        in document: ProjectDocument, _ make: (UInt32, Ticks) -> ReelOp
+    ) -> [ReelOp] {
+        let before = document.editedProject.snapshot
+        let at = document.playhead
+        // `.project` on a `try?` collapses three answers into one nil: a
+        // throw, an identity and a rule's refusal. Either way the front track
+        // will not take this clip, so all of them take the new-track path.
+        if let front = before.tracks.last?.id,
+            (try? document.editedProject.applying(make(front, at))).project != nil
+        {
+            return [make(front, at)]
+        }
+        // The id of a newly added track is `next_id` from BEFORE the op —
+        // the documented contract of the one JSON op entry point, since
+        // `rc_project_apply` returns a project rather than an id.
+        // Index 0 is the BACK of the stack (§6), so the count is the front.
+        return [.addTrack(index: before.tracks.count), make(before.nextId, at)]
     }
 
     /// Select whatever appeared, so the inspector opens on the new clip's own

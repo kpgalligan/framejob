@@ -63,13 +63,13 @@ extension AgentServer {
     /// `record_screen` — the four caption rows of them built in
     /// `AgentCatalog+Captions.swift`, `render_frame`, `export`,
     /// `export_status` and `cancel_export` in `AgentCatalog+Render.swift`,
-    /// `record_screen` in `AgentCatalog+Recording.swift`) and the nine of
+    /// `record_screen` in `AgentCatalog+Recording.swift`) and the eleven of
     /// `AgentCatalog+Graphics.swift` (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
-    /// `restore_graphic`). Every
+    /// `restore_graphic`, `list_graphics`, `insert_graphic`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all ninety-eight get `project`
+    /// through here, so this is still where all one hundred get `project`
     /// and where all sixty-two get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
@@ -166,7 +166,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of ninety-eight
+    /// decode behind it happen once per process instead of one hundred
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be

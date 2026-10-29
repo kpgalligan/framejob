@@ -3,6 +3,8 @@
 // at each, an area fill behind and the last value called out.
 export const meta = {
   name: "Line chart",
+  category: "Data & Time",
+  description: "A line drawn through its points, the last value called out.",
   durationInFrames: 150,
 };
 

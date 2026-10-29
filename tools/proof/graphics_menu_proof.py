@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Road map 10, G5b — Insert ▸ Graphic (the bundled templates and From
-File…), File ▸ Add Font to Graphics… and Add Image to Graphics…, Help ▸
-Graphics Reference — and issue batch B84's phase 2 (#103, spec §11 G-30):
-File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version… and
-their one sheet — against the built app and a probe.
+"""Road map 10, G5b — Insert ▸ Graphic… (since spec §11 G-45 the graphic
+browser: categories, graphics, a looping preview, From File…), File ▸ Add
+Font to Graphics… and Add Image to Graphics…, Help ▸ Graphics Reference —
+and issue batch B84's phase 2 (#103, spec §11 G-30): File ▸ Rename
+Graphic…, Delete Graphic… and Restore Graphic Version… and their one sheet
+— against the built app and a probe.
 
     python3 tools/proof/graphics_menu_proof.py [--app PATH]
     python3 tools/proof/graphics_menu_proof.py --mutant <name>
@@ -34,35 +35,64 @@ with `Fonts/`, `GraphicTemplates/` (from `graphic/tests/graphics/`) and
 COPIES of GM and a COPY of GF (`files`):
 M1  the probe builds (a failure is scored, never an exit);
 M2  `AppDelegate().buildMainMenu()`: Insert right after Edit, holding
-    Adjustment Clip then Graphic; Insert ▸ Graphic is the 23 templates by
-    title, sorted by stem (Arrow Highlight, Bar Chart, Callout, Chapter Card,
-    Countdown, Counter, Donut Chart, End Screen, Gauge, Handle Tag, Keyboard
-    Keys, Kinetic Type, Line Chart, Logo Reveal, Lower Third, News Ticker,
-    Progress Bar, Quote Card, Social Popup, Step Badge, Subscribe Button,
-    Title Card, Window Frame), a
-    separator, From File…; each template's `representedObject` a URL whose
-    bytes equal the source file;
+    Adjustment Clip then Graphic…, one item with no submenu whose action is
+    `showGraphicBrowser:` (spec §11 G-45 (f));
 M3  File holds Add Font to Graphics… then Add Image to Graphics… right after
     Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none
-    of the twenty-seven new items has a key equivalent;
-M4  with no window `NSApp.target(forAction:)` is nil for the four editor
+    of the four items (Graphic…, the two Adds, Graphics Reference) has a key
+    equivalent;
+M4  with no window `NSApp.target(forAction:)` is nil for the three editor
     selectors; `validateMenuItem` is true for Graphics Reference and false
     once the copied `GraphicsAPI.md` is moved away (CONTROL);
-M5  an `EditorViewController` over the document: the four validate false
+M21 (G-45 (a)) `GraphicCatalog.category(meta:)` is Other for `{}`, a blank
+    string and a number, and "Screencast" for " Screencast "; an item with
+    no meta is Other, titled from its stem, not ok;
+M22 (G-45 (d)) `categories(templates:project:)` over six fixture templates
+    and no project item: no This Project, the categories by case-insensitive
+    name, Other last, each graphic by title case-insensitively then name;
+M23 the same with three project items: This Project first, listing all
+    three whatever their own category, the two titled "Lower third" /
+    "lower third" read "<title> — <name>" (G-45 (e));
+M5  an `EditorViewController` over the document: the three validate false
     before `startGraphicStore()` and true after;
-M6  playhead 2 s, `insertGraphicTemplate` with the Lower Third item:
+
+The browser rows drive `GraphicBrowserSheetController` through its own
+controls, found by accessibility identifier (`graphicbrowser.*`): the
+editor's `showGraphicBrowser(nil)`, a table row selected, a button's own
+action sent to its own target.
+M24 the browser opens on the first category (Data & Time; no This Project on
+    a package with no module) and its first graphic, the title shown, Insert
+    enabled; the tables' rows, category by category, equal
+    `GraphicCatalog.categories(for:)`;
+M25 the preview's image view has a picture within 3 s, drawn on the
+    player's own thread (no frame on main);
+M26 with the graphic deselected Insert is disabled and the title cleared;
+M27 Cancel (Esc) closes it and writes nothing: no module, no clip, no step;
+M6  playhead 2 s, Titles & Text ▸ Lower third, Insert: the browser closes,
     `graphics/lower-third.js` byte-equal to the template, one clip added named
     lower-third at 1 200 000 lasting 3 000 000, undo name "Insert Graphic"; a
     run-loop turn leaves `groupingLevel == 0`; one undo removes the clip, the
     file remains, `canUndo` is then false;
-M7  the same item again: `lower-third-2.js` and a clip named `lower-third-2`;
-    a run-loop turn, level 0 — a CLOSED step before M8;
+M28 after that Insert the player's render thread has exited within 2 s;
+M7  the same graphic again: `lower-third-2.js` and a clip named
+    `lower-third-2`; a run-loop turn, level 0 — a CLOSED step before M8;
+M29 This Project now comes first, listing "Lower third — lower-third" and
+    "Lower third — lower-third-2"; the tables equal the catalog;
+M30 the browser opens on This Project; lower-third-2 inserted from it
+    writes no file and places one more clip drawn by it, "Insert Graphic",
+    level 0; undo takes it back;
 M8  `insertGraphic(from: "My Counter (v2).js", grouped: true)` → module
     `my-counter-v2`, level 0 at once; one undo removes it and `lower-third-2`
     STAYS; `canUndo` still true;
 M9  a `.js` of `export function render() { return` throws a sentence naming
     the module and "does not compile"; the file exists, no clip, `canUndo`
     unchanged;
+M31 This Project's `broken` chosen in the browser and Insert pressed: the
+    browser stays up with `graphicClipMaker`'s sentence ("graphics/broken.js
+    does not compile: …") word for word in `graphicbrowser.message`, no clip,
+    the undo stack unmoved; Cancel closes it;
+M32 From File… pressed: within 2 s the browser is gone and an `NSOpenPanel`
+    is the window's attached sheet (then cancelled);
 M10 on the second copy (NO module): `importFont(Oswald-Medium.ttf)` answers
     `["Oswald"]`, lands in `fonts/`, and the registry's library holds Oswald
     at once; a `.txt` is refused naming ".ttf"; `importAsset(red.png)` lists
@@ -153,7 +183,8 @@ Z1  both projects close, and `grep "Frame Job: "` over the log prints nothing.
 
 Made to fail by hand (G5b's record): `|| outcome.library` removed from
 `GraphicStore.drain()` fails `graphics_proof.py`'s W1 and I4; From File…
-dropped from `graphicMenu()` fails M2; M7's run-loop turn removed fails M8.
+dropped from `graphicMenu()` (gone since G-45) failed M2; M7's run-loop turn
+removed fails M8.
 Issue batch B8: `holdsModule(named:)`'s disk check removed fails M11, and
 `String(decoding:as:)` restored in `insertGraphic` fails M12.
 
@@ -164,7 +195,8 @@ replaced, and the fixtures and the probe run (no S row).
 no-op) keeps **Rule R**: exit 0 means M13 was answered and FAILED — caught;
 exit 1 means it passed — survived; exit 2 means the control was not performed
 (the copy, the anchor, the fixture or the build failed, or the probe gave no
-M13). The ten of B84's phase 2 are held to **Rule R1**: exit 0 only when the
+M13). The ten of B84's phase 2 and the seven of G-45's browser are held to
+**Rule R1**: exit 0 only when the
 mutant's row was answered, FAILED, and every row the probe answered before it
 passed — the row is the FIRST failure; exit 1 when the row passed, or an
 earlier row failed first (printed by name); exit 2 when the control was not
@@ -181,6 +213,13 @@ performed.
                               is called                                  → M19
     restore-deleted-unlisted  restore's choices filtered to names
                               holdsModule holds                          → M20
+    browser-fallback          category(meta:)'s fallback not "Other"     → M21
+    browser-project-empty     This Project listed when no module is      → M22
+    browser-project-last      This Project after the templates           → M23
+    browser-insert-enabled    Insert enabled with no graphic chosen      → M26
+    browser-project-copies    a This Project insert writes a copy first  → M30
+    browser-skip-unique       writeGraphicModule skips uniqueModuleName  → M7
+    browser-player-kept       viewDidDisappear's player.stop() removed   → M28
 
 **App-tier mutants** (`APP_MUTANTS`): a COPY of the tree
 (`tree_copy.make_copy`) with one anchor replaced, built by the copy's own `make app-debug` (`make app` under
@@ -221,10 +260,11 @@ OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
 RED_PNG = ROOT / "graphic/tests/assets/red.png"
 CALL_BOUND = 120
 SECOND = 600000
-PROBE_ROWS = [f"M{n}" for n in range(2, 21)]
+PROBE_ROWS = [f"M{n}" for n in range(2, 33)]
 KEPT = ("probe", "framejob.log")     # what a run leaves in WORK
 
 SHEET_FILE = "GraphicFileSheetController.swift"
+BROWSER_FILE = "GraphicBrowserSheetController.swift"
 NEST_LINE = "        if act == .rename, document.scope != nil { return false }\n"
 # name -> (file under app/Sources, anchor, replacement, the row that must fail)
 PROBE_MUTANTS = {
@@ -266,6 +306,32 @@ PROBE_MUTANTS = {
         SHEET_FILE, "            names = store.keptNames()\n",
         "            names = store.keptNames().filter { store.holdsModule(named: $0) }\n",
         "M20"),
+    "browser-fallback": (
+        "GraphicCatalog.swift", "        return named.isEmpty ? other : named\n",
+        "        return named.isEmpty ? \"Uncategorised\" : named\n", "M21"),
+    "browser-project-empty": (
+        "GraphicCatalog.swift", "        let ours: [GraphicBrowserCategory] = project.isEmpty ? []\n",
+        "        let ours: [GraphicBrowserCategory] = false ? []\n", "M22"),
+    "browser-project-last": (
+        "GraphicCatalog.swift", "        return ours + theirs\n",
+        "        return theirs + ours\n", "M23"),
+    "browser-insert-enabled": (
+        BROWSER_FILE, "        insertButton.isEnabled = item != nil\n",
+        "        insertButton.isEnabled = true\n", "M26"),
+    "browser-project-copies": (
+        "EditorViewController+GraphicMenus.swift",
+        "        let make = try document.graphicClipMaker(named: name)\n",
+        "        let make = try document.graphicClipMaker(named: try document.writeGraphicModule("
+        "from: (document.graphicStore?.folderURL ?? URL(fileURLWithPath: \"/\"))"
+        ".appendingPathComponent(name + \".js\")))\n", "M30"),
+    "browser-skip-unique": (
+        "ProjectDocument+GraphicInsert.swift",
+        "        let name = store.uniqueModuleName(\n"
+        "            GraphicTemplates.moduleName(from: url.deletingPathExtension()"
+        ".lastPathComponent))\n",
+        "        let name = GraphicTemplates.moduleName(from: url.deletingPathExtension()"
+        ".lastPathComponent)\n", "M7"),
+    "browser-player-kept": (BROWSER_FILE, "        player.stop()\n", "", "M28"),
 }
 APP_MUTANTS = {
     "app-rename-in-nest": (SHEET_FILE, NEST_LINE, "", "S1"),
@@ -456,7 +522,7 @@ def build_probe(out, sources=ROOT / "app/Sources"):
 def probe_checks(package, files, sources=ROOT / "app/Sources", out=WORK / "probe"):
     """Builds and runs the probe over copies of GM (`package`) and GF
     (`files`). The probe's rows as it answered them, `[(row, ok)]`."""
-    print("\n1 — the probe: M1–M20", flush=True)
+    print("\n1 — the probe: M1–M32", flush=True)
     binary, error = build_probe(out, sources)
     check("M1 the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -484,7 +550,7 @@ def probe_checks(package, files, sources=ROOT / "app/Sources", out=WORK / "probe
         return []
     probe_rows = json.loads(answer.read_text())["rows"]
     present = all(any(r["name"].split()[0] == n for r in probe_rows) for n in PROBE_ROWS)
-    check("the probe answers every M-row (M2–M20 present)", present, f"{len(probe_rows)} rows")
+    check("the probe answers every M-row (M2–M32 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
     return [(row["name"].split()[0], bool(row["ok"])) for row in probe_rows]

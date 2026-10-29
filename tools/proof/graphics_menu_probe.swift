@@ -1,6 +1,9 @@
-// Road map 10, G5b — Insert ▸ Graphic, File ▸ Add Font/Image to Graphics…,
+// Road map 10, G5b — Insert ▸ Graphic…, File ▸ Add Font/Image to Graphics…,
 // Help ▸ Graphics Reference; the probe (`graphics_menu_proof.py` builds and
-// runs it).
+// runs it). Since spec §11 G-45 Insert ▸ Graphic… is the graphic browser:
+// M21–M23 hold `GraphicCatalog` over fixture items, and M24–M32 drive the
+// browser through its own controls (found by accessibility identifier), as
+// M16–M20 drive the file sheet.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a` —
@@ -83,38 +86,18 @@ let delegate = AppDelegate()
 let mainMenu = delegate.buildMainMenu()
 let barTitles = mainMenu.items.map(\.title)
 let insert = mainMenu.items.first { $0.title == "Insert" }?.submenu
-let graphicItem = insert?.items.first { $0.title == "Graphic" }
-let graphic = graphicItem?.submenu
-let graphicTitles = graphic?.items.map { $0.isSeparatorItem ? "—" : $0.title } ?? []
-let wantTitles = ["Arrow Highlight", "Bar Chart", "Callout", "Chapter Card", "Countdown",
-                  "Counter", "Donut Chart", "End Screen", "Gauge", "Handle Tag", "Keyboard Keys",
-                  "Kinetic Type", "Line Chart", "Logo Reveal", "Lower Third", "News Ticker",
-                  "Progress Bar", "Quote Card", "Social Popup", "Step Badge", "Subscribe Button",
-                  "Title Card", "Window Frame", "—", "From File…"]
-let templateItems = graphic?.items.filter {
-    $0.action == #selector(EditorViewController.insertGraphicTemplate(_:))
-} ?? []
-let bytesMatch = templateItems.map { item -> String in
-    guard let url = item.representedObject as? URL else { return "\(item.title): no URL" }
-    let source = templatesURL.appendingPathComponent(url.lastPathComponent)
-    let same = (try? Data(contentsOf: url)) == (try? Data(contentsOf: source))
-        && (try? Data(contentsOf: url)) != nil
-    return same ? "ok" : "\(item.title): \(url.path) differs from \(source.path)"
-}
+let graphicItem = insert?.items.first { $0.title == "Graphic…" }
 let editIndex = barTitles.firstIndex(of: "Edit")
-check("M2 the menu bar has Insert right after Edit, holding Adjustment Clip then Graphic; "
-      + "Insert ▸ Graphic is the 23 templates by "
-      + "title, a separator and From File…; each template's representedObject is a URL whose "
-      + "bytes equal graphic/tests/graphics/",
+check("M2 the menu bar has Insert right after Edit, holding Adjustment Clip then Graphic… — "
+      + "one item with no submenu, its action showGraphicBrowser: (spec §11 G-45 (f))",
       editIndex != nil && barTitles.indices.contains((editIndex ?? 0) + 1)
           && barTitles[(editIndex ?? 0) + 1] == "Insert"
-          && insert?.items.map(\.title) == ["Adjustment Clip", "Graphic"]
-          && graphicTitles == wantTitles
-          && graphic?.items.last?.action
-              == #selector(EditorViewController.insertGraphicFromFile(_:))
-          && templateItems.count == 23 && bytesMatch.allSatisfy { $0 == "ok" },
-      "bar \(barTitles); Insert \(insert?.items.map(\.title) ?? []); Graphic \(graphicTitles); "
-          + "bytes \(bytesMatch)")
+          && insert?.items.map(\.title) == ["Adjustment Clip", "Graphic…"]
+          && graphicItem?.submenu == nil
+          && graphicItem?.action == #selector(EditorViewController.showGraphicBrowser(_:)),
+      "bar \(barTitles); Insert \(insert?.items.map(\.title) ?? []); Graphic… submenu "
+          + "\(graphicItem?.submenu != nil), action "
+          + "\(graphicItem?.action.map(NSStringFromSelector) ?? "nil")")
 
 let file = mainMenu.items.first { $0.title == "File" }?.submenu
 let fileTitles = file?.items.map { $0.isSeparatorItem ? "—" : $0.title } ?? []
@@ -124,15 +107,11 @@ let consolidate = fileTitles.firstIndex(of: "Consolidate Media…") ?? -10
 let fontItem = file?.items.first { $0.title == "Add Font to Graphics…" }
 let imageItem = file?.items.first { $0.title == "Add Image to Graphics…" }
 let referenceItem = help?.items.first { $0.title == "Graphics Reference" }
-let fromFileItem = graphic?.items.first {
-    $0.title == "From File…" && $0.action == #selector(EditorViewController.insertGraphicFromFile(_:))
-}
-let newItems = templateItems + [fromFileItem, fontItem, imageItem, referenceItem]
-    .compactMap { $0 }
+let newItems = [graphicItem, fontItem, imageItem, referenceItem].compactMap { $0 }
 let keyed = newItems.filter { !$0.keyEquivalent.isEmpty }.map(\.title)
 check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right after "
-      + "Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none of the twenty-seven "
-      + "new items has a key equivalent",
+      + "Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none of the four "
+      + "items (Graphic…, the two Adds, Graphics Reference) has a key equivalent",
       fileTitles.indices.contains(consolidate + 2)
           && fileTitles[consolidate + 1] == "Add Font to Graphics…"
           && fileTitles[consolidate + 2] == "Add Image to Graphics…"
@@ -140,14 +119,13 @@ check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right
           && imageItem?.action == #selector(EditorViewController.addGraphicImage(_:))
           && helpTitles == ["Frame Job Help", "Graphics Reference"]
           && referenceItem?.action == #selector(AppDelegate.showGraphicsReference(_:))
-          && newItems.count == 27 && keyed.isEmpty,
-      "File \(fileTitles); Help \(helpTitles); \(newItems.count) new items; keyed \(keyed)")
+          && newItems.count == 4 && keyed.isEmpty,
+      "File \(fileTitles); Help \(helpTitles); \(newItems.count) items; keyed \(keyed)")
 
 // MARK: - M4: no window
 
 let editorSelectors = [
-    #selector(EditorViewController.insertGraphicTemplate(_:)),
-    #selector(EditorViewController.insertGraphicFromFile(_:)),
+    #selector(EditorViewController.showGraphicBrowser(_:)),
     #selector(EditorViewController.addGraphicFont(_:)),
     #selector(EditorViewController.addGraphicImage(_:)),
 ]
@@ -166,11 +144,66 @@ try? FileManager.default.removeItem(at: aside)
 let moved = (try? FileManager.default.moveItem(at: reference, to: aside)) != nil
 let liveAfter = referenceItem.map { delegate.validateMenuItem($0) } ?? true
 let restored = (try? FileManager.default.moveItem(at: aside, to: reference)) != nil
-check("M4 with no window the four editor selectors have no target; Graphics Reference "
+check("M4 with no window the three editor selectors have no target; Graphics Reference "
       + "validates true, and false once GraphicsAPI.md is moved away (CONTROL)",
       targets.allSatisfy { $0 == nil } && liveBefore && moved && !liveAfter && restored,
       "targets \(targets.map { $0.map { "\($0)" } ?? "nil" }), before \(liveBefore), moved "
           + "\(moved), after \(liveAfter), restored \(restored), \(reference.path)")
+
+// MARK: - M21..M23: the catalog over fixture items (spec §11 G-45 (a), (d), (e))
+
+func fixtureItem(
+    _ name: String, _ title: String, _ category: String, _ origin: GraphicBrowserItem.Origin
+) -> GraphicBrowserItem {
+    GraphicBrowserItem(
+        name: name, title: title, description: nil, category: category, origin: origin, ok: true)
+}
+func outline(_ categories: [GraphicBrowserCategory]) -> [String] {
+    categories.map { "\($0.name): " + $0.items.map { "\($0.title) [\($0.name)]" }.joined(separator: ", ") }
+}
+
+let blank = GraphicCatalog.category(meta: [:])
+let spaces = GraphicCatalog.category(meta: ["category": "   "])
+let number = GraphicCatalog.category(meta: ["category": 5])
+let padded = GraphicCatalog.category(meta: ["category": " Screencast "])
+let itemNoMeta = GraphicCatalog.item(name: "plain-module", entry: nil, origin: .template)
+check("M21 a module with no category is filed under Other: meta {} , a blank string and a "
+      + "number are Other, \" Screencast \" is Screencast; an item with no meta is Other, titled "
+      + "from its stem, not ok",
+      blank == "Other" && spaces == "Other" && number == "Other" && padded == "Screencast"
+          && itemNoMeta.category == "Other" && itemNoMeta.title == "Plain Module"
+          && itemNoMeta.description == nil && !itemNoMeta.ok,
+      "{} \(blank), blank \(spaces), 5 \(number), padded \(padded); item \(itemNoMeta)")
+
+let fixtureTemplates = [
+    fixtureItem("zz", "Zed", "Zeta", .template),
+    fixtureItem("misc", "Misc", "Other", .template),
+    fixtureItem("b2", "banana", "Alpha", .template),
+    fixtureItem("b1", "Banana", "Alpha", .template),
+    fixtureItem("ap", "apple", "Alpha", .template),
+    fixtureItem("be", "Bee", "beta", .template),
+]
+let noProject = GraphicCatalog.categories(templates: fixtureTemplates, project: [])
+let wantNoProject = ["Alpha: apple [ap], Banana [b1], banana [b2]", "beta: Bee [be]",
+                     "Zeta: Zed [zz]", "Other: Misc [misc]"]
+check("M22 with no project module there is no This Project: the categories by case-insensitive "
+      + "name, Other last, each graphic by title case-insensitively then name",
+      outline(noProject) == wantNoProject,
+      "\(outline(noProject))")
+
+let fixtureProject = [
+    fixtureItem("lower-third-2", "Lower third", "Titles & Text", .project),
+    fixtureItem("arrow", "Arrow", "Screencast", .project),
+    fixtureItem("lower-third", "lower third", "Titles & Text", .project),
+]
+let withProject = GraphicCatalog.categories(templates: fixtureTemplates, project: fixtureProject)
+let wantWithProject = ["This Project: Arrow [arrow], lower third — lower-third [lower-third], "
+                           + "Lower third — lower-third-2 [lower-third-2]"] + wantNoProject
+check("M23 with project modules This Project comes first and lists every one whatever its own "
+      + "category; two whose titles match case-insensitively read \"<title> — <name>\"; the "
+      + "templates' categories follow in M22's order",
+      outline(withProject) == wantWithProject,
+      "\(outline(withProject))")
 
 // MARK: - M5: the editor's validator
 
@@ -212,8 +245,8 @@ let offBefore = validates()
 let fileOffBefore = fileValidates(controller)
 document.startGraphicStore()
 let onAfter = validates()
-check("M5 the four editor items validate false before startGraphicStore() and true after",
-      offBefore == [false, false, false, false] && onAfter == [true, true, true, true],
+check("M5 the three editor items validate false before startGraphicStore() and true after",
+      offBefore == [false, false, false] && onAfter == [true, true, true],
       "before \(offBefore), after \(onAfter)")
 
 guard let store = document.graphicStore, let undo = document.undoManager else {
@@ -221,54 +254,284 @@ guard let store = document.graphicStore, let undo = document.undoManager else {
     finish()
 }
 
-// MARK: - M6, M7: the template item, twice
+// MARK: - The browser, driven through its own controls
 
 let second: Ticks = 600_000
 func graphicClips() -> [ClipSnapshot] {
     document.project.snapshot.clips.filter { $0.graphic != nil }
 }
 func names() -> [String] { graphicClips().compactMap { $0.graphic?.name }.sorted() }
-let lowerThird = templateItems.first { $0.title == "Lower Third" }
 let lowerSource = try? Data(contentsOf: templatesURL.appendingPathComponent("lower-third.js"))
 let folder = store.folderURL
+/// The `.js` files `graphics/` holds, sorted.
+func modulesOnDisk() -> [String] {
+    ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+        .filter { $0.hasSuffix(".js") }.sorted()
+}
+
+/// Pumps until `condition` holds or `limit` seconds pass; whether it held.
+func pumpUntil(_ limit: Double, _ condition: () -> Bool) -> Bool {
+    let start = Date()
+    while Date().timeIntervalSince(start) < limit {
+        if condition() { return true }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+    }
+    return condition()
+}
+func subviews(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(subviews) }
+struct Browser {
+    let window: NSWindow
+    let controller: GraphicBrowserSheetController
+    let categories: NSTableView
+    let graphics: NSTableView
+    let preview: NSImageView
+    let title: NSTextField
+    let message: NSTextField
+    let insert: NSButton
+    let fromFile: NSButton
+    let cancel: NSButton
+
+    func rows(_ table: NSTableView) -> [String] {
+        (0..<table.numberOfRows).map { row in
+            (table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSTableCellView)?
+                .textField?.stringValue ?? "?"
+        }
+    }
+    /// The row reading `text` selected; whether there was one.
+    func choose(_ table: NSTableView, _ text: String) -> Bool {
+        guard let row = rows(table).firstIndex(of: text) else { return false }
+        table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        return true
+    }
+    /// A button's own action sent to its own target, never a disabled one's.
+    func press(_ button: NSButton) -> Bool {
+        guard button.isEnabled, let action = button.action,
+              window === button.window?.sheetParent?.attachedSheet
+        else { return false }
+        return NSApp.sendAction(action, to: button.target, from: button)
+    }
+}
+/// The editor's own action called and the browser waited for.
+func openBrowser() -> Browser? {
+    controller.showGraphicBrowser(nil)
+    guard pumpUntil(3, { window.attachedSheet != nil }), let sheet = window.attachedSheet,
+          let browser = sheet.contentViewController as? GraphicBrowserSheetController
+    else { return nil }
+    let views = sheet.contentView.map(subviews) ?? []
+    func find<T>(_ id: String, _ type: T.Type) -> T? {
+        views.first { $0.accessibilityIdentifier() == id } as? T
+    }
+    guard let categories = find("graphicbrowser.categories", NSTableView.self),
+          let graphics = find("graphicbrowser.graphics", NSTableView.self),
+          let preview = find("graphicbrowser.preview", NSImageView.self),
+          let title = find("graphicbrowser.title", NSTextField.self),
+          let message = find("graphicbrowser.message", NSTextField.self),
+          let insertButton = find("graphicbrowser.insert", NSButton.self),
+          let fromFile = find("graphicbrowser.fromFile", NSButton.self),
+          let cancel = find("graphicbrowser.cancel", NSButton.self)
+    else { return nil }
+    return Browser(
+        window: sheet, controller: browser, categories: categories, graphics: graphics,
+        preview: preview, title: title, message: message, insert: insertButton,
+        fromFile: fromFile, cancel: cancel)
+}
+func browserGone() -> Bool {
+    pumpUntil(3) { !(window.attachedSheet?.contentViewController is GraphicBrowserSheetController) }
+}
+/// Whatever sheet a failed row left attached, ended.
+func clearBrowser() {
+    if let stuck = window.attachedSheet { window.endSheet(stuck) }
+    spin(0.3)
+}
+/// Every category's graphics as the sheet's tables show them, the first
+/// category selected again afterwards.
+func tableOutline(_ browser: Browser) -> [String] {
+    let names = browser.rows(browser.categories)
+    var lines: [String] = []
+    for (row, name) in names.enumerated() {
+        browser.categories.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        lines.append("\(name): " + browser.rows(browser.graphics).joined(separator: ", "))
+    }
+    if !names.isEmpty {
+        browser.categories.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    }
+    return lines
+}
+func catalogOutline() -> [String] {
+    GraphicCatalog.categories(for: document).map {
+        "\($0.name): " + $0.items.map(\.title).joined(separator: ", ")
+    }
+}
+
+// M24..M27 — open, the lists, the preview, Insert with nothing chosen, Esc
+
+var ok24 = false, ok25 = false, ok26 = false, ok27 = false
+var detail24 = "the sheet did not attach", detail25 = "", detail26 = "", detail27 = ""
+let catalog24 = GraphicCatalog.categories(for: document)
+if let browser = openBrowser() {
+    let shown = tableOutline(browser)
+    let wanted = catalogOutline()
+    let firstCategory = browser.categories.selectedRow
+    let firstGraphic = browser.graphics.selectedRow
+    let titled = browser.title.stringValue
+    let live = browser.insert.isEnabled
+    let firstName = catalog24.first?.name
+    let firstTitle = catalog24.first?.items.first?.title
+    ok24 = shown == wanted && catalog24.count >= 4 && firstName == "Data & Time"
+        && firstCategory == 0 && firstGraphic == 0 && titled == firstTitle && live
+    detail24 = "tables \(shown) vs catalog \(wanted); opened on category \(firstCategory) "
+        + "(\(firstName ?? "nil")), graphic \(firstGraphic), title \(titled.debugDescription) "
+        + "(\(firstTitle ?? "nil")), Insert enabled \(live)"
+
+    let pictured = pumpUntil(3) { browser.preview.image != nil }
+    let drawn = browser.controller.player.drawn
+    let thread = browser.controller.player.thread
+    ok25 = pictured && drawn.frames > 0 && !drawn.onMain && thread != nil && thread !== Thread.main
+    detail25 = "image within 3 s \(pictured), frames \(drawn.frames), any on main \(drawn.onMain), "
+        + "thread \(thread?.name ?? "nil")"
+
+    browser.graphics.deselectAll(nil)
+    let dimmed = !browser.insert.isEnabled
+    let cleared = browser.title.stringValue.isEmpty
+    ok26 = dimmed && cleared && browser.graphics.selectedRow == -1
+    detail26 = "graphic row \(browser.graphics.selectedRow), Insert disabled \(dimmed), title "
+        + "cleared \(cleared)"
+
+    let clips = document.project.snapshot.clips.count
+    let escape = browser.cancel.keyEquivalent == "\u{1b}"
+    let pressed = browser.press(browser.cancel)
+    let gone = browserGone()
+    ok27 = escape && pressed && gone && modulesOnDisk().isEmpty
+        && document.project.snapshot.clips.count == clips && !undo.canUndo
+    detail27 = "Cancel's key Esc \(escape), pressed \(pressed), gone \(gone), graphics/ "
+        + "\(modulesOnDisk()), clips \(document.project.snapshot.clips.count) vs \(clips), canUndo "
+        + "\(undo.canUndo)"
+}
+clearBrowser()
+check("M24 Insert ▸ Graphic… opens the browser on the first category (Data & Time — no This "
+      + "Project on a package with no module) and its first graphic, the title shown and Insert "
+      + "enabled; the two tables' rows, category by category, equal "
+      + "GraphicCatalog.categories(for:)",
+      ok24, detail24)
+check("M25 the preview shows a picture within 3 s, drawn on the player's own thread (no frame on "
+      + "main)",
+      ok25, detail25)
+check("M26 with the graphic deselected Insert is disabled and the title cleared", ok26, detail26)
+check("M27 Cancel (Esc) closes the browser and writes nothing: no module, no clip, no undo step",
+      ok27, detail27)
+
+// M6, M28 — Titles & Text ▸ Lower third through the Insert button
 
 document.playhead = 2 * second
-let countBefore = document.project.snapshot.clips.count
-controller.insertGraphicTemplate(lowerThird)
-let countAfter = document.project.snapshot.clips.count
-let actionName = undo.undoActionName
-let landed = graphicClips()
-let written = try? Data(contentsOf: folder.appendingPathComponent("lower-third.js"))
-let clip = landed.first
-spin(0.3)
-let level6 = undo.groupingLevel
-let canUndo6 = undo.canUndo
-undo.undo()
-let afterUndo = graphicClips().count
-let fileStays = FileManager.default.fileExists(
-    atPath: folder.appendingPathComponent("lower-third.js").path)
-check("M6 Insert ▸ Graphic ▸ Lower Third at 2 s: graphics/lower-third.js byte-equal to the "
-      + "template, one clip named lower-third at 1 200 000 lasting 3 000 000, undo name "
-      + "\"Insert Graphic\"; a run-loop turn closes the event group (level 0); one undo removes "
-      + "the clip, the file stays, canUndo is then false",
-      lowerThird != nil && lowerSource != nil && written == lowerSource
-          && countAfter == countBefore + 1 && landed.count == 1 && clip?.graphic?.name == "lower-third"
-          && clip?.start == 1_200_000 && clip?.duration == 3_000_000
-          && actionName == "Insert Graphic" && level6 == 0 && canUndo6
-          && afterUndo == 0 && fileStays && !undo.canUndo,
-      "item \(lowerThird != nil), bytes equal \(written == lowerSource), clips \(landed.map { "\($0.graphic?.name ?? "?") \($0.start)+\($0.duration)" }), "
-          + "undo name \(actionName), level \(level6), canUndo \(canUndo6), after undo "
-          + "\(afterUndo), file \(fileStays), canUndo after \(undo.canUndo)")
+var ok6 = false, ok28 = false
+var detail6 = "the sheet did not attach", detail28 = "the sheet did not attach"
+if let browser = openBrowser() {
+    let countBefore = document.project.snapshot.clips.count
+    let chose = browser.choose(browser.categories, "Titles & Text")
+        && browser.choose(browser.graphics, "Lower third")
+    let thread = browser.controller.player.thread
+    let pressed = browser.press(browser.insert)
+    let gone = browserGone()
+    let finished = pumpUntil(2) { thread?.isFinished == true }
+    ok28 = thread != nil && finished
+    detail28 = "thread \(thread?.name ?? "nil"), finished within 2 s \(finished)"
+    let countAfter = document.project.snapshot.clips.count
+    let actionName = undo.undoActionName
+    let landed = graphicClips()
+    let written = try? Data(contentsOf: folder.appendingPathComponent("lower-third.js"))
+    let clip = landed.first
+    spin(0.3)
+    let level6 = undo.groupingLevel
+    let canUndo6 = undo.canUndo
+    undo.undo()
+    let afterUndo = graphicClips().count
+    let fileStays = FileManager.default.fileExists(
+        atPath: folder.appendingPathComponent("lower-third.js").path)
+    ok6 = chose && pressed && gone && lowerSource != nil && written == lowerSource
+        && countAfter == countBefore + 1 && landed.count == 1
+        && clip?.graphic?.name == "lower-third" && clip?.start == 1_200_000
+        && clip?.duration == 3_000_000 && actionName == "Insert Graphic" && level6 == 0
+        && canUndo6 && afterUndo == 0 && fileStays && !undo.canUndo
+    detail6 = "chose \(chose), pressed \(pressed), browser gone \(gone), bytes equal "
+        + "\(written == lowerSource), clips \(landed.map { "\($0.graphic?.name ?? "?") \($0.start)+\($0.duration)" }), "
+        + "undo name \(actionName), level \(level6), canUndo \(canUndo6), after undo "
+        + "\(afterUndo), file \(fileStays), canUndo after \(undo.canUndo)"
+}
+clearBrowser()
+check("M6 the browser's Titles & Text ▸ Lower third, Insert pressed at 2 s: the browser closes, "
+      + "graphics/lower-third.js byte-equal to the template, one clip named lower-third at "
+      + "1 200 000 lasting 3 000 000, undo name \"Insert Graphic\"; a run-loop turn closes the "
+      + "event group (level 0); one undo removes the clip, the file stays, canUndo is then false",
+      ok6, detail6)
+check("M28 after that Insert the preview's render thread has exited within 2 s", ok28, detail28)
 
-controller.insertGraphicTemplate(lowerThird)
-let second7 = names()
-let written7 = try? Data(contentsOf: folder.appendingPathComponent("lower-third-2.js"))
-spin(0.3)
-let level7 = undo.groupingLevel
-check("M7 the same item again writes lower-third-2.js and places a clip named lower-third-2; "
+// M7, M29, M30 — the same template again; This Project; a project graphic placed with no copy
+
+var ok7 = false
+var detail7 = "the sheet did not attach"
+if let browser = openBrowser() {
+    let chose = browser.choose(browser.categories, "Titles & Text")
+        && browser.choose(browser.graphics, "Lower third")
+    let pressed = browser.press(browser.insert)
+    let gone = browserGone()
+    let second7 = names()
+    let written7 = try? Data(contentsOf: folder.appendingPathComponent("lower-third-2.js"))
+    spin(0.3)
+    let level7 = undo.groupingLevel
+    ok7 = chose && pressed && gone && second7 == ["lower-third-2"] && written7 == lowerSource
+        && level7 == 0
+    detail7 = "chose \(chose), pressed \(pressed), gone \(gone), clips \(second7), bytes equal "
+        + "\(written7 == lowerSource), level \(level7)"
+}
+clearBrowser()
+check("M7 the same graphic again writes lower-third-2.js and places a clip named lower-third-2; "
       + "a run-loop turn leaves level 0, so it is a CLOSED step",
-      second7 == ["lower-third-2"] && written7 == lowerSource && level7 == 0,
-      "clips \(second7), bytes equal \(written7 == lowerSource), level \(level7)")
+      ok7, detail7)
+
+var ok29 = false, ok30 = false
+var detail29 = "the sheet did not attach", detail30 = "the sheet did not attach"
+let catalog29 = GraphicCatalog.categories(for: document)
+if let browser = openBrowser() {
+    let shown = tableOutline(browser)
+    let wanted = catalogOutline()
+    let ours = catalog29.first
+    let wantedOurs = ["Lower third — lower-third", "Lower third — lower-third-2"]
+    ok29 = shown == wanted && ours?.name == "This Project"
+        && ours?.items.map(\.title) == wantedOurs
+        && ours?.items.allSatisfy { $0.origin == .project && $0.category == "Titles & Text" } == true
+    detail29 = "first \(ours?.name ?? "nil"): \(ours?.items.map(\.title) ?? []); tables \(shown) "
+        + "vs catalog \(wanted)"
+
+    let opened = browser.categories.selectedRow == 0
+        && browser.rows(browser.categories).first == "This Project"
+    let onDisk = modulesOnDisk()
+    let clips = document.project.snapshot.clips.count
+    let chose = browser.choose(browser.graphics, "Lower third — lower-third-2")
+    let pressed = browser.press(browser.insert)
+    let gone = browserGone()
+    let after = names()
+    let actionName = undo.undoActionName
+    let unwritten = modulesOnDisk() == onDisk
+    spin(0.3)
+    let level = undo.groupingLevel
+    undo.undo()
+    ok30 = opened && chose && pressed && gone && unwritten
+        && document.project.snapshot.clips.count == clips
+        && after == ["lower-third-2", "lower-third-2"] && actionName == "Insert Graphic"
+        && level == 0 && names() == ["lower-third-2"]
+    detail30 = "opened on This Project \(opened), chose \(chose), pressed \(pressed), gone "
+        + "\(gone), graphics/ \(onDisk) → \(modulesOnDisk()), clips \(after), undo name "
+        + "\(actionName), level \(level), after undo \(names())"
+}
+clearBrowser()
+check("M29 after two inserts of Lower third, This Project comes first listing \"Lower third — "
+      + "lower-third\" and \"Lower third — lower-third-2\" (each its module's own category); the "
+      + "tables equal GraphicCatalog.categories(for:)",
+      ok29, detail29)
+check("M30 the browser opens on This Project; lower-third-2 inserted from it writes no file and "
+      + "places one more clip drawn by lower-third-2, \"Insert Graphic\", level 0; undo takes it "
+      + "back",
+      ok30, detail30)
 
 // MARK: - M8: From File…'s body, grouped
 
@@ -314,6 +577,59 @@ check("M9 a .js that does not compile throws a sentence naming the module and \"
           && document.project.snapshot.clips.count == clips9 && undo.canUndo == canUndo9,
       "thrown \(thrown9), clips \(document.project.snapshot.clips.count) vs \(clips9), "
           + "canUndo \(undo.canUndo) vs \(canUndo9)")
+
+// MARK: - M31: a This Project module that does not compile, inserted from the browser
+
+var want31 = ""
+do { _ = try document.graphicClipMaker(named: "broken") } catch { want31 = error.localizedDescription }
+let brokenTitle = GraphicCatalog.categories(for: document).first?.items
+    .first { $0.name == "broken" }?.title
+var ok31 = false
+var detail31 = "the sheet did not attach"
+if let browser = openBrowser() {
+    let clips = document.project.snapshot.clips.count
+    let canUndo = undo.canUndo
+    let chose = brokenTitle.map { browser.choose(browser.graphics, $0) } ?? false
+    let pressed = browser.press(browser.insert)
+    spin(0.5)
+    let stays = window.attachedSheet === browser.window
+    let shown = browser.message.stringValue
+    let cancelled = browser.press(browser.cancel) && browserGone()
+    ok31 = !want31.isEmpty && want31.hasPrefix("graphics/broken.js does not compile: ")
+        && chose && pressed && stays && shown == want31
+        && document.project.snapshot.clips.count == clips && undo.canUndo == canUndo && cancelled
+    detail31 = "title \(brokenTitle ?? "nil"), chose \(chose), pressed \(pressed), stays \(stays), "
+        + "message \(shown.debugDescription) (wanted \(want31.debugDescription)), clips "
+        + "\(document.project.snapshot.clips.count) vs \(clips), canUndo \(undo.canUndo) vs "
+        + "\(canUndo), Cancel detached \(cancelled)"
+}
+clearBrowser()
+check("M31 This Project's broken (does not compile) chosen and Insert pressed: the browser stays "
+      + "up with graphicClipMaker's sentence word for word in graphicbrowser.message (\"graphics/"
+      + "broken.js does not compile: …\"), no clip, the undo stack unmoved; Cancel closes it",
+      ok31, detail31)
+
+// MARK: - M32: From File… — the browser goes down, then the open panel comes up
+
+var ok32 = false
+var detail32 = "the sheet did not attach"
+if let browser = openBrowser() {
+    let pressed = browser.press(browser.fromFile)
+    let panelUp = pumpUntil(2) { window.attachedSheet is NSOpenPanel }
+    let gone = !(window.attachedSheet?.contentViewController is GraphicBrowserSheetController)
+    let attached = window.attachedSheet.map { String(describing: type(of: $0)) } ?? "nothing"
+    if let panel = window.attachedSheet as? NSOpenPanel {
+        window.endSheet(panel, returnCode: .cancel)
+    }
+    let cleared = pumpUntil(2) { window.attachedSheet == nil }
+    ok32 = pressed && panelUp && gone && cleared
+    detail32 = "pressed \(pressed), an NSOpenPanel attached within 2 s \(panelUp) (\(attached)), "
+        + "the browser gone \(gone), cleared after cancelling \(cleared)"
+}
+clearBrowser()
+check("M32 From File… pressed: within 2 s the browser is gone and an NSOpenPanel is the window's "
+      + "attached sheet (then cancelled)",
+      ok32, detail32)
 
 // MARK: - M11: a module written from the shell a moment before is not overwritten (#75)
 

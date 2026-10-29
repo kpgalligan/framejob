@@ -8,7 +8,7 @@
 // refusal and the table are the ones the app ships. `AppDelegate().
 // buildMainMenu()` is built and never hung on `NSApp.mainMenu`, nothing is
 // validated, and no window opens; `GraphicTemplates/` beside the binary
-// gives Insert ▸ Graphic its template items. It prints exactly one stdout
+// gives Insert ▸ Graphic…'s sheet its templates. It prints exactly one stdout
 // line, `ANSWER <json>`:
 // `{"leaves": [{"path", "selector", "refusal"}], "table": {selector: verdict},
 //   "target": {"ok": Bool, "detail": String}}`.
