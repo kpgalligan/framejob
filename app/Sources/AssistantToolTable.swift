@@ -75,6 +75,10 @@ enum AssistantToolTable {
         AssistantToolRow(
             tool: "consolidate_media", rule: .askFirst, onlyWith: nil,
             reason: "It copies every referenced file into the package."),
+        AssistantToolRow(
+            tool: "export_graphic", rule: .askFirst, onlyWith: nil,
+            reason: "It writes a .fjgraphic package where the model chose, replacing any file "
+                + "already there."),
     ]
 
     static let devToolReason =
@@ -118,6 +122,11 @@ enum AssistantToolTable {
             path = given ?? document.fileURL?.path
         case "consolidate_media":
             path = document.fileURL.map { "\($0.path)/media" }
+        case "export_graphic":
+            // Where the tool will write: `.fjgraphic` added as `destinationURL` adds it.
+            path = given.map {
+                AgentServer.destinationURL($0, extension: GraphicPackage.fileExtension).path
+            }
         default:
             path = given
         }

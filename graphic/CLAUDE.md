@@ -28,7 +28,12 @@ The crate's record is road map 10 §10.4.
   SHA-256; a PNG or JPEG kind is asked of the cache first), their content `version`
   (SHA-256 with length prefixes), the `measure_text` memo, and the
   crate-private `options()` builder whose resolvers record into a `Probe`
-  what resvg never reports. The generic families map to bundled faces
+  what resvg never reports. It also keeps the face-ID → font-blob map and
+  the usage set (`Usage`, `Library::usage()`, spec §11 G-46), filled by
+  `select_font`, the wrapped fallback selector and `resolve_string` (image
+  kinds only); each closure calls usvg FIRST and only then locks the usage
+  set for its own insert, because a nested SVG asset re-enters on the same
+  thread. The generic families map to bundled faces
   (`serif` Source Serif 4, `sans-serif` Source Sans 3, `monospace` IBM Plex
   Mono, G-6), and `select_font` queries only the text's own families,
   never usvg's appended serif fallback, so a missing family still draws

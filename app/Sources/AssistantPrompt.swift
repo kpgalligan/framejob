@@ -65,12 +65,12 @@ enum AssistantPrompt {
         ("audio: find silences and filler words, even out loudness, line up recordings by "
             + "their sound",
          ["detect_silence", "detect_fillers", "normalize_clip", "sync_audio"]),
-        ("graphics: write, rename, delete or restore a module; place and change a graphic "
-            + "clip; its reference, fonts and assets; insert a template",
+        ("graphics: write, rename, delete, restore or export a module; place and change a "
+            + "graphic clip; its reference, fonts and assets; insert one",
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",
           "graphic_reference", "render_graphic", "import_graphic_font",
           "import_graphic_asset", "delete_graphic", "rename_graphic", "restore_graphic",
-          "list_graphics", "insert_graphic"]),
+          "list_graphics", "insert_graphic", "export_graphic"]),
         ("export a movie, see how it is going, or stop it",
          ["export", "export_status", "cancel_export"]),
     ]

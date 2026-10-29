@@ -395,7 +395,7 @@ Read it first: every other tool names things by the ids it reports.
 
 ## The tools
 
-One hundred tools, grouped by area. A tool marked *op* is one of the
+One hundred and one tools, grouped by area. A tool marked *op* is one of the
 project's edit operations and also takes `scope`. Every tool takes
 `project`. The tool's own description, which the client shows the model,
 spells out each argument; the area pages cover the features in depth.
@@ -574,6 +574,7 @@ See [Captions](captions.md) and [Remove Silences and Remove Filler Words](cleanu
 | `restore_graphic` | **File ▸ Restore Graphic Version…** |
 | `list_graphics` | **Insert ▸ Graphic…**'s lists: This Project and the bundled templates by category, in the dialog's order. |
 | `insert_graphic` | **Insert ▸ Graphic…**'s Insert: a template copied into `graphics/` (or a project module as it is) and a clip at the playhead, one undo step. |
+| `export_graphic` | **Insert ▸ Graphic…**'s Export…: the graphic (`name`, `from`) written as a `.fjgraphic` package at `path` — the module and the project fonts and pictures it was seen to use; an existing file is replaced. Not an edit. |
 
 Writing, deleting and restoring modules and adding fonts or images in
 `graphics/` are not undoable (renaming is, as one step with its clips), but

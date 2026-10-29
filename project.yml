@@ -194,6 +194,13 @@ targets:
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
               public.filename-extension: [framejob]
+          # The Graphic dialog's Export… (spec §11 G-46 (d)): exported only, so
+          # Finder names it; no CFBundleDocumentTypes row, as the app opens none.
+          - UTTypeIdentifier: com.kgalligan.framejob-graphic
+            UTTypeDescription: Frame Job Graphic
+            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [fjgraphic]
         CFBundleDocumentTypes:
           - CFBundleTypeName: Frame Job Project
             LSItemContentTypes: [com.kgalligan.framejob-project]

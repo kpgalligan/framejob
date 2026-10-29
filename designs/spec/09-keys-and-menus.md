@@ -175,11 +175,14 @@ Font to Graphics…** and **Add Image to Graphics…** right after Consolidate
 Media…. Since §11 G-45 Insert holds one graphics item, **Graphic…**, which
 puts up the graphic browser: a sheet listing This Project (when the package
 holds a module) and the bundled templates by category, the chosen
-graphic's looping preview, title and description, From File… at the bottom
-left (a `.js` chosen in an open panel once the sheet is down), and Cancel
-(Esc) and Insert (Return; a double-click on a graphic is Insert) at the
-right. None of these items takes a key equivalent, for the caption items'
-reason; §11 G-16 and G-45 have the rules.
+graphic's looping preview, title and description, Export… at the bottom
+left (§11 G-46: the chosen graphic as a `.fjgraphic` package, in a save
+panel shown as a sheet on the browser, which stays up; enabled when the
+graphic compiles), From File… to its right (a `.js` chosen in an open panel
+once the sheet is down), and Cancel (Esc) and Insert (Return; a double-click
+on a graphic is Insert) at the right. None of these items takes a key
+equivalent, for the caption items' reason; §11 G-16, G-45 and G-46 have the
+rules.
 Issue batch B84 (#103) adds, after a separator straight under Add Image to
 Graphics… and before the separator above Export…, **Rename Graphic…**,
 **Delete Graphic…** and **Restore Graphic Version…**, in that order and

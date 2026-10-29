@@ -677,6 +677,42 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   after; `CoreValues.swift` 242 → 285. The next seam: the `Data`-to-pointer bridging the
   remaining wrappers each spell inline (`ReelAV1`, `ReelWebM.add`/`addVideo`,
   `GraphicLibrary.addFont`/`addAsset`) as `withBytes`-style helpers, their `rc_*` calls staying.
+  The graphic browser's phase 2 (spec §11 G-46) paid that seam and one more before
+  `GraphicLibrary.usage()` (`rc_graphic_library_usage`) and `ReelGraphicPackage`
+  (`rc_graphic_package_write`) landed, two payments each gated alone by `make typecheck` (exit 0,
+  the four baseline warnings). Payment 1: `withByteBuffer(_:_:)` and
+  `withMutableByteBuffer(_:_:)` in `CoreValues.swift`, exactly the inline `withUnsafeBytes` /
+  `withUnsafeMutableBytes` and `bindMemory` they replace, at the seven sites —
+  `withByteBuffer` at `ReelAV1.config`, `ReelWebM.add`/`addVideo` and
+  `GraphicLibrary.addFont`/`addAsset`, `withMutableByteBuffer(&data)` at
+  `ReelAV1.stripTemporalDelimiters` and `withMutableByteBuffer(&head)` at `ReelAV1.brandAV01`,
+  which still write in place; the pointers, their mutability and the `rc_*` calls unchanged.
+  `wc -l app/Sources/ReelCore.swift`: 788 before, 772 after; `CoreValues.swift` 285 → 301.
+  Payment 2: the docs of `extension ReelOp`'s `coreSchemas()` and `coreNames()` were cut to
+  their contracts (what each answers, from `rc_op_schemas` / `rc_op_names`, and that empty means
+  the core failed), no code changed. Their rationale, moved here word for word —
+  `coreSchemas()`: "Every op's arguments as JSON Schema, keyed by op name — `OP_TABLE` in
+  `core/src/op_table.rs`, projected by `core/src/op_schema.rs` and read through the FFI rather
+  than restated in Swift, which is the whole point of the export: the catalog can print what the
+  core accepts instead of keeping a hand copy that can be wrong about a type, a vocabulary or a
+  required list and still pass every part of the startup parity check. / The keys are
+  `coreNames()`'s names, and neither list is derived from the other on this side: they are two
+  views of one table in the core. / Empty only if the core failed or its answer could not be
+  read, which it does not — and an empty answer is a catastrophe rather than "no arguments", so
+  a caller treats it the way `AgentCatalog` already treats an empty `coreNames()`: it refuses to
+  build on one. / The second member of `ReelOp` that did NOT go to `ReelOps.swift`, for
+  `coreNames()`'s reason: it names an `rc_*` symbol, and this file is the only one that may." —
+  and `coreNames()`: "Every op name the core accepts, in the order of its table (`OP_NAMES` in
+  `core/src/edit.rs`), read through the FFI rather than copied into Swift: a copy is one more
+  spelling to drift, and its one reader — `AgentCatalog.opNames`, which three things share — is
+  there to catch it. Empty only if the core failed, which it does not. / The first member of
+  `ReelOp` that did NOT go to `ReelOps.swift` with the struct and its factories: it names an
+  `rc_*` symbol, and this file is the only one that may. `coreSchemas()` above stayed for the
+  same rule." `wc -l app/Sources/ReelCore.swift`: 772 before, 748 after. `usage()` and
+  `ReelGraphicPackage` then took it to 768, within its 788. The next seam: the
+  `// MARK: - Graphics` block's `GraphicLibrary` and `GraphicModule` docs (the freeze rule,
+  which the header states) and `ReelAgentSocket`'s cut to their contracts, a doc-only cut;
+  nothing `rc_*`-free is left to move.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

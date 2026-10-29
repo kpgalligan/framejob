@@ -23,9 +23,9 @@ tiny_http = "0.12"
 svgtypes = "0.16.1"
 # The motion-graphics engine (road map 10, G-2): only `ffi_graphic.rs` names it.
 graphic = { path = "../graphic" }
-
-[dev-dependencies]
-# `graphic_ffi.rs`'s revision oracle (already in the lock through `graphic`).
+# The `.fjgraphic` manifest's checksums (`graphic_package.rs`, G-46 (c)); also
+# `graphic_ffi.rs`'s and `graphic_package.rs`'s test oracles. Already in the
+# lock through `graphic`.
 sha2 = "0.10"
 
 [profile.release]

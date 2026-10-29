@@ -44,6 +44,10 @@ _Avoid_: preset (a preset is stored settings, not code), sample, built-in graphi
 The list a **Module** is filed under in the Graphic dialog: its `meta.category`, else Other. Every bundled **Template** has one of Data & Time, Screencast, Social & YouTube and Titles & Text; the package's own modules are all listed under This Project, first, whatever their own category (spec §11 G-45).
 _Avoid_: folder, group, tag
 
+**Graphic package**:
+A `.fjgraphic` file the Graphic dialog's Export… writes (`export_graphic` for an agent): a stored zip of a `manifest.json`, one **Module** and only the project fonts and assets the engine was seen to draw, measure, fall back to or resolve while drawing the graphic's frames and its `enum`/boolean variants — never one of the app's bundled fonts. Its paths mirror `graphics/`, so a later import is a copy; a file name the zip path cannot hold is stored under a tidied one, the manifest keeping the original. Exporting is not an edit, and the app does not open one yet (spec §11 G-46).
+_Avoid_: graphic archive, bundle, template file (a **Template** ships with the app)
+
 **Error card**:
 What a **Graphic** draws in its own box when it cannot draw itself — its **Module** is missing or does not compile, or a frame throws, runs past its budget or will not rasterize: dark red, a bright red border, and the graphic's name, its frame and the first diagnostic with its line and column in white. Never the last good frame, which would hide the error from someone scrubbing. An export never delivers one: it is refused before it starts, or stopped at the frame, with no file left (spec §11 G-8).
 _Avoid_: slate (the slate is what a layer with no source at all draws), error frame, placeholder

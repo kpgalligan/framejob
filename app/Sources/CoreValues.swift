@@ -14,7 +14,9 @@ import Foundation
 /// and `ReelSpeed.limits` (`SpeedLimits.decoded`), and `ReelHDR10.withBytes` (two pure moves).
 /// Codec-export C5's fix pass moved the decoding halves of `ReelExport.sizes`,
 /// `ReelExport.settings` and `ReelAV1.config`, and `ReelCube.parse`'s borrowed byte
-/// (`withNonNullBytes`), a pure move.
+/// (`withNonNullBytes`), a pure move. The graphic browser's export (spec §11 G-46) added
+/// `withByteBuffer` and `withMutableByteBuffer`, the borrow seven `ReelCore.swift` calls wrote
+/// inline (its toll), and `GraphicUsage`.
 
 /// Error thrown by the Rust core, carrying the message from `err_out`.
 struct ReelCoreError: LocalizedError {
@@ -282,4 +284,31 @@ func withNonNullBytes<R>(_ data: Data, _ body: (UnsafePointer<UInt8>, Int) -> R?
         guard let base = bytes.bindMemory(to: UInt8.self).baseAddress else { return nil }
         return body(base, count)
     }
+}
+
+/// What a graphics library's parses and measures used (`GraphicLibrary.usage()`, spec §11
+/// G-46 (b)): the font blobs by the order they were added, ascending, and the image assets.
+struct GraphicUsage: Equatable, Decodable {
+    let fonts: [Int]
+    let assets: [String]
+
+    /// The core's `{"fonts":[…],"assets":[…]}`; empty when nil or unreadable.
+    static func decoded(_ json: String?) -> GraphicUsage {
+        json.flatMap { ReelJSON.decode(GraphicUsage.self, from: $0) }
+            ?? GraphicUsage(fonts: [], assets: [])
+    }
+}
+
+/// `data`'s bytes and count for an `rc_*` call taking `const uint8_t *`: exactly the inline
+/// `withUnsafeBytes` / `bindMemory` it replaces, so an empty `data` may lend NULL.
+func withByteBuffer<R>(_ data: Data, _ body: (UnsafePointer<UInt8>?, Int) -> R) -> R {
+    data.withUnsafeBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+}
+
+/// `data`'s bytes and count for an `rc_*` call that writes them in place (`uint8_t *`):
+/// exactly the inline `withUnsafeMutableBytes` / `bindMemory` it replaces.
+func withMutableByteBuffer<R>(
+    _ data: inout Data, _ body: (UnsafeMutablePointer<UInt8>?, Int) -> R
+) -> R {
+    data.withUnsafeMutableBytes { body($0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
 }

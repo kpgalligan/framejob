@@ -21,7 +21,8 @@ import Foundation
 /// issue batch B84 (#103) three more after those: `delete_graphic`,
 /// `rename_graphic` and `restore_graphic` (spec §11 G-27, G-28, G-29); and
 /// the graphic browser two after those, the Insert ▸ Graphic… sheet's acts:
-/// `list_graphics` and `insert_graphic` (spec §11 G-45).
+/// `list_graphics` and `insert_graphic` (spec §11 G-45); and its phase 2 one more, the
+/// sheet's Export…: `export_graphic` (spec §11 G-46).
 extension AgentServer {
     /// The graphic rows, given the sentences the clip group already hoisted.
     func graphicTools(
@@ -339,6 +340,37 @@ extension AgentServer {
                             + "module already in the project's graphics/.",
                     ],
                 ], required: ["name", "from"]),
+            tool(
+                "export_graphic",
+                "Writes one graphic as a .fjgraphic package, as Insert ▸ Graphic…'s Export… "
+                    + "does: a zip of manifest.json, the module and only the project fonts and "
+                    + "assets it was seen to use. The app draws every frame up to 900 (else 900 "
+                    + "evenly spaced) with the default props, then each enum option and each "
+                    + "boolean's opposite (at most 32, over 30 frames each), and packs the "
+                    + "project fonts and assets the engine drew, measured, fell back to or "
+                    + "resolved; a bundled font is never packed, and string and asset props are "
+                    + "sampled only at their defaults. An existing file is replaced. Reply: "
+                    + "{path, files (the package's entries, manifest.json first), frames, "
+                    + "failed_frames (frames that threw, skipped)}. Refused, writing nothing, "
+                    + "for an unknown name, a module that does not compile, or a missing folder. "
+                    + "No edit and no undo step.",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The graphic's name as list_graphics gives it: a template's "
+                            + "or a module's.",
+                    ],
+                    "from": [
+                        "type": "string", "enum": ["template", "project"],
+                        "description": "template: one of the app's bundled templates. project: a "
+                            + "module in the project's graphics/.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write it; .fjgraphic is added when the path "
+                            + "lacks it. Its folder must exist.",
+                    ],
+                ], required: ["name", "from", "path"]),
         ]
     }
 }

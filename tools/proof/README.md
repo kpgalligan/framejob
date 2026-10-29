@@ -405,8 +405,9 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **100** since the graphic browser's
-`list_graphics` and `insert_graphic` (spec §11 G-45; 98 from #340's
+`op_argument_proof.py` asserts **101** since the graphic browser's phase 2
+`export_graphic` (spec §11 G-46; 100 from its phase 1 `list_graphics` and
+`insert_graphic`, spec §11 G-45; 98 from #340's
 `add_speed_ramp`, 97 from cut-by-transcript CT-4's `get_transcript`, 96 from
 CT-3's `transcribe_for_fillers`, 95 from CT-2's
 `detect_fillers`, 94 from #326's `export_status` and `cancel_export`, 92 from
@@ -25560,4 +25561,109 @@ python3 tools/proof/graphics_menu_proof.py              # → 39/39
 python3 tools/proof/graphic_browser_proof.py            # → 15/15
 python3 tools/proof/graphics_menu_proof.py --mutant browser-fallback
 python3 tools/proof/graphic_browser_proof.py --mutant list-templates-only
+```
+
+## The graphic browser, phase 2 — Export… and the `.fjgraphic` package (`graphic/tests/usage.rs`, `core/tests/graphic_package.rs` and five core mutants; `graphics_menu_proof.py` M33–M37 and one mutant; `graphic_browser_proof.py` E0–E6 and four mutants; spec §11 G-46)
+
+Spec §11 G-46 gives the Graphic dialog **Export…** at its far left: the
+chosen graphic written as a `.fjgraphic` stored zip of `manifest.json`, the
+module, and only the project fonts and assets the engine saw it use, never a
+bundled face. The engine records what it used (`Library::usage()`, read
+through `rc_graphic_library_usage`); `GraphicPackageJob` draws every frame up
+to 900 and the `enum`/boolean variants, then the core writes the archive
+(`rc_graphic_package_write`, `core/src/graphic_package.rs`), legalising an
+in-package name the zip path cannot hold. `export_graphic` mirrors it off main
+and is ask-first in the assistant, so the product catalog is **101** tools.
+
+- **`graphic/tests/usage.rs`** (in `make test`): a drawn family records its
+  blob (Anton; `serif` → Source Serif 4; a missing family nothing); a
+  fallback records both faces (Greek alpha in Anton: alone, Anton's
+  missing-glyph box, the same pixels as for Cyrillic Zhe; with Source Sans 3,
+  a different picture and blobs 0 and 1); `measure_text` alone records its
+  face; a drawn PNG is recorded, a non-image asset and a missing href are
+  not; a nested SVG asset's text records its face; a faceless blob at index 0
+  moves Anton to 1; usage accumulates and is per library.
+- **`core/tests/graphic_package.rs`** (in `make test`), black box through the
+  FFI with its own zip reader (end record → central directory → local
+  headers), a bitwise CRC-32 checked against `"123456789"` → `0xCBF43926`
+  and `sha2`: each entry's order, bytes, CRC, sizes, flag bit 11 and 1980
+  date; the manifest's whole text; two writes byte-identical and a rewrite
+  truncating; every input refusal naming its value, lowercase, writing
+  nothing; an I/O refusal naming the path; the in-package names (`a:b.ttf` →
+  `a-b.ttf`, `red\dot.png` → `red-dot.png`, a control run → one `-`, a
+  leading `.` dropped, `:` → `-`, `..` → `file`; a legal `a-b.ttf` keeps its
+  name and the legalised one before it takes `a-b-2.ttf`; a suffixed name
+  within 255 bytes by whole scalars). The archive-over-`u32::MAX` refusal is
+  not exercised (it needs 4 GiB of data). `graphic_ffi.rs` reads the usage
+  through the FFI and `model_tests.rs`'s null sweep covers both exports.
+- **`graphics_menu_proof.py`'s probe**: M33 (answered after M27) Export… is
+  the leftmost bottom-bar button, titled and enabled on the opening graphic;
+  M34 (after M31) disabled with no graphic chosen and on This Project's
+  `broken`; M35 on Titles & Text ▸ Lower third an `NSSavePanel` attaches to
+  the browser within 2 s named `lower-third.fjgraphic`, the browser up; M36
+  `exportChosen(to:)` writes `PK\x03\x04…` within 30 s and the message reads
+  "Exported Lower third to lower-third.fjgraphic: lower-third.js."; M37 the
+  browser stays up, the project handle and undo state are unchanged and the
+  export thread, named `com.kgalligan.framejob.graphic-export`, has
+  finished. `browser-export-failed-enabled` (Export…
+  enabled on a graphic that does not compile) is held to Rule R1 → M34.
+- **`graphic_browser_proof.py`**: E0–E6 after I5 on the light instance (the
+  docstring has each row) and U1's ten identifiers (`graphicbrowser.export`
+  added). E2's `variant` has an `enum` (Georgia) and a `boolean` (Arial), so
+  its package holds both faces. Its four new `APP_MUTANTS` run the tool and
+  export rows: `export-frame-zero` → E1, `export-all-assets` → E1,
+  `export-no-variants` → E2, `export-no-boolean` (the `"boolean"` literal in
+  `GraphicPackage.variants` mistyped) → E2 (Rule R).
+
+`op_argument_proof.py` asserts `PRODUCT_TOOLS = 101`; `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py` list `export_graphic` among the
+thirty-nine app-state tools; `assistant_prompt_proof.py`'s F5 and F8 find it
+ask-first and F6 holds the guide to 1497 of 1500;
+`capture_spike/inventory.json` holds the save panel's `beginSheetModal`
+site (`exportClicked`, reached after `showGraphicBrowser:`).
+
+**The five core mutants**, each one replacement (anchor asserted once) in a
+scratch copy of `core/` and `graphic/` (and `app/Resources/Fonts`) outside
+the tree, with its own target folder, each run alone after both controls
+(`--test usage` 7 passed, `--test graphic_package` 9 passed) passed in the
+copy. 5 of 5 caught.
+
+| Mutant | Edit | What failed, as cargo printed it |
+|---|---|---|
+| `usage-no-fallback` | the fallback selector's `record_font` removed | `a_fallback_records_both_faces` |
+| `usage-bad-asset` | `resolve_string` records an asset whatever its kind | `only_a_drawn_image_asset_is_recorded` |
+| `crc-init-zero` | the CRC starts from 0 | `each_entry_carries_the_ieee_crc_of_its_bytes` |
+| `legal-keep-colon` | `:` out of the legaliser's set | `an_illegal_in_package_name_is_legalised_and_the_manifest_keeps_the_given_name`, and the collision and 255-byte tests |
+| `legal-no-suffix` | a claimed legalised name takes no `-N` | `a_legalised_name_already_claimed_takes_a_suffix_and_the_legal_name_keeps_its_own`, and the 255-byte test |
+
+**The recorded run (2026-10-29, Release after `make gate`, which passed with
+the four baseline warnings):** `RC_PROOF_APP=release graphics_menu_proof.py`
+44/44; `RC_PROOF_APP=release graphic_browser_proof.py` 22/22;
+`op_argument_proof.py` 171/171 and `phase9_proof.py` 237/237 on one Release
+instance, its log clean. Mutants (Debug): `browser-export-failed-enabled`
+caught with M34 the first failure; `export-frame-zero` caught at E1 (the
+package lacked `fonts/Arial.ttf`, 1 frame), `export-all-assets` at E1
+(`assets/steel.jpg` packed), `export-no-variants` at E2 (no font). With the
+five core mutants above, 9 of 9 caught. `wc -l app/Sources/ReelCore.swift`
+is 768.
+
+**Fix pass 1 (2026-10-29):** `core/src/graphic_package.rs` cut to 400 lines
+(a chained call joined, a doc comment made one line; no behaviour change),
+and `crc-init-zero`, `legal-keep-colon` and `legal-no-suffix` re-run in a
+fresh scratch copy: control 9 passed, each caught with the tests in the table
+above. E0's `variant` gained the boolean `tag` (Arial when true) and E2 wants
+`fonts/Arial.ttf` and `fonts/Georgia.ttf`; `export-no-boolean` (Debug) caught
+at E2 (the package held only `fonts/Georgia.ttf`). M37 checks the export
+thread's name instead of an always-true `!== Thread.main`. 10 of 10 caught. Then `make gate`
+passed, and on Release `graphics_menu_proof.py` 44/44 and
+`graphic_browser_proof.py` 22/22, both logs clean.
+
+```sh
+cd graphic && cargo test --release --test usage
+cd core && cargo test --release --test graphic_package --test graphic_ffi
+make app-debug
+python3 tools/proof/graphics_menu_proof.py              # → 44/44
+python3 tools/proof/graphic_browser_proof.py            # → 22/22
+python3 tools/proof/graphics_menu_proof.py --mutant browser-export-failed-enabled
+python3 tools/proof/graphic_browser_proof.py --mutant export-frame-zero
 ```

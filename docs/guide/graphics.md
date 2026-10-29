@@ -57,7 +57,8 @@ listed in grey and its preview is the red error card.
 The dialog opens on the first category's first graphic. **Insert** (Return,
 or a double-click on a graphic) adds the chosen graphic; **Cancel** (Esc)
 closes the dialog; **From File…** closes it and asks for a `.js` module to
-copy into the project instead.
+copy into the project instead. **Export…**, at the far left, saves the chosen
+graphic to share (see [Sharing a graphic](#sharing-a-graphic)).
 
 A module of your own goes into a category by giving its `meta` a `category`
 (and a `description` for the line under the preview); one without a category
@@ -159,6 +160,38 @@ Insert ▸ Graphic… is greyed until the project's window is open.
 (`name`, `from`: `template` or `project`) is its Insert; or `write_graphic`
 then `add_graphic_clip` (`track`, `at`, `name`, and optionally `duration`,
 `width`, `height`, `props`).
+
+### Sharing a graphic
+
+**Export…** in the Graphic dialog saves the chosen graphic as a
+`.fjgraphic` file (Finder calls it a Frame Job Graphic): a zip holding a
+`manifest.json`, the module, and the project fonts and pictures it uses. It
+is enabled when the chosen graphic compiles. A save panel slides down over
+the dialog, named after the module; the dialog stays open, and the line under
+the lists says "Exporting <title>…", then "Exported <title> to <file>: …"
+with the files it holds, or why it could not. Saving over a file replaces it.
+Exporting changes nothing in the project and is not an undo step.
+
+To find which fonts and pictures belong in the package, Frame Job draws the
+graphic: every frame (up to 900; a longer graphic has 900 frames spread over
+it) with its default properties, then each choice of each `enum` property
+and the other value of each `boolean` property, one at a time, over 30
+frames each (at most 32 of these). A font is packed when the graphic drew or
+measured text with it, or fell back to it for a character its own font
+lacks; a picture when an `asset(name)` drew it. The app's own fonts are
+never packed, since every copy of Frame Job has them. Text and pictures a
+graphic only uses for property values other than the defaults (a different
+title, another picture) are not looked for. A frame that fails is skipped.
+
+A file name a zip path cannot hold (a `:` or `\`, a control character, a
+leading `.`) is stored under a tidied name (`a:b.ttf` as `a-b.ttf`), and the
+manifest keeps the original, so a font is still found by its family and
+`asset(name)` still finds its picture. Frame Job does not open `.fjgraphic`
+files yet.
+
+*Agents:* `export_graphic` (`name`, `from`: `template` or `project`, `path`)
+is Export…; it answers the path, the files in the package, the frames drawn
+and how many failed. The assistant asks before it runs.
 
 ## The Graphic sub-tab
 

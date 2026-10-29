@@ -209,18 +209,35 @@ final class GraphicStore {
     /// A NEW builder each call — a library is frozen by its first compile
     /// or rasterize — holding the bundled faces, then `scan.fonts`, then
     /// `scan.assets` by name.
-    func makeLibrary() throws -> GraphicLibrary {
+    func makeLibrary() throws -> GraphicLibrary { try makeIndexedLibrary().library }
+
+    /// The `.ttf` / `.otf` files in `folder`, sorted by name: the faces `makeLibrary()` adds first.
+    static func bundledFontURLs(in folder: URL) -> [URL] {
+        let all = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: nil)) ?? []
+        return all.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+            .filter { fontExtensions.contains($0.pathExtension.lowercased()) }
+    }
+
+    /// `makeLibrary()`'s library with what each of its font blobs is — `fonts[i]` the project
+    /// file blob `i` came from, nil for a bundled face — and the scan it was built from
+    /// (`GraphicPackageJob`, spec §11 G-46 (b)).
+    func makeIndexedLibrary() throws -> (
+        library: GraphicLibrary, fonts: [GraphicFile?], scan: GraphicScan
+    ) {
         let library = GraphicLibrary()
-        let bundled = (try? FileManager.default.contentsOfDirectory(
-            at: bundledFonts, includingPropertiesForKeys: nil)) ?? []
-        for url in bundled.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
-        where Self.fontExtensions.contains(url.pathExtension.lowercased()) {
+        var fonts: [GraphicFile?] = []
+        for url in Self.bundledFontURLs(in: bundledFonts) {
             try library.addFont(Data(contentsOf: url))
+            fonts.append(nil)
         }
         let current = scan
-        for font in current.fonts { try library.addFont(font.bytes) }
+        for font in current.fonts {
+            try library.addFont(font.bytes)
+            fonts.append(font)
+        }
         for asset in current.assets { try library.addAsset(name: asset.name, bytes: asset.bytes) }
-        return library
+        return (library, fonts, current)
     }
 
     // MARK: - Publishing (main)

@@ -608,6 +608,12 @@ bool rc_graphic_library_add_asset(RcGraphicLibrary *lib, const char *name, const
  * library as a compile would). NULL only for NULL. */
 char *rc_graphic_library_families(const RcGraphicLibrary *lib);
 
+/* {"fonts":[<blob index>…],"assets":[<name>…]}: the font blobs whose faces a parse or measure against
+ * `lib` selected (directly or as a fallback), and the image assets it resolved. Freezes it. NULL only for NULL.
+ * A blob index counts every `add_font` in order; fonts ascend and assets are sorted; cumulative over the
+ * library's life (spec §11 G-46 (b)). */
+char *rc_graphic_library_usage(const RcGraphicLibrary *lib);
+
 /* Releases a library. NULL-tolerant. */
 void rc_graphic_library_free(RcGraphicLibrary *lib);
 
@@ -644,6 +650,16 @@ void rc_graphic_free(RcGraphic *g);
 /* The engine's decoded-image cache (spec §11 G-39): sets its limit, trims it least recently
  * used first, and answers the bytes it holds after; 0 empties it. Never fails. */
 size_t rc_graphic_image_cache(size_t limit_bytes);
+
+/* Writes the .fjgraphic at `path` (created or truncated). package_json: {"module","title","category",
+ * "description":string|null,"app_version","files":[{"path","size"}…]}, each path relative to the project's
+ * `graphics/` folder; `data` is the files' bytes concatenated in that order. Answers the manifest.json it wrote
+ * (freed with rc_string_free); NULL with a lowercase sentence through err_out, including for a NULL argument.
+ * The first file is exactly `<module>.js`, every other `fonts/<n>` or `assets/<n>`; an <n> the package path
+ * cannot hold is legalised, the manifest keeping the given name (spec §11 G-46 (c); core/src/graphic_package.rs).
+ * Through core/src/ffi_graphic_package.rs, which names no engine type. */
+char *rc_graphic_package_write(const char *path, const char *package_json, const uint8_t *data, size_t len,
+                               char **err_out);
 
 /* ------------------------------------------------------------- container */
 

@@ -248,7 +248,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred product tools (and the dev tools, road
+  stranger by name, for all one hundred and one product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -323,7 +323,7 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
-`restore_graphic`, `list_graphics` and `insert_graphic`. A Debug or Release build also has the dev tools
+`restore_graphic`, `list_graphics`, `insert_graphic` and `export_graphic`. A Debug or Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
 "Seeing the chrome" below; `play_preview`, which plays a window's preview
 for a while and answers the frames composed (#127, spec §11 G-36);

@@ -4,9 +4,10 @@
 //! parse shares, whose resolvers record what resvg itself never reports.
 //! The generic families `serif`, `sans-serif` and `monospace` are named on
 //! the database (G-6), and a font is chosen from the text's OWN families
-//! only, never usvg's appended `serif` fallback.
+//! only, never usvg's appended `serif` fallback. Its `usage()` is every font
+//! blob and asset those resolvers handed a parse or a measure (G-46 (b)).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use resvg::usvg;
@@ -31,6 +32,26 @@ pub struct Library {
     version: String,
     warnings: Vec<Diagnostic>,
     memo: Mutex<HashMap<MemoKey, TextMetrics>>,
+    /// Each loaded face's blob: its index in `new()`'s `fonts`.
+    blobs: HashMap<fontdb::ID, usize>,
+    used: Mutex<Used>,
+}
+
+/// What every parse and measure against one library has used, cumulative
+/// over its life (G-46 (b)): the font blobs whose faces were selected,
+/// directly or as a fallback, as indexes into `Library::new`'s `fonts`
+/// (faceless blobs counted), ascending; and the assets resolved as images,
+/// by name, sorted.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Usage {
+    pub fonts: Vec<usize>,
+    pub assets: Vec<String>,
+}
+
+#[derive(Default)]
+struct Used {
+    fonts: BTreeSet<usize>,
+    assets: BTreeSet<String>,
 }
 
 /// One loaded face.
@@ -67,11 +88,14 @@ impl Library {
         let version = version_of(&fonts, &assets);
         let mut db = fontdb::Database::new();
         let mut warnings = Vec::new();
+        let mut blobs = HashMap::new();
         for (index, bytes) in fonts.into_iter().enumerate() {
-            let before = db.len();
-            db.load_font_data(bytes);
-            if db.len() == before {
+            let ids = db.load_font_source(fontdb::Source::Binary(Arc::new(bytes)));
+            if ids.is_empty() {
                 warnings.push(Diagnostic::warning(format!("font {index} loaded no face")));
+            }
+            for id in ids {
+                blobs.insert(id, index);
             }
         }
         // G-6's generics; `cursive` and `fantasy` keep fontdb's defaults,
@@ -99,6 +123,26 @@ impl Library {
             version,
             warnings,
             memo: Mutex::new(HashMap::new()),
+            blobs,
+            used: Mutex::new(Used::default()),
+        }
+    }
+
+    /// The font blobs and assets every parse and measure against this
+    /// library has used so far.
+    pub fn usage(&self) -> Usage {
+        let used = lock(&self.used);
+        Usage {
+            fonts: used.fonts.iter().copied().collect(),
+            assets: used.assets.iter().cloned().collect(),
+        }
+    }
+
+    /// Records a selected face's blob; called after usvg's own work, so no
+    /// other lock is held.
+    fn record_font(&self, id: fontdb::ID) {
+        if let Some(&index) = self.blobs.get(&id) {
+            lock(&self.used).fonts.insert(index);
         }
     }
 
@@ -155,12 +199,24 @@ impl Library {
 
     /// The options every parse uses: this font set only, `<image>` hrefs
     /// answered from the asset map only, and every miss recorded in
-    /// `probe`. `Options` is not `Clone`, so each call builds its own.
+    /// `probe`. Every face selected (directly or as a fallback) and every
+    /// asset resolved as an image is recorded in the usage set, each closure
+    /// locking it only after usvg's own call returns. `Options` is not
+    /// `Clone`, so each call builds its own.
     pub(crate) fn options<'a>(&'a self, probe: &'a Mutex<Probe>) -> usvg::Options<'a> {
         let select_font: usvg::FontSelectionFn<'a> = Box::new(move |font, db| {
             let id = select_font(font, db);
-            if id.is_none() {
-                lock(probe).families.push(font.families().to_vec());
+            match id {
+                Some(id) => self.record_font(id),
+                None => lock(probe).families.push(font.families().to_vec()),
+            }
+            id
+        });
+        let fallback = usvg::FontResolver::default_fallback_selector();
+        let select_fallback: usvg::FallbackSelectionFn<'a> = Box::new(move |c, used, db| {
+            let id = fallback(c, used, db);
+            if let Some(id) = id {
+                self.record_font(id);
             }
             id
         });
@@ -174,6 +230,8 @@ impl Library {
                     let kind = image_kind(asset, opts);
                     if kind.is_none() {
                         lock(probe).bad_assets.push(href.to_string());
+                    } else {
+                        lock(&self.used).assets.insert(href.to_string());
                     }
                     kind
                 }
@@ -186,7 +244,7 @@ impl Library {
             fontdb: self.db.clone(),
             font_resolver: usvg::FontResolver {
                 select_font,
-                select_fallback: usvg::FontResolver::default_fallback_selector(),
+                select_fallback,
             },
             image_href_resolver: usvg::ImageHrefResolver {
                 resolve_data,

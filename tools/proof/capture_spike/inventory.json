@@ -322,7 +322,7 @@
     "app/Sources/EditorViewController+GraphicMenus.swift `@objc func showGraphicBrowser(`",
     "app/Sources/EditorViewController+GraphicMenus.swift:34"
    ],
-   "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:50) from its viewDidDisappear"
+   "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:50) from its viewDidDisappear; Export… begins an NSSavePanel sheet on the browser itself (its `exportClicked`), and the export's result or refusal is a label in the sheet"
   },
   "splitAtPlayhead:": {
    "verdict": "none",
@@ -1212,6 +1212,19 @@
    "reached_from": [],
    "reached_after": [],
    "other_caller": "app/Sources/FileDropView.swift `func performDragOperation(` — a Finder drop that will not open"
+  },
+  "app/Sources/GraphicBrowserSheetController.swift:378": {
+   "token": "beginSheetModal",
+   "func": "exportClicked",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showGraphicBrowser:",
+     "via": "app/Sources/GraphicBrowserSheetController.swift `exportButton.action = #selector(exportClicked(_:))`",
+     "gate": "app/Sources/GraphicBrowserSheetController.swift `guard let item = chosenItem, item.ok, !exporting, let window = view.window else {` — the sheet's Export… was pressed on a graphic that compiles"
+    }
+   ],
+   "other_caller": ""
   },
   "app/Sources/GraphicPane+Source.swift:216": {
    "token": "runModal",

@@ -1,7 +1,8 @@
-//! C FFI: the motion-graphics engine (road map 10 §5e) — eleven
+//! C FFI: the motion-graphics engine (road map 10 §5e) — twelve
 //! `rc_graphic_*` exports delegating to the `graphic` crate (the builder's
 //! `new` and `add_asset` live in `ffi_graphic_pending.rs`, re-exported
-//! here), the eleventh the engine's decoded-image cache (spec §11 G-39). **The
+//! here), the eleventh the engine's decoded-image cache (spec §11 G-39), the
+//! twelfth what a library's parses and measures used (G-46 (b)). **The
 //! only module of the core that names that crate** (G-2): the core still
 //! does no pixel work and reaches no file; it hands the app's bytes to the
 //! engine and the engine's answer back.
@@ -125,6 +126,26 @@ pub unsafe extern "C" fn rc_graphic_library_families(lib: *const RcGraphicLibrar
     unsafe {
         handle_json(lib, |lib| {
             Some(Value::from(frozen(lib).families().to_vec()).to_string())
+        })
+    }
+}
+
+/// `{"fonts":[<blob index>…],"assets":[<name>…]}`: the font blobs (indexes
+/// in the order they were added, a faceless one counted) whose faces a parse
+/// or a measure against `lib` selected, directly or as a fallback, ascending;
+/// and the image assets it resolved, sorted. Cumulative over the library's
+/// life (G-46 (b)). Freezes the library as a compile would. NULL only for
+/// NULL.
+///
+/// # Safety
+/// `lib` must be NULL or a live handle from [`rc_graphic_library_new`]. The
+/// string is freed with `rc_string_free`.
+#[no_mangle]
+pub unsafe extern "C" fn rc_graphic_library_usage(lib: *const RcGraphicLibrary) -> *mut c_char {
+    unsafe {
+        handle_json(lib, |lib| {
+            let usage = frozen(lib).usage();
+            Some(serde_json::json!({"fonts": usage.fonts, "assets": usage.assets}).to_string())
         })
     }
 }

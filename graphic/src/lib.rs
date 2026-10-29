@@ -27,7 +27,7 @@ pub use images::{
     image_cache_builds, image_cache_bytes, set_image_build_hook, set_image_cache_limit,
     ImageBuildHook,
 };
-pub use library::{Face, Library};
+pub use library::{Face, Library, Usage};
 pub use measure::{measure_text, FontStyle, TextFont, TextMetrics};
 pub use module::Module;
 pub use props::{overlay, MAX_OPTIONS, MAX_PROPS, MAX_STRING, TYPES};

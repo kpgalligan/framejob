@@ -385,40 +385,16 @@ enum ReelExport {
 // MARK: - The op table, read back
 
 extension ReelOp {
-    /// Every op's arguments as JSON Schema, keyed by op name — `OP_TABLE`
-    /// in `core/src/op_table.rs`, projected by `core/src/op_schema.rs` and
-    /// read through the FFI rather than restated in Swift, which is the
-    /// whole point of the export: the catalog can print what the core
-    /// accepts instead of keeping a hand copy that can be wrong about a
-    /// type, a vocabulary or a required list and still pass every part of
-    /// the startup parity check.
-    ///
-    /// The keys are `coreNames()`'s names, and neither list is derived from
-    /// the other on this side: they are two views of one table in the core.
-    ///
-    /// Empty only if the core failed or its answer could not be read, which
-    /// it does not — and an empty answer is a catastrophe rather than "no
-    /// arguments", so a caller treats it the way `AgentCatalog` already
-    /// treats an empty `coreNames()`: it refuses to build on one.
-    ///
-    /// The second member of `ReelOp` that did NOT go to `ReelOps.swift`,
-    /// for `coreNames()`'s reason: it names an `rc_*` symbol, and this file
-    /// is the only one that may.
+    /// Every op's arguments as JSON Schema, keyed by op name (`coreNames()`'s names):
+    /// `rc_op_schemas`, the core's `OP_TABLE` projected by `op_schema.rs`. Empty means the
+    /// core failed, and a caller refuses to build on it.
     static func coreSchemas() -> [String: ReelOpSchema] {
         guard let json = takeString(rc_op_schemas()) else { return [:] }
         return ReelOpSchema.table(from: json)
     }
 
-    /// Every op name the core accepts, in the order of its table
-    /// (`OP_NAMES` in `core/src/edit.rs`), read through the FFI rather than
-    /// copied into Swift: a copy is one more spelling to drift, and its one
-    /// reader — `AgentCatalog.opNames`, which three things share — is there
-    /// to catch it. Empty only if the core failed, which it does not.
-    ///
-    /// The first member of `ReelOp` that did NOT go to `ReelOps.swift` with
-    /// the struct and its factories: it names an `rc_*` symbol, and this
-    /// file is the only one that may. `coreSchemas()` above stayed for the
-    /// same rule.
+    /// Every op name the core accepts, in its table's order: `rc_op_names` (`OP_NAMES`).
+    /// Empty means the core failed.
     static func coreNames() -> [String] {
         guard let json = takeString(rc_op_names()) else { return [] }
         return ReelJSON.decode([String].self, from: json) ?? []
@@ -559,9 +535,7 @@ enum ReelAV1 {
     /// the core's sentence when there is none or it ends early.
     static func config(sequenceHeader: Data) throws -> Config {
         var err: UnsafeMutablePointer<CChar>? = nil
-        let raw: UnsafeMutablePointer<CChar>? = sequenceHeader.withUnsafeBytes {
-            rc_av1_config($0.bindMemory(to: UInt8.self).baseAddress, $0.count, &err)
-        }
+        let raw = withByteBuffer(sequenceHeader) { rc_av1_config($0, $1, &err) }
         guard let text = takeString(raw) else {
             throw ReelCoreError(
                 message: takeErrorMessage(err, fallback: "the av1C record could not be built"))
@@ -572,9 +546,7 @@ enum ReelAV1 {
     /// `data` without its temporal delimiter OBUs; false, `data` untouched, when
     /// it is not a run of whole OBUs (or is empty).
     static func stripTemporalDelimiters(_ data: inout Data) -> Bool {
-        let kept = data.withUnsafeMutableBytes {
-            rc_av1_strip_temporal_delimiters($0.bindMemory(to: UInt8.self).baseAddress, $0.count)
-        }
+        let kept = withMutableByteBuffer(&data) { rc_av1_strip_temporal_delimiters($0, $1) }
         guard kept > 0 else { return false }
         data.removeSubrange(data.startIndex.advanced(by: kept)...)
         return true
@@ -583,9 +555,7 @@ enum ReelAV1 {
     /// `rc_av1_ftyp_brand` over a file's first bytes, in place: 1 rewritten, 0
     /// already carried, -1 no `ftyp` box or no `mp41` brand.
     static func brandAV01(_ head: inout Data) -> Int32 {
-        head.withUnsafeMutableBytes {
-            rc_av1_ftyp_brand($0.bindMemory(to: UInt8.self).baseAddress, $0.count)
-        }
+        withMutableByteBuffer(&head) { rc_av1_ftyp_brand($0, $1) }
     }
 }
 
@@ -609,10 +579,8 @@ final class ReelWebM {
 
     func add(track: UInt32, ptsNs: Int64, key: Bool, discardPaddingNs: Int64, data: Data) throws {
         try check { err in
-            data.withUnsafeBytes {
-                rc_webm_add_packet(
-                    handle, track, ptsNs, key, discardPaddingNs,
-                    $0.bindMemory(to: UInt8.self).baseAddress, $0.count, err)
+            withByteBuffer(data) {
+                rc_webm_add_packet(handle, track, ptsNs, key, discardPaddingNs, $0, $1, err)
             }
         }
     }
@@ -621,12 +589,10 @@ final class ReelWebM {
     /// `alpha_mode`.
     func addVideo(ptsNs: Int64, key: Bool, data: Data, alpha: Data) throws {
         try check { err in
-            data.withUnsafeBytes { picture in
-                alpha.withUnsafeBytes { plane in
+            withByteBuffer(data) { picture, pictureCount in
+                withByteBuffer(alpha) { plane, planeCount in
                     rc_webm_add_video_with_alpha(
-                        handle, ptsNs, key, picture.bindMemory(to: UInt8.self).baseAddress,
-                        picture.count, plane.bindMemory(to: UInt8.self).baseAddress, plane.count,
-                        err)
+                        handle, ptsNs, key, picture, pictureCount, plane, planeCount, err)
                 }
             }
         }
@@ -667,19 +633,13 @@ final class GraphicLibrary {
 
     func addFont(_ bytes: Data) throws {
         var err: UnsafeMutablePointer<CChar>? = nil
-        let ok = bytes.withUnsafeBytes { raw in
-            rc_graphic_library_add_font(
-                handle, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
-        }
+        let ok = withByteBuffer(bytes) { rc_graphic_library_add_font(handle, $0, $1, &err) }
         if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No font added.")) }
     }
 
     func addAsset(name: String, bytes: Data) throws {
         var err: UnsafeMutablePointer<CChar>? = nil
-        let ok = bytes.withUnsafeBytes { raw in
-            rc_graphic_library_add_asset(
-                handle, name, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
-        }
+        let ok = withByteBuffer(bytes) { rc_graphic_library_add_asset(handle, name, $0, $1, &err) }
         if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
     }
 
@@ -695,6 +655,12 @@ final class GraphicLibrary {
     func families() -> [String] {
         guard let json = takeString(rc_graphic_library_families(handle)) else { return [] }
         return ReelJSON.decode([String].self, from: json) ?? []
+    }
+
+    /// The font blobs (by add order) and image assets every parse and measure against this
+    /// library has used (spec §11 G-46 (b)). FREEZES it, as a compile would.
+    func usage() -> GraphicUsage {
+        GraphicUsage.decoded(takeString(rc_graphic_library_usage(handle)))
     }
 
     /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
@@ -751,6 +717,20 @@ final class GraphicModule {
         let diagnostics = takeDiagnostics(diag)
         guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
         return (svg, diagnostics)
+    }
+}
+
+/// The core's `.fjgraphic` writer (spec §11 G-46 (c)), `GraphicPackageJob`'s file write.
+enum ReelGraphicPackage {
+    /// Writes the package at `path` from `packageJSON` and `data` (the files' bytes in order);
+    /// answers its `manifest.json`, or throws the core's sentence.
+    static func write(path: String, packageJSON: String, data: Data) throws -> String {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let raw = withByteBuffer(data) { rc_graphic_package_write(path, packageJSON, $0, $1, &err) }
+        guard let manifest = takeString(raw) else {
+            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be written"))
+        }
+        return manifest
     }
 }
 

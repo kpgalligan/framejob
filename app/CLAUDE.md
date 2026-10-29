@@ -21,7 +21,7 @@ detail there.
   once per handle and clip, SR-20), timecode, snapping (export presets/sizes/settings are
   `ExportValues.swift`'s, a pure move, HDR H-1), `ReelSpeed.limits` (the
   core's speed range and audio ceiling, typed as `SpeedLimits` in
-  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
+  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25), `ReelGraphicPackage` (`rc_graphic_package_write`, G-46), `GraphicLibrary.usage()` (`rc_graphic_library_usage`) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
   #216-R) and `ReelWebM` (`rc_webm_*`, the `av1_webm` writer, spec §11 CX-15) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
   `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
@@ -60,7 +60,9 @@ detail there.
   and `.of(_:)`, the one spelling of a diagnostic made from a message, a
   missing module or a thrown error), `GraphicFailure` (what a
   `diag_out` failure throws; `err_out` stays `ReelCoreError`) and
-  `GraphicRaster` are `CoreValues.swift`'s, with `SpeedLimits` (a pure move,
+  `GraphicRaster` are `CoreValues.swift`'s, with `GraphicUsage`, the byte
+  bridges `withByteBuffer` and `withMutableByteBuffer` (G-46's toll; never
+  `UnsafeMutablePointer(mutating:)`), `SpeedLimits` (a pure move,
   clean-up batch 2), `ReelCoreError` and `Fps.ffiPair` (G6 phase 5's toll), and
   `CoreJSON` (`value`, `snapTicks`: `clipState`'s and `snapCandidates`' JSON
   halves, clean-up round 3's toll; `array`, `overrides`, C1's tolls; `ExportSize.list`,
@@ -2319,8 +2321,12 @@ free.
   `<title> — <name>`; and `GraphicTemplateLibrary`, the templates compiled
   once per process, first read on main, `NSLock`-memoised (the menu bar never
   reads it). `GraphicBrowserSheetController.swift` — Insert ▸ Graphic…'s
-  sheet: categories, graphics, the preview, From File… at the far left,
-  Cancel and Insert. Insert calls the editor's bodies in-event
+  sheet: categories, graphics, the preview, Export… at the far left and
+  From File… beside it, Cancel and Insert. Export… (spec §11 G-46) is
+  enabled for a graphic that compiles, asks with an `NSSavePanel` sheet and
+  runs `GraphicPackage` on its own named `Thread`
+  (`com.kgalligan.framejob.graphic-export`, `GraphicPrefetch.workerStackBytes`),
+  the result or refusal in `graphicbrowser.message`. Insert calls the editor's bodies in-event
   (`applyEdit`) and shows a throw word for word in
   `graphicbrowser.message`; `viewDidDisappear` stops the player and begins
   From File…'s panel there (a sheet just dismissed is still the window's
@@ -2329,7 +2335,14 @@ free.
   `NSCondition`; no AppKit or document off main; a main hop per frame for the
   newest subject only. `ProjectDocument+GraphicInsert.swift` —
   `writeGraphicModule`, `graphicClipMaker` and `noGraphicsFolderSentence`,
-  the bodies the sheet and `insert_graphic` share.
+  the bodies the sheet and `insert_graphic` share. `GraphicPackage.swift` —
+  `GraphicPackage`, `GraphicPackageJob`, `GraphicPackageResult` (G-46): a
+  fresh indexed library (`GraphicStore.makeIndexedLibrary()`,
+  `bundledFontURLs(in:)`), the module drawn at default props and each
+  `enum` option and flipped boolean, `GraphicLibrary.usage()` read, and the
+  project's used fonts and assets (never a bundled face) handed to
+  `ReelGraphicPackage.write`; QuickJS only on the sheet's export `Thread`
+  or the server's thread.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
@@ -2604,9 +2617,12 @@ free.
   `graphic_reference` (the bundled `GraphicsAPI.md`; it calls `target(a)` only
   when given a non-null `project`, so it answers with no project open and
   refuses a path no open project is at, G-20 (e)) — and `graphicsSummary`,
-  `get_project`'s `graphics`. `+GraphicBrowser` is `list_graphics` and
-  `insert_graphic` (spec §11 G-45), thin over `GraphicCatalog` and
-  `ProjectDocument+GraphicInsert.swift`. `+GraphicRender` is `render_graphic`, an
+  `get_project`'s `graphics`. `+GraphicBrowser` is `list_graphics`,
+  `insert_graphic` (spec §11 G-45) and `export_graphic` (G-46, an
+  `offMainTools` member, ask-first in the assistant), thin over
+  `GraphicCatalog`, `ProjectDocument+GraphicInsert.swift` and
+  `GraphicPackage`, with `browserGraphic(name:from:document:)` the one
+  `name`/`from` lookup. `+GraphicRender` is `render_graphic`, an
   `offMainTools` member: one `onMain` for the target, the registry's
   compiled module, the canvas and `meta`; then, off main, the ctx built by
   hand in `graphicContext` (`recipe_graphic.rs`'s keys; internal, the
@@ -2649,12 +2665,12 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-two op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-six APP-STATE tools, which have no op behind them
+  callers are the thirty-nine APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media` and `consolidate_media`, `AgentCatalog+Recording.swift`'s `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
-  `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
+  `AgentCatalog+Graphics.swift`'s twelve, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
   `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move
   out of `+Clips`), where the three looks' keys are taught. `opTool`
@@ -2683,7 +2699,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and one
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -3260,7 +3276,8 @@ queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26, G-36), and the
 graphic browser's preview player — one `Thread` per player
 (`GraphicPreviewPlayer.swift`, G-45) and its `DispatchQueue.main.async`
-frame hop. Beyond the camera's
+frame hop, and the browser's export `Thread`
+(`com.kgalligan.framejob.graphic-export`, G-46). Beyond the camera's
 two and the frame watch's, the recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

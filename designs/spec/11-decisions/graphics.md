@@ -2368,3 +2368,69 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (G-16 (c)'s "was written but" is gone, since a This Project graphic was
   not written). The agent's mirror is `list_graphics` and
   `insert_graphic {name, from}`.
+
+- **G-46 — The Graphic dialog's Export… writes a `.fjgraphic` package:
+  a stored zip of a manifest, the module, and only the project fonts and
+  assets the engine saw it use; never a bundled font** (owner,
+  2026-10-29; phase 2 of 2 of the graphic browser).
+  (a) **The door.** Export… sits at the sheet's far left, with From
+  File… to its right. It is enabled when a graphic is chosen and
+  compiles. It opens an `NSSavePanel` as a sheet on the browser, named
+  `<module>.fjgraphic`. The browser stays up; the result or the refusal
+  goes in `graphicbrowser.message`. Exporting is no edit and no undo
+  step.
+  (b) **The usage rule.** A fresh library is built: the bundled faces,
+  then the project's fonts, then its assets, and the module is compiled
+  against it. Each frame is drawn (svg, then rasterize at the meta size,
+  else the canvas) with default props: every frame up to 900, and past
+  that 900 evenly spaced frames. Then the variants are drawn, one at a
+  time with every other prop at its default: each `enum` option other
+  than the default, and each boolean's opposite, in schema order, at most
+  32, over 30 evenly spaced frames each. Every project font blob and asset
+  the engine selected, measured, fell back to or resolved is packed; a
+  bundled face never is. A frame that throws is skipped and counted.
+  String and asset props are sampled only at their defaults. Accepted: a
+  font or asset a module reaches only through a caller's own text or an
+  asset prop's non-default value is not packed.
+  (c) **The format.** A zip, stored (method 0), version needed 10,
+  made-by `0x031E`, flag bit 11 (UTF-8 names), DOS time 0 and date
+  `0x0021` (1980-01-01) so the bytes are deterministic, no extra fields,
+  no directory entries, external attributes `0o100644 << 16`; no Zip64,
+  so an archive over `u32::MAX` bytes is refused. `manifest.json` comes
+  first, then `<module>.js`, then the fonts and assets, then the central
+  directory. Its paths mirror `graphics/` (`fonts/<n>`, `assets/<n>`), so
+  a later import is a copy. The manifest is pretty JSON with a trailing
+  newline, in the key order `fjgraphic` (1), `module`, `title`,
+  `category`, `description` (string or null), `app_version`, `files`
+  (`path`, `name`, `size`, `sha256` each); `path` is the in-package path,
+  `name` the file's name in its project folder, `sha256` lowercase hex;
+  the manifest does not list itself. **A project font or asset whose name
+  the package path cannot hold** (`\`, `:`, a control character, a
+  leading `.`) **is never refused at export**: a legal in-package `<n>` is
+  non-empty, at most 255 bytes, does not begin with `.`, and holds no
+  `/`, `\`, `:` or control scalar (U+0000–U+001F, U+007F–U+009F). For
+  `fonts/` and `assets/`, each on its own, the legal names are claimed
+  first in the order given; then each illegal one, in order, has each run
+  of `\`, `:` or control scalars made one `-` and its leading `.`s
+  dropped (an empty result is `file`), and a name already claimed takes
+  `-2`, `-3`, … before its last `.` (G-23 (c)'s form), the stem cut by
+  whole scalars to stay within 255 bytes. `a:b.ttf` → `fonts/a-b.ttf`;
+  `red\dot.png` → `assets/red-dot.png`; `a:b.ttf` beside a legal
+  `a-b.ttf` → `fonts/a-b-2.ttf`. The manifest's `name` keeps the
+  project's, so an import can restore it and `asset(name)` still
+  resolves; a font is found by family, never by file name, so its renamed
+  entry changes no picture. The core (`rc_graphic_package_write`) writes
+  the archive and answers the manifest; Swift writes `.<file>.partial`
+  beside the destination and moves it into place, replacing a file
+  already there.
+  (d) **The UTI** `com.kgalligan.framejob-graphic` ("Frame Job Graphic",
+  conforming to `public.zip-archive` and `public.data`, extension
+  `fjgraphic`) is exported only; the app does not open a `.fjgraphic`.
+  (e) **`export_graphic {name, from, path}`** is the agent's mirror. It
+  runs off main, like `render_graphic`, has no `scope`, and refuses
+  `from` and an unknown name as `insert_graphic` does and a module that
+  does not compile with (f) of G-45's sentence; a refusal writes nothing.
+  It is ask-first in the assistant under AI-7's own criterion: it writes
+  a file where the model chose.
+  (f) **Import is not built.** It is filed as an issue when the phase
+  closes.

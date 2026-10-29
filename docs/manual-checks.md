@@ -615,6 +615,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Answer:** for each graphic whose preview stutters, does not loop or has the wrong shape, its name and project; any description cut short (its name); Esc, Return, double-click and From File… each as expected, yes or no; anything wrong in the other appearance.
 - **Source:** spec §11 G-45; `tools/proof/graphics_menu_proof.py` (M24–M32) and `tools/proof/graphic_browser_proof.py` measure the lists, the acts, the preview's first frame and the thread, not how the loop looks or how the keys feel.
 
+**GR-15 — The Graphic dialog's Export… saves a package a person can open**
+- **Setup:** a project with a module of your own that uses an imported font and an imported picture (e.g. File ▸ Add Font to Graphics… and Add Image to Graphics…, then ask the assistant for a module drawing text in that font and the picture), and a second module that uses only the app's fonts.
+- **Do:** Insert ▸ Graphic…, choose the first module, press Export…, save it to the Desktop; then the second module; then the template Lower third. Repeat once in the other appearance. In Finder, select each file and press ⌘I; double-click each to unpack it with Archive Utility.
+- **Expect:** the save panel slides down over the dialog as a sheet (not a separate window), named `<module>.fjgraphic`, in both appearances, and the dialog is still there when it closes; the line under the lists reads whole ("Exported <title> to <file>: …"); Finder's Kind reads "Frame Job Graphic"; each unpacks to a folder holding `manifest.json` and the module's `.js`, with `fonts/` and `assets/` only for the first (holding the font and the picture it uses), and no folder of the app's own fonts.
+- **Answer:** the panel as a sheet on the dialog, yes or no (each appearance); the message cut short, yes or no; Finder's Kind as read; for each file, what the unpacked folder holds.
+- **Source:** spec §11 G-46; `tools/proof/graphics_menu_proof.py` (M33–M37) and `tools/proof/graphic_browser_proof.py` (E0–E6) measure the button, the panel's attachment, the package's entries and bytes, not how the panel looks, how the message reads at its width, Finder's Kind or Archive Utility.
+
 ## Mattes
 
 **MAT-1 — A matte plays**

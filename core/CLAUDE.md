@@ -167,6 +167,12 @@ governs a module now.
   before 32,767 ms, Cues, the SeekHead and the Segment size patched at
   `finish`; `ffi_webm.rs` the six `rc_webm_*` exports over a
   `Mutex<WebmWriter>`. It writes the bytes it is handed and never decodes.
+- `graphic_package.rs` · `ffi_graphic_package.rs` — the `.fjgraphic` package
+  (spec §11 G-46): the package request's checks, the in-package name
+  legaliser (legal names claimed first, G-23 (c)'s suffixes on a clash),
+  `manifest.json`, the stored zip and its CRC-32, and the write (`.partial`
+  renamed into place); names no `graphic` item. `ffi_graphic_package.rs` is
+  `rc_graphic_package_write`, answering the manifest it wrote.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,
@@ -890,9 +896,11 @@ governs a module now.
   from `vpcc`; spec §11 CX-16 (10)); the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
-- `ffi_graphic.rs` — the eleven `rc_graphic_*` exports (road map 10 §5e; the
+- `ffi_graphic.rs` — the twelve `rc_graphic_*` exports (road map 10 §5e; the
   eleventh `rc_graphic_image_cache`, G-39: set the decoded-image cache's
-  limit, answer its bytes; two re-exported from `ffi_graphic_pending.rs`)
+  limit, answer its bytes; the twelfth `rc_graphic_library_usage`, G-46: the
+  font files and assets the library's draws used; two re-exported from
+  `ffi_graphic_pending.rs`)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
   `RcGraphicLibrary` is a BUILDER that the first compile or rasterize
@@ -944,7 +952,8 @@ names only the value. `graphic` (the path crate `../graphic`, road map
 dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
 out. `svgtypes` 0.16.1 (usvg's own pin, already in the lock) for its
 named-colour table only, so a stored name agrees with what usvg draws
-(`model_color.rs`). Dev: `sha2`, `graphic_ffi.rs`'s revision oracle.
+(`model_color.rs`). `sha2` for the `.fjgraphic` manifest's checksums
+(G-46; also `graphic_ffi.rs`'s revision oracle).
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

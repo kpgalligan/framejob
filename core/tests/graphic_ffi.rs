@@ -1,4 +1,4 @@
-//! The eleven `rc_graphic_*` exports (road map 10 §5e), black box through the
+//! The twelve `rc_graphic_*` exports (road map 10 §5e), black box through the
 //! FFI: a library built from the app's bundled faces, the `lower-third`
 //! fixture compiled and drawn, and every answer read back off the C side.
 //!
@@ -21,8 +21,8 @@ use common::{cstring, take_string};
 use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
     rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
-    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
-    RcGraphic, RcGraphicLibrary,
+    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_library_usage,
+    rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
 };
 
 const FONTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../app/Resources/Fonts");
@@ -439,6 +439,28 @@ fn families_answers_the_bundled_faces_sorted_and_freezes() {
     );
     assert_eq!(add_font(lib, &fonts[0]).as_deref(), Some(FROZEN));
     assert!(unsafe { rc_graphic_library_families(ptr::null()) }.is_null());
+    unsafe { rc_graphic_library_free(lib) };
+}
+
+#[test]
+fn usage_answers_the_blob_a_rasterize_drew_with() {
+    let anton = fs::read_dir(FONTS)
+        .expect("the bundled fonts directory")
+        .map(|entry| entry.expect("an entry").file_name().into_string().unwrap())
+        .filter(|name| name.ends_with(".ttf"))
+        .collect::<std::collections::BTreeSet<_>>()
+        .iter()
+        .position(|name| name == "Anton-Regular.ttf")
+        .expect("Anton is bundled");
+    let lib = library();
+    draw(
+        lib,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1920\" height=\"1080\">\
+         <text x=\"10\" y=\"100\" font-family=\"Anton\" font-size=\"80\">Usage</text></svg>",
+    );
+    let text = take_string(unsafe { rc_graphic_library_usage(lib) }).expect("a usage");
+    assert_eq!(text, format!("{{\"fonts\":[{anton}],\"assets\":[]}}"));
+    assert!(unsafe { rc_graphic_library_usage(ptr::null()) }.is_null());
     unsafe { rc_graphic_library_free(lib) };
 }
 

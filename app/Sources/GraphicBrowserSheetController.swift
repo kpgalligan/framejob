@@ -1,8 +1,8 @@
 // app/Sources/GraphicBrowserSheetController.swift — Insert ▸ Graphic… (spec
 // §11 G-45): a sheet of three panes — the categories, the graphics of the
 // chosen one, and a looping preview of the chosen graphic with its title and
-// one-line description — over a message line and a bottom bar of From File…
-// at the left and Cancel and Insert at the right.
+// one-line description — over a message line and a bottom bar of Export… and
+// From File… at the left and Cancel and Insert at the right.
 //
 // **What it lists is `GraphicCatalog.categories(for:)`**, read once when the
 // sheet is made, in the order `list_graphics` answers. It opens on the first
@@ -23,6 +23,13 @@
 // dismisses; the open panel is begun there, once the browser is down. And
 // the preview's render thread is stopped there, so every way out — Cancel,
 // Esc, Insert, From File… — stops it.
+//
+// **Export…** (spec §11 G-46 (a)) is enabled when the chosen graphic
+// compiles and no export is running. It opens a save panel as a sheet on the
+// browser, which stays up; `exportChosen(to:)` builds a `GraphicPackageJob` on
+// main and writes it on a `Thread` of `GraphicPrefetch.workerStackBytes`
+// (QuickJS needs the stack), and the result or the refusal goes in the
+// message line. No edit and no undo step.
 
 import AppKit
 
@@ -35,6 +42,10 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
     private let categories: [GraphicBrowserCategory]
     private let canvas: CanvasSnapshot
     private var fromFilePending = false
+    /// An export's thread is running; Export… stays disabled until it reports.
+    private(set) var exporting = false
+    /// The last export's thread, for the probe to see it finish.
+    private(set) var exportThread: Thread?
 
     private let categoryTable = NSTableView()
     private let graphicTable = NSTableView()
@@ -44,6 +55,7 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
     private let insertButton: NSButton
     private let fromFileButton: NSButton
+    private let exportButton: NSButton
 
     /// The preview's loop; its thread starts with the first graphic shown.
     private(set) lazy var player = GraphicPreviewPlayer(canvas: canvas) { [weak self] image in
@@ -65,6 +77,8 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
         self.insertButton = StickerButton(title: "Insert", style: .primary, target: nil, action: nil)
         self.fromFileButton = StickerButton(
             title: "From File…", style: .secondary, target: nil, action: nil)
+        self.exportButton = StickerButton(
+            title: "Export…", style: .secondary, target: nil, action: nil)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -151,12 +165,15 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
         fromFileButton.target = self
         fromFileButton.action = #selector(fromFileClicked(_:))
         fromFileButton.setAccessibilityIdentifier("graphicbrowser.fromFile")
+        exportButton.target = self
+        exportButton.action = #selector(exportClicked(_:))
+        exportButton.setAccessibilityIdentifier("graphicbrowser.export")
         let cancelButton = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         cancelButton.setAccessibilityIdentifier("graphicbrowser.cancel")
         view = makeSheetView(
             title: "Insert Graphic", content: sheetColumn([panes, messageLabel]),
             buttonRow: makeButtonRow(
-                cancel: cancelButton, apply: insertButton, leading: [fromFileButton]),
+                cancel: cancelButton, apply: insertButton, leading: [exportButton, fromFileButton]),
             width: Self.width)
 
         categoryTable.reloadData()
@@ -271,6 +288,7 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
         descriptionLabel.toolTip = item?.description
         messageLabel.stringValue = ""
         insertButton.isEnabled = item != nil
+        exportButton.isEnabled = item?.ok == true && !exporting
         if item == nil { previewView.image = nil }
         player.play(item.map(subject(for:)))
     }
@@ -344,6 +362,79 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
             return
         }
         dismiss(self)
+    }
+
+    // MARK: - Export
+
+    /// The save panel, as a sheet on the browser, named `<module>.fjgraphic`.
+    @objc private func exportClicked(_ sender: Any?) {
+        guard let item = chosenItem, item.ok, !exporting, let window = view.window else {
+            NSSound.beep()
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [GraphicPackage.contentType]
+        panel.nameFieldStringValue = "\(item.name).\(GraphicPackage.fileExtension)"
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            self?.exportChosen(to: url)
+        }
+    }
+
+    /// The panel's OK (and the probe's entry): the chosen graphic's job built here, on main,
+    /// and written on its own thread. A throw beeps and shows the sentence.
+    func exportChosen(to url: URL) {
+        guard let item = chosenItem, let document = document, !exporting else {
+            NSSound.beep()
+            return
+        }
+        let job: GraphicPackageJob
+        do {
+            switch item.origin {
+            case .template:
+                guard let template = GraphicTemplateLibrary.shared.entry(named: item.name) else {
+                    throw ReelCoreError(
+                        message: "The template \"\(item.name)\" is not in this build's bundle")
+                }
+                job = try GraphicPackageJob.template(template, document: document)
+            case .project:
+                job = try GraphicPackageJob.project(named: item.name, document: document)
+            }
+        } catch {
+            NSSound.beep()
+            messageLabel.stringValue = Self.sentence(error)
+            return
+        }
+        exporting = true
+        exportButton.isEnabled = false
+        messageLabel.stringValue = "Exporting \(job.title)…"
+        let thread = Thread { [weak self] in
+            let outcome = Result { try job.write(to: url) }
+            DispatchQueue.main.async { [weak self] in self?.exportFinished(job, outcome) }
+        }
+        thread.stackSize = GraphicPrefetch.workerStackBytes
+        thread.name = "com.kgalligan.framejob.graphic-export"
+        exportThread = thread
+        thread.start()
+    }
+
+    private func exportFinished(
+        _ job: GraphicPackageJob, _ outcome: Result<GraphicPackageResult, Error>
+    ) {
+        exporting = false
+        exportButton.isEnabled = chosenItem?.ok == true
+        switch outcome {
+        case .success(let result):
+            messageLabel.stringValue = "Exported \(job.title) to \(result.url.lastPathComponent): "
+                + result.files.joined(separator: ", ") + "."
+        case .failure(let error):
+            NSSound.beep()
+            messageLabel.stringValue = Self.sentence(error)
+        }
+    }
+
+    private static func sentence(_ error: Error) -> String {
+        (error as? ReelCoreError)?.message ?? error.localizedDescription
     }
 
     override func viewDidDisappear() {

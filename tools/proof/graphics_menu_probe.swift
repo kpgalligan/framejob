@@ -3,7 +3,7 @@
 // runs it). Since spec §11 G-45 Insert ▸ Graphic… is the graphic browser:
 // M21–M23 hold `GraphicCatalog` over fixture items, and M24–M32 drive the
 // browser through its own controls (found by accessibility identifier), as
-// M16–M20 drive the file sheet.
+// M16–M20 drive the file sheet; M33–M37 its Export… (spec §11 G-46 (a)).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a` —
@@ -290,6 +290,8 @@ struct Browser {
     let insert: NSButton
     let fromFile: NSButton
     let cancel: NSButton
+    /// Export… (G-46); looked for but not required, so a missing one fails M33 alone.
+    let export: NSButton?
 
     func rows(_ table: NSTableView) -> [String] {
         (0..<table.numberOfRows).map { row in
@@ -333,7 +335,7 @@ func openBrowser() -> Browser? {
     return Browser(
         window: sheet, controller: browser, categories: categories, graphics: graphics,
         preview: preview, title: title, message: message, insert: insertButton,
-        fromFile: fromFile, cancel: cancel)
+        fromFile: fromFile, cancel: cancel, export: find("graphicbrowser.export", NSButton.self))
 }
 func browserGone() -> Bool {
     pumpUntil(3) { !(window.attachedSheet?.contentViewController is GraphicBrowserSheetController) }
@@ -365,8 +367,11 @@ func catalogOutline() -> [String] {
 
 // M24..M27 — open, the lists, the preview, Insert with nothing chosen, Esc
 
-var ok24 = false, ok25 = false, ok26 = false, ok27 = false
+var ok24 = false, ok25 = false, ok26 = false, ok27 = false, ok33 = false
 var detail24 = "the sheet did not attach", detail25 = "", detail26 = "", detail27 = ""
+var detail33 = "the sheet did not attach"
+/// M34's first half: Export… with no graphic chosen.
+var exportNoneEnabled: Bool?
 let catalog24 = GraphicCatalog.categories(for: document)
 if let browser = openBrowser() {
     let shown = tableOutline(browser)
@@ -390,7 +395,20 @@ if let browser = openBrowser() {
     detail25 = "image within 3 s \(pictured), frames \(drawn.frames), any on main \(drawn.onMain), "
         + "thread \(thread?.name ?? "nil")"
 
+    // M33 — Export… leftmost in the bottom bar, titled, enabled on the opening graphic.
+    func minX(_ button: NSButton?) -> CGFloat {
+        button.map { $0.convert($0.bounds, to: nil).minX } ?? .infinity
+    }
+    let exportX = minX(browser.export)
+    let others = [browser.fromFile, browser.cancel, browser.insert].map(minX)
+    ok33 = browser.export != nil && others.allSatisfy { exportX < $0 }
+        && browser.export?.title == "Export…" && browser.export?.isEnabled == true
+    detail33 = "export \(browser.export != nil) at minX \(exportX) vs From File…, Cancel, Insert "
+        + "\(others); title \(browser.export?.title.debugDescription ?? "nil"), enabled "
+        + "\(browser.export?.isEnabled == true) on \(titled.debugDescription)"
+
     browser.graphics.deselectAll(nil)
+    exportNoneEnabled = browser.export?.isEnabled
     let dimmed = !browser.insert.isEnabled
     let cleared = browser.title.stringValue.isEmpty
     ok26 = dimmed && cleared && browser.graphics.selectedRow == -1
@@ -419,6 +437,9 @@ check("M25 the preview shows a picture within 3 s, drawn on the player's own thr
 check("M26 with the graphic deselected Insert is disabled and the title cleared", ok26, detail26)
 check("M27 Cancel (Esc) closes the browser and writes nothing: no module, no clip, no undo step",
       ok27, detail27)
+check("M33 Export… is the bottom bar's leftmost button (its minX below From File…'s, Cancel's and "
+      + "Insert's), titled \"Export…\", and enabled on the opening graphic",
+      ok33, detail33)
 
 // M6, M28 — Titles & Text ▸ Lower third through the Insert button
 
@@ -586,10 +607,13 @@ let brokenTitle = GraphicCatalog.categories(for: document).first?.items
     .first { $0.name == "broken" }?.title
 var ok31 = false
 var detail31 = "the sheet did not attach"
+/// M34's second half: Export… on a This Project module that does not compile.
+var exportBrokenEnabled: Bool?
 if let browser = openBrowser() {
     let clips = document.project.snapshot.clips.count
     let canUndo = undo.canUndo
     let chose = brokenTitle.map { browser.choose(browser.graphics, $0) } ?? false
+    exportBrokenEnabled = browser.export?.isEnabled
     let pressed = browser.press(browser.insert)
     spin(0.5)
     let stays = window.attachedSheet === browser.window
@@ -608,6 +632,11 @@ check("M31 This Project's broken (does not compile) chosen and Insert pressed: t
       + "up with graphicClipMaker's sentence word for word in graphicbrowser.message (\"graphics/"
       + "broken.js does not compile: …\"), no clip, the undo stack unmoved; Cancel closes it",
       ok31, detail31)
+check("M34 Export… is disabled with no graphic chosen and on This Project's broken (does not "
+      + "compile)",
+      exportNoneEnabled == false && exportBrokenEnabled == false,
+      "no graphic chosen: enabled \(exportNoneEnabled.map(String.init) ?? "no button"); broken: "
+          + "enabled \(exportBrokenEnabled.map(String.init) ?? "no button")")
 
 // MARK: - M32: From File… — the browser goes down, then the open panel comes up
 
@@ -630,6 +659,67 @@ clearBrowser()
 check("M32 From File… pressed: within 2 s the browser is gone and an NSOpenPanel is the window's "
       + "attached sheet (then cancelled)",
       ok32, detail32)
+
+// MARK: - M35..M37: Export… — the save panel on the browser, the package, nothing edited
+
+var ok35 = false, ok36 = false, ok37 = false
+var detail35 = "the sheet did not attach", detail36 = "not reached", detail37 = "not reached"
+if let browser = openBrowser() {
+    let handle = document.project
+    let undoBefore = "\(undo.canUndo) \(undo.undoActionName) \(undo.canRedo)"
+    let chose = browser.choose(browser.categories, "Titles & Text")
+        && browser.choose(browser.graphics, "Lower third")
+    let pressed = browser.export.map { browser.press($0) } ?? false
+    let panelUp = pumpUntil(2) { browser.window.attachedSheet is NSSavePanel }
+    let panel = browser.window.attachedSheet as? NSSavePanel
+    let named = panel?.nameFieldStringValue ?? "nil"
+    let upWithPanel = window.attachedSheet === browser.window
+    if let panel = panel { browser.window.endSheet(panel, returnCode: .cancel) }
+    let panelGone = pumpUntil(2) { browser.window.attachedSheet == nil }
+    ok35 = chose && pressed && panelUp && named == "lower-third.fjgraphic" && upWithPanel
+        && panelGone
+    detail35 = "chose \(chose), pressed \(pressed), an NSSavePanel on the browser within 2 s "
+        + "\(panelUp), named \(named.debugDescription), browser up \(upWithPanel), panel "
+        + "cancelled \(panelGone)"
+
+    let target = scratch.appendingPathComponent("lower-third.fjgraphic")
+    try? FileManager.default.removeItem(at: target)
+    browser.controller.exportChosen(to: target)
+    let started = browser.controller.exporting
+    let done = pumpUntil(30) { !browser.controller.exporting }
+    let head = (try? FileHandle(forReadingFrom: target)).map { handle -> Data in
+        defer { try? handle.close() }
+        return handle.readData(ofLength: 4)
+    }
+    let message = browser.message.stringValue
+    let wanted = "Exported Lower third to lower-third.fjgraphic: lower-third.js."
+    ok36 = started && done && head == Data([0x50, 0x4B, 0x03, 0x04]) && message == wanted
+    detail36 = "started \(started), finished within 30 s \(done), head "
+        + "\(head.map { $0.map { String(format: "%02x", $0) }.joined() } ?? "no file"), message "
+        + "\(message.debugDescription) (wanted \(wanted.debugDescription))"
+
+    let thread = browser.controller.exportThread
+    let finished = pumpUntil(2) { thread?.isFinished == true }
+    let stillUp = window.attachedSheet === browser.window
+    let undoAfter = "\(undo.canUndo) \(undo.undoActionName) \(undo.canRedo)"
+    ok37 = stillUp && document.project === handle && undoAfter == undoBefore && finished
+        && thread?.name == "com.kgalligan.framejob.graphic-export"
+    detail37 = "browser up \(stillUp), project handle the same \(document.project === handle), "
+        + "undo \(undoBefore) → \(undoAfter), export thread \(thread?.name ?? "nil") finished "
+        + "\(finished)"
+    _ = browser.press(browser.cancel) && browserGone()
+}
+clearBrowser()
+check("M35 Titles & Text ▸ Lower third, Export… pressed: within 2 s an NSSavePanel is the "
+      + "browser's attached sheet, named lower-third.fjgraphic, the browser still up; then "
+      + "cancelled",
+      ok35, detail35)
+check("M36 exportChosen(to:) writes a file beginning PK\\x03\\x04 within 30 s and the message reads "
+      + "\"Exported Lower third to lower-third.fjgraphic: lower-third.js.\"",
+      ok36, detail36)
+check("M37 through M35–M36 the browser stays up, the project handle and the undo state are "
+      + "unchanged, and the export thread (com.kgalligan.framejob.graphic-export) has finished",
+      ok37, detail37)
 
 // MARK: - M11: a module written from the shell a moment before is not overwritten (#75)
 

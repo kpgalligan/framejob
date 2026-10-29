@@ -44,8 +44,10 @@ use framejob_core::ffi_edit::rc_project_apply;
 use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
     rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
-    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
+    rc_graphic_library_free, rc_graphic_library_new, rc_graphic_library_usage,
+    rc_graphic_rasterize, rc_graphic_svg,
 };
+use framejob_core::ffi_graphic_package::rc_graphic_package_write;
 use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak, rc_hdr10_still_peak};
 use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
@@ -2219,6 +2221,9 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     assert!(unsafe { rc_graphic_library_families(ptr::null()) }.is_null());
     cover("rc_graphic_library_families");
 
+    assert!(unsafe { rc_graphic_library_usage(ptr::null()) }.is_null());
+    cover("rc_graphic_library_usage");
+
     let source = cstring("export function render() { return \"\"; }");
     let mut diag: *mut c_char = ptr::null_mut();
     assert!(unsafe {
@@ -2312,6 +2317,45 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     // No pointers: a limit of 0 (the engine's default) empties the cache.
     assert_eq!(unsafe { rc_graphic_image_cache(0) }, 0);
     cover("rc_graphic_image_cache");
+
+    // Every NULL is refused by name before anything is written.
+    let package_path = cstring("/nonexistent/never.fjgraphic");
+    let package = cstring("{}");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_package_write(ptr::null(), package.as_ptr(), byte.as_ptr(), 1, &mut err)
+    }
+    .is_null());
+    assert_eq!(take_string(err).as_deref(), Some("path is NULL"));
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_package_write(
+            package_path.as_ptr(),
+            ptr::null(),
+            byte.as_ptr(),
+            1,
+            &mut err,
+        )
+    }
+    .is_null());
+    assert_eq!(take_string(err).as_deref(), Some("package_json is NULL"));
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_package_write(
+            package_path.as_ptr(),
+            package.as_ptr(),
+            ptr::null(),
+            0,
+            &mut err,
+        )
+    }
+    .is_null());
+    assert_eq!(take_string(err).as_deref(), Some("data is NULL"));
+    assert!(unsafe {
+        rc_graphic_package_write(ptr::null(), ptr::null(), ptr::null(), 0, ptr::null_mut())
+    }
+    .is_null());
+    cover("rc_graphic_package_write");
 
     let mut err: *mut c_char = ptr::null_mut();
     assert!(unsafe { rc_container_open(ptr::null(), &mut err) }.is_null());

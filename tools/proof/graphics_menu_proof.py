@@ -93,6 +93,21 @@ M31 This Project's `broken` chosen in the browser and Insert pressed: the
     the undo stack unmoved; Cancel closes it;
 M32 From File… pressed: within 2 s the browser is gone and an `NSOpenPanel`
     is the window's attached sheet (then cancelled);
+M33 (spec §11 G-46 (a); answered after M27, read in M24's opening) Export…
+    is the bottom bar's leftmost button (its `minX` below From File…'s,
+    Cancel's and Insert's), titled "Export…", and enabled on the opening
+    graphic;
+M34 (answered after M31, read in M26's and M31's openings) Export… is
+    disabled with no graphic chosen and on This Project's `broken`;
+M35 Titles & Text ▸ Lower third, Export… pressed: within 2 s an
+    `NSSavePanel` is the BROWSER's attached sheet, named
+    `lower-third.fjgraphic`, with the browser still up; the panel is then
+    cancelled;
+M36 `exportChosen(to:)` (the panel's OK) writes a file beginning
+    `PK\x03\x04` within 30 s, and the message reads "Exported Lower third
+    to lower-third.fjgraphic: lower-third.js.";
+M37 through M35–M36 the browser stays up, the project handle and the undo
+    state are unchanged, and the export thread has finished;
 M10 on the second copy (NO module): `importFont(Oswald-Medium.ttf)` answers
     `["Oswald"]`, lands in `fonts/`, and the registry's library holds Oswald
     at once; a `.txt` is refused naming ".ttf"; `importAsset(red.png)` lists
@@ -195,7 +210,7 @@ replaced, and the fixtures and the probe run (no S row).
 no-op) keeps **Rule R**: exit 0 means M13 was answered and FAILED — caught;
 exit 1 means it passed — survived; exit 2 means the control was not performed
 (the copy, the anchor, the fixture or the build failed, or the probe gave no
-M13). The ten of B84's phase 2 and the seven of G-45's browser are held to
+M13). The ten of B84's phase 2, the seven of G-45's browser and G-46's one are held to
 **Rule R1**: exit 0 only when the
 mutant's row was answered, FAILED, and every row the probe answered before it
 passed — the row is the FIRST failure; exit 1 when the row passed, or an
@@ -220,6 +235,9 @@ performed.
     browser-project-copies    a This Project insert writes a copy first  → M30
     browser-skip-unique       writeGraphicModule skips uniqueModuleName  → M7
     browser-player-kept       viewDidDisappear's player.stop() removed   → M28
+    browser-export-failed-enabled
+                              Export… enabled on a graphic that does
+                              not compile                                → M34
 
 **App-tier mutants** (`APP_MUTANTS`): a COPY of the tree
 (`tree_copy.make_copy`) with one anchor replaced, built by the copy's own `make app-debug` (`make app` under
@@ -260,7 +278,7 @@ OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
 RED_PNG = ROOT / "graphic/tests/assets/red.png"
 CALL_BOUND = 120
 SECOND = 600000
-PROBE_ROWS = [f"M{n}" for n in range(2, 33)]
+PROBE_ROWS = [f"M{n}" for n in range(2, 38)]
 KEPT = ("probe", "framejob.log")     # what a run leaves in WORK
 
 SHEET_FILE = "GraphicFileSheetController.swift"
@@ -332,6 +350,9 @@ PROBE_MUTANTS = {
         "        let name = GraphicTemplates.moduleName(from: url.deletingPathExtension()"
         ".lastPathComponent)\n", "M7"),
     "browser-player-kept": (BROWSER_FILE, "        player.stop()\n", "", "M28"),
+    "browser-export-failed-enabled": (
+        BROWSER_FILE, "        exportButton.isEnabled = item?.ok == true && !exporting\n",
+        "        exportButton.isEnabled = item != nil && !exporting\n", "M34"),
 }
 APP_MUTANTS = {
     "app-rename-in-nest": (SHEET_FILE, NEST_LINE, "", "S1"),
@@ -522,7 +543,7 @@ def build_probe(out, sources=ROOT / "app/Sources"):
 def probe_checks(package, files, sources=ROOT / "app/Sources", out=WORK / "probe"):
     """Builds and runs the probe over copies of GM (`package`) and GF
     (`files`). The probe's rows as it answered them, `[(row, ok)]`."""
-    print("\n1 — the probe: M1–M32", flush=True)
+    print("\n1 — the probe: M1–M37", flush=True)
     binary, error = build_probe(out, sources)
     check("M1 the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -550,7 +571,7 @@ def probe_checks(package, files, sources=ROOT / "app/Sources", out=WORK / "probe
         return []
     probe_rows = json.loads(answer.read_text())["rows"]
     present = all(any(r["name"].split()[0] == n for r in probe_rows) for n in PROBE_ROWS)
-    check("the probe answers every M-row (M2–M32 present)", present, f"{len(probe_rows)} rows")
+    check("the probe answers every M-row (M2–M37 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
     return [(row["name"].split()[0], bool(row["ok"])) for row in probe_rows]

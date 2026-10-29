@@ -135,7 +135,7 @@ The assistant works only on its own window's project. A tool call that names ano
 
 ### Tools it asks about first
 
-Four tools ask first: `export`, `export_captions`, `save_project` and `consolidate_media`. Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
+Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_media` and `export_graphic`. Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
 
 | Tool | The question reads |
 |---|---|
