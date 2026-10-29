@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_015CYYn4HN2RFcuXQnP2bMMH",
+  "agent_id": "a9af6e5d1c4815ca1",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage graphics templates",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 30092,
+    "cache_read_tokens": 26365,
+    "output_tokens": 515,
+    "api_call_count": 2
+  },
+  "started_at": "2026-10-29T11:28:50.101767-04:00",
+  "completed_at": "2026-10-29T11:29:03.785743-04:00"
+}

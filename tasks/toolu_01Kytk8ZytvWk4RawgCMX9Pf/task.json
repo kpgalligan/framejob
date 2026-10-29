@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Kytk8ZytvWk4RawgCMX9Pf",
+  "agent_id": "a9a18b1c62df78a4d",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary graphics templates",
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 86137,
+    "cache_read_tokens": 1113964,
+    "output_tokens": 15694,
+    "api_call_count": 19
+  },
+  "started_at": "2026-10-29T11:36:14.454532-04:00",
+  "completed_at": "2026-10-29T11:39:11.799872-04:00"
+}

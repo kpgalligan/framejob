@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01A8iq7MidXTWknH2JgpT4ar",
+  "agent_id": "afabf001d061b069c",
+  "subagent_type": "lc-reviewer",
+  "task_description": "Re-review graphics templates",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 110569,
+    "cache_read_tokens": 1158685,
+    "output_tokens": 11269,
+    "api_call_count": 16
+  },
+  "started_at": "2026-10-29T12:29:08.000406-04:00",
+  "completed_at": "2026-10-29T12:31:21.5304-04:00"
+}
