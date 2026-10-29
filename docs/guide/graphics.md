@@ -1,9 +1,10 @@
 # Motion graphics
 
 A graphic clip is a motion graphic drawn fresh on every frame by a small
-JavaScript module kept inside your project. Frame Job ships six ready-made
-graphics (titles, a lower third, a counter, a chart and more), and you can
-bring in your own module or have an agent write one. Each module declares the
+JavaScript module kept inside your project. Frame Job ships twenty-three
+ready-made graphics (charts, a gauge and timers, screencast keys and window
+frames, title, quote and logo cards, and social pop-ups), and you can bring in
+your own module or have an agent write one. Each module declares the
 properties it takes, and the inspector turns those into controls, so you can
 change text, colours and numbers without touching code, and animate them over
 time like any other clip property.
@@ -48,24 +49,58 @@ the fonts installed on your Mac, so a project draws the same everywhere.
 
 | Item | What you get | Default length |
 |---|---|---|
+| Arrow Highlight | A rounded box drawn on around a spot, an arrow growing toward it from the side nearer the frame's centre, and a label at the arrow's tail | 90 frames |
 | Bar Chart | A titled bar chart whose bars grow in turn, from comma-separated values and labels | 150 frames |
 | Callout | A circle that draws itself on, with an arrow and a label, at a position on the frame | 90 frames |
+| Chapter Card | A full-frame card: a large outlined chapter number, a kicker, an accent rule drawing across and the title rising into view | 120 frames |
+| Countdown | A timer counting down (or up) one step a second inside a ring that empties or fills, pulsing on each tick and flashing at the end | 330 frames |
 | Counter | A number counting from one value to another with thousands separators, a prefix and a label | 90 frames |
+| Donut Chart | A titled donut whose slices sweep in turn from comma-separated values and labels, the first slice's share counting up in the centre, with a legend beside it (below it in portrait) | 150 frames |
+| End Screen | A full-frame card with a title, two 16:9 placeholders for the videos you link, side by side, and a subscribe circle centred under them (a column in portrait) | 300 frames |
+| Gauge | A dial with ticks whose accent arc and needle swing to a value, with the value counting up and its units and label | 120 frames |
+| Handle Tag | An accent tile holding a generic glyph (play, camera, speech bubble, note or globe) and a pill with your @handle, at a corner | 120 frames |
+| Keyboard Keys | A shortcut such as cmd+shift+4 as keycaps popping in, each pressed in turn, with ⌘ ⇧ ⌥ ⌃ and the arrows drawn as symbols, and a label under them | 90 frames |
 | Kinetic Type | A sentence shown word by word, each word springing in, with an accent colour | 150 frames |
+| Line Chart | A titled line drawn on through comma-separated values, a dot popping at each point, an optional area fill and the last value called out | 150 frames |
+| Logo Reveal | A full-frame card on which an accent bar sweeps across, revealing your logo image (or a text mark), then becomes a rule over a tagline | 120 frames |
 | Lower Third | A name and subtitle that slide in and fade out, boxed or not, aligned left, centre or right | 150 frames |
+| News Ticker | A band along the foot of the frame with a headline box and items, separated by "\|", crawling right to left | 300 frames |
+| Progress Bar | A labelled bar on a plate whose fill grows to a percentage, the figure counting, with a shine across it, at the bottom, centre or top | 120 frames |
+| Quote Card | A full-frame card with a large quote mark, the quote's lines fading up in turn, and the attribution sliding in | 150 frames |
+| Social Popup | A notification card at a corner with a generic avatar and a handle (and, for a comment, its text), its heart, speech bubble or share arrow popping as the count ticks up by one | 120 frames |
+| Step Badge | A numbered accent circle popping in at a corner, with a label panel wiping out from behind it | 90 frames |
+| Subscribe Button | A subscribe button a cursor clicks: it turns to its done label with a check, and a bell pops in beside it and rings after a second click | 150 frames |
 | Title Card | A title fitted to the frame and a kicker over a two-colour gradient, fading in and out | 120 frames |
+| Window Frame | A browser or app window's frame — title bar, three dots, a title or an address field, an outline — to put over a screen recording on the track below; the window's inside stays clear | 150 frames |
 | From File… | Asks for a `.js` module and copies it into the project | the module's own |
 
 Each template's properties, as the Graphic sub-tab shows them:
 
 | Template | Properties |
 |---|---|
+| Arrow Highlight | x and y (sliders from 0 to 1, the spot as a fraction of the frame), boxWidth and boxHeight (0.02–0.8 of the frame), shape (a pop-up: box+arrow, box, arrow), label, accent |
 | Bar Chart | values and labels (comma-separated text), title, color |
 | Callout | x and y (sliders from 0 to 1, a fraction of the frame's width and height), label, color |
+| Chapter Card | number (0–99), kicker, title, background, accent |
+| Countdown | from, to, format (a pop-up: seconds, m:ss, h:mm:ss), label, ring (a checkbox), accent |
 | Counter | from, to, prefix, label, color |
+| Donut Chart | values and labels (comma-separated text; a value below 0 counts as 0), title, accent |
+| End Screen | title, videoA, videoB, subscribe (the three labels), background, accent |
+| Gauge | value (held between min and max), min, max, label, units, accent |
+| Handle Tag | handle, glyph (a pop-up: play, camera, bubble, note, globe), position (a pop-up of the four corners), accent |
+| Keyboard Keys | keys (keys joined by "+": cmd, shift, opt or alt, ctrl, up, down, left, right, or any other key's name or character), label (empty hides it), theme (a pop-up: light, dark), position (a pop-up: bottom, center, top), accent |
 | Kinetic Type | text, stagger (1–30), color, accent |
+| Line Chart | values and labels (comma-separated text), title, area (a checkbox), accent |
+| Logo Reveal | logo (an image from the project's graphic assets; none draws the mark), mark, tagline, background, accent |
 | Lower Third | Title, subtitle, accent, size (12–200), boxed (a checkbox), align (a pop-up: left, center, right) |
+| News Ticker | headline, items (separated by "\|"), speed (40–600, pixels a second at 1080p), background, accent |
+| Progress Bar | value (0–100), label, showPercent (a checkbox), position (a pop-up: bottom, center, top), accent |
+| Quote Card | quote (a text area), attribution, background, accent |
+| Social Popup | kind (a pop-up: like, comment, share), handle, text (shown for a comment), count, position (a pop-up of the four corners), accent |
+| Step Badge | number (0–99), label, position (a pop-up of the four corners), accent |
+| Subscribe Button | label, doneLabel, bell (a checkbox), position (a pop-up: bottom, center, top), accent |
 | Title Card | title, kicker, from and to (the gradient's two colours) |
+| Window Frame | style (a pop-up: browser, window), title (window), url (browser), theme (a pop-up: dark, light), scale (0.5–1, the share of the title-safe area it covers), shadow (a checkbox), accent |
 
 Choosing one:
 

@@ -121,7 +121,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Item | Shortcut | What it does |
 |---|---|---|
 | Adjustment Clip | | Adds an adjustment clip over the in/out range. Without a range it covers the selected clips' span, and without a selection the whole timeline. Greyed while a nest is open ([Colour grading](color-grading.md)) |
-| Graphic ▸ Bar Chart · Callout · Counter · Kinetic Type · Lower Third · Title Card | | Adds a clip made from one of the bundled graphic templates ([Graphics](graphics.md)) |
+| Graphic ▸ Arrow Highlight · Bar Chart · Callout · Chapter Card · Countdown · Counter · Donut Chart · End Screen · Gauge · Handle Tag · Keyboard Keys · Kinetic Type · Line Chart · Logo Reveal · Lower Third · News Ticker · Progress Bar · Quote Card · Social Popup · Step Badge · Subscribe Button · Title Card · Window Frame | | Adds a clip made from one of the bundled graphic templates ([Graphics](graphics.md)) |
 | Graphic ▸ From File… | | Adds a graphic from a `.js` file you choose |
 
 *Agents:* `add_adjustment_clip`, and `write_graphic` followed by

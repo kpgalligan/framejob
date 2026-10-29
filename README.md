@@ -81,8 +81,9 @@ deliverables, with Show SDR Version to preview the last.
 → [HDR and colour management](docs/guide/hdr-and-color.md)
 
 **Motion graphics.** Graphic clips drawn every frame by a small JavaScript
-module: six built-ins (Bar Chart, Callout, Counter, Kinetic Type, Lower Third,
-Title Card), properties as inspector controls, your own modules too.
+module: 23 built-ins: charts, a gauge and timers, screencast keys and window
+frames, title, quote and logo cards, and social pop-ups; properties as
+inspector controls, your own modules too.
 → [Motion graphics](docs/guide/graphics.md)
 
 **Screen recording.** A display or a window, with system audio, microphone and

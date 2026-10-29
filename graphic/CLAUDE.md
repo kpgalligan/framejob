@@ -125,6 +125,13 @@ The crate's record is road map 10 §10.4.
 - `tests/pins.json` is re-pinned with `GRAPHIC_REPIN=1 cargo test
   --release --test pins`, only after looking at the PNGs a mismatch
   writes to `target/pins/`.
+- **The modules of `tests/graphics/` are the bundled templates** (Insert ▸
+  Graphic; project.yml's "Copy Graphic Templates" lists each). Every one
+  except `common::FIXTURES` is held to spec §11 G-44 by
+  `tests/templates.rs`: inside title-safe at every frame at 1920×1080,
+  1080×1920 and 1080×1080, with defaults, every combination of `enum` options
+  and every `string` long (`tests/templates/long_text.rs` must name each), a
+  card's background static, the last frame bare, no warning, no `NaN`.
 
 ## Dependencies, and why each
 

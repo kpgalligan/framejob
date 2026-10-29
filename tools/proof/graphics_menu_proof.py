@@ -25,7 +25,7 @@ with NO module. GF: `title` written twice (texts a, b — one text kept),
 S0  with the instance listening, `<home>/Library/Application Support` is a
     directory (the scratch home took). When it fails no tool is called.
 R1  the built app's `Contents/Resources/GraphicTemplates/` holds exactly the
-    six modules of `graphic/tests/graphics/`, byte-equal.
+    23 modules of `graphic/tests/graphics/`, byte-equal.
 
 **The probe**, `graphics_menu_probe.swift`, compiled AS `main.swift` over
 every file in `app/Sources` but the app's own on `swift_build.py`'s line,
@@ -34,12 +34,17 @@ with `Fonts/`, `GraphicTemplates/` (from `graphic/tests/graphics/`) and
 COPIES of GM and a COPY of GF (`files`):
 M1  the probe builds (a failure is scored, never an exit);
 M2  `AppDelegate().buildMainMenu()`: Insert right after Edit, holding
-    Adjustment Clip then Graphic; Insert ▸ Graphic is Bar Chart, Callout, Counter, Kinetic Type, Lower Third, Title Card, a
+    Adjustment Clip then Graphic; Insert ▸ Graphic is the 23 templates by
+    title, sorted by stem (Arrow Highlight, Bar Chart, Callout, Chapter Card,
+    Countdown, Counter, Donut Chart, End Screen, Gauge, Handle Tag, Keyboard
+    Keys, Kinetic Type, Line Chart, Logo Reveal, Lower Third, News Ticker,
+    Progress Bar, Quote Card, Social Popup, Step Badge, Subscribe Button,
+    Title Card, Window Frame), a
     separator, From File…; each template's `representedObject` a URL whose
     bytes equal the source file;
 M3  File holds Add Font to Graphics… then Add Image to Graphics… right after
     Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none
-    of the ten new items has a key equivalent;
+    of the twenty-seven new items has a key equivalent;
 M4  with no window `NSApp.target(forAction:)` is nil for the four editor
     selectors; `validateMenuItem` is true for Graphics Reference and false
     once the copied `GraphicsAPI.md` is moved away (CONTROL);
@@ -410,9 +415,9 @@ def bundle_check(app):
     want = sorted(p.name for p in TEMPLATES.glob("*.js"))
     same = [n for n in want if (folder / n).exists()
             and (folder / n).read_bytes() == (TEMPLATES / n).read_bytes()]
-    check("R1 the built app's Contents/Resources/GraphicTemplates/ holds exactly the six, "
+    check("R1 the built app's Contents/Resources/GraphicTemplates/ holds exactly the 23, "
           "byte-equal to graphic/tests/graphics/",
-          len(want) == 6 and held == want and same == want,
+          len(want) == 23 and held == want and same == want,
           f"{folder}: holds {held}, byte-equal {same}")
 
 

@@ -171,11 +171,11 @@ to Front), Help (Frame Job Help, Graphics Reference — road map 10's G5b: the
 bundled `GraphicsAPI.md` opened in the person's own app, live while the
 bundle holds it, with no document needed).
 Road map 10's G5b adds **Insert**, right after Edit, holding **Graphic ▸**:
-one item per bundled template (the six of `graphic/tests/graphics/`, copied
+one item per bundled template (the twenty-three of `graphic/tests/graphics/`, copied
 into the app's `GraphicTemplates/`, titled from the file stem —
 `lower-third.js` is Lower Third — never by compiling it), a separator and
 From File…; and File gains **Add Font to Graphics…** and **Add Image to
-Graphics…** right after Consolidate Media…. None of the ten items takes a
+Graphics…** right after Consolidate Media…. None of the twenty-seven items takes a
 key equivalent, for the caption items' reason; §11 G-16 has the rules.
 Issue batch B84 (#103) adds, after a separator straight under Add Image to
 Graphics… and before the separator above Export…, **Rename Graphic…**,

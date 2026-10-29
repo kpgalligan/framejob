@@ -2282,3 +2282,46 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   side of the cut is equal); inside the head and the tail a sample
   matches the unsplit clip within the matrices' round-trip error (1e-6
   per channel), not exactly.
+
+- **G-44 — The bundled templates: one unit, title-safe at every frame,
+  a static card, the bundled faces, generic glyphs, an accent and an
+  outro, held by a test** (owner, 2026-10-29: "I want to create some more
+  default graphics"; seventeen added to road map 10's six).
+  (a) **The unit.** A template sizes everything by
+  `u = Math.min(ctx.width, ctx.height) / 1080`, which is the six's
+  `ctx.height / 1080` in landscape and keeps a portrait (1080 × 1920)
+  frame from drawing at 1.78 times the size.
+  (b) **Title-safe at every frame.** Everything a template draws, at
+  every frame, lies inside the 90 % title-safe rectangle
+  (x ∈ [0.05W, 0.95W), y ∈ [0.05H, 0.95H)), at 1920 × 1080, at
+  1080 × 1920 and at 1080 × 1080 (the square social canvas, which takes
+  the landscape layout). An entrance is a spring, a clipPath wipe or a
+  fade, never a move in from off-frame. Long user text is fitted or
+  wrapped to stay inside, never kept out by narrowing the schema.
+  (c) **A card's background is static.** A full-frame template (one that
+  passes `background` to `svg`) draws the same background at frame 0 as at
+  every later frame; its outro fades or moves the content only.
+  (d) **The faces.** Montserrat 800/900 for text, IBM Plex Mono 500 for
+  ticking digits, and `'Source Sans 3'` 600 only for window-frame's UI
+  text. Bundled faces only (G-6).
+  (e) **Glyphs.** A keycap symbol, a bell, a heart, a play triangle or a
+  platform glyph is a generic vector shape drawn by the module; no brand's
+  artwork.
+  (f) **Accent and outro.** Every template has an `accent` colour prop and
+  an outro in about its last 15 frames, keyed to `ctx.durationInFrames`,
+  that leaves its last frame bare: clear for an overlay, the background
+  alone for a card.
+  (g) **The test.** `graphic/tests/templates.rs` holds every module of
+  `graphic/tests/graphics/` except `common::FIXTURES` (road map 10's six,
+  which keep their own look and pins) to (b), (c) and (f)'s bare last
+  frame at all three sizes, with its defaults, with every combination of
+  its `enum` options, and with long text (every `string` property given a
+  realistic long value: about 40 characters for a title or label, about
+  120 for a quote, ticker or subtitle, a list's longest plausible entries;
+  `tests/templates/long_text.rs` names one for each, and a string it does
+  not name fails): every sampled frame equals frame 0 outside
+  title-safe, and frame 0 has one alpha value there; no warning from `svg`
+  or `rasterize`, no `NaN` or `Infinity` in the SVG, with defaults and with
+  degenerate data (one point, an all-zero series, `max ≤ min`); and
+  `project.yml`'s "Copy Graphic Templates" lists exactly the folder's
+  `*.js` files.

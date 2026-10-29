@@ -86,8 +86,11 @@ let insert = mainMenu.items.first { $0.title == "Insert" }?.submenu
 let graphicItem = insert?.items.first { $0.title == "Graphic" }
 let graphic = graphicItem?.submenu
 let graphicTitles = graphic?.items.map { $0.isSeparatorItem ? "—" : $0.title } ?? []
-let wantTitles = ["Bar Chart", "Callout", "Counter", "Kinetic Type", "Lower Third",
-                  "Title Card", "—", "From File…"]
+let wantTitles = ["Arrow Highlight", "Bar Chart", "Callout", "Chapter Card", "Countdown",
+                  "Counter", "Donut Chart", "End Screen", "Gauge", "Handle Tag", "Keyboard Keys",
+                  "Kinetic Type", "Line Chart", "Logo Reveal", "Lower Third", "News Ticker",
+                  "Progress Bar", "Quote Card", "Social Popup", "Step Badge", "Subscribe Button",
+                  "Title Card", "Window Frame", "—", "From File…"]
 let templateItems = graphic?.items.filter {
     $0.action == #selector(EditorViewController.insertGraphicTemplate(_:))
 } ?? []
@@ -100,7 +103,7 @@ let bytesMatch = templateItems.map { item -> String in
 }
 let editIndex = barTitles.firstIndex(of: "Edit")
 check("M2 the menu bar has Insert right after Edit, holding Adjustment Clip then Graphic; "
-      + "Insert ▸ Graphic is the six templates by "
+      + "Insert ▸ Graphic is the 23 templates by "
       + "title, a separator and From File…; each template's representedObject is a URL whose "
       + "bytes equal graphic/tests/graphics/",
       editIndex != nil && barTitles.indices.contains((editIndex ?? 0) + 1)
@@ -109,7 +112,7 @@ check("M2 the menu bar has Insert right after Edit, holding Adjustment Clip then
           && graphicTitles == wantTitles
           && graphic?.items.last?.action
               == #selector(EditorViewController.insertGraphicFromFile(_:))
-          && templateItems.count == 6 && bytesMatch.allSatisfy { $0 == "ok" },
+          && templateItems.count == 23 && bytesMatch.allSatisfy { $0 == "ok" },
       "bar \(barTitles); Insert \(insert?.items.map(\.title) ?? []); Graphic \(graphicTitles); "
           + "bytes \(bytesMatch)")
 
@@ -128,7 +131,7 @@ let newItems = templateItems + [fromFileItem, fontItem, imageItem, referenceItem
     .compactMap { $0 }
 let keyed = newItems.filter { !$0.keyEquivalent.isEmpty }.map(\.title)
 check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right after "
-      + "Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none of the ten "
+      + "Consolidate Media…; Help holds Graphics Reference after Frame Job Help; none of the twenty-seven "
       + "new items has a key equivalent",
       fileTitles.indices.contains(consolidate + 2)
           && fileTitles[consolidate + 1] == "Add Font to Graphics…"
@@ -137,7 +140,7 @@ check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right
           && imageItem?.action == #selector(EditorViewController.addGraphicImage(_:))
           && helpTitles == ["Frame Job Help", "Graphics Reference"]
           && referenceItem?.action == #selector(AppDelegate.showGraphicsReference(_:))
-          && newItems.count == 10 && keyed.isEmpty,
+          && newItems.count == 27 && keyed.isEmpty,
       "File \(fileTitles); Help \(helpTitles); \(newItems.count) new items; keyed \(keyed)")
 
 // MARK: - M4: no window

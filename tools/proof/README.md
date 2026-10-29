@@ -6996,7 +6996,7 @@ naming line 2, so that row is not expected to fail.
 Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
 
 - **R1, the bundle.** The built app's `Contents/Resources/GraphicTemplates/`
-  holds exactly the six modules of `graphic/tests/graphics/`, byte-equal
+  holds exactly the 23 modules of `graphic/tests/graphics/`, byte-equal
   (project.yml's "Copy Graphic Templates" script).
 - **The fixture, over MCP.** One owned instance on a scratch socket (its
   log is `work/graphics-menu/framejob.log`) runs
@@ -7009,7 +7009,7 @@ Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
   the probe builds (M1, a scored failure otherwise); the menu bar's Insert
   right after Edit and its Graphic submenu, each template's URL byte-equal
   to its source (M2); File's two items after Consolidate Media…, Help's
-  Graphics Reference, no key equivalent on the ten new items (M3); no
+  Graphics Reference, no key equivalent on the twenty-seven new items (M3); no
   target for the four editor selectors with no window, and Graphics
   Reference live until the copied `GraphicsAPI.md` is moved away, a CONTROL
   (M4); the four validate false before `startGraphicStore()` and true after

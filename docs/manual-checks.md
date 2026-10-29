@@ -601,6 +601,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Answer:** rings in the preview, yes or no; rings in the PNG, the ProRes, the `hevc_10bit`, the `h264`, each yes or no; visible grain anywhere, yes or no (and where).
 - **Source:** #375 part 1 (spec §11 PR-13); `tools/proof/raster_dither_proof.py` measures the banding (B1–B4b) and the per-pixel noise each export keeps, not how it looks to a person on a display.
 
+**GR-13 — The bundled templates look and move right**
+- **Setup:** a 1920×1080 project with a video clip on it, a 1080×1920 project and a 1080×1080 project; View ▸ Safe Areas on; View ▸ Preview Quality ▸ Full.
+- **Do:** In each project, insert each of the 23 templates (Insert ▸ Graphic ▸ …), over the clip in the 1080p project, then play each from its start to its end.
+- **Expect:** smooth entrances and outros, readable text, and nothing drawn past the Safe guide's outer (90 %, title-safe) rectangle at any moment, in every project.
+- **Answer:** for each template that fails, its name, the project (1080p, 1080×1920 or 1080×1080) and what is wrong: a jerky move, text you cannot read, or something past the outer rectangle.
+- **Source:** owner 2026-10-29 (spec §11 G-44); `graphic/tests/templates.rs` measures that nothing outside title-safe moves at every fifth frame and that no frame warns, and that the last frame is bare, with defaults, every `enum` combination and every text property long, not how the motion looks.
+
 ## Mattes
 
 **MAT-1 — A matte plays**
