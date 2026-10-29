@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Ud1w2N29VoPY4qoVTyUJY9",
+  "agent_id": "a1e6318d020a7d16e",
+  "subagent_type": "general-purpose",
+  "task_description": "Close codec-export road map",
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 251582,
+    "cache_read_tokens": 9324676,
+    "output_tokens": 38836,
+    "api_call_count": 47
+  },
+  "started_at": "2026-10-29T02:19:36.979402-04:00",
+  "completed_at": "2026-10-29T02:29:58.250206-04:00"
+}
