@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01GRpw43f2GTatq2jJJtDES8",
+  "agent_id": "a4e2a996f673a97bb",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage fjgraphic export phase",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 30544,
+    "cache_read_tokens": 27345,
+    "output_tokens": 558,
+    "api_call_count": 2
+  },
+  "started_at": "2026-10-29T15:13:53.740862-04:00",
+  "completed_at": "2026-10-29T15:13:59.66797-04:00"
+}
