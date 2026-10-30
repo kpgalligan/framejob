@@ -39,13 +39,13 @@ enum AssistantPrompt {
             + "below, insert and overwrite edits, paste, duplicate",
          ["add_clip", "add_text_clip", "add_shape_clip", "add_adjustment_clip", "add_background",
           "add_blurred_background", "insert_clip", "overwrite_clip", "paste", "duplicate"]),
-        ("cut and time clips: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
-            + "detach audio, delete, ripple delete, delete or lift a range, insert time, close "
-            + "a gap",
+        ("cut and time: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
+            + "detach or attach audio, (ripple) delete, delete or lift a range, insert time, "
+            + "close a gap",
          ["move_clip", "trim_start", "trim_end", "rate_stretch", "slip", "roll", "split",
           "delete", "ripple_delete", "ripple_delete_range", "ripple_delete_ranges", "lift_range",
           "insert_time", "close_gap", "set_speed", "set_reversed", "freeze_frame",
-          "detach_audio"]),
+          "detach_audio", "attach_audio"]),
         ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",

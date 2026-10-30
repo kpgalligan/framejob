@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all sixty-two.
+    /// not an argument of any op and is spelled once for all sixty-three.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an
@@ -428,18 +428,23 @@ extension ReelOp {
     }
 
     /// Front trim: the source in-point advances with the start, so later
-    /// content stays where it is.
-    static func trimStart(clip: UInt32, to: Ticks) -> ReelOp {
+    /// content stays where it is. A linked partner whose start coincides
+    /// follows unless `alone` — the J-cut (spec §11 AU-93); `alone` is
+    /// written only when true.
+    static func trimStart(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "trim_start", args: a.values)
     }
 
-    static func trimEnd(clip: UInt32, to: Ticks) -> ReelOp {
+    /// End trim; `alone` as `trimStart`'s — the L-cut.
+    static func trimEnd(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "trim_end", args: a.values)
     }
 
@@ -467,11 +472,13 @@ extension ReelOp {
     /// ⌥⇧-drag on a clip edge: the hard cut between this clip and the one
     /// ending exactly at its start moves to `to`, and nothing else does.
     /// Refuses without a hard cut there — a gap, or an overlap, whose
-    /// length is `setTransitionDuration`'s.
-    static func roll(clip: UInt32, to: Ticks) -> ReelOp {
+    /// length is `setTransitionDuration`'s. A linked partner's cut rolls too
+    /// unless `alone` (spec §11 AU-93), written only when true.
+    static func roll(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "roll", args: a.values)
     }
 
@@ -618,6 +625,15 @@ extension ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         return ReelOp(name: "detach_audio", args: a.values)
+    }
+
+    /// Merges a linked picture and its detached sound back into one clip;
+    /// either half may be named. Refuses a clip with no detached sound, and
+    /// a pair that no longer covers the same time (spec §11 AU-95).
+    static func attachAudio(clip: UInt32) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        return ReelOp(name: "attach_audio", args: a.values)
     }
 
     /// Copies placed after the originals' span on the same tracks.

@@ -16,8 +16,10 @@ impl Project {
     /// The original keeps its video and gets `enabled.audio = false`; the
     /// new clip is `{video: false, audio: true}` with the same source, in
     /// point, duration and speed, and its VIDEO props, so re-enabling video
-    /// on it is not lossy. Refuses, naming why, with no audio to detach
-    /// (spec §11 #88), and when the new clip breaks the overlap rule below.
+    /// on it is not lossy. The two name each other in `linked` (spec §11
+    /// AU-90), and Attach Audio is the way back. Refuses, naming why, with
+    /// no audio to detach (spec §11 #88), and when the new clip breaks the
+    /// overlap rule below.
     pub fn detach_audio(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let why = match target.source {
@@ -61,9 +63,13 @@ impl Project {
         audio_clip.audio = target.audio.or_else(|| Some(AudioProps::default()));
         // The transition describes an overlap on the ORIGINAL track.
         audio_clip.transition_in = None;
+        // The two halves name each other (spec §11 AU-90): every placement
+        // edit keeps them in step from here, and Attach Audio merges them.
+        audio_clip.linked = Some(clip);
 
         if let Some(slot) = next.clip_mut(clip) {
             slot.enabled.audio = false;
+            slot.linked = Some(audio_clip.id);
         }
         self.commit_additions(next, vec![audio_clip])
     }

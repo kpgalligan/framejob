@@ -23,6 +23,7 @@
 //! half B puts A's end before B's midpoint while B/C staying within half B
 //! puts C's start after that midpoint, contradicting A reaching C.
 
+use crate::edit_time::shifted;
 use crate::model::Project;
 use crate::time::{frames_within, Ticks};
 use crate::transition::overlap_limit;
@@ -59,7 +60,8 @@ pub(crate) fn largest_passing(limit: Ticks, mut fits: impl FnMut(Ticks) -> bool)
 
 /// Greatest positive shift count not forbidden by a fixed/moved pair on
 /// any touched track. The caller checked the original affected tracks and
-/// supplies the same shift set as `shift_clips`.
+/// supplies the same touched tracks as `shift_clips`; the moved partition
+/// is `shift_clips`'s own set ([`shifted`], linked partners included).
 pub(crate) fn shift_frame_limit(
     project: &Project,
     cut: Ticks,
@@ -75,17 +77,13 @@ pub(crate) fn shift_frame_limit(
         i128::from(frames_within(cut, span, fps))
     };
     let maximum = i128::from(limit);
+    let moving = shifted(project, cut);
     for track in touched {
-        let fixed: Vec<_> = project
+        let (moved, fixed): (Vec<_>, Vec<_>) = project
             .clips
             .iter()
-            .filter(|c| c.track == *track && c.start < cut)
-            .collect();
-        let moved: Vec<_> = project
-            .clips
-            .iter()
-            .filter(|c| c.track == *track && c.start >= cut)
-            .collect();
+            .filter(|c| c.track == *track)
+            .partition(|c| moving.contains(&c.id));
         for a in &fixed {
             for b in &moved {
                 let s = i128::from(a.start);

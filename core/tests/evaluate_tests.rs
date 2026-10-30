@@ -1831,6 +1831,7 @@ fn a_clip_whose_media_is_absent_renders_a_slate() {
         transition_in: None,
         name: None,
         label: None,
+        linked: None,
     });
     value.next_id = 12;
 

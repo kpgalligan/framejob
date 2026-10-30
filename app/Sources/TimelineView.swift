@@ -880,6 +880,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         trim = TrimSession(
             clip: id, edge: edge,
             stretch: flags.contains(.option) && clip.source.hasSourceBound,
+            alone: clip.isLinkedSound,
             originalStart: clip.start, originalEnd: clip.end, frame: frame,
             time: edge == .start ? clip.start : clip.end)
         onLiveBegin?()

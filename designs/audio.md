@@ -441,6 +441,65 @@ keeping the old mode until its Volume section is rebuilt.
 
 **Owed:** SE-23 (the read-out's look, the drag, the sound) for the owner.
 
+### AP9's record (2026-10-30)
+
+**Decided.** The owner answered "Asked at AP9" with (a), the linked pair, including the
+deviation from the road map's "⌥-drag" (⌥ on an edge is Rate Stretch, so the half you grab
+decides): AU-90…AU-97, recorded before the code. The adversary's three objections were taken:
+a partner follows in time but keeps its own track (so a detached sound can reach a track of its
+own and a J-cut between consecutive detached shots does not become a dissolve), one clamp over
+the pair and a refusal for a shift that would take a leading sound below 0, and `delete` of a
+sound half alone keeping its picture (Detach Audio then Delete stays the way to drop a sound).
+
+**Landed.** The toll first, a pure move gated alone: `fit_scale` and `fill_scale` from
+`edit_clip.rs` to `edit_fit.rs` (634 → 587; 61), `cargo test --release` green and `make lint`
+clean. Then `Clip.linked` (format 28, provisional), `edit_link.rs` (the closure, the delete
+closure, `settle_links` in `finish`, `check_links` in `validate`, split pairing, copy
+re-pairing, carried edges, the rate refusal and `attach_audio`), `edit_time.rs`'s `shifted` and
+the shift floor refusal, `alone` on `trim_start`, `trim_end` and `roll`, slip on both halves;
+the app's `attach_audio` mirror, Clip ▸ Attach Audio (⇧⌥⌘D) and the Mix button, the sound-half
+`alone` in the trim and roll sessions and W/E, Copy adding a picture's sound, the link glyph and
+the echo ring. `edit_clip.rs` ends at 616 (over the cap, known debt, its next seam named in
+`designs/adr/core-file-history.md`); `edit_time.rs` 595, `model.rs` 590, `edit_action.rs` 560,
+`AgentCatalog+Clips.swift` 570.
+
+**Measured.** `core/tests/link.rs` (27) and `link_edges.rs` (10) cover every op on a linked pair,
+J and L variants, each refusal sentence, locks, a scoped move and identities; `schema_v28.rs` (5)
+the format. Sixteen mutants, one per branch AU-91…AU-96 add, each killed by a named test (the
+table in `tools/proof/README.md`). `make gate` PASS in 335 s (names 1, typecheck 6, fmt 3, lint
+6, test 182, app 138; the four baseline warnings). `ap9_split_edits_proof.py` A0–A9 against
+Release after the gate's `make app`: 10/10 (and 10/10 on Debug before it) — onset − first frame
+−0.4999 s for the J-cut, offset − picture end +0.5000 s for the L-cut, through the move, the
+ripple, the split + delete (head 0.0000 s once the lead is cut away) and the nest; the worst
+click − flash 0.174 ms against the 1 ms tolerance; Attach's export equal to a never-detached
+clip's, sample for sample. `op_catalog_proof.py` 23/23 and `op_argument_proof.py` 173/173 (its
+pinned counts moved to 63 ops and 103 tools); `assistant_prompt_proof.py --probe` 14/14.
+
+**Deviations.** `beginRoll` lives in `EditorViewController+Edge.swift`, not the frozen
+`TimelineView.swift`, so the roll's `alone` is wired there. The assistant prompt's cut group was
+reworded to "detach or attach audio" to stay under the search guide's 1,500 characters (1,498).
+Because `split_clips` takes the closure, `freeze_frame`, `insert_clip` and `overwrite_clip` also
+cut a linked partner at the same bound and pair it (AU-92); under an overwritten picture the
+sound becomes three abutting pieces, the middle one unlinked. `ripple_delete_range` over a
+J-cut's lead cuts the lead with the range rather than refusing (`link_edges.rs` pins it).
+
+**Review.** The first review asked for one fix: the `insert_clip` and `overwrite_clip` rows
+(`edit.rs`, `edit_insert.rs`, spec §6b, the two catalog descriptions, `editing.md`) still said
+no other track is cut, which a linked partner now is. The fix pass corrected all of them;
+`make gate` PASS 382 s, `spec_index_proof.py` 213/213; the Release proof was not re-run, the
+pass changing prose only. The second review passed, three nits left as written: `editing.md`'s
+exception names only the sound as the cut partner where the rule is symmetric; `shifted` and
+`shift_clips` are O(n²) through linear `partner` lookups; and the roll's `alone` reads the grabbed
+clip, not `right`, the clip the op names.
+
+**Integrated.** AU-90…AU-97's index rows and the decisions file merged beside AP1's
+AU-10…AU-17; the manual check renumbered SE-24, since AP1 took SE-23; format 28 was free and
+stays; §5.2a's heading and its index cell now say format 28. No product code needed a hand
+merge. `make gate` on the merged tree: PASS 470 s (names 1, typecheck 12, fmt 5, lint 12, test
+234, app 204).
+
+**Owed.** SE-24 in `docs/manual-checks.md` (the glyph, the echo, a J-cut heard in the preview).
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

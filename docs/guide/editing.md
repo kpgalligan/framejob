@@ -24,8 +24,8 @@ Drag a file's row from the Media tab onto a track. What the drop does depends on
 | Drop | What it does | Undo name |
 |---|---|---|
 | No modifier | Places the whole file as a clip at the drop point. Nothing else moves. The drop is refused if the clip would overlap its neighbours in a way the overlap rule forbids. | Add Clip |
-| ⌥ | **Insert.** Splits the clip under the drop point on that track, pushes everything on every unlocked track later by the file's length, then places the file in the gap. Only the destination track is cut. Clips on other tracks that span the drop point stay where they are, uncut; only clips that start at or after it move later. | Insert |
-| ⇧⌥ | **Overwrite.** Clears the file's length from the drop point on that track alone, cutting at both ends and removing what lies between, then places the file. Nothing moves and no other track is touched. | Overwrite |
+| ⌥ | **Insert.** Splits the clip under the drop point on that track, pushes everything on every unlocked track later by the file's length, then places the file in the gap. Only the destination track is cut. Clips on other tracks that span the drop point stay where they are, uncut; only clips that start at or after it move later. The exception is a detached sound linked to a clip that is cut: it is cut at the same point, so the pair stays in step. | Insert |
+| ⇧⌥ | **Overwrite.** Clears the file's length from the drop point on that track alone, cutting at both ends and removing what lies between, then places the file. Nothing moves and no other track is touched, except that a detached sound linked to a clip that is cut is cut at the same points; its piece under the new file stays, no longer linked. | Overwrite |
 
 Dropping a row on the **preview canvas** adds the file at the playhead on a new track at the front.
 
@@ -138,7 +138,7 @@ To open room by hand, press ⌥⌘A (**Edit ▸ Select After Playhead**) and dra
 
 | Command | Shortcut | What it does |
 |---|---|---|
-| **Edit ▸ Copy** | ⌘C | Puts the selected clips on the clipboard, with the media files they show. Pasted into a text editor, they arrive as a one-line summary such as "Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00". |
+| **Edit ▸ Copy** | ⌘C | Puts the selected clips on the clipboard, with the media files they show. A selected picture brings its detached sound along, so the pair pastes as a pair; a selected detached sound is copied on its own. Pasted into a text editor, they arrive as a one-line summary such as "Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00". |
 | **Edit ▸ Cut** | ⌘X | Copies, then deletes the selection and leaves gaps, as ⌫ does. One undo step. |
 | **Edit ▸ Paste** | ⌘V | Pastes the clipboard's clips at the playhead, then selects them. |
 | **Edit ▸ Paste Attributes** | ⌥⌘V | Copies the copied clip's look onto every selected clip. |
@@ -165,11 +165,13 @@ The target keeps its place, length, speed, animation actions, transition, name, 
 
 **Clip ▸ Detach Audio** (⌥⌘D) switches off each selected clip's sound and adds an audio-only copy of it on the track below, at the same time, with the same footage and speed. If the clip is on the back track, a new track is added behind it. Undo name: "Detach Audio".
 
+The two clips stay linked: moving, splitting, rippling, nesting or copying either one takes the other, and trimming the sound's edge alone makes a J-cut or an L-cut ([Audio](audio.md#j-cuts-and-l-cuts)). **Clip ▸ Attach Audio** (⇧⌥⌘D) merges each pair back into one clip. Undo name: "Attach Audio".
+
 Each clip that can't be detached is refused with a reason: "clip … has no audio to detach: it is not a media clip", "…: media … has no audio track", or "…: its audio is switched off".
 
 A clip's picture and sound can each be switched on or off. The app's only control for this is Detach Audio. Agents can set either half directly.
 
-*Agents:* `detach_audio` takes `clip`. `set_enabled` takes `clip` and `video` and/or `audio` (true or false). Leave one out to keep its value.
+*Agents:* `detach_audio` takes `clip`, and `attach_audio` takes either half's `clip`. `set_enabled` takes `clip` and `video` and/or `audio` (true or false). Leave one out to keep its value.
 
 ## Nests
 
@@ -288,6 +290,7 @@ During a drag, positions the project refuses are skipped and the clip waits at t
 | ⌘X / ⌘C / ⌘V | Cut / copy / paste |
 | ⌥⌘V | Paste Attributes |
 | ⌥⌘D | Detach Audio |
+| ⇧⌥⌘D | Attach Audio |
 | ⌘G / ⇧⌘G | Nest / Un-nest |
 | ⌘↓ / ⌘↑ | Open Nest / Close Nest |
 | `,` / `.` | Nudge one frame earlier / later (⇧: ten frames) |

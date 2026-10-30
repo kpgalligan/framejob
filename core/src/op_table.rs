@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the sixty-two-way dispatch are the implementation of that
+//! enum and the sixty-three-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -83,7 +83,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 62;
+pub const OP_COUNT: usize = 63;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -95,10 +95,11 @@ pub struct OpRow {
 
 /// One named value an op takes. `required` is the absence of a serde
 /// default on the enum's field. Optional means omission is accepted; it does
-/// not imply that `null` is accepted. The five defaulted plain booleans
+/// not imply that `null` is accepted. The eight defaulted plain booleans
 /// (`add_transition.ripple`, `paste_attributes.skip_missing`, both
-/// `with_clips` fields, and `set_canvas.rescale_clips`) default to false
-/// when absent and reject null.
+/// `with_clips` fields, `set_canvas.rescale_clips`, and the `alone` of
+/// `trim_start`, `trim_end` and `roll`) default to false when absent and
+/// reject null.
 /// Other optional fields are `Option<T>` and decode absence and null alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Argument {
@@ -254,11 +255,11 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("insert_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),
     op("overwrite_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),
     op("move_clip", &[req("clips", Ids), req("delta", Ticks), opt("track", Id)]),
-    op("trim_start", &[req("clip", Id), req("to", Ticks)]),
-    op("trim_end", &[req("clip", Id), req("to", Ticks)]),
+    op("trim_start", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
+    op("trim_end", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
     op("rate_stretch", &[req("clip", Id), req("to_end", Ticks)]),
     op("slip", &[req("clip", Id), req("delta", Ticks)]),
-    op("roll", &[req("clip", Id), req("to", Ticks)]),
+    op("roll", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
     op("split", &[opt("clips", Ids), req("at", Ticks)]),
     op("delete", &[req("clips", Ids)]),
     op("ripple_delete", &[req("clips", Ids)]),
@@ -272,6 +273,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("set_reversed", &[req("clip", Id), req("reversed", Boolean)]),
     op("freeze_frame", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
     op("detach_audio", &[req("clip", Id)]),
+    op("attach_audio", &[req("clip", Id)]),
     op("duplicate", &[req("clips", Ids)]),
     op("paste", &[req("at", Ticks), opt("track", Id), req("payload", Object)]),
     op("paste_attributes",

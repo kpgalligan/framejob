@@ -22,7 +22,7 @@
 //! slip and a trim can never disagree about where a media ends.
 
 use crate::edit_clip::clip_end;
-use crate::model::{Project, Source};
+use crate::model::{Clip, Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
@@ -60,21 +60,71 @@ impl Project {
     /// Nothing moves, so there is no overlap to check and no transition can
     /// be gained; the actions are clip-relative and stay exactly where they
     /// are.
+    ///
+    /// **A linked partner on an unlocked track slips with it**, by the
+    /// smaller in magnitude of the two clamped amounts, so the sound stays
+    /// on its picture (spec §11 AU-94).
     pub fn slip(&self, clip: u32, delta: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
-        let (media, current) = match target.source {
+        let delta = self.snapped(delta);
+        let Some(own) = self.slip_amount(&target, delta)? else {
+            return Ok(Outcome::Identity);
+        };
+        let partner = self
+            .partner(clip)
+            .filter(|p| self.track(p.track).is_some_and(|t| !t.locked))
+            .cloned();
+        let mut amount = own;
+        if let Some(partner) = &partner {
+            let theirs = self.slip_amount(partner, delta)?.unwrap_or(0);
+            if theirs.abs() < amount.abs() {
+                amount = theirs;
+            }
+        }
+        if amount == 0 {
+            return Ok(Outcome::Identity);
+        }
+
+        let mut next = self.clone();
+        for id in std::iter::once(clip).chain(partner.map(|p| p.id)) {
+            if let Some(slot) = next.clip_mut(id) {
+                slot.source = match &slot.source {
+                    Source::Media {
+                        media,
+                        r#in,
+                        reversed,
+                    } => Source::Media {
+                        media: *media,
+                        r#in: r#in.saturating_add(amount),
+                        reversed: *reversed,
+                    },
+                    Source::Still { media, at } => Source::Still {
+                        media: *media,
+                        at: at.saturating_add(amount),
+                    },
+                    other => other.clone(),
+                };
+            }
+        }
+        self.finish(next)
+    }
+
+    /// How far, in SOURCE ticks, a slip of `delta` timeline ticks moves
+    /// `clip` once clamped inside its media; `None` when the move rounds to
+    /// nothing before the clamp. `Err` for a source with nothing to slip,
+    /// decided FIRST (the doc above).
+    fn slip_amount(&self, clip: &Clip, delta: Ticks) -> Result<Option<Ticks>, String> {
+        let (media, current) = match clip.source {
             Source::Media { media, r#in, .. } => (media, r#in),
             Source::Still { media, at } => (media, at),
-            _ => return Err(format!("clip {clip} is not a media clip")),
+            _ => return Err(format!("clip {} is not a media clip", clip.id)),
         };
-
-        let delta = self.snapped(delta);
         // Timeline ticks to source ticks, at this clip's rate. A sub-tick
         // move at a very slow speed rounds to nothing, which is a refusal
         // and not an edit.
-        let moved_by = timeline_to_source(delta, target.speed);
+        let moved_by = timeline_to_source(delta, clip.speed);
         if moved_by == 0 {
-            return Ok(Outcome::Identity);
+            return Ok(None);
         }
 
         // The last legal position of what the clip shows: a window is
@@ -82,33 +132,12 @@ impl Project {
         // short of it. Both are `source_window.rs`'s, which is also where
         // the reasons for the two shapes are written down.
         let media = self.require_media(media)?;
-        let last = match target.source {
+        let last = match clip.source {
             Source::Still { .. } => self.last_still_time(media),
-            _ => self.last_in_point(&target, media),
+            _ => self.last_in_point(clip, media),
         };
         let slipped = current.saturating_add(moved_by).clamp(0, last);
-        if slipped == current {
-            return Ok(Outcome::Identity);
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.source = match &slot.source {
-                Source::Media {
-                    media, reversed, ..
-                } => Source::Media {
-                    media: *media,
-                    r#in: slipped,
-                    reversed: *reversed,
-                },
-                Source::Still { media, .. } => Source::Still {
-                    media: *media,
-                    at: slipped,
-                },
-                other => other.clone(),
-            };
-        }
-        self.finish(next)
+        Ok(Some(slipped.saturating_sub(current)))
     }
 
     /// Moves a hard cut: this clip's start and its predecessor's end both
@@ -141,7 +170,26 @@ impl Project {
     /// (spec §11, W-3): a word stays on the speech it times. Its
     /// `graphic.in` advances by the move as `trim_start`'s does, and the
     /// predecessor's `length` is untouched (road map 10's G-9).
-    pub fn roll(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
+    ///
+    /// Without `alone`, a linked partner whose start is this clip's and
+    /// which has a hard-cut predecessor of its own is rolled to the same
+    /// `to` after it (spec §11 AU-93, `carried_edge`); with it, the clip's
+    /// cut moves alone.
+    pub fn roll(&self, clip: u32, to: Ticks, alone: bool) -> Result<Outcome, String> {
+        let hard_cut = |partner: &Clip| {
+            self.clips_on_track(partner.track)
+                .iter()
+                .any(|c| c.id != partner.id && clip_end(c) == partner.start)
+        };
+        self.carried_edge(
+            clip,
+            alone,
+            |target, partner| partner.start == target.start && hard_cut(partner),
+            |project, id| project.roll_one(id, to),
+        )
+    }
+
+    fn roll_one(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Some(previous) = self
             .clips_on_track(target.track)

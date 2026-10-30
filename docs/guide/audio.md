@@ -15,7 +15,7 @@ When the selection includes at least one clip that plays sound, the Clip tab of 
 3. **Ducking**: lowers every other clip while this one plays
 4. **Noise Reduction**
 5. **Compressor**
-6. **Mix**: pan, mix to mono and Detach Audio
+6. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
 
 Noise Reduction, Compressor and Mix appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
@@ -156,7 +156,7 @@ The compressor acts on the clip's sound before the volume, fades and ducking, so
 
 *Agents:* `set_audio` with `compressor: {threshold_db, ratio, attack, release, makeup_db}` (attack and release in ticks), or `compressor: null` to turn it off.
 
-## Mix: pan, mono and Detach Audio
+## Mix: pan, mono, Detach Audio and Attach Audio
 
 | Control | What it does | Range | Default |
 |---|---|---|---|
@@ -164,6 +164,7 @@ The compressor acts on the clip's sound before the volume, fades and ducking, so
 | Position | Read-only: "centre", or the side and amount, for example "left 40". | — | centre |
 | Mix to mono | Averages all of the clip's channels into one and sends it to every channel. | on / off | off |
 | Detach Audio | Moves the clip's audio onto its own clip (see below). | — | — |
+| Attach Audio | Merges a detached sound back into its picture (see below). | — | — |
 
 The section summary reads "centre", "mono" or the pan position. Reset sets the pan back to centre and turns mono off.
 
@@ -180,13 +181,46 @@ The section summary reads "centre", "mono" or the pan position. Reset sets the p
 
 - The original clip keeps its picture, and its audio is switched off.
 - The new clip plays only sound. It has the same file, in point, length and speed as the original, and it keeps the original's audio settings and actions.
-- After detaching, you can trim, move and adjust the two clips separately.
+- The two clips stay **linked**. Each shows a link symbol after its kind icon, and selecting one draws a dashed ring around the other.
 
 Detach Audio is refused, with the reason given, for a clip that isn't a media clip, a clip whose file has no audio track, and a clip whose audio is already switched off. It's also refused when the track below already has a clip where the new audio clip would go. A new track is added only when the clip is on the bottom track.
 
-There is no control that switches a clip's audio back on. To get the original clip's sound back, use Undo, or ask an agent. A clip whose audio is off shows no waveform and no fade handles, and a clip with both its picture and its sound switched off is drawn dimmed.
+A clip whose audio is off shows no waveform and no fade handles, and a clip with both its picture and its sound switched off is drawn dimmed.
 
 *Agents:* `detach_audio` (`clip`). `set_enabled` (`clip`, `video`, `audio`) turns either half of a clip back on or off.
+
+### What stays in sync
+
+A linked picture and sound stay in step in time through every edit:
+
+- **Moving** either clip moves both by the same amount. Only the clip you drag changes track, so you can drag the sound onto another track and its picture stays where it is. When a move would take either clip before the start of the timeline, both stop together.
+- **Split**, **Duplicate**, **Nest**, **Ripple Delete** and copy and paste take both clips. A split through both pairs the two halves on each side of the cut.
+- **Ripple edits, Close Gap and Insert Time** move the other half too. One that would push a sound that starts before its picture past the start of the timeline is refused: "clip … would start before 0: it leads its linked clip … by … ticks".
+- **Slip** slips both, as far as the one with less room allows.
+- **Delete** on the picture deletes its sound too. Deleting the sound alone keeps the picture, silent. Detach Audio and then deleting the sound is how you remove a clip's sound.
+- **Speed** and **Reverse** are refused on a linked clip: "clip … is linked to clip …: Attach Audio before changing its speed or direction". Attach Audio first, change the speed, then detach again.
+- A clip on a locked track isn't moved, cut, copied or deleted with its partner.
+
+### J-cuts and L-cuts
+
+Trimming the picture's edge also trims the sound when their edges line up. Trimming the **sound's** edge moves it alone, which is how you make a split edit:
+
+- **J-cut**: drag the sound clip's start edge earlier, so the next shot's sound begins before its picture.
+- **L-cut**: drag the sound clip's end edge later, so the sound runs on under the next shot.
+
+W and E trim a sound clip alone in the same way, and a roll (⌥⇧-drag on an edge) of a sound clip moves only the sound's cut.
+
+When the shot before was detached too, its sound sits on the same track as this one's, so a lead would overlap it and become a cross dissolve. **Drag the sound to a track of its own first**, then trim it: on its own track, the lead overlaps nothing.
+
+*Agents:* `trim_start`, `trim_end` and `roll` with `alone: true` move one clip's edge without its linked partner's.
+
+### Attach Audio
+
+**Clip ▸ Attach Audio** (⇧⌥⌘D), or the **Attach Audio** button in the Mix section, merges each detached sound in the selection back into its picture. Either clip can be selected. The picture's audio comes back on with the sound clip's audio settings, and the sound clip is removed. Its track stays.
+
+Attach Audio is refused for a clip that isn't linked to a detached sound, and for a pair that no longer covers the same time, such as a J-cut or an L-cut: "clip …'s picture and clip …'s sound do not cover the same time; trim them to match before Attach Audio". Trim the two to the same start and end, then attach.
+
+*Agents:* `attach_audio` (`clip`), either half.
 
 ## Keep pitch when the speed changes
 
@@ -326,7 +360,8 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, noise reduction and ducking always apply to the whole clip.
 - On a nest clip, pan, the compressor and noise reduction have no effect. Set them on the clips inside.
-- No control switches a clip's audio back on after Detach Audio; use Undo.
+- Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.
+- A linked clip's speed and direction can't change until you attach its audio.
 - Above ×12 a clip's audio is left out of the mix ([Speed](speed.md)).
 - Synchronize Audio corrects drift only up to 0.2 % from ×1. It doesn't work on nests, reversed clips, ramped clips, or clips playing at other rates.
 - Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".

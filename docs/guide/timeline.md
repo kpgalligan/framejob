@@ -183,6 +183,10 @@ where one ends and the next begins.
   transition's kind written in it when the word fits.
 - **Selected**: a 2 pt coral ring, with trim grips at both ends when the clip
   is wide enough to trim and its track is unlocked.
+- **Linked**: a picture and the sound Detach Audio split from it each show a
+  link symbol after the kind symbol. When one is selected, the other gets a
+  dashed accent ring, because edits to one move both (see
+  [Audio](audio.md#what-stays-in-sync)).
 - **Dimmed**: a clip on a hidden track, or one with both its picture and its
   sound switched off.
 - **No filmstrip**: text, shape, graphic, nest and adjustment clips have no

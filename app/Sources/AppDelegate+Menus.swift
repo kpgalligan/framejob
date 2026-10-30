@@ -267,6 +267,11 @@ extension AppDelegate {
             item(
                 "Detach Audio", #selector(EditorViewController.detachAudio(_:)), "d",
                 [.command, .option]))
+        // Detach Audio's way back (spec §11 AU-95, AU-97): its key plus ⇧.
+        menu.addItem(
+            item(
+                "Attach Audio", #selector(EditorViewController.attachAudio(_:)), "d",
+                [.command, .option, .shift]))
         // Road map 2's phase 5c, next to Detach Audio because those two are
         // the Clip menu's only sound commands. It duplicates the Audio
         // section's button deliberately (contract D-C8): a command reachable

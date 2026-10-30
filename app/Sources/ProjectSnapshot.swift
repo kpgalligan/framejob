@@ -1143,6 +1143,9 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
     /// Stored unvalidated on both sides, so draw it through
     /// `ClipLabel.color(named:)`, which absorbs a name this build lacks.
     let label: String?
+    /// The clip this one is linked to (format 28, spec §11 AU-90): Detach
+    /// Audio's picture and sound, which every placement edit keeps in step.
+    let linked: UInt32?
 
     init(
         id: UInt32, track: UInt32, start: Ticks = 0, duration: Ticks = 0,
@@ -1151,7 +1154,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         text: TextProps? = nil, shape: ShapeProps? = nil,
         graphic: GraphicSnapshot? = nil,
         actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil,
-        name: String? = nil, label: String? = nil
+        name: String? = nil, label: String? = nil, linked: UInt32? = nil
     ) {
         self.id = id
         self.track = track
@@ -1169,6 +1172,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         self.transitionIn = transitionIn
         self.name = name
         self.label = label
+        self.linked = linked
     }
 
     init(from decoder: Decoder) throws {
@@ -1189,6 +1193,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         transitionIn = c.lenient(.transitionIn)
         name = c.lenient(.name)
         label = c.lenient(.label)
+        linked = c.lenient(.linked)
     }
 
     /// Project time one tick past the clip's last frame.

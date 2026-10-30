@@ -72,6 +72,15 @@ extension TimelineContentView {
         for i in shown where owner.selection.contains(clips[i].id) {
             drawSelectionRing(Self.bodyRect(rects[i]))
         }
+        // The echo: a selected clip's linked partner, which the core moves
+        // with it, gets a dashed accent ring (spec §11 AU-97). A partner
+        // that is itself selected has its own ring.
+        for i in shown {
+            guard let partner = clips[i].linked, owner.selection.contains(partner),
+                  !owner.selection.contains(clips[i].id)
+            else { continue }
+            drawEchoRing(Self.bodyRect(rects[i]))
+        }
     }
 
     /// One clip's body, in paint order: fill, media, the selected action's
@@ -175,6 +184,18 @@ extension TimelineContentView {
         outline.stroke()
     }
 
+    /// A selected clip's linked partner: the selection ring's geometry,
+    /// dashed, in the accent.
+    private func drawEchoRing(_ body: CGRect) {
+        DS.accent.setStroke()
+        let outline = NSBezierPath(
+            roundedRect: body.insetBy(dx: 1, dy: 1), xRadius: TimelineLayout.clipRadius,
+            yRadius: TimelineLayout.clipRadius)
+        outline.lineWidth = 2
+        outline.setLineDash([4, 3], count: 2, phase: 0)
+        outline.stroke()
+    }
+
     // MARK: - Name strip
 
     /// The 16 pt strip along the body's top: a black wash over the tint, the
@@ -208,6 +229,15 @@ extension TimelineContentView {
                 symbol.name, fallback: symbol.fallback, in: iconBox,
                 tint: NSColor.white.withAlphaComponent(0.62))
             x = iconBox.maxX + 5
+        }
+        // A linked clip (Detach Audio's picture or sound, spec §11 AU-97):
+        // the link glyph right after the kind, guarded like it.
+        let linkBox = CGRect(x: x, y: strip.minY, width: 11, height: strip.height)
+        if clip.linked != nil, linkBox.maxX <= strip.maxX - padding {
+            TimelineDraw.symbol(
+                "link", fallback: "∞", in: linkBox,
+                tint: NSColor.white.withAlphaComponent(0.62))
+            x = linkBox.maxX + 5
         }
         // Guarded like the icon: a strip too narrow for both keeps the kind
         // and drops the dot, rather than painting one over its own edge. The

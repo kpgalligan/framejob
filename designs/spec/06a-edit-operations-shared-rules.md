@@ -16,12 +16,35 @@ names the number the caller sent.
 
 An optional op argument may be omitted; this alone does not make JSON `null`
 valid. `add_transition.ripple`, `paste_attributes.skip_missing`, both
-`with_clips` arguments and `set_canvas.rescale_clips` are plain booleans:
+`with_clips` arguments, `set_canvas.rescale_clips` and the `alone` of
+`trim_start`, `trim_end` and `roll` are plain booleans:
 omission means `false`, while `null` is a decode error. Every other optional
 core enum field is `Option<T>` and decodes absence and null alike. The
 separate `scope` envelope key accepts absence or null; a present value must
 be a nest id. The app's MCP schemas may apply stricter present-value rules
 for transition arguments (§7.9).
+
+**A linked pair moves as one in time** (format 28, §11 AU-90…AU-96). Detach Audio's
+picture and sound name each other in `clips[].linked`, and every placement op takes a clip's
+partner on an UNLOCKED track with it — locks win over links everywhere:
+
+- `move_clip`, `split`, `duplicate`, `nest` and `ripple_delete` act on the named clips and their
+  partners. A move moves the pair by ONE delta, clamped so no clip of the pair starts before 0
+  (a sound lead is kept), and the track delta is anchored on and applied to the NAMED clips only:
+  a partner keeps its own track, so a sound half dragged to a track of its own goes alone.
+- `delete` takes a picture's sound with it, but a linked SOUND half (its picture off) named alone
+  is deleted alone and its picture stays, silent. `ripple_delete` takes both either way.
+- A timeline-wide shift — the ripples, `close_gap`, `insert_time`, `add_transition`'s ripple form —
+  moves each moved clip's partner too, whatever its own start, and refuses, nothing moved, when
+  that would put a partner before 0: "clip S would start before 0: it leads its linked clip P by
+  N ticks".
+- A split pairs its halves (§6b `split`); a copy (`duplicate`, `paste`, `unnest`) re-pairs through
+  its fresh ids and clears a link whose partner was not copied.
+- `trim_start`, `trim_end` and `roll` carry the same `to` to a partner whose same edge coincides
+  unless `alone` is true — the J- and L-cut; `slip` slips both; speed, direction and speed-action
+  edits on a linked clip are refused until `attach_audio` merges the pair (§6b).
+- Whatever an op leaves one-sided (half a pair deleted, nested or overwritten) is cleared before
+  its result is compared or stored, so no op writes a one-sided link.
 
 **How to read a "refuses" in §6b and §6c.** An op the core understood answers one of
 three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**

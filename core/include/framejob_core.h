@@ -191,9 +191,16 @@ extern "C" {
  * ramps to along the action's curve and holds after; no key moves, so every
  * project without one writes the text it did, and there is no migration step.
  * An older build would play a ramp at the clip's base rate and lose nothing
- * visible on save, so it must refuse the file. 28 and above, 1014 included,
- * are newer. */
-#define RC_FORMAT_VERSION 27
+ * visible on save, so it must refuse the file.
+ *
+ * Version 28 is a linked pair (spec §11 AU-90): `clips[].linked`, the id of
+ * the clip a clip is linked to, after `label`, written only when set, which
+ * Detach Audio's picture and sound carry for each other. A link is mutual and
+ * inside one container, and a one-sided one is refused on open; no key moves,
+ * so every project without one writes the text it did, and there is no
+ * migration step. An older build would drop the link on save, so it must
+ * refuse the file. 29 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 28
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

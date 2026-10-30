@@ -144,3 +144,88 @@ spike S4 (`designs/audio.md`'s AP0 record).
   readout's mirror is the loudness answer's `measured_lufs` and `true_peak_dbtp`.
 - **AU-17 — No format bump, no core, FFI or op change.** The cache is a display and analysis
   cache under `cache/`, made again when absent; the project's file is unchanged.
+
+AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
+AP9, survey A10), recorded before its code.
+
+- **AU-90 — The model is a LINKED PAIR: Detach Audio's two clips name each other in
+  `Clip.linked` (format 28), every placement edit keeps both in step in time, trimming the sound
+  half's edge alone makes the J- or L-cut, and Attach Audio merges a pair back (owner,
+  2026-10-30, the road map's "Asked at AP9", answer (a)).** Each half stays an ordinary clip on
+  its own track, so the pair fits spec §2's one kind of track; a sound lead on a track of its own
+  cannot collide with "overlap is a transition"; and the plan, playback, export and the overlap
+  rule are untouched. Option (b), one clip whose sound overhangs its picture, would have changed
+  every one of them. **The half you grab decides, not ⌥**: ⌥-drag on an edge is already Rate
+  Stretch (spec §4.4), so a drag on the sound half's edge trims the sound alone, and the owner
+  accepted this deviation from the road map's "⌥-drag" wording. `linked` is the partner's id,
+  written only when set; a link must be mutual and inside one container (the timeline or one
+  nest), and the reader refuses a file with a one-sided link: "clip {a} is linked to clip {b},
+  which is not linked back".
+- **AU-91 — What follows the link: TIME, not track; one clamp over the pair; a ripple that would
+  push a leading sound below 0 refuses; a sound half deleted alone keeps its picture.**
+  `move_clip` moves the named clips and their partners by one delta, clamped so no clip of the
+  closure starts before 0 (a J-cut picture dragged left stops where its sound reaches 0, so the
+  lead is kept), and the track delta is anchored on and applied to the CALLER's clips only — a
+  partner keeps its own track, so dragging a sound half to an empty track moves it alone
+  vertically and its picture stays. That is what lets the sound of a second consecutive detached
+  shot lead into the first without overlapping its neighbour's sound (which the overlap rule
+  would turn into a dissolve). `split`, `duplicate`, `nest` and `ripple_delete` (its spans the
+  union over the closure) take both halves. A timeline-wide shift (`shift_clips`: the ripples,
+  `close_gap`, `insert_time`, `add_transition`'s ripple form) moves every clip on an unlocked
+  track at or after the boundary AND each such clip's partner on an unlocked track
+  (`edit_time.rs`'s `shifted`), and when a partner would start before 0 the op refuses — "clip
+  {s} would start before 0: it leads its linked clip {p} by {lead} ticks" — because a ripple
+  closes fully or not at all (`close_gap`'s rule); `insert_time` only moves right and never
+  meets it. `delete` takes a picture's sound with it, but a sound half named alone is deleted
+  alone and its picture stays silent (its link cleared): Detach Audio then Delete stays the one
+  way the app drops a clip's sound. `ripple_delete` of either half removes both, since leaving
+  half a pair behind a ripple would leave it out of sync with everything that moved. Locks win
+  over links everywhere: a partner on a locked track is not moved, cut, copied or deleted, and
+  stays linked.
+- **AU-92 — A split pairs its halves.** When both halves of a pair are cut at one time, the two
+  second halves name each other and the originals keep their link. When only one is cut (the
+  time falls outside the other, as in a J- or L-cut), the uncut partner stays linked to the half
+  sharing the longer stretch of time with it, the first on a tie, and the other half is unlinked.
+- **AU-93 — Edges: a trim or roll carries to the partner whose same edge coincides, unless
+  `alone`.** `trim_start` and `trim_end` without `alone`, on a linked clip whose unlocked
+  partner's same edge equals this clip's edge before the edit, apply the same `to` to the
+  partner after this clip, each through its own clamps; a refusal from either is the answer.
+  `roll` without `alone` also rolls the partner to the same `to` when its start equals this
+  clip's and it has a hard-cut predecessor. Otherwise the clip moves alone. `alone` (default
+  false) is the J/L-cut: the timeline's trim and roll gestures send it when the clip grabbed is
+  a linked SOUND half (linked, picture off), and W and E do the same, so dragging the sound's
+  front edge earlier makes a J-cut and its back edge later an L-cut, while dragging the
+  picture's edge trims both. A picture-alone gesture is out of scope; an agent sends `alone`.
+- **AU-94 — Slip slips both halves; speed and direction are refused on a linked pair.** `slip`
+  on a linked clip with an unlocked partner slips both by the smaller in magnitude of the two
+  clamped amounts, so the sound stays on its picture. `set_speed`, `rate_stretch`,
+  `set_reversed`, `add_speed_ramp`, `set_action`, `set_action_end` and `remove_action` are
+  refused when they would change a linked clip's speed, its direction or its speed-naming
+  actions (start, duration, curve, `end.speed`): "clip {c} is linked to clip {p}: Attach Audio
+  before changing its speed or direction". Re-timing both halves identically is a second
+  implementation of every rate op; Attach Audio, then the change, then Detach Audio is the way.
+- **AU-95 — Attach Audio (`attach_audio {clip}`, Clip ▸ Attach Audio) merges a linked pair back
+  into one clip.** Either half may be named. Refused, each in its own sentence: "clip {c} is not
+  linked to a detached sound"; "clips {a} and {b} are not a picture and its detached sound" (the
+  sound is the half with its audio on, the picture the half with it off); and "clip {v}'s picture
+  and clip {s}'s sound do not cover the same time; trim them to match before Attach Audio" when
+  their start, duration, source, speed or actions' spans and curves differ. Otherwise the
+  picture's audio is switched on and takes the sound clip's `audio` group, and each of its
+  actions' `end.audio` the sound's action at the same index (removed where that one has none);
+  its link is cleared and the sound clip is removed. The sound's track stays, as after any
+  delete. One undo step.
+- **AU-96 — Links settle in one place; copies re-pair.** `Project::finish` clears, before its
+  identity comparison, every `linked` whose clip is absent from its container or does not name
+  this clip back (`settle_links`), so an op that removes, moves into a nest or replaces half a
+  pair (`delete`, `overwrite_clip`, `remove_track`, `add_blurred_background`'s copy, a split's
+  other half) needs no code of its own and never writes a one-sided link. `duplicate`, `paste`
+  (the timeline and each copied nest) and `unnest` map each copied link through their old → new
+  ids, and a link whose partner was not copied is cleared. Copy puts the partner of each selected
+  PICTURE half in the payload, so a pasted detached clip arrives as a pair; a selected sound half
+  is copied alone.
+- **AU-97 — The chrome: a link glyph, an echo, and Clip ▸ Attach Audio (⇧⌥⌘D).** A linked clip's
+  name strip shows the SF Symbol `link` after its kind symbol; each selected clip's partner is
+  drawn with a dashed accent ring, so a selection shows what the core will move with it (the
+  selection itself stays what was clicked). Attach Audio sits after Detach Audio in the Clip menu
+  on ⇧⌥⌘D (Detach Audio's ⌥⌘D plus ⇧), and as a button beside Detach Audio in the Sound tab's
+  Mix section; it sends one `attach_audio` per pair in the selection.

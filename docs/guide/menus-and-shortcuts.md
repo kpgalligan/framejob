@@ -134,7 +134,8 @@ first selected clip. With nothing selected it is the front-most track. See
 | Trim Start to Playhead | W (key) | Trims the selected clips' starts to the playhead |
 | Trim End to Playhead | E (key) | Trims their ends to the playhead |
 | Freeze Frame | ⇧⌘F | Holds the frame under the playhead as a still clip |
-| Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip ([Audio](audio.md)) |
+| Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip, linked to it ([Audio](audio.md)) |
+| Attach Audio | ⇧⌥⌘D | Merges a detached sound back into its picture ([Audio](audio.md#attach-audio)) |
 | Normalize | | Sets the selected clips' volume to a peak or a loudness, by the mode chosen in the Volume section's Normalize row |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
@@ -188,6 +189,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Split | The timeline has any clip |
 | Trim Start / End to Playhead, Freeze Frame | A selected clip is under the playhead |
 | Detach Audio | Something is selected |
+| Attach Audio | A selected clip is linked to its detached sound or picture |
 | Normalize | A selected clip plays sound |
 | Synchronize Audio | Two or more selected clips play sound |
 | Add Action | A selected clip is under the playhead |
@@ -210,7 +212,7 @@ first selected clip. With nothing selected it is the front-most track. See
 Open Nest and Close Nest are also greyed while you are typing in a text
 field.
 
-*Agents:* `split`, `trim_start`, `trim_end`, `freeze_frame`, `detach_audio`,
+*Agents:* `split`, `trim_start`, `trim_end`, `freeze_frame`, `detach_audio`, `attach_audio`,
 `normalize_clip`, `sync_audio`, `add_action`, `set_speed`, `add_speed_ramp`,
 `close_gap`, `detect_silence`, `detect_fillers`, `add_transition` /
 `set_transition`, `set_video` (motion and look), `add_background`,

@@ -301,6 +301,12 @@ pub struct Clip {
     /// list would refuse a project written by a newer one.
     #[serde(default)]
     pub label: Option<String>,
+    /// The id of the clip this one is linked to (format version 28, spec
+    /// §11 AU-90): Detach Audio's picture and sound name each other, and
+    /// every placement edit keeps the two in step in time. Mutual and inside
+    /// one container, or absent; written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linked: Option<u32>,
 }
 
 /// What a clip shows. `media` is the only kind with a source bound —

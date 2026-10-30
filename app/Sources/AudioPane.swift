@@ -2,7 +2,7 @@ import AppKit
 
 /// The Clip tab's AUDIO sections (spec §4.3): volume with its dB read-out,
 /// Normalize and mute, the two fades, ducking, noise reduction, the
-/// compressor, pan, mix-to-mono and Detach Audio.
+/// compressor, pan, mix-to-mono, Detach Audio and Attach Audio.
 ///
 /// **This pane is never shown**: since the six tabs became three it is a
 /// factory `ClipPane` holds and calls, last in the Clip tab, whenever at least
@@ -424,6 +424,9 @@ final class AudioPane: InspectorPaneView {
         let detach = commandButton(
             "Detach Audio", #selector(EditorViewController.detachAudio(_:)),
             toolTip: "Move the audio to its own clip on the track below (⌥⌘D)")
+        let attach = commandButton(
+            "Attach Audio", #selector(EditorViewController.attachAudio(_:)),
+            toolTip: "Merge a detached sound back into its picture (⇧⌥⌘D)")
         return InspectorSection(
             id: "audio.mix", title: "Mix",
             summary: {
@@ -455,7 +458,7 @@ final class AudioPane: InspectorPaneView {
                     read: { binding.audioProps.mono },
                     ops: { binding.ops(audio: AudioPatch(mono: $0)) },
                     mixed: { binding.mixedAudio { $0.mono } }),
-                inspectorButtonRow([detach]),
+                inspectorButtonRow([detach, attach]),
             ])
     }
 }

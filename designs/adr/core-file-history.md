@@ -217,9 +217,15 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
 - `edit_clip.rs`: grading L3 (on the `grading` branch) moved `detach_audio` and `set_enabled`,
   with the `// ---- enablement` banner, to `edit_detach.rs`, a pure move; nothing widened. `wc -l
-  core/src/edit_clip.rs`: 757 before, 661 after; `edit_detach.rs` is 108. Still over the cap,
-  known debt. The next seam: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
-  `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) out whole.
+  core/src/edit_clip.rs`: 757 before, 661 after; `edit_detach.rs` is 108. Road map "audio" AP9
+  paid the seam that record named: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
+  `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) moved whole to
+  `edit_fit.rs`, a pure move gated alone (634 → 587; `edit_fit.rs` 61), before AP9 wired the link
+  closure into `move_clips`, `split_clips`, `delete_clips` and `duplicate_clips` and the rate
+  refusal into `set_reversed`. The next seam: the described clips — `Described`, the Title
+  preset's constants, `add_text_clip`, `add_shape_clip` and `add_described_clip` — out whole to an
+  `edit_described.rs`, leaving `edit_clip.rs` the placement callers (move, split, delete,
+  duplicate) and `add_clip`.
 - `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
 - `recipe.rs`: grading-2's G2-0 moved the block from `// ---- what a caller asked for` through
   `impl RecipeOptions` (`RecipeOptions` and its reader `of`) to the new `recipe_options.rs`,

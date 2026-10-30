@@ -47,9 +47,12 @@
 //! clip's track, so carried matte tracks land on the tracks in front of it
 //! and nest-then-unnest gives the picture back; it makes no track a matte.
 
+use std::collections::HashMap;
+
 use crate::edit_adjustment::{adjustment_cannot_nest, is_adjustment};
 use crate::edit_clip::clip_end;
 use crate::edit_commit::Landing;
+use crate::edit_link::relink_copies;
 use crate::model::{AudioProps, Clip, Nest, Project, Source, Track, VideoProps};
 use crate::outcome::Outcome;
 use crate::recipe_matte::matte_target;
@@ -90,8 +93,9 @@ impl Project {
     /// whatever was NOT selected is refused, in the rule's own sentence. `Err` on an unknown clip id or a selection
     /// that would put the project past the track cap.
     pub fn nest_clips(&self, clips: &[u32], name: Option<&str>) -> Result<Outcome, String> {
+        // A linked partner goes in with its clip (spec §11 AU-91).
         let selected: Vec<Clip> = self
-            .selected_clips(clips)?
+            .selected_clips(&self.with_links(clips)?)?
             .into_iter()
             .cloned()
             .collect::<Vec<_>>();
@@ -290,14 +294,21 @@ impl Project {
         ordered.sort_by_key(|c| (std::cmp::Reverse(depth(c.track)), c.start, c.id));
 
         let mut landing = Landing::new(base);
+        let first = next.clips.len();
+        let mut fresh: HashMap<u32, u32> = HashMap::new();
         for source in ordered {
             let mut moved = source.clone();
             next.remint(&mut moved);
+            fresh.insert(source.id, moved.id);
             // Translate first; the shared normalization then handles a
             // hand-written or legacy off-grid nest on the parent grid.
             moved.start = target.start.saturating_add(source.start);
             next.resnap_clip_times(&mut moved);
             landing.land(&mut next, moved, depth(source.track));
+        }
+        // The returning clips re-pair through their fresh ids (AU-96).
+        if let Some(landed) = next.clips.get_mut(first..) {
+            relink_copies(landed, &fresh);
         }
 
         if !next.nest_is_shown(project) {

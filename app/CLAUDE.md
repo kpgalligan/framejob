@@ -78,7 +78,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-two op tools.
+  `AgentCatalog.opTool` prints for all sixty-three op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -751,10 +751,14 @@ the key map behind it.
   real heights per track KIND) · `TimelineBar.swift` · `TimelineClipDrawing.swift`
   (a clip is ONE object: body, name strip with the kind symbol, label dot,
   motion wedges for active edges only, filmstrip under a tint wash, waveform, grips on the
-  selected clip, hatched transition zone; a track paints in three passes —
-  bodies, transition zones, selection rings (`drawClips`, #66) — because a
-  zone lies inside the PREVIOUS clip's body) · `TimelineSessions.swift` (drag,
-  trim, slip, roll sessions) · `TimelineView+Rename` (the one inline editor
+  selected clip, hatched transition zone, the link glyph after a linked
+  clip's kind symbol; a track paints in three passes — bodies, transition
+  zones, selection rings (`drawClips`, #66), the last also drawing the dashed
+  accent echo ring on each selected clip's partner (spec §11 AU-97) — because
+  a zone lies inside the PREVIOUS clip's body) · `TimelineSessions.swift`
+  (drag, trim, slip, roll sessions; `TrimSession.alone` and
+  `RollSession.alone`, so a linked SOUND half's edge moves alone, spec §11
+  AU-93, and `ClipSnapshot.isLinkedSound`) · `TimelineView+Rename` (the one inline editor
   for clips, tracks and markers; it drops an unchanged and an empty commit,
   follows its target through relayout, and ends with its commit DROPPED when
   the target is gone or on Escape; a commit goes through `onGroupedEdit`
@@ -2721,7 +2725,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-two op tools is `opTool`'s** and carries no
+  **Every one of the sixty-three op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -2757,7 +2761,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and two
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and three
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

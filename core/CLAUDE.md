@@ -310,7 +310,7 @@ governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-two op tools in the agent catalog,
+  reader is every one of the sixty-three op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -358,9 +358,8 @@ governs a module now.
   `props` and refuses `in` by name. With a `schema`, a `null` for a prop
   an action on the clip names stores the schema's default (G-34 (d)).
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
-  duplicate, delete, join, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
-  footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
-  it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`,
+  duplicate, delete, join; move, split, delete and duplicate take a linked
+  partner through `edit_link.rs`'s closures. `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
   `in + duration × speed ≤ media.duration` and the plan's segment rate is
@@ -382,6 +381,24 @@ governs a module now.
   no head bound, saturating at 0); `trim_end` leaves `length` alone.
 - `edit_detach.rs` — `detach_audio` and `set_enabled`, a clip's video and
   audio halves; a pure move out of `edit_clip.rs` (grading L3).
+- `edit_fit.rs` — `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
+  footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
+  it, scales up as readily as down and clamps to `SCALE_MAX`); a pure move
+  out of `edit_clip.rs` (road map "audio" AP9's toll).
+- `edit_link.rs` — linked pairs (format 28, spec §11 AU-90…AU-96): Detach
+  Audio's picture and sound name each other in `Clip.linked`. `partner`
+  (mutual, one container); `with_links` (the named clips, then each one's
+  partner on an UNLOCKED track — `move_clips`, `split_clips`,
+  `duplicate_clips`, `nest_clips`, `ripple_delete`) and `delete_closure` (a
+  linked sound half named alone goes alone); `settle_links`, which `finish`
+  runs BEFORE its identity comparison so no op stores a one-sided link and
+  none clears the half it orphaned, and `check_links`, `validate`'s refusal
+  of one; `pair_split_halves` and `relink_copies` (`duplicate`, `paste` top
+  level and nests, `unnest`); `carried_edge` (`trim_start`, `trim_end`,
+  `roll`: the partner whose same edge coincided follows unless `alone`);
+  `linked_rate_refusal` (speed, direction and speed-naming actions refused);
+  and the one op, `attach_audio`. The shift's half is `edit_time.rs`'s
+  `shifted`.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
   caller order and check old tracks before destination tracks; additions
   check caller-allocated candidates against the input project; both write
@@ -494,7 +511,10 @@ governs a module now.
   (the hole left open), `close_gap` (refuses rather than closing part way, and
   refuses naming what is there when `at` is on a clip or nothing follows it,
   spec §11 #88),
-  freeze frame, `shift_clips`, and `locked_track` — THE locked-track
+  freeze frame, `shift_clips`, `shifted` (what a shift moves: every unlocked
+  clip at or after the boundary and each one's linked partner;
+  `shift_clips` moves exactly that set and answers a refusal, nothing moved,
+  when a partner would start before 0), and `locked_track` — THE locked-track
   refusal's sentence, written once here for its three callers
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
   rippled form), each passing the clause after the comma.
@@ -504,7 +524,8 @@ governs a module now.
   EXACTLY at the clip's start); `insert_clip` and `overwrite_clip`,
   compositions of split + insert time + add made ONE op so a drop is one
   undo step and carries the rule neither half states — an insert cuts only
-  the destination track and then shifts every unlocked one.
+  the destination track (and a cut clip's linked partner, AU-92) and then
+  shifts every unlocked one.
   `roll` is a front trim on its clip, so it advances `graphic.in` as
   `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,

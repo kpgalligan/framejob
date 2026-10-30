@@ -41,8 +41,11 @@
 //! merge and `props_check`'s checks, so a `text` argument is validated
 //! exactly as a later `set_text` would be.
 
+use std::collections::HashMap;
+
 use serde_json::Value;
 
+use crate::edit_link::{pair_split_halves, relink_copies};
 use crate::edit_split::split_clip;
 use crate::model::{
     AudioProps, Clip, GraphicProps, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
@@ -50,7 +53,7 @@ use crate::model::{
 };
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
-use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
+use crate::props_check::{check_shape, check_text};
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// Default duration for a source with no source bound — text, shape, and an
@@ -174,53 +177,6 @@ impl Project {
                 }
                 Ok(duration)
             }
-        }
-    }
-
-    /// Fit scale for a new clip: `min(cw/sw, ch/sh)` when `fit_new_clips`
-    /// is on and the source exceeds the canvas, else 1 (spec §5.3). A
-    /// source that already fits is never scaled UP — Fit is a rescue for
-    /// oversized footage, not a stretch.
-    pub(crate) fn fit_scale(&self, source_width: f64, source_height: f64) -> f64 {
-        if !(self.canvas.fit_new_clips && source_width > 0.0 && source_height > 0.0) {
-            return 1.0;
-        }
-        let canvas_width = f64::from(self.canvas.width);
-        let canvas_height = f64::from(self.canvas.height);
-        if source_width <= canvas_width && source_height <= canvas_height {
-            return 1.0;
-        }
-        let scale = (canvas_width / source_width).min(canvas_height / source_height);
-        if scale.is_finite() {
-            scale.clamp(SCALE_MIN, SCALE_MAX)
-        } else {
-            1.0
-        }
-    }
-
-    /// Fill scale: `max(cw/sw, ch/sh)`, the smallest scale that leaves no
-    /// canvas showing — [`Project::fit_scale`]'s sibling, and what
-    /// `edit_background.rs` gives a backdrop.
-    ///
-    /// Three differences from Fit, all of them one difference read three
-    /// ways: Fit is a RESCUE for oversized footage and Fill is a
-    /// REQUIREMENT. So it ignores `canvas.fit_new_clips` — a backdrop that
-    /// leaves a bar down the side has failed at its one job whatever that
-    /// flag says; it scales UP as readily as down, a source smaller than the
-    /// canvas being exactly the case that needs it; and it clamps HERE, so
-    /// no caller can store a scale `check_video` would refuse. The clamp's
-    /// visible cost is `edit_zoom.rs`'s, for the same constant: on a
-    /// 1920-wide canvas a source under 192 pixels cannot reach the edge, and
-    /// what comes back is the biggest legal magnification rather than a
-    /// refusal. A degenerate source has no ratio to take and answers 1;
-    /// callers refuse one by name before they ever reach this.
-    pub(crate) fn fill_scale(&self, source_width: f64, source_height: f64) -> f64 {
-        let scale = (f64::from(self.canvas.width) / source_width)
-            .max(f64::from(self.canvas.height) / source_height);
-        if scale.is_finite() && scale > 0.0 {
-            scale.clamp(SCALE_MIN, SCALE_MAX)
-        } else {
-            1.0
         }
     }
 
@@ -423,6 +379,12 @@ impl Project {
     /// Refuses when a clip would land outside the track list or the overlap
     /// rule fails on any affected track. A clip that gains a predecessor
     /// overlap and has no transition gets a cross dissolve.
+    ///
+    /// **A linked partner follows in TIME, not in track** (spec §11 AU-91):
+    /// every clip of the closure moves by the one delta, the clamp at 0 is
+    /// taken over the closure so a J-cut's lead is kept, and the track delta
+    /// is anchored on and applied to the CALLER's clips only — so a sound
+    /// half dragged to a track of its own goes alone and its picture stays.
     pub fn move_clips(
         &self,
         clips: &[u32],
@@ -433,11 +395,12 @@ impl Project {
         if selection.is_empty() {
             return Ok(Outcome::Identity);
         }
+        let closure = self.selected_clips(&self.with_links(clips)?)?;
 
         // Snapping the delta keeps a dragged clip on the grid: every start
         // is already on it, so a snapped delta lands on it too.
         let mut delta = self.snapped(delta);
-        let earliest = selection.iter().map(|c| c.start).min().unwrap_or(0);
+        let earliest = closure.iter().map(|c| c.start).min().unwrap_or(0);
         if delta < -earliest {
             delta = -earliest;
         }
@@ -460,10 +423,11 @@ impl Project {
         };
 
         let mut candidates: Vec<Clip> = Vec::new();
-        for clip in &selection {
+        for clip in &closure {
             let mut moved = (*clip).clone();
             moved.start = moved.start.saturating_add(delta).max(0);
-            if index_delta != 0 {
+            let named = selection.iter().any(|c| c.id == clip.id);
+            if index_delta != 0 && named {
                 let from = self.require_track_index(clip.track)? as i64;
                 let to = from.saturating_add(index_delta);
                 // A selection dragged off either end of the track list is a
@@ -507,17 +471,25 @@ impl Project {
     /// Cuts each named clip at project time `at` (spec §6). A clip `at` is
     /// not strictly inside is skipped; when nothing can be cut the whole op
     /// is an identity. `Err` only for an unknown clip id.
+    ///
+    /// A linked partner is cut too, and the halves are paired (spec §11
+    /// AU-92, `edit_link.rs`'s `pair_split_halves`).
     pub fn split_clips(&self, clips: &[u32], at: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at);
-        let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
+        let ids = self.with_links(clips)?;
         let mut next = self.clone();
-        let mut cut = false;
+        let mut halves: Vec<(u32, u32)> = Vec::new();
         for id in ids {
-            cut |= split_clip(&mut next, id, at);
+            // `split_clip` allocates the second half's id first.
+            let second = next.next_id;
+            if split_clip(&mut next, id, at) {
+                halves.push((id, second));
+            }
         }
-        if !cut {
+        if halves.is_empty() {
             return Ok(Outcome::Identity);
         }
+        pair_split_halves(&mut next, &halves);
         self.finish(next)
     }
 
@@ -542,9 +514,10 @@ impl Project {
     }
 
     /// Removes the named clips. Gaps stay — rippling is `edit_time`'s job
-    /// (spec §6).
+    /// (spec §6). A picture takes its linked sound with it; a linked sound
+    /// named alone goes alone (spec §11 AU-91, `delete_closure`).
     pub fn delete_clips(&self, clips: &[u32]) -> Result<Outcome, String> {
-        let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
+        let ids = self.delete_closure(clips)?;
         if ids.is_empty() {
             return Ok(Outcome::Identity);
         }
@@ -557,11 +530,12 @@ impl Project {
     /// own tracks (spec §6): the copies start one span-length later, so a
     /// multi-clip selection keeps its internal timing exactly.
     ///
-    /// Clips and their actions get fresh ids. Refuses when the copies would
-    /// break the overlap rule.
+    /// Clips and their actions get fresh ids, and a linked partner is
+    /// copied too, the copies linked to each other (spec §11 AU-96).
+    /// Refuses when the copies would break the overlap rule.
     pub fn duplicate_clips(&self, clips: &[u32]) -> Result<Outcome, String> {
         let selection: Vec<Clip> = self
-            .selected_clips(clips)?
+            .selected_clips(&self.with_links(clips)?)?
             .into_iter()
             .cloned()
             .collect::<Vec<Clip>>();
@@ -577,12 +551,15 @@ impl Project {
 
         let mut next = self.clone();
         let mut copies: Vec<Clip> = Vec::new();
+        let mut fresh: HashMap<u32, u32> = HashMap::new();
         for clip in &selection {
             let mut copy = clip.clone();
             next.remint(&mut copy);
+            fresh.insert(clip.id, copy.id);
             copy.start = clip.start.saturating_add(delta);
             copies.push(copy);
         }
+        relink_copies(&mut copies, &fresh);
         self.commit_additions(next, copies)
     }
 
@@ -606,7 +583,7 @@ impl Project {
     ///
     /// A non-media source is an `Err` and not a refusal — the non-media
     /// rule (`edit.rs`, Results). An identity when the clip already plays
-    /// that way.
+    /// that way. Refused on a linked clip (spec §11 AU-94).
     pub fn set_reversed(&self, clip: u32, reversed: bool) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let Source::Media {
@@ -621,13 +598,18 @@ impl Project {
             return Ok(Outcome::Identity);
         }
 
+        let mut after = target.clone();
+        after.source = Source::Media {
+            media,
+            r#in,
+            reversed,
+        };
+        if let Some(why) = self.linked_rate_refusal(target, &after) {
+            return Ok(Outcome::Refused(why));
+        }
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
-            slot.source = Source::Media {
-                media,
-                r#in,
-                reversed,
-            };
+            *slot = after;
         }
         self.finish(next)
     }

@@ -212,6 +212,10 @@ struct TrimSession {
     let clip: UInt32
     let edge: TimelineEdge
     let stretch: Bool
+    /// The grabbed clip is a linked SOUND half, so its edge moves without
+    /// its picture's — the J- or L-cut (spec §11 AU-93). A picture's edge
+    /// carries to a sound whose edge coincides.
+    let alone: Bool
     let originalStart: Ticks
     let originalEnd: Ticks
     /// One frame of the document's grid: the minimum a clip may keep.
@@ -227,11 +231,12 @@ struct TrimSession {
     var op: ReelOp {
         switch edge {
         case .start:
-            return .trimStart(clip: clip, to: min(time, originalEnd - frame))
+            return .trimStart(clip: clip, to: min(time, originalEnd - frame), alone: alone)
         case .end:
             let to = max(time, originalStart + frame)
             return isRateStretch
-                ? .rateStretch(clip: clip, toEnd: to) : .trimEnd(clip: clip, to: to)
+                ? .rateStretch(clip: clip, toEnd: to)
+                : .trimEnd(clip: clip, to: to, alone: alone)
         }
     }
 
@@ -294,6 +299,9 @@ struct SlipSession {
 /// drag past those still looks live and lands where the core allows.
 struct RollSession {
     let clip: UInt32
+    /// The grabbed clip is a linked sound half: its cut rolls without the
+    /// picture's (spec §11 AU-93).
+    let alone: Bool
     let earliest: Ticks
     let latest: Ticks
 
@@ -301,7 +309,7 @@ struct RollSession {
     var guide: Ticks?
     var didMove = false
 
-    var op: ReelOp { .roll(clip: clip, to: time) }
+    var op: ReelOp { .roll(clip: clip, to: time, alone: alone) }
 
     mutating func update(time: Ticks, snapper: TimelineSnapper) {
         let resolved = snapper.resolve(time)
@@ -439,4 +447,11 @@ struct TrackDragSession {
         self.row = min(max(row, 0), max(trackCount - 1, 0))
         didMove = true
     }
+}
+
+extension ClipSnapshot {
+    /// A linked SOUND half — Detach Audio's sound, its picture off — whose
+    /// edge a trim or roll moves alone (spec §11 AU-93): the half you grab
+    /// decides.
+    var isLinkedSound: Bool { linked != nil && !enabled.video }
 }

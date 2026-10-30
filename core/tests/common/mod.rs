@@ -670,6 +670,11 @@ pub fn content(clip: &Value) -> Value {
     let object = out.as_object_mut().expect("a clip is an object");
     object.remove("id");
     object.remove("track");
+    // A link names an id too (spec §11 AU-90): whether a clip is linked is
+    // content, which clip it names is an id.
+    if let Some(linked) = object.get_mut("linked").filter(|v| !v.is_null()) {
+        *linked = Value::Bool(true);
+    }
     if let Some(actions) = object.get_mut("actions").and_then(Value::as_array_mut) {
         for action in actions {
             if let Some(entry) = action.as_object_mut() {

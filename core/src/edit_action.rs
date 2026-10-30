@@ -385,6 +385,13 @@ impl Project {
                 slot.curve = curve;
             }
         }
+        // A linked clip's rate is refused (spec §11 AU-94).
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(&target, after))
+        {
+            return Ok(Outcome::Refused(why));
+        }
         // A rate action moves the out point when it moves (SR-2).
         if end_speed(&existing).is_some() {
             let what = format!("retiming action {action}");
@@ -500,6 +507,12 @@ impl Project {
             }
             check_count(&stored.props)?;
         }
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(target, after))
+        {
+            return Ok(Outcome::Refused(why));
+        }
         // The out point the new end rate reads to (SR-2): R1/R2 for a rate,
         // R3 for one taken away.
         if let (Some(read), Some(after)) = (speed, next.clip(clip)) {
@@ -529,6 +542,12 @@ impl Project {
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
             slot.actions.retain(|a| a.id != action);
+        }
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(target, after))
+        {
+            return Ok(Outcome::Refused(why));
         }
         if names_speed {
             let what = format!("removing action {action}");

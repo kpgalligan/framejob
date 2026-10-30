@@ -198,12 +198,15 @@ extension EditorViewController {
 
     /// W / E. Every selected clip is offered to the core; the ones the
     /// playhead is not inside are refused, and a wholly refused batch beeps.
+    /// A linked sound half trims alone, as its edge's drag does (spec §11
+    /// AU-93).
     func trimToPlayhead(_ edge: TimelineEdge) {
         guard let document = document else { return }
         let now = document.playhead
         let ops = clipsUnderPlayhead.map { clip in
             edge == .start
-                ? ReelOp.trimStart(clip: clip.id, to: now) : ReelOp.trimEnd(clip: clip.id, to: now)
+                ? ReelOp.trimStart(clip: clip.id, to: now, alone: clip.isLinkedSound)
+                : ReelOp.trimEnd(clip: clip.id, to: now, alone: clip.isLinkedSound)
         }
         guard !ops.isEmpty else {
             NSSound.beep()
@@ -278,6 +281,29 @@ extension EditorViewController {
             return
         }
         document.applyEdit("Detach Audio", selectedClips.map { .detachAudio(clip: $0.id) })
+    }
+
+    /// ⇧⌥⌘D — Clip ▸ Attach Audio and the Mix section's button: each linked
+    /// pair the selection touches merges back into one clip (spec §11 AU-95).
+    @objc func attachAudio(_ sender: Any?) { attachSelectionAudio() }
+
+    /// One `attach_audio` per PAIR, so a selection holding both halves of a
+    /// pair asks once. The core refuses a pair out of step in its own
+    /// sentence; a selection with no linked clip beeps.
+    func attachSelectionAudio() {
+        guard let document = document else { return }
+        var seen: Set<UInt32> = []
+        var ops: [ReelOp] = []
+        for clip in selectedClips {
+            guard let partner = clip.linked, !seen.contains(clip.id) else { continue }
+            seen.formUnion([clip.id, partner])
+            ops.append(.attachAudio(clip: clip.id))
+        }
+        guard !ops.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        document.applyEdit("Attach Audio", ops)
     }
 
     // Clip ▸ Speed… is a sheet, not a menu: `SpeedSheetController`, put up by
@@ -401,6 +427,8 @@ extension EditorViewController {
         switch action {
         case #selector(duplicateClips(_:)), #selector(detachAudio(_:)):
             return hasSelection
+        case #selector(attachAudio(_:)):
+            return selectedClips.contains { $0.linked != nil }
         case #selector(deleteClips(_:)):
             // ⌫ lifts the in/out range with nothing selected, so the item
             // has to be live for that too.

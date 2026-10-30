@@ -369,6 +369,7 @@ impl Project {
             self.check_clips(&nest.clips, &nest.tracks, &format!(" in nest {}", nest.id))?;
         }
         self.check_nesting()?;
+        self.check_links()?;
 
         if self.next_id <= max_id {
             return Err(format!(

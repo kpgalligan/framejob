@@ -58,7 +58,8 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 **Audio.** Per-clip volume, fades, ducking, noise reduction, compressor, pan and
 mono; each clip's loudness and true peak in the inspector, and Normalize to a peak or to
 a loudness target (−16 LUFS by default) that matches clips; Synchronize Audio lines up a camera and a separate recorder by
-their sound, drift included.
+their sound, drift included. Detach Audio keeps the sound linked to its picture,
+so J- and L-cuts stay in sync through every edit, and Attach Audio puts it back.
 → [Audio](docs/guide/audio.md)
 
 **Clean-up tools.** Remove Silences cuts dead air by voice or by level; Remove

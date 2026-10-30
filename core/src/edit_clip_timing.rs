@@ -160,7 +160,20 @@ impl Project {
     /// word trimmed off the front keeps its (negative) time. A graphic's
     /// `in` advances by the same delta (road map 10's G-9), with no speed
     /// and no head bound, never below 0.
-    pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
+    ///
+    /// Without `alone`, a linked partner whose start is this clip's is
+    /// trimmed to the same `to` after it, by its own clamps; with it, the
+    /// clip moves alone — the J-cut (spec §11 AU-93, `carried_edge`).
+    pub fn trim_start(&self, clip: u32, to: Ticks, alone: bool) -> Result<Outcome, String> {
+        self.carried_edge(
+            clip,
+            alone,
+            |target, partner| partner.start == target.start,
+            |project, id| project.trim_start_one(id, to),
+        )
+    }
+
+    fn trim_start_one(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let end = clip_end(&target);
         let latest = end.saturating_sub(self.frame());
@@ -198,7 +211,18 @@ impl Project {
     /// never the one past it (spec §11, #22 and D4-2). A ramped clip's bound
     /// reads its map on past the end (S∞, spec §11 SR-18 (a)). A graphic's
     /// `length` is untouched: null follows the new end, a number stays (G-9).
-    pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
+    /// `alone` is `trim_start`'s: without it a linked partner ending where
+    /// this clip ends follows; with it, the L-cut (spec §11 AU-93).
+    pub fn trim_end(&self, clip: u32, to: Ticks, alone: bool) -> Result<Outcome, String> {
+        self.carried_edge(
+            clip,
+            alone,
+            |target, partner| clip_end(partner) == clip_end(target),
+            |project, id| project.trim_end_one(id, to),
+        )
+    }
+
+    fn trim_end_one(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());
         let mut to = self.snapped(to).max(earliest);
@@ -226,6 +250,7 @@ impl Project {
     /// start) through `scaled_profile`, so the ramp keeps its shape and its
     /// window; an f that would take any rate the clip names past the limits
     /// (`profile_factors`) changes nothing (spec §11 SR-19 (a), (b)).
+    /// Refused on a linked clip (spec §11 AU-94).
     pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         if !matches!(target.source, Source::Media { .. }) {
@@ -242,7 +267,7 @@ impl Project {
                 return Ok(Outcome::Identity);
             }
             let moved = self.scaled_profile(&target, factor, duration);
-            return self.commit_replacements(vec![moved]);
+            return self.commit_rate(&target, moved);
         }
         let rate = self.content_length_in_source(&target) as f64 / duration as f64;
         if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
@@ -253,6 +278,15 @@ impl Project {
         moved.speed = rate;
         moved.duration = duration;
         self.rescale_actions(&mut moved.actions, target.duration, duration);
+        self.commit_rate(&target, moved)
+    }
+
+    /// A rate edit's commit: refused on a linked clip whose rate it changes
+    /// (spec §11 AU-94), else placed as any replacement is.
+    fn commit_rate(&self, before: &Clip, moved: Clip) -> Result<Outcome, String> {
+        if let Some(why) = self.linked_rate_refusal(before, &moved) {
+            return Ok(Outcome::Refused(why));
+        }
         self.commit_replacements(vec![moved])
     }
 
@@ -279,7 +313,8 @@ impl Project {
     /// f does not clamp, the base is the clamped rate itself. The
     /// new duration is d, or snapped(round(D ÷ f)) when f clamped or the
     /// rate arm set it, held through `scaled_profile` (spec §11 SR-19 (a),
-    /// (b)). An f of 1 changes nothing but `keep_pitch`.
+    /// (b)). An f of 1 changes nothing but `keep_pitch`. A linked clip's
+    /// rate is refused (spec §11 AU-94); `keep_pitch` alone is not a rate.
     pub fn set_speed(
         &self,
         clip: u32,
@@ -349,7 +384,7 @@ impl Project {
             if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
                 audio.keep_pitch = keep;
             }
-            return self.commit_replacements(vec![moved]);
+            return self.commit_rate(&target, moved);
         }
         let rate = match (rate, duration) {
             (Some(rate), _) => rate,
@@ -372,6 +407,6 @@ impl Project {
         if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
             audio.keep_pitch = keep;
         }
-        self.commit_replacements(vec![moved])
+        self.commit_rate(&target, moved)
     }
 }

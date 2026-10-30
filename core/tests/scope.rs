@@ -634,7 +634,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use framejob_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 62, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 63, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -776,6 +776,9 @@ fn every_op() -> Vec<(&'static str, Value)> {
             json!({"op":"freeze_frame","clip":7,"at":SEC}),
         ),
         ("detach_audio", json!({"op":"detach_audio","clip":7})),
+        // Clip 7 is not linked, so this is a refusal inside the nest as on
+        // the timeline; `link.rs` measures a scoped attach.
+        ("attach_audio", json!({"op":"attach_audio","clip":7})),
         ("duplicate", json!({"op":"duplicate","clips":[11]})),
         ("paste", json!({"op":"paste","at":20*SEC,"payload":payload})),
         (

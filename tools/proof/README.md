@@ -25830,3 +25830,78 @@ by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
 after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
 at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
 rows. `phase5_proof.py` 92/92 on both.
+
+## Road map "audio" AP9 — split edits that keep sync, and Attach Audio (`ap9_split_edits_proof.py` A0–A9; `core/tests/link.rs`, `link_edges.rs`, `schema_v28.rs`; sixteen core mutants; spec §11 AU-90…AU-97)
+
+Detach Audio's two clips are a LINKED PAIR (`clips[].linked`, format 28):
+every placement edit keeps them in step in time, trimming the sound half's
+edge alone makes a J- or L-cut, and `attach_audio` merges a pair back. The
+proof builds the cuts over MCP, exports them, and measures where the sound
+starts and stops against the picture.
+
+```sh
+make app-debug
+python3 tools/proof/proof_app.py launch                     # prints folder, socket, log, pid
+python3 tools/proof/ap9_split_edits_proof.py <dir>/agent.sock [--only A2,A3]
+```
+
+**The fixture** is made once under `tools/proof/work/ap9/fixture-v1.mov`: 10 s
+at 30 fps, 640×360, a gray ProRes picture with a white flash frame at frames
+45, 90, …, 270 and, at those instants, `export_offset_proof.py`'s
+raised-cosine click, over a continuous 440 Hz tone at 0.1 (48 kHz 16-bit
+PCM). Python writes the sound; ffmpeg the picture and the movie.
+
+**The measures** are `export_offset_proof.py`'s, imported and never copied:
+`read_ffmpeg` decodes each export's sound, `flash_times` reads the frames
+(mean luma over 32 is the picture, over 200 a flash) and `locate` finds the
+click near each flash. The tolerance is that file's E-row `TARGET_MS`
+(1 ms): an offset (tone onset − first picture frame, tone offset − the last
+picture frame's end) is held to it, and so is every click to its flash.
+
+| Row | What it claims |
+|---|---|
+| A0 | no `Frame Job: ` line in the instance's log |
+| A1 | `detach_audio` writes `linked` on both halves, mutually |
+| A2 | the J-cut (a carried one-second head trim, then the sound's `trim_start` alone 15 frames early): onset − first frame = −0.5 s |
+| A3 | the L-cut (the picture's `trim_end` with `alone: true` 15 frames early): offset − picture end = +0.5 s |
+| A4 | after `move_clip` on the picture, `ripple_delete` of a hidden, silent clip before the pair, `split` + `delete` of the first halves, and `nest`: each export keeps the +0.5 s tail, the −0.5 s head until the split removes the lead (0 after), and every click on its flash |
+| A5 | `set_speed` on a half refused in AU-94's sentence; `attach_audio` on the J-cut refused in AU-95's |
+| A6 | `attach_audio` on an in-step pair leaves one clip, and its `audio_wav` export equals a never-detached clip's within −90 dBFS |
+| A7 | `undo` restores the pair, linked |
+| A8 | two consecutive detached shots, the second's sound moved to a new track and J-cut 15 frames: the picture stays on its track, the sound has no `transition_in`, every click on its flash |
+| A9 | `delete` of a detached sound alone: the picture stays, unlinked, and its export is silent |
+
+Every project is closed with `discard: true`; no menu item is performed.
+
+**The sixteen core mutants** (more than ten because AU-91…AU-96 hold sixteen
+separate branches), each one replacement in `core/src/` (anchor asserted
+once), run with `cargo test --release --test link --test link_edges --test
+schema_v28 --test op_default_booleans` and the file restored after each:
+
+| Mutant | Edit | Killed by (among others) |
+|---|---|---|
+| `M1-closure-dropped-in-move` | `move_clips` acts on the named clips only | `moving_either_half_moves_both_in_time` |
+| `M2-anchor-from-closure` | the track delta anchored on the closure | `a_picture_moved_up_a_track_lands_on_the_track_asked_for` |
+| `M3-partners-take-track-delta` | every clip of the closure changes track | `a_sound_dragged_to_an_empty_track_goes_alone_and_then_leads_cleanly` |
+| `M4-earliest-from-caller-only` | the clamp at 0 over the named clips only | `a_j_cut_near_zero_keeps_its_lead_when_the_picture_is_dragged_left` |
+| `M5-lock-ignored-in-with-links` | a partner on a locked track added | `a_partner_on_a_locked_track_stays_and_stays_linked` |
+| `M6-partners-out-of-shifted` | `shifted` without partners | `a_shift_moves_a_partner_that_starts_before_the_boundary` |
+| `M7-floor-never-refuses` | the floor refusal never answered | `a_ripple_that_would_push_a_leading_sound_below_zero_refuses` |
+| `M8-delete-closure-is-with-links` | a sound named alone takes its picture | `deleting_a_sound_alone_keeps_its_picture_silent` |
+| `M9-pairing-skipped` | `pair_split_halves` not called | `a_split_through_both_halves_pairs_the_second_halves` |
+| `M10-uncut-partner-keeps-first` | the uncut partner always keeps the first half | `an_uncut_partner_keeps_the_half_it_shares_more_time_with` |
+| `M11-edge-always-carries` | the edge coincidence test removed | `a_trim_does_not_carry_across_a_j_cut` |
+| `M12-alone-ignored` | `alone` read as false | `trimming_the_sound_alone_makes_the_j_and_l_cuts` |
+| `M13-slip-own-clamp` | slip by the named clip's own clamp | `slip_moves_both_halves_by_the_smaller_clamp` |
+| `M14-rate-refusal-none` | `linked_rate_refusal` answers none | `speed_direction_and_ramps_are_refused_on_a_linked_clip` |
+| `M15-attach-in-step-removed` | Attach's in-step test removed | `attach_refuses_in_its_own_sentences` |
+| `M16-settle-no-op` | `settle_links` does nothing | `deleting_a_sound_alone_keeps_its_picture_silent` (validate refuses the one-sided link) |
+
+16 of 16 killed (2026-10-30; the runner and its logs are the implementer's
+scratch, each mutant a one-line replacement asserted to occur once).
+
+**The recorded run (2026-10-30, Release after `make gate`, which passed in 335 s
+with the four baseline warnings):** `RC_PROOF_APP=release
+ap9_split_edits_proof.py` 10/10, its log clean (A0): the J-cut's onset − first
+frame −0.4999 s, the L-cut's offset − picture end +0.5000 s, the worst click −
+flash 0.174 ms. 10/10 on Debug too.

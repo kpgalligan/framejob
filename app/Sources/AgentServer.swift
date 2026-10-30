@@ -251,6 +251,7 @@ final class AgentServer {
         "set_reversed": { $0.setReversed },
         "freeze_frame": { $0.freezeFrame },
         "detach_audio": { $0.detachAudio },
+        "attach_audio": { $0.attachAudio },
         "duplicate": { $0.duplicateClips },
         "paste": { $0.pasteClips },
         "paste_attributes": { $0.pasteAttributes },

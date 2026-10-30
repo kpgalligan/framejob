@@ -403,6 +403,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the read-out settle to a believable number, does the drag stay smooth, and do the normalised clips sound matched and clean?
 - **Source:** road map "audio" AP1 (spec §11 AU-10..AU-16); `tools/proof/loudness_normalize_proof.py` measures the exports (N3–N10) and `tools/proof/loudness_cache_probe.py` the read-out's arithmetic and the memo (C1–C11), not how the rows look or the sound.
 
+**SE-24 — A linked pair looks linked, and a J-cut is heard in the preview**
+- **Do:** 1. Put two talking-head clips with sound back to back on one track and Detach Audio (⌥⌘D) on both. 2. Click the second picture, then its sound, at S, M and L track heights, in both appearances. 3. Drag the second sound onto an empty track, then drag its start edge half a second earlier. 4. Play across the cut in the preview, then select either half of the second pair and choose Clip ▸ Attach Audio (⇧⌥⌘D); trim the sound back to the picture's start and attach again.
+- **Expect:** each detached clip shows a link symbol after its kind symbol in the name strip, never overlapping the name or the label dot; selecting one half draws the other with a dashed accent ring, clearly different from the coral selection ring; the dragged sound changes track while its picture stays; in the preview the second shot's voice starts half a second before its picture, with no click or gap at the cut; the first Attach Audio beeps with "Refused: clip …'s picture and clip …'s sound do not cover the same time; …" at the inspector's foot; the second leaves one clip with its waveform back.
+- **Answer:** do the link symbol and the echo ring read clearly at every height and in both appearances, and does the J-cut sound right?
+- **Source:** road map "audio" AP9 (spec §11 AU-90…AU-97); `tools/proof/ap9_split_edits_proof.py` measures the offsets in the export, not how the chrome looks or the preview sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**
