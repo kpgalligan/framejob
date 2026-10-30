@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_013jyCesVxzbj8HvXnMCPR28",
+  "agent_id": "ac8ef19e6866b120d",
+  "subagent_type": "general-purpose",
+  "task_description": "AP0 spike S4: loudness cache",
+  "token_usage": {
+    "input_tokens": 184,
+    "cache_creation_tokens": 304247,
+    "cache_read_tokens": 17593164,
+    "output_tokens": 150883,
+    "api_call_count": 92
+  },
+  "started_at": "2026-10-30T15:29:50.36743-04:00",
+  "completed_at": "2026-10-30T15:59:49.944356-04:00"
+}
