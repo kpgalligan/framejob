@@ -541,7 +541,7 @@ See [Timeline](timeline.md), [Canvas and layers](canvas-and-layers.md) and [HDR 
 | Tool | What it does |
 |---|---|
 | `detect_silence` | Reports the quiet spans, changing nothing (the read half of **Clip ▸ Remove Silences…**). |
-| `normalize_clip` | Sets each clip's volume so its loudest moment lands at `peak_db` (**Clip ▸ Normalize**). |
+| `normalize_clip` | Sets each clip's volume so its loudest moment lands at `peak_db`, or with `mode: "loudness"` so its integrated loudness lands at `target_lufs` under −1 dBTP (**Clip ▸ Normalize**). |
 | `sync_audio` | Lines clips up by their sound (**Clip ▸ Synchronize Audio**). |
 | `detect_fillers` | Reports filler words as ranges, changing nothing (the read half of **Clip ▸ Remove Filler Words…**). |
 | `transcribe_for_fillers` | Re-transcribes one media file with AssemblyAI, adding filler words — a paid upload. |

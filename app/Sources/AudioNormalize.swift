@@ -60,10 +60,12 @@ import Foundation
 /// BASE level normalised and is then overridden for the action's whole span.
 /// The tooltip and the tool description both say so.
 ///
-/// **One gain per clip.** A selection of five clips gets five different gains,
-/// each measured from its own material — not one gain that would make them
-/// match. Matching levels across a selection is a different feature and should
-/// be asked for by that name.
+/// **One gain per clip, in either mode.** A selection of five clips gets five
+/// different gains, each measured from its own material. In Peak mode (this
+/// file, the default) that does not match levels: each clip's loudest moment
+/// lands at the target, and a sparse voice still sounds quieter than a dense
+/// one. Loudness mode (`AudioNormalize+Loudness.swift`, spec §11 AU-13) takes
+/// each clip to one integrated loudness, which is what matching clips means.
 ///
 /// **One job's failure is one job's problem** (`transcribe`'s posture): a clip
 /// that cannot be measured is reported under `skipped`, by name and with a
@@ -227,68 +229,17 @@ enum AudioNormalize {
         guard let plan = document.editedProject.plan else { return nil }
         let snapshot = document.editedProject.snapshot
         let loader = MediaPeaks.loader(cacheDirectory: document.cacheDirectory)
-
-        // Every audio segment in the timeline, indexed by the clip it plays.
-        // A clip normally has exactly one; the list is kept whole because
-        // nothing in §7.2 promises that, and taking the loudest of several is
-        // the conservative reading (the clip ends up quieter than asked,
-        // never clipped).
-        var segments: [UInt32: [PlanSegment]] = [:]
-        for track in plan.audioTracks {
-            for segment in track.segments where segment.duration > 0 {
-                segments[segment.clip, default: []].append(segment)
-            }
-        }
+        let segments = audioSegments(in: plan)
 
         var readings: [Reading] = []
         var problems: [Problem] = []
         var seen: Set<UInt32> = []
         for id in clips ?? document.selection.sorted() where seen.insert(id).inserted {
-            guard let clip = snapshot.clip(id) else {
-                problems.append(Problem(clip: id, reason: "is not a clip in this project."))
+            if let problem = admit(id, in: snapshot, segments: segments) {
+                problems.append(problem)
                 continue
             }
-            // A nest is refused HERE rather than by the segment test below,
-            // and the reason is the message. A nest clip is audible — its own
-            // volume and mute multiply every voice under it (`audio.rs`) — but
-            // the plan flattens it, so every segment it plays carries an INNER
-            // clip's id and `segments[id]` is empty for the nest itself. The
-            // generic refusal would therefore say "plays no sound in this
-            // timeline" about a clip the user can hear, which is the one thing
-            // a refusal must not do; and there is no level to measure anyway,
-            // because the peaks cache is per MEDIA and a nest holds clips that
-            // each have their own.
-            if case .nest = clip.source {
-                problems.append(
-                    Problem(
-                        clip: id,
-                        reason: "is a nest, and a nest has no level of its own to measure: the "
-                            + "waveform cache is per media file and the clips inside a nest "
-                            + "each have their own. Un-nest it (⇧⌘G), normalize the clips "
-                            + "inside, and nest them again — or set the nest clip's own volume "
-                            + "by hand."))
-                continue
-            }
-            guard let cited = segments[id], !cited.isEmpty else {
-                problems.append(
-                    Problem(
-                        clip: id,
-                        reason: "plays no sound in this timeline, so there is no level to "
-                            + "measure. A still, a clip whose media has no audio track and a "
-                            + "clip with audio switched off all read this way."))
-                continue
-            }
-            // The core refuses `set_audio` on a clip with no audio group by
-            // name ("clip N has no audio properties"), and that message would
-            // otherwise reach a dialog from a button press. It cannot happen
-            // for a clip that has a segment — `add_clip` gives an audio group
-            // to exactly the clips whose media has sound — but a project is
-            // JSON somebody may have edited, and the pre-check costs a line.
-            guard clip.audio != nil else {
-                problems.append(
-                    Problem(clip: id, reason: "has no audio properties to write a volume into."))
-                continue
-            }
+            guard let cited = segments[id] else { continue }  // `admit` vouched for it
 
             // A missing peaks file means UNKNOWN, never silent: the cache is
             // written by a fire-and-forget task at open, so a project opened a
@@ -331,6 +282,68 @@ enum AudioNormalize {
             readings.append(Reading(clip: id, media: cited[0].media, peak: loudest))
         }
         return Input(readings: readings, problems: problems)
+    }
+
+    /// Every audio segment in the timeline, indexed by the clip it plays.
+    /// A clip normally has exactly one; the list is kept whole because
+    /// nothing in §7.2 promises that, and taking the loudest of several is
+    /// the conservative reading (the clip ends up quieter than asked,
+    /// never clipped). Both modes' reads index the plan through this.
+    static func audioSegments(in plan: CompositionPlan) -> [UInt32: [PlanSegment]] {
+        var segments: [UInt32: [PlanSegment]] = [:]
+        for track in plan.audioTracks {
+            for segment in track.segments where segment.duration > 0 {
+                segments[segment.clip, default: []].append(segment)
+            }
+        }
+        return segments
+    }
+
+    /// Whether `id` can be measured at all, in either mode: nil when it can,
+    /// else the refusal by name — not a clip, a nest, no audio segment, no
+    /// audio props. What is read off the cache after this is each mode's own.
+    static func admit(
+        _ id: UInt32, in snapshot: ProjectSnapshot, segments: [UInt32: [PlanSegment]]
+    ) -> Problem? {
+        guard let clip = snapshot.clip(id) else {
+            return Problem(clip: id, reason: "is not a clip in this project.")
+        }
+        // A nest is refused HERE rather than by the segment test below,
+        // and the reason is the message. A nest clip is audible — its own
+        // volume and mute multiply every voice under it (`audio.rs`) — but
+        // the plan flattens it, so every segment it plays carries an INNER
+        // clip's id and `segments[id]` is empty for the nest itself. The
+        // generic refusal would therefore say "plays no sound in this
+        // timeline" about a clip the user can hear, which is the one thing
+        // a refusal must not do; and there is no level to measure anyway,
+        // because the peaks cache is per MEDIA and a nest holds clips that
+        // each have their own.
+        if case .nest = clip.source {
+            return Problem(
+                clip: id,
+                reason: "is a nest, and a nest has no level of its own to measure: the "
+                    + "waveform cache is per media file and the clips inside a nest "
+                    + "each have their own. Un-nest it (⇧⌘G), normalize the clips "
+                    + "inside, and nest them again — or set the nest clip's own volume "
+                    + "by hand.")
+        }
+        guard let cited = segments[id], !cited.isEmpty else {
+            return Problem(
+                clip: id,
+                reason: "plays no sound in this timeline, so there is no level to "
+                    + "measure. A still, a clip whose media has no audio track and a "
+                    + "clip with audio switched off all read this way.")
+        }
+        // The core refuses `set_audio` on a clip with no audio group by
+        // name ("clip N has no audio properties"), and that message would
+        // otherwise reach a dialog from a button press. It cannot happen
+        // for a clip that has a segment — `add_clip` gives an audio group
+        // to exactly the clips whose media has sound — but a project is
+        // JSON somebody may have edited, and the pre-check costs a line.
+        guard clip.audio != nil else {
+            return Problem(clip: id, reason: "has no audio properties to write a volume into.")
+        }
+        return nil
     }
 
     // MARK: - Planning

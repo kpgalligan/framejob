@@ -118,38 +118,61 @@ extension AgentServer {
                 ]),
             tool(
                 "normalize_clip",
-                "Sets each clip's audio volume so its own loudest moment lands at peak_db — "
-                    + "the Normalize button in the Clip tab's Volume section, and Clip ▸ "
-                    + "Normalize. The level is measured from the clip's cached waveform over "
-                    + "the part of it that actually plays, which is PRE-FADER: it knows "
-                    + "nothing about the volume, fades, ducking, mute or solo already on the "
-                    + "clip, because normalise is a statement about the material and not "
-                    + "about the mix. Three things follow, and each is a decision rather than "
-                    + "an accident. It REPLACES volume rather than multiplying it, so a "
-                    + "second call changes nothing (and comes back as \"made no change\", "
-                    + "which is that working). It writes the clip's BASE volume even when the "
-                    + "playhead is inside an action, since it is about the whole clip — a "
-                    + "clip whose volume is animated is normalised underneath and then "
-                    + "overridden for the action's span. And it leaves muted alone: a mute is "
-                    + "a switch, not a level. Each clip gets its OWN gain, so this does not "
-                    + "match levels across a selection. One undo step however many clips. "
-                    + "The model's volume ceiling is \(AudioNormalize.maxGainName), so a clip "
-                    + "quieter than about "
+                "Sets each clip's audio volume so its own loudest moment lands at peak_db "
+                    + "(mode \"peak\", the default), or so its integrated loudness lands at "
+                    + "target_lufs (mode \"loudness\") — the Normalize button in the Clip tab's "
+                    + "Volume section, and Clip ▸ Normalize, which follow the mode chosen in "
+                    + "that section's Normalize row. The level is measured from the clip's "
+                    + "cached waveform (peak) or loudness cache (BS.1770-4 gated, as the "
+                    + "export plays it: a mono clip as dual mono, a stereo clip through its own "
+                    + "mono and pan) over the part of it that actually plays, which is "
+                    + "PRE-FADER: it knows nothing about the volume, fades, ducking, mute or "
+                    + "solo already on the clip, because normalise is a statement about the "
+                    + "material and not about the mix. Three things follow, and each is a "
+                    + "decision rather than an accident. It REPLACES volume rather than "
+                    + "multiplying it, so a second call changes nothing (and comes back as "
+                    + "\"made no change\", which is that working). It writes the clip's BASE "
+                    + "volume even when the playhead is inside an action, since it is about the "
+                    + "whole clip — a clip whose volume is animated is normalised underneath "
+                    + "and then overridden for the action's span. And it leaves muted alone: a "
+                    + "mute is a switch, not a level. In peak mode each clip gets its OWN gain "
+                    + "to the same peak, so it does not match levels across a selection; in "
+                    + "loudness mode each clip is taken to the one target, which does. One undo "
+                    + "step however many clips. The model's volume ceiling is "
+                    + "\(AudioNormalize.maxGainName), so a clip quieter than about "
                     + String(format: "%.0f", AudioNormalize.quietestReachableDB)
                     + " dBFS cannot reach -1: it is still normalised, as loud as it goes, "
-                    + "and result_db says where it landed. A clip that plays no sound, one "
-                    + "that is silent over the part that plays, and one whose waveform has "
+                    + "and result_db says where it landed. In loudness mode the volume also "
+                    + "stops where the clip's true peak would pass -1 dBTP; each row's "
+                    + "limited_by names the cap that stopped it (true_peak or max_gain, else "
+                    + "null), result_lufs says where it lands, and measured_lufs and "
+                    + "true_peak_dbtp are the Volume section's Loudness readout. A clip that "
+                    + "plays no sound, one that is silent (or under -70 LUFS, or plays under "
+                    + "0.4 s) over the part that plays, and one whose waveform or loudness has "
                     + "not been analysed yet are each reported by name under skipped and the "
                     + "rest are still normalised.",
                 [
                     "clips": clipsProperty,
                     "peak_db": [
                         "type": "number", "minimum": -60, "maximum": 0,
-                        "description": "Where the loudest moment should land, in dBFS. "
-                            + "Default -1, which is what the button uses: hot enough to use "
-                            + "the format, with a decibel of room for the inter-sample peaks "
-                            + "a lossy encoder can add. Above 0 is a request to clip and is "
-                            + "refused rather than clamped.",
+                        "description": "Peak mode only: where the loudest moment should land, "
+                            + "in dBFS. Default -1, which is what the button uses: hot enough "
+                            + "to use the format, with a decibel of room for the inter-sample "
+                            + "peaks a lossy encoder can add. Above 0 is a request to clip and "
+                            + "is refused rather than clamped; refused with mode \"loudness\".",
+                    ],
+                    "mode": [
+                        "type": "string", "enum": ["peak", "loudness"],
+                        "description": "\"peak\" (the default) takes each clip's loudest moment "
+                            + "to peak_db; \"loudness\" takes each clip's integrated loudness "
+                            + "to target_lufs under a -1 dBTP true-peak ceiling.",
+                    ],
+                    "target_lufs": [
+                        "type": "number", "minimum": -50, "maximum": -5,
+                        "description": "Loudness mode only: the integrated loudness each clip "
+                            + "should land at, in LUFS. Default -16; -14 is YouTube's playback "
+                            + "reference and -23 EBU R 128's. Outside -50 to -5 is refused "
+                            + "rather than clamped; refused with mode \"peak\".",
                     ],
                 ], required: ["clips"]),
             // Road map "audio-sync" AS-1 (spec §11 SY-1..SY-5): Clip ▸

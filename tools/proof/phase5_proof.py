@@ -576,8 +576,9 @@ def catalog_part(mcp):
 
     normalize = schema_of("normalize_clip")
     check(
-        set(normalize["properties"]) == {"clips", "peak_db", "project"},
-        f"normalize_clip declares clips and peak_db (and project): "
+        set(normalize["properties"]) == {"clips", "peak_db", "mode", "target_lufs", "project"},
+        f"normalize_clip declares clips, peak_db, mode and target_lufs (and project; "
+        f"spec §11 AU-16): "
         f"{sorted(normalize['properties'])}",
     )
     check(

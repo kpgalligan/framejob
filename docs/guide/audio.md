@@ -10,7 +10,7 @@ The waveform shows the level of the file itself, so moving the Volume slider doe
 
 When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has six sections, in this order:
 
-1. **Volume**: level, gain read-out, Mute and Normalize
+1. **Volume**: level, gain read-out, loudness read-out, Mute and Normalize
 2. **Fades**: fade in and fade out
 3. **Ducking**: lowers every other clip while this one plays
 4. **Noise Reduction**
@@ -49,8 +49,11 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 |---|---|---|---|
 | Volume | The clip's level as a percentage. The slider covers 0–400 %; type a higher value in the field, up to 3200 %. Above 400 % the slider's knob stays at the right end. Quick picks: 0, 50, 100, 150, 200, 400. | 0–3200 % | 100 % |
 | Gain | Read-only: the volume in dB (for example "+6.0 dB"), or "silent" at 0 %. | — | +0.0 dB |
+| Loudness | Read-only: the clip's integrated loudness and true peak over the part that plays, at volume 100 % (for example "−41.7 LUFS · −18.5 dBTP"). "measuring…" until the clip's loudness analysis has run; "—" with several clips selected or none that can be measured. | — | — |
+| At volume | Read-only: the same with the clip's volume applied. It follows a Volume drag; the Loudness row itself updates when the drag ends. | — | — |
 | Mute | Silences the clip without changing its volume. | on / off | off |
-| Normalize | Sets the volume from the clip's own loudest moment (see below). | — | — |
+| Normalize (row) | The mode, Peak or Loudness, and the Loudness target in LUFS (quick picks −14, −16, −23; used in Loudness mode only). The choice is the app's, not the project's, and is kept between launches. | Peak / Loudness; −50 to −5 LUFS | Peak; −16 LUFS |
+| Normalize (button) | Sets the volume from the clip's own loudest moment, or from its loudness, by the mode (see below). | — | — |
 
 The section's summary reads "muted", "silent" or the gain in dB. Reset puts the volume back to 100 % and turns Mute off.
 
@@ -58,18 +61,21 @@ You can animate volume, Mute and the fades with actions. While an action is sele
 
 ### Normalize
 
-**Normalize** sets each selected clip's volume so that its loudest moment reaches **−1 dBFS**. It's the button in the Volume section, and it's also **Clip ▸ Normalize**.
+**Normalize** sets each selected clip's volume from a measurement of the clip. It's the button in the Volume section, and it's also **Clip ▸ Normalize**; both follow the mode chosen in the Normalize row.
 
-- **It measures the material, not the mix.** The level is read from the clip's cached waveform over the part of the file that actually plays. The clip's volume, fades, ducking, mute and solo don't affect the reading.
+- **Peak** (the default) sets each clip's volume so its loudest moment reaches **−1 dBFS**.
+- **Loudness** sets each clip's volume so its integrated loudness (BS.1770, as the export plays it) reaches the target, **−16 LUFS** unless you choose another. Every clip goes to the same target, so this is how you match clips. A clip whose true peak would pass **−1 dBTP** at that volume stops at the volume that holds −1 dBTP and lands quieter than the target; so does a clip that would need more than 3200 %. A volume can go down as well as up. A mono clip is measured as the export plays it, on both channels, which reads 3 dB louder than the file on its own.
+
+- **It measures the material, not the mix.** The level is read from the clip's cached waveform (Peak) or loudness analysis (Loudness) over the part of the file that actually plays. The clip's volume, fades, ducking, mute and solo don't affect the reading, and neither do noise reduction or the compressor. Mix to mono and pan on a stereo clip do count in Loudness mode.
 - **It replaces the volume** rather than multiplying it, so pressing it a second time changes nothing (the second press beeps).
-- **Each clip gets its own gain.** Normalize doesn't match levels across a selection. However many clips are selected, it is one undo step, named "Normalize".
+- **Each clip gets its own gain.** In Peak mode that doesn't match levels across a selection; in Loudness mode it does. However many clips are selected, it is one undo step, named "Normalize".
 - **It writes the clip's base level**, even when the playhead is inside an action. With an action selected, the button carries a small boxed "clip" tag to show this.
 - **It leaves Mute alone.**
 - **It can go past 400 %.** A quiet recording, such as a desktop USB microphone's, is turned up as far as it needs, up to the 3200 % ceiling (about +30 dB). Only a clip whose peak is quieter than about −31 dBFS can't reach −1 dBFS. It is turned up to 3200 % and stops there.
 
-Some clips in a selection are skipped and the rest are still normalized: nests (their level lives in the clips inside them), shapes, titles and silent movies. Normalize also skips a clip whose waveform hasn't been analysed yet, and a clip that is silent over the part that plays. When nothing in the selection can be normalized, the button and the menu item are disabled, and a press that does nothing beeps.
+Some clips in a selection are skipped and the rest are still normalized: nests (their level lives in the clips inside them), shapes, titles and silent movies. Normalize also skips a clip whose waveform (or, in Loudness mode, loudness) hasn't been analysed yet, and a clip that is silent over the part that plays. Loudness mode also skips a clip that plays for under 0.4 s and one that is quieter than −70 LUFS throughout. When nothing in the selection can be normalized, the button and the menu item are disabled, and a press that does nothing beeps.
 
-*Agents:* `normalize_clip` (`clips`, optional `peak_db` from −60 to 0, default −1). It answers each clip's `result_db` and lists every skipped clip under `skipped` with the reason.
+*Agents:* `normalize_clip` (`clips`; optional `mode`, `"peak"` or `"loudness"`, default `"peak"`; in Peak mode optional `peak_db` from −60 to 0, default −1; in Loudness mode optional `target_lufs` from −50 to −5, default −16). An argument of the other mode is refused by name. In Peak mode it answers each clip's `result_db`; in Loudness mode each clip's `measured_lufs` and `true_peak_dbtp` (the Loudness row's numbers), `volume`, `result_lufs`, `result_true_peak_dbtp` and `limited_by` (`"true_peak"`, `"max_gain"` or null). Both list every skipped clip under `skipped` with the reason. The tool doesn't read the mode chosen in the Volume section; it uses its own `mode`.
 
 ## Fades
 
@@ -323,4 +329,6 @@ The screen recorder can record a microphone with the screen, or record the micro
 - No control switches a clip's audio back on after Detach Audio; use Undo.
 - Above ×12 a clip's audio is left out of the mix ([Speed](speed.md)).
 - Synchronize Audio corrects drift only up to 0.2 % from ×1. It doesn't work on nests, reversed clips, ramped clips, or clips playing at other rates.
-- Normalize and Synchronize Audio both need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed".
+- Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".
+- The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
+- Loudness mode has no limiter yet: a clip with high peaks stops at −1 dBTP and stays under its target.

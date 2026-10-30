@@ -1,0 +1,267 @@
+import Accelerate
+import CoreMedia
+import Foundation
+
+/// A media's loudness cache as loaded (spec §11 AU-10): one record per 10 ms
+/// block of the media record, `width` Float32s each — mono `z, tp`, stereo
+/// `zL, zR, zLR, tpL, tpR`. `z` is the MEAN of the K-weighted samples squared
+/// over the block's frames (`zLR` the mean of yL·yR), so a 400 ms gating block
+/// is the plain average of forty records at any rate; `tp` is the block's
+/// true peak, linear: max(4× Annex 2 interpolation, |x|).
+struct MediaLoudness: Equatable {
+    /// 1 or 2.
+    let channels: Int
+    /// Records: `⌈duration·100⌉` from the marker, `loadPeaks`' count.
+    let count: Int
+    /// `count × width` values, record-major.
+    let records: [Float]
+
+    var width: Int { channels == 1 ? 2 : 5 }
+}
+
+/// BS.1770-4's K-weighting at a rate. Tables 1 and 2 at exactly 48 kHz, the
+/// standard's own numbers (`LoudnessMeter.stage1`/`stage2`); at any other
+/// rate the two sections derived from their analog prototype through the
+/// bilinear transform, libebur128's derivation, which ffmpeg 9 uses too
+/// (AP0's spike S4: within 0.005 LU of the 48 kHz path at 44.1 kHz).
+enum KWeighting {
+    static func coefficients(sampleRate: Double) -> (LoudnessMeter.Biquad, LoudnessMeter.Biquad) {
+        if sampleRate == LoudnessMeter.requiredSampleRate {
+            return (LoudnessMeter.stage1, LoudnessMeter.stage2)
+        }
+        // The high shelf, +4 dB above about 1.7 kHz.
+        var f0 = 1681.974450955533
+        let gain = 3.999843853973347
+        var q = 0.7071752369554196
+        var k = tan(Double.pi * f0 / sampleRate)
+        let vh = pow(10.0, gain / 20.0)
+        let vb = pow(vh, 0.4996667741545416)
+        let a0 = 1.0 + k / q + k * k
+        let shelf = LoudnessMeter.Biquad(
+            b0: (vh + vb * k / q + k * k) / a0, b1: 2.0 * (k * k - vh) / a0,
+            b2: (vh - vb * k / q + k * k) / a0,
+            a1: 2.0 * (k * k - 1.0) / a0, a2: (1.0 - k / q + k * k) / a0)
+        // The RLB high-pass at about 38 Hz.
+        f0 = 38.13547087602444
+        q = 0.5003270373238773
+        k = tan(Double.pi * f0 / sampleRate)
+        let d = 1.0 + k / q + k * k
+        let highPass = LoudnessMeter.Biquad(
+            b0: 1, b1: -2, b2: 1, a1: 2.0 * (k * k - 1.0) / d, a2: (1.0 - k / q + k * k) / d)
+        return (shelf, highPass)
+    }
+}
+
+extension MediaImporter {
+    /// The loudness pass's accumulator: every sample buffer the reader yields,
+    /// in order. A `PeakBuckets` is fed the same buffers and is the authority
+    /// on validation, the failure latch, the frame count and `covers`, so a
+    /// buffer the peaks cache refuses is refused here too and the two caches
+    /// certify the same decode. Frames are placed by its rule verbatim: the
+    /// PTS less the MP3 lead rounded to a frame once, frame f in block
+    /// `⌊(startFrame + f)·100/rate⌋`. The K-weighting state and the true-peak
+    /// FIR's 11-sample history run on across buffers (and across an edit gap,
+    /// which reads as silence, as it plays); a frame outside `[0, count)` feeds
+    /// the filters and lands in no record.
+    struct LoudnessBlocks {
+        private var peaks: PeakBuckets
+        private let lead: CMTime
+        private let count: Int
+        private(set) var failed = false
+        private(set) var channels: Int?
+        private(set) var sampleRate: Double?
+        private var stages: (LoudnessMeter.Biquad, LoudnessMeter.Biquad)?
+        /// Per channel: `x1, x2, y1, y2` for each of the two sections.
+        private var filterState: [[Double]] = []
+        /// Per channel: the last `peakTaps − 1` raw samples.
+        private var history: [[Double]] = []
+        /// Per block: Σ y² per channel, Σ yL·yR, frames, and the true peaks.
+        private var sumL: [Double]
+        private var sumR: [Double]
+        private var sumLR: [Double]
+        private var frames: [Int]
+        private var peakL: [Float]
+        private var peakR: [Float]
+
+        init(duration: Ticks, lead: CMTime = .zero) {
+            peaks = PeakBuckets(duration: duration, lead: lead)
+            self.lead = lead
+            count = max(1, Int((Double(duration) / Double(ReelTime.perSecond)
+                * Double(MediaImporter.peakBucketsPerSecond)).rounded(.up)))
+            sumL = [Double](repeating: 0, count: count)
+            sumR = sumL
+            sumLR = sumL
+            frames = [Int](repeating: 0, count: count)
+            peakL = [Float](repeating: 0, count: count)
+            peakR = peakL
+        }
+
+        var acceptedFrames: Int { peaks.acceptedFrames }
+
+        func covers(_ expectedRanges: [CMTimeRange]) -> Bool {
+            !failed && peaks.covers(expectedRanges)
+        }
+
+        /// The `.bin`: headerless little-endian Float32 records.
+        var data: Data {
+            let stereo = channels == 2
+            var values: [Float] = []
+            values.reserveCapacity(count * (stereo ? 5 : 2))
+            for b in 0..<count {
+                let n = Double(max(frames[b], 1))
+                if stereo {
+                    values += [Float(sumL[b] / n), Float(sumR[b] / n), Float(sumLR[b] / n),
+                               peakL[b], peakR[b]]
+                } else {
+                    values += [Float(sumL[b] / n), peakL[b]]
+                }
+            }
+            return values.withUnsafeBufferPointer { Data(buffer: $0) }
+        }
+
+        /// A buffer the peaks rule refuses, one of more than two channels, or
+        /// one whose channel count or rate differs from the first latches
+        /// failure, and nothing of it lands.
+        mutating func add(_ sample: CMSampleBuffer) -> Bool {
+            guard !failed else { return false }
+            guard peaks.add(sample) else { failed = true; return false }
+            let count = CMSampleBufferGetNumSamples(sample)
+            if count == 0 { return true }
+            guard let format = CMSampleBufferGetFormatDescription(sample),
+                let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
+                let block = CMSampleBufferGetDataBuffer(sample)
+            else { failed = true; return false }
+            let width = Int(asbd.mChannelsPerFrame)
+            let rate = asbd.mSampleRate
+            if channels == nil {
+                guard (1...2).contains(width) else { failed = true; return false }
+                channels = width
+                sampleRate = rate
+                stages = KWeighting.coefficients(sampleRate: rate)
+                filterState = Array(repeating: [Double](repeating: 0, count: 8), count: width)
+                history = Array(
+                    repeating: [Double](repeating: 0, count: LoudnessMeter.peakTaps - 1),
+                    count: width)
+            }
+            guard width == channels, rate == sampleRate, let stages else {
+                failed = true; return false
+            }
+            var samples = [Float](repeating: 0, count: count * width)
+            let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
+                guard let base = raw.baseAddress else { return -1 }
+                return CMBlockBufferCopyDataBytes(
+                    block, atOffset: 0, dataLength: count * width * 4, destination: base)
+            }
+            guard copied == noErr else { failed = true; return false }
+            let stamp = CMSampleBufferGetPresentationTimeStamp(sample)
+            let time = lead == .zero ? stamp : CMTimeSubtract(stamp, lead)
+            let startFrame = (CMTimeGetSeconds(time) * rate).rounded()
+
+            // Per channel: the true peak of each frame, then the weighted run.
+            var weighted: [[Double]] = []
+            var framePeaks: [[Double]] = []
+            for channel in 0..<width {
+                let (run, peak) = process(samples, channel: channel, width: width,
+                                          frames: count, stages: stages)
+                weighted.append(run)
+                framePeaks.append(peak)
+            }
+            // The blocks, grouped as `PeakBuckets` groups them.
+            func blockOf(_ frame: Int) -> Double {
+                floor((startFrame + Double(frame))
+                      * Double(MediaImporter.peakBucketsPerSecond) / rate)
+            }
+            var frame = 0
+            while frame < count {
+                let blockDouble = blockOf(frame)
+                var take = 1
+                while frame + take < count, blockOf(frame + take) == blockDouble { take += 1 }
+                if blockDouble >= 0, blockDouble < Double(self.count) {
+                    accumulate(Int(blockDouble), from: frame, take: take,
+                               weighted: weighted, framePeaks: framePeaks)
+                }
+                frame += take
+            }
+            return true
+        }
+
+        private mutating func accumulate(
+            _ b: Int, from frame: Int, take: Int, weighted: [[Double]], framePeaks: [[Double]]
+        ) {
+            let n = vDSP_Length(take)
+            var energy = 0.0
+            var peak = 0.0
+            weighted[0].withUnsafeBufferPointer { vDSP_svesqD($0.baseAddress! + frame, 1, &energy, n) }
+            framePeaks[0].withUnsafeBufferPointer { vDSP_maxvD($0.baseAddress! + frame, 1, &peak, n) }
+            sumL[b] += energy
+            peakL[b] = max(peakL[b], Float(peak))
+            if weighted.count == 2 {
+                var cross = 0.0
+                weighted[1].withUnsafeBufferPointer { vDSP_svesqD($0.baseAddress! + frame, 1, &energy, n) }
+                framePeaks[1].withUnsafeBufferPointer { vDSP_maxvD($0.baseAddress! + frame, 1, &peak, n) }
+                weighted[0].withUnsafeBufferPointer { l in
+                    weighted[1].withUnsafeBufferPointer { r in
+                        vDSP_dotprD(l.baseAddress! + frame, 1, r.baseAddress! + frame, 1, &cross, n)
+                    }
+                }
+                sumR[b] += energy
+                sumLR[b] += cross
+                peakR[b] = max(peakR[b], Float(peak))
+            }
+            frames[b] += take
+        }
+
+        /// One channel's run: each frame's true peak, max(|x|, the four
+        /// interpolated phases' magnitudes at it) — `LoudnessMeter.process`'s
+        /// FIR in Double, its history carried — then the K-weighted samples.
+        private mutating func process(
+            _ samples: [Float], channel: Int, width: Int, frames count: Int,
+            stages: (LoudnessMeter.Biquad, LoudnessMeter.Biquad)
+        ) -> ([Double], [Double]) {
+            let taps = LoudnessMeter.peakTaps
+            let held = taps - 1
+            var buffer = history[channel] + [Double](repeating: 0, count: count)
+            samples.withUnsafeBufferPointer { src in
+                buffer.withUnsafeMutableBufferPointer { dst in
+                    vDSP_vspdp(src.baseAddress! + channel, vDSP_Stride(width),
+                               dst.baseAddress! + held, 1, vDSP_Length(count))
+                }
+            }
+            var peak = [Double](repeating: 0, count: count)
+            buffer.withUnsafeBufferPointer { raw in
+                vDSP_vabsD(raw.baseAddress! + held, 1, &peak, 1, vDSP_Length(count))
+            }
+            var phase = [Double](repeating: 0, count: count)
+            for filter in LoudnessMeter.peakFilter {
+                let reversed = Array(filter.reversed())
+                vDSP_convD(buffer, 1, reversed, 1, &phase, 1, vDSP_Length(count), vDSP_Length(taps))
+                vDSP_vabsD(phase, 1, &phase, 1, vDSP_Length(count))
+                vDSP_vmaxD(phase, 1, peak, 1, &peak, 1, vDSP_Length(count))
+            }
+            history[channel] = Array(buffer[count..<(count + held)])
+
+            var run = Array(buffer[held...])
+            var state = filterState[channel]
+            for (index, section) in [stages.0, stages.1].enumerated() {
+                var x1 = state[index * 4], x2 = state[index * 4 + 1]
+                var y1 = state[index * 4 + 2], y2 = state[index * 4 + 3]
+                for n in 0..<count {
+                    let x = run[n]
+                    let y = section.b0 * x + section.b1 * x1 + section.b2 * x2
+                        - section.a1 * y1 - section.a2 * y2
+                    x2 = x1
+                    x1 = x
+                    y2 = y1
+                    y1 = y
+                    run[n] = y
+                }
+                state[index * 4] = x1
+                state[index * 4 + 1] = x2
+                state[index * 4 + 2] = y1
+                state[index * 4 + 3] = y2
+            }
+            filterState[channel] = state
+            return (run, peak)
+        }
+    }
+}

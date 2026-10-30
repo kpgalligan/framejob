@@ -69,6 +69,16 @@ extension AgentServer {
     func normalizeClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
+        // Loudness mode (spec §11 AU-16): the button's and the menu's mode
+        // when the Normalize row says Loudness (`NormalizeChoice`).
+        if try normalizeMode(a) == .loudness {
+            return try normalizeLoudness(a, document: document, clips: clips)
+        }
+        guard try doubleArg(a, "target_lufs") == nil else {
+            throw ToolError(
+                message: "target_lufs is the loudness mode's target; with mode \"peak\" the "
+                    + "level is peak_db. Pass mode \"loudness\" to normalise to a loudness.")
+        }
         let peakDB = try normalizePeakDB(a)
         guard let input = AudioNormalize.read(from: document, clips: clips) else {
             throw ToolError(
@@ -89,6 +99,7 @@ extension AgentServer {
         let plan = AudioNormalize.plan(input, peakDB: peakDB)
 
         var fields: [String: Any] = [
+            "mode": AudioNormalize.Mode.peak.rawValue,
             // The level that RAN, off the plan rather than off the argument:
             // `AudioNormalize.plan` substitutes the default for a non-finite
             // one, and a caller reading this back sees what was used.
@@ -265,6 +276,82 @@ extension AgentServer {
             if let note = note { result["drift_note"] = note }
         }
         return result
+    }
+
+    /// `mode`, refused by name outside its two values; absent is Peak.
+    private func normalizeMode(_ a: [String: Any]) throws -> AudioNormalize.Mode {
+        guard let raw = try stringArg(a, "mode") else { return .peak }
+        guard let mode = AudioNormalize.Mode(rawValue: raw) else {
+            throw ToolError(
+                message: "mode must be \"peak\" or \"loudness\", not \"\(raw)\"; the default "
+                    + "is \"peak\".")
+        }
+        return mode
+    }
+
+    /// `normalize_clip {mode: "loudness"}` — the Normalize button and Clip ▸
+    /// Normalize in Loudness mode (`NormalizeChoice.ops`), through the same
+    /// `readLoudness` + `plan` pair (spec §11 AU-13, AU-14, AU-16). `peak_db`
+    /// is refused by name, and `target_lufs` outside −50…−5 is refused, never
+    /// clamped. The answer reports each clip's measured loudness and true
+    /// peak (the readout's numbers), the volume written, where it lands, and
+    /// the cap that stopped it short; a note names each limited clip.
+    private func normalizeLoudness(
+        _ a: [String: Any], document: ProjectDocument, clips: [UInt32]
+    ) throws -> String {
+        guard try doubleArg(a, "peak_db") == nil else {
+            throw ToolError(
+                message: "peak_db is the peak mode's level; with mode \"loudness\" the target "
+                    + "is target_lufs.")
+        }
+        let range = AudioNormalize.targetLUFSRange
+        let requested = try doubleArg(a, "target_lufs") ?? AudioNormalize.defaultTargetLUFS
+        guard requested.isFinite, range.contains(requested) else {
+            throw ToolError(
+                message: "target_lufs must be a loudness from \(range.lowerBound) to "
+                    + "\(range.upperBound) LUFS, and the default is "
+                    + "\(AudioNormalize.defaultTargetLUFS).")
+        }
+        guard let input = AudioNormalize.readLoudness(from: document, clips: clips) else {
+            throw ToolError(
+                message: "The project's audio plan could not be read, so there is no loudness "
+                    + "to measure.")
+        }
+        guard !input.isEmpty else {
+            let reasons = input.problems.map { $0.description }.joined(separator: " ")
+            throw ToolError(message: "Nothing could be normalised. \(reasons)")
+        }
+        let plan = AudioNormalize.plan(input, targetLUFS: requested)
+        var fields: [String: Any] = [
+            "mode": AudioNormalize.Mode.loudness.rawValue,
+            "target_lufs": plan.targetLUFS,
+            "ceiling_dbtp": AudioNormalize.ceilingDBTP,
+            "normalized": plan.normalized.map { result in
+                [
+                    "clip": Int(result.clip),
+                    "media": Int(result.media),
+                    "measured_lufs": Self.jsonLevel(result.measuredLUFS),
+                    "true_peak_dbtp": Self.jsonLevel(result.truePeakDBTP),
+                    "volume": result.volume,
+                    "result_lufs": Self.jsonLevel(result.resultLUFS),
+                    "result_true_peak_dbtp": Self.jsonLevel(result.resultTruePeakDBTP),
+                    "limited_by": result.limit.map { $0.rawValue as Any } ?? NSNull(),
+                ] as [String: Any]
+            },
+        ]
+        if !plan.skipped.isEmpty {
+            fields["skipped"] = plan.skipped.map { $0.description }
+        }
+        let limited = plan.normalized.filter { $0.limit != nil }
+        if !limited.isEmpty {
+            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
+            fields["note"] =
+                "Clip(s) \(ids) stopped short of \(plan.targetLUFS) LUFS: the volume that reaches "
+                + "it would put the true peak past \(AudioNormalize.ceilingDBTP) dBTP "
+                + "(limited_by true_peak) or pass the \(AudioNormalize.maxGainName) ceiling "
+                + "(limited_by max_gain). result_lufs says where each landed."
+        }
+        return try editResult(document, "Normalize", plan.ops, fields)
     }
 
     /// `peak_db`, in the button's own unit, refused by name.

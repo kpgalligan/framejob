@@ -56,7 +56,8 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 → [Speed, reverse and freeze frames](docs/guide/speed.md)
 
 **Audio.** Per-clip volume, fades, ducking, noise reduction, compressor, pan and
-mono; Normalize; Synchronize Audio lines up a camera and a separate recorder by
+mono; each clip's loudness and true peak in the inspector, and Normalize to a peak or to
+a loudness target (−16 LUFS by default) that matches clips; Synchronize Audio lines up a camera and a separate recorder by
 their sound, drift included.
 → [Audio](docs/guide/audio.md)
 

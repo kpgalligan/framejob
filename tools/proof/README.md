@@ -25749,3 +25749,84 @@ make app-debug
 python3 tools/proof/graphic_import_proof.py             # → 17/17
 python3 tools/proof/graphic_import_proof.py --mutant asset-replace
 ```
+
+## Road map "audio" AP1 — loudness you can see and target (`loudness_cache_probe.py`, `loudness_normalize_proof.py`; spec §11 AU-10..AU-17)
+
+Two instruments. **`loudness_cache_probe.py`** compiles
+`loudness_cache_probe.swift` with `app/Sources` through `swift_build.build`
+(a failed build is a scored failure) and builds the loudness cache with the
+product's own pass (`MediaImporter.loudness`), then reads it back through
+`ClipLoudness` against `LoudnessMeter` fed exactly each window. Its fixtures
+are made under `tools/proof/work/loudness-cache-probe/fixtures/` from
+`samples/Rode-usb-mic.m4a` with ffmpeg: a stereo file (L the recording, R the
+recording reversed at −6 dB, spike S4's), the recording and a 30 Hz + 1.6 kHz
+tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
+
+| Row | What it holds |
+|---|---|
+| C1 | the mono and stereo caches publish: width 2 / 5, `⌈duration·100⌉` records, marker version 1 at 100 a second and ×4 |
+| C2 | the whole recording against the meter as dual mono: ≤ 0.1 LU, TP ≤ 0.01 dB |
+| C3 | S4's ten named windows forward, each ≤ 0.1 LU of the meter on that window |
+| C4 | the same windows reversed against the meter on the reversed samples, ≤ 0.1 LU |
+| C5 | the stereo file through identity, the mono fold and a hard pan, ≤ 0.1 LU of the meter on transformed samples (and the matrices themselves) |
+| C6 | the two 44.1 kHz fixtures against the meter on their 48 kHz copies, ≤ 0.1 LU |
+| C7 | 0.39 s played reads nil and 0.40 s reads a number; the −85 dBFS tone reads nil |
+| C8 | `plan`'s caps: reaching the target, the true-peak cap, ×32, a tie (`true_peak`), a turn-down, the non-finite target's −16 |
+| C9 | a marker of version 0, or of 50 blocks a second, reads absent beside a valid `.bin` |
+| C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
+| C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
+
+`--mutants` runs seven, each one replacement in a copied `app/Sources` (its
+anchor asserted once), and scores each killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `mono-not-doubled` | a mono record's z not doubled | C2 |
+| `reversed-forward-order` | a reversed segment's steps pooled in source order | C4 |
+| `no-relative-gate` | the −10 LU gate dropped | C3 |
+| `no-true-peak-cap` | the cap is ×32 alone | C8 |
+| `limited-by-nil` | `limited_by` always nil | C8 |
+| `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
+| `version-unchecked` | the marker's version not checked | C9 |
+
+**`loudness_normalize_proof.py <dir>/agent.sock`** drives an instance over
+MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
+(`integrated`, `true_peak`). It writes its fixtures into `work/fixtures/`
+(stereo and mono steady tones, a quiet one, a peaky one, a copy of the owner's
+recording) and waits for each media's loudness marker after placing it. N10
+launches two more instances of the chosen app, one with `-FrameJobNormalizeMode
+peak` and one with `-FrameJobNormalizeMode loudness`, each with
+`-FrameJobNormalizeTargetLUFS -16` (the argument domain: nothing persists, and
+the mode the shared defaults domain holds is never read), and stops each.
+
+| Row | What it holds |
+|---|---|
+| N1 | the schema: `mode` the enum peak / loudness, `target_lufs` −50…−5, only `clips` required |
+| N2 | refused by name: `target_lufs` −51 and −4, `mode` "rms", `target_lufs` with peak (named or default), `peak_db` with loudness; the volume untouched |
+| N3 | stereo and mono steady fixtures to −16, −14 and −23: the export within 0.5 LU of the target and of `result_lufs` |
+| N4 | the peaky fixture: `limited_by` true_peak, the export's TP ≤ −0.9 dBTP, the note names the clip |
+| N5 | two clips of different levels in one call land within 0.5 LU of each other |
+| N6 | the owner's recording: measured about −41.7 LUFS, limited by true peak, the export at `result_lufs` ±0.5 |
+| N7 | a reversed clip and a ×2 Keep pitch clip of a steady fixture land at −16 ±0.5 |
+| N8 | `measured_lufs` / `true_peak_dbtp` against the volume-1 export of the same window, ±0.5 LU / ±0.5 dB |
+| N9 | a second call "made no change" |
+| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance at −16 ±0.5 LUFS |
+
+The eighth mutant, `target_lufs`'s range check dropped in
+`AgentServer+Audio.swift`, runs on a mutated Debug build (restored after) and
+must fail N2's −51 and −4 rows.
+
+```sh
+python3 tools/proof/loudness_cache_probe.py            # C1–C11
+python3 tools/proof/loudness_cache_probe.py --mutants   # 7 mutants
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+```
+
+**The recorded run (2026-10-30):** `loudness_cache_probe.py` 11/11 rows (C3
+worst 0.076 LU, C4 0.087, C5 0.052, C6 0.004; the owner's recording −41.672
+LUFS and −18.526 dBTP against the meter's same); `--mutants` 7/7 killed, each
+by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
+after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
+at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
+rows. `phase5_proof.py` 92/92 on both.

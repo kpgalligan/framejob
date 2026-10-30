@@ -395,6 +395,52 @@ speech by 0.14 dB, so a limiter exact by an accurate meter is reported at −0.8
 `Loudness.swift` and `phase5_proof.py`. Like the noise reducer, it runs for the whole track once
 any clip on it asks, so the track's delay never changes at a cut (670 samples with both).
 
+### AP1's record (2026-10-30)
+
+**Decisions:** AU-10…AU-17, recorded before the code. **Toll T1** (a pure move gated alone,
+PASS 351 s): `thumbnails`' request arithmetic (`thumbnailSeconds`, `thumbnailRequests`,
+`tileIndices`) and its "measured" paragraph into `MediaImporter+Thumbnails.swift`;
+`MediaImporter.swift` 595 → 559, then 589 with the loudness pass.
+
+**Landed.** The per-media loudness cache (`cache/loudness/`, S4's 10 ms format;
+`MediaImporter+Loudness.swift`, `LoudnessBlocks.swift`) on the lane after peaks, its retry
+riding the waveform's; the reader (`ClipLoudness.swift`: the export's dual mono, the clip's
+own fold and pan on stereo, played-order steps through `sourceTick` and `ReverseMirror`, the
+gates once) and the Volume section's Loudness and At volume rows behind a memo that holds
+per handle, per file and through a live drag; Normalize's Loudness mode
+(`AudioNormalize+Loudness.swift`: −16 LUFS by default, −1 dBTP and ×32 caps, `limited_by`),
+its mode and target app-wide (`NormalizeChoice.swift`) and followed by the button and
+Clip ▸ Normalize; `normalize_clip {mode, target_lufs}`. `AudioNormalize`'s admission and
+segment index extracted for both modes. No core, FFI, op or format change.
+
+**Measured** (Debug, then Release after the gate; the figures are the runs'):
+`loudness_cache_probe.py` 11/11 rows — C3 forward windows within 0.076 LU and C4 reversed
+within 0.087 LU of the meter (S4's figures), C5 stereo within 0.052, C6 44.1 kHz within
+0.004; the owner's recording reads −41.672 LUFS, −18.526 dBTP, the meter's to three decimals.
+`loudness_normalize_proof.py` 30/30: steady fixtures land at −16.00, −14.00 and −23.00
+LUFS; the peaky fixture stops at −1.00 dBTP; two clips land at −16.00 and −16.00; **the
+owner's recording measures −41.67 LUFS and lands at −24.15 LUFS, held by its true peak**
+(−18.53 dBTP: ×7.52 puts it at −1 dBTP, 8.15 LU short of −16 — AP2's limiter is what closes
+the gap); reversed and ×2 Keep pitch steady clips land at −16.00. `phase5_proof.py` 92/92;
+`cache_pass_probe.py` 13/13. The same on Release after `make gate` (PASS 253 s, typecheck at
+its four baseline warnings): `loudness_normalize_proof.py` 30/30, `phase5_proof.py` 92/92, the
+log clean. **Mutants 8/8:** the probe's seven (`--mutants`) each failed its named row
+(mono-not-doubled C2, reversed-forward-order C4, no-relative-gate C3, no-true-peak-cap C8,
+limited-by-nil C8, tables-at-44k C6, version-unchecked C9), and `target_lufs`'s range check
+dropped on a Debug build failed N2's −51 and −4 rows (restored after).
+
+**Review fix.** N10's Peak leg read whatever mode the shared defaults domain held (AU-15
+persists the choice), so it now runs on its own instance launched with
+`-FrameJobNormalizeMode peak`, and both legs pin `-FrameJobNormalizeTargetLUFS -16`; the
+pass moved `normalizePeakDB`'s doc back above it. Release after `make gate` (PASS 385 s):
+`loudness_normalize_proof.py` 31/31, the log clean. The second review passed with three nits
+left as written: N10's target pin holds because −16 is also the default (the argument
+domain's string fails `NormalizeChoice`'s `NSNumber` read and falls back), the
+`normalizeClips` doc's sentence on which pair runs, and another window's Normalize tooltip
+keeping the old mode until its Volume section is rebuilt.
+
+**Owed:** SE-23 (the read-out's look, the drag, the sound) for the owner.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

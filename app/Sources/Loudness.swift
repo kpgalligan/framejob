@@ -148,14 +148,14 @@ final class LoudnessMeter {
     /// BS.1770-4 equation (2)'s offset. Note 1 of that clause says what it
     /// is for: it cancels the K-weighting's gain at 997 Hz, which this
     /// implementation measures as +0.6977 dB.
-    private static let offset: Double = -0.691
+    static let offset: Double = -0.691
 
     /// Γa, the absolute gate, in LUFS. A block at or below it is not
     /// programme.
-    private static let absoluteGate: Double = -70
+    static let absoluteGate: Double = -70
 
     /// Γr's offset below the gated mean, in LU.
-    private static let relativeGate: Double = -10
+    static let relativeGate: Double = -10
 
     // ---- K-weighting -----------------------------------------------------
 
@@ -170,14 +170,14 @@ final class LoudnessMeter {
     /// direct form I loses enough per step to drift audibly over a
     /// forty-minute programme. This is not the audio render thread, so the
     /// precision is free.
-    private struct Biquad {
+    struct Biquad {
         let b0: Double, b1: Double, b2: Double, a1: Double, a2: Double
     }
 
     /// Table 1: "Filter coefficients for stage 1 of the pre-filter to model a
     /// spherical head" — a high shelf, +4 dB above about 2 kHz. Quoted from
     /// Recommendation ITU-R BS.1770-4 (10/2015), for 48 kHz.
-    private static let stage1 = Biquad(
+    static let stage1 = Biquad(
         b0: 1.535_124_859_586_97,
         b1: -2.691_696_189_406_38,
         b2: 1.198_392_810_852_85,
@@ -186,7 +186,7 @@ final class LoudnessMeter {
 
     /// Table 2: "Filter coefficients for the second stage weighting curve" —
     /// the RLB high-pass. Same source, same rate.
-    private static let stage2 = Biquad(
+    static let stage2 = Biquad(
         b0: 1.0,
         b1: -2.0,
         b2: 1.0,
@@ -196,8 +196,8 @@ final class LoudnessMeter {
     // ---- true peak -------------------------------------------------------
 
     /// Taps per phase of the interpolating FIR.
-    private static let peakTaps = 12
-    private static let peakPhases = 4
+    static let peakTaps = 12
+    static let peakPhases = 4
 
     /// Annex 2, § 3: "One set of filter coefficients (for the order 48,
     /// 4-phase, FIR interpolating) that would satisfy the requirements would
@@ -215,7 +215,7 @@ final class LoudnessMeter {
     /// omitted on the standard's own instruction: "This step is not necessary
     /// if the calculations are performed in floating point." So is the
     /// matching amplification, which is what it was for.
-    private static let peakFilter: [[Double]] = [
+    static let peakFilter: [[Double]] = [
         [
             0.001_708_984_375_0, 0.010_986_328_125_0, -0.019_653_320_312_5,
             0.033_203_125_000_0, -0.059_448_242_187_5, 0.137_329_101_562_5,

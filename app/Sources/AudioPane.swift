@@ -23,6 +23,35 @@ import AppKit
 /// in the pane and LAST in the signal, being the fader the core folds into the
 /// plan's envelope. `ClipPane` keeps them in that order.
 final class AudioPane: InspectorPaneView {
+    /// The Volume section's loudness readout (spec §11 AU-15), dropped by a
+    /// `loudness` cache post.
+    let loudnessMemo = ClipLoudness.Memo()
+
+    override init(inspector: InspectorViewController) {
+        super.init(inspector: inspector)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(loudnessCacheChanged(_:)), name: .mediaCacheDidChange,
+            object: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("AudioPane does not support NSCoder")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    /// A loudness file landed or was withdrawn: the memo's files and answers
+    /// go, and the readout reads again.
+    @objc private func loudnessCacheChanged(_ note: Notification) {
+        guard note.userInfo?[MediaImporter.cacheKindKey] as? String == MediaImporter.loudnessKind
+        else { return }
+        loudnessMemo.invalidate()
+        inspector?.refresh(isLive: false)
+    }
+
     // MARK: Volume
 
     func volumeSection() -> InspectorSection {
@@ -37,24 +66,8 @@ final class AudioPane: InspectorPaneView {
             title: "Normalize",
             action: { [weak self] in self?.normalize() },
             enabled: { !AudioPane.normalizable(binding).isEmpty }, onEdit: {})
-        // Two of the three sentences are the limits, and they are here because
-        // this is where somebody meets them: the tool's description says the
-        // same three things (road map 2 phase 5c, D-C3). The level is spelled
-        // with the typographic minus the sheets use, and read off the constant
-        // so that changing the target changes the sentence. The nest clause is
-        // a fourth limit and is here for the same reason turned around: a nest
-        // alone leaves the button disabled, but a nest picked BESIDE an
-        // ordinary clip leaves it enabled and the nest quietly not asked
-        // about, which is the one thing about the press the others do not say.
-        let level = String(format: "%.0f dBFS", AudioNormalize.defaultPeakDB)
-            .replacingOccurrences(of: "-", with: "−")
-        let tip: String =
-            "Set each selected clip's volume so its loudest moment reaches " + level
-            + ". It REPLACES the volume rather than adding to it, so pressing it twice "
-            + "changes nothing; it writes the clip's base level even while the playhead "
-            + "is inside an action; and it leaves Mute alone. A nest is skipped: its "
-            + "level lives in the clips inside it, not in the nest."
-        normalize.toolTip = tip
+        // The tooltip follows the chosen mode (`normalizeTip`, AU-15).
+        let modeRow = normalizeRow(updating: normalize)
         return InspectorSection(
             id: "audio.volume", title: "Volume",
             summary: {
@@ -85,16 +98,19 @@ final class AudioPane: InspectorPaneView {
                         }
                     ], binding: binding,
                     follows: binding.ops(audio: AudioPatch(volume: binding.audioProps.volume))),
+            ] + loudnessRows() + [
                 inspectorCheckRow(
                     "Mute", binding, name: "Mute",
                     read: { binding.audioProps.muted },
                     ops: { binding.ops(audio: AudioPatch(muted: $0)) },
                     mixed: { binding.mixedAudio { $0.muted } }),
+                modeRow,
                 inspectorButtonRow([normalize, InspectorClipTag(binding: binding)]),
             ])
     }
 
-    /// Normalize Clip's UI half: measure, then commit as ONE undo step.
+    /// Normalize Clip's UI half: measure, then commit as ONE undo step, in
+    /// the mode the Normalize row chose (`NormalizeChoice`, spec §11 AU-15).
     ///
     /// All of the arithmetic is `AudioNormalize`'s, which is the point — the
     /// agent's `normalize_clip` calls the same two functions, so the button and
@@ -137,13 +153,13 @@ final class AudioPane: InspectorPaneView {
 
     private func normalize() {
         guard let document = binding.document,
-              let input = AudioNormalize.read(
-                from: document, clips: AudioPane.normalizable(binding).map { $0.id })
+              let ops = NormalizeChoice.ops(
+                for: document, clips: AudioPane.normalizable(binding).map { $0.id })
         else {
             NSSound.beep()
             return
         }
-        binding.apply("Normalize", AudioNormalize.plan(input).ops)
+        binding.apply("Normalize", ops)
     }
 
     // MARK: Fades

@@ -55,7 +55,9 @@ import UniformTypeIdentifiers
 /// holding, which are the old film's. The voice cache's withdrawal post
 /// (`MediaImporter.speech`, kind `speech`, at a stale head or for a media
 /// with no audio left) is the flag's second carrier: it, too, opens a pass
-/// that replaces a file already on disk. `peaks` posts without it.
+/// that replaces a file already on disk. `peaks` posts without it. The
+/// loudness cache posts kind `loudness` on a publish and on a withdrawal,
+/// `peaks`' posture and without the flag (spec §11 AU-10).
 ///
 /// Thumbnails post repeatedly as they accumulate, so an observer must be
 /// cheap: mark the lane dirty and redraw, never rebuild the timeline.
@@ -72,6 +74,7 @@ extension MediaImporter {
     static let thumbsKind = "thumbs"
     static let peaksKind = "peaks"
     static let speechKind = "speech"
+    static let loudnessKind = "loudness"
     static let transcriptsKind = "transcripts"
     /// Present (and `true`) only on the first post from a pass that replaced
     /// a file that was on disk — a `thumbs` rebuild, or the `speech`

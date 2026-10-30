@@ -135,7 +135,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Trim End to Playhead | E (key) | Trims their ends to the playhead |
 | Freeze Frame | ⇧⌘F | Holds the frame under the playhead as a still clip |
 | Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip ([Audio](audio.md)) |
-| Normalize | | Sets the selected clips' loudness |
+| Normalize | | Sets the selected clips' volume to a peak or a loudness, by the mode chosen in the Volume section's Normalize row |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |

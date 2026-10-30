@@ -61,4 +61,60 @@ extension MediaImporter {
         }
         postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
     }
+
+    /// The strip's length in seconds, at least one and at most `maxThumbnails`.
+    ///
+    /// `media.duration` is the RECORD's, and a file replaced in place
+    /// keeps its record, so a file of another length at the old path
+    /// sizes this strip — and `peaks`' bucket count — from the old
+    /// duration. Recorded here rather than fixed: the marker rebuilds the
+    /// strip for the changed file, at the old length — a longer file's
+    /// tail is HELD below.
+    static func thumbnailSeconds(for media: MediaSnapshot) -> Int {
+        max(
+            1,
+            min(maxThumbnails, Int((Double(media.duration) / Double(ReelTime.perSecond)).rounded(.up))))
+    }
+
+    /// The seconds `thumbnails` holds and the times it asks the generator for.
+    ///
+    /// The seconds at or past `lastTime` are HELD: a suffix (the times are
+    /// monotonic), asking for `lastTime` once, written under each of them.
+    ///
+    /// **What the generator answers between frames, measured** (the R0
+    /// spike's own recordings and `tools/proof/remaining_probe.py`'s 5f
+    /// fixtures): a second whose displayed frame is a SYNC sample lands
+    /// however far after it — 24 s after a keyframe — and a real
+    /// ScreenCaptureKit recording lands every second up to its track's end,
+    /// 1.6 s after its last, non-sync sample; but an `ffmpeg`-made file of
+    /// three frames 25 s apart FAILS (`-11821`, not `-11832`) at every second
+    /// inside a non-sync frame's range that is not the frame's own time, and
+    /// 0.7 ms after its last frame's time under the VideoToolbox encoder. So
+    /// the held request is the frame's exact time and not the track's end
+    /// less a frame: the end is stored in the movie timescale and rounds UP
+    /// (50.0333 s is 50.034 at 1000), which the composition's window absorbs
+    /// and the generator does not.
+    static func thumbnailRequests(seconds: Int, lastTime: CMTime) -> (held: [Int], times: [CMTime]) {
+        let last = CompositionBuilder.ticks(lastTime)
+        let held = (0..<seconds).filter { Ticks($0) * ReelTime.perSecond >= last }
+        var times = (0..<(seconds - held.count)).map {
+            CompositionBuilder.time(Ticks($0) * ReelTime.perSecond)
+        }
+        if !held.isEmpty { times.append(lastTime) }
+        return (held, times)
+    }
+
+    /// The tile indices a landed frame is written under.
+    ///
+    /// Named by the seconds that ASKED for the requested time, not
+    /// by a counter: results arrive in request order today, and a
+    /// counter would silently shift the whole strip by one if that
+    /// ever stopped being true or a frame failed. `time` and
+    /// `ticks` are exact inverses at the tick timescale, so an
+    /// unheld second divides exactly; the held request is the one
+    /// time in the list off the grid, compared as a time.
+    static func tileIndices(requested: CMTime, lastTime: CMTime, held: [Int]) -> [Int] {
+        requested == lastTime
+            ? held : [Int(CompositionBuilder.ticks(requested) / ReelTime.perSecond)]
+    }
 }

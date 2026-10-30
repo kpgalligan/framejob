@@ -96,7 +96,8 @@ Properties (no key equivalent; the copied graphic's props onto the selected
 clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start to Playhead,
-Trim End to Playhead, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
+Trim End to Playhead, Freeze Frame, Detach Audio, Normalize (following the Volume section's
+Normalize mode, Peak or Loudness, its title unchanged, §11 AU-15; road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Synchronize Audio (road

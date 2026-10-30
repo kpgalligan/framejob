@@ -9,12 +9,14 @@ import AppKit
 extension EditorViewController {
 
     /// Clip ▸ Normalize (road map 2 phase 5c) — the menu half of the Audio
-    /// section's Normalize button.
+    /// section's Normalize button. It follows the mode chosen there
+    /// (`NormalizeChoice`, spec §11 AU-15): Peak, or Loudness at its target;
+    /// the title stays "Normalize".
     ///
     /// **Not a line of the arithmetic is here**, which is the whole point of
     /// `AudioNormalize` being a value type: this reads no peaks and derives no
-    /// gain, it calls the same `read` + `plan` pair `AudioPane.normalize` and
-    /// the agent's `normalize_clip` call, so the three cannot mean different
+    /// gain, it calls the same `read` + `plan` pair (through `NormalizeChoice`)
+    /// `AudioPane.normalize` and the agent's `normalize_clip` call, so the three cannot mean different
     /// things. What reaches the document is one ordinary `set_audio` per clip
     /// — each clip gets its own measured gain — committed as ONE undo step.
     ///
@@ -44,11 +46,11 @@ extension EditorViewController {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot
         let ids = selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.map { $0.id }
-        guard !ids.isEmpty, let input = AudioNormalize.read(from: document, clips: ids) else {
+        guard !ids.isEmpty, let ops = NormalizeChoice.ops(for: document, clips: ids) else {
             NSSound.beep()
             return
         }
-        document.applyEdit("Normalize", AudioNormalize.plan(input).ops)
+        document.applyEdit("Normalize", ops)
     }
 
     /// Clip ▸ Synchronize Audio — the menu half of `sync_audio`. The same

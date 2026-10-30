@@ -397,6 +397,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** Normalize sets the volume past 400 % (about 755 % for the RØDE file) and the Gain row reads about +17.6 dB; the slider's knob sits at its right end while the field shows the true value; the voice plays clearly louder than before with no crackle or distortion; at 1200 % the meter shows the mix past full scale and it may audibly clip, which is expected; a drag writes values within 0–400 %.
 - **Source:** the owner's audio pass (spec §11 AU-1); `tools/proof/phase5_proof.py` 5c measures the normalised export at −1 dBFS and `core/tests/audio_gain.rs` holds the ceiling.
 
+**SE-23 — The loudness read-out and Normalize's Loudness mode read and sound right**
+- **Do:** 1. Import `samples/Rode-usb-mic.m4a` (or any voice recording) and select its clip; open the Clip tab's Volume section. 2. Read the Loudness and At volume rows just after the import, then once they settle. 3. Drag the Volume slider slowly and watch At volume; let go. 4. Set the Normalize row's Mode to Loudness, pick −16 in its Target field's quick picks, press Normalize, and play the clip through headphones. 5. Put a second, louder clip beside it, select both, press Normalize, and play across the two. 6. Quit and relaunch, and look at the Normalize row.
+- **Expect:** the Loudness row reads "measuring…" briefly, then about "−41.7 LUFS · −18.5 dBTP" for the RØDE file; At volume follows the drag smoothly with no stutter in the drag, and the Loudness row is unchanged; the Target field is greyed in Peak mode and live in Loudness; the RØDE clip comes up to about −24 LUFS (its true peak holds it under −16) and plays clean, with no crackle; the two clips sound about equally loud where the louder one is not held by its peaks; the mode and target are still chosen after the relaunch; the rows fit the inspector's width with nothing cut off.
+- **Answer:** does the read-out settle to a believable number, does the drag stay smooth, and do the normalised clips sound matched and clean?
+- **Source:** road map "audio" AP1 (spec §11 AU-10..AU-16); `tools/proof/loudness_normalize_proof.py` measures the exports (N3–N10) and `tools/proof/loudness_cache_probe.py` the read-out's arithmetic and the memo (C1–C11), not how the rows look or the sound.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

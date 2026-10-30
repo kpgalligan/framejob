@@ -303,13 +303,14 @@ detail there.
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
+  `MediaImporter+Loudness.swift` · `LoudnessBlocks.swift` ·
   `MediaCacheLane.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `CodecLibraries.swift` (the SVT-AV1 and libvpx link and its `-RCCodecProbe`;
   export rows arrive with road map codec-export's C1) ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
-  `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
-  `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
+  `RewrapProgressWindowController.swift` — the import funnel and the per-media caches (`thumbs/`, `peaks/`,
+  `loudness/`, `sync/`, `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
   per-process opt-in to macOS's supplemental VP9 and AV1 decoders (`enable()`:
   `main.swift`, `generateCaches`, `CompositionBuilder.firstTrack`, the harness
   and the formats probe), the import's one-frame decode (`decodesFirstFrame`,
@@ -330,13 +331,13 @@ detail there.
   Frame Job window, and Cancel removes the partial copy (spec §11 #228-P). A
   tool call passes no watch.
   `MediaCacheLane.swift` (await-free) is `MediaImporter.CacheLane`, the cache
-  lane: every pass's peaks, sync and speech decodes run on it, at most two at
-  a time, first in first out, on a queue of its own and never on the Swift
-  cooperative pool, where synchronous reads would stop every `AVAssetReader`
-  in the process (spec §11 #367).
+  lane: every pass's peaks, loudness, sync and speech decodes run on it, at
+  most two at a time, first in first out, on a queue of its own and never on
+  the Swift cooperative pool, where synchronous reads would stop every
+  `AVAssetReader` in the process (spec §11 #367).
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
-  are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles`, `MediaCacheLedger`
-  and `MediaCacheLane`. A cache is CURRENT when its
+  are the `+` files, `MediaPeakBuckets`, `LoudnessBlocks`, `MediaCacheFiles`,
+  `MediaCacheLedger` and `MediaCacheLane`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
@@ -374,6 +375,16 @@ detail there.
   bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31; an
   MP3 read past its tag's encoder delay, SY-38) →
   speech.
+  `MediaImporter+Loudness.swift` (await-free, spec §11 AU-10) is the loudness
+  cache's marker (`LoudnessStamp`, `loudnessVersion` 1), URLs, load, clear,
+  head check (`loudnessPassNeeded`), reader (`writeLoudness`: the file's own
+  rate, a file of more than two channels read again as two) and one
+  publication (`finishLoudness`, a `loudness` post); `LoudnessBlocks.swift` is
+  the loaded cache (`MediaLoudness`), `KWeighting` (Tables 1–2 at 48 kHz,
+  libebur128's derivation elsewhere) and the 10 ms accumulator fed beside a
+  `PeakBuckets` that validates, places and covers for it.
+  `MediaImporter.loudness` runs after `peaks` and before `syncFeatures`; the
+  in-session retry runs while either published nothing.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
@@ -1038,7 +1049,10 @@ the key map behind it.
   inside an action Rate writes the selected action's `end.speed`
   (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is
   `clip_state.speed`), while Keep pitch writes `set_speed` at `baseRate` and
-  Fit to is ⊘, SR-21; the note reads the peak a clip names) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  Fit to is ⊘, SR-21; the note reads the peak a clip names) ·
+  `AudioPane.swift` (+`Loudness`: the Volume section's Loudness and At volume
+  rows and the Normalize row's Mode popup and Target field, spec §11 AU-15) ·
+  `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
   shared module from `GraphicRegistry.entry(named:for:)`, main only, never a
@@ -2224,9 +2238,21 @@ free.
   language, speakers and vocabulary from its marker, the shipped models,
   `disfluencies` and `refresh` true), its jobs and its `CloudEstimate` line,
   shared by the sheet and `transcribe_for_fillers`.
-- `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
-  measured PRE-FADER from the plan segment, REPLACING `volume` so a second
-  press is a no-op, always to BASE props.
+- `AudioNormalize.swift` (+`Loudness`) · `ClipLoudness.swift` ·
+  `NormalizeChoice.swift` — Normalize Clip as a value type: peaks (Peak mode)
+  or the loudness cache (Loudness mode, spec §11 AU-13: −16 LUFS by default,
+  held under −1 dBTP and ×32, `limited_by`) in, ops out, measured PRE-FADER
+  from the plan segment, REPLACING `volume` so a second press is a no-op,
+  always to BASE props; `audioSegments(in:)` and `admit(_:in:segments:)` are
+  both modes' admission. `ClipLoudness` is a clip's reading over the window
+  that plays (the export's dual mono, the clip's own mono fold and pan on
+  stereo, played-order 10 ms steps through `MediaPeaks.sourceTick` and
+  `ReverseMirror`, the gates once, AU-11, AU-12) and the Volume section's
+  `Memo` (per handle, per media file, and the held answer through a live
+  edit, AU-15). `NormalizeChoice` is the mode and target in UserDefaults
+  (`FrameJobNormalizeMode`, `FrameJobNormalizeTargetLUFS`) and the ops the
+  button and Clip ▸ Normalize run; `normalize_clip` names its own mode and
+  never reads it.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
   `RealFFT.swift` ·
@@ -2277,7 +2303,9 @@ free.
   back. The MODEL publishes a raw peak and RMS and the VIEW owns the
   ballistics, with ONE resting appearance so the harness settles.
   `Loudness.swift` is BS.1770-4 (`LoudnessReport`, `LoudnessMeter`) with no
-  AVFoundation in it, refusing any rate but 48 kHz; `ExportLoudness.swift`
+  AVFoundation in it, refusing any rate but 48 kHz; its K-weighting tables,
+  the Annex 2 FIR and the gates are internal, read by `LoudnessBlocks` and
+  `ClipLoudness` (road map "audio" AP1); `ExportLoudness.swift`
   (a pure move out of it, road map "audio" AP0) is the export gain a target
   and a ceiling ask for and the export's summary line, and
   `phase5_chrome.py`'s section 9 compiles the two alone. A metered track
