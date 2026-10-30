@@ -1,0 +1,146 @@
+
+    AU Validation Tool
+    Version: 1.10.0 
+    Copyright 2003-2019, Apple Inc. All Rights Reserved.
+    Specify -h (-help) for command options
+
+--------------------------------------------------
+VALIDATING AUDIO UNIT: 'aufx' - 'vois' - 'appl'
+--------------------------------------------------
+Manufacturer String: Apple
+AudioUnit Name: AUSoundIsolation
+Component Version: 1.6.0 (0x10600)
+
+* * PASS
+--------------------------------------------------
+TESTING OPEN TIMES:
+COLD:
+Time to open AudioUnit:         27.774 ms
+WARM:
+Time to open AudioUnit:         0.256  ms
+This AudioUnit is a version 2 implementation.
+FIRST TIME:
+Time for initialization:        63.286 ms
+
+* * PASS
+--------------------------------------------------
+VERIFYING DEFAULT SCOPE FORMATS:
+Input Scope Bus Configuration:
+ Default Bus Count:1
+    Default Format: AudioStreamBasicDescription:  1 ch,  48000 Hz, Float32
+
+Output Scope Bus Configuration:
+ Default Bus Count:1
+    Default Format: AudioStreamBasicDescription:  1 ch,  48000 Hz, Float32
+
+* * PASS
+--------------------------------------------------
+VERIFYING REQUIRED PROPERTIES:
+
+* * PASS
+--------------------------------------------------
+VERIFYING RECOMMENDED PROPERTIES:
+  VERIFYING PROPERTY: Latency
+    PASS
+  VERIFYING PROPERTY: Tail Time
+    PASS
+  VERIFYING PROPERTY: Bypass Effect
+    PASS
+
+* * PASS
+--------------------------------------------------
+VERIFYING OPTIONAL PROPERTIES:
+
+* * PASS
+--------------------------------------------------
+VERIFYING SPECIAL PROPERTIES:
+
+VERIFYING CUSTOM UI
+Cocoa Views Available: 0
+
+VERIFYING CLASS INFO
+    PASS
+
+TESTING HOST CALLBACKS
+    PASS
+
+* * PASS
+--------------------------------------------------
+PUBLISHED PARAMETER INFO:
+
+# # # 2 Global Scope Parameters:
+Parameter ID:0
+Name: Wet/Dry Mix
+Parameter Type: Percent
+Values: Minimum = -100.000000, Default = 100.000000, Maximum = 100.000000
+Flags: Readable, Writable 
+  -parameter PASS
+
+Parameter ID:1
+Name: Sound to Isolate
+Parameter Type: Indexed
+Values: Minimum = 0.000000, Default = 1.000000, Maximum = 1.000000
+Flags: Readable, Writable 
+Parameter has Value Strings
+Num Strings = 2
+Value: 0,  String: High Quality Voice
+Value: 1,  String: Voice
+  -parameter PASS
+
+Testing that parameters retain value across reset and initialization
+  PASS
+
+* * PASS
+--------------------------------------------------
+FORMAT TESTS:
+
+Reported Channel Capabilities (explicit):
+      [-1, -1]  
+
+Input/Output Channel Handling:
+1-1   1-2   1-4   1-5   1-6   1-7   1-8   2-2   2-4   2-5   2-6   2-7   2-8   4-4   4-5   5-5   6-6   7-7   8-8
+X                                         X                                   X           X     X     X     X     
+
+* * PASS
+--------------------------------------------------
+RENDER TESTS:
+Implements: AudioUnitProcessMultiple
+Input Format: AudioStreamBasicDescription:  1 ch,  48000 Hz, Float32
+Output Format: AudioStreamBasicDescription:  1 ch,  48000 Hz, Float32
+Render Test at 512 frames
+Slicing Render Test at 64 frames
+  PASS
+
+
+Render Test at 64 frames, sample rate: 22050 Hz
+Render Test at 137 frames, sample rate: 96000 Hz
+Render Test at 4096 frames, sample rate: 48000 Hz
+Render Test at 4096 frames, sample rate: 192000 Hz
+Render Test at 4096 frames, sample rate: 11025 Hz
+Render Test at 512 frames, sample rate: 44100 Hz
+  PASS
+
+2 Channel Test:
+Render Test at 512 frames
+  PASS
+
+Checking connection semantics:
+Connection format:
+AudioStreamBasicDescription:  1 ch,  44100 Hz, Float32
+  PASS
+
+Bad Max Frames - Render should fail
+  PASS
+
+Checking parameter setting
+Using AudioUnitSetParameter
+Using AudioUnitScheduleParameter
+  PASS
+
+Test MIDI
+  PASS
+
+* * PASS
+--------------------------------------------------
+AU VALIDATION SUCCEEDED.
+--------------------------------------------------

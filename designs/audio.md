@@ -301,6 +301,71 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
 - E8 as designed and measured (`designs/adr/effects-survey.md`, #123): sixteen kinds as fixed
   chains of Apple units rendered offline, with an amount and a pitch. Closes #123.
 
+### AP0's record (2026-10-30)
+
+**Landed.** `9e47f56`: the survey, this plan, AU-2…AU-4 and spec §1's audio non-goal lifted. The
+tolls, each a pure move gated alone (PASS 307, 246, 243 and 136 s) and checked line-identical
+against `9e47f56`: `c67ccee` (`AudioDSP.swift` 890 → 368; `AudioCompressorStage.swift` 158,
+`AudioNoiseReductionStage.swift` 376), `54e4649` (`AudioTap.swift` 595 → 328;
+`AudioTapSchedule.swift` 273), `a0eb094` (`Loudness.swift` 674 → 511; `ExportLoudness.swift` 168,
+which `phase5_chrome.py`'s section 9 now compiles too), `6a51bfc` (`model_props.rs` 551 → 459;
+`model_audio.rs` 114); the map entries `fec5132`.
+
+**Spike S.** Each record states its rule before its runs; records, logs and the instruments each
+spike wrote are in `tools/proof/audio_spike/S1…S4/` (copies of product code they compiled are left
+out: `git show 9e47f56:<path>` gives them back).
+
+- **S2, voice isolation — viable, with the High Quality Voice model.** `AUSoundIsolation`
+  (`aufx`/`vois`/`appl`) through `AVAudioEngine` manual rendering; parameter 1 = 0 selects High
+  Quality Voice (the unit's default, Voice, loses everything above 10.5 kHz and 0.7–1.1 dB of the
+  voice). Each channel renders as its own mono render; latency is a constant 4440 frames (92.5 ms)
+  at 48 kHz mono, to be discarded and pinned by cross-correlation in a proof; 4 s of the media is
+  fed before a window (the model adapts over 0.5–2 s; silence resets it). 28–51× real time at
+  load 9. Whole-file renders are byte-identical; windows starting mid-file differ by about −51 dB,
+  so proofs compare levels and alignment, never bytes, and a cache is never checked by
+  re-rendering. On the owner's recording the pause floor falls 10.9 dB (mean) with speech moved
+  +0.14 dB and every octave 63 Hz–8 kHz within ±0.3 dB; the shipped reducer reaches the same mean
+  floor only by costing 1.3 dB of speech. The unit's 50 % equals a sample-aligned 50/50 mix of dry
+  and a 100 % render (−84 dB), so Amount is a crossfade of one cached render and is not in the
+  cache key. **De-reverb (B4) rides on it:** on a synthetic RT60 0.6 s room, C50 +5.2 dB and the
+  late tail −5.3 dB ("reduces room echo"). Because it renders offline from the media, isolation
+  runs before the live chain — AP5 amends AU-3's order. At 100 % the pauses become dead air.
+- **S3, tracks and the master in the preview.** A composition audio track never carries two
+  top-level timeline tracks (`evaluate.rs`), but a nest's inner tracks share one. Track gain, pan
+  and EQ per composition track are exact (EQ −145 dB). Dynamics are not: a limiter misses its
+  ceiling by +0.85 dB through a crossfade on the owner's speech, a nest bus by +1.4–1.8 dB. Nothing
+  in the macOS 26.2 SDK reaches an AVPlayer's mixed audio; playing the preview's sound through
+  `AVAudioEngine` (a reader into a ring, the player's audio off, the device clock) prototypes at
+  0.02 ppm drift and 60–150 ms to start, at the cost of rewriting the transport; an offline premix
+  runs 104–475× real time but lags edits. In the export, one reader with one mix output per
+  timeline track gives sub-mixes that sum to the mix within −147.7 dB, so track and bus dynamics,
+  the master chain and stems are exact there. Summing the existing taps by timestamp, each times
+  the plan's envelope, matches the export's mix within 0.0067 LU momentary; today's sum of
+  per-track peaks over-reads the true peak by up to 3.85 dB. `AVAssetWriter` writes multitrack
+  `.mov`/`.mp4` stems (AAC or 24-bit LPCM) that AVFoundation and ffprobe read.
+- **S4, the loudness cache — 10 ms blocks.** Against the export's own meter fed exactly the window:
+  100 ms blocks miss by up to −0.139 LU, 25 ms by −0.149, 10 ms stay within 0.076 (97.5 % of 200
+  random windows within 0.1 LU; the rest is where BS.1770's 400 ms grid falls, which moves the
+  export's own figure by a median 0.17 LU). 10 ms is the peaks grid, so `MediaPeaks.window`,
+  `ReverseMirror` and the source map apply unchanged. Records are Float32 per block (mono `z, tp`;
+  stereo `zL, zR, zLR, tpL, tpR`, which answers any 2×2 channel matrix): 2.75 MB/h mono, 6.9 MB/h
+  stereo, built at about 1 s per 20 minutes. Gating blocks are counted from the exact window length;
+  a reversed clip's grid starts at the forward window's end; a ramped clip is measured on its ×1
+  render. **The export copies a mono clip into both channels, +3.01 LU**: the owner's recording is
+  −41.67 LUFS as exported (−44.7 is the mono file's own figure), and Normalize must use the
+  exported figure. Speech-only loudness reads 1.1–1.7 LU above gated BS.1770 here; AU-4's gated
+  target stands.
+- **S1, own DSP or Apple's units live:** pending.
+
+**What it changes in the phases.** AP1 measures the exported figure (mono counted twice). AP2's
+master limiter in the export's float stage is required, not optional — two clips each under their
+own limiter reached +1.49 dBTP through a crossfade — and the preview has none, which the guide and
+the meter say. AP5 follows S2's recipe and moves isolation ahead of the live chain. AP7 rebuilds
+the mix from the taps off the audio thread. AP10 labels each composition span with its timeline
+track (and inner track), makes track dynamics exact in the export through per-track sub-mixes and
+approximate in the preview, and asks the owner whether an exact preview (the `AVAudioEngine`
+route) is wanted as a road map of its own.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

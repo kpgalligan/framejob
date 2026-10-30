@@ -1,0 +1,20 @@
+engine: output presentation latency 1.5 ms, IO buffer 0.0 ms
+reader throughput: 120 s composition (2 tapped tracks + video) read in 0.26 s = 467x real time
+== player audio enabled + muted, default clock
+  start at   2.0 s: reader first buffer    3.3 ms, ring 100 ms full at    4.7 ms, player seek done    0.2 ms; offset first +0.005 ms, last +0.013 ms, min +0.005 max +0.033; drift +0.02 ppm over 60 s; underruns 0
+  start at  70.0 s: reader first buffer    3.2 ms, ring 100 ms full at    4.6 ms, player seek done    0.2 ms; offset first -0.002 ms, last +0.001 ms, min -0.004 max +0.016; drift +1.46 ppm over 6 s; underruns 0
+  start at  95.0 s: reader first buffer    3.4 ms, ring 100 ms full at    4.6 ms, player seek done    0.2 ms; offset first +0.002 ms, last -0.001 ms, min -0.002 max +0.015; drift -1.17 ppm over 6 s; underruns 0
+  start at  40.0 s: reader first buffer    3.2 ms, ring 100 ms full at    4.6 ms, player seek done    0.2 ms; offset first -0.003 ms, last -0.003 ms, min -0.003 max +0.015; drift -0.02 ppm over 6 s; underruns 0
+  tap calls per track: reader [8808, 8808], player [925, 924]
+== player audio tracks disabled, default clock
+  start at   2.0 s: reader first buffer    3.2 ms, ring 100 ms full at    4.5 ms, player seek done    1.5 ms; offset first -0.004 ms, last +0.264 ms, min -0.004 max +0.264; drift +4.43 ppm over 60 s; underruns 0
+  start at  70.0 s: reader first buffer    3.5 ms, ring 100 ms full at    5.1 ms, player seek done    0.2 ms; offset first -0.010 ms, last +0.017 ms, min -0.010 max +0.017; drift +4.52 ppm over 6 s; underruns 0
+  start at  95.0 s: reader first buffer    4.7 ms, ring 100 ms full at    4.9 ms, player seek done    0.2 ms; offset first -0.010 ms, last +0.017 ms, min -0.010 max +0.017; drift +4.50 ppm over 6 s; underruns 0
+  start at  40.0 s: reader first buffer    3.6 ms, ring 100 ms full at    4.7 ms, player seek done    0.1 ms; offset first +0.005 ms, last +0.032 ms, min +0.005 max +0.032; drift +4.53 ppm over 6 s; underruns 0
+  tap calls per track: reader [8816, 8816], player [0, 0]
+== player audio tracks disabled + sourceClock = output device clock
+  start at   2.0 s: reader first buffer    3.3 ms, ring 100 ms full at    4.8 ms, player seek done    1.1 ms; offset first -0.008 ms, last -0.015 ms, min -0.024 max -0.001; drift +0.02 ppm over 60 s; underruns 0
+  start at  70.0 s: reader first buffer    3.9 ms, ring 100 ms full at    4.6 ms, player seek done    0.1 ms; offset first +0.004 ms, last +0.001 ms, min -0.003 max +0.015; drift +0.86 ppm over 6 s; underruns 0
+  start at  95.0 s: reader first buffer    6.3 ms, ring 100 ms full at    8.1 ms, player seek done    0.2 ms; offset first -0.008 ms, last -0.001 ms, min -0.016 max +0.003; drift -0.58 ppm over 6 s; underruns 0
+  start at  40.0 s: reader first buffer    3.3 ms, ring 100 ms full at    5.1 ms, player seek done    0.2 ms; offset first -0.002 ms, last -0.008 ms, min -0.017 max +0.004; drift +0.34 ppm over 6 s; underruns 0
+  tap calls per track: reader [8808, 8808], player [0, 0]

@@ -1,0 +1,31 @@
+== Part 1: AVAssetReaderAudioMixOutput mix vs the mix rebuilt from PreEffects taps
+  mono track read as stereo: L = 1.000000 x tap sample (env 1.0); max |L-R| 0.00e+00; tap channels 1
+  track 1001: 1877 calls, channels 2, threads 1, frame sizes [128, 256, 384, 512], first t 0.0, invalid-time calls 0
+  track 1002: 1689 calls, channels 1, threads 1, frame sizes [128, 256, 384, 512], first t 0.0, invalid-time calls 0
+  track 1003: 1407 calls, channels 2, threads 1, frame sizes [128, 512], first t 0.0, invalid-time calls 0
+  reader: all taps on 1 thread(s)
+  rebuilt vs reader mix, 0-20 s: error/signal -52.8 dB, worst sample error 7.18e-02 at 12.0010 s; momentary max |dLU| 0.0067, short-term max |dLU| 0.0005
+    away from the 12 s jump (0-11.9 s): error/signal -100.7 dB, worst sample error 2.19e-05 at 5.0006 s; momentary max |dLU| 0.0004, short-term max |dLU| 0.0001
+    the jump's 100 ms (12.0-12.1 s): error/signal -35.2 dB, worst sample error 7.18e-02 at 12.0010 s; momentary max |dLU| 0.0000, short-term max |dLU| 0.0000
+  whole-programme (ungated) loudness: reader -11.277 LUFS, rebuilt -11.277 LUFS
+  today's meter (sum of per-track peaks x env) over the true mix peak: mean +0.38 dB, worst +3.85 dB over 214 blocks
+== Part 2: PostEffects taps
+  track 1001 PostEffects tap: projection on its own source 1.0000 (volume 0.5 => post-fader if 0.5), on track 1002's source -0.0374
+  track 1002 PostEffects tap at 9.0-9.1 s: gain 1.0000 (envelope there 0.4281)
+== Part 3: AVPlayer, PreEffects recording taps, isMuted = true
+  track 1001: 191 calls (107 before the seek), threads 1, frame sizes [1920], invalid-time calls 1, t range 0.000-12.059 s
+  track 1002: 190 calls (106 before the seek), threads 1, frame sizes [1920], invalid-time calls 1, t range 0.043-11.984 s
+  track 1003: 190 calls (106 before the seek), threads 1, frame sizes [1920], invalid-time calls 1, t range 0.053-11.995 s
+  player: all taps on 1 thread(s) in total
+  cycles (calls grouped T1→T2→T3 by host order): 32 with one start time, 189 with differing starts
+    T1@-1.0000/1920
+    T1@0.0000/1920 T2@-1.0000/1920 T3@-1.0000/1920
+    T1@0.0400/1920 T2@0.0427/1920 T3@0.0534/1920
+    T1@0.0800/1920 T2@0.0827/1920 T3@0.0934/1920
+    T1@0.1200/1920 T2@0.1227/1920 T3@0.1334/1920
+    T1@0.1600/1920 T2@0.1627/1920 T3@0.1734/1920
+    T1@0.2000/1920 T2@0.2027/1920 T3@0.2134/1920
+    T1@0.2400/1920 T3@0.2534/1920
+  first valid tap call at +88.5 ms after play(), for t = 0.0000 s
+  player-tap rebuild vs reader mix, 0.5-3.0 s: error/signal -334.7 dB, worst sample error 0.00e+00 at 0.0000 s; momentary max |dLU| 0.0000, short-term max |dLU| 0.0000
+  player-tap rebuild vs reader mix, 9.5-11.0 s (after the seek; the ramp runs here): error/signal -138.6 dB, worst sample error 2.31e-07 at 9.5019 s; momentary max |dLU| 0.0000, short-term max |dLU| 0.0000

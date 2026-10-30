@@ -1,0 +1,4 @@
+reader status 2 (2 = completed), 0.09 s, buffers per output [118, 106]
+sub-mix X + sub-mix Y vs the full mix: error/signal -147.7 dB, worst sample 1.19e-07
+sub-mix 0 (tracks 1001+1003) vs its tracks' taps x envelopes: error/signal -102.2 dB
+sub-mix 1 (tracks 1002) vs its tracks' taps x envelopes: error/signal -107.7 dB
