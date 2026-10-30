@@ -36,3 +36,40 @@ its code.
   - What it accepts: a mix can go further past full scale than before. The preview's output and
     an un-normalised export clip there (phase 5d's 16-bit decode, which says so); a normalised
     export gains in float (#86) and does not. Normalize itself still lands at −1 dBFS.
+
+AU-2…AU-4 open road map "audio" (`designs/audio.md`, from `designs/audio-survey.md`'s tiers A
+and B), recorded at its AP0 from the owner's answers of 2026-10-30 to the road map's five
+choices ("Yes, lift scopes, and allow Apple's built-in audio effects", then "OK" to each of the
+rest), before any of its code. **Numbering from here:** each phase records its decisions in a
+block of its own, APn's as AU-n0…AU-n9 (AP1's AU-10…, AP10's AU-100…), so phases built in
+parallel lanes never claim one ID; AP0's are AU-2…AU-9.
+
+- **AU-2 — Audio beyond what shipped is in scope: EQ, track and bus processing, and Apple's
+  built-in audio units (owner, 2026-10-30, choice 1; amends spec §1).** Spec §1's non-goal
+  "audio beyond what shipped … so no EQ, mix buses or Audio Units, while offline voice effects
+  are deferred rather than out" is lifted. In: Frame Job's own DSP stages, track and master
+  processing, and the audio units macOS itself ships (`AUSoundIsolation`, `AVAudioUnitEQ`, the
+  dynamics and time-pitch units), run in the process as `AVAudioUnitTimePitch` already runs for
+  speed-ramp audio. Out, under §1's plugin system: hosting third-party Audio Unit plug-ins (the
+  survey's C5). Tier C of the survey is not in the road map; it is neither in nor out until the
+  owner asks.
+- **AU-3 — Live stages are Frame Job's own DSP in the tap, in one fixed order; Apple's units
+  only where Frame Job cannot write its own (owner, 2026-10-30, choices 4 and 5).** EQ and the
+  high-pass, the hum notch, the gate/expander, the de-esser and the limiter are written beside
+  the compressor: real-time safe in the `MTAudioProcessingTap`, deterministic, and proved
+  against analytic responses. Apple's units are used for ML voice isolation (`AUSoundIsolation`)
+  and E8's voice effects, both rendered offline per clip window into `cache/` on the speed-ramp
+  audio pattern. AP0's spike S1 may overturn the first half by measurement, recorded as an
+  amendment here. The clip chain's order is fixed: channels → high-pass and EQ → hum notch →
+  isolation or noise reduction → gate → de-esser → compressor → limiter, then the fader (the
+  core's envelope). Every stage is off by default and inert when off, so a project that uses
+  none plays and exports byte-identical to today (a track whose clips ask for nothing still
+  gets no tap). A closed vocabulary, as R5-1 has every effect: no user-ordered chain, no
+  per-clip stage list.
+- **AU-4 — Normalize targets loudness: −16 LUFS by default at −1 dBTP, Peak kept beside it
+  (owner, 2026-10-30, choices 2 and 3).** AP1 adds Normalize's Loudness mode (a target in
+  LUFS, gated BS.1770 over the window that plays) beside today's Peak; the button stays Peak
+  until AP2's limiter can hold −1 dBTP, and from AP2 its default is Loudness. The default
+  target is −16 LUFS integrated, with −14 (YouTube's playback reference) and −23 (EBU R 128)
+  as quick picks; the ceiling is −1 dBTP. `normalize_clip` keeps `peak_db` and gains the
+  loudness mode's arguments.

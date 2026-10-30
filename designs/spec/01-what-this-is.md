@@ -22,12 +22,9 @@ working space for SDR projects is not wanted, GR-20; tier 4's vectorscope zoom,
 hue curves, the blend between curves of different point counts and the
 qualifier's cleanup blur are in, GR-24, GR-31…GR-35, while an Offset
 wheel, a qualifier on picture clips, 1,024-level scopes and a histogram
-behind the curves are not wanted, GR-27…GR-30), audio beyond what shipped
-(volume, fades, duck, pan, compressor, noise reduction, peak normalize, the
-transition crossfade and the export's loudness target — M3 and §11 R5-2; so
-no EQ, mix buses or Audio Units, while offline voice effects are deferred
-rather than out), a plugin system (a clip may draw itself from a JavaScript
-module in its package, road map 10; nothing else is scriptable — §11 G-1),
+behind the curves are not wanted, GR-27…GR-30), a plugin system (a clip may
+draw itself from a JavaScript module in its package, road map 10; nothing
+else is scriptable — §11 G-1),
 motion blur, stabilisation, optical-flow retiming and auto-reframe (heavy
 pixel work or ML, outside the compositor's one-pass shape — road map 2 §4),
 any platform but macOS. **Screen recording was on this list until road map 3
@@ -37,6 +34,10 @@ paused and resumed from the menu bar, each stretch its own file and its own
 clip; callouts reconstructed after the fact stay out. **Camera recording
 was on it too until §11 CAM-1** (road map "camera-recording") reversed it: a
 camera alone or beside a screen recording, each its own file and clip.
+**Audio beyond what shipped was on it too until §11 AU-2** (road map
+"audio", 2026-10-30) lifted it: EQ, track and bus processing, and Apple's
+built-in audio units are in, beside Frame Job's own DSP; hosting
+third-party Audio Unit plug-ins stays out, under the plugin system above.
 
 **The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
 drop on the Dock icon, or the welcome window's Open Video…) creates an
