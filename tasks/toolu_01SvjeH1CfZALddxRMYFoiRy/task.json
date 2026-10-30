@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01SvjeH1CfZALddxRMYFoiRy",
+  "agent_id": "a8fcdb05a3e7132e2",
+  "subagent_type": "general-purpose",
+  "task_description": "AP0 spike S2: voice isolation",
+  "token_usage": {
+    "input_tokens": 160,
+    "cache_creation_tokens": 259532,
+    "cache_read_tokens": 12318822,
+    "output_tokens": 133617,
+    "api_call_count": 80
+  },
+  "started_at": "2026-10-30T15:29:50.369444-04:00",
+  "completed_at": "2026-10-30T15:55:42.760265-04:00"
+}
