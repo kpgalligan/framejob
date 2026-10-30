@@ -31,16 +31,18 @@ deleted. Nothing there is a picture and nothing there is claimed to be one.
 
 **Section 9 is not a picture either**, and it is here for section 8's reason
 one step further on. The export gain is decided in one pure function over
-three doubles (`ExportLoudness.resolve`, `app/Sources/Loudness.swift`), and
+three doubles (`ExportLoudness.resolve`, `app/Sources/ExportLoudness.swift`,
+a pure move out of `Loudness.swift` in road map "audio" AP0), and
 the only way `phase5_proof.py` can reach it is to export a whole file and
 read the report back — which asks about ONE measured true peak, whichever
 that Mac's decode happened to give. The gain is quantised to a 0.01 dB grid,
 so whether a ceiling-capped export lands over its ceiling depends on where
 the measured peak falls in that grid: one fixture answers that by coin toss
-and a sweep of 200 peaks answers it. `Loudness.swift` has no AVFoundation, no
-AppKit and no project in it, so unlike the meter it needs neither the harness
-nor a stand-in — this script writes a `main.swift`, compiles the two together
-in under a second, and hands the probe its cases as JSON.
+and a sweep of 200 peaks answers it. Neither `Loudness.swift` nor
+`ExportLoudness.swift` has AVFoundation, AppKit or a project in it, so unlike
+the meter they need neither the harness nor a stand-in — this script writes a
+`main.swift`, compiles the three together in under a second, and hands the
+probe its cases as JSON.
 
 Every claim in sections 1–7 is a BYTE comparison of two PNGs the offscreen
 harness wrote (`tools/proof/harness/`, CLAUDE.md's "Seeing the chrome"), then
@@ -1147,7 +1149,9 @@ def report():
 
 # ---------------------------------------------------------------------------
 # Section 9 — the export GAIN's arithmetic, over a probe compiled out of
-# `app/Sources/Loudness.swift` alone.
+# `app/Sources/Loudness.swift` and `app/Sources/ExportLoudness.swift` alone
+# (the gain went to the second in road map "audio" AP0's toll T3, a pure
+# move; the probe reads `LoudnessReport` from the first).
 #
 # It belongs beside section 8 and for the same reason one step further on:
 # the numbers `ExportLoudness.resolve` answers are decided in one pure
@@ -1157,13 +1161,14 @@ def report():
 # The defect this section was written for lives in the 0.01 dB grid the gain
 # is quantised to, so it shows on some measured peaks and not on others: a
 # check that exports one fixture is a coin toss, and a sweep over 200 peaks
-# is not. `Loudness.swift` has no AVFoundation, no AppKit and no project in
-# it (its own header says why), so unlike the meter it needs neither the
-# harness nor a stand-in — it compiles with a `main.swift` this script
+# is not. Neither file has AVFoundation, AppKit or a project in it
+# (`Loudness.swift`'s header says why), so unlike the meter they need neither
+# the harness nor a stand-in — they compile with a `main.swift` this script
 # writes and nothing else, in under a second.
 
 LOUDNESS = os.path.join(CHROME, "loudness")
 LOUDNESS_SOURCE = os.path.join(ROOT, "app", "Sources", "Loudness.swift")
+EXPORT_LOUDNESS_SOURCE = os.path.join(ROOT, "app", "Sources", "ExportLoudness.swift")
 
 # The probe. A case in, a resolved report out, JSON both ways — with the
 # non-finite levels spelled "inf" / "-inf", because JSON has no infinity and
@@ -1217,17 +1222,19 @@ STEP = 0.01              # ExportLoudness.gainStepDB
 
 
 def build_probe():
-    """`app/Sources/Loudness.swift` and the probe above, compiled together
-    through `swift_build.build` (which adds the bridging header and the
-    staticlib, though this file links nothing of the core's). Reused only
-    when every input is byte-identical, so a stale probe cannot lie."""
+    """`app/Sources/Loudness.swift`, `app/Sources/ExportLoudness.swift` and
+    the probe above, compiled together through `swift_build.build` (which
+    adds the bridging header and the staticlib, though neither file links
+    anything of the core's). Reused only when every input is byte-identical,
+    so a stale probe cannot lie."""
     os.makedirs(LOUDNESS, exist_ok=True)
     main = os.path.join(LOUDNESS, "main.swift")
     with open(main, "w") as f:
         f.write(PROBE)
     binary = os.path.join(LOUDNESS, "probe")
     try:
-        swift_build.build(sources=[LOUDNESS_SOURCE, main], output=binary)
+        swift_build.build(
+            sources=[LOUDNESS_SOURCE, EXPORT_LOUDNESS_SOURCE, main], output=binary)
     except swift_build.SwiftBuildFailed as error:
         sys.stderr.write("\n".join(error.diagnostics) + "\n")
         sys.exit("the loudness probe did not build")
