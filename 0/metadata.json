@@ -77,6 +77,37 @@
         "label": "Skill: mattpocock-skills:research",
         "default_collapsed": true
       }
+    },
+    {
+      "id": "claude-skill-toolu_01My13Tew2YG2TisJPLnE1mh",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "workflow-authoring"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "cc1987a56985",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1514,
+        "end": 1515,
+        "entry_ids": [
+          "a6a280f4-dc33-41aa-9dc3-46cf28efd9df"
+        ],
+        "tool_use_id": "toolu_01My13Tew2YG2TisJPLnE1mh"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01My13Tew2YG2TisJPLnE1mh"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: workflow-authoring",
+        "default_collapsed": true
+      }
     }
   ],
   "session_metrics": {
