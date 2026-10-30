@@ -729,7 +729,17 @@ the key map behind it.
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
   to the window. A new text-taking or Space-handling view must be added to
-  `SpaceKey.route` and to `tools/proof/space_key_probe.swift`.
+  `SpaceKey.route` and to `tools/proof/space_key_probe.swift`. Before that
+  it asks `TextFocus` (K-4): typing is focus-averse, so a mouse-down outside
+  the text being typed in (its host: a field editor's field or the
+  `OptionFieldControl` framing it, else the text view's scroll view), Tab
+  (unless Full Keyboard Access is on) and a Return in a field editor hand
+  first responder to the content view first; a key that leaves is spent, a
+  click is then delivered. A field commits through its own end-of-editing
+  path, so a new field needs nothing here — but one whose Return must do
+  more than commit cannot rely on Return reaching it in this window, and a
+  multi-line view routes its own Return through `TextEditKey`
+  (`tools/proof/text_focus_probe.swift`).
   `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
   `handleEditorKey` (#61).
@@ -855,7 +865,9 @@ the key map behind it.
 - `InspectorLabels.swift` — a pure move out of `InspectorPane.swift` (speed
   ramps SR5-0): the small labels and fields every section uses,
   `InspectorRowLabel`, `InspectorMixedBadge`, `InspectorTimecodeField`,
-  `InspectorNoteLabel` and `InspectorTextArea`. `InspectorNoteLabel(wraps:)`
+  `InspectorNoteLabel` and `InspectorTextArea` (whose text view routes K-2's
+  Return, applying by handing first responder to the content view, K-4).
+  `InspectorNoteLabel(wraps:)`
   with `wraps: true` is the one wrapping note: Motion's zero-duration note,
   Speed's silent-audio note and the Clip tab's matte note (#358).
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED

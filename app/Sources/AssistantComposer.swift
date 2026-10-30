@@ -7,7 +7,10 @@ import AppKit
 /// while idle and beeps otherwise — never an answer); Return with ⇧, ⌘, ⌥ or
 /// ⌃ inserts "\n", K-2's rule through the same `TextEditKey.route`, and
 /// nothing is routed while an input method has marked text. Tab and ⇧Tab
-/// move focus, as the single-line field's did, and never type a tab.
+/// never type a tab: in the editor window `TextFocus` takes them first and
+/// hands the keys back to the editor (spec §11 K-4), as a Return that sends
+/// does (`AssistantView.send`); with Full Keyboard Access on they reach
+/// here and move focus along the key-view loop.
 ///
 /// **Undo is its own.** An editable text view takes its undo manager from
 /// the window, and an editor window's IS the document's, so typing would

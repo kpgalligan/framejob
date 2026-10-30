@@ -103,11 +103,11 @@ final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate 
         }
         // Re-read directly rather than through `refresh()`: every refresh the
         // commit just ran was skipped, because the field editor is still
-        // attached here — and after Return or Tab AppKit re-attaches it — so
-        // the field would go on showing what was typed (blank after a clear,
-        // padded text after a padded rename, blank on a clip whose empty
-        // commit sent nothing) while the model holds the trimmed name or the
-        // fallback. The timecode field's beep path sets itself the same way.
+        // attached here, so the field would go on showing what was typed
+        // (blank after a clear, padded text after a padded rename, blank on a
+        // clip whose empty commit sent nothing) while the model holds the
+        // trimmed name or the fallback. The timecode field's beep path sets
+        // itself the same way.
         let now = read()
         if stringValue != now { stringValue = now }
     }

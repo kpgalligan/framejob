@@ -249,7 +249,9 @@ J pressed while playing forwards, or L while playing backwards, switches
 direction at 1×.
 
 Space plays and pauses wherever the focus is, except while you type in a
-text field or when a focused button uses the key itself. On the preview
+text field or when a focused button uses the key itself. Typing ends with
+Return, Tab or a click outside the field (on the timeline, say), and Space
+plays straight after it. On the preview
 canvas a quick Space press still plays or pauses (when you let go), while
 holding Space and dragging pans the canvas instead. Holding Space down
 doesn't toggle playback over and over. Letter keys never

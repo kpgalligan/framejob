@@ -365,7 +365,7 @@ plain string or a text patch); `set_text` to restyle.
 
 | Section | Rows |
 |---|---|
-| **Content** | A multi-line text area. It applies when you click away or press ⌘Return |
+| **Content** | A multi-line text area. Return, Tab or a click away applies it and gives the keys back to the editor; ⇧Return, ⌘Return, ⌥Return or ⌃Return starts a new line |
 | **Font** | **Family** (every font installed on the Mac, plus the faces the app ships with: Source Sans 3, Source Serif 4, Montserrat, Anton, Bebas Neue, Darker Grotesque and IBM Plex Mono), **Style** (that family's faces), **Size** 6–800 px |
 | **Style** | **Color**, **Align** (L / C / R), **Vertical** (top / middle / bottom within the box), **UPPERCASE**, **Line spacing** 0.5–4× (default 1), **Tracking** −20 to 100 px (default 0) |
 | **Outline** | **Outline** on/off, **Width** 0–40 px (default 2), **Color** (default black) |

@@ -274,11 +274,15 @@ final class AssistantView: NSView {
         send()
     }
 
+    /// A message taken empties the composer and, when it held the keys, hands
+    /// them back to the editor, so Space plays while the turn runs (spec §11
+    /// K-4); a message refused keeps both.
     private func send() {
         let text = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         guard onSend?(text) == true else { return }
         composer.string = ""
+        if window?.firstResponder === composer { window?.makeFirstResponder(window?.contentView) }
     }
 
     @objc private func clearClicked(_ sender: Any?) {

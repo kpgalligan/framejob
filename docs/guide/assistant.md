@@ -45,9 +45,9 @@ Type in the field ("Ask about or edit this project…") and press Return or clic
 
 | Key | In the message field |
 |---|---|
-| Return or keypad Enter | Sends the message. While the assistant is working or waiting for an answer, it beeps instead. |
+| Return or keypad Enter | Sends the message and gives the keys back to the editor, so Space plays while the assistant works. While the assistant is working or waiting for an answer, it beeps instead and the field keeps the keys. |
 | ⇧Return, ⌘Return, ⌥Return, ⌃Return | Starts a new line |
-| Tab, ⇧Tab | Moves focus to the next or previous control |
+| Tab, ⇧Tab | Gives the keys back to the editor. With Full Keyboard Access on, moves focus to the next or previous control |
 | ⌘Z, ⇧⌘Z | Undoes or redoes your typing. Typing never lands on the project's undo stack. |
 
 The field empties once the message is sent. If the conversation cannot start (for example, the key was removed), the reason appears in red in the transcript and your text stays in the field.

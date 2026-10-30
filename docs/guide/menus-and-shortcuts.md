@@ -308,6 +308,14 @@ The open windows are listed at the end of the menu, as in any Mac app.
 These keys work in the editor window when you are not typing in a field.
 They also work in the Preview Window.
 
+A field takes the keys only when you click in it, or choose a command that
+opens one for typing (Clip ▸ Rename…, View ▸ Assistant). Return, keypad Enter, Tab
+or a click anywhere outside the field applies what you typed and gives the
+keys back to the editor, so Space plays straight away. In a multi-line
+field (the Text tab's Content, the Assistant's message), Return applies and
+⇧Return starts a new line. With Full Keyboard Access on, Tab moves to the
+next control instead.
+
 ### Playback and moving the playhead
 
 | Key | What it does |

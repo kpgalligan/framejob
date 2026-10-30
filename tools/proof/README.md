@@ -6825,6 +6825,49 @@ python3 tools/proof/space_key_proof.py                      # → 29/29
 python3 tools/proof/space_key_proof.py --baseline 1888069   # exit 0 = exactly S2a, S2b FAIL
 ```
 
+## Typing gives the keys back (`text_focus_proof.py`, `text_focus_probe.swift`)
+
+Spec §11 K-4: typing in the editor window is focus-averse —
+`EditorWindow.sendEvent` asks `TextFocus` before dispatch, and a click
+outside the text, Tab (Full Keyboard Access off) or a Return in a one-line
+field hands first responder to the content view. Built and run as
+`space_key_proof.py`'s probe is, over the same card package (written under
+`work/text-focus/`) and with the same dummy key and environment. F1 asks
+`TextFocus` directly: which responder is typing; Return, keypad Enter, ⇧ and
+⇪ Return leave a field editor and ⌥/⌘/⌃ Return do not; Tab and ⇧Tab leave
+any text unless Full Keyboard Access is on, ⌃Tab and ⌥Tab never; marked
+text keeps every key; a click's host is the field (or the
+`OptionFieldControl` framing it), else the scroll view, else the text view,
+and a hit outside the content view (nil) never leaves. F2 drives the app's
+OWN window with synthesized keys and mouse-downs (each mouse-up queued
+first, so a field editor's tracking loop ends) and reads the first
+responder, the commit and whether Space then plays: (z) the host's Full
+Keyboard Access is off, the Tab rows' premise; (a–c) the toolbar timecode's
+Return, Tab and ⇧Tab; (d) the clip header's name on Return; (e) the same
+name on a click on the timeline; (f) a click inside the field keeps it;
+(g–h) an `OptionFieldControl`'s Tab, and a click on its own margin keeping
+it; (i–j) the Text tab's area — ⇧Return a new line, Return applies once,
+Tab applies; (k) the composer's Tab after View ▸ Assistant. F3 is the
+composer's Return in a window of its own: a send leaves, a refused send
+keeps the text and the keys.
+
+`--baseline <commit>` builds the probe over that commit's `app/Sources`
+with `-D HARNESS_REFERENCE_BUILD` (F1 compiled out) and exits 0 only when
+EXACTLY `BASELINE_EXPECTED` fails. Measured 2026-10-30: 57/57 on the fix;
+`--baseline d4537dc` fails exactly F2b, F2d, F2e, F2g, F2i, F2j, F2k and F3a
+(F2d: the name committed, then its field editor was first responder again
+and Space was typed into it; F2e: the timeline click committed nothing).
+F2a and F2c held there — the toolbar timecode's delegate already handed
+the keys back — and are guards. Eight mutants, each killed: the click
+branch, the field editor's Return, the `OptionFieldControl` host, marked
+text, Full Keyboard Access, the scroll-view host, the composer's send and
+the area's Return.
+
+```sh
+python3 tools/proof/text_focus_proof.py                     # → 57/57
+python3 tools/proof/text_focus_proof.py --baseline d4537dc  # exit 0 = exactly the eight FAIL
+```
+
 ## The text editor grows as you type (`text_edit_proof.py`, `text_edit_probe.swift`)
 
 kpgalligan/framejob#36: the in-canvas text editor is sized, after every

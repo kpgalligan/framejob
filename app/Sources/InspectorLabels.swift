@@ -178,8 +178,12 @@ final class InspectorNoteLabel: NSTextField, OptionControl {
 
 // MARK: - Multi-line text
 
-/// The Text tab's content editor: an `NSTextView` that commits on blur (and
-/// on ⌘Return), because a text clip's content is typed, not dialled. The
+/// The Text tab's content editor: an `NSTextView` that commits on blur,
+/// because a text clip's content is typed, not dialled. Its keys are the
+/// canvas editor's (spec §11 K-2, K-4): a bare Return or keypad Enter
+/// applies and hands the keys back to the editor, Return with ⇧, ⌘, ⌥ or ⌃
+/// is a new line, and the editor window takes Tab (with Full Keyboard Access
+/// off) and a click outside. The
 /// `refresh()` is skipped while it holds first responder, or every keystroke
 /// would be overwritten by the value it just wrote.
 final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
@@ -187,7 +191,7 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
     private let write: (String) -> Void
     private let enabled: () -> Bool
     private let onEdit: () -> Void
-    private let textView = NSTextView()
+    private let textView = InspectorTextAreaView()
     private let scroll = NSScrollView()
 
     init(
@@ -256,16 +260,18 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
     func textDidEndEditing(_ notification: Notification) {
         commit()
     }
+}
 
-    /// ⌘Return commits without leaving the field — the same bargain the
-    /// canvas's inline text session makes (PreviewCanvasView).
-    func textView(
-        _ view: NSTextView, doCommandBy commandSelector: Selector
-    ) -> Bool {
-        guard commandSelector == #selector(NSResponder.insertNewline(_:)),
-              NSApp.currentEvent?.modifierFlags.contains(.command) == true
-        else { return false }
-        commit()
-        return true
+/// `InspectorTextArea`'s text view: Return through `TextEditKey.route`, as
+/// `CanvasTextView` and the composer route it. Applying is leaving — first
+/// responder to the window's content view, whose resign runs the area's
+/// `textDidEndEditing` commit — so there is one commit path, the blur's.
+private final class InspectorTextAreaView: NSTextView {
+    override func keyDown(with event: NSEvent) {
+        switch TextEditKey.route(event, hasMarkedText: hasMarkedText()) {
+        case .apply: window?.makeFirstResponder(window?.contentView)
+        case .newline: insertNewline(nil)
+        case .escape, nil: super.keyDown(with: event)
+        }
     }
 }

@@ -155,7 +155,8 @@ in §6).
   Return or keypad Enter (⇪ allowed) sends while idle and beeps otherwise; it never answers a
   question. Return with ⇧, ⌘, ⌥ or ⌃ inserts "\n", K-2's rule through the same
   `TextEditKey.route`; nothing is routed while an input method has marked text. Tab and ⇧Tab
-  move focus, as the single-line field's did; they never type a tab into the message. The
+  move focus, as the single-line field's did; they never type a tab into the message (amended
+  by K-4: they, and a Return that sends, hand the keys back to the editor). The
   composer's typing undo is its OWN `UndoManager`: ⌘Z in the composer undoes typing, and typing
   never lands on the document's stack, never dirties the document and never enters
   `registerUndo`'s grouping (AI-10, app/CLAUDE.md's Undo); a programmatic set of its text (a

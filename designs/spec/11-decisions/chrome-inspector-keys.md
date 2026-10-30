@@ -321,8 +321,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the one destructive answer and is never the default. The Text tab's
   `InspectorTextArea` keeps its form-field bargain (Return a newline,
   ⌘Return a commit in place, blur commits): it sits among fields that
-  commit on blur, and a session that must be left is the canvas's alone. No
-  MCP mirror: the keys are view state, `set_text` is the apply.
+  commit on blur, and a session that must be left is the canvas's alone
+  (withdrawn by K-4: the area now takes this Return too). No MCP mirror:
+  the keys are view state, `set_text` is the apply.
 - **K-3 — The canvas text editor lays its text out with the renderer's
   attributes at view scale; an UPPERCASE text is edited as typed**
   (kpgalligan/framejob#117, 2026-09-30). The font, `.kern` and paragraph
@@ -337,6 +338,36 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   clip is edited axis-aligned: AppKit text editing in a rotated frame fights
   the input method. The 60 × 24 pt floor still widens a box narrower than
   60 pt.
+- **K-4 — Typing in the editor window is focus-averse; amends K-2 for the
+  Text tab's area and AI-17 for the composer's Tab** (the owner,
+  2026-10-30). Only a click or double-click — or a command that exists to
+  type, View ▸ Assistant or a rename — gives text the keys, and the editor
+  window takes them back BEFORE dispatch, first responder to its content
+  view (the root that holds the bare-key map, #60), so Space and the
+  transport keys work the moment typing ends: (1) a mouse-down inside the
+  content view whose hit lies outside the text — a field editor's field,
+  or the `OptionFieldControl` that frames it; a text view's scroll view; the
+  text view — so a click on the timeline, which refuses first responder
+  and so left the field editor attached, now ends the typing (the title
+  bar is outside the content view and keeps it); (2) Tab or ⇧Tab in any
+  editable text, unless Full Keyboard Access is on — then Tab stays
+  AppKit's key-view loop, how such a user reaches a control (K-1's
+  exception), and the Text tab's area types a tab as it did; (3) a Return
+  or keypad Enter (⇧ ⇪ allowed) in a one-line field. Never while an input method has marked text, never with
+  a sheet attached, and a field that refuses to resign keeps the key. Each
+  field commits through its own end-of-editing path, as a blur always did;
+  AppKit's own Return handling, which re-selected the field after the
+  commit (so the next Space was typed into it, behind no focus ring), and
+  Tab's next key view are no longer reached. The multi-line editors take
+  K-2's Return: the Text tab's `InspectorTextArea` applies and leaves on a
+  bare Return or keypad Enter and inserts "\n" on Return with ⇧, ⌘, ⌥ or
+  ⌃ — K-2's "form-field bargain" for it is withdrawn, so ⌘Return is a new
+  line where it was a commit in place — and the Assistant composer leaves
+  after a Return that sends (a beep keeps it) and on Tab, where AI-17 moved
+  focus to the next key view (it still does with Full Keyboard Access on).
+  Esc is unchanged everywhere. Sheets, Settings
+  and Welcome are other windows and keep AppKit's dialog keys. No MCP
+  mirror: focus is view state, app/CLAUDE.md's exemption.
 - **SH-3 — An inspector name field is the inspector's value field**
   (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
   sub-tab's string rows, the Document tab's marker name and the clip

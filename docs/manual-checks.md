@@ -190,6 +190,11 @@ the same way.
 - **Expect:** the second window opens with the timeline height and inspector width from step 1; the third opens with those same sizes, not the ones the window resize in step 3 left behind.
 - **Source:** #327.
 
+**TL-16 — Typing gives the keys back**
+- **Do:** With a real keyboard and mouse, Full Keyboard Access off, and a clip selected: 1. Click the clip's name in the inspector, type a new name, press Return, then Space. 2. Click the name again, type, then click an empty part of the timeline and press Space. 3. Click an inspector number, type a value, press Tab, then Space. 4. On a text clip, click the Text tab's Content, type, press ⇧Return and type a second line, then press Return and Space. 5. Click into a field and click inside that same field again; click a number field's border. 6. In the Assistant tab, type a message and press Return, then Space. 7. Turn Full Keyboard Access on, click a field and press Tab.
+- **Expect:** 1–4 and 6: each value is applied once (one undo step each), no space appears in any field, and Space plays at once with no beep and no extra click. In 4 ⇧Return starts a new line and Return applies both lines. 5: the field keeps its caret. 7: Tab moves to the next control instead.
+- **Source:** spec §11 K-4.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).
