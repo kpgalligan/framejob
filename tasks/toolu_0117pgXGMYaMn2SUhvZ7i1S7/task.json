@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_0117pgXGMYaMn2SUhvZ7i1S7",
+  "agent_id": "a1d426d1f894e63c9",
+  "subagent_type": "lc-triage",
+  "task_description": "Triage fjgraphic import",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 31342,
+    "cache_read_tokens": 27306,
+    "output_tokens": 659,
+    "api_call_count": 2
+  },
+  "started_at": "2026-10-29T20:40:51.148044-04:00",
+  "completed_at": "2026-10-29T20:40:58.891864-04:00"
+}

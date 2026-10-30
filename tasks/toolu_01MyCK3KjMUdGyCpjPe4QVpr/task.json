@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01MyCK3KjMUdGyCpjPe4QVpr",
+  "agent_id": "a282ce1c81d4a3555",
+  "subagent_type": "lc-adversary",
+  "task_description": "Adversary fjgraphic import spec",
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 106418,
+    "cache_read_tokens": 1920459,
+    "output_tokens": 30932,
+    "api_call_count": 25
+  },
+  "started_at": "2026-10-29T20:52:58.320936-04:00",
+  "completed_at": "2026-10-29T20:58:29.0674-04:00"
+}
