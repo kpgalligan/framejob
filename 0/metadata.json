@@ -55,6 +55,40 @@
       "shell_stdin": 0
     }
   },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01PxwAYdDXv3DVFJXctGvAUB",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:research"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "438751756b21",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 981,
+        "end": 982,
+        "entry_ids": [
+          "bcfca604-c0ae-437e-bd9d-fcf254557d5c"
+        ],
+        "tool_use_id": "toolu_01PxwAYdDXv3DVFJXctGvAUB"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01PxwAYdDXv3DVFJXctGvAUB"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:research",
+        "default_collapsed": true
+      }
+    }
+  ],
   "session_metrics": {
     "turn_count": 1
   }
