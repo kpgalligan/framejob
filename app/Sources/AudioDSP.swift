@@ -81,6 +81,31 @@ struct AudioCompressorSettings: Equatable {
     }
 }
 
+/// The clip limiter's settings in the units the stage works in (spec §11
+/// AU-22): its ceiling BEFORE the fader, since the fader is downstream of
+/// the tap.
+struct AudioLimiterSettings: Equatable {
+    /// Linear, pre-fader: `10^(ceilingDb/20) / volume` for the clip's base
+    /// volume; +∞ at volume 0, where nothing reaches the ceiling.
+    let ceiling: Float
+    /// Seconds for the gain to recover.
+    let releaseSeconds: Double
+
+    init(ceiling: Float, releaseSeconds: Double) {
+        self.ceiling = ceiling.isNaN ? .infinity : ceiling
+        self.releaseSeconds = releaseSeconds.isFinite ? Swift.max(releaseSeconds, 0) : 0.1
+    }
+
+    /// The settings a clip's limiter and base volume ask for. A hand-edited
+    /// value outside the model's ranges is held to them (`clamp_audio`'s).
+    init(ceilingDb: Double, volume: Double, releaseSeconds: Double) {
+        let db = ceilingDb.isFinite ? Swift.min(Swift.max(ceilingDb, -24), 0) : -1
+        let linear = pow(10, db / 20)
+        let ceiling = volume.isFinite && volume > 0 ? Float(linear / volume) : Float.infinity
+        self.init(ceiling: ceiling, releaseSeconds: releaseSeconds)
+    }
+}
+
 /// One clip's worth of sample-level audio settings — everything the model
 /// carries that the composition plan cannot.
 ///
@@ -112,10 +137,12 @@ struct AudioClipDSP: Equatable {
     /// envelope is a scalar per track and applies to every channel equally,
     /// so it commutes with the fold and may stay downstream of the tap.
     var enclosingMono: Bool
+    /// The clip's limiter, last in the chain (AU-20); nil when it has none.
+    var limiter: AudioLimiterSettings?
 
     init(
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
-        mono: Bool = false, enclosingMono: Bool = false
+        mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -124,6 +151,7 @@ struct AudioClipDSP: Equatable {
         // No clamping: a bool has no range.
         self.mono = mono
         self.enclosingMono = enclosingMono
+        self.limiter = limiter
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -138,6 +166,7 @@ struct AudioClipDSP: Equatable {
     /// wrong answer.
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
+            && limiter == nil
     }
 }
 
@@ -196,7 +225,8 @@ enum AudioPanLaw {
 
 /// One composition audio track's effect chain: noise reduction, then the
 /// compressor, then the Mix stage — the mono fold, then the pan, then the
-/// fold an enclosing NEST clip asked for.
+/// fold an enclosing NEST clip asked for — then the limiter (spec §11 AU-3,
+/// AU-20).
 ///
 /// **That order is the order a channel strip has**, and each step is there
 /// because of the one before it. Cleaning first means the compressor is not
@@ -229,22 +259,32 @@ enum AudioPanLaw {
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
 /// full order the samples actually see is
 /// noise reduction → compressor → the clip's fold → pan → an enclosing nest's
-/// fold → volume/fades/ducking, which puts the compressor before the fader
-/// exactly as an insert should be.
+/// fold → limiter → volume/fades/ducking, which puts the compressor before the
+/// fader exactly as an insert should be. The limiter is told the fader's base
+/// gain instead (`AudioLimiterSettings`, AU-22).
 final class AudioDSPChain {
     let channelCount: Int
     private let compressor: AudioCompressorStage
     /// One per channel, or nil when no clip on this track asks for noise
     /// reduction — in which case the track has no added latency at all.
     private let reducers: [AudioNoiseReductionStage]?
+    /// Nil when no clip on this track has a limiter — no added latency.
+    private let limiter: AudioLimiterStage?
 
-    /// `usesNoiseReduction` is decided for the WHOLE track when the
-    /// composition is built, not per buffer: the stage adds a fixed delay, and
-    /// switching it in and out at a cut would make the track jump backwards
-    /// and forwards by 10 ms.
-    init(channelCount: Int, sampleRate: Double, maxFrames: Int, usesNoiseReduction: Bool) {
+    /// `usesNoiseReduction` and `usesLimiter` are decided for the WHOLE track
+    /// when the composition is built, not per buffer: each stage adds a fixed
+    /// delay, and switching one in and out at a cut would make the track jump
+    /// backwards and forwards (SY-25, AU-23).
+    init(
+        channelCount: Int, sampleRate: Double, maxFrames: Int, usesNoiseReduction: Bool,
+        usesLimiter: Bool = false
+    ) {
         self.channelCount = max(0, channelCount)
         compressor = AudioCompressorStage(sampleRate: sampleRate, maxFrames: maxFrames)
+        limiter = usesLimiter && self.channelCount > 0
+            ? AudioLimiterStage(
+                channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
+            : nil
         if usesNoiseReduction, self.channelCount > 0 {
             // All channels or none: a track whose left channel was filtered
             // and whose right was not would be delayed on one side, which is
@@ -270,6 +310,7 @@ final class AudioDSPChain {
     func reset() {
         compressor.reset()
         reducers?.forEach { $0.reset() }
+        limiter?.reset()
     }
 
     /// Runs the chain in place over one buffer.
@@ -306,6 +347,10 @@ final class AudioDSPChain {
         // everything this clip does to its own channels, which is what makes
         // the sum of the folded contributors the fold of the sum.
         if params.enclosingMono, count >= 2 { fold(channels, count: count, frames: frames) }
+
+        // Last, for the whole track once any clip on it asks (AU-23): a
+        // clip without a limiter passes through it as a delay.
+        limiter?.process(channels, count: count, frames: frames, settings: params.limiter)
     }
 
     /// The pan, in place. Its own method only so the tail fold above it is

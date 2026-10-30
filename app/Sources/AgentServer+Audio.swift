@@ -69,8 +69,9 @@ extension AgentServer {
     func normalizeClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        // Loudness mode (spec §11 AU-16): the button's and the menu's mode
-        // when the Normalize row says Loudness (`NormalizeChoice`).
+        // Loudness mode (spec §11 AU-16, AU-25): the button's and the menu's
+        // default (`NormalizeChoice`), and this tool's unless it names
+        // `peak_db` alone.
         if try normalizeMode(a) == .loudness {
             return try normalizeLoudness(a, document: document, clips: clips)
         }
@@ -278,13 +279,16 @@ extension AgentServer {
         return result
     }
 
-    /// `mode`, refused by name outside its two values; absent is Peak.
+    /// `mode`, refused by name outside its two values; absent is Loudness
+    /// (spec §11 AU-25), except beside a `peak_db`, which only Peak takes.
     private func normalizeMode(_ a: [String: Any]) throws -> AudioNormalize.Mode {
-        guard let raw = try stringArg(a, "mode") else { return .peak }
+        guard let raw = try stringArg(a, "mode") else {
+            return try doubleArg(a, "peak_db") == nil ? .loudness : .peak
+        }
         guard let mode = AudioNormalize.Mode(rawValue: raw) else {
             throw ToolError(
                 message: "mode must be \"peak\" or \"loudness\", not \"\(raw)\"; the default "
-                    + "is \"peak\".")
+                    + "is \"loudness\" (\"peak\" when peak_db is given).")
         }
         return mode
     }
@@ -294,8 +298,9 @@ extension AgentServer {
     /// `readLoudness` + `plan` pair (spec §11 AU-13, AU-14, AU-16). `peak_db`
     /// is refused by name, and `target_lufs` outside −50…−5 is refused, never
     /// clamped. The answer reports each clip's measured loudness and true
-    /// peak (the readout's numbers), the volume written, where it lands, and
-    /// the cap that stopped it short; a note names each limited clip.
+    /// peak (the readout's numbers), the volume written, the clip's limiter
+    /// after the edit (AU-24), where it lands, and the volume ceiling when it
+    /// stopped it short; a note names each such clip.
     private func normalizeLoudness(
         _ a: [String: Any], document: ProjectDocument, clips: [UInt32]
     ) throws -> String {
@@ -336,6 +341,9 @@ extension AgentServer {
                     "result_lufs": Self.jsonLevel(result.resultLUFS),
                     "result_true_peak_dbtp": Self.jsonLevel(result.resultTruePeakDBTP),
                     "limited_by": result.limit.map { $0.rawValue as Any } ?? NSNull(),
+                    "limiter": result.limiter.map {
+                        ["ceiling_db": $0.ceilingDb, "release": $0.release] as Any
+                    } ?? NSNull(),
                 ] as [String: Any]
             },
         ]
@@ -347,9 +355,8 @@ extension AgentServer {
             let ids = limited.map { String($0.clip) }.joined(separator: ", ")
             fields["note"] =
                 "Clip(s) \(ids) stopped short of \(plan.targetLUFS) LUFS: the volume that reaches "
-                + "it would put the true peak past \(AudioNormalize.ceilingDBTP) dBTP "
-                + "(limited_by true_peak) or pass the \(AudioNormalize.maxGainName) ceiling "
-                + "(limited_by max_gain). result_lufs says where each landed."
+                + "it would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
+                + "result_lufs says where each landed."
         }
         return try editResult(document, "Normalize", plan.ops, fields)
     }

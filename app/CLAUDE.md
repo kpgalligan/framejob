@@ -148,7 +148,8 @@ detail there.
   and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113). `AudioProps.swift`
   (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
   `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
-  `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles);
+  `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
+  30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body;
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -971,7 +972,8 @@ the key map behind it.
   exception that sends a `filters` or `obscure` list of a different LENGTH, or
   `motion`, to the BASE props (a curve never: every count animates, spec §11
   GR-34), and `structural(audio:for:)` the one that sends pan, mono,
-  compressor, noise reduction, duck and keep-pitch there (CI-3);
+  compressor, noise reduction, the limiter (AU-21), duck and keep-pitch there
+  (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
   and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
@@ -1076,7 +1078,9 @@ the key map behind it.
   `AudioPane.swift` (the Ducking section's Duck by, Pre-roll and Hold and the
   Fades section's In shape and Out shape, base-only, spec §11 AU-110…AU-114;
   +`Loudness`: the Volume section's Loudness and At volume rows and the
-  Normalize row's Mode popup and Target field, spec §11 AU-15) ·
+  Normalize row's Mode popup and Target field, spec §11 AU-15; +`Limiter`: the
+  Limiter section, spec §11 AU-26, registered after Mix in
+  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, base-only) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1737,20 +1741,27 @@ the key map behind it.
   at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
   line, so it stays one integer literal.
 - `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
-  `AudioCompressorStage.swift` · `AudioNoiseReductionStage.swift` — the
-  `MTAudioProcessingTap` playback and export share, and the four sample-level
-  effects: noise reduction (a 512-sample delay the builder leads by, SY-25),
-  the compressor, the mono fold (BEFORE the pan, or it is algebraically
-  self-cancelling) and pan (constant-power, unity at centre). A track whose
-  clips ask for none is bit-identical. `AudioTap.swift` is the tap
+  `AudioCompressorStage.swift` · `AudioNoiseReductionStage.swift` ·
+  `AudioLimiterStage.swift` — the `MTAudioProcessingTap` playback and export
+  share, and the five sample-level effects: noise reduction (a 512-sample
+  delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE
+  the pan, or it is algebraically self-cancelling) and pan (constant-power,
+  unity at centre), then the clip limiter (AU-20: a lookahead true-peak
+  limiter last in the chain, told the clip's base volume because the fader is
+  after it, AU-22; its 158-sample delay led out by `AudioShift.limiterLead`,
+  1,975 ticks, with the tap looking spans up `lookupLead` ahead, AU-23; FIR
+  taps and the box sum as element-wise vDSP, never scalar loops, which miss
+  the tap's real-time deadline in the Debug app's `-Onone` build). A track
+  whose clips ask for none is bit-identical. `AudioTap.swift` is the tap
   (`AudioTapContext`, `AudioTap.make`); `AudioTapSchedule.swift` is what a
   track's tap is told when the composition is built (`AudioDSPSpan`,
   `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
   it (road map "audio" AP0). `AudioDSP.swift` keeps the parameters
-  (`AudioCompressorSettings`, `AudioClipDSP`), the pan law and the chain
+  (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP`), the pan
+  law and the chain
   (`AudioDSPChain`, whose order is the channel strip's); each stage is a file
-  of its own, `AudioCompressorStage.swift` and `AudioNoiseReductionStage.swift`,
-  pure moves out of it (AP0).
+  of its own, `AudioCompressorStage.swift`, `AudioNoiseReductionStage.swift`
+  and `AudioLimiterStage.swift` (the first two pure moves out of it, AP0).
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
@@ -2274,9 +2285,13 @@ free.
   `disfluencies` and `refresh` true), its jobs and its `CloudEstimate` line,
   shared by the sheet and `transcribe_for_fillers`.
 - `AudioNormalize.swift` (+`Loudness`) · `ClipLoudness.swift` ·
-  `NormalizeChoice.swift` — Normalize Clip as a value type: peaks (Peak mode)
-  or the loudness cache (Loudness mode, spec §11 AU-13: −16 LUFS by default,
-  held under −1 dBTP and ×32, `limited_by`) in, ops out, measured PRE-FADER
+  `AudioLimiterModel.swift` · `NormalizeChoice.swift` — Normalize Clip as a
+  value type: peaks (Peak mode) or the loudness cache (Loudness mode, spec §11
+  AU-24: −16 LUFS by default; a clip whose true peak fits −1 dBTP gets its
+  volume alone, any other gets `{volume, limiter}` with the volume solved
+  through `AudioLimiterModel`, the clip limiter at block rate over
+  `ClipLoudness.Reading.steps` and `stepPeaks`; ×32 the one cap,
+  `limited_by: max_gain`) in, ops out, measured PRE-FADER
   from the plan segment, REPLACING `volume` so a second press is a no-op,
   always to BASE props; `audioSegments(in:)` and `admit(_:in:segments:)` are
   both modes' admission. `ClipLoudness` is a clip's reading over the window
@@ -2285,7 +2300,8 @@ free.
   `ReverseMirror`, the gates once, AU-11, AU-12) and the Volume section's
   `Memo` (per handle, per media file, and the held answer through a live
   edit, AU-15). `NormalizeChoice` is the mode and target in UserDefaults
-  (`FrameJobNormalizeMode`, `FrameJobNormalizeTargetLUFS`) and the ops the
+  (Loudness and −16 by default, AU-25; `FrameJobNormalizeMode`,
+  `FrameJobNormalizeTargetLUFS`) and the ops the
   button and Clip ▸ Normalize run; `normalize_clip` names its own mode and
   never reads it.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·

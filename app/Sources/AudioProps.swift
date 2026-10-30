@@ -102,6 +102,31 @@ struct CompressorProps: Codable, Equatable {
     }
 }
 
+/// The clip's true-peak limiter (format 30, spec §11 AU-20, AU-21): a
+/// ceiling in dBTP that holds after the clip's fader at its base volume
+/// (AU-22), and the time its gain takes to recover. Base-only, like the
+/// compressor.
+struct LimiterProps: Codable, Equatable {
+    /// dBTP, post-fader: −24…0.
+    var ceilingDb: Double = -1
+    /// Ticks: 600…600 000 (1 ms…1 s).
+    var release: Ticks = 60_000
+
+    init(ceilingDb: Double = -1, release: Ticks = 60_000) {
+        self.ceilingDb = ceilingDb
+        self.release = release
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ceilingDb = c.lenient(.ceilingDb, -1)
+        release = c.lenient(.release, 60_000)
+    }
+
+    /// The patch's body (`AudioPatch.dictionary`).
+    var dictionary: [String: Any] { ["ceiling_db": ceilingDb, "release": release] }
+}
+
 /// The sample half of a clip. `volume` may exceed 1, up to 32 (§5.2, §11 AU-1).
 struct AudioProps: Codable, Equatable {
     let volume: Double
@@ -121,12 +146,15 @@ struct AudioProps: Codable, Equatable {
     /// The fades' curves (format 29, spec §11 AU-114).
     let fadeInShape: FadeShape
     let fadeOutShape: FadeShape
+    /// The true-peak limiter, nil when off (AU-21).
+    let limiter: LimiterProps?
 
     init(
         volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
         duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
         pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0,
-        fadeInShape: FadeShape = .linear, fadeOutShape: FadeShape = .linear
+        fadeInShape: FadeShape = .linear, fadeOutShape: FadeShape = .linear,
+        limiter: LimiterProps? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -140,6 +168,7 @@ struct AudioProps: Codable, Equatable {
         self.noiseReduction = noiseReduction
         self.fadeInShape = fadeInShape
         self.fadeOutShape = fadeOutShape
+        self.limiter = limiter
     }
 
     init(from decoder: Decoder) throws {
@@ -156,6 +185,7 @@ struct AudioProps: Codable, Equatable {
         noiseReduction = c.lenient(.noiseReduction, 0)
         fadeInShape = c.lenient(.fadeInShape, FadeShape.linear)
         fadeOutShape = c.lenient(.fadeOutShape, FadeShape.linear)
+        limiter = c.lenient(.limiter)
     }
 
     /// Volume in dB for the Audio tab's read-out; -inf shows as silence.

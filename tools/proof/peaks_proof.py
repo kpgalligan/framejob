@@ -90,7 +90,7 @@ def main():
     check("corrupt audio is pending by media ID", level.get("pending_peaks") == [bad_media],
           str(level))
     check("corrupt audio proposes no interior level cuts", level.get("ranges") == [], str(level))
-    error = bad.error("normalize_clip", clips=[bad_clip])
+    error = bad.error("normalize_clip", mode="peak", clips=[bad_clip])
     check("normalize names the missing waveform rather than silence",
           f"clip {bad_clip}" in error and "waveform has not been written" in error,
           error[:150])
@@ -113,7 +113,7 @@ def main():
     check("level proposes the full silent clip",
           silent_level.get("ranges") == [[0, clip_duration]],
           str(silent_level.get("ranges")))
-    silent_error = silent.error("normalize_clip", clips=[silent_clip])
+    silent_error = silent.error("normalize_clip", mode="peak", clips=[silent_clip])
     check("normalize names real silence", "silent over the part of it that plays" in silent_error,
           silent_error[:150])
 
@@ -122,7 +122,7 @@ def main():
     check("nonzero cache lands", wait_for(lambda: loud.marker(loud_media).exists()
           and loud.peaks(loud_media).exists()) is not None)
     before_loud = loud.project()
-    normalized = loud.op("normalize_clip", clips=[loud_clip])
+    normalized = loud.op("normalize_clip", mode="peak", clips=[loud_clip])
     check("healthy nonzero clip normalizes", any(row.get("clip") == loud_clip
           for row in normalized.get("normalized", [])), str(normalized))
     check("normalization changed audio volume", loud.project() != before_loud)
@@ -139,7 +139,7 @@ def main():
     check("legacy false-silent cache is unavailable immediately",
           legacy_level.get("pending_peaks") == [loud_media]
           and legacy_level.get("ranges") == [], str(legacy_level))
-    legacy_error = loud.error("normalize_clip", clips=[loud_clip])
+    legacy_error = loud.error("normalize_clip", mode="peak", clips=[loud_clip])
     check("legacy zeros cannot normalize as silence",
           "waveform has not been written" in legacy_error, legacy_error[:150])
     # Reopen kicks off the normal cache pass, which withdraws the stale .bin.

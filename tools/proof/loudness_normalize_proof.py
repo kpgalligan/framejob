@@ -1,20 +1,26 @@
-"""Normalize's Loudness mode over MCP (road map "audio" AP1, spec §11 AU-13..AU-16).
+"""Normalize's Loudness mode over MCP (road map "audio" AP1 and AP2, spec §11 AU-13..AU-16,
+AU-24, AU-25).
 
 Usage: python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
 
 Every level is MEASURED on an exported WAV with phase5_proof.py's own BS.1770-4
-arithmetic (`integrated`, `true_peak`), never read back from the app alone.
+arithmetic (`integrated`, `true_peak`), never read back from the app alone; a limited
+export's true peak by limiter_probe.py's two meters too (`true_peaks`: a 4x Kaiser and
+BS.1770-4 Annex 2).
 
-  N1   normalize_clip's schema: mode (peak|loudness), target_lufs (-50..-5).
+  N1   normalize_clip's schema: mode (peak|loudness, loudness the default),
+       target_lufs (-50..-5).
   N2   refusals by name: target_lufs -51 and -4, mode "rms", target_lufs with
-       peak, peak_db with loudness.
+       peak (named, or implied by peak_db alone), peak_db with loudness.
   N3   steady fixtures (stereo and mono) to -16, -14 and -23: each export within
        0.5 LU of the target and of result_lufs.
-  N4   a peaky fixture: limited_by true_peak, export TP <= -0.9 dBTP, the note
-       names the clip.
+  N4   a peaky fixture: the limiter turned on (-1 dBTP, 100 ms), limited_by null,
+       the export at -16 +-0.5 LUFS and its true peak <= -1 dBTP + 0.001 dB by both
+       meters; the saved clip carries audio.limiter.
   N5   two clips of different levels in one call land within 0.5 LU of each other.
-  N6   the owner's recording (samples/Rode-usb-mic.m4a): measured about -41.7,
-       limited by true peak, the export at result_lufs +-0.5 (reported).
+  N6   the owner's recording (samples/Rode-usb-mic.m4a): measured about -41.7, the
+       limiter on, the export at -16 +-0.5 LUFS and at result_lufs +-0.5, its true
+       peak <= -1 dBTP + 0.001 dB by both meters.
   N7   a reversed clip and a x2 Keep pitch clip of a steady fixture within 0.5 LU.
   N8   measured_lufs / true_peak_dbtp against this script's measurement of a
        volume-1 export of the same window (0.5 LU, 0.5 dB).
@@ -22,6 +28,10 @@ arithmetic (`integrated`, `true_peak`), never read back from the app alone.
   N10  Clip > Normalize on an instance launched with -FrameJobNormalizeMode
        loudness (and target -16) lands at -16 +-0.5 LUFS; on one launched with
        -FrameJobNormalizeMode peak at -1 dBFS peak.
+  N11  the tool's default (AU-25): no mode is Loudness; peak_db alone is Peak.
+  N12  a clip's own limiter is kept (-3 dBTP and its release) and one above -1
+       dBTP is lowered to -1; the row's limiter says so.
+  N13  one undo step takes back the volume and the limiter together.
 
 The two instances N10 needs are launched here, each on its own socket, with the
 mode in the argument domain (nothing persists, and the shared domain's own
@@ -35,6 +45,7 @@ import subprocess
 import sys
 import time
 
+import limiter_probe
 import mcp as mcp_module
 import phase5_proof as p5
 import proof_app
@@ -133,6 +144,9 @@ def schema_rows(m):
     check(t.get("type") == "number" and t.get("minimum") == -50 and t.get("maximum") == -5,
           f"N1 target_lufs is a number bounded -50..-5 ({t.get('minimum')}..{t.get('maximum')})")
     check(schema.get("required") == ["clips"], "N1 and only clips is required")
+    mode_text = props.get("mode", {}).get("description", "")
+    check('"loudness" (the default)' in mode_text,
+          f"N1 mode's description names loudness the default: {mode_text[:90]!r}")
 
 
 def refusal_rows(m):
@@ -144,7 +158,7 @@ def refusal_rows(m):
         ({"mode": "loudness", "target_lufs": -4}, "target_lufs"),
         ({"mode": "rms"}, "mode"),
         ({"mode": "peak", "target_lufs": -16}, "target_lufs"),
-        ({"target_lufs": -16}, "target_lufs"),
+        ({"peak_db": -1, "target_lufs": -16}, "target_lufs"),
         ({"mode": "loudness", "peak_db": -1}, "peak_db"),
     ]
     for args, name in cases:
@@ -171,19 +185,31 @@ def steady_rows(m):
             m.call("close_project", project=s.path, discard=True)
 
 
+def limited(path, ceiling=-1.0):
+    """(Kaiser dBTP, Annex 2 dBTP, both at or under `ceiling` + 0.001 dB) of a file."""
+    kaiser, annex = limiter_probe.true_peaks(path)
+    return kaiser, annex, kaiser <= ceiling + 0.001 and annex <= ceiling + 0.001
+
+
 def peaky_rows(m):
-    print("\nN4 — a peaky fixture stops at the true-peak ceiling")
+    print("\nN4 — a peaky fixture reaches the target through the limiter")
     s = Session(m, "loudness-peaky")
     clip = place(s, "peaky.wav")
     answer = loud(s, [clip])
     row = answer["normalized"][0]
-    lufs, tp, _ = measure(s, "peaky")
-    check(row["limited_by"] == "true_peak" and near(row["result_true_peak_dbtp"], -1, 1e-6),
-          f"N4 limited_by {row['limited_by']}, result_true_peak_dbtp "
-          f"{f(row['result_true_peak_dbtp'])}, result_lufs {f(row['result_lufs'])}")
-    check(tp <= -0.9, f"N4 the export's true peak {f(tp)} dBTP is at or under -0.9")
-    check(str(clip) in (answer.get("note") or ""), f"N4 the note names clip {clip}: "
-          f"{(answer.get('note') or '')[:120]!r}")
+    check(row["limited_by"] is None and row["limiter"] == {"ceiling_db": -1.0, "release": 60000}
+          and near(row["result_true_peak_dbtp"], -1, 1e-6) and near(row["result_lufs"], -16, 0.01),
+          f"N4 limiter {row['limiter']}, limited_by {row['limited_by']}, result_true_peak_dbtp "
+          f"{f(row['result_true_peak_dbtp'])}, result_lufs {f(row['result_lufs'])}, volume "
+          f"{row['volume']:.3f}")
+    result = s.export("peaky")
+    lufs = integrated(channels(pcm(result["path"])))
+    kaiser, annex, under = limited(result["path"])
+    check(near(lufs, -16, 0.5) and under,
+          f"N4 the export lands at {f(lufs)} LUFS, true peak {kaiser:.4f} (Kaiser) / "
+          f"{annex:.4f} (Annex 2) dBTP")
+    check(s.clip(clip)["audio"].get("limiter") == {"ceiling_db": -1.0, "release": 60000},
+          f"N4 the clip carries audio.limiter: {s.clip(clip)['audio'].get('limiter')}")
     m.call("close_project", project=s.path, discard=True)
 
 
@@ -211,14 +237,17 @@ def rode_rows(m):
     lufs1, tp1, _ = measure(s, "rode-v1")
     answer = loud(s, [clip])
     row = answer["normalized"][0]
-    check(near(row["measured_lufs"], -41.7, 0.3) and row["limited_by"] == "true_peak",
+    check(near(row["measured_lufs"], -41.7, 0.3) and row["limited_by"] is None
+          and row["limiter"] == {"ceiling_db": -1.0, "release": 60000},
           f"N6 measured {f(row['measured_lufs'])} LUFS, true peak "
-          f"{f(row['true_peak_dbtp'])} dBTP, limited_by {row['limited_by']}, volume "
-          f"{row['volume']:.3f}, result_lufs {f(row['result_lufs'])}")
-    lufs2, tp2, _ = measure(s, "rode-normalized")
-    check(near(lufs2, row["result_lufs"], 0.5),
-          f"N6 the export lands at {f(lufs2)} LUFS ({f(tp2)} dBTP) against result_lufs "
-          f"{f(row['result_lufs'])}: short of -16 because the true peak holds it")
+          f"{f(row['true_peak_dbtp'])} dBTP, limiter {row['limiter']}, limited_by "
+          f"{row['limited_by']}, volume {row['volume']:.3f}, result_lufs {f(row['result_lufs'])}")
+    result = s.export("rode-normalized")
+    lufs2 = integrated(channels(pcm(result["path"])))
+    kaiser, annex, under = limited(result["path"])
+    check(near(lufs2, -16, 0.5) and near(lufs2, row["result_lufs"], 0.5) and under,
+          f"N6 the export lands at {f(lufs2)} LUFS against result_lufs {f(row['result_lufs'])}, "
+          f"true peak {kaiser:.4f} (Kaiser) / {annex:.4f} (Annex 2) dBTP")
     check(near(row["measured_lufs"], lufs1, 0.5) and near(row["true_peak_dbtp"], tp1, 0.5),
           f"N8 measured_lufs {f(row['measured_lufs'])} / true_peak_dbtp "
           f"{f(row['true_peak_dbtp'])} against the volume-1 export's {f(lufs1)} / {f(tp1)}")
@@ -279,12 +308,59 @@ def menu_rows(m):
               f"N10 launched in Loudness mode: {f(measured[0])} LUFS")
 
 
+def default_rows(m):
+    print("\nN11 — the tool's default mode")
+    s = Session(m, "loudness-default")
+    clip = place(s, "steady.wav")
+    answer = s.op("normalize_clip", clips=[clip])
+    check(answer.get("mode") == "loudness" and near(answer.get("target_lufs"), -16, 1e-9),
+          f"N11 no mode is loudness at -16: mode {answer.get('mode')}, target "
+          f"{answer.get('target_lufs')}")
+    answer = s.op("normalize_clip", clips=[clip], peak_db=-1)
+    check(answer.get("mode") == "peak", f"N11 peak_db alone is peak: mode {answer.get('mode')}")
+    m.call("close_project", project=s.path, discard=True)
+
+
+def own_limiter_rows(m):
+    print("\nN12 — a clip's own limiter")
+    s = Session(m, "loudness-own")
+    a = place(s, "steady.wav", at=0)
+    b = place(s, "steady.wav", at=6 * p5.SEC)
+    s.op("set_audio", clips=[a], patch={"limiter": {"ceiling_db": -3, "release": 30000}})
+    s.op("set_audio", clips=[b], patch={"limiter": {"ceiling_db": 0, "release": 30000}})
+    rows = {r["clip"]: r for r in loud(s, [a, b])["normalized"]}
+    check(rows[a]["limiter"] == {"ceiling_db": -3.0, "release": 30000}
+          and s.clip(a)["audio"].get("limiter") == {"ceiling_db": -3.0, "release": 30000},
+          f"N12 -3 dBTP kept: row {rows[a]['limiter']}, clip {s.clip(a)['audio'].get('limiter')}")
+    check(rows[b]["limiter"] == {"ceiling_db": -1.0, "release": 30000}
+          and s.clip(b)["audio"].get("limiter") == {"ceiling_db": -1.0, "release": 30000},
+          f"N12 0 dBTP lowered to -1: row {rows[b]['limiter']}, clip "
+          f"{s.clip(b)['audio'].get('limiter')}")
+    m.call("close_project", project=s.path, discard=True)
+
+
+def undo_rows(m):
+    print("\nN13 — one undo step")
+    s = Session(m, "loudness-undo")
+    clip = place(s, "peaky.wav")
+    before = s.clip(clip)["audio"]
+    row = loud(s, [clip])["normalized"][0]
+    after = s.clip(clip)["audio"]
+    s.undo()
+    undone = s.clip(clip)["audio"]
+    check(row["limiter"] is not None and after.get("limiter") is not None
+          and after["volume"] != before["volume"] and undone == before,
+          f"N13 one undo takes back volume {after['volume']:.3f} and limiter "
+          f"{after.get('limiter')}: {undone == before}")
+    m.call("close_project", project=s.path, discard=True)
+
+
 def main():
     os.makedirs(p5.WORK, exist_ok=True)
     fixtures()
     m = MCP(p5.SOCKET)
     for part in (schema_rows, refusal_rows, steady_rows, peaky_rows, match_rows, rode_rows,
-                 kinds_rows, menu_rows):
+                 kinds_rows, menu_rows, default_rows, own_limiter_rows, undo_rows):
         try:
             part(m)
         except (ToolError, KeyError, IndexError, RuntimeError, OSError) as error:

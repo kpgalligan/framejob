@@ -294,30 +294,58 @@ do {
           "\(String(describing: read))")
 }
 
-// C8: the plan's caps.
+// C8: the plan (AU-24): a volume alone, the limiter turned on through the
+// model, a clip's own limiter kept, the ×32 cap, a turn-down, the fallback.
 do {
-    func r(_ clip: UInt32, _ lufs: Double, _ tp: Double) -> AudioNormalize.LoudnessReading {
-        AudioNormalize.LoudnessReading(clip: clip, media: 9, lufs: lufs, truePeak: tp)
+    /// One second of 10 ms steps at `lufs`, each step's peak `quiet`, every
+    /// `every`th step `loud` (the reading's true peak).
+    func r(_ clip: UInt32, _ lufs: Double, quiet: Double, loud: Double, every: Int = 50,
+           limiter: LimiterProps? = nil) -> AudioNormalize.LoudnessReading {
+        let steps = [Double](repeating: pow(10, (lufs - LoudnessMeter.offset) / 10), count: 100)
+        let peaks = (0..<100).map { $0 % every == every - 1 ? loud : quiet }
+        return AudioNormalize.LoudnessReading(
+            clip: clip, media: 9, lufs: ClipLoudness.integrated(steps) ?? .nan,
+            truePeak: max(quiet, loud), steps: steps, stepPeaks: peaks, limiter: limiter)
     }
-    let ceiling = pow(10, -1.0 / 20)
     let input = AudioNormalize.LoudnessInput(readings: [
-        r(1, -30, 0.1), r(2, -30, 0.5), r(3, -50, 0.001), r(4, -60, ceiling / 32),
-        r(5, -10, 0.1)], problems: [])
+        r(1, -30, quiet: 0.1, loud: 0.1), r(2, -30, quiet: 0.05, loud: 0.5),
+        r(3, -50, quiet: 0.001, loud: 0.001), r(4, -30, quiet: 0.5, loud: 0.5, every: 1),
+        r(5, -10, quiet: 0.1, loud: 0.1),
+        r(6, -30, quiet: 0.1, loud: 0.1, limiter: LimiterProps(ceilingDb: -3, release: 30_000)),
+        r(7, -30, quiet: 0.1, loud: 0.1, limiter: LimiterProps(ceilingDb: 0, release: 30_000)),
+    ], problems: [])
     let plan = AudioNormalize.plan(input, targetLUFS: -16)
     let rows = plan.normalized
-    func near(_ x: Double, _ y: Double) -> Bool { abs(x - y) < 1e-9 }
-    check("C8", "a clip reaching the target: volume 10^(14/20), limited_by nil, −16 LUFS",
+    func near(_ x: Double, _ y: Double, _ e: Double = 1e-9) -> Bool { abs(x - y) < e }
+    func patch(_ index: Int) -> [String: Any] {
+        plan.ops[index].args["patch"] as? [String: Any] ?? [:]
+    }
+    check("C8", "a peak that fits: volume 10^(14/20) alone, no limiter, −16 LUFS",
           near(rows[0].volume, pow(10, 14.0 / 20)) && rows[0].limit == nil
-            && near(rows[0].resultLUFS, -16), "\(rows[0])")
-    check("C8", "the true-peak cap: stops at −1 dBTP, limited_by true_peak",
-          near(rows[1].volume, ceiling / 0.5) && rows[1].limit == .truePeak
-            && near(rows[1].resultTruePeakDBTP, -1), "\(rows[1])")
-    check("C8", "the ×32 cap: volume 32, limited_by max_gain",
-          rows[2].volume == 32 && rows[2].limit == .maxGain, "\(rows[2])")
-    check("C8", "a tie names true_peak", rows[3].limit == .truePeak && near(rows[3].volume, 32),
-          "\(rows[3])")
+            && rows[0].limiter == nil && near(rows[0].resultLUFS, -16)
+            && patch(0).keys.sorted() == ["volume"], "\(rows[0]) \(patch(0))")
+    check("C8", "a peak past −1 dBTP: the default limiter on, the model's gain reaches −16 "
+            + "within 0.001 LU, the result's peak at the ceiling",
+          rows[1].limiter == LimiterProps() && rows[1].limit == nil
+            && rows[1].volume > pow(10, 14.0 / 20) && near(rows[1].resultLUFS, -16, 0.001)
+            && near(rows[1].resultTruePeakDBTP, -1, 1e-9)
+            && patch(1)["limiter"] != nil && patch(1)["volume"] != nil,
+          "\(rows[1]) \(patch(1))")
+    check("C8", "the ×32 cap: volume 32, limited_by max_gain, no limiter",
+          rows[2].volume == 32 && rows[2].limit == .maxGain && rows[2].limiter == nil,
+          "\(rows[2])")
+    check("C8", "every step past the ceiling: the limiter on, ×32, limited_by max_gain",
+          rows[3].volume == 32 && rows[3].limit == .maxGain && rows[3].limiter != nil
+            && rows[3].resultLUFS < -16, "\(rows[3])")
     check("C8", "a loud clip is turned down", near(rows[4].volume, pow(10, -6.0 / 20))
-            && rows[4].limit == nil, "\(rows[4])")
+            && rows[4].limit == nil && rows[4].limiter == nil, "\(rows[4])")
+    check("C8", "a clip's own limiter is kept (−3 stays, 30,000 ticks) and written with the "
+            + "volume, which is the unlimited gain when nothing is limited",
+          rows[5].limiter == LimiterProps(ceilingDb: -3, release: 30_000)
+            && near(rows[5].volume, pow(10, 14.0 / 20)) && patch(5)["limiter"] != nil,
+          "\(rows[5])")
+    check("C8", "a clip's own ceiling above −1 dBTP is lowered to −1",
+          rows[6].limiter == LimiterProps(ceilingDb: -1, release: 30_000), "\(rows[6])")
     let fallback = AudioNormalize.plan(input, targetLUFS: .nan)
     check("C8", "a non-finite target runs and reports −16", fallback.targetLUFS == -16
             && near(fallback.normalized[0].volume, rows[0].volume), "\(fallback.targetLUFS)")

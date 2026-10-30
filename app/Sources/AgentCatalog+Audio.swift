@@ -118,11 +118,12 @@ extension AgentServer {
                 ]),
             tool(
                 "normalize_clip",
-                "Sets each clip's audio volume so its own loudest moment lands at peak_db "
-                    + "(mode \"peak\", the default), or so its integrated loudness lands at "
-                    + "target_lufs (mode \"loudness\") — the Normalize button in the Clip tab's "
+                "Sets each clip's audio volume so its integrated loudness lands at "
+                    + "target_lufs (mode \"loudness\", the default), or so its own loudest "
+                    + "moment lands at peak_db (mode \"peak\", the default only when peak_db "
+                    + "is given without a mode) — the Normalize button in the Clip tab's "
                     + "Volume section, and Clip ▸ Normalize, which follow the mode chosen in "
-                    + "that section's Normalize row. The level is measured from the clip's "
+                    + "that section's Normalize row (Loudness unless changed). The level is measured from the clip's "
                     + "cached waveform (peak) or loudness cache (BS.1770-4 gated, as the "
                     + "export plays it: a mono clip as dual mono, a stereo clip through its own "
                     + "mono and pan) over the part of it that actually plays, which is "
@@ -142,11 +143,17 @@ extension AgentServer {
                     + "\(AudioNormalize.maxGainName), so a clip quieter than about "
                     + String(format: "%.0f", AudioNormalize.quietestReachableDB)
                     + " dBFS cannot reach -1: it is still normalised, as loud as it goes, "
-                    + "and result_db says where it landed. In loudness mode the volume also "
-                    + "stops where the clip's true peak would pass -1 dBTP; each row's "
-                    + "limited_by names the cap that stopped it (true_peak or max_gain, else "
-                    + "null), result_lufs says where it lands, and measured_lufs and "
-                    + "true_peak_dbtp are the Volume section's Loudness readout. A clip that "
+                    + "and result_db says where it landed. In loudness mode a clip whose true "
+                    + "peak would pass -1 dBTP at the target, or that already has a limiter, "
+                    + "gets the clip's true-peak limiter in the same edit (set_audio's "
+                    + "limiter: its own kept with the ceiling at most -1 dBTP, else the "
+                    + "default), and the volume is the one that reaches the target through it; "
+                    + "each row's limiter says what the clip has after the edit (null for a "
+                    + "volume alone), limited_by is max_gain when the volume ceiling stopped it "
+                    + "short (else null), result_lufs says where it lands, "
+                    + "result_true_peak_dbtp is held at the limiter's ceiling, and "
+                    + "measured_lufs and true_peak_dbtp are the Volume section's Loudness "
+                    + "readout. A clip that "
                     + "plays no sound, one that is silent (or under -70 LUFS, or plays under "
                     + "0.4 s) over the part that plays, and one whose waveform or loudness has "
                     + "not been analysed yet are each reported by name under skipped and the "
@@ -156,16 +163,19 @@ extension AgentServer {
                     "peak_db": [
                         "type": "number", "minimum": -60, "maximum": 0,
                         "description": "Peak mode only: where the loudest moment should land, "
-                            + "in dBFS. Default -1, which is what the button uses: hot enough "
-                            + "to use the format, with a decibel of room for the inter-sample "
-                            + "peaks a lossy encoder can add. Above 0 is a request to clip and "
-                            + "is refused rather than clamped; refused with mode \"loudness\".",
+                            + "in dBFS. Default -1, which is what the button uses in Peak mode: "
+                            + "hot enough to use the format, with a decibel of room for the "
+                            + "inter-sample peaks a lossy encoder can add. Above 0 is a request "
+                            + "to clip and is refused rather than clamped; refused with mode "
+                            + "\"loudness\".",
                     ],
                     "mode": [
                         "type": "string", "enum": ["peak", "loudness"],
-                        "description": "\"peak\" (the default) takes each clip's loudest moment "
-                            + "to peak_db; \"loudness\" takes each clip's integrated loudness "
-                            + "to target_lufs under a -1 dBTP true-peak ceiling.",
+                        "description": "\"loudness\" (the default) takes each clip's integrated "
+                            + "loudness to target_lufs under a -1 dBTP true-peak ceiling, turning "
+                            + "the clip's limiter on when the peak needs it; \"peak\" (the "
+                            + "default when only peak_db is given) takes each clip's loudest "
+                            + "moment to peak_db.",
                     ],
                     "target_lufs": [
                         "type": "number", "minimum": -50, "maximum": -5,

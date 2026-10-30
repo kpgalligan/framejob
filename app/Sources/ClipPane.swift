@@ -220,6 +220,8 @@ final class ClipPane: InspectorPaneView {
             sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),
                 audioPane.noiseSection(), audioPane.compressorSection(), audioPane.mixSection(),
+                // Last in the clip's chain, so last here (spec §11 AU-26).
+                audioPane.limiterSection(),
             ]
         case .clip:
             if binding.isSingle, let clip = binding.primary {

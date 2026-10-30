@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, noise reduction, compressor, pan and mono fold, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudest moment, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -8,7 +8,7 @@ There is only one kind of track. Any track can hold a clip with sound, whether i
 
 The waveform shows the level of the file itself, so moving the Volume slider doesn't redraw it. It's drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track that holds only sound clips is drawn as a shorter lane than a track with pictures.
 
-When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has six sections, in this order:
+When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has seven sections, in this order:
 
 1. **Volume**: level, gain read-out, loudness read-out, Mute and Normalize
 2. **Fades**: fade in and fade out
@@ -16,8 +16,9 @@ When the selection includes at least one clip that plays sound, the Clip tab of 
 4. **Noise Reduction**
 5. **Compressor**
 6. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+7. **Limiter**: holds the clip's peaks under a ceiling
 
-Noise Reduction, Compressor and Mix appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
+Noise Reduction, Compressor, Mix and Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
 Every section header has a summary and a Reset button that appears when the section differs from its default. The summaries read:
 
@@ -29,6 +30,7 @@ Every section header has a summary and a Reset button that appears when the sect
 | Noise Reduction | the amount, for example "50%", or "off" |
 | Compressor | the ratio, for example "3.0:1", or "off" |
 | Mix | "centre", "mono", or the pan position, for example "left 40" |
+| Limiter | the ceiling, for example "−1.0 dBTP", or "off" |
 
  When you change a control with several clips selected, the change goes to all of them. A control whose clips hold different values is marked mixed.
 
@@ -39,9 +41,9 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 - **Volume, Mute and the fades** on a nest clip scale everything inside it. Turning a nest down turns all of it down, and muting it silences all of it.
 - **Mix to mono** on a nest clip folds the nest's whole mix.
 - **Ducking** on a nest clip lowers the rest of the project for the nest's whole length.
-- **Pan, the compressor and noise reduction** set on a nest clip have no effect. Open the nest (⌘↓) and set them on the clips inside.
+- **Pan, the compressor, noise reduction and the limiter** set on a nest clip have no effect. Open the nest (⌘↓) and set them on the clips inside.
 
-*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `fade_in_shape`, `fade_out_shape`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor` and `noise_reduction`. Setting `duck` or `compressor` to null turns it off. `get_project` reads them back.
+*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `fade_in_shape`, `fade_out_shape`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor`, `noise_reduction` and `limiter`. Setting `duck`, `compressor` or `limiter` to null turns it off. `get_project` reads them back.
 
 ## Volume
 
@@ -50,32 +52,32 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 | Volume | The clip's level as a percentage. The slider covers 0–400 %; type a higher value in the field, up to 3200 %. Above 400 % the slider's knob stays at the right end. Quick picks: 0, 50, 100, 150, 200, 400. | 0–3200 % | 100 % |
 | Gain | Read-only: the volume in dB (for example "+6.0 dB"), or "silent" at 0 %. | — | +0.0 dB |
 | Loudness | Read-only: the clip's integrated loudness and true peak over the part that plays, at volume 100 % (for example "−41.7 LUFS · −18.5 dBTP"). "measuring…" until the clip's loudness analysis has run; "—" with several clips selected or none that can be measured. | — | — |
-| At volume | Read-only: the same with the clip's volume applied. It follows a Volume drag; the Loudness row itself updates when the drag ends. | — | — |
+| At volume | Read-only: the same with the clip's volume applied, and with its limiter when the Limiter is on (the true peak then reads no higher than the ceiling). It follows a Volume drag; the Loudness row itself updates when the drag ends. | — | — |
 | Mute | Silences the clip without changing its volume. | on / off | off |
-| Normalize (row) | The mode, Peak or Loudness, and the Loudness target in LUFS (quick picks −14, −16, −23; used in Loudness mode only). The choice is the app's, not the project's, and is kept between launches. | Peak / Loudness; −50 to −5 LUFS | Peak; −16 LUFS |
+| Normalize (row) | The mode, Peak or Loudness, and the Loudness target in LUFS (quick picks −14, −16, −23; used in Loudness mode only). The choice is the app's, not the project's, and is kept between launches. | Peak / Loudness; −50 to −5 LUFS | Loudness; −16 LUFS |
 | Normalize (button) | Sets the volume from the clip's own loudest moment, or from its loudness, by the mode (see below). | — | — |
 
 The section's summary reads "muted", "silent" or the gain in dB. Reset puts the volume back to 100 % and turns Mute off.
 
-You can animate volume, Mute and the fades with actions. While an action is selected, the Volume row, the Mute checkbox and the Fade in and Fade out rows write that action's end state, so a level moves across the action's span. Pan, Mix to mono, Keep pitch, the compressor, noise reduction and ducking can't be animated. They always change the clip's own settings, even with an action selected.
+You can animate volume, Mute and the fades with actions. While an action is selected, the Volume row, the Mute checkbox and the Fade in and Fade out rows write that action's end state, so a level moves across the action's span. Pan, Mix to mono, Keep pitch, the compressor, noise reduction, the limiter and ducking can't be animated. They always change the clip's own settings, even with an action selected.
 
 ### Normalize
 
 **Normalize** sets each selected clip's volume from a measurement of the clip. It's the button in the Volume section, and it's also **Clip ▸ Normalize**; both follow the mode chosen in the Normalize row.
 
-- **Peak** (the default) sets each clip's volume so its loudest moment reaches **−1 dBFS**.
-- **Loudness** sets each clip's volume so its integrated loudness (BS.1770, as the export plays it) reaches the target, **−16 LUFS** unless you choose another. Every clip goes to the same target, so this is how you match clips. A clip whose true peak would pass **−1 dBTP** at that volume stops at the volume that holds −1 dBTP and lands quieter than the target; so does a clip that would need more than 3200 %. A volume can go down as well as up. A mono clip is measured as the export plays it, on both channels, which reads 3 dB louder than the file on its own.
+- **Loudness** (the default) sets each clip's volume so its integrated loudness (BS.1770, as the export plays it) reaches the target, **−16 LUFS** unless you choose another. Every clip goes to the same target, so this is how you match clips. A clip whose true peak would pass **−1 dBTP** at that volume gets its **Limiter** turned on at −1 dBTP in the same step, and its volume is the one that reaches the target through the limiter; a clip that already has a limiter keeps it, with its ceiling lowered to −1 dBTP if it was higher. A clip that would need more than 3200 % stops there and lands quieter than the target. A volume can go down as well as up. A mono clip is measured as the export plays it, on both channels, which reads 3 dB louder than the file on its own. A quiet desktop USB microphone recording, for example, measures −41.7 LUFS with peaks at −18.5 dBTP; one press takes it to −16 LUFS with the limiter holding −1 dBTP.
+- **Peak** sets each clip's volume so its loudest moment reaches **−1 dBFS**.
 
 - **It measures the material, not the mix.** The level is read from the clip's cached waveform (Peak) or loudness analysis (Loudness) over the part of the file that actually plays. The clip's volume, fades, ducking, mute and solo don't affect the reading, and neither do noise reduction or the compressor. Mix to mono and pan on a stereo clip do count in Loudness mode.
 - **It replaces the volume** rather than multiplying it, so pressing it a second time changes nothing (the second press beeps).
-- **Each clip gets its own gain.** In Peak mode that doesn't match levels across a selection; in Loudness mode it does. However many clips are selected, it is one undo step, named "Normalize".
+- **Each clip gets its own gain.** In Peak mode that doesn't match levels across a selection; in Loudness mode it does. However many clips are selected, it is one undo step, named "Normalize", which takes back the limiter it turned on along with the volume.
 - **It writes the clip's base level**, even when the playhead is inside an action. With an action selected, the button carries a small boxed "clip" tag to show this.
 - **It leaves Mute alone.**
 - **It can go past 400 %.** A quiet recording, such as a desktop USB microphone's, is turned up as far as it needs, up to the 3200 % ceiling (about +30 dB). Only a clip whose peak is quieter than about −31 dBFS can't reach −1 dBFS. It is turned up to 3200 % and stops there.
 
 Some clips in a selection are skipped and the rest are still normalized: nests (their level lives in the clips inside them), shapes, titles and silent movies. Normalize also skips a clip whose waveform (or, in Loudness mode, loudness) hasn't been analysed yet, and a clip that is silent over the part that plays. Loudness mode also skips a clip that plays for under 0.4 s and one that is quieter than −70 LUFS throughout. When nothing in the selection can be normalized, the button and the menu item are disabled, and a press that does nothing beeps.
 
-*Agents:* `normalize_clip` (`clips`; optional `mode`, `"peak"` or `"loudness"`, default `"peak"`; in Peak mode optional `peak_db` from −60 to 0, default −1; in Loudness mode optional `target_lufs` from −50 to −5, default −16). An argument of the other mode is refused by name. In Peak mode it answers each clip's `result_db`; in Loudness mode each clip's `measured_lufs` and `true_peak_dbtp` (the Loudness row's numbers), `volume`, `result_lufs`, `result_true_peak_dbtp` and `limited_by` (`"true_peak"`, `"max_gain"` or null). Both list every skipped clip under `skipped` with the reason. The tool doesn't read the mode chosen in the Volume section; it uses its own `mode`.
+*Agents:* `normalize_clip` (`clips`; optional `mode`, `"peak"` or `"loudness"`, default `"loudness"`, or `"peak"` when only `peak_db` is given; in Peak mode optional `peak_db` from −60 to 0, default −1; in Loudness mode optional `target_lufs` from −50 to −5, default −16). An argument of the other mode is refused by name. In Peak mode it answers each clip's `result_db`; in Loudness mode each clip's `measured_lufs` and `true_peak_dbtp` (the Loudness row's numbers), `volume`, `limiter` (the clip's limiter after the edit, `{ceiling_db, release}`, or null when only the volume was written), `result_lufs`, `result_true_peak_dbtp` (held at the limiter's ceiling) and `limited_by` (`"max_gain"` or null). Both list every skipped clip under `skipped` with the reason. The tool doesn't read the mode chosen in the Volume section; it uses its own `mode`.
 
 ## Fades
 
@@ -177,6 +179,22 @@ The defaults are a gentle setting for speech. The section summary shows the rati
 The compressor acts on the clip's sound before the volume, fades and ducking, so moving the Volume slider doesn't change how hard it compresses. If noise reduction is on, it runs before the compressor, which means the threshold is compared against sound that has already been cleaned. Attack and release are measured in milliseconds and aren't rounded to frames.
 
 *Agents:* `set_audio` with `compressor: {threshold_db, ratio, attack, release, makeup_db}` (attack and release in ticks), or `compressor: null` to turn it off.
+
+## Limiter
+
+The limiter holds the clip's peaks under a ceiling, so a quiet recording can be turned up to a delivery loudness without its loudest moments clipping. It is a true-peak limiter: it looks between the samples, where a peak can sit higher than any sample, and it looks a little ahead, so it turns the sound down smoothly just before a peak rather than after it.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Limit peaks | Turns the limiter on. | on / off | off |
+| Ceiling | The highest true peak the clip may reach, after its volume. Quick picks: −1, −2, −3, −6. | −24–0 dBTP | −1 dBTP |
+| Release | How quickly the level recovers after a peak. Quick picks: 50, 100, 200, 500. | 1–1000 ms | 100 ms |
+
+The limiter is last in the clip's chain, after the Mix section, and it knows the clip's volume: the ceiling is where the clip's peaks land *after* the Volume slider, so turning the volume up makes the limiter work harder rather than pushing the clip past the ceiling. Fades and ducking only turn a clip down, so they never take it over the ceiling either. Normalize in Loudness mode turns it on for you when a clip needs it.
+
+A track that has a limited clip on it plays every clip on it 3.3 ms later inside Frame Job and places them 3.3 ms earlier to match, so everything still lands on its frame. As with noise reduction, a clip that starts within the first 3.3 ms of the timeline loses that much of its start, and the last 3.3 ms of the track are not heard.
+
+*Agents:* `set_audio` with `limiter: {ceiling_db, release}` (`ceiling_db` from −24 to 0, `release` in ticks from 600 to 600000; `limiter: {}` turns it on at the defaults), or `limiter: null` to turn it off.
 
 ## Mix: pan, mono, Detach Audio and Attach Audio
 
@@ -391,13 +409,14 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Pan has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, noise reduction and ducking always apply to the whole clip.
-- On a nest clip, pan, the compressor and noise reduction have no effect. Set them on the clips inside.
+- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, noise reduction, the limiter and ducking always apply to the whole clip.
+- On a nest clip, pan, the compressor, noise reduction and the limiter have no effect. Set them on the clips inside.
 - Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.
 - A linked clip's speed and direction can't change until you attach its audio.
 - Above ×12 a clip's audio is left out of the mix ([Speed](speed.md)).
 - Synchronize Audio corrects drift only up to 0.2 % from ×1. It doesn't work on nests, reversed clips, ramped clips, or clips playing at other rates.
 - Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".
 - The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
-- Loudness mode has no limiter yet: a clip with high peaks stops at −1 dBTP and stays under its target.
+- The limiter holds each clip on its own. Two limited clips that overlap (in a transition, or on two tracks) can add up past the ceiling, and so can a clip whose volume an action raises above its own Volume setting, a clip inside a nest whose volume is above 100 %, and the first moments after a hard cut from a louder clip on the same track, while the level settles. There is no limiter on the whole mix yet.
+- Loudness mode's result for a limited clip is a model of the limiter, read from the loudness analysis; the export lands within a few tenths of a LU of it (−15.9 LUFS for the −16 example above).
 - Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

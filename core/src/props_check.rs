@@ -62,6 +62,13 @@ pub(crate) const COMPRESSOR_THRESHOLD_MIN_DB: f64 = -60.0;
 pub(crate) const COMPRESSOR_RATIO_MAX: f64 = 20.0;
 pub(crate) const COMPRESSOR_MAKEUP_MAX_DB: f64 = 24.0;
 
+/// The clip limiter's bounds (spec §11 AU-21). A ceiling from −24 dBTP,
+/// past which it is a level control rather than a limiter, up to full
+/// scale; a release of 1 ms to 1 s, in ticks.
+pub(crate) const LIMITER_CEILING_MIN_DB: f64 = -24.0;
+pub(crate) const LIMITER_RELEASE_MIN: Ticks = 600;
+pub(crate) const LIMITER_RELEASE_MAX: Ticks = 600_000;
+
 /// Where a word-caption page's active word may settle (format version 9,
 /// road map 8 §5a). 1 is "no pop"; past 1.5 the active word crowds its
 /// neighbours on a page the pager filled to a measured width.
@@ -128,6 +135,16 @@ fn ticks_in_envelope(key: &str, value: Ticks) -> Result<(), String> {
     } else {
         Err(format!(
             "{key} must be between -{MAX_STORED_TICKS} and {MAX_STORED_TICKS} ticks, not {value}"
+        ))
+    }
+}
+
+fn ticks_in_range(key: &str, value: Ticks, low: Ticks, high: Ticks) -> Result<(), String> {
+    if (low..=high).contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{key} must be between {low} and {high} ticks, not {value}"
         ))
     }
 }
@@ -362,6 +379,20 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
             compressor.makeup_db,
             0.0,
             COMPRESSOR_MAKEUP_MAX_DB,
+        )?;
+    }
+    if let Some(limiter) = &props.limiter {
+        in_range(
+            "audio.limiter.ceiling_db",
+            limiter.ceiling_db,
+            LIMITER_CEILING_MIN_DB,
+            0.0,
+        )?;
+        ticks_in_range(
+            "audio.limiter.release",
+            limiter.release,
+            LIMITER_RELEASE_MIN,
+            LIMITER_RELEASE_MAX,
         )?;
     }
     Ok(())

@@ -56,12 +56,13 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 → [Speed, reverse and freeze frames](docs/guide/speed.md)
 
 **Audio.** Per-clip volume, fades in four shapes, ducking for a clip's length
-or only while its speech plays, noise reduction, compressor, pan and mono; each
-clip's loudness and true peak in the inspector, and Normalize to a peak or to a
-loudness target (−16 LUFS by default) that matches clips; Synchronize Audio lines
-up a camera and a separate recorder by their sound, drift included. Detach Audio
-keeps the sound linked to its picture, so J- and L-cuts stay in sync through
-every edit, and Attach Audio puts it back.
+or only while its speech plays, noise reduction, compressor, pan, mono and a
+true-peak limiter; each clip's loudness and true peak in the inspector, and
+Normalize to a loudness target (−16 LUFS at −1 dBTP by default, turning the
+limiter on when a clip's peaks need it) or to a peak, which matches clips;
+Synchronize Audio lines up a camera and a separate recorder by their sound,
+drift included. Detach Audio keeps the sound linked to its picture, so J- and
+L-cuts stay in sync through every edit, and Attach Audio puts it back.
 → [Audio](docs/guide/audio.md)
 
 **Clean-up tools.** Remove Silences cuts dead air by voice or by level; Remove

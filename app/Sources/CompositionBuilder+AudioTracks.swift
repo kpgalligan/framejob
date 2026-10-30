@@ -167,7 +167,8 @@ extension CompositionBuilder {
                         reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
                         shift: AudioShift.of(
                             segments: family.segments,
-                            usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false),
+                            usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false,
+                            usesLimiter: trackDSP?.usesLimiter ?? false),
                         ramps: ramps)
                 }
                 let sink = metering ? LevelMeterSink() : nil

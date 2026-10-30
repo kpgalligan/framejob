@@ -339,8 +339,15 @@ use crate::model::{Canvas, Project};
 /// every other project writes exactly the text it did and there is no
 /// migration step. The bump is so an older build refuses the file rather than
 /// ducking a speech duck over its whole clip and dropping the keys on save.
-/// Every number from 30 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 29;
+///
+/// Version 30 is the clip limiter (spec §11 AU-21): `audio.limiter`,
+/// `{ceiling_db, release}` after `fade_out_shape`, written only when set,
+/// so every project without one writes exactly the text it did, and the
+/// reader's default is none, so there is no migration step. The bump is so
+/// an older build refuses a limited file instead of opening it unlimited and
+/// dropping the limiter on save.
+/// Every number from 31 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 30;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

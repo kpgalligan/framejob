@@ -3,8 +3,8 @@ import Foundation
 /// Normalize's chosen mode and loudness target (spec §11 AU-15): app-wide in
 /// UserDefaults, set by the Volume section's Mode popup and Target field, and
 /// followed by its Normalize button and by Clip ▸ Normalize, whose title stays
-/// "Normalize". Peak and −16 LUFS by default (AU-4: the button stays Peak until
-/// AP2's limiter). `normalize_clip` does not read it: the tool names its mode.
+/// "Normalize". Loudness and −16 LUFS by default (AU-4, AU-25: from AP2's
+/// limiter). `normalize_clip` does not read it: the tool names its mode.
 enum NormalizeChoice {
     static let modeKey = "FrameJobNormalizeMode"
     static let targetKey = "FrameJobNormalizeTargetLUFS"
@@ -12,7 +12,7 @@ enum NormalizeChoice {
     static var mode: AudioNormalize.Mode {
         get {
             UserDefaults.standard.string(forKey: modeKey).flatMap(AudioNormalize.Mode.init)
-                ?? .peak
+                ?? .loudness
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: modeKey) }
     }

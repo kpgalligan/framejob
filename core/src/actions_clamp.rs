@@ -13,7 +13,8 @@ use crate::model::{
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, EXPOSURE_MAX,
-    SCALE_MAX, SCALE_MIN, SPOT_ZOOM_MAX, TONE_MAX, WORD_SCALE_MAX, WORD_SCALE_MIN,
+    LIMITER_CEILING_MIN_DB, LIMITER_RELEASE_MAX, LIMITER_RELEASE_MIN, SCALE_MAX, SCALE_MIN,
+    SPOT_ZOOM_MAX, TONE_MAX, WORD_SCALE_MAX, WORD_SCALE_MIN,
 };
 
 /// Brings an evaluated value back into the range the ops enforce.
@@ -297,6 +298,12 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
         compressor.attack = compressor.attack.max(0);
         compressor.release = compressor.release.max(0);
         compressor.makeup_db = bounded(compressor.makeup_db, 0.0, COMPRESSOR_MAKEUP_MAX_DB, 0.0);
+    }
+    if let Some(limiter) = props.limiter.as_mut() {
+        limiter.ceiling_db = bounded(limiter.ceiling_db, LIMITER_CEILING_MIN_DB, 0.0, -1.0);
+        limiter.release = limiter
+            .release
+            .clamp(LIMITER_RELEASE_MIN, LIMITER_RELEASE_MAX);
     }
     props
 }

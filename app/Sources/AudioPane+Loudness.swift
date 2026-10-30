@@ -4,7 +4,8 @@ import AppKit
 /// volume readouts and the Normalize row's mode and target. The readout reads
 /// through the pane's `loudnessMemo` (`ClipLoudness.Memo`), so a live Volume
 /// or Pan drag reads no file and decodes no plan per tick; At volume is the
-/// held answer plus the current base volume. Mode and target are app-wide
+/// held answer plus the current base volume, through `AudioLimiterModel` while
+/// the clip's limiter is on (AU-26). Mode and target are app-wide
 /// (`NormalizeChoice`), never an edit, so neither writes the document.
 extension AudioPane {
 
@@ -21,17 +22,27 @@ extension AudioPane {
     }
 
     /// "−41.7 LUFS · −18.5 dBTP", "measuring…" or "—"; `gain` in dB is added
-    /// to both (At volume).
-    private func loudnessText(gain: Double) -> String {
+    /// to both (At volume). With `limiter`, the loudness is the model's at that
+    /// gain and the peak is held at the limiter's ceiling (AU-24, AU-26).
+    private func loudnessText(gain: Double, limiter: LimiterProps? = nil) -> String {
         switch loudnessAnswer() {
         case .pending: return "measuring…"
         case .unavailable: return "—"
         case .reading(let reading):
             guard gain.isFinite else { return "silent" }
-            let peak = reading.truePeak > 0 ? 20 * log10(reading.truePeak) + gain : -.infinity
+            var peak = reading.truePeak > 0 ? 20 * log10(reading.truePeak) + gain : -.infinity
+            var lufs = reading.lufs.map { $0 + gain }
+            if let limiter, reading.lufs != nil {
+                let ceiling = pow(10, limiter.ceilingDb / 20)
+                peak = min(peak, limiter.ceilingDb)
+                lufs = AudioLimiterModel.integrated(
+                    steps: reading.steps, peaks: reading.stepPeaks, gain: pow(10, gain / 20),
+                    ceiling: ceiling,
+                    releaseSeconds: Double(limiter.release) / Double(ReelTime.perSecond))
+            }
             let peakText = peak.isFinite ? String(format: "%.1f dBTP", peak) : "−∞ dBTP"
-            guard let lufs = reading.lufs else { return "— LUFS · " + minus(peakText) }
-            return minus(String(format: "%.1f LUFS · ", lufs + gain) + peakText)
+            guard let lufs else { return "— LUFS · " + minus(peakText) }
+            return minus(String(format: "%.1f LUFS · ", lufs) + peakText)
         }
     }
 
@@ -40,7 +51,8 @@ extension AudioPane {
     }
 
     /// The Loudness row (the clip's material at volume 1, pre-fader) and the
-    /// At volume row (the same with the base volume's gain).
+    /// At volume row (the same with the base volume's gain, through the
+    /// clip's limiter when it has one).
     func loudnessRows() -> [NSView] {
         let binding = self.binding
         return [
@@ -50,7 +62,9 @@ extension AudioPane {
                 }]),
             inspectorRow(
                 "At volume", [inspectorReadout(width: 160) { [weak self] in
-                    self?.loudnessText(gain: binding.audioProps.decibels) ?? "—"
+                    self?.loudnessText(
+                        gain: binding.audioProps.decibels, limiter: binding.audioProps.limiter)
+                        ?? "—"
                 }]),
         ]
     }
@@ -106,8 +120,9 @@ extension AudioPane {
             let target = String(format: "%.1f LUFS", NormalizeChoice.targetLUFS)
             let ceiling = String(format: "%.0f dBTP", AudioNormalize.ceilingDBTP)
             return ("Set each selected clip's volume so its integrated loudness reaches " + target
-                + ", stopping short where its true peak would pass " + ceiling + " or the "
-                + "volume would pass " + AudioNormalize.maxGainName)
+                + ", turning the clip's limiter on at " + ceiling + " where its true peak would "
+                + "pass it, and stopping short where the volume would pass "
+                + AudioNormalize.maxGainName)
                 .replacingOccurrences(of: "-", with: "−") + rest
         }
     }

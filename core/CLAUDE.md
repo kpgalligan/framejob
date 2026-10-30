@@ -30,10 +30,11 @@ governs a module now.
   compares against the same integers): append,
   never reorder. `Normal` is 0 with no `+1`, so a zeroed uniform block, an
   older recipe and a file with no `blend` key all render source-over.
-- `model_audio.rs` — the audio vocabulary: `AudioProps`, `Compressor` and
-  `Duck` (with format 29's `DuckMode`, `pre_roll`, `hold` and
-  `DUCK_SPEECH_PAD`) and `FadeShape` (`fade_in_shape` / `fade_out_shape`,
-  and `Transition.audio_shape`), and their defaults, every format-29 key
+- `model_audio.rs` — the audio vocabulary: `AudioProps`, `Compressor`,
+  `Limiter` (format 30, spec §11 AU-21, written only when set) and `Duck`
+  (with format 29's `DuckMode`, `pre_roll`, `hold` and `DUCK_SPEECH_PAD`)
+  and `FadeShape` (`fade_in_shape` / `fade_out_shape`, and
+  `Transition.audio_shape`), and their defaults, every format-29 key
   written only when not its default (the FIELD `Clip.audio` stays in
   `model.rs`), re-exported through `model_props.rs`; a pure move out of it
   (road map "audio" AP0), so the audio group's new keys land here.

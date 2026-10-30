@@ -1,8 +1,8 @@
 import Foundation
 
-/// Normalize's Loudness mode (spec §11 AU-4, AU-13, AU-14): each clip to one
-/// integrated loudness in LUFS, held under a −1 dBTP true peak and the volume
-/// ceiling. `read`/`plan`'s seam beside Peak mode's: `readLoudness` touches the
+/// Normalize's Loudness mode (spec §11 AU-4, AU-13, AU-14, AU-24): each clip
+/// to one integrated loudness in LUFS under a −1 dBTP true peak, through the
+/// clip limiter when the peak needs it, and under the volume ceiling. `read`/`plan`'s seam beside Peak mode's: `readLoudness` touches the
 /// document, the plan and the loudness cache once (`ClipLoudness`), and `plan`
 /// is pure arithmetic. The pane's button, Clip ▸ Normalize (both through
 /// `NormalizeChoice`) and `normalize_clip {mode: "loudness"}` all call these.
@@ -18,13 +18,12 @@ extension AudioNormalize {
     static let targetLUFSQuickPicks: [Double] = [-14, -16, -23]
     /// What a caller may ask for; a tool refuses outside it by name.
     static let targetLUFSRange = -50.0 ... -5.0
-    /// The true-peak ceiling, in dBTP. Without AP2's limiter a clip whose
-    /// true peak would pass it at the target stops at the gain that holds it.
+    /// The true-peak ceiling, in dBTP. A clip whose true peak would pass it at
+    /// the target gets the clip limiter at this ceiling (AU-24).
     static let ceilingDBTP = -1.0
 
-    /// The cap that bit, when one did.
+    /// The cap that bit, when one did: only the volume ceiling is left (AU-24).
     enum Limit: String {
-        case truePeak = "true_peak"
         case maxGain = "max_gain"
     }
 
@@ -36,6 +35,12 @@ extension AudioNormalize {
         let lufs: Double
         /// Linear, > 0.
         let truePeak: Double
+        /// The reading's 10 ms steps and their true peaks, played order
+        /// (`ClipLoudness.Reading`): what `AudioLimiterModel` runs over.
+        var steps: [Double] = []
+        var stepPeaks: [Double] = []
+        /// The clip's own limiter, nil when it has none.
+        var limiter: LimiterProps? = nil
     }
 
     /// What one clip's loudness normalise will do.
@@ -50,6 +55,8 @@ extension AudioNormalize {
         let resultTruePeakDBTP: Double
         /// nil when the clip reaches the target.
         let limit: Limit?
+        /// The clip's limiter after the edit, nil when it has none.
+        let limiter: LimiterProps?
     }
 
     struct LoudnessInput {
@@ -108,7 +115,9 @@ extension AudioNormalize {
                     let media = segments[id]?.first?.media ?? 0
                     readings.append(
                         LoudnessReading(
-                            clip: id, media: media, lufs: lufs, truePeak: reading.truePeak))
+                            clip: id, media: media, lufs: lufs, truePeak: reading.truePeak,
+                            steps: reading.steps, stepPeaks: reading.stepPeaks,
+                            limiter: snapshot.clip(id)?.audio?.limiter))
                 } else {
                     problems.append(
                         Problem(
@@ -123,10 +132,14 @@ extension AudioNormalize {
 
     // MARK: - Planning
 
-    /// AU-13: `volume = min(10^((T−L)/20), 10^(−1/20)/tp, maxGain)`; the cap
-    /// that bit is named (`true_peak` on a tie). It may turn a clip down. A
-    /// non-finite target falls back to the default and is reported as
-    /// `targetLUFS`.
+    /// AU-24: `v0 = min(10^((T−L)/20), maxGain)`. A clip with no limiter whose
+    /// true peak fits the ceiling at `v0` gets `volume: v0` alone (AP1's
+    /// result). Any other gets one `set_audio {volume, limiter}`: its own
+    /// limiter kept, the ceiling lowered to −1 dBTP when above it, or the
+    /// default; the volume is `AudioLimiterModel`'s gain for the target under
+    /// that limiter. `limited_by` is `max_gain` when the volume ceiling stops
+    /// it short. It may turn a clip down. A non-finite target falls back to
+    /// the default and is reported as `targetLUFS`.
     static func plan(_ input: LoudnessInput, targetLUFS: Double = defaultTargetLUFS)
         -> LoudnessPlan
     {
@@ -136,19 +149,56 @@ extension AudioNormalize {
         var normalized: [LoudnessResult] = []
         for reading in input.readings {
             let wanted = pow(10, (target - reading.lufs) / 20)
-            let peakCap = ceiling / reading.truePeak
-            let cap = min(peakCap, maxGain)
-            let volume = max(0, min(wanted, cap))
-            let limit: Limit? = wanted <= cap ? nil : (peakCap <= maxGain ? .truePeak : .maxGain)
-            ops.append(.setAudio(clips: [reading.clip], patch: AudioPatch(volume: volume)))
-            normalized.append(
-                LoudnessResult(
+            let first = max(0, min(wanted, maxGain))
+            let row: LoudnessResult
+            if reading.limiter == nil, reading.truePeak * first <= ceiling {
+                ops.append(.setAudio(clips: [reading.clip], patch: AudioPatch(volume: first)))
+                row = LoudnessResult(
                     clip: reading.clip, media: reading.media, measuredLUFS: reading.lufs,
-                    truePeakDBTP: 20 * log10(reading.truePeak), volume: volume,
-                    resultLUFS: reading.lufs + 20 * log10(volume),
-                    resultTruePeakDBTP: 20 * log10(reading.truePeak * volume), limit: limit))
+                    truePeakDBTP: 20 * log10(reading.truePeak), volume: first,
+                    resultLUFS: reading.lufs + 20 * log10(first),
+                    resultTruePeakDBTP: 20 * log10(reading.truePeak * first),
+                    limit: wanted <= maxGain ? nil : .maxGain, limiter: nil)
+            } else {
+                var limiter = reading.limiter ?? LimiterProps()
+                limiter.ceilingDb = min(limiter.ceilingDb, ceilingDBTP)
+                let solved = solve(reading, target: target, wanted: first, limiter: limiter)
+                ops.append(
+                    .setAudio(
+                        clips: [reading.clip],
+                        patch: AudioPatch(volume: solved.volume, limiter: .some(limiter))))
+                row = LoudnessResult(
+                    clip: reading.clip, media: reading.media, measuredLUFS: reading.lufs,
+                    truePeakDBTP: 20 * log10(reading.truePeak), volume: solved.volume,
+                    resultLUFS: solved.lufs,
+                    resultTruePeakDBTP: 20 * log10(
+                        min(reading.truePeak * solved.volume, pow(10, limiter.ceilingDb / 20))),
+                    limit: solved.lufs < target - AudioLimiterModel.tolerance ? .maxGain : nil,
+                    limiter: limiter)
+            }
+            normalized.append(row)
         }
         return LoudnessPlan(
             targetLUFS: target, ops: ops, normalized: normalized, skipped: input.problems)
+    }
+
+    /// The volume and the model's loudness for one reading under `limiter`.
+    /// A reading with no steps (none this build makes) has nothing for the
+    /// model to run over, and gets the unlimited gain.
+    private static func solve(
+        _ reading: LoudnessReading, target: Double, wanted: Double, limiter: LimiterProps
+    ) -> (volume: Double, lufs: Double) {
+        guard !reading.steps.isEmpty else {
+            return (wanted, reading.lufs + 20 * log10(wanted))
+        }
+        let ceiling = pow(10, limiter.ceilingDb / 20)
+        let release = Double(max(limiter.release, 0)) / Double(ReelTime.perSecond)
+        let volume = AudioLimiterModel.gain(
+            reaching: target, steps: reading.steps, peaks: reading.stepPeaks, ceiling: ceiling,
+            releaseSeconds: release, maxGain: maxGain)
+        let lufs = AudioLimiterModel.integrated(
+            steps: reading.steps, peaks: reading.stepPeaks, gain: volume, ceiling: ceiling,
+            releaseSeconds: release) ?? (reading.lufs + 20 * log10(volume))
+        return (volume, lufs)
     }
 }

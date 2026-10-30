@@ -134,7 +134,7 @@ final class AudioTapContext {
         chain = track.isActive
             ? AudioDSPChain(
                 channelCount: channelCount, sampleRate: sampleRate, maxFrames: maxFrames,
-                usesNoiseReduction: track.usesNoiseReduction)
+                usesNoiseReduction: track.usesNoiseReduction, usesLimiter: track.usesLimiter)
             : nil
         channels = Array(repeating: nil, count: channelCount)
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
@@ -172,10 +172,14 @@ final class AudioTapContext {
             // A buffer that straddles a cut is processed in runs, so a clip's
             // pan begins exactly at its own first sample rather than up to a
             // buffer early. The stages keep their state across the boundary —
-            // they are track inserts, not per-clip effects.
+            // they are track inserts, not per-clip effects. On a limited track
+            // the spans are looked up `lookupLead` ahead: its media was placed
+            // that much early, and the limiter's delay brings it back (AU-23).
             var offset = 0
             while offset < frames {
-                let run = self.run(from: start + ticks(frames: offset), remaining: frames - offset)
+                let run = self.run(
+                    from: start + track.lookupLead + ticks(frames: offset),
+                    remaining: frames - offset)
                 guard run.length > 0 else { break }
                 for index in 0..<count {
                     channels[index] = list[index].mData?

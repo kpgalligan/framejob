@@ -61,6 +61,13 @@ enum ClipLoudness {
         /// Linear, the max over the played window (outward).
         let truePeak: Double
         let playedTicks: Ticks
+        /// The 10 ms steps' energies (Σ over the output channels of the mean
+        /// square), in played order: what `integrated` gates, and what
+        /// `AudioLimiterModel` runs over (spec §11 AU-24).
+        let steps: [Double]
+        /// Each step's true peak, linear: the max of the records its energy
+        /// read, on the louder output channel.
+        let stepPeaks: [Double]
     }
 
     enum Answer: Equatable {
@@ -78,6 +85,7 @@ enum ClipLoudness {
     ) -> Reading {
         let step = stepTicks
         var steps: [Double] = []
+        var stepPeaks: [Double] = []
         var peak = 0.0
         var played: Ticks = 0
         let ordered = segments.indices.sorted { segments[$0].start < segments[$1].start }
@@ -99,10 +107,14 @@ enum ClipLoudness {
                     a = ReverseMirror.mirrored(a, about: pivot)
                     b = ReverseMirror.mirrored(b, about: pivot)
                 }
-                steps.append(energy(cache, from: min(a, b), to: max(a, b), matrix))
+                let read = energy(cache, from: min(a, b), to: max(a, b), matrix)
+                steps.append(read.energy)
+                stepPeaks.append(read.peak)
             }
         }
-        return Reading(lufs: integrated(steps), truePeak: peak, playedTicks: played)
+        return Reading(
+            lufs: integrated(steps), truePeak: peak, playedTicks: played, steps: steps,
+            stepPeaks: stepPeaks)
     }
 
     /// BS.1770-4's gating over 10 ms steps: block j is the mean of steps
@@ -131,24 +143,29 @@ enum ClipLoudness {
 
     /// One step's Σ over the output channels of the mean square: the mean of
     /// records `[⌊a/step + ½⌋, ⌊b/step + ½⌋)`, else the one record holding the
-    /// midpoint. Outside the file reads as silence.
+    /// midpoint. Outside the file reads as silence. Its peak is the largest
+    /// true peak of the records it read.
     private static func energy(
         _ cache: MediaLoudness, from a: Ticks, to b: Ticks, _ matrix: ChannelMatrix
-    ) -> Double {
+    ) -> (energy: Double, peak: Double) {
         let step = stepTicks
         let first = MediaPeaks.bucketIndex(a + step / 2, bucket: step)
         let end = MediaPeaks.bucketIndex(b + step / 2, bucket: step)
         if end > first {
             let lower = max(0, first)
             let upper = min(cache.count, end)
-            guard upper > lower else { return 0 }
+            guard upper > lower else { return (0, 0) }
             var sum = 0.0
-            for record in lower..<upper { sum += energy(cache, record, matrix) }
-            return sum / Double(end - first)
+            var peak = 0.0
+            for record in lower..<upper {
+                sum += energy(cache, record, matrix)
+                peak = max(peak, truePeak(cache, record, matrix))
+            }
+            return (sum / Double(end - first), peak)
         }
         let middle = MediaPeaks.bucketIndex(a + (b - a) / 2, bucket: step)
-        guard middle >= 0, middle < cache.count else { return 0 }
-        return energy(cache, middle, matrix)
+        guard middle >= 0, middle < cache.count else { return (0, 0) }
+        return (energy(cache, middle, matrix), truePeak(cache, middle, matrix))
     }
 
     private static func energy(_ cache: MediaLoudness, _ record: Int, _ m: ChannelMatrix) -> Double {

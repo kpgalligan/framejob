@@ -33,6 +33,16 @@ struct AudioTrackDSP: Equatable {
     /// switching it in at a cut would jump the track 10 ms backwards
     /// mid-programme.
     let usesNoiseReduction: Bool
+    /// Whether the limiter runs for the WHOLE track (spec §11 AU-23): once
+    /// any clip on it has one, for the same reason as the noise reducer — its
+    /// 158-sample delay may not come and go at a cut.
+    let usesLimiter: Bool
+    /// How far ahead of a buffer's composition time the tap looks its spans
+    /// up: `AudioShift.limiterLead` on a limited track, else 0. The media is
+    /// placed that much earlier, so the samples entering the stages after
+    /// the noise reducer belong to `t + lookupLead`, and the limiter's delay
+    /// brings them back to `t` (AU-23).
+    let lookupLead: Ticks
 
     init(segments: [PlanSegment], parameters: AudioDSPParameters) {
         var spans: [AudioDSPSpan] = []
@@ -47,12 +57,16 @@ struct AudioTrackDSP: Equatable {
         self.spans = spans
         isActive = !spans.isEmpty
         usesNoiseReduction = spans.contains { $0.dsp.noiseReduction > 0 }
+        usesLimiter = spans.contains { $0.dsp.limiter != nil }
+        lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0
     }
 
     private init() {
         spans = []
         isActive = false
         usesNoiseReduction = false
+        usesLimiter = false
+        lookupLead = 0
     }
 
     /// A track that asks for no processing at all. What a METERING-only tap is
@@ -95,7 +109,8 @@ struct AudioDSPParameters: Equatable {
     /// A nest inside a folded nest is walked too: an outer fold applies to
     /// everything within, and folding twice is folding once.
     ///
-    /// **The nest clip's other three do NOT travel, and two of them cannot.**
+    /// **The nest clip's other three do NOT travel, and two of them cannot**
+    /// (nor does its limiter, AU-21, for the compressor's reason).
     /// The compressor and the noise reducer are not linear, so running either
     /// on each contributor is a different sound from running it on the mix —
     /// bus compression is the whole reason a bus has a compressor — and the
@@ -140,7 +155,14 @@ struct AudioDSPParameters: Equatable {
                             makeupDB: $0.makeupDb)
                     },
                     noiseReduction: audio.noiseReduction,
-                    mono: audio.mono)
+                    mono: audio.mono,
+                    // Told the clip's BASE volume, the fader's gain before
+                    // fades and ducks lower it (AU-22).
+                    limiter: audio.limiter.map {
+                        AudioLimiterSettings(
+                            ceilingDb: $0.ceilingDb, volume: audio.volume,
+                            releaseSeconds: AudioDSPParameters.seconds($0.release))
+                    })
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }
@@ -188,8 +210,8 @@ struct AudioDSPParameters: Equatable {
     /// where a reader comparing the two files can see it.
     private static let nestDepthCap = 8
 
-    /// Ticks → seconds, the one place the compressor's two times cross that
-    /// boundary.
+    /// Ticks → seconds, the one place the compressor's two times and the
+    /// limiter's release cross that boundary.
     private static func seconds(_ ticks: Ticks) -> Double {
         Double(max(ticks, 0)) / Double(ReelTime.perSecond)
     }

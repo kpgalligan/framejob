@@ -145,6 +145,71 @@ spike S4 (`designs/audio.md`'s AP0 record).
 - **AU-17 — No format bump, no core, FFI or op change.** The cache is a display and analysis
   cache under `cache/`, made again when absent; the project's file is unchanged.
 
+AU-20…AU-26 are AP2's first part (the clip limiter, and Normalize to a loudness through it),
+recorded before its code from AP0's spike S1 and AP1's record. AP2 is built in two parts: the
+export's float decode, its master limiter and `audio_bits` are the second, with their own
+decisions from AU-27.
+
+- **AU-20 — The clip limiter stage is S1's, last in the tap's chain.** `AudioLimiterStage`
+  (`AudioLimiterStage.swift`), a port of S1's `OwnLimiter2.swift` at `taps: 64, beta: 10,
+  annexToo: true, tapOuter: true` and nothing else. The detector is the maximum, per sample and
+  over every channel, of |x|, the three fractional phases of a 64-tap Kaiser-windowed sinc
+  (β 10) 4× interpolator, and BS.1770-4 Annex 2's four 12-tap phases; each FIR loops its taps
+  outermost with element-wise vDSP only (never `vDSP_conv` or `vDSP_biquad`, which give
+  different bits for different buffer sizes). The need `min(1, ceiling/peak)` is held by a
+  sliding minimum over 159 samples; the release is a one-pole of `releaseSeconds` that never
+  rises above the held value and snaps to it once within 2⁻²⁰; the gain is the box mean of the
+  last 96 released values, summed afresh each sample (no running sum, so a released stage's
+  gain is exactly 1 and it is an exact delay); one gain for all channels; the audio is delayed
+  158 samples (lookahead 96 + taps − 2) at any rate. Every buffer is allocated in `init`, and
+  `reset()` restores the fresh state. In the chain it runs last, after an enclosing nest's fold
+  (AU-3's "limiter, then the fader"). With no settings its ceiling is +∞: a pure delay once
+  released.
+- **AU-21 — `audio.limiter`.** Null (absent) or `{ceiling_db, release}`: `ceiling_db` in dBTP,
+  post-fader, −24…0, default −1; `release` in ticks, 600…600 000 (1 ms…1 s), default 60 000
+  (100 ms). Written only when set (`skip_serializing_if`), so a project without one writes the
+  text it did; format 30 (28 and 29 went to AP9 and AP11, which landed first), so an older
+  build refuses a limited file instead of dropping its limiter on save. `set_audio {limiter:
+  {}}` stores the defaults, `limiter: null` clears it, a value out of range is refused by name,
+  and an action's end is clamped to the same ranges. Base-only like the compressor (`structural(audio:)`): an action does not move it.
+  A NEST clip's limiter reaches nothing, as its compressor does (the plan names the innermost
+  clip).
+- **AU-22 — The stage is told the clip's gain: its base volume.** The fader is downstream of the
+  tap, so the stage's linear ceiling is pre-fader: `10^(ceiling_db/20) / audio.volume` (base),
+  +∞ at volume 0. Fades and ducks only ever lower the gain after it, so they keep the output
+  under the ceiling. Accepted, each passing the ceiling: an action raising the volume above its
+  base, an enclosing nest clip's volume above 1, the fader's slew at a hard cut from a louder
+  clip (#87's limit), and two limited clips overlapping (a transition, two tracks), whose sum no
+  clip limiter sees. AP2's second part's master limiter holds the export; the preview has none
+  (S3).
+- **AU-23 — The limiter's lead.** The stage runs for the WHOLE composition audio track once any
+  clip on it has a limiter, so the track's delay never changes at a cut. Such a track's media is
+  placed 1,975 ticks earlier (158 samples at 48 kHz; plus SY-25's 6,400 when it also runs noise
+  reduction), and the tap looks its spans up at `t + 1,975`, so the compressor, the folds, the
+  pan and the limiter meet their own clip's settings at their own samples. Noise reduction's
+  amount keeps SY-25's cost at a cut. As SY-25: a clip starting under 3.3 ms into the track
+  loses that much head, and the track's last 3.3 ms go unheard. A project with no limiter has
+  no lead and no lookup shift, and exports byte-identical to before.
+- **AU-24 — Normalize to a loudness writes the limiter when the peak needs it.** For target T,
+  measured L and true peak tp: `v0 = min(10^((T−L)/20), 32)`. A clip with no limiter whose
+  `tp·v0 ≤ 10^(−1/20)` gets `volume: v0` alone (AP1's result). Otherwise Normalize writes one
+  `set_audio {volume: v, limiter}`: the clip's own limiter kept (its ceiling lowered to −1 when
+  above it) or the default. `v` comes from `AudioLimiterModel`, a block-rate model of the stage
+  over the reading's 10 ms played steps: per step `need = min(1, c/(peak·v))` for ceiling c and
+  the step's true peak, `env = need < env ? need : env + (need − env)(1 − e^(−0.01/release))`,
+  the step's energy times `v²·env²`, integrated by `ClipLoudness`'s gates; the gain is found by
+  bisection on log gain to 0.001 LU and capped at 32 (`limited_by: "max_gain"`, the only limit
+  left). The answer reports `result_lufs` as the model's figure and `result_true_peak_dbtp` as
+  `min(tp·v, ceiling)`, and the row gains `limiter: {ceiling_db, release}` or null.
+- **AU-25 — Loudness is Normalize's default (AU-4's AP2 step; amends AU-15 and AU-16).** The
+  button and Clip ▸ Normalize default to Loudness (a stored choice still wins); `normalize_clip`
+  with no `mode` is Loudness, except a call naming `peak_db` and no `mode`, which is Peak.
+- **AU-26 — The Limiter section.** In the Sound sub-tab after Mix (the signal's order): a "Limit
+  peaks" checkbox (on writes the defaults), Ceiling (dBTP, −24…0, one decimal, quick picks −1,
+  −2, −3, −6) and Release (ms, 1…1000, quick picks 50, 100, 200, 500); its summary reads
+  "−1.0 dBTP" or "off", and Reset clears it. While the clip's limiter is on, the Volume
+  section's At volume row reads the model's LUFS (AU-24) and `min(tp·v, ceiling)`.
+
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
 AP9, survey A10), recorded before its code.
 

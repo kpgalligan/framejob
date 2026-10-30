@@ -11,7 +11,8 @@ cache built by the product's own pass, read back by `ClipLoudness`, against
   C5   stereo identity, mono fold and hard pan against the meter on transformed samples.
   C6   44.1 kHz fixtures against the meter on ffmpeg's 48 kHz copies (0.1 LU).
   C7   under 0.4 s played and a -85 dBFS tone read nil.
-  C8   Loudness mode's three caps, limited_by, a tie, a turn-down, the non-finite target.
+  C8   Loudness mode's plan (AU-24): a volume alone, the limiter on through the model, a
+       clip's own limiter kept and lowered, the x32 cap, a turn-down, the non-finite target.
   C9   a stale-version or other-grain marker reads absent.
   C10  ClipLoudness.Memo: pending, held, then the reading after invalidate().
   C11  the memo through a live edit: the held reading, no file read, no recompute.
@@ -38,15 +39,15 @@ MUTANTS = [
     ("mono-not-doubled", "C2", "ClipLoudness.swift",
      "return 2 * Double(r[base]) }  // dual mono", "return Double(r[base]) }  // dual mono"),
     ("reversed-forward-order", "C4", "ClipLoudness.swift",
-     "steps.append(energy(cache, from: min(a, b), to: max(a, b), matrix))",
-     "steps.insert(energy(cache, from: min(a, b), to: max(a, b), matrix), "
-     "at: pivot == nil ? steps.count : steps.count - Int(k))"),
+     "steps.append(read.energy)",
+     "steps.insert(read.energy, at: pivot == nil ? steps.count : steps.count - Int(k))"),
     ("no-relative-gate", "C3", "ClipLoudness.swift",
      "let kept = gated.filter { loudness($0) > threshold }", "let kept = gated; _ = threshold"),
-    ("no-true-peak-cap", "C8", "AudioNormalize+Loudness.swift",
-     "let cap = min(peakCap, maxGain)", "let cap = maxGain"),
+    ("no-limiter", "C8", "AudioNormalize+Loudness.swift",
+     "if reading.limiter == nil, reading.truePeak * first <= ceiling {",
+     "if reading.limiter == nil {"),
     ("limited-by-nil", "C8", "AudioNormalize+Loudness.swift",
-     "let limit: Limit? = wanted <= cap ? nil", "let limit: Limit? = true ? nil"),
+     "limit: wanted <= maxGain ? nil : .maxGain, limiter: nil)", "limit: nil, limiter: nil)"),
     ("tables-at-44k", "C6", "LoudnessBlocks.swift",
      "if sampleRate == LoudnessMeter.requiredSampleRate {", "if sampleRate > 0 {"),
     ("version-unchecked", "C9", "MediaImporter+Loudness.swift",

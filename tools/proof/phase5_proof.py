@@ -770,7 +770,7 @@ def normalize_part(mcp):
         f"the fixture exports at −6.02 dBFS before anything is normalised ({fmt(plain)})",
     )
 
-    answer = s.op("normalize_clip", clips=[clip])
+    answer = s.op("normalize_clip", mode="peak", clips=[clip])
     row = answer["normalized"][0]
     check(
         row["clip"] == clip and close(row["measured_db"], -6.0206, 0.05),
@@ -794,7 +794,7 @@ def normalize_part(mcp):
     )
 
     check(
-        "made no change" in (s.error("normalize_clip", clips=[clip]) or ""),
+        "made no change" in (s.error("normalize_clip", mode="peak", clips=[clip]) or ""),
         "a second call is an identity edit and is refused as one — normalise REPLACES the "
         "volume rather than multiplying it (D-C3)",
     )
@@ -816,7 +816,7 @@ def normalize_part(mcp):
     print("\n5c — past ×4: a quiet microphone reaches −1 (spec §11 AU-1)")
     m = Session(mcp, "phase5-mic")
     mic = m.place("mic.wav")
-    answer = m.op("normalize_clip", clips=[mic])
+    answer = m.op("normalize_clip", mode="peak", clips=[mic])
     row = answer["normalized"][0]
     check(
         row["clamped"] is False and close(row["volume"], 8.9125, 0.001)
@@ -838,7 +838,7 @@ def normalize_part(mcp):
     print("\n5c — the ×32 clamp: the level it actually reached")
     q = Session(mcp, "phase5-clamp")
     quiet = q.place("quiet.wav")
-    answer = q.op("normalize_clip", clips=[quiet])
+    answer = q.op("normalize_clip", mode="peak", clips=[quiet])
     row = answer["normalized"][0]
     check(
         row["clamped"] is True and close(row["volume"], 32.0, 1e-9),
@@ -865,12 +865,12 @@ def normalize_part(mcp):
     r = Session(mcp, "phase5-refuse")
     silent = r.place("silent.wav")
     good = r.place("half.wav", track=r.add_track())
-    message = r.error("normalize_clip", clips=[silent]) or ""
+    message = r.error("normalize_clip", mode="peak", clips=[silent]) or ""
     check(
         f"clip {silent}" in message and "silent over the part of it that plays" in message,
         f"a silent clip is refused by name: {message[:110]!r}",
     )
-    answer = r.op("normalize_clip", clips=[silent, good])
+    answer = r.op("normalize_clip", mode="peak", clips=[silent, good])
     check(
         [row["clip"] for row in answer["normalized"]] == [good]
         and answer.get("skipped") == [
@@ -890,18 +890,18 @@ def normalize_part(mcp):
     # loader reads the file fresh on every call, so removing it is the
     # deterministic spelling of the state the app reaches at import.
     os.remove(peaks)
-    message = n.error("normalize_clip", clips=[unread]) or ""
+    message = n.error("normalize_clip", mode="peak", clips=[unread]) or ""
     check(
         f"clip {unread}" in message and "waveform has not been written" in message,
         f"a clip whose peaks are not on disk is refused by name — never normalised against "
         f"a missing cache: {message[:110]!r}",
     )
-    message = n.error("normalize_clip", clips=[9999]) or ""
+    message = n.error("normalize_clip", mode="peak", clips=[9999]) or ""
     check("9999" in message, f"and an id that is not a clip is refused by name: {message[:80]!r}")
     # The argument is named and the bound is quoted; the offending VALUE is
     # not, which is this server's own house style rather than the core's —
     # `AgentServer+Silence.swift`'s `threshold_db` refusal reads the same way.
-    message = r.error("normalize_clip", clips=[good], peak_db=5) or ""
+    message = r.error("normalize_clip", mode="peak", clips=[good], peak_db=5) or ""
     check(
         "peak_db" in message and "0" in message and "request to clip" in message,
         f"peak_db above 0 dBFS is a request to clip and is refused BY NAME rather than "
@@ -934,7 +934,7 @@ def normalize_part(mcp):
         f"and the nest AUDIBLY plays: its export holds the inner clip's −6.02 dBFS "
         f"({fmt(level)})",
     )
-    message = g.error("normalize_clip", clips=[nested]) or ""
+    message = g.error("normalize_clip", mode="peak", clips=[nested]) or ""
     check(
         f"clip {nested}" in message and "is a nest" in message
         and "plays no sound" not in message,
@@ -942,7 +942,7 @@ def normalize_part(mcp):
         f"file — and never as a clip that plays no sound: {message[:150]!r}",
     )
     beside = g.place("half.wav", track=g.add_track())
-    answer = g.op("normalize_clip", clips=[nested, beside])
+    answer = g.op("normalize_clip", mode="peak", clips=[nested, beside])
     check(
         [row["clip"] for row in answer["normalized"]] == [beside]
         and len(answer.get("skipped", [])) == 1
@@ -961,7 +961,7 @@ def normalize_part(mcp):
     backward = v.place("ramp.wav", track=v.add_track())
     v.op("set_reversed", clip=backward, reversed=True)
     v.op("trim_end", clip=backward, to=int(1.4 * SEC))
-    rows = {row["clip"]: row for row in v.op("normalize_clip", clips=[forward, backward])["normalized"]}
+    rows = {row["clip"]: row for row in v.op("normalize_clip", mode="peak", clips=[forward, backward])["normalized"]}
     check(
         close(rows[forward]["measured_db"], -6.0206, 0.05),
         f"the forward clip's first 1.4 s measures the fixture's LOUD half "

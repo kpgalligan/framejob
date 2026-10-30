@@ -205,9 +205,14 @@ extern "C" {
  * `media.speech`, `audio.duck`'s `mode`, `pre_roll` and `hold`,
  * `audio.fade_in_shape` and `fade_out_shape`, and `transition_in.audio_shape`,
  * each written only when not its default, so every other project writes the
- * text it did, and there is no migration step. 30 and above, 1014 included,
- * are newer. */
-#define RC_FORMAT_VERSION 29
+ * text it did, and there is no migration step.
+ *
+ * Version 30 is the clip limiter (spec §11 AU-21): `audio.limiter`,
+ * `{ceiling_db, release}` after `fade_out_shape`, written only when set, so
+ * every project without one writes the text it did; the reader's default is
+ * none, so there is no migration step. 31 and above, 1014 included, are
+ * newer. */
+#define RC_FORMAT_VERSION 30
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

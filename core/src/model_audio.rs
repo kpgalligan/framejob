@@ -1,6 +1,6 @@
 //! The audio vocabulary of spec §5.2: [`AudioProps`], the `audio` group a
-//! [`crate::model::Clip`] carries, and the [`Compressor`] and [`Duck`]
-//! inside it, each over a hand-written [`Default`] that says what an absent
+//! [`crate::model::Clip`] carries, and the [`Compressor`], [`Limiter`] and
+//! [`Duck`] inside it, each over a hand-written [`Default`] that says what an absent
 //! key means.
 //!
 //! A pure move out of `model_props.rs` (its audio section, whole) for road
@@ -42,6 +42,10 @@ pub struct AudioProps {
     pub fade_in_shape: FadeShape,
     #[serde(skip_serializing_if = "FadeShape::is_linear")]
     pub fade_out_shape: FadeShape,
+    /// The clip's true-peak limiter (format version 30, spec §11 AU-21),
+    /// last in the tap's chain; absent is off, and is not written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limiter: Option<Limiter>,
 }
 
 impl Default for AudioProps {
@@ -59,6 +63,7 @@ impl Default for AudioProps {
             noise_reduction: 0.0,
             fade_in_shape: FadeShape::Linear,
             fade_out_shape: FadeShape::Linear,
+            limiter: None,
         }
     }
 }
@@ -142,6 +147,29 @@ impl Default for Compressor {
             attack: TIMESCALE / 100,
             release: TIMESCALE / 5,
             makeup_db: 0.0,
+        }
+    }
+}
+
+/// The clip's true-peak limiter (spec §11 AU-20, AU-21): a ceiling in dBTP
+/// that holds AFTER the clip's fader at its base volume (AU-22), and the
+/// time its gain takes to recover. The DSP is the Swift side's, as the
+/// compressor's is.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Limiter {
+    /// dBTP, post-fader: −24…0.
+    pub ceiling_db: f64,
+    /// Ticks: 600…600 000 (1 ms…1 s).
+    pub release: Ticks,
+}
+
+impl Default for Limiter {
+    /// −1 dBTP (AU-4's ceiling) and a 100 ms release.
+    fn default() -> Self {
+        Limiter {
+            ceiling_db: -1.0,
+            release: TIMESCALE / 10,
         }
     }
 }

@@ -129,20 +129,22 @@ extension InspectorBinding {
             structural: { self.structural(video: $0, for: $1) })
     }
 
-    /// Spec §11 CI-3: pan, mono, compressor, noise reduction, duck and
-    /// keep-pitch are the clip's, whatever is selected — and the fade shapes
-    /// (AU-114), as the duck is.
+    /// Spec §11 CI-3: pan, mono, compressor, noise reduction, the limiter
+    /// (AU-21), duck and keep-pitch are the clip's, whatever is selected — and
+    /// the fade shapes (AU-114), as the duck is.
     private func structural(audio patch: AudioPatch, for clip: ClipSnapshot)
         -> (base: AudioPatch?, animatable: AudioPatch?)
     {
         let base = AudioPatch(
             duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
             compressor: patch.compressor, noiseReduction: patch.noiseReduction,
-            fadeInShape: patch.fadeInShape, fadeOutShape: patch.fadeOutShape)
+            fadeInShape: patch.fadeInShape, fadeOutShape: patch.fadeOutShape,
+            limiter: patch.limiter)
         var animatable = patch
         (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
         (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
         (animatable.fadeInShape, animatable.fadeOutShape) = (nil, nil)
+        animatable.limiter = nil
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

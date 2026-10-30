@@ -185,6 +185,10 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
   loudness target met within ±0.5 LU on `phase5_proof.py`'s crest fixture, which today lands
   quieter; a 24-bit file decoded with its low bits used; the owner's recording.
 - **Manual check:** no pumping or distortion on speech and on music.
+- **Built in two parts, by size.** Part 1: the clip limiter, `audio.limiter` (format 30), its
+  Limiter section and `set_audio` key, and Loudness Normalize through it as the default
+  (AU-20…AU-26; its record below). Part 2: the export's float decode (#86), the master limiter
+  in the float write pass and `audio_bits` (AU-27 on).
 
 ### AP3 — EQ, hum removal and channel selection (A3, A7, B7)
 
@@ -649,6 +653,73 @@ by the merge. On the merged tree: `make gate` PASS 280 s (names 1, typecheck 6, 
 app 134; fmt and lint unchanged), and `scrub_audio_probe.py` 15/15 with every figure as above.
 
 **Owed.** PB-14 in `docs/manual-checks.md` (the feel of a drag, no clicks, silence on a hold).
+
+### AP2's record (2026-10-30)
+
+Part 1 of AP2: the clip limiter, and Normalize to a loudness through it. Part 2 (the export's
+float decode and #86, the master limiter, `audio_bits`) is the next spec.
+
+**Decided.** AU-20…AU-26, recorded before the code. The one objection was taken:
+`refusal_proof.py` §3 called `normalize_clip` with no `mode`, which AU-25 turns into Loudness,
+so its four calls (and every Peak call in `phase5_proof.py` and `peaks_proof.py`) name
+`mode="peak"`. The lane's toll (`DuckProps`, `CompressorProps`, `AudioProps` out of
+`ProjectSnapshot.swift` into `AudioProps.swift`, gated alone, PASS 421 s) was the same pure
+move AP11's toll had already landed, so it merged as nothing and the limiter joined AP11's file.
+
+**Landed.** `audio.limiter` (`{ceiling_db, release}`, written only when set, after
+`fade_out_shape`; **format 30**, `schema_v30.rs`), its range checks (`ticks_in_range`) and
+clamp, the patch template's `limiter`; the stage (`AudioLimiterStage.swift`, last in
+`AudioDSPChain`), its settings told the base volume (`AudioLimiterSettings`), the track-wide
+`usesLimiter`, the 1,975-tick placement lead (`AudioShift.limiterLead`) and the tap's lookup at
+`t + lookupLead`; `ClipLoudness.Reading`'s `steps` and `stepPeaks`, `AudioLimiterModel` and
+Loudness Normalize's AU-24 plan (the row's `limiter`, `limited_by` only `max_gain`); Loudness
+the default of the button, Clip ▸ Normalize and `normalize_clip` (AU-25); the Limiter section
+after Mix and At volume through the model (AU-26, `AudioPane+Limiter.swift`); `set_audio`'s
+`limiter` in the catalog; SE-22 sets Mode to Peak first, SE-23 expects Loudness, SE-24 is new.
+The lane wrote format 28; AP9 and AP11 had taken 28 and 29, so the integration renumbered it to
+30 in `format.rs`, the header, the schema test (the lane's `schema_v28.rs` as `schema_v30.rs`),
+AU-21, §5.2a/b and the file map, and `limiter_proof.py` P6 now reads the header's number.
+
+**Two departures from S1's code, neither from its arithmetic.** (1) Each FIR tap is an
+element-wise `vDSP_vsmul` then `vDSP_vadd` and the box mean `vDSP_sve` over the fixed 96-element
+box: the scalar loops missed AudioToolbox's real-time deadline in the Debug app's `-Onone`
+build (P2's export silent, P3's 18 dB short, then `EXC_BAD_ACCESS` on the RT tap thread in
+`ProcessingTapManager`); L3 still holds the bytes across block sizes. (2) The release envelope
+is a Double: a Float one-pole stalls under half an ulp near 1 before the 2⁻²⁰ snap. The lane
+also defined N11–N13 (no `mode` is Loudness and `peak_db` alone Peak; a clip's own limiter kept
+at −3 and lowered from 0 to −1; one undo for volume and limiter), changed N2's no-mode case to
+`{peak_db: -1, target_lufs: -16}`, and added P4's second leg because M26 survived the spec's
+first (the fader's slew at the cut, #87, holds the crest clip's first 3.3 ms near ×1).
+
+**Measured** (the lane, Debug then Release after its gate): `limiter_probe.py` 9/9 (every L2
+output at its ceiling to four decimals by both meters; L6 exact from 1.346 s; L7 188,416 samples
+equal; L8 the model −16.001 against the stage −15.911, gap 0.090) and `--mutants` 6/6;
+`loudness_cache_probe.py` 11/11 and `--mutants` 7/7; `limiter_proof.py` 19/19 (P2 −0.9995 /
+−0.9998 dBTP, 7.80 dBTP unlimited; P3 −2.9993 / −2.9998); `loudness_normalize_proof.py` 37/37 —
+**the owner's recording, measured −41.67 LUFS, gets volume 23.368 and the limiter at −1, and
+exports at −15.91 LUFS, −0.9998 (Kaiser) / −0.9999 (Annex 2) dBTP**; `export_offset_proof.py`
+E4, E22, E44, E45 4/4; `phase5_proof.py` 92/92; on Debug `peaks_proof.py` 21/21 and
+`refusal_proof.py` 145/145; `make gate` PASS 346 s. By hand on Debug, M25 failed E44
+(+3.292 ms) and M26 P4's second leg (+3.5363 dBTP).
+
+**Review.** Pass, with three nits, all fixed at integration: P6's literal 28 (now
+`format_version()` off the header), P2's docstring "+15" (now about +8, as measured), and
+`peak_db`'s description, which now says −1 is what the button uses in Peak mode.
+
+**Integrated.** AP9, AP11 and AP13 had landed: their decision blocks, index rows, records and
+proof README sections stand beside this phase's (AP2's before AP9's), the union taken in
+`AudioProps.swift`, `TypedPatches.swift`, `InspectorBinding+Writes.swift`, `model_audio.rs`,
+`patch.rs`, the guide (the limit "Loudness mode has no limiter yet" removed), the README
+highlight and the menus row, and the Lines cells counted again. On the merged tree: `make gate`
+PASS 342 s (names 1, typecheck 6, fmt 3, lint 11, test 189, app 132; the four baseline
+warnings); `limiter_probe.py` 9/9 (L8 gap 0.090); on Release `limiter_proof.py` 19/19 (P6 "the
+file is version 30, the header's 30"), `loudness_normalize_proof.py` 37/37 (N6 −15.91 LUFS,
+−0.9998 / −0.9999 dBTP), `export_offset_proof.py` E4, E22, E44, E45 4/4, `phase5_proof.py`
+92/92 and AP11's `audio_ap11_proof.py` 13/13 over the merged audio group; the parity log
+clean. No mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-23 (Loudness the default, −16 LUFS through the limiter) and SE-24 (no pumping or
+distortion on speech and music) for the owner; AP2 part 2. Nothing to file.
 
 ### Closing the road map
 

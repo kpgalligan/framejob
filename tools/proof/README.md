@@ -25771,7 +25771,7 @@ tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
 | C5 | the stereo file through identity, the mono fold and a hard pan, ≤ 0.1 LU of the meter on transformed samples (and the matrices themselves) |
 | C6 | the two 44.1 kHz fixtures against the meter on their 48 kHz copies, ≤ 0.1 LU |
 | C7 | 0.39 s played reads nil and 0.40 s reads a number; the −85 dBFS tone reads nil |
-| C8 | `plan`'s caps: reaching the target, the true-peak cap, ×32, a tie (`true_peak`), a turn-down, the non-finite target's −16 |
+| C8 | `plan` (AP2, AU-24): a peak that fits gets the volume alone; a peak past −1 dBTP gets the default limiter and the model's gain, −16 within 0.001 LU, its peak at the ceiling; ×32 with and without the limiter (`max_gain`); a turn-down; a clip's own limiter kept at −3 and one at 0 lowered to −1; the non-finite target's −16 |
 | C9 | a marker of version 0, or of 50 blocks a second, reads absent beside a valid `.bin` |
 | C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
 | C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
@@ -25784,8 +25784,8 @@ anchor asserted once), and scores each killed when its named row fails:
 | `mono-not-doubled` | a mono record's z not doubled | C2 |
 | `reversed-forward-order` | a reversed segment's steps pooled in source order | C4 |
 | `no-relative-gate` | the −10 LU gate dropped | C3 |
-| `no-true-peak-cap` | the cap is ×32 alone | C8 |
-| `limited-by-nil` | `limited_by` always nil | C8 |
+| `no-limiter` | the limiter never turned on (AP2) | C8 |
+| `limited-by-nil` | the volume-alone row's `limited_by` always nil (AP2) | C8 |
 | `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
 | `version-unchecked` | the marker's version not checked | C9 |
 
@@ -25801,16 +25801,19 @@ the mode the shared defaults domain holds is never read), and stops each.
 
 | Row | What it holds |
 |---|---|
-| N1 | the schema: `mode` the enum peak / loudness, `target_lufs` −50…−5, only `clips` required |
-| N2 | refused by name: `target_lufs` −51 and −4, `mode` "rms", `target_lufs` with peak (named or default), `peak_db` with loudness; the volume untouched |
+| N1 | the schema: `mode` the enum peak / loudness, its description naming loudness the default (AP2), `target_lufs` −50…−5, only `clips` required |
+| N2 | refused by name: `target_lufs` −51 and −4, `mode` "rms", `target_lufs` with peak (named, or implied by `peak_db` alone since AP2), `peak_db` with loudness; the volume untouched |
 | N3 | stereo and mono steady fixtures to −16, −14 and −23: the export within 0.5 LU of the target and of `result_lufs` |
-| N4 | the peaky fixture: `limited_by` true_peak, the export's TP ≤ −0.9 dBTP, the note names the clip |
+| N4 | the peaky fixture (AP2): the limiter on at −1 dBTP and 60 000 ticks, `limited_by` null, the export at −16 ±0.5 LUFS with its true peak ≤ −1 dBTP + 0.001 dB by `limiter_probe.true_peaks`' two meters, the clip carrying `audio.limiter` |
 | N5 | two clips of different levels in one call land within 0.5 LU of each other |
-| N6 | the owner's recording: measured about −41.7 LUFS, limited by true peak, the export at `result_lufs` ±0.5 |
+| N6 | the owner's recording (AP2): measured about −41.7 LUFS, the limiter on, the export at −16 ±0.5 LUFS and at `result_lufs` ±0.5, its true peak ≤ −1 dBTP + 0.001 dB by both meters |
 | N7 | a reversed clip and a ×2 Keep pitch clip of a steady fixture land at −16 ±0.5 |
 | N8 | `measured_lufs` / `true_peak_dbtp` against the volume-1 export of the same window, ±0.5 LU / ±0.5 dB |
 | N9 | a second call "made no change" |
 | N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance at −16 ±0.5 LUFS |
+| N11 | (AP2) no `mode` is Loudness at −16; `peak_db` alone is Peak |
+| N12 | (AP2) a clip's own limiter at −3 dBTP is kept, one at 0 is lowered to −1, each with its release, in the row and on the clip |
+| N13 | (AP2) one undo takes back the volume and the limiter together |
 
 The eighth mutant, `target_lufs`'s range check dropped in
 `AgentServer+Audio.swift`, runs on a mutated Debug build (restored after) and
@@ -25830,6 +25833,95 @@ by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
 after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
 at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
 rows. `phase5_proof.py` 92/92 on both.
+
+## Road map "audio" AP2, part 1 — the clip limiter, and Normalize to a loudness through it (`limiter_probe.py`, `limiter_proof.py`; `loudness_normalize_proof.py` N4, N6, N11–N13; `export_offset_proof.py` E44, E45; `core/tests/schema_v30.rs`; spec §11 AU-20..AU-26)
+
+Two new instruments. **`limiter_probe.py`** compiles `limiter_probe.swift`
+with `app/Sources` through `swift_build.build(optimize=True)` (a failed build
+is a scored failure; optimised, so the probe's long signals run in seconds)
+and runs the product's `AudioLimiterStage`, chain, `AudioTapContext`,
+schedule, `AudioLimiterModel` and Normalize plan on S1's crest signal
+(`crest_signal()`, gen_signals.py's recipe and seed) and on the owner's
+recording, decoded by ffmpeg into `tools/proof/work/limiter-probe/fixtures/`.
+L2's outputs are written as raw Float32 and measured by the script's OWN
+meters, which other proofs import as `limiter_probe.true_peaks(path)`: a 4×
+oversampler of 64 taps per phase (Kaiser β 10, S1's analysis meter) and
+BS.1770-4 Annex 2's four 12-tap phases, each over |x| too and over the whole
+convolution. `--measure <file>` prints a file's true peak by both.
+
+| Row | What it holds |
+|---|---|
+| L1 | an impulse under the ceiling comes out 158 samples late and unchanged; `latency` = lookahead + taps − 2; `AudioShift.limiterLead` 1,975 ticks, 8,375 with noise reduction, `.none` with neither |
+| L2 | every output at or under its ceiling + 0.001 dB by both meters: the crest signal and the recording +28 dB at −1, −3 and 0 dBTP; a stereo pair at −1 (one gain); L8's normalised recording; ×8 material at volume 4 told through `AudioDSPParameters(snapshot:)`, the fader applied after (AU-22) |
+| L3 | 512, 4096 and irregular blocks (1, 1023, 333, 691, 4096, 7, 2048, 17, 512) byte-identical, the settings changing every 12,000 samples between −1 dBTP, none and −6 at volume 2 |
+| L4 | after `reset()` a used stage gives a fresh stage's bytes |
+| L5 | nil settings: an exact 158-sample delay of a signal far over full scale |
+| L6 | after a burst at −6 dBTP the output equals the input, sample for sample, from within 2 s on (100 ms release) |
+| L7 | the product's `AudioTapContext` (a limiter at volume 16) under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same samples over the first 188,416 frames (S1's 4 s window), and not silence |
+| L8 | `AudioLimiterModel`'s figure against `LoudnessMeter` on the stage's output, the owner's recording at Normalize's own volume and limiter: ≤ 0.3 LU |
+| L9 | with no stored choice, `NormalizeChoice.mode` is Loudness |
+
+`--mutants` runs six, each one replacement in a copied `app/Sources`:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `annex2-only` | the Kaiser phases dropped from the detector | L2 |
+| M2 `kaiser-only` | Annex 2's phases dropped from the detector | L2 |
+| M5 `gain-not-told` | the stage told volume 1 | L2 |
+| M6 `model-off` | Normalize's limited volume is the unlimited gain | L8 |
+| M7 `reset-incomplete` | `reset()` leaves the envelope | L4 |
+| M8 `default-peak` | `NormalizeChoice` defaults to Peak | L9 |
+
+**`limiter_proof.py <dir>/agent.sock`** drives an instance over MCP and
+measures each export with `limiter_probe.true_peaks`. Its fixture is S1's
+crest signal halved, stereo (left forward, right reversed), as a 16-bit WAV
+in `work/fixtures/limiter-crest.wav`, beside a 1 kHz tone at 0.02, `limiter-quiet.wav`.
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s `limiter`: `{}` the defaults, a value round-trips, each bound and an unknown key refused by name with nothing changed, `null` clears it |
+| P2 | the crest fixture at volume 8 under −1 dBTP: ≤ −1 + 0.001 dB by both meters (and above +6 dBTP without the limiter) |
+| P3 | the same under −3 dBTP |
+| P4 | a clip at volume 1 then one at volume 8 abutting it, both under −1 dBTP: ≤ −1 + 0.001 dB across the cut; and a quiet clip with no limiter at volume 8 then the crest clip at volume 8 under −1 dBTP, the same — the leg the tap's lookup lead decides (the first cannot: the fader's slew from 1 to 8 at the cut, #87, holds the crest clip's first 3.3 ms near ×1) |
+| P5 | a limiter set then cleared exports the same PCM bytes as one never set |
+| P6 | the saved file is at the header's `RC_FORMAT_VERSION` (30, AU-21), `"limiter"` only on the limited clip, none before it was set |
+
+`export_offset_proof.py` E44 (`clicks48` at F206 with a −1 dBTP limiter)
+and E45 (the same with noise reduction 0.5) hold every click on its frame
+through the limiter's 158-sample delay, as E22 does the reducer's; each
+prints its difference from E4. Two mutants run by hand on a Debug build
+(`HAND_MUTANTS` there): M25 drops the placement lead and must fail E44; M26
+drops the tap's lookup lead and must fail P4's second leg. `loudness_cache_probe.py`'s C8
+is rewritten for the new `plan`, and its two plan mutants re-anchored
+(`no-limiter`, `limited-by-nil`). `phase5_proof.py`, `peaks_proof.py` and
+`refusal_proof.py` name `mode="peak"` on every `normalize_clip` they mean as
+Peak, since Loudness is the default (AU-25).
+
+```sh
+python3 tools/proof/limiter_probe.py              # L1–L9
+python3 tools/proof/limiter_probe.py --mutants    # M1, M2, M5–M8
+python3 tools/proof/limiter_probe.py --measure <file>
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/limiter_proof.py <dir>/agent.sock
+python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E4,E22,E44,E45
+```
+
+**The recorded run (2026-10-30):** `limiter_probe.py` 9/9 rows (every L2 output
+at its ceiling to four decimals by both meters; L6 exact from 1.346 s; L7 188,416
+samples equal; L8 gap 0.090 LU, model −16.001 against the stage −15.911);
+`--mutants` 6/6 killed, each by its named row. `limiter_proof.py` 19/19 on Debug
+and on Release after `make gate` (PASS); `loudness_normalize_proof.py` 37/37 on
+both, the owner's recording exporting at −15.91 LUFS and −0.9998 / −0.9999 dBTP;
+`export_offset_proof.py --only E4,E22,E44,E45` 4/4 on both; `phase5_proof.py`
+92/92 on both; `peaks_proof.py` 21/21 and `refusal_proof.py` 145/145 on Debug;
+`loudness_cache_probe.py` 11/11 and `--mutants` 7/7. By hand on Debug: M25 failed
+E44 (+3.292 ms); M26 failed P4's second leg (+3.5363 dBTP) and passed its first.
+Again at integration, where the format became 30 (on the merged tree, Release, after
+`make gate` PASS): `limiter_proof.py` 19/19, P6 "the file is version 30, the header's 30";
+`loudness_normalize_proof.py` 37/37, N6 −15.91 LUFS and −0.9998 / −0.9999 dBTP;
+`export_offset_proof.py --only E4,E22,E44,E45` 4/4; `phase5_proof.py` 92/92;
+`limiter_probe.py` 9/9, L8 gap 0.090 LU.
 
 ## Road map "audio" AP9 — split edits that keep sync, and Attach Audio (`ap9_split_edits_proof.py` A0–A9; `core/tests/link.rs`, `link_edges.rs`, `schema_v28.rs`; sixteen core mutants; spec §11 AU-90…AU-97)
 
