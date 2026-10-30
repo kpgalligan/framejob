@@ -88,6 +88,7 @@ mod lut;
 pub mod mcp_versions;
 mod media_color;
 pub mod model;
+pub mod model_audio;
 pub mod model_canvas;
 mod model_color;
 pub mod model_grade;
