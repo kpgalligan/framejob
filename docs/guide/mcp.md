@@ -395,7 +395,7 @@ Read it first: every other tool names things by the ids it reports.
 
 ## The tools
 
-One hundred and one tools, grouped by area. A tool marked *op* is one of the
+One hundred and two tools, grouped by area. A tool marked *op* is one of the
 project's edit operations and also takes `scope`. Every tool takes
 `project`. The tool's own description, which the client shows the model,
 spells out each argument; the area pages cover the features in depth.
@@ -575,6 +575,7 @@ See [Captions](captions.md) and [Remove Silences and Remove Filler Words](cleanu
 | `list_graphics` | **Insert ▸ Graphic…**'s lists: This Project and the bundled templates by category, in the dialog's order. |
 | `insert_graphic` | **Insert ▸ Graphic…**'s Insert: a template copied into `graphics/` (or a project module as it is) and a clip at the playhead, one undo step. |
 | `export_graphic` | **Insert ▸ Graphic…**'s Export…: the graphic (`name`, `from`) written as a `.fjgraphic` package at `path` — the module and the project fonts and pictures it was seen to use; an existing file is replaced. Not an edit. |
+| `import_graphic` | A `.fjgraphic` opened from the Finder, or **Insert ▸ Graphic…**'s From File…, without the sheet: the package at `path` checked, then its module, fonts and pictures copied into `graphics/` under the package's names — a file already there with the same contents reused, a module or font name taken by something else suffixed (`renamed_from`), a picture name taken by a different picture refused. Not undoable. |
 
 Writing, deleting and restoring modules and adding fonts or images in
 `graphics/` are not undoable (renaming is, as one step with its clips), but

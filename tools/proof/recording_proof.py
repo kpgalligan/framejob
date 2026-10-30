@@ -443,6 +443,7 @@ APP_STATE_TOOLS = {
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
     "get_transcript", "list_graphics", "insert_graphic", "export_graphic",
+    "import_graphic",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`
@@ -861,7 +862,7 @@ def catalog_part(mcp):
           f"at least {OPS} tools declare the envelope's scope (got {len(scoped)}) — R1 adds "
           "no op, and the exact number is the newest phase's to assert")
     check(names - set(scoped) - set(DEV_TOOLS) == APP_STATE_TOOLS,
-          "and the tools WITHOUT one are exactly the thirty-nine app-state tools (the dev "
+          "and the tools WITHOUT one are exactly the forty app-state tools (the dev "
           "tools apart), named: "
           f"{sorted(names - set(scoped) - set(DEV_TOOLS) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")

@@ -121,7 +121,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Item | Shortcut | What it does |
 |---|---|---|
 | Adjustment Clip | | Adds an adjustment clip over the in/out range. Without a range it covers the selected clips' span, and without a selection the whole timeline. Greyed while a nest is open ([Colour grading](color-grading.md)) |
-| Graphic… | | Opens the Graphic dialog: the bundled templates by category (and This Project's own graphics), a looping preview, and Insert to add the chosen one at the playhead, From File… to add a `.js` file you choose, or Export… to save the chosen one as a `.fjgraphic` file ([Graphics](graphics.md#adding-a-graphic)) |
+| Graphic… | | Opens the Graphic dialog: the bundled templates by category (and This Project's own graphics), a looping preview, and Insert to add the chosen one at the playhead, From File… to add a `.js` file or import a `.fjgraphic` you choose, or Export… to save the chosen one as a `.fjgraphic` file ([Graphics](graphics.md#adding-a-graphic)) |
 
 *Agents:* `add_adjustment_clip`; `list_graphics` and `insert_graphic`, or
 `write_graphic` followed by `add_graphic_clip`.

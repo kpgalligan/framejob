@@ -81,6 +81,7 @@ pub mod format;
 pub mod frame_grid;
 mod grade_check;
 mod graphic_package;
+mod graphic_package_read;
 pub mod hdr10;
 pub mod hdr10_still;
 mod lut;

@@ -57,7 +57,8 @@ listed in grey and its preview is the red error card.
 The dialog opens on the first category's first graphic. **Insert** (Return,
 or a double-click on a graphic) adds the chosen graphic; **Cancel** (Esc)
 closes the dialog; **From File…** closes it and asks for a `.js` module to
-copy into the project instead. **Export…**, at the far left, saves the chosen
+copy into the project instead, or a `.fjgraphic` to import (see
+[Sharing a graphic](#sharing-a-graphic)). **Export…**, at the far left, saves the chosen
 graphic to share (see [Sharing a graphic](#sharing-a-graphic)).
 
 A module of your own goes into a category by giving its `meta` a `category`
@@ -186,12 +187,44 @@ title, another picture) are not looked for. A frame that fails is skipped.
 A file name a zip path cannot hold (a `:` or `\`, a control character, a
 leading `.`) is stored under a tidied name (`a:b.ttf` as `a-b.ttf`), and the
 manifest keeps the original, so a font is still found by its family and
-`asset(name)` still finds its picture. Frame Job does not open `.fjgraphic`
-files yet.
+`asset(name)` still finds its picture.
 
 *Agents:* `export_graphic` (`name`, `from`: `template` or `project`, `path`)
 is Export…; it answers the path, the files in the package, the frames drawn
 and how many failed. The assistant asks before it runs.
+
+**Importing a graphic.** Double-click a `.fjgraphic` in Finder (or open it
+with Open With, drop it on Frame Job's Dock icon, or open it from a browser's
+downloads), or choose one with the Graphic dialog's **From File…**. The
+package goes into the front project — the one whose window is in front;
+with none open, a new untitled project — or, for From File…, the dialog's
+own project. If Frame Job was not running it opens first, and the package
+waits until any projects it reopens are back.
+
+Frame Job checks the package before it copies anything: a package that is
+damaged, compressed, changed after it was written, or written by a newer
+Frame Job is refused with a sentence saying why, and nothing is copied. Then
+an **Import Graphic** sheet shows the graphic's title and description, the
+module's name, and its fonts and pictures. Each file keeps the name the
+package gives it. A file the project already has with the same contents is
+used as it is ("already here"). A module or font whose name the project
+already uses for something else is copied under a new name (the sheet
+reads "Module: lower-third-2 (lower-third is taken)", or "as `Inter-2.ttf`"
+for a font); a font is found by its family, so its
+file name changes nothing. A picture whose name is taken by a different
+picture stops the import, because the module asks for its pictures by name:
+rename or remove the project's file and import again.
+
+**Import** copies the files into the project's `graphics/` and opens the
+Graphic dialog on This Project with the graphic chosen and a line saying
+what was added and what was already there. **Cancel** copies nothing.
+Importing is not an undo step and does not mark the project as edited; an
+untitled project keeps the files when it is first saved. If a copy fails
+part-way, what it had copied is removed.
+
+*Agents:* `import_graphic` (`path`) is Import, without the sheet; it answers
+the module's name, the fonts and pictures each `written` or `reused`, and
+`renamed_from` for anything copied under a new name.
 
 ## The Graphic sub-tab
 

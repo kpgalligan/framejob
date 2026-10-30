@@ -114,7 +114,8 @@ targets:
           ENABLE_DEBUG_DYLIB: "NO"
           # The Debug build is its own app (spec §11 V-5, NM-3): "Frame Job
           # Debug", its own bundle id and defaults domain, and an Alternate
-          # `.framejob` handler, so a double-click opens the real Frame Job.
+          # `.framejob` and `.fjgraphic` handler (G-47 (h)), so a double-click
+          # opens the real Frame Job.
           # Info.plist reads PRODUCT_NAME for both names and the RC_ setting
           # through `:default=`, so Release and Distribution, which take the
           # base PRODUCT_NAME and leave the handler rank unset, keep theirs.
@@ -194,11 +195,12 @@ targets:
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
               public.filename-extension: [framejob]
-          # The Graphic dialog's Export… (spec §11 G-46 (d)): exported only, so
-          # Finder names it; no CFBundleDocumentTypes row, as the app opens none.
+          # The Graphic dialog's Export… (spec §11 G-46 (d)). Data and content,
+          # not a zip (spec §11 G-47 (g)), so a browser's "open safe files" and
+          # the Finder leave it whole for Frame Job to import.
           - UTTypeIdentifier: com.kgalligan.framejob-graphic
             UTTypeDescription: Frame Job Graphic
-            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeConformsTo: [public.data, public.content]
             UTTypeTagSpecification:
               public.filename-extension: [fjgraphic]
         CFBundleDocumentTypes:
@@ -207,6 +209,14 @@ targets:
             CFBundleTypeRole: Editor
             NSDocumentClass: FrameJob.ProjectDocument
             LSTypeIsPackage: true
+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"
+          # A .fjgraphic is imported into a project, not opened as one (spec §11
+          # G-47 (a), (h)): a Viewer with no NSDocumentClass, whose open
+          # ProjectDocumentController routes; ranked as the project type is
+          # (V-5), so a Debug build never takes it from the installed app.
+          - CFBundleTypeName: Frame Job Graphic
+            LSItemContentTypes: [com.kgalligan.framejob-graphic]
+            CFBundleTypeRole: Viewer
             LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"
           # Opening a media file makes an UNTITLED project sized to it with
           # the file as the first clip (spec 1) — the app is an Alternate

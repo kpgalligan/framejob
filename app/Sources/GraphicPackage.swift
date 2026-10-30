@@ -31,10 +31,10 @@ enum GraphicPackage {
     static let fileExtension = "fjgraphic", typeIdentifier = "com.kgalligan.framejob-graphic"
     static let maxFrames = 900, variantFrames = 30, maxVariants = 32
 
-    /// The exported type (`project.yml`), else a zip by its extension.
+    /// The exported type (`project.yml`), else data by its extension (spec §11 G-47 (g)).
     static var contentType: UTType {
         UTType(typeIdentifier)
-            ?? UTType(filenameExtension: fileExtension, conformingTo: .zip) ?? .zip
+            ?? UTType(filenameExtension: fileExtension, conformingTo: .data) ?? .data
     }
 
     /// The manifest's `app_version`: the bundle's `CFBundleShortVersionString`, else "".

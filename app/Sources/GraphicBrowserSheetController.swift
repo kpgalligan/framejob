@@ -24,6 +24,10 @@
 // the preview's render thread is stopped there, so every way out — Cancel,
 // Esc, Insert, From File… — stops it.
 //
+// **Opened after an import** (spec §11 G-47 (f)) with `select`: This Project
+// and the graphic of that name are chosen, and `message` is put in the
+// message line after the choice has cleared it.
+//
 // **Export…** (spec §11 G-46 (a)) is enabled when the chosen graphic
 // compiles and no export is running. It opens a save panel as a sheet on the
 // browser, which stays up; `exportChosen(to:)` builds a `GraphicPackageJob` on
@@ -42,6 +46,9 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
     private let categories: [GraphicBrowserCategory]
     private let canvas: CanvasSnapshot
     private var fromFilePending = false
+    /// The graphic to choose and the message to show at load (G-47 (f)).
+    private let select: String?
+    private let message: String?
     /// An export's thread is running; Export… stays disabled until it reports.
     private(set) var exporting = false
     /// The last export's thread, for the probe to see it finish.
@@ -69,9 +76,14 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
     private static let gap: CGFloat = 12
     private static let cellID = NSUserInterfaceItemIdentifier("graphicbrowser.cell")
 
-    init(document: ProjectDocument, editor: EditorViewController) {
+    init(
+        document: ProjectDocument, editor: EditorViewController, select: String? = nil,
+        message: String? = nil
+    ) {
         self.document = document
         self.editor = editor
+        self.select = select
+        self.message = message
         self.categories = GraphicCatalog.categories(for: document)
         self.canvas = document.project.snapshot.canvas
         self.insertButton = StickerButton(title: "Insert", style: .primary, target: nil, action: nil)
@@ -181,6 +193,21 @@ final class GraphicBrowserSheetController: NSViewController, NSTableViewDataSour
             categoryTable.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
         categoryChanged()
+        chooseSelected()
+    }
+
+    /// `select` chosen under This Project, then `message` shown (G-47 (f)).
+    private func chooseSelected() {
+        if let select = select,
+            let section = categories.firstIndex(where: { $0.name == GraphicCatalog.thisProject }),
+            let row = categories[section].items.firstIndex(where: { $0.name == select })
+        {
+            categoryTable.selectRowIndexes(IndexSet(integer: section), byExtendingSelection: false)
+            categoryChanged()
+            graphicTable.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            graphicChanged()
+        }
+        if let message = message { messageLabel.stringValue = message }
     }
 
     private func configure(_ table: NSTableView, id: String) {

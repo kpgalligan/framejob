@@ -18,6 +18,11 @@ import UniformTypeIdentifiers
 /// (G-3) and the clip is one undo step, "Insert Graphic". `insert_graphic`
 /// calls the same two document bodies.
 ///
+/// **From File… takes a `.fjgraphic` too** (spec §11 G-47 (a)): the package
+/// goes to `GraphicImportSheetController.ask(packageAt:editor:)`, which asks
+/// before copying it into this project's `graphics/`; a `.js` is inserted as
+/// before.
+///
 /// The sheet's Insert runs INSIDE its button's event, so `applyEdit`; the
 /// panels' completions are OFF-EVENT, so `performGroupedEdit` (app/CLAUDE.md's
 /// undo pitfall). `rescan()` is called from the command, never from a
@@ -34,7 +39,18 @@ extension EditorViewController {
         presentAsSheet(sheet)
     }
 
-    /// The sheet's From File…: a `.js` chosen in a panel. Called from the
+    /// The browser after an import (spec §11 G-47 (f)): This Project's `name` chosen and
+    /// `message` in its message line.
+    func showGraphicBrowser(selecting name: String, message: String) {
+        guard let document = document, document.graphicStore != nil else {
+            NSSound.beep()
+            return
+        }
+        presentAsSheet(GraphicBrowserSheetController(
+            document: document, editor: self, select: name, message: message))
+    }
+
+    /// The sheet's From File…: a `.js` or a `.fjgraphic` chosen in a panel. Called from the
     /// browser's `viewDidDisappear`, once the browser is down, so the panel
     /// is the sheet that follows it.
     func insertGraphicFromFile(_ sender: Any?) {
@@ -45,11 +61,16 @@ extension EditorViewController {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.javaScript]
-        panel.message = "Choose a graphic module (.js) to copy into this project's graphics."
+        panel.allowedContentTypes = [.javaScript, GraphicPackage.contentType]
+        panel.message = "Choose a graphic module (.js) or a graphic package (.fjgraphic) to copy "
+            + "into this project's graphics."
         panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            self?.reportingGraphicFailure { try self?.insertGraphic(from: url, grouped: true) }
+            guard let self, response == .OK, let url = panel.url else { return }
+            if url.pathExtension.lowercased() == GraphicPackage.fileExtension {
+                GraphicImportSheetController.ask(packageAt: url, editor: self)
+                return
+            }
+            self.reportingGraphicFailure { try self.insertGraphic(from: url, grouped: true) }
         }
     }
 

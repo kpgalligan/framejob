@@ -713,6 +713,32 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `// MARK: - Graphics` block's `GraphicLibrary` and `GraphicModule` docs (the freeze rule,
   which the header states) and `ReelAgentSocket`'s cut to their contracts, a doc-only cut;
   nothing `rc_*`-free is left to move.
+  The `.fjgraphic` import (#384, spec §11 G-47) paid that seam before `ReelGraphicPackage.read`
+  (`rc_graphic_package_read`) landed: a doc-only cut gated alone by `make typecheck` (exit 0, the
+  four baseline warnings), no code changed. The docs as they stood, moved here word for word —
+  `GraphicLibrary`: "The engine's fonts and assets (`RcGraphicLibrary`). Filled with `addFont` /
+  `addAsset` until the first compile or rasterize against it FREEZES it; an add after that
+  throws. A module compiled against it keeps its fonts alive, so the two are freed in either
+  order."; `maxSide`: "The header's `RC_GRAPHIC_MAX_SIDE`, pinned to the engine's `MAX_SIDE`: a
+  larger side is refused here, before a buffer is allocated for it."; `imageCache(limit:)`: "The
+  engine's decoded-image cache, one per process (spec §11 G-39): its limit set to `limit` bytes
+  and trimmed least recently used first; the bytes it holds after. 0 empties it.";
+  `families()`: "The engine's own family names, sorted — the exact strings a `font-family` must
+  match. FREEZES the library, as a compile would."; `usage()`: "The font blobs (by add order)
+  and image assets every parse and measure against this library has used (spec §11 G-46 (b)).
+  FREEZES it, as a compile would."; `ReelAgentSocket`: "The core's Unix-socket listener for the
+  agent server (road map 14, spec §11 MC-1), the only listener since MC4 deleted the TCP one,
+  serving the catalog through `AgentServer`'s handler. Only the wrapper lives here, for the
+  one-file rule above; the path, the MC-2 policy and the log lines are
+  `AgentServer+Socket.swift`'s."; `start(…)`: "Binds at `path`, chmod 0600; throws the core's
+  sentence. Never unlinks a file already there, and a second bind in one process is refused.
+  `handler` and `context` must stay valid for the process's life, because `release()` never
+  joins."; `release()`: "For quit: unlinks the socket file only if it is still this listener's,
+  then abandons the listener without a join. Safe when none is bound." `wc -l
+  app/Sources/ReelCore.swift`: 768 before, 752 after; `ReelGraphicPackage.read` then took it to
+  763, within its 768. The next seam: the file header's three conventions carried from
+  Rasterize (lines 17–25), which the root `CLAUDE.md`'s "FFI contract" already states in part,
+  cut to its contracts — a doc-only cut; nothing `rc_*`-free is left to move.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

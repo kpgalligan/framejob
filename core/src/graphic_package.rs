@@ -30,12 +30,12 @@ use sha2::{Digest, Sha256};
 use crate::model_graphic::check_name;
 
 /// The longest in-package name, in UTF-8 bytes (APFS's file-name limit).
-const MAX_NAME: usize = 255;
-const MANIFEST: &str = "manifest.json";
+pub(crate) const MAX_NAME: usize = 255;
+pub(crate) const MANIFEST: &str = "manifest.json";
 /// A local header's fixed part, and a central directory entry's.
-const LOCAL_FIXED: usize = 30;
-const CENTRAL_FIXED: usize = 46;
-const END_RECORD: usize = 22;
+pub(crate) const LOCAL_FIXED: usize = 30;
+pub(crate) const CENTRAL_FIXED: usize = 46;
+pub(crate) const END_RECORD: usize = 22;
 /// 1980-01-01 as a DOS date: day 1, month 1, year 0.
 const DOS_DATE: u16 = 0x0021;
 /// Bit 11: the names are UTF-8.
@@ -220,7 +220,7 @@ fn is_replaced(c: char) -> bool {
     c == '\\' || c == ':' || is_control(c)
 }
 
-fn is_legal(name: &str) -> bool {
+pub(crate) fn is_legal(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
         && !name.starts_with('.')
@@ -303,13 +303,13 @@ fn package_names(files: &[(String, u64)]) -> Vec<String> {
     out.into_iter().map(Option::unwrap_or_default).collect()
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// CRC-32 (IEEE): the reflected polynomial `0xEDB88320`, init and xorout
 /// `0xFFFFFFFF`, by a 256-entry table.
-fn crc32(bytes: &[u8]) -> u32 {
+pub(crate) fn crc32(bytes: &[u8]) -> u32 {
     let mut table = [0u32; 256];
     for (n, slot) in table.iter_mut().enumerate() {
         let mut c = n as u32;

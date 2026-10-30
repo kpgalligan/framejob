@@ -47,7 +47,7 @@ use framejob_core::ffi_graphic::{
     rc_graphic_library_free, rc_graphic_library_new, rc_graphic_library_usage,
     rc_graphic_rasterize, rc_graphic_svg,
 };
-use framejob_core::ffi_graphic_package::rc_graphic_package_write;
+use framejob_core::ffi_graphic_package::{rc_graphic_package_read, rc_graphic_package_write};
 use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak, rc_hdr10_still_peak};
 use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
@@ -2356,6 +2356,13 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     }
     .is_null());
     cover("rc_graphic_package_write");
+
+    // A NULL `data` is refused by name, with or without a channel.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_graphic_package_read(ptr::null(), 0, &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("data is NULL"));
+    assert!(unsafe { rc_graphic_package_read(ptr::null(), 0, ptr::null_mut()) }.is_null());
+    cover("rc_graphic_package_read");
 
     let mut err: *mut c_char = ptr::null_mut();
     assert!(unsafe { rc_container_open(ptr::null(), &mut err) }.is_null());

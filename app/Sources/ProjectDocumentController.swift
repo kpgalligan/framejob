@@ -20,6 +20,13 @@ import AppKit
 /// document, before the caller's handler runs. A reopen with no URL (an
 /// untitled document restored) holds no path and is not counted.
 ///
+/// **A `.fjgraphic` is not a project** (spec §11 G-47 (a)): an open of one —
+/// a Finder double-click, Open With, a Dock drop, a browser's download — is
+/// handed to `GraphicImportSheetController.open(packageAt:)` and answers no
+/// document and no error; it is not counted. `whenSettled` is that door's
+/// wait for launch and restoration (G-47 (b)): no open or reopen in flight,
+/// an untitled project's reopen included.
+///
 /// `main.swift` makes the one instance before anything else can make an
 /// `NSDocumentController`: the first one instantiated is `.shared`. No other
 /// product file instantiates it. A proof probe compiles every source but
@@ -29,6 +36,9 @@ class ProjectDocumentController: NSDocumentController {
 
     /// Opens in flight, by `AgentServer.canonical` path. Main only.
     private var opening: [String: Int] = [:]
+    /// Reopens of an untitled project in flight, and what waits for none of either. Main only.
+    private var untitledReopens = 0
+    private var settledWaiters: [() -> Void] = []
 
     override init() {
         super.init()
@@ -83,6 +93,33 @@ class ProjectDocumentController: NSDocumentController {
     private func ended(_ key: String) {
         let left = (opening[key] ?? 1) - 1
         opening[key] = left > 0 ? left : nil
+        fireIfSettled()
+    }
+
+    // MARK: - Settled
+
+    /// Runs `body` on main once no open or reopen is in flight, a main-queue turn after the
+    /// last ends so AppKit has made its window — never before `applicationDidFinishLaunching`
+    /// (spec §11 G-47 (b)). The next turn when the shared controller is not this class. Main.
+    static func whenSettled(_ body: @escaping () -> Void) {
+        guard let controller = NSDocumentController.shared as? ProjectDocumentController else {
+            DispatchQueue.main.async(execute: body)
+            return
+        }
+        controller.settledWaiters.append(body)
+        controller.fireIfSettled()
+    }
+
+    private var isSettled: Bool { opening.isEmpty && untitledReopens == 0 }
+
+    private func fireIfSettled() {
+        guard isSettled, !settledWaiters.isEmpty else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isSettled else { return }
+            let waiting = self.settledWaiters
+            self.settledWaiters = []
+            for body in waiting { body() }
+        }
     }
 
     // MARK: - The two public opens
@@ -91,6 +128,11 @@ class ProjectDocumentController: NSDocumentController {
         withContentsOf url: URL, display displayDocument: Bool,
         completionHandler: @escaping (NSDocument?, Bool, (any Error)?) -> Void
     ) {
+        if url.pathExtension.lowercased() == GraphicPackage.fileExtension {
+            GraphicImportSheetController.open(packageAt: url)
+            completionHandler(nil, false, nil)
+            return
+        }
         let key = began(url)
         super.openDocument(withContentsOf: url, display: displayDocument) {
             [weak self] document, wasOpen, error in
@@ -104,9 +146,14 @@ class ProjectDocumentController: NSDocumentController {
         completionHandler: @escaping (NSDocument?, Bool, (any Error)?) -> Void
     ) {
         guard let url = urlOrNil else {
+            untitledReopens += 1
             super.reopenDocument(
-                for: urlOrNil, withContentsOf: contentsURL, display: displayDocument,
-                completionHandler: completionHandler)
+                for: urlOrNil, withContentsOf: contentsURL, display: displayDocument
+            ) { [weak self] document, wasOpen, error in
+                self?.untitledReopens -= 1
+                self?.fireIfSettled()
+                completionHandler(document, wasOpen, error)
+            }
             return
         }
         let key = began(url)

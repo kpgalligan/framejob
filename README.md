@@ -85,7 +85,8 @@ module: 23 built-ins, browsed by category with a live looping preview in the
 Graphic dialog: charts, a gauge and timers, screencast keys and window
 frames, title, quote and logo cards, and social pop-ups; properties as
 inspector controls, your own modules too, each saved to share as a
-`.fjgraphic` file with only the fonts and pictures it uses.
+`.fjgraphic` file with only the fonts and pictures it uses, which Frame Job
+opens to import into a project.
 → [Motion graphics](docs/guide/graphics.md)
 
 **Screen recording.** A display or a window, with system audio, microphone and

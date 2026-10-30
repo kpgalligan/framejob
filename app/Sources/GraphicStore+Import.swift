@@ -24,6 +24,10 @@
 // that is not is legalised (`GraphicAssetName`) and the copy filed under it,
 // taking `-2`, `-3`, … while that name is held (scan or disk), so a RENAMED
 // copy never replaces; the answer says the name used and the name asked for.
+//
+// **`landNew` is the `.fjgraphic` import's write** (spec §11 G-47 (e)): bytes
+// already read, landed the same way but NEVER replacing — a file already at
+// the name is a throw — and no rescan, which the import does once at its end.
 
 import Foundation
 
@@ -40,6 +44,30 @@ extension GraphicStore {
         let target = folder.appendingPathComponent(name)
         let replaced = try Self.land(at: target) { try files.copyItem(at: source, to: $0) }
         return (target, replaced)
+    }
+
+    /// `bytes` written to `graphics/<subfolder>/<name>` through a `.partial` beside it, never
+    /// replacing: throws when a file is already there. Does not rescan. Main.
+    func landNew(_ bytes: Data, into subfolder: String, as name: String) throws -> URL {
+        try ensureFolder()
+        let files = FileManager.default
+        let folder = folderURL.appendingPathComponent(subfolder, isDirectory: true)
+        try files.createDirectory(at: folder, withIntermediateDirectories: true)
+        let target = folder.appendingPathComponent(name)
+        guard !files.fileExists(atPath: target.path) else {
+            throw ReelCoreError(message: "graphics/\(subfolder)/\(name) already exists")
+        }
+        let partial = folder.appendingPathComponent(name + ".partial")
+        try? files.removeItem(at: partial)
+        do {
+            try bytes.write(to: partial)
+            // `moveItem` refuses an existing target, so a file that appeared meanwhile stays.
+            try files.moveItem(at: partial, to: target)
+        } catch {
+            try? files.removeItem(at: partial)
+            throw error
+        }
+        return target
     }
 
     /// What `graphics/assets/` takes, in the refusals' words.

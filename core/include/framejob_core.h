@@ -661,6 +661,14 @@ size_t rc_graphic_image_cache(size_t limit_bytes);
 char *rc_graphic_package_write(const char *path, const char *package_json, const uint8_t *data, size_t len,
                                char **err_out);
 
+/* Checks the .fjgraphic held in `data` (`len` bytes) and answers its manifest as JSON (freed with rc_string_free):
+ * {"fjgraphic":1,"module","title","category","description":string|null,"app_version","files":[{"path","name","size",
+ * "sha256","offset"}…]}, files[0] the module, each offset the byte offset of that file's data in `data`. NULL with a
+ * lowercase sentence through err_out, including for a NULL `data`: not a stored zip without Zip64, a damaged entry
+ * or CRC-32, a manifest failing its checks or of a newer format, or entries not matching it by path, size or SHA-256
+ * (spec §11 G-47 (c); core/src/graphic_package_read.rs). Writes nothing. */
+char *rc_graphic_package_read(const uint8_t *data, size_t len, char **err_out);
+
 /* ------------------------------------------------------------- container */
 
 /* A WebM or Matroska file being imported, read as an INDEX (spec §11

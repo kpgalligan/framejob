@@ -2434,3 +2434,116 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   a file where the model chose.
   (f) **Import is not built.** It is filed as an issue when the phase
   closes.
+  **Amended by G-47:** (d)'s UTI conforms to `public.data` and
+  `public.content`, no longer to `public.zip-archive`, and the app opens a
+  `.fjgraphic` as a Viewer; (f)'s import is built.
+
+- **G-47 — Frame Job opens a `.fjgraphic`: the core checks the package,
+  a sheet asks first, and the module, fonts and assets are copied into the
+  front project's `graphics/` under the manifest's names** (owner,
+  2026-10-29: "start with the extension for now"; #384). Amends G-46 (d)
+  and (f).
+  (a) **The doors.** The Finder door — a double-click, Open With, a drop
+  on the Dock icon, a browser opening its download — reaches
+  `ProjectDocumentController.openDocument(withContentsOf:…)`, which hands a
+  URL whose extension is `fjgraphic` (any case) to the import and answers
+  no document, no error; that open is not counted (#234), and nothing else
+  it opens changes. The Graphic dialog's From File… takes a `.js` (inserted
+  as before, G-45 (f)) or a `.fjgraphic` (imported). The agent's door is
+  `import_graphic {path}`. File ▸ Open does not list the type, and there is
+  no menu item.
+  (b) **Where it goes.** The front project: the first window in
+  `NSApp.orderedWindows` whose content is an `EditorViewController` with a
+  `ProjectDocument`, else the first such window of an open project; with
+  none, File ▸ New Project's untitled project, made for it. From File…
+  imports into its own editor's project, and `import_graphic` into the
+  project its call names. **The Finder door chooses only once launch and
+  restoration are done**, so a package double-clicked while Frame Job is
+  not running lands once, in one project: AppKit delivers a launch's
+  open-documents event inside `finishLaunching`, after window restoration
+  has begun, and restored projects are read concurrently
+  (`canConcurrentlyReadDocuments`). The door therefore waits for the main
+  queue's next turn — after `applicationDidFinishLaunching` — and then
+  until `ProjectDocumentController` has no open or reopen in flight (a
+  restored untitled project counted too), one more turn after the last
+  ends, so AppKit has made the restored window. A restored project then
+  takes the import; with none, the untitled project is made. AppKit asks
+  `applicationShouldOpenUntitledFile` (the Welcome window) only for a
+  launch with no document to open, so a launch whose open is a
+  `.fjgraphic` shows no Welcome window and makes no second project; a
+  Welcome window already up closes when the new project's window becomes
+  main, as for any project.
+  (c) **Checks.** The core's first (`rc_graphic_package_read`, below), then
+  the app's: a regular file of 1 to `UInt32.max` bytes; each font's
+  extension one of G-6's and the font loads in a throwaway library; each
+  asset's extension one of G-23's set, its name `asset(name)` can use, and
+  not empty. Every refusal is "<file name> cannot be imported: <the
+  sentence>", and a refusal writes nothing. The core reads the archive's
+  end record (within the last 22 + 65,535 bytes), one disk, the central
+  directory in bounds; every entry stored (method 0), not encrypted, no data
+  descriptor, both sizes equal, no Zip64 field, a UTF-8 name that is no
+  directory and not repeated, its local header agreeing, its data in bounds
+  and before the central directory, its CRC-32 right; `manifest.json`
+  first, a JSON object whose `fjgraphic` is 1 (a larger whole number is
+  "the package is format N; this Frame Job reads format 1 — a newer Frame
+  Job wrote it"), whose `module` is a module name (G-3), whose `title`,
+  `category` and `app_version` are strings and `description` a string or
+  null, unknown keys ignored; `files` non-empty, each with a `path`, a
+  `name`, a `size` and a lowercase-hex `sha256`, the first both `path` and
+  `name` `<module>.js`, every other path `fonts/<n>` or `assets/<n>` with
+  G-46 (c)'s legal `<n>`, every other `name` 1 to 247 bytes with no `/`,
+  no control scalar and no leading `.`, no name twice in one folder; the
+  entries after the manifest exactly the files' paths in order, each of
+  the listed size and SHA-256, and the module UTF-8. It answers the
+  manifest with each file's byte offset in the package.
+  (d) **Names.** As the manifest names them: the module under `module`, a
+  font or an asset under its `name` (so `Ver:dana.ttf` and `red\dot.png`,
+  legalised in the package, come back as they were). A name already taken
+  is decided per file. **The module:** a free name is written; a name
+  whose file holds the same bytes is reused; otherwise the name (its root
+  cut to 60 scalars) takes `-2`, `-3`, … until free. A name is free when
+  the folder holds no such module and no clip draws it. **A font:** a free
+  name is written, an identical file of exactly that name reused;
+  otherwise `<stem>-2<.ext>`, `-3`, … (G-23 (c)'s form), reusing an
+  identical file and writing at the first free name. A name that differs
+  only in case is a different file. A font is found by family, never by
+  file name, so a renamed font changes no picture. **An asset:** a free
+  name is written, an identical file of exactly that name reused; any
+  other file of that name refuses the import — "graphics/assets/<name>
+  already holds a different picture, and this graphic reaches its own by
+  asset("<name>"), so it cannot be renamed; rename or remove the project's
+  file and import again" — because the module reaches it by name.
+  (e) **Not an undo step and never dirty** (G-3): the import writes files.
+  The fonts are written first, then the assets, then the module, none
+  replacing a file; a failure removes every file this import wrote and is
+  "graphics/<path> could not be written: <why>". One rescan follows. An
+  untitled project carries the files at its first save (G-29 (g)).
+  (f) **Ask first.** The Finder door and From File… show a sheet, Import
+  Graphic: the title, the description, the module's name and what happens
+  to it (written, already in this project, or written under another name
+  because its own is taken), the fonts and the pictures each with
+  "(already here)" or "(as <name>)", and "Importing copies these files
+  into this project's graphics. It is not an Undo step." Import runs the
+  plan again and imports; a refusal stays in the sheet. After Import the
+  Graphic dialog opens on This Project with the module chosen and the
+  sentence "Imported <title> as <module>. Added: … Already here: …." in its
+  message line. A refusal before the sheet is an alert on the project's
+  window, or an application-modal alert with no project.
+  (g) **The UTI** `com.kgalligan.framejob-graphic` conforms to
+  `public.data` and `public.content`, no longer to `public.zip-archive`,
+  so a browser's "open safe files" does not unpack it and the Finder does
+  not offer Archive Utility as its opener; it stays exported.
+  (h) **Rank.** The app's `CFBundleDocumentTypes` gains a row, "Frame Job
+  Graphic", role Viewer, no `NSDocumentClass` (the routing above is the
+  only reader), ranked by V-5's `RC_PROJECT_HANDLER_RANK`: Alternate in
+  Debug, so a Debug build never takes the type from the installed app,
+  Owner in Release and Distribution. Release shares Distribution's bundle
+  id, so to Launch Services they are one app.
+  (i) **`import_graphic {path}`** answers `{name, renamed_from (only when
+  it differs), title, module: written | reused, fonts: [{name,
+  renamed_from?, action}], assets: [{name, action}], note}`. It runs on
+  main, has no `scope`, and is not ask-first in the assistant: it writes
+  only inside the project's `graphics/`, as `import_graphic_font` does.
+  **Accepted:** two font files of one family in a project draw with
+  whichever the engine picks; a module that does not compile is still
+  imported, and the Graphic dialog lists it with its error.

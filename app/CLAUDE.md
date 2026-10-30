@@ -21,7 +21,7 @@ detail there.
   once per handle and clip, SR-20), timecode, snapping (export presets/sizes/settings are
   `ExportValues.swift`'s, a pure move, HDR H-1), `ReelSpeed.limits` (the
   core's speed range and audio ceiling, typed as `SpeedLimits` in
-  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25), `ReelGraphicPackage` (`rc_graphic_package_write`, G-46), `GraphicLibrary.usage()` (`rc_graphic_library_usage`) and
+  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25), `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`, `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`) and
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
   #216-R) and `ReelWebM` (`rc_webm_*`, the `av1_webm` writer, spec §11 CX-15) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
   `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
@@ -478,7 +478,9 @@ detail there.
   mean a DELETED module. `GraphicStore+Import.swift`'s `importAsset` files a name
   `asset(name)` cannot use under `GraphicAssetName.legalized`, a renamed
   copy taking `-2`, `-3`, … while `holdsAsset(named:)` (scan or disk) says
-  the name is held, and answers `name`/`renamedFrom` (G-23 (c), (d)). **`drain()` is not
+  the name is held, and answers `name`/`renamedFrom` (G-23 (c), (d)).
+  `landNew` is the `.fjgraphic` import's write (G-47 (e)): bytes landed
+  under a name not yet taken, never replacing a file. **`drain()` is not
   re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
   `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
   builder every call (a library freezes on first use). It also writes the
@@ -717,7 +719,12 @@ the key map behind it.
   which is every proof probe but `agent_open_probe.swift`, which subclasses
   it (so it is not `final`). A launch whose shared controller is not this
   class logs `Frame Job: `; `agent_socket_proof.py`'s `no-controller` mutant
-  removes the `install()` line and must fail Z1.
+  removes the `install()` line and must fail Z1. A `.fjgraphic` URL never
+  reaches `super`: it goes to `GraphicImportSheetController.open(packageAt:)`
+  (spec §11 G-47) through
+  `whenSettled`, which waits until launch and any reopening (restored
+  untitled projects counted apart from #234's per-path count) are done, then
+  picks the front project or opens one untitled project.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
@@ -2342,7 +2349,16 @@ free.
   `enum` option and flipped boolean, `GraphicLibrary.usage()` read, and the
   project's used fonts and assets (never a bundled face) handed to
   `ReelGraphicPackage.write`; QuickJS only on the sheet's export `Thread`
-  or the server's thread.
+  or the server's thread. `GraphicPackageImport.swift` — the `.fjgraphic`
+  import (G-47): read through `ReelGraphicPackage.read`, the plan (each
+  file reused when its bytes match, a module or font under a taken name
+  suffixed, a different asset under a taken name refused), the copy through
+  `landNew` then `write(name:bytes:)`, rolled back whole on a failure; no undo
+  step and no dirty mark. `GraphicImportSheetController.swift` — the
+  ask-first sheet (title, description, module, fonts, assets, Cancel and
+  Import); on Import the Graphic dialog opens on This Project with the
+  module chosen. Doors: Finder (through `ProjectDocumentController`), the
+  Graphic dialog's From File… and `import_graphic`.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
@@ -2665,12 +2681,12 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-two op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the thirty-nine APP-STATE tools, which have no op behind them
+  callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
   left, the five other file tools (`AgentCatalog+Files.swift`'s `import_media` and `consolidate_media`, `AgentCatalog+Recording.swift`'s `record_screen`, and `AgentCatalog+Render.swift`'s `render_frame`, `export`, `export_status` and `cancel_export`, spliced back where they left), and
-  `AgentCatalog+Graphics.swift`'s twelve, after its two `opTool` rows.
+  `AgentCatalog+Graphics.swift`'s thirteen, after its two `opTool` rows.
   `set_text`'s clause for `case`, `words` and `word_style` is
   `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move
   out of `+Clips`), where the three looks' keys are taught. `opTool`
@@ -2699,7 +2715,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and one
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and two
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

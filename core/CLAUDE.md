@@ -171,8 +171,13 @@ governs a module now.
   (spec §11 G-46): the package request's checks, the in-package name
   legaliser (legal names claimed first, G-23 (c)'s suffixes on a clash),
   `manifest.json`, the stored zip and its CRC-32, and the write (`.partial`
-  renamed into place); names no `graphic` item. `ffi_graphic_package.rs` is
-  `rc_graphic_package_write`, answering the manifest it wrote.
+  renamed into place); names no `graphic` item. `graphic_package_read.rs`
+  is the reader (G-47): stored entries only, `manifest.json` first,
+  `"fjgraphic": 1` (a newer version refused by number), each file's size and
+  SHA-256 against the manifest, no path out of `fonts/`/`assets/`; it
+  answers the checked manifest and each file's offset. `ffi_graphic_package.rs`
+  is `rc_graphic_package_write`, answering the manifest it wrote, and
+  `rc_graphic_package_read`.
 - `hdr10.rs` · `ffi_hdr10.rs` — an HDR10 file's peak (spec §11 HD-6,
   HD-12): the mastering-display and content-light blobs of a sample
   description, else the first sample's prefix SEI (payloads 137, 144,

@@ -152,7 +152,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+GraphicMenus.swift `func addGraphicFont(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:145"
+    "app/Sources/EditorViewController+GraphicMenus.swift:166"
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
   },
@@ -160,7 +160,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+GraphicMenus.swift `@objc func addGraphicImage(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:145"
+    "app/Sources/EditorViewController+GraphicMenus.swift:166"
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
   },
@@ -320,9 +320,9 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+GraphicMenus.swift `@objc func showGraphicBrowser(`",
-    "app/Sources/EditorViewController+GraphicMenus.swift:34"
+    "app/Sources/EditorViewController+GraphicMenus.swift:39"
    ],
-   "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:50) from its viewDidDisappear; Export… begins an NSSavePanel sheet on the browser itself (its `exportClicked`), and the export's result or refusal is a label in the sheet"
+   "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:67) from its viewDidDisappear; Export… begins an NSSavePanel sheet on the browser itself (its `exportClicked`), and the export's result or refusal is a label in the sheet; a .fjgraphic chosen there goes to the Import Graphic sheet (GraphicImportSheetController's `present`), and after its Import the browser comes back with the module chosen (:49)"
   },
   "splitAtPlayhead:": {
    "verdict": "none",
@@ -1024,7 +1024,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:34": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:39": {
    "token": "presentAsSheet",
    "func": "showGraphicBrowser",
    "reached_from": [
@@ -1033,7 +1033,20 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:50": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:49": {
+   "token": "presentAsSheet",
+   "func": "showGraphicBrowser",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showGraphicBrowser:",
+     "via": "app/Sources/GraphicImportSheetController.swift `editor?.showGraphicBrowser(selecting: done.module.target, message: done.sentence)`",
+     "gate": "app/Sources/GraphicImportSheetController.swift `guard let done = imported else { return }` — the Import Graphic sheet's Import succeeded (From File… chose a .fjgraphic)"
+    }
+   ],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item, then the Import Graphic sheet's Import"
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:67": {
    "token": "beginSheetModal",
    "func": "insertGraphicFromFile",
    "reached_from": [],
@@ -1046,7 +1059,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:145": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:166": {
    "token": "beginSheetModal",
    "func": "chooseGraphicFile",
    "reached_from": [
@@ -1056,14 +1069,14 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:162": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:183": {
    "token": "beginSheetModal",
    "func": "reportingGraphicFailure",
    "reached_from": [],
    "reached_after": [
     {
      "selector": "showGraphicBrowser:",
-     "via": "app/Sources/EditorViewController+GraphicMenus.swift `self?.reportingGraphicFailure { try self?.insertGraphic(from: url, grouped: true) }`",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift `self.reportingGraphicFailure { try self.insertGraphic(from: url, grouped: true) }`",
      "gate": "app/Sources/EditorViewController+GraphicMenus.swift `try body()` — the From File… insert throws"
     },
     {
@@ -1079,7 +1092,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+GraphicMenus.swift:172": {
+  "app/Sources/EditorViewController+GraphicMenus.swift:193": {
    "token": "beginSheetModal",
    "func": "showGraphicNotice",
    "reached_from": [],
@@ -1213,7 +1226,7 @@
    "reached_after": [],
    "other_caller": "app/Sources/FileDropView.swift `func performDragOperation(` — a Finder drop that will not open"
   },
-  "app/Sources/GraphicBrowserSheetController.swift:378": {
+  "app/Sources/GraphicBrowserSheetController.swift:405": {
    "token": "beginSheetModal",
    "func": "exportClicked",
    "reached_from": [],
@@ -1225,6 +1238,53 @@
     }
    ],
    "other_caller": ""
+  },
+  "app/Sources/GraphicImportSheetController.swift:69": {
+   "token": "beginSheetModal",
+   "func": "open",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; the package is refused with a project window open"
+  },
+  "app/Sources/GraphicImportSheetController.swift:71": {
+   "token": "presentError",
+   "func": "open",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; the package is refused with no project window"
+  },
+  "app/Sources/GraphicImportSheetController.swift:109": {
+   "token": "presentError",
+   "func": "untitledEditor",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; no project is open and the untitled one could not be made"
+  },
+  "app/Sources/GraphicImportSheetController.swift:121": {
+   "token": "presentAsSheet",
+   "func": "present",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showGraphicBrowser:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift `GraphicImportSheetController.ask(packageAt: url, editor: self)`",
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift `if url.pathExtension.lowercased() == GraphicPackage.fileExtension {` — From File… chose a .fjgraphic"
+    }
+   ],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item"
+  },
+  "app/Sources/GraphicImportSheetController.swift:133": {
+   "token": "beginSheetModal",
+   "func": "alert",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showGraphicBrowser:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift `GraphicImportSheetController.ask(packageAt: url, editor: self)`",
+     "gate": "app/Sources/GraphicImportSheetController.swift `present(try GraphicPackageContents.read(at: url), editor: editor)` — the package or its plan is refused"
+    }
+   ],
+   "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; its plan is refused"
   },
   "app/Sources/GraphicPane+Source.swift:216": {
    "token": "runModal",

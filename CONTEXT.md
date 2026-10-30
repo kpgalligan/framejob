@@ -45,7 +45,7 @@ The list a **Module** is filed under in the Graphic dialog: its `meta.category`,
 _Avoid_: folder, group, tag
 
 **Graphic package**:
-A `.fjgraphic` file the Graphic dialog's Export… writes (`export_graphic` for an agent): a stored zip of a `manifest.json`, one **Module** and only the project fonts and assets the engine was seen to draw, measure, fall back to or resolve while drawing the graphic's frames and its `enum`/boolean variants — never one of the app's bundled fonts. Its paths mirror `graphics/`, so a later import is a copy; a file name the zip path cannot hold is stored under a tidied one, the manifest keeping the original. Exporting is not an edit, and the app does not open one yet (spec §11 G-46).
+A `.fjgraphic` file the Graphic dialog's Export… writes (`export_graphic` for an agent): a stored zip of a `manifest.json`, one **Module** and only the project fonts and assets the engine was seen to draw, measure, fall back to or resolve while drawing the graphic's frames and its `enum`/boolean variants — never one of the app's bundled fonts. Its paths mirror `graphics/`, so a later import is a copy; a file name the zip path cannot hold is stored under a tidied one, the manifest keeping the original. Exporting is not an edit. Frame Job opens one (a Finder double-click, the Graphic dialog's From File…, `import_graphic`) to import it: checked, asked about, and its files copied into the front project's `graphics/` under the manifest's names (spec §11 G-46, G-47).
 _Avoid_: graphic archive, bundle, template file (a **Template** ships with the app)
 
 **Error card**:

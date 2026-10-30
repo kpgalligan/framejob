@@ -22,7 +22,8 @@ import Foundation
 /// `rename_graphic` and `restore_graphic` (spec §11 G-27, G-28, G-29); and
 /// the graphic browser two after those, the Insert ▸ Graphic… sheet's acts:
 /// `list_graphics` and `insert_graphic` (spec §11 G-45); and its phase 2 one more, the
-/// sheet's Export…: `export_graphic` (spec §11 G-46).
+/// sheet's Export…: `export_graphic` (spec §11 G-46); and the `.fjgraphic` import one more,
+/// `import_graphic` (spec §11 G-47).
 extension AgentServer {
     /// The graphic rows, given the sentences the clip group already hoisted.
     func graphicTools(
@@ -371,6 +372,29 @@ extension AgentServer {
                             + "lacks it. Its folder must exist.",
                     ],
                 ], required: ["name", "from", "path"]),
+            tool(
+                "import_graphic",
+                "Copies a .fjgraphic package (one export_graphic or Export… wrote) into the "
+                    + "project's graphics/: its module, fonts and assets under the names the "
+                    + "manifest gives, as the Import Graphic sheet's Import does. The package "
+                    + "is checked first — a stored zip whose entries match its manifest by "
+                    + "path, size and SHA-256, a format this app reads, each font loading and "
+                    + "each picture a name asset(name) can use — and a refusal writes nothing. "
+                    + "A name the project already holds with the same bytes is reused; a "
+                    + "module or font name holding something else is suffixed (-2, -3, …; "
+                    + "renamed_from says what the package called it); a picture name holding "
+                    + "a different picture is refused, since the module reaches it by name. "
+                    + "No file is replaced, and a failure part-way removes what was written. "
+                    + "Reply: {name (the module), renamed_from?, title, module (written or "
+                    + "reused), fonts [{name, renamed_from?, action}], assets [{name, action}], "
+                    + "note}. Not undoable. Mirrors a .fjgraphic opened from the Finder, or "
+                    + "Insert ▸ Graphic…'s From File…",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "The .fjgraphic file to import; ~ is expanded.",
+                    ],
+                ], required: ["path"]),
         ]
     }
 }

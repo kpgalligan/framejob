@@ -405,8 +405,9 @@ log is where the startup parity check would complain — `grep "Frame Job: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **101** since the graphic browser's phase 2
-`export_graphic` (spec §11 G-46; 100 from its phase 1 `list_graphics` and
+`op_argument_proof.py` asserts **102** since the `.fjgraphic` import's
+`import_graphic` (spec §11 G-47; 101 from the graphic browser's phase 2
+`export_graphic`, spec §11 G-46; 100 from its phase 1 `list_graphics` and
 `insert_graphic`, spec §11 G-45; 98 from #340's
 `add_speed_ramp`, 97 from cut-by-transcript CT-4's `get_transcript`, 96 from
 CT-3's `transcribe_for_fillers`, 95 from CT-2's
@@ -25666,4 +25667,85 @@ python3 tools/proof/graphics_menu_proof.py              # → 44/44
 python3 tools/proof/graphic_browser_proof.py            # → 22/22
 python3 tools/proof/graphics_menu_proof.py --mutant browser-export-failed-enabled
 python3 tools/proof/graphic_browser_proof.py --mutant export-frame-zero
+```
+
+## The `.fjgraphic` import — opening a package (`core/tests/graphic_package_read.rs` and four core mutants; `graphic_import_proof.py` P1, S0, A0, R1, R2, C1–C4, F0, F1, W1, L1, L2, Z1 and four mutants; spec §11 G-47)
+
+Spec §11 G-47 makes Frame Job open a `.fjgraphic`: a Finder double-click,
+Open With, a Dock drop or a browser's download reaches
+`ProjectDocumentController`, which hands it to
+`GraphicImportSheetController.open(packageAt:)`; the Graphic dialog's From
+File… takes one too; `import_graphic` is the agent's door, so the product
+catalog is **102** tools. The core checks the package
+(`rc_graphic_package_read`, `core/src/graphic_package_read.rs`), the app
+checks the fonts and pictures, an Import Graphic sheet asks first, and the
+files are copied into the front project's `graphics/` under the manifest's
+names (`GraphicPackageImport.swift`). The UTI conforms to `public.data` and
+`public.content`, and the app gains a Viewer row ranked by V-5.
+
+- **`core/tests/graphic_package_read.rs`** (in `make test`), black box
+  through the FFI with its own stored-zip builder (each entry's method and
+  size fields its knobs), a bitwise CRC-32 and `sha2`: a package built here
+  reads and each offset points at its bytes; a round trip through
+  `rc_graphic_package_write` answers the whole manifest text, in key order,
+  with the legalised paths and the project names (`Ver:dana.ttf`,
+  `red\dot.png`); and each check refused by its own sentence: a flipped data
+  byte with its CRC fixed (SHA-256), a flipped byte (CRC), a deflated entry,
+  the manifest not first, format 2 and format 0, `fonts/../x.ttf`,
+  `fonts/.x.ttf` and `../x.ttf` paths, `.x.ttf`, `a/b.ttf` and `../x.ttf`
+  names, a `media/` path, an extra and a missing entry, a size mismatch, a
+  module that is not UTF-8, four truncations, and Zip64 markers in an entry
+  and in the end record. `model_tests.rs`'s null sweep covers the export.
+- **`graphic_import_proof.py`** launches its own instances in a scratch home
+  (the docstring has each row): P1 reads the built Info.plist; A0–W1 run on
+  one instance over saved fixtures (G-46's `late-font` and `odd-names`,
+  exported from project A); L1 and L2 each launch the app with
+  `late-font.fjgraphic` as the launch's open argument — L1 sees the Import
+  Graphic sheet on the one untitled project with no Welcome window and
+  cancels it; L2 adds the dev-only `-RCDevGraphicImportAccept YES`, so the
+  sheet presses its own Import, and sees the package land once and the
+  Graphic dialog's message. Its four `APP_MUTANTS` run the tool rows:
+  `asset-replace` → C3, `font-no-suffix` → C4, `module-reuse-any` → C2,
+  `no-rollback` → W1 (Rule R).
+
+`op_argument_proof.py` asserts `PRODUCT_TOOLS = 102`; `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py` list `import_graphic` among the
+forty app-state tools; `assistant_prompt_proof.py`'s F6 holds the guide to
+1500 of 1500 (the graphics topic reads "write, rename, delete, restore,
+export or import a module; place, change or insert a graphic clip; its
+reference, fonts and assets"); `capture_spike/inventory.json` holds the
+import sheet's six sites (`open`'s alert and `presentError`,
+`untitledEditor`'s `presentError`, `present`'s `presentAsSheet`, `alert`'s
+`beginSheetModal`, and `showGraphicBrowser(selecting:message:)`'s
+`presentAsSheet`) and the moved keys of
+`EditorViewController+GraphicMenus.swift` and
+`GraphicBrowserSheetController.swift`.
+
+**The four core mutants**, each one replacement in
+`core/src/graphic_package_read.rs` (anchor asserted once), run with
+`cargo test --release --test graphic_package_read` and the file restored
+after each. 4 of 4 caught.
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `sha-unchecked` | the SHA-256 comparison skipped | `a_flipped_data_byte_with_its_crc_fixed_is_refused_by_its_sha256` |
+| `newer-accepted` | any `fjgraphic` number accepted | `a_newer_format_and_format_0_are_refused` |
+| `escape-accepted` | a path's `<n>` not held to `is_legal` | `an_escaping_or_hidden_path_is_refused` |
+| `deflate-accepted` | method 8 accepted | `a_deflated_entry_is_refused` |
+
+**The recorded run (2026-10-29, Release after `make gate`, which passed with
+the four baseline warnings):** `RC_PROOF_APP=release graphic_import_proof.py`
+17/17 (P1 ranked Owner for `com.kgalligan.FrameJob`; 17/17 on Debug too, P1
+Alternate); `graphic_browser_proof.py` 22/22; `graphics_menu_proof.py`
+44/44; `op_argument_proof.py` 172/172 and `phase9_proof.py` 237/237 on one
+Release instance, its log clean. App mutants (Debug): `asset-replace` caught
+at C3, `font-no-suffix` at C4, `module-reuse-any` at C2, `no-rollback` at W1,
+each the only failure. With the four core mutants above, 8 of 8 caught.
+`wc -l app/Sources/ReelCore.swift` is 763.
+
+```sh
+cd core && cargo test --release --test graphic_package_read
+make app-debug
+python3 tools/proof/graphic_import_proof.py             # → 17/17
+python3 tools/proof/graphic_import_proof.py --mutant asset-replace
 ```

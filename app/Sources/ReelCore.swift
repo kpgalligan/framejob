@@ -618,13 +618,10 @@ private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDia
     takeString(raw).map(GraphicDiagnostic.list(json:)) ?? []
 }
 
-/// The engine's fonts and assets (`RcGraphicLibrary`). Filled with
-/// `addFont` / `addAsset` until the first compile or rasterize against it
-/// FREEZES it; an add after that throws. A module compiled against it keeps
-/// its fonts alive, so the two are freed in either order.
+/// The engine's fonts and assets (`RcGraphicLibrary`), frozen by its first compile or rasterize;
+/// it and a module compiled against it may be freed in either order.
 final class GraphicLibrary {
-    /// The header's `RC_GRAPHIC_MAX_SIDE`, pinned to the engine's `MAX_SIDE`:
-    /// a larger side is refused here, before a buffer is allocated for it.
+    /// The header's `RC_GRAPHIC_MAX_SIDE`; a larger side is refused before allocating.
     static let maxSide = Int(RC_GRAPHIC_MAX_SIDE)
     fileprivate let handle: OpaquePointer
 
@@ -643,22 +640,18 @@ final class GraphicLibrary {
         if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
     }
 
-    /// The engine's decoded-image cache, one per process (spec §11 G-39): its
-    /// limit set to `limit` bytes and trimmed least recently used first; the
-    /// bytes it holds after. 0 empties it.
+    /// Sets the per-process image cache's limit (spec §11 G-39); answers the bytes it holds.
     @discardableResult static func imageCache(limit: Int) -> Int {
         rc_graphic_image_cache(max(0, limit))
     }
 
-    /// The engine's own family names, sorted — the exact strings a
-    /// `font-family` must match. FREEZES the library, as a compile would.
+    /// The engine's family names, sorted. FREEZES the library.
     func families() -> [String] {
         guard let json = takeString(rc_graphic_library_families(handle)) else { return [] }
         return ReelJSON.decode([String].self, from: json) ?? []
     }
 
-    /// The font blobs (by add order) and image assets every parse and measure against this
-    /// library has used (spec §11 G-46 (b)). FREEZES it, as a compile would.
+    /// What every parse and measure has used (spec §11 G-46 (b)). FREEZES the library.
     func usage() -> GraphicUsage {
         GraphicUsage.decoded(takeString(rc_graphic_library_usage(handle)))
     }
@@ -720,7 +713,7 @@ final class GraphicModule {
     }
 }
 
-/// The core's `.fjgraphic` writer (spec §11 G-46 (c)), `GraphicPackageJob`'s file write.
+/// The core's `.fjgraphic` writer (spec §11 G-46 (c)) and reader (G-47 (c)).
 enum ReelGraphicPackage {
     /// Writes the package at `path` from `packageJSON` and `data` (the files' bytes in order);
     /// answers its `manifest.json`, or throws the core's sentence.
@@ -732,20 +725,26 @@ enum ReelGraphicPackage {
         }
         return manifest
     }
+
+    /// Checks the package held in `data` (spec §11 G-47 (c)); answers its manifest with each
+    /// file's `offset` in `data`, or throws the core's sentence.
+    static func read(_ data: Data) throws -> String {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let raw = withByteBuffer(data) { rc_graphic_package_read($0, $1, &err) }
+        guard let answer = takeString(raw) else {
+            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
+        }
+        return answer
+    }
 }
 
 // MARK: - The agent socket
 
-/// The core's Unix-socket listener for the agent server (road map 14, spec
-/// §11 MC-1), the only listener since MC4 deleted the TCP one, serving the
-/// catalog through `AgentServer`'s handler. Only the wrapper
-/// lives here, for the one-file rule above; the path, the MC-2 policy and
-/// the log lines are `AgentServer+Socket.swift`'s.
+/// The core's agent-socket listener (spec §11 MC-1); its policy is `AgentServer+Socket.swift`'s.
 enum ReelAgentSocket {
-    /// Binds at `path`, chmod 0600; throws the core's sentence. Never
-    /// unlinks a file already there, and a second bind in one process is
-    /// refused. `handler` and `context` must stay valid for the process's
-    /// life, because `release()` never joins.
+    /// Binds at `path`, chmod 0600, or throws the core's sentence (a file already there is
+    /// never unlinked; a second bind is refused); `handler` and `context` stay valid for the
+    /// process's life.
     static func start(
         path: String, serverName: String, version: String, toolsJSON: String,
         handler: RcAgentToolHandler, context: UnsafeMutableRawPointer?
@@ -759,9 +758,8 @@ enum ReelAgentSocket {
         }
     }
 
-    /// For quit: unlinks the socket file only if it is still this
-    /// listener's, then abandons the listener without a join. Safe when
-    /// none is bound.
+    /// For quit: unlinks this listener's own socket file and abandons it, unjoined; safe
+    /// when none is bound.
     static func release() {
         rc_agent_socket_release()
     }

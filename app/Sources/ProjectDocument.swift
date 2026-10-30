@@ -1,7 +1,7 @@
 // The app module is named "Frame Job", so project.yml sets
 // NSDocumentClass = "FrameJob.ProjectDocument" on every CFBundleDocumentTypes
-// entry — the package type AND the movie/audio/image Alternate entries that
-// make File > Open on a `.mov` build a project (spec §1).
+// entry but the Frame Job Graphic Viewer row (spec §11 G-47) — the package type AND the
+// movie/audio/image Alternate entries that make File > Open on a `.mov` build a project (§1).
 
 import AppKit
 import UniformTypeIdentifiers

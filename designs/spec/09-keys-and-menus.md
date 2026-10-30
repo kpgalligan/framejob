@@ -179,10 +179,12 @@ graphic's looping preview, title and description, Export… at the bottom
 left (§11 G-46: the chosen graphic as a `.fjgraphic` package, in a save
 panel shown as a sheet on the browser, which stays up; enabled when the
 graphic compiles), From File… to its right (a `.js` chosen in an open panel
-once the sheet is down), and Cancel (Esc) and Insert (Return; a double-click
+once the sheet is down, or a `.fjgraphic`, which §11 G-47's Import Graphic
+sheet asks about before importing it), and Cancel (Esc) and Insert (Return; a double-click
 on a graphic is Insert) at the right. None of these items takes a key
-equivalent, for the caption items' reason; §11 G-16, G-45 and G-46 have the
-rules.
+equivalent, for the caption items' reason; §11 G-16, G-45, G-46 and G-47
+have the rules. A `.fjgraphic` opened from the Finder imports through the same
+sheet (G-47); no menu item imports one, and File ▸ Open does not list it.
 Issue batch B84 (#103) adds, after a separator straight under Add Image to
 Graphics… and before the separator above Export…, **Rename Graphic…**,
 **Delete Graphic…** and **Restore Graphic Version…**, in that order and

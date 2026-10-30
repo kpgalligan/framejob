@@ -13,6 +13,11 @@
 // dirty (G-3), `write_graphic`'s posture. An asset name `asset(name)` cannot
 // use is filed under a legal one (spec §11 G-23): `name` answers the name
 // used, and `renamed_from` the name asked for, only when the two differ.
+//
+// `import_graphic` (spec §11 G-47) copies a `.fjgraphic`'s module, fonts and
+// assets in through `ProjectDocument.importGraphicPackage`
+// (`GraphicPackageImport.swift`), the body the Import Graphic sheet runs; on
+// MAIN, ending in the plan's one `rescan()`, and not undoable either.
 
 import Foundation
 
@@ -47,6 +52,21 @@ extension AgentServer {
         ]
         if let asked = landed.renamedFrom { result["renamed_from"] = asked }
         return try jsonResult(result)
+    }
+
+    /// `import_graphic` — UI path: a `.fjgraphic` opened from the Finder, or Insert ▸
+    /// Graphic…'s From File… (`GraphicImportSheetController.swift`), whose sheet asks first.
+    func importGraphic(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        _ = try graphicStore(document)
+        let source = try graphicImportSource(a)
+        let plan: GraphicImportPlan
+        do {
+            plan = try document.importGraphicPackage(GraphicPackageContents.read(at: source))
+        } catch let error as ReelCoreError {
+            throw ToolError(message: error.message)
+        }
+        return try jsonResult(plan.reply)
     }
 
     /// `path`, `~` expanded: a regular file, or the sentence saying there is none.
