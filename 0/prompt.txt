@@ -1,0 +1,15 @@
+All text entry in the properties panel seems to capture input. For example, after exiting focus on a text field, when I hit the space bar to start play, the text field is then re-focused, and the space is entered there. Instead, text fields in the app should be focus-averse. Only clicking or double-clicking a field should give it focus, and when the user hits enter or tab, that field should lose focus, and the broader app should then get focus, so pressing space or other keys operates the preview and play tools.
+
+---
+
+<task-notification>
+<task-id>bzgfluq37</task-id>
+<tool-use-id>toolu_012WaYmnaJCHWyo8LsWdezTk</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-ux-updates/92fb208f-b576-497f-a18b-ce0d110e2dd1/tasks/bzgfluq37.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the full gate in the background" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+commit
