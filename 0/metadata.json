@@ -1,0 +1,61 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M670NV5VMAK0BS1X20P2PS5P",
+  "session_id": "9bb0487d-a352-45e3-9da8-07b6f4762c27",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-30T18:20:44.527163Z",
+  "branch": "worktree-audio-updates",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "app/Sources/AgentCatalog+Audio.swift",
+    "app/Sources/AgentCatalog+Properties.swift",
+    "app/Sources/AgentServer+Audio.swift",
+    "app/Sources/AudioNormalize.swift",
+    "app/Sources/AudioPane.swift",
+    "app/Sources/InspectorRows.swift",
+    "app/Sources/ProjectSnapshot.swift",
+    "core/src/audio.rs",
+    "core/src/model_props.rs",
+    "core/tests/audio_gain.rs",
+    "core/tests/evaluate_tests.rs",
+    "core/tests/paste.rs",
+    "designs/spec/04.3b-inspector-clip-sections.md",
+    "designs/spec/05.2a-project-schema-canvas-media-video.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/audio.md",
+    "designs/spec/README.md",
+    "docs/guide/audio.md",
+    "docs/manual-checks.md",
+    "tools/proof/patch_door_patches.py",
+    "tools/proof/phase5_proof.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "438751756b21",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 206,
+    "cache_creation_tokens": 310275,
+    "cache_read_tokens": 26932541,
+    "output_tokens": 71727,
+    "api_call_count": 100
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}

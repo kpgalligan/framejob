@@ -1,0 +1,9 @@
+I want to make some comprehensive improvements to the audio handling in our tool. I've added a sample audio file 'samples/Rode-usb-mic.m4a', which was recorded with my RODE USB desktop mic. I want to be able to turn that into usable audio for videos. The first issue is "Normalize", which simple bumped the volume level up to the max of 400%. That is still below what would be the max. This audio sample is pretty clean, so it could be increased even more without issue. 400% should not be a hard max.
+
+---
+
+Commit it. We should make other useful samples as well and add them later.
+
+---
+
+Review the audio editing features of other video editing tools. What other audio editing features should we support to be considered a professional-grade tool?
