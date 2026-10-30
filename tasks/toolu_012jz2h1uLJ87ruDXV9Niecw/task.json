@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_012jz2h1uLJ87ruDXV9Niecw",
+  "agent_id": "aa295522a2947b456",
+  "subagent_type": "general-purpose",
+  "task_description": "AP0 spike S1: own DSP vs Apple units",
+  "token_usage": {
+    "input_tokens": 182,
+    "cache_creation_tokens": 410261,
+    "cache_read_tokens": 23212195,
+    "output_tokens": 224704,
+    "api_call_count": 91
+  },
+  "started_at": "2026-10-30T15:29:50.364869-04:00",
+  "completed_at": "2026-10-30T16:12:10.55107-04:00"
+}
