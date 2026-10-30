@@ -21,15 +21,19 @@ governs a module now.
   `linear`, written only when `linear`, format 24, spec §11 GR-18, HD-16),
   re-exported by `model.rs`; the recipe canvas carries it only when linear.
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
-  (`VideoProps`, `AudioProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
-  `Filter`, `Reflection`, `BlendMode`, `Compressor`, `Duck`) and their
-  defaults, re-exported whole by `model.rs` so every `crate::model::X` path
-  holds. **`BlendMode`'s, `ObscureKind`'s and `TrackMatte`'s declaration
-  ORDER are shader discriminants** (`ProjectSnapshot.swift` and
+  (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`,
+  `Reflection`, `BlendMode`) and their defaults (the audio group's are
+  `model_audio.rs`'s), re-exported whole by `model.rs` so every
+  `crate::model::X` path holds. **`BlendMode`'s, `ObscureKind`'s and
+  `TrackMatte`'s declaration ORDER are shader discriminants** (`ProjectSnapshot.swift` and
   `TrackMatte.swift` derive the code from the case index, `Compositor.metal`
   compares against the same integers): append,
   never reorder. `Normal` is 0 with no `+1`, so a zeroed uniform block, an
   older recipe and a file with no `blend` key all render source-over.
+- `model_audio.rs` — the audio vocabulary: `AudioProps`, `Compressor` and
+  `Duck` and their defaults (the FIELD `Clip.audio` stays in `model.rs`),
+  re-exported through `model_props.rs`; a pure move out of it (road map
+  "audio" AP0), so the audio group's new keys land here.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
   — the text, shape, region and motion vocabularies, each re-exported through
   `model_props.rs`. Text and shape are the two sources the model only

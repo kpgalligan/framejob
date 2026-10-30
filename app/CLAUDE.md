@@ -1687,11 +1687,21 @@ the key map behind it.
   `GraphicLibrary.maxSide`, since an error card is drawn through `bitmap(_:)`
   at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
   line, so it stays one integer literal.
-- `AudioTap.swift` · `AudioDSP.swift` — the `MTAudioProcessingTap` playback
-  and export share, and the four sample-level effects: noise reduction (a
-  512-sample delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE the pan, or it is
-  algebraically self-cancelling) and pan (constant-power, unity at centre).
-  A track whose clips ask for none is bit-identical.
+- `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
+  `AudioCompressorStage.swift` · `AudioNoiseReductionStage.swift` — the
+  `MTAudioProcessingTap` playback and export share, and the four sample-level
+  effects: noise reduction (a 512-sample delay the builder leads by, SY-25),
+  the compressor, the mono fold (BEFORE the pan, or it is algebraically
+  self-cancelling) and pan (constant-power, unity at centre). A track whose
+  clips ask for none is bit-identical. `AudioTap.swift` is the tap
+  (`AudioTapContext`, `AudioTap.make`); `AudioTapSchedule.swift` is what a
+  track's tap is told when the composition is built (`AudioDSPSpan`,
+  `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
+  it (road map "audio" AP0). `AudioDSP.swift` keeps the parameters
+  (`AudioCompressorSettings`, `AudioClipDSP`), the pan law and the chain
+  (`AudioDSPChain`, whose order is the channel strip's); each stage is a file
+  of its own, `AudioCompressorStage.swift` and `AudioNoiseReductionStage.swift`,
+  pure moves out of it (AP0).
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
@@ -2260,14 +2270,18 @@ free.
   `EditorViewController+Audio` holds the Clip menu's sound
   commands (Normalize, moved whole out of the frozen file, and Synchronize
   Audio) with their validator arms.
-- `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` — the meter
-  reads the DSP tap that already exists and multiplies by the plan's
-  envelope; a second `PostEffects` tap cannot be built (one
-  `audioTapProcessor` per input, exclusive flags). Do not "fix" it back. The
-  MODEL publishes a raw peak and RMS and the VIEW owns the ballistics, with
-  ONE resting appearance so the harness settles. `Loudness` is BS.1770-4 with
-  no AVFoundation in it, refusing any rate but 48 kHz. A metered track counts
-  only while one of its OWN sounding spans holds the playhead
+- `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` ·
+  `ExportLoudness.swift` — the meter reads the DSP tap that already exists
+  and multiplies by the plan's envelope; a second `PostEffects` tap cannot be
+  built (one `audioTapProcessor` per input, exclusive flags). Do not "fix" it
+  back. The MODEL publishes a raw peak and RMS and the VIEW owns the
+  ballistics, with ONE resting appearance so the harness settles.
+  `Loudness.swift` is BS.1770-4 (`LoudnessReport`, `LoudnessMeter`) with no
+  AVFoundation in it, refusing any rate but 48 kHz; `ExportLoudness.swift`
+  (a pure move out of it, road map "audio" AP0) is the export gain a target
+  and a ceiling ask for and the export's summary line, and
+  `phase5_chrome.py`'s section 9 compiles the two alone. A metered track
+  counts only while one of its OWN sounding spans holds the playhead
   (`LevelMeterTrack.mix`; its format family's resolved segments, #65): a sink
   keeps its last buffer across silence.
 
