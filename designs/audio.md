@@ -355,7 +355,25 @@ out: `git show 9e47f56:<path>` gives them back).
   −41.67 LUFS as exported (−44.7 is the mono file's own figure), and Normalize must use the
   exported figure. Speech-only loudness reads 1.1–1.7 LU above gated BS.1770 here; AU-4's gated
   target stands.
-- **S1, own DSP or Apple's units live:** pending.
+- **S1, own DSP or Apple's units live — own; AU-3 stands, no amendment.** The rule, fixed before
+  the runs: a subject is admissible for a live stage when it allocates and locks nothing on the
+  tap's thread, reads byte-identically twice AND whatever the buffer sizes, is within 0.1 dB of
+  its analytic response (a limiter within 0.1 dB of a −1 dBTP ceiling), has one constant latency
+  ≤ 512 samples, and an eight-stage stereo chain costs ≤ 1 % of real time. Frame Job's own stages
+  (Double RBJ biquads, an expander, the shipped compressor, a lookahead true-peak limiter) pass all
+  five; no Apple unit passes for any stage. Apple's output depends on how the stream is cut into
+  render calls — at rounding level for `AUNBandEQ` and `AUPeakLimiter` (−145 to −223 dBFS), up to
+  −34 dBFS for `AUDynamicsProcessor` on irregular slices, which `AudioTap`'s splits at cuts and the
+  player's 4096-frame against the reader's 512-frame buffers both make. `AUPeakLimiter` limits
+  sample peak at a fixed 0 dBFS (+3.10 dBTP on a crest signal, +2.10 with −1 dB after it) and its
+  latency is its attack (48–1440 samples). `AUNBandEQ` is exactly the RBJ cookbook, but only
+  1.5–1.6× cheaper than own biquads (under the 2× bar), its stacked high-passes make a
+  Linkwitz-Riley slope, not Butterworth, and it smooths a parameter change itself over 3–27 ms. The
+  own chain of eight stages costs 107.5 µs per 1024 stereo frames (0.50 % of real time); every own
+  stage adds no latency but the limiter, 158 samples (3.3 ms at a 2 ms lookahead). Apple's units
+  *can* run in the tap without allocating or locking (v2 `AudioUnitRender`; v3 only with its
+  input bus enabled and block-typed calls); the record keeps that recipe. The tap's thread is
+  AudioToolbox's real-time thread on the export's path too.
 
 **What it changes in the phases.** AP1 measures the exported figure (mono counted twice). AP2's
 master limiter in the export's float stage is required, not optional — two clips each under their
@@ -366,6 +384,17 @@ track (and inner track), makes track dynamics exact in the export through per-tr
 approximate in the preview, and asks the owner whether an exact preview (the `AVAudioEngine`
 route) is wanted as a road map of its own.
 
+From S1, for every live stage (AP2, AP3, AP4): scalar per-sample code or element-wise vDSP only —
+`vDSP_biquad` and `vDSP_conv` give different bits for different buffer sizes; an FIR loops its taps
+outermost (bit-identical to the scalar loop and 4.7× faster); a stage's `reset()` restores its fresh
+state and `AudioTap` keeps resetting on StartOfStream, because the player's first callback is a
+silent pre-roll that otherwise leaves a gate closed (−56 dBFS off the export). AP2's limiter takes
+the maximum over a 64-tap Kaiser (β 10) detector's phases AND BS.1770 Annex 2's: a detector the
+size of Annex 2's alone lets broadband onsets through up to +0.97 dB, while Annex 2 over-reads
+speech by 0.14 dB, so a limiter exact by an accurate meter is reported at −0.86 dBTP by
+`Loudness.swift` and `phase5_proof.py`. Like the noise reducer, it runs for the whole track once
+any clip on it asks, so the track's delay never changes at a cut (670 samples with both).
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in
@@ -375,7 +404,8 @@ issue.
 ## Risks
 
 - **CPU in the live tap.** Up to eight stages per clip on every composition track, real-time.
-  S1 measures it; a stage that cannot run live renders offline as isolation does.
+  S1 measured eight own stages at 0.50 % of real time per stereo track; a stage that cannot run
+  live renders offline as isolation does.
 - **Preview against export.** Master processing may exist only in the export (S3). If so, the
   guide and the meter say so rather than leave the two to differ silently.
 - **Offline renders.** Isolation and voice effects add render time and cache space; both reuse
