@@ -572,6 +572,84 @@ touched product code (the format number, `OP_COUNT`), so on Release after it
 **Owed.** The person checks SE-25 (the speech duck by ear and its line's look) and SE-26 (the
 shapes by ear) in `docs/manual-checks.md`; the crossing-bound nit as an issue.
 
+### AP13's record (2026-10-30)
+
+**Decided.** AU-130…AU-136, recorded before the code: grains of the player's mix read from a
+composition built only for scrubbing, one `AVAssetReader` at a time on
+`com.kgalligan.framejob.scrub-audio`, played through an `AVAudioEngine` only scrubbing uses;
+80 ms with 5 ms sin² edges, forward from the frame-snapped playhead and forward when dragging
+left; one grain ahead and only on a new frame, so a hold or the mouse-up goes silent; the scrub
+build remade as its own never-dropped queue item when the player's composition object changes;
+stateful stages fresh in each grain; no toggle, key or tool. The adversary's three objections
+were taken before the code: a `move` on an inactive scheduler starts a scrub and `end()` forgets
+the last start, the rebuild is its own queue item, and AU-134 rests on `AudioTapContext.prepare`
+making a new chain per reader, scored on the scheduler's own adjacent grains (C3).
+
+**Landed.** `ScrubGrains.swift` (174: `ScrubGrain`, `ScrubGrains`' window and `read`,
+`ScrubGrainScheduler`), `ScrubAudio.swift` (262: `ScrubSource`, `ScrubGrainSink`,
+`ScrubEngineSink`, `ScrubAudio`) and `EditorViewController+ScrubAudio.swift` (28). Wiring only in
+the frozen files: `EditorViewController.swift`'s `scrubAudio` and its `invalidate()` in `deinit`,
+`TimelineView.swift`'s `onScrubEnded` called in `endGesture`'s scrub arm;
+`EditorViewController+Timeline.swift` (482) calls `scrubAudioMoved()` after `setPlayhead` and
+installs `onScrubEnded`. `Playback.swift` and `AudioTap.swift` are untouched. No core, FFI,
+format, op, tool or `UserDefaults` change.
+
+**Measured.** `scrub_audio_probe.py` 15/15 on the final instrument: the window's edges
+1.07e-5 and its largest step 0.0065449 (π/480 = 0.0065450); 14 back-to-back grains in a 1 s drag
+at 60 Hz; the last grain ending 0.1067 s after a hold began; C1's grains at 1.0, 3.0 and 5.3 s
+and C2's from 1.96 s equal to the export's float read (max |Δ| 0.0), C2's tail exactly 0; C3's
+20 adjacent grains through a compressor and noise reduction each equal to a cold read on a fresh
+build (max |Δ| 0.0), against an RMS of 0.0194 between those grains and the whole-timeline read,
+so the stages do start fresh per reader; E1–E5 max |Δ| 0.0. Reported, not scored: a grain that
+starts inside a gain ramp differs from the export's read at the same frames (max |Δ| 0.0988 for
+a grain from 2.25 s inside a duck's attack), because AVFoundation evaluates a volume ramp from
+where its reader starts; a diagnostic run (not kept) found the gain off by up to about a third at
+the grain's first frame, converging toward its end, and a grain starting exactly on a ramp's last
+tick off for its first 139 frames. The player seeking into a ramp is in the same position.
+`--mutants` 8 of 9 killed, each by its named row; `read-by-arrival` survives as equivalent
+(below), and the script now runs it unscored: 8/8 killed, exit 0. The spec's 9/9 bar is the
+record's deviation. `make gate` PASS 473 s (names 1, typecheck 6, fmt 3, lint 15, test 299,
+app 148; the four baseline warnings), then PASS 105 s after the docs' last edits (names and
+test re-ran).
+`make app-debug`, an instance launched by `proof_app.py`: its log printed no `Frame Job: ` line,
+and a project opened and closed over MCP (the editor's `deinit` stopping the scrub sink) left it
+running. There is no Release proof: the probe drives no app.
+
+**Deviations.** The mutant `read-by-arrival` (frames placed in arrival order rather than by
+presentation time) is EQUIVALENT: an `AVAssetReaderAudioMixOutput` with a `timeRange` stamps its
+first buffer exactly at the range's start and fills a composition gap with silent buffers, so
+arrival and presentation agree sample for sample, in C1 and in a grain across a gap's far edge
+(2.96 s over a gap ending at 3.0 s), tried as a C2 extension to look for the one case that could
+differ. That extension was then dropped from the probe: across the far edge the grain against the
+export read max |Δ| 0.000195 in 2 of 5 runs of one binary and 0 in the other 3, a
+nondeterminism in AVFoundation's mix at a segment that starts after empty time, under 1e-3 and
+not scored. `read` keeps the presentation-time placement AU-131 asks for. G4 holds on the last
+granted frame: a hand that stops on a frame the lead rule passed over gets that frame's one grain
+first, which is AU-132's rule. C1's third start is 5.3 s, not 5 s: `DuckProps`' default 1 s
+release puts a gain step at 5.0 s. `ScrubAudio.builds` is an `NSLock`-guarded computed property
+rather than a stored one (written on the queue, read on main).
+
+**Review.** One should-fix: `read-by-arrival` was still scored, so `--mutants` exited 1 on
+every run, and AU-136 and its index row said nine mutants killed. Fixed: the probe's
+`EQUIVALENT` set runs it and prints it unscored (8/8 killed, exit 0), and AU-136, its row, the
+proof README and this record say eight plus one equivalent; fix pass `make gate` PASS 431 s,
+`spec_index_proof.py` 213/213. Accepted as limits, not filed: `ScrubAudio` never reads a grain's
+`at`, so the 0.12 s silence after a hold is proved on the scheduler's clock (G4), and a queue
+lagging behind a scrub rebuild or a read longer than 80 ms plays its grains late (neither time is
+measured in the app; PB-14 hears it); and an anchor or build failure of the unscored mutant does
+not fail `--mutants`. The second review passed with those two nits and the docstring's "nine
+mutants … scores each killed".
+
+**Integrated.** AP11 had landed meanwhile, so its AU-110…AU-116, index rows, record, proof
+README section and docs stand beside this phase's (AP13's block after AP11's, with the block's
+own opening line), and the Lines cells were counted again (`audio.md` 366, `07.4` 65,
+`11-decisions/` 15170; `spec_index_proof.py` 213/213). PB-14 was still free.
+`EditorViewController+Timeline.swift` is 484 lines with AP11's line. No product code was touched
+by the merge. On the merged tree: `make gate` PASS 280 s (names 1, typecheck 6, test 139,
+app 134; fmt and lint unchanged), and `scrub_audio_probe.py` 15/15 with every figure as above.
+
+**Owed.** PB-14 in `docs/manual-checks.md` (the feel of a drag, no clicks, silence on a hold).
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

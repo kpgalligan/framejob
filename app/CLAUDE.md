@@ -1302,6 +1302,16 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
+- `ScrubGrains.swift` · `ScrubAudio.swift` · `EditorViewController+ScrubAudio.swift`
+  — audio while scrubbing (road map "audio" AP13, spec §11 AU-130…AU-136):
+  `ScrubGrains` the pure half (80 ms grains with 5 ms sin² edges,
+  `ScrubGrainScheduler`'s one-ahead rule, `read` over a build's mix as the
+  export's float read); `ScrubAudio` one window's player (its own
+  composition, rebuilt by its own queue item when the player's changes; one
+  reader per grain on its serial queue; a stale grain request dropped by
+  generation; `ScrubEngineSink`'s `AVAudioEngine` started on demand and
+  stopped 1 s after the drag, never `inputNode`). Wired by `timelineScrubbed`
+  and `TimelineView.onScrubEnded`.
 - `AudioRateCopy.swift` — a non-48 kHz audio source, or an MP3 whose
   LAME/Xing encoder delay Core Audio leaves in (read past it, SY-36), is read
   from a file-keyed 24-bit 48 kHz CAF copy in `NSTemporaryDirectory()/FrameJob/
@@ -3337,7 +3347,8 @@ R6-7), the transcribe sheet's Download row's KVO main hop
 observation), `FFmpegRewrap`'s serial queue, the container rewrap's per-input writer
 queues (`ContainerRewrapWriter.swift`), the one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue`, `LookGallery.queue` — a fourth one-frame render joins
-this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
+this entry rather than growing the list), the scrub audio queue (`ScrubAudio`'s
+`com.kgalligan.framejob.scrub-audio`, spec §11 AU-130), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main

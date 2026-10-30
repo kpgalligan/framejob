@@ -113,6 +113,11 @@ the same way.
 - **Expect:** the question says the video can be copied as it is and the flac soundtrack has to be re-encoded to AAC. The Media tab row and the clip are named `v.mkv`. It plays with its sound in sync, every scrub shows a picture and every single-frame step shows a new one.
 - **Source:** #227, #233 (issue batch B80, spec §11 #227 and #233; `ffmpeg_rewrap_proof.py` scripts the plan, the copy's frame times, the original and the fallbacks on generated files, never the question, the names or playback on screen).
 
+**PB-14 — A ruler scrub is heard, without clicks, and goes quiet on a hold and on mouse-up**
+- **Do:** 1. Place `samples/Rode-usb-mic.m4a` (or any recording of speech) on the timeline, and a music or tone clip on a second track under it. 2. Drag the playhead slowly along the ruler across a sentence, then quickly, then leftwards. 3. Stop mid-word and hold the mouse still for two seconds; then let go. 4. Click once on the ruler. 5. Mute the speech track and scrub again; unmute it, set the clip's volume to 25 % and scrub again. 6. Play, pause, and press ← and →; click a marker in the Document tab's Markers list.
+- **Expect:** each drag plays the speech under the playhead in short pieces, words recognisable at a slow drag, with no clicks or pops between pieces; the music under it is heard as well. Dragging left plays each piece forwards. On the hold, the sound stops within about a tenth of a second and stays silent; nothing plays after the mouse-up. A single click plays one short piece. With the track muted the speech is not heard; at 25 % it is quieter. The level meter does not move while scrubbing. Play, the arrow keys and the marker click play no scrub sound (playback plays as before).
+- **Source:** road map "audio" AP13 (spec §11 AU-130…AU-136; `scrub_audio_probe.py` scores the scheduler, the window, the reader and the queue, never the sound on the Mac's output).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

@@ -297,3 +297,70 @@ recorded before its code.
   relink that probes the new file rewrites `speech` in the same edit — spans starting at or
   past the new `duration` dropped, ends clamped to it, the list cleared when it empties or the
   file has no audio — so a relink never fails `validate` over spans (no re-detection).
+
+AU-130…AU-136 are AP13's (audio while scrubbing; survey B5), recorded before its code.
+
+- **AU-130 — Scrub grains are read from a composition built only for scrubbing, one
+  `AVAssetReader` at a time, and played through an `AVAudioEngine` only scrubbing uses.** The
+  build is `CompositionBuilder.build(plan:planJSON:urls:recipeKey:)` with `metering: false`, from
+  the player's plan, media and recipe slot, with fresh taps (for the reason `ExporterLoudness.swift`'s
+  header gives for its own build). Each grain is one `AVAssetReader` with an
+  `AVAssetReaderAudioMixOutput` over the build's `audioMix`, read in
+  `ExportAudioGain.floatMixSettings`. The readers run strictly one at a time on a new serial queue,
+  `com.kgalligan.framejob.scrub-audio`, and the grains play through an `AVAudioPlayerNode`. Spike
+  S3's E8 measured a mid-file reader's first buffer at 7.4–13.7 ms with one AAC track and 31–71 ms
+  with four (`tools/proof/audio_spike/S3/e8_premix.log`), and reused one mix across sequential
+  readers. Rate bursts on the `AVPlayer` are rejected: playing moves and reports the playhead
+  through `timeAdvanced`, fights `startSeek`'s one-in-flight rule, and
+  `seekingWaitsForVideoCompositionRendering` holds the sound behind the picture, and S1 found a
+  silent pre-roll. `audioTimePitchAlgorithm` and a scrubbing `AVAudioMix` are rejected because both
+  are still the player. The scrub build is remade when the player's composition object changes
+  (`===` against `Playback.built?.composition`), so a new plan, a DSP change, a landed reversal or
+  a ramp render is heard. The rebuild is its own queue item: it is posted whenever a move sees a
+  new composition, whether or not a grain is asked for, and it is never dropped by generation. No
+  player composition means no grain.
+- **AU-131 — A grain is 80 ms of the mix forward from the frame-snapped playhead, with 5 ms sin²
+  edges, at unity.** 3,840 frames at 48 kHz; the gain is `sin²(π/2·(i+0.5)/240)` rising over the
+  first 240 frames, 1 between, and the mirror over the last 240. A grain never reads past the
+  timeline's duration: within 80 ms of the end it is shortened to the end, and when fewer than 480
+  frames remain, or the playhead is at or past the end, there is none. Frames are taken by
+  presentation time: frames before the start are skipped, frames past the end are dropped, and a
+  short read is zero-padded.
+- **AU-132 — When grains play: one ahead, only on a new frame, silent on hold and on mouse-up.**
+  The press on the ruler and every drag position go to the scheduler through the same `move`; a
+  `move` on an inactive scheduler starts a new scrub. A grain is asked for only when the snapped
+  playhead differs from the last grain's start in this scrub (none at its start, so a press always
+  qualifies) and no more than 0.04 s of sound is still queued. Its start of sound is the later of
+  now and the end of what is queued, and the queue then ends one grain later. Holding still, or
+  moving within one frame, asks for nothing, so silence follows within 0.12 s (the lead plus one
+  grain). Mouse-up ends the scrub (the last start is forgotten, the queue's end is kept) and asks
+  for nothing more: the grain already handed to the output plays out its fade, and requests not
+  yet read are dropped by generation. The engine starts on demand on the scrub queue and stops 1 s
+  after the end, by a run-loop `Timer` the next move cancels. A configuration change
+  (`AVAudioEngineConfigurationChange`) makes the next start build a fresh engine. The engine's
+  `inputNode` is never touched, because touching it would ask for the microphone.
+- **AU-133 — Dragging left plays each grain forward from the playhead.** A reversed 80 ms of
+  speech carries no word, and finding a word is the point.
+- **AU-134 — A grain is the player's mix, and its stateful stages start fresh.** It carries the
+  clip's volume, fades, ducks, pan, mono fold, mute and solo (the plan) and the PreEffects tap's
+  DSP. It is sample-for-sample the export's float read at the same frames, except that stateful
+  stages (the compressor, noise reduction, and every later live stage) start fresh in each grain,
+  as an export starting at that frame would. That rests on the tap's `prepare` making a new
+  `AudioDSPChain` for each reader (`AudioTapContext.prepare` in `AudioTap.swift`), and not on its
+  0.1 s seek rule, which adjacent grains do not trip; `scrub_audio_probe.py`'s C3 scores it on the
+  scheduler's own adjacent grains. Were C3 to fail, `ScrubAudio` would make a fresh scrub build for
+  every grain while any track of the plan has an active DSP chain, with the measured build time
+  per grain in the record. The export's loudness gain and any master stage do not apply, as in the
+  player. The level meter does not move during a scrub, because the rate KVO arms it.
+- **AU-135 — Scrub audio has no toggle, no key and no tool.** It is always on; a person silences
+  it as they silence the preview, with mute or solo or the Mac's volume. So there is no
+  `UserDefaults` key and no View item (Final Cut Pro's View ▸ Audio Skimming is not copied). It has
+  no MCP mirror: a scrub makes no edit and no menu item, `set_playhead` is a seek and plays no
+  grain, and an agent cannot hear. `scrub_audio_probe.py` drives the scheduler and the reader
+  instead.
+- **AU-136 — The proof is `scrub_audio_probe.py`'s rows and mutants and manual check PB-14.** Its
+  rows G1–G7 score the window and the scheduler, C1–C3 the reader against the export's float read,
+  and E1–E5 `ScrubAudio`'s queue (what is played, the drop by generation, the rebuild); eight
+  mutants, each killed by its named row, plus `read-by-arrival`, which is equivalent (AVFoundation's
+  mix reader delivers in presentation order) and is run but not scored. How the drag feels — no
+  clicks, silence on hold — is the person's, PB-14 in `docs/manual-checks.md`.

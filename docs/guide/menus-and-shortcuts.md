@@ -394,7 +394,7 @@ instead ([below](#preview-canvas-gestures)).
 | Drag | Edge of an action band | Changes the action's length |
 | Double-click | Clip | Renames it in place |
 | Double-click | Nest clip | Goes inside the nest. To rename a nest clip, use ⇧⌘R |
-| Click or drag | Ruler | Moves the playhead (scrubbing) |
+| Click or drag | Ruler | Moves the playhead (scrubbing), playing the sound under it |
 | Drag | Marker | Moves it |
 | Double-click | Marker | Renames it |
 | Drag | Track header | Moves the track up or down the stack |

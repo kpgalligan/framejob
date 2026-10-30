@@ -63,6 +63,9 @@ final class EditorViewController: NSViewController {
     /// this view tree; `ProjectDocument` never touches it.
     let playback: Playback
 
+    /// Audio while scrubbing (`EditorViewController+ScrubAudio.swift`, spec §11 AU-130).
+    let scrubAudio = ScrubAudio()
+
     /// View ▸ Preview Window's panel, once it has been asked for (road map 2's
     /// phase 8b). A stored property is exactly what an extension cannot hold,
     /// which is why this one line is here and every other line of the feature
@@ -184,6 +187,7 @@ final class EditorViewController: NSViewController {
         // Drops the player item and stops the periodic observer. Releasing
         // the RecipeSource key is the DOCUMENT's job (ProjectDocument.close).
         playback.invalidate()
+        scrubAudio.invalidate()
     }
 
     // MARK: - View construction

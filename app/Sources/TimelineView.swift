@@ -97,6 +97,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var onSelectionChanged: ((Set<UInt32>) -> Void)?
     /// A scrub: the playhead is view state, so this never becomes an op.
     var onScrub: ((Ticks) -> Void)?
+    /// The scrub's mouse-up (its audio stops asking for grains, spec §11 AU-132).
+    var onScrubEnded: (() -> Void)?
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
@@ -755,6 +757,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     func endGesture(at point: CGPoint, flags: NSEvent.ModifierFlags) {
         if scrub != nil {
             scrub = nil
+            onScrubEnded?()
         } else if let session = clipDrag {
             clipDrag = nil
             onLiveEnd?(session.duplicating ? "Duplicate Clips" : "Move Clips")

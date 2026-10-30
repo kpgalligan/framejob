@@ -37,6 +37,7 @@ extension EditorViewController {
         // method on this controller.
         timeline.onSelectionChanged = { [weak self] ids in self?.timelineSelected(ids) }
         timeline.onScrub = { [weak self] time in self?.timelineScrubbed(time) }
+        timeline.onScrubEnded = { [weak self] in self?.scrubAudioEnded() }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
         timeline.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
@@ -131,6 +132,7 @@ extension EditorViewController {
     private func timelineScrubbed(_ time: Ticks) {
         playback.pause()
         setPlayhead(time)
+        scrubAudioMoved()
     }
 
     /// Applies ops to the current handle PURELY so a gesture can learn the

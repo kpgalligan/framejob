@@ -358,7 +358,8 @@ struct RangeSession {
 /// Scrubbing from the ruler. Playback stops for the duration of the drag —
 /// seeking under a running player fights the rate observer — and the time is
 /// pushed straight at the controller, never at an op: the playhead is view
-/// state (spec §5.2).
+/// state (spec §5.2). What is heard meanwhile is not the player but short
+/// grains of the mix at the playhead (`ScrubAudio`, spec §11 AU-132).
 struct PlayheadSession {
     var time: Ticks
     let wasPlaying: Bool

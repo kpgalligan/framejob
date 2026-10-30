@@ -279,6 +279,17 @@ A clip's own **Mute** (in the Volume section) silences just that clip.
 
 *Agents:* `set_track` (`track`, plus `muted`, `solo`, `hidden` or `locked`).
 
+## Hearing a scrub
+
+When you click or drag along the ruler, you hear the sound under the playhead. Each time the playhead reaches a new frame, Frame Job plays about 80 ms of the mix forward from it, with a 5 ms fade at each end so the pieces don't click. Hold the mouse still and the sound stops within about a tenth of a second; let go and it stops.
+
+- **It's the mix you'd hear playing:** each clip's volume, fades, ducking, pan, mono, mute and solo, and the compressor and noise reduction.
+- **Dragging left plays each piece forwards** from the playhead, not backwards, so a word stays recognisable.
+- **It's always on.** To silence it, mute or solo tracks, or turn down the Mac's volume.
+- **Only a scrub on the ruler is heard.** Stepping with ← and →, clicking a marker in the Document tab's Markers list and an agent's `set_playhead` move the playhead silently.
+
+*Agents:* there is no tool; `set_playhead` is a silent seek.
+
 ## The level meter
 
 The level meter is in the timeline bar, just left of the zoom controls. While the timeline plays, it shows the mix you are hearing:
@@ -389,3 +400,4 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".
 - The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
 - Loudness mode has no limiter yet: a clip with high peaks stops at −1 dBTP and stays under its target.
+- Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

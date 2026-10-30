@@ -25959,3 +25959,70 @@ reflection skipped, the S-curve and −3 dB formulas, +3 dB's outgoing side as
 `gain(1 − p)`, the `set_audio` refusal removed or read from the merged
 props, relink's clip of `speech` skipped) each fail a named core test; the
 record is AP11's in `designs/audio.md`.
+
+## Road map "audio" AP13 — audio while scrubbing (`scrub_audio_probe.py` G1–G7, C1–C3, E1–E5; nine mutants; spec §11 AU-130…AU-136)
+
+A ruler scrub plays 80 ms grains of the mix at the playhead (`ScrubGrains.swift`,
+`ScrubAudio.swift`). Nothing about it is reachable over MCP — a scrub makes no edit and
+`set_playhead` plays no grain (AU-135) — so the instrument is a probe:
+**`scrub_audio_probe.py`** compiles `scrub_audio_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `Blank.mp4` beside the binary.
+It drives `ScrubGrainScheduler` with its own clock, reads grains with `ScrubGrains.read`
+against the export's float read (`ExportWriter.audioReadOutput(…, gained: true)`) of a second
+build of the same plan, and runs `ScrubAudio` with a recording sink in place of the engine.
+Its fixtures are 48 kHz stereo float WAVs of seeded noise written by `AVAudioFile` under
+`tools/proof/work/scrub-audio-probe/<build>/scratch/`; its projects are made from ops on an
+untitled `ProjectDocument` with `AudioDSPSource` published for the key. No app, no ffmpeg.
+
+| Row | What it holds |
+|---|---|
+| G1 | a mid-timeline grain is 3,840 frames and starts at the playhead passed in |
+| G2 | the window: gain at frames 0 and n−1 < 1e-3, 1 across the middle, symmetric, step ≤ π/480; a windowed full-scale DC grain's first and last samples ≤ 1e-3 |
+| G3 | a 1 s forward drag at 60 Hz on a 30 fps grid: each `at` the previous `at` + 80 ms, each start the playhead at its request, no request with more than `lead` queued |
+| G4 | a 0.5 s hold on the last grain's frame: no grain; the last grain ends ≤ 0.12 s after the hold began |
+| G5 | `end()` leaves `isActive` false and `lastStart` nil; a press on the last grain's frame once the queue ran out gives a full grain; a leftward drag's grains start at the playhead, full forward length |
+| G6 | near the end the grain is duration − start; under 480 frames, at or past the end, none |
+| G7 | the same snapped frame twice in one scrub: one grain |
+| C1 | three tracks (volume 0.5, pan −0.6, a 0.5 s fade-in; a ducking clip; a muted track): the grain at 1.0, 3.0 and 5.3 s against the export's read at the same frames, max \|Δ\| ≤ 1e-5; a grain inside the duck's attack is reported, not scored |
+| C2 | a clip trimmed to end at 2.0 s, a gap, a clip at 3.0 s: the grain from 1.96 s is exactly 0 from 2.0 s and the export's read before it |
+| C3 | a compressor and noise reduction: the scheduler's own adjacent grains from a 1× drag, read in turn on one build, each (after the first) equal to a cold read on a fresh build, ≤ 1e-5; the RMS against the whole-timeline read reported |
+| E1 | `ScrubAudio` with a recording sink: the grains played are `read` × window at the scheduler's starts |
+| E2 | a sink whose first `play` blocks; three more grains asked, `end()`, release: one played |
+| E3 | two moves on one player composition make one build; a new composition object a second |
+| E4 | a move with composition B that asks for no grain: after `end()` and a new press, two builds and the grain is B's |
+| E5 | as E4, but the move with B asks for a grain the blocked queue then drops: the next scrub's grain is still B's |
+
+`--mutants` runs nine, each a replacement in a copied `app/Sources` (its anchor asserted
+once), and scores each killed when one of its named rows fails; `read-by-arrival` is
+equivalent (below), so it is run and reported but not scored, and the score is out of eight:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `flat-window` | `gain` answers 1 everywhere | G2 |
+| `no-hold-rule` | the new-frame test removed | G4 / G7 |
+| `no-lead-rule` | the 0.04 s lead test removed | G3 |
+| `no-end-clamp` | every grain 3,840 frames, none refused at the end | G6 |
+| `end-keeps-last-start` | `end()` keeps `lastStart` | G5 |
+| `leftward-backwards` | a leftward grain starts at playhead − length | G5 |
+| `read-by-arrival` | `read` places buffers in arrival order, not by presentation time | C1 (survives: equivalent, below) |
+| `no-stale-drop` | the generation test answers "not stale" | E2 |
+| `rebuild-on-grain` | the rebuild rides on the grain request and is dropped with it | E4 / E5 |
+
+```sh
+python3 tools/proof/scrub_audio_probe.py            # G1–G7, C1–C3, E1–E5
+python3 tools/proof/scrub_audio_probe.py --mutants  # 9 mutants, 8 scored
+```
+
+**`read-by-arrival` is equivalent.** An `AVAssetReaderAudioMixOutput` with a `timeRange` stamps
+its first buffer exactly at the range's start and fills a composition gap with silent buffers, so
+arrival order and presentation time agree sample for sample; it passed every row, and passed a
+trial row across a gap's far edge too. That trial row (the grain from 2.96 s over a gap ending at
+3.0 s) is not kept: against the export's read it gave max |Δ| 0.00019547 in 2 of 5 runs of one
+binary and 0.0 in 3.
+
+**The recorded run (2026-10-30):** 15/15 rows (C1, C2, C3 and E1–E5 max |Δ| 0.0; the window's
+edges 1.07e-5, its largest step 0.0065449; the last grain 0.1067 s after a hold began; C3's
+whole-timeline RMS 0.0194, reported; a grain inside a duck's attack 0.0988 from the export,
+reported); `--mutants` 8/9 killed, each by its named row, `read-by-arrival` surviving as
+equivalent. Once `read-by-arrival` was marked equivalent in the script, `--mutants` printed
+"8/8 mutants killed (1 equivalent, not scored)", exit 0, with `read-by-arrival` failing no row.

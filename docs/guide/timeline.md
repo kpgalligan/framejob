@@ -225,7 +225,9 @@ Labels drop the hours when the timeline is under an hour long. The playhead
 is the coral line with a triangle head on the ruler.
 
 - **Click the ruler** to move the playhead there, and **drag** along it to
-  scrub. Playback stops while you scrub. The scrub snaps like any other drag
+  scrub. Playback stops while you scrub, and you hear the sound under the
+  playhead instead (see [Hearing a scrub](audio.md#hearing-a-scrub)). The
+  scrub snaps like any other drag
   (see [Snapping](#snapping)).
 - The timeline scrolls itself to keep the playhead in view: when the playhead
   leaves the visible part, during playback or after a jump, the view moves
