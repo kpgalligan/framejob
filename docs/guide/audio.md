@@ -47,7 +47,7 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 
 | Control | What it does | Range | Default |
 |---|---|---|---|
-| Volume | The clip's level as a percentage. Quick picks: 0, 50, 100, 150, 200, 400. | 0–400 % | 100 % |
+| Volume | The clip's level as a percentage. The slider covers 0–400 %; type a higher value in the field, up to 3200 %. Above 400 % the slider's knob stays at the right end. Quick picks: 0, 50, 100, 150, 200, 400. | 0–3200 % | 100 % |
 | Gain | Read-only: the volume in dB (for example "+6.0 dB"), or "silent" at 0 %. | — | +0.0 dB |
 | Mute | Silences the clip without changing its volume. | on / off | off |
 | Normalize | Sets the volume from the clip's own loudest moment (see below). | — | — |
@@ -65,7 +65,7 @@ You can animate volume, Mute and the fades with actions. While an action is sele
 - **Each clip gets its own gain.** Normalize doesn't match levels across a selection. However many clips are selected, it is one undo step, named "Normalize".
 - **It writes the clip's base level**, even when the playhead is inside an action. With an action selected, the button carries a small boxed "clip" tag to show this.
 - **It leaves Mute alone.**
-- **The 400 % ceiling applies.** A clip whose peak is quieter than about −13 dBFS can't reach −1 dBFS. It is turned up to 400 % and stops there.
+- **It can go past 400 %.** A quiet recording, such as a desktop USB microphone's, is turned up as far as it needs, up to the 3200 % ceiling (about +30 dB). Only a clip whose peak is quieter than about −31 dBFS can't reach −1 dBFS. It is turned up to 3200 % and stops there.
 
 Some clips in a selection are skipped and the rest are still normalized: nests (their level lives in the clips inside them), shapes, titles and silent movies. Normalize also skips a clip whose waveform hasn't been analysed yet, and a clip that is silent over the part that plays. When nothing in the selection can be normalized, the button and the menu item are disabled, and a press that does nothing beeps.
 
@@ -314,7 +314,7 @@ The screen recorder can record a microphone with the screen, or record the micro
 
 ## Limits
 
-- Volume tops out at 400 % (about +12 dB).
+- Volume tops out at 3200 % (about +30 dB). The slider covers 0–400 %; type in the field for more.
 - Pan has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.

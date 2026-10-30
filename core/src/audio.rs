@@ -121,9 +121,12 @@ pub(crate) const ACTION_SAMPLE: Ticks = TIMESCALE / 30;
 /// slow enough that a coarser grid is inaudible.
 pub(crate) const MAX_ACTION_SAMPLES: i64 = 4096;
 
-/// Gain ceiling. `volume` is linear and may exceed 1, up to 4 (spec §5.2);
-/// clamping here keeps one bad patch from sending +80 dB to the mix.
-pub(crate) const MAX_GAIN: f64 = 4.0;
+/// Gain ceiling. `volume` is linear and may exceed 1, up to 32 — about
+/// +30 dB, enough to bring a quiet desktop microphone to −1 dBFS and most of
+/// the way to a delivery loudness (spec §5.2, §11 AU-1); clamping here keeps
+/// one bad patch from sending +80 dB to the mix. `AudioNormalize.maxGain` is
+/// the app's copy, held to this by `core/tests/audio_gain.rs`.
+pub(crate) const MAX_GAIN: f64 = 32.0;
 
 /// How close two ramps must be to count as one straight line. 1e-9 of
 /// linear gain is roughly 1e-8 dB — some seven orders of magnitude below

@@ -230,8 +230,8 @@ def audio_door(mcp):
     # The range refusals are `props_check.rs`'s and carry the GROUP's name
     # with no array index, which is the other sentence shape a caller meets.
     refused(s, "set_audio", "a volume past the ceiling",
-            "audio.volume must be between 0 and 4, not 9",
-            clips=[clip], patch={"volume": 9})
+            "audio.volume must be between 0 and 32, not 99",
+            clips=[clip], patch={"volume": 99})
     refused(s, "set_audio", "a compressor ratio past the limiter",
             "audio.compressor.ratio must be between 1 and 20, not 99",
             clips=[clip], patch={"compressor": {"ratio": 99.0}})

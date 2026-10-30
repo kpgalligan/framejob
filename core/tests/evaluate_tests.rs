@@ -2344,7 +2344,7 @@ fn an_out_of_range_action_patch_is_clamped_before_it_reaches_the_recipe() {
     let state = handle
         .clip_state(11, 3_000_000)
         .expect("clip_state for a live clip");
-    assert_eq!(num(&state, "/audio/volume"), 4.0, "gain must clamp to 4");
+    assert_eq!(num(&state, "/audio/volume"), 32.0, "gain must clamp to 32");
     assert_eq!(num(&state, "/video/opacity"), 1.0);
 
     // Halfway through, interpolation is toward the UNCLAMPED target, so the

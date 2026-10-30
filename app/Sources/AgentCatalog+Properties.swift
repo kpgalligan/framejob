@@ -190,7 +190,8 @@ extension AgentServer {
         + "filled in nor clamped. chroma's key is the one exception, three numbers "
         + "with no alpha."
     private static let audioPatchDescription: String =
-        "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
+        "Audio properties to merge. Keys: volume (0–"
+        + String(format: "%g", AudioNormalize.maxGain) + ", 1 = unity), muted, fade_in, "
         + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
         + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
         + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1). "

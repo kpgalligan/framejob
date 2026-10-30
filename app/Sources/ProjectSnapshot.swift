@@ -932,7 +932,7 @@ struct CompressorProps: Codable, Equatable {
     }
 }
 
-/// The sample half of a clip. `volume` may exceed 1, up to 4 (§5.2).
+/// The sample half of a clip. `volume` may exceed 1, up to 32 (§5.2, §11 AU-1).
 struct AudioProps: Codable, Equatable {
     let volume: Double
     let muted: Bool

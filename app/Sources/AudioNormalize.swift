@@ -85,10 +85,19 @@ enum AudioNormalize {
     static let peakDBRange = -60.0...0.0
 
     /// The model's own ceiling on `audio.volume`: `MAX_GAIN` in
-    /// `core/src/audio.rs`, enforced by `props_check.rs`'s `check_audio` and
-    /// spelled 400 % by the pane's Volume row. A gain past it is not refused —
-    /// see `Result.clamped`.
-    static let maxGain = 4.0
+    /// `core/src/audio.rs`, enforced by `props_check.rs`'s `check_audio`
+    /// (spec §11 AU-1). The app's ONE copy of it: the pane's Volume field tops
+    /// out here and the agent's sentences print it. `core/tests/audio_gain.rs`
+    /// reads this line and holds it to the core's refusal, so it stays one
+    /// literal. A gain past it is not refused — see `Result.clamped`.
+    static let maxGain = 32.0
+
+    /// `maxGain` as a sentence spells it: "32×".
+    static var maxGainName: String { String(format: "%g×", maxGain) }
+
+    /// The quietest peak that still reaches `defaultPeakDB` through `maxGain`,
+    /// in dBFS: about −31 at ×32. A quieter clip is `clamped`.
+    static var quietestReachableDB: Double { defaultPeakDB - 20 * log10(maxGain) }
 
     // MARK: - Vocabulary
 
@@ -124,12 +133,12 @@ enum AudioNormalize {
         let media: UInt32
         /// The measured peak as a level, in dBFS.
         let measuredDB: Double
-        /// The volume written — `set_audio`'s `volume`, 0…4.
+        /// The volume written — `set_audio`'s `volume`, 0…`maxGain`.
         let volume: Double
         /// Where that volume actually puts the clip's peak, in dBFS. It is the
         /// requested level unless `clamped`, and then it is lower.
         let resultDB: Double
-        /// True when the clip wanted more than the model's 4× and got 4×. It
+        /// True when the clip wanted more than `maxGain` and got `maxGain`. It
         /// is still normalised — to the loudest it can be — because refusing
         /// would be worse than doing the thing, and doing it silently would be
         /// worse than saying so.

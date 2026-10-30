@@ -143,6 +143,8 @@ app/
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/framejob_core.h
 designs/             the spec, adr/ (condensed records), the handoffs — the table above
+samples/             the owner's real recordings for real-material work; README.md says what
+                     each is and how it measures
 archive/             closed road maps and histories, verbatim; INDEX.md — read only when asked
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block

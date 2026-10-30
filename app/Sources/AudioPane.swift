@@ -66,8 +66,11 @@ final class AudioPane: InspectorPaneView {
             reset: { binding.apply("Volume", audio: AudioPatch(volume: 1, muted: false)) },
             defaultExpanded: false,
             rows: [
+                // The field reaches the model's ceiling and the slider stops at
+                // 400 %, where a linear rail is still useful (spec §11 AU-1).
                 inspectorValueRow(
-                    "Volume", binding, name: "Volume", unit: "%", decimals: 0, min: 0, max: 400,
+                    "Volume", binding, name: "Volume", unit: "%", decimals: 0, min: 0,
+                    max: AudioNormalize.maxGain * 100, sliderMax: 400,
                     quick: [0, 50, 100, 150, 200, 400],
                     read: { binding.audioProps.volume * 100 },
                     ops: { binding.ops(audio: AudioPatch(volume: $0 / 100)) },

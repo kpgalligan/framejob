@@ -133,8 +133,10 @@ extension AgentServer {
                     + "overridden for the action's span. And it leaves muted alone: a mute is "
                     + "a switch, not a level. Each clip gets its OWN gain, so this does not "
                     + "match levels across a selection. One undo step however many clips. "
-                    + "The model's volume ceiling is 4×, so a clip quieter than about "
-                    + "-13 dBFS cannot reach -1: it is still normalised, as loud as it goes, "
+                    + "The model's volume ceiling is \(AudioNormalize.maxGainName), so a clip "
+                    + "quieter than about "
+                    + String(format: "%.0f", AudioNormalize.quietestReachableDB)
+                    + " dBFS cannot reach -1: it is still normalised, as loud as it goes, "
                     + "and result_db says where it landed. A clip that plays no sound, one "
                     + "that is silent over the part that plays, and one whose waveform has "
                     + "not been analysed yet are each reported by name under skipped and the "

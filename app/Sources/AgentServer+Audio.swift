@@ -51,7 +51,8 @@ extension AgentServer {
     /// The result reports what actually ran, `detect_silence`'s posture: every
     /// clip's measured peak and the volume written, every clip that could not
     /// be measured with the reason it could not, and a note when the model's
-    /// 4× ceiling stopped a clip short of the level asked for.
+    /// volume ceiling (`AudioNormalize.maxGain`) stopped a clip short of the
+    /// level asked for.
     ///
     /// **A second identical call is an identity edit** and comes back as the
     /// shared "Normalize made no change: the project is already in that
@@ -112,13 +113,14 @@ extension AgentServer {
         let clamped = plan.normalized.filter { $0.clamped }
         if !clamped.isEmpty {
             // The clamp is reported rather than refused (contract D-C7): a
-            // clip quieter than about −13 dBFS cannot reach −1 with a volume
+            // clip quieter than about −31 dBFS cannot reach −1 with a volume
             // the model allows, so it is normalised to the loudest it can be
             // and told so. `result_db` on each row is where it actually
             // landed.
             let ids = clamped.map { String($0.clip) }.joined(separator: ", ")
             fields["note"] =
-                "Clip(s) \(ids) wanted more gain than the model's 4× ceiling on volume, so each "
+                "Clip(s) \(ids) wanted more gain than the model's "
+                + "\(AudioNormalize.maxGainName) ceiling on volume, so each "
                 + "was raised as far as it goes and lands below \(plan.peakDB) dBFS — result_db "
                 + "says where."
         }

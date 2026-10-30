@@ -42,9 +42,11 @@ The five parts, and what each is measured with:
 
 * **5c Normalise Clip** — the placement is read back through the tool, and
   then the LEVEL is measured on an exported WAV. A −6 dBFS tone normalises to
-  a file whose loudest sample is −1 dBFS ±0.1; a −40 dBFS tone cannot get
-  there (the model's volume ceiling is 4×) and its file lands at the −27.96
-  the result claimed rather than at −1, which is the whole of D-C7. The
+  a file whose loudest sample is −1 dBFS ±0.1; so does a −20 dBFS tone, the
+  quiet microphone the old ×4 ceiling stopped at −7.96 (spec §11 AU-1); a
+  −40 dBFS tone cannot get there (the model's volume ceiling is ×32) and its
+  file lands at the −9.90 the result claimed rather than at −1, which is the
+  whole of D-C7. The
   refusals are read for the words that name the clip: a silent clip, a clip
   whose peaks file this script DELETED off the package (the deterministic
   spelling of "not analysed yet"), a clip id that is not in the project, and a
@@ -393,7 +395,10 @@ FIXTURE_EXPRESSIONS = {
     # 5c and 5d. A plain tone at exactly half scale: −6.020600 dBFS, which
     # normalise must turn into −1 dBFS with a volume of 1.7825.
     "half.wav": ("0.5*sin(2*PI*440*t)", "0.5*sin(2*PI*440*t)", 3),
-    # 5c's clamp. −40 dBFS, which 4× can only lift to −27.96.
+    # 5c's quiet microphone (spec §11 AU-1). −20 dBFS, which wants ×8.9125 to
+    # reach −1: past the old ×4 ceiling (−7.96), inside the ×32 one.
+    "mic.wav": ("0.1*sin(2*PI*440*t)", "0.1*sin(2*PI*440*t)", 3),
+    # 5c's clamp. −40 dBFS, which ×32 can only lift to −9.90.
     "quiet.wav": ("0.01*sin(2*PI*440*t)", "0.01*sin(2*PI*440*t)", 3),
     # 5c's silence refusal: an audio track that is there and is nothing.
     "silent.wav": ("0", "0", 2),
@@ -588,9 +593,10 @@ def catalog_part(mcp):
     )
     told = schemas.get("normalize_clip", {}).get("description", "")
     check(
-        "REPLACES volume" in told and "4×" in told,
+        "REPLACES volume" in told and "ceiling is 32×" in told and "-31 dBFS" in told,
         "normalize_clip's description states the two decisions a caller has to know: it "
-        "REPLACES the volume, and the model's 4× ceiling can stop it short",
+        "REPLACES the volume, and the model's 32× ceiling can stop a clip quieter than "
+        "-31 dBFS short (spec §11 AU-1)",
     )
 
     export = schema_of("export")
@@ -803,26 +809,47 @@ def normalize_part(mcp):
         f"({describe(before, undone)})",
     )
 
-    # D-C7: the 4× ceiling. A −40 dBFS tone cannot reach −1, so it is
+    # AU-1: past the old ×4. A −20 dBFS tone — the level of a quiet desktop
+    # microphone — wants ×8.9125, which the old ceiling stopped at −7.96. It
+    # now reaches −1 unclamped, measured on the file as above.
+    print("\n5c — past ×4: a quiet microphone reaches −1 (spec §11 AU-1)")
+    m = Session(mcp, "phase5-mic")
+    mic = m.place("mic.wav")
+    answer = m.op("normalize_clip", clips=[mic])
+    row = answer["normalized"][0]
+    check(
+        row["clamped"] is False and close(row["volume"], 8.9125, 0.001)
+        and close(row["result_db"], -1.0, 0.001) and "note" not in answer,
+        f"a −20 dBFS clip gets volume {row['volume']:.4f}, past the old ×4, claiming "
+        f"−1 dBFS unclamped ({fmt(row['result_db'])})",
+    )
+    _, lifted, _ = m.wav("lifted")
+    measured = db(sample_peak(channels(lifted)))
+    check(
+        close(measured, -1.0, 0.1),
+        f"and the EXPORT's loudest sample lands at −1 dBFS within ±0.1 ({fmt(measured)})",
+    )
+
+    # D-C7: the ×32 ceiling. A −40 dBFS tone cannot reach −1, so it is
     # normalised as far as it goes and SAYS where it landed. This is the check
     # that a build reporting the requested level instead of the reached one
     # fails, and it is measured on the file rather than read off the result.
-    print("\n5c — the 4× clamp: the level it actually reached")
+    print("\n5c — the ×32 clamp: the level it actually reached")
     q = Session(mcp, "phase5-clamp")
     quiet = q.place("quiet.wav")
     answer = q.op("normalize_clip", clips=[quiet])
     row = answer["normalized"][0]
     check(
-        row["clamped"] is True and close(row["volume"], 4.0, 1e-9),
-        f"a −40 dBFS clip is clamped at the model's 4× ({row['volume']})",
+        row["clamped"] is True and close(row["volume"], 32.0, 1e-9),
+        f"a −40 dBFS clip is clamped at the model's ×32 ({row['volume']})",
     )
     check(
-        close(row["result_db"], -27.96, 0.05),
-        f"and reports the level it ACTUALLY reached, −27.96 dBFS, not the −1 it was asked "
+        close(row["result_db"], -9.90, 0.05),
+        f"and reports the level it ACTUALLY reached, −9.90 dBFS, not the −1 it was asked "
         f"for ({fmt(row['result_db'])})",
     )
     check(
-        "note" in answer and str(quiet) in answer["note"] and "4×" in answer["note"],
+        "note" in answer and str(quiet) in answer["note"] and "32×" in answer["note"],
         f"with a note naming the clip and the ceiling: {answer.get('note', '')[:90]!r}",
     )
     _, clamped, _ = q.wav("clamped")
@@ -1105,7 +1132,7 @@ def loudness_part(mcp):
     print("\n5d — a mix past full scale: gained in float, clipped only without a gain")
     o = Session(mcp, "phase5-overscale")
     hot_clip = o.place("half.wav")
-    # A half-scale tone at the model's 4× ceiling: +6 dBFS of mix, which is
+    # A half-scale tone at ×4: +6 dBFS of mix, which is
     # what two normalised clips on two tracks would also give.
     o.op("set_audio", clips=[hot_clip], patch={"volume": 4})
     _, hot, hot_result = o.wav("hot", loudness_lufs=-14, peak_dbtp=-1)

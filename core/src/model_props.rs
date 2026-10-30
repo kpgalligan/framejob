@@ -455,7 +455,7 @@ pub enum BlendMode {
 
 // ---- audio properties ----------------------------------------------------
 
-/// `volume` is a linear gain and may exceed 1, up to 4 (spec §5.2).
+/// `volume` is a linear gain and may exceed 1, up to 32 (spec §5.2, §11 AU-1).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AudioProps {

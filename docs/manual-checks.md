@@ -392,6 +392,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** is the file transparent, with clean edges, through play and seek in Chrome and in Firefox? What does Safari do with it — transparent, opaque, or not at all?
 - **Source:** #377, codec-export C5 (spec §11 CX-17 (8)); `tools/proof/vp9_alpha_export_proof.py` decodes the alpha with ffmpeg's libvpx decoder and walks the file, not how a browser composites it. Safari's answer goes into CX-17 and the guide's Limits.
 
+**SE-22 — Normalize lifts a quiet microphone past 400 % and it plays clean**
+- **Do:** 1. Import a quiet desktop-microphone recording (`samples/Rode-usb-mic.m4a`, or any voice peaking near −18 dBFS) and put it on the timeline. 2. Press Normalize in the Clip tab's Volume section and play it in the preview through headphones and the built-in speakers. 3. Type 1200 in the Volume field, then drag the slider.
+- **Expect:** Normalize sets the volume past 400 % (about 755 % for the RØDE file) and the Gain row reads about +17.6 dB; the slider's knob sits at its right end while the field shows the true value; the voice plays clearly louder than before with no crackle or distortion; at 1200 % the meter shows the mix past full scale and it may audibly clip, which is expected; a drag writes values within 0–400 %.
+- **Source:** the owner's audio pass (spec §11 AU-1); `tools/proof/phase5_proof.py` 5c measures the normalised export at −1 dBFS and `core/tests/audio_gain.rs` holds the ceiling.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

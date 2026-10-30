@@ -103,9 +103,15 @@ func inspectorReadout(width: CGFloat = 96, _ read: @escaping () -> String) -> Op
 /// The four typed builders derive the row's default from `read` and `ops`
 /// (spec §11 CI-9); `resets: false` is for a row whose `read` bypasses the
 /// props readers, where a derived default could never differ.
+///
+/// `sliderMax` gives the slider a shorter travel than the field's `max`, for
+/// a range whose top would crowd the useful part of a linear rail (Volume,
+/// spec §11 AU-1): a value past it pins the knob at the rail's end, and a
+/// drag writes the rail's own range.
 func inspectorValueRow(
     _ label: String, _ binding: InspectorBinding, name: String, unit: String = "",
-    decimals: Int = 0, min lower: Double, max upper: Double, quick: [Double] = [],
+    decimals: Int = 0, min lower: Double, max upper: Double, sliderMax: Double? = nil,
+    quick: [Double] = [],
     slider: Bool = true, width: CGFloat = InspectorMetrics.fieldWidth,
     read: @escaping () -> Double, ops: @escaping (Double) -> [ReelOp],
     mixed: (() -> Bool)? = nil, enabled: @escaping () -> Bool = { true },
@@ -113,7 +119,7 @@ func inspectorValueRow(
 ) -> NSView {
     var controls: [NSView] = []
     let track = slider ? InspectorSliderControl(
-        min: lower, max: upper, read: read,
+        min: lower, max: sliderMax ?? upper, read: read,
         write: { [weak binding] value in binding?.liveUpdate(ops(value)) },
         begin: { [weak binding] in binding?.liveBegin() },
         end: { [weak binding] in binding?.liveEnd(name) },
