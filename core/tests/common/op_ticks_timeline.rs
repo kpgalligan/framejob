@@ -55,6 +55,16 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
                 ("/clips/1/start", json!(30 * f)),
             ],
         ),
+        // Speech spans are SOURCE ticks off the voice cache's 19,200-tick
+        // grid, never the frame grid, so they are stored exactly as given
+        // (spec §11 AU-110).
+        applied(
+            "set_media_speech.spans",
+            "spans",
+            two.clone(),
+            json!({"op":"set_media_speech","media":2,"spans":[[off(4,f),off(9,f)]]}),
+            vec![("/media/0/speech", json!([[off(4, f), off(9, f)]]))],
+        ),
         applied(
             "lift_range.from",
             "from",

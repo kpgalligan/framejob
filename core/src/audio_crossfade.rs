@@ -25,7 +25,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use crate::audio::{Side, Stage, ACTION_SAMPLE, MAX_ACTION_SAMPLES};
-use crate::model::Project;
+use crate::model::{FadeShape, Project};
 use crate::time::Ticks;
 use crate::transition;
 
@@ -33,7 +33,9 @@ impl Project {
     /// The constant-power crossfade multiplier at `t` for one stage (format
     /// version 7, spec §11's R5-2): `cos(p·π/2)` going out, `sin(p·π/2)`
     /// coming in, and 1 wherever there is no overlap or the transition's
-    /// `audio` is false.
+    /// `audio` is false. That is `audio_shape`'s default, `plus_3db`; another
+    /// shape (format 29, AU-115) gives `gain(p)` coming in and `gain(1 − p)`
+    /// going out.
     ///
     /// Constant power rather than equal gain because the two clips of a
     /// transition are UNCORRELATED material — a Remove Silences cut, a jump
@@ -68,11 +70,14 @@ impl Project {
         if !transition.audio {
             return 1.0;
         }
-        let angle = progress.clamp(0.0, 1.0) * FRAC_PI_2;
-        if is_incoming {
-            angle.sin()
-        } else {
-            angle.cos()
+        let p = progress.clamp(0.0, 1.0);
+        match (transition.audio_shape, is_incoming) {
+            // R5-2's law on its own code path, so a transition with no
+            // `audio_shape` plans exactly as before (spec §11 AU-115).
+            (FadeShape::Plus3Db, true) => (p * FRAC_PI_2).sin(),
+            (FadeShape::Plus3Db, false) => (p * FRAC_PI_2).cos(),
+            (shape, true) => shape.gain(p),
+            (shape, false) => shape.gain(1.0 - p),
         }
     }
 

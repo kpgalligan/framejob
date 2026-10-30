@@ -199,8 +199,15 @@ extern "C" {
  * inside one container, and a one-sided one is refused on open; no key moves,
  * so every project without one writes the text it did, and there is no
  * migration step. An older build would drop the link on save, so it must
- * refuse the file. 29 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 28
+ * refuse the file.
+ *
+ * Version 29 is ducking by speech and fade shapes (spec §11 AU-110..AU-116):
+ * `media.speech`, `audio.duck`'s `mode`, `pre_roll` and `hold`,
+ * `audio.fade_in_shape` and `fade_out_shape`, and `transition_in.audio_shape`,
+ * each written only when not its default, so every other project writes the
+ * text it did, and there is no migration step. 30 and above, 1014 included,
+ * are newer. */
+#define RC_FORMAT_VERSION 29
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -334,7 +341,11 @@ int64_t rc_project_duration(const RcProject *p);
 /* The composition plan (spec 7.2): what Swift builds an AVMutableComposition,
  * AVMutableAudioMix and AVVideoComposition.Configuration from. Swift asks for this
  * after every edit and rebuilds ONLY when the JSON differs from the current
- * plan — the plan holds exactly the structural facts. */
+ * plan — the plan holds exactly the structural facts. A project with a
+ * speech duck (format 29, spec §11 AU-113) adds a top-level "ducks":
+ * [{"clip": id, "ramps": [ramp, ...]}], one per speech ducker, its own
+ * multiplier over its widened spans, for the timeline's line; the key is
+ * absent when there is none. */
 char *rc_project_composition_plan(const RcProject *p);
 
 /* The frame recipe at time `t` (spec 7.3): the back-to-front layer list with

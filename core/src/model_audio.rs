@@ -36,6 +36,12 @@ pub struct AudioProps {
     /// How much background noise to remove: 0 is off, 1 the most the
     /// platform will do.
     pub noise_reduction: f64,
+    /// The shape of `fade_in` and `fade_out` (format 29, spec §11 AU-114),
+    /// each written only when not `linear`, so an older file's text holds.
+    #[serde(skip_serializing_if = "FadeShape::is_linear")]
+    pub fade_in_shape: FadeShape,
+    #[serde(skip_serializing_if = "FadeShape::is_linear")]
+    pub fade_out_shape: FadeShape,
 }
 
 impl Default for AudioProps {
@@ -51,9 +57,58 @@ impl Default for AudioProps {
             pan: 0.0,
             compressor: None,
             noise_reduction: 0.0,
+            fade_in_shape: FadeShape::Linear,
+            fade_out_shape: FadeShape::Linear,
         }
     }
 }
+
+/// A fade's or a crossfade's gain curve over its progress u in 0..1 (spec
+/// §11 AU-114, AU-115): `linear` is `u`, `s_curve` `(1 − cos πu)/2`,
+/// `plus_3db` `sin(uπ/2)` (fast start) and `minus_3db` `1 − cos(uπ/2)`
+/// (slow start). The formulas are `audio_shape.rs`'s.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FadeShape {
+    #[default]
+    Linear,
+    SCurve,
+    #[serde(rename = "plus_3db")]
+    Plus3Db,
+    #[serde(rename = "minus_3db")]
+    Minus3Db,
+}
+
+impl FadeShape {
+    pub fn is_linear(&self) -> bool {
+        *self == FadeShape::Linear
+    }
+
+    /// A transition's default, R5-2's constant power (spec §11 AU-115).
+    pub fn is_plus_3db(&self) -> bool {
+        *self == FadeShape::Plus3Db
+    }
+}
+
+/// What a [`Duck`] follows (format 29, spec §11 AU-110): the ducking clip's
+/// whole extent (the default and the only mode before 29), or the speech
+/// spans saved on its media (`media[].speech`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DuckMode {
+    #[default]
+    Extent,
+    Speech,
+}
+
+impl DuckMode {
+    pub fn is_extent(&self) -> bool {
+        *self == DuckMode::Extent
+    }
+}
+
+/// `pre_roll`'s and `hold`'s default: 0.5 s (spec §11 AU-112).
+pub const DUCK_SPEECH_PAD: Ticks = 300_000;
 
 /// "Smooth volume levels" (spec §4.3): a downward compressor over the
 /// clip's own samples.
@@ -91,15 +146,27 @@ impl Default for Compressor {
     }
 }
 
-/// Ducking is by clip extent, not voice activity (spec §11): every other
-/// clip's envelope is multiplied by `level` over this clip's extent, with
-/// linear `attack` and `release` ramps.
+/// Every other clip's envelope is multiplied by `level` over this clip's
+/// extent (spec §11), with linear `attack` and `release` ramps — or, in
+/// `speech` mode (AU-110, AU-112), over each of its media's speech spans
+/// widened by `pre_roll` before and `hold` after. The three keys of format 29
+/// are each written only when not their default, in either mode (AU-116).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Duck {
     pub level: f64,
     pub attack: Ticks,
     pub release: Ticks,
+    #[serde(skip_serializing_if = "DuckMode::is_extent")]
+    pub mode: DuckMode,
+    #[serde(skip_serializing_if = "is_speech_pad")]
+    pub pre_roll: Ticks,
+    #[serde(skip_serializing_if = "is_speech_pad")]
+    pub hold: Ticks,
+}
+
+fn is_speech_pad(ticks: &Ticks) -> bool {
+    *ticks == DUCK_SPEECH_PAD
 }
 
 impl Default for Duck {
@@ -109,6 +176,9 @@ impl Default for Duck {
             level: 0.2,
             attack: 300_000,
             release: 600_000,
+            mode: DuckMode::Extent,
+            pre_roll: DUCK_SPEECH_PAD,
+            hold: DUCK_SPEECH_PAD,
         }
     }
 }

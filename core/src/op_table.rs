@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the sixty-three-way dispatch are the implementation of that
+//! enum and the sixty-four-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -58,9 +58,10 @@
 //!   two. Named rather than "a list of numbers" because their LENGTH is
 //!   part of what serde refuses.
 //! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`],
-//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`], [`Kind::Blending`]
-//!   and [`Kind::RampShape`] — `TransitionKind`, `TransitionAlign`, `Curve`,
-//!   `ZoomFit`, `TrackMatte`, `CanvasOutput`, `CanvasBlending`, `RampShape`: closed
+//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`], [`Kind::Blending`],
+//!   [`Kind::RampShape`] and [`Kind::FadeShape`] — `TransitionKind`,
+//!   `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`, `CanvasOutput`,
+//!   `CanvasBlending`, `RampShape`, `FadeShape`: closed
 //!   vocabularies, each carrying its members in [`Kind::values`] rather
 //!   than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
@@ -83,7 +84,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 63;
+pub const OP_COUNT: usize = 64;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -153,6 +154,7 @@ pub enum Kind {
     Output,
     Blending,
     RampShape,
+    FadeShape,
 }
 
 impl Kind {
@@ -190,6 +192,7 @@ impl Kind {
             Output => &["sdr", "hlg"],
             Blending => &["encoded", "linear"],
             RampShape => &["ramp_up", "ramp_down", "speed_dip", "speed_burst"],
+            FadeShape => &["linear", "s_curve", "plus_3db", "minus_3db"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -293,7 +296,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("add_transition",
        &[req("clip", Id), opt("kind", Transition), req("duration", Ticks),
          opt("align", Alignment), opt("ripple", Boolean)]),
-    op("set_transition_style", &[req("clip", Id), opt("curve", Curve), opt("audio", Boolean)]),
+    op("set_transition_style",
+       &[req("clip", Id), opt("curve", Curve), opt("audio", Boolean),
+         opt("audio_shape", FadeShape)]),
 
     // ---- actions --------------------------------------------------------
     op("add_action", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
@@ -337,6 +342,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
        &[req("media", Id), req("path", Text), opt("bookmark", Text), opt("probe", Object)]),
     op("remove_media", &[req("media", Id), opt("with_clips", Boolean)]),
     op("set_media_color", &[req("media", Id), req("color", Object)]),
+    op("set_media_speech", &[req("media", Id), req("spans", Ranges)]),
 ];
 
 /// Every op name, in table order — a projection of [`OP_TABLE`], not a

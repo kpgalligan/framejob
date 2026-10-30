@@ -81,13 +81,18 @@ extension AgentServer {
                     + "transition on a clip with no overlap is simply not drawn until there "
                     + "is one — and a clip with no transition at all gets a cross_dissolve "
                     + "with the style applied. The crossfade is constant power (cosine out, "
-                    + "sine in), which holds the level across two unrelated takes where a "
-                    + "straight-line pair dips 3 dB. A project written before this existed "
+                    + "sine in) by default, which holds the level across two unrelated takes "
+                    + "where a straight-line pair dips 3 dB; audio_shape picks another curve — "
+                    + "the Crossfade Shape popup. A project written before this existed "
                     + "reads as linear with no crossfade, exactly as it always sounded.",
                 [
                     "clip": clipDescription,
                     "curve": "How the transition's progress is eased.",
                     "audio": "Crossfade the two clips' sound across the overlap.",
+                    "audio_shape": "The crossfade's curve over the eased progress p: plus_3db "
+                        + "(the default, constant power: sin in, cos out), linear (p in, 1 − p "
+                        + "out), s_curve or minus_3db (slow start); the outgoing clip takes the "
+                        + "shape of 1 − p.",
                 ]),
         ]
     }

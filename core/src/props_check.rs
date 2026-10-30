@@ -337,6 +337,8 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
         in_range("audio.duck.level", duck.level, 0.0, 1.0)?;
         ticks_positive_or_zero("audio.duck.attack", duck.attack)?;
         ticks_positive_or_zero("audio.duck.release", duck.release)?;
+        ticks_positive_or_zero("audio.duck.pre_roll", duck.pre_roll)?;
+        ticks_positive_or_zero("audio.duck.hold", duck.hold)?;
     }
     in_range("audio.pan", props.pan, -1.0, 1.0)?;
     in_range("audio.noise_reduction", props.noise_reduction, 0.0, 1.0)?;

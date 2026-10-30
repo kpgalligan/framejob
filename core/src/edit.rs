@@ -91,12 +91,13 @@
 //! same times its `clips[]` are written in — not project time. A nest has
 //! no speed, so `t − nest_clip.start` is the whole mapping.
 //!
-//! **Nine ops are an `Err` with a scope**, naming themselves and the nest:
+//! **Ten ops are an `Err` with a scope**, naming themselves and the nest:
 //! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
 //! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
 //! the parent had when it was made, deliberately, and the rest of a canvas
 //! — the rate, the background, the two switches — is the document's), and
-//! `add_media`, `relink_media`, `remove_media`, `set_media_color` (a nest
+//! `add_media`, `relink_media`, `remove_media`, `set_media_color`,
+//! `set_media_speech` (a nest
 //! references the parent's `media[]` in the parent's one id space, so a
 //! media edit inside a scope is an edit OUTSIDE it wearing a scope, which is
 //! the one thing a scope exists to prevent), and `add_adjustment_clip` (an adjustment clip
@@ -152,7 +153,7 @@
 //! | `set_transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | Moves the clip so its overlap with its predecessor is exactly `duration`. Refuses on the first clip of its track, and on a duration past the pair's overlap limit (half the shorter clip, snapped down), naming the limit. |
 //! | `add_transition` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `align` is `center` when absent: half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; a request under one frame of the canvas's grid refuses first, naming the shortest duration that passes, and one that clamps below a frame refuses. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions and `text.words` move with its new first frame; a graphic's `in` moves back by the head, saturating at 0 (a graphic's head is unbounded, G-18). `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). A ramped incoming clip's head reads at its base rate and its speed actions move with its first frame; a ramped outgoing clip's tail reads S∞ (SR-18 (a), (b)). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple` (false when absent): when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the duration counted in whole frames of the canvas's grid and landed on it (§11 #42), so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and the greatest passing whole-frame shift is selected without enumerating frames, even when a crossing makes a larger shift valid again, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track refuses. An already-invalid affected track refuses by the overlap rule before fitting; an unrelated track is ignored. |
-//! | `set_transition_style` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is an identity and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
+//! | `set_transition_style` | Sets the transition's easing, whether it crossfades the two clips' sound, and the crossfade's shape (`audio_shape`, format 29, spec §11 AU-115: `plus_3db`, R5-2's constant power, by default; `linear`, `s_curve`, `minus_3db`); an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NO key given is an identity and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
 //!
 //! The closed vocabularies an argument may take — a transition kind, a
 //! curve, an alignment, a zoom fit — are [`crate::op_table::Kind::values`],
@@ -189,6 +190,7 @@
 //! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. The `probe` the host fills is the new file's descriptor minus `path` and `bookmark`: the media takes its duration, size, rate and flags, a file of another kind is refused, and a media clip running past a shorter file's end is held to it (spec §11, #63), a ramped one through S∞ with its actions unchanged (SR-19 (h)). The probe's `original` replaces the stored one, so a probe without one clears it (#228-O). No `probe` keeps the record. |
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. A `lut` media is no clip's source: it refuses while it is a clip's base look or a media's Camera Log unless `with_clips`, which clears those looks and conversions and keeps the clips and the media (spec §11 GR-8, GR-16). |
 //! | `set_media_color` | A video media's Camera Log (spec §11 GR-16): `color` is `{log, gamut}` (a built-in curve, its gamut defaulting to the curve's first) or `{lut}` (a `lut` media as the input conversion), converted at step 0 for every clip of the media; `null` clears it. A PQ file's `peak` (spec §11 HD-12, 1–10000 cd/m²) is the override of the peak import read into `pq`, beside either or alone; a PQ still (spec §11 HD-20 (b)) takes `peak` alone. `color` replaces the Camera Log and the override together, and `null` clears both, keeping import's reading. Refused, each in its own sentence: an audio or LUT media, and an image unless the colour is a PQ still's `peak` alone; neither or both of `log` and `lut` (and no `peak`); a `gamut` without `log` or outside the curve's pairings; a `lut` that names no `lut` media; `detected` and `pq`, which import writes; a `peak` outside 1–10000 or on media that is not a PQ file. `media_color.rs` holds the rules. |
+//! | `set_media_speech` | A media's speech spans (format 29, spec §11 AU-110, AU-111): `spans` is `[start, end]` pairs in forward-file SOURCE ticks, stored as `media.speech` and read by every clip of the media whose `audio.duck.mode` is `speech`. An empty list is a media with no speech found, stored as such; spans equal to the stored ones are an identity. Refused, each in its own sentence: a media without audio; a span starting before 0, ending at or before its start, or ending past the media's `duration`; spans unsorted or overlapping (touching is allowed); more than 100,000. `Err` for an unknown media. `media_speech.rs` holds the rules. |
 //!
 //! ### Results
 //!
@@ -238,7 +240,7 @@ use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{
-    CanvasBlending, CanvasOutput, Color, Curve, Project, TrackMatte, TransitionKind,
+    CanvasBlending, CanvasOutput, Color, Curve, FadeShape, Project, TrackMatte, TransitionKind,
 };
 use crate::outcome::Outcome;
 use crate::scope;
@@ -522,6 +524,8 @@ pub enum Op {
         curve: Option<Curve>,
         #[serde(default)]
         audio: Option<bool>,
+        #[serde(default)]
+        audio_shape: Option<FadeShape>,
     },
 
     // ---- actions --------------------------------------------------------
@@ -684,14 +688,19 @@ pub enum Op {
         media: u32,
         color: Value,
     },
+    /// `[start, end]` pairs, `RippleDeleteRanges`' spelling.
+    SetMediaSpeech {
+        media: u32,
+        spans: Vec<[Ticks; 2]>,
+    },
 }
 
 /// One parsed envelope: the op, and the nest it applies INSIDE.
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all sixty-three, and folding it into the enum would mean
-/// sixty-three copies of one optional field. [`Project::apply_op`] still
+/// thing over all sixty-four, and folding it into the enum would mean
+/// sixty-four copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -717,7 +726,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all sixty-three
+/// before the typed decode keeps all three — the refusal, all sixty-four
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -889,9 +898,12 @@ impl Project {
                 align,
                 ripple,
             } => self.add_transition(*clip, *kind, *duration, *align, *ripple),
-            Op::SetTransitionStyle { clip, curve, audio } => {
-                self.set_transition_style(*clip, *curve, *audio)
-            }
+            Op::SetTransitionStyle {
+                clip,
+                curve,
+                audio,
+                audio_shape,
+            } => self.set_transition_style(*clip, *curve, *audio, *audio_shape),
 
             // ---- actions -------------------------------------------------
             Op::AddAction { clip, at, duration } => self.add_action(*clip, *at, *duration),
@@ -1000,6 +1012,7 @@ impl Project {
             } => self.relink_media(*media, path, bookmark.as_deref(), probe.as_ref()),
             Op::RemoveMedia { media, with_clips } => self.remove_media(*media, *with_clips),
             Op::SetMediaColor { media, color } => self.set_media_color(*media, color),
+            Op::SetMediaSpeech { media, spans } => self.set_media_speech(*media, spans),
         }
     }
 }

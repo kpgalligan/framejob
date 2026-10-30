@@ -189,11 +189,14 @@ struct AudioPatch: Codable, Equatable {
     var pan: Double?
     var compressor: CompressorProps??
     var noiseReduction: Double?
+    var fadeInShape: FadeShape?
+    var fadeOutShape: FadeShape?
 
     init(
         volume: Double? = nil, muted: Bool? = nil, fadeIn: Ticks? = nil, fadeOut: Ticks? = nil,
         duck: DuckProps?? = nil, mono: Bool? = nil, keepPitch: Bool? = nil, pan: Double? = nil,
-        compressor: CompressorProps?? = nil, noiseReduction: Double? = nil
+        compressor: CompressorProps?? = nil, noiseReduction: Double? = nil,
+        fadeInShape: FadeShape? = nil, fadeOutShape: FadeShape? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -205,6 +208,8 @@ struct AudioPatch: Codable, Equatable {
         self.pan = pan
         self.compressor = compressor
         self.noiseReduction = noiseReduction
+        self.fadeInShape = fadeInShape
+        self.fadeOutShape = fadeOutShape
     }
 
     init(from decoder: Decoder) throws {
@@ -219,6 +224,8 @@ struct AudioPatch: Codable, Equatable {
         pan = c.lenient(.pan)
         compressor = c.nullable(.compressor)
         noiseReduction = c.lenient(.noiseReduction)
+        fadeInShape = c.lenient(.fadeInShape)
+        fadeOutShape = c.lenient(.fadeOutShape)
     }
 
     var dictionary: [String: Any] {
@@ -233,6 +240,8 @@ struct AudioPatch: Codable, Equatable {
         if let pan = pan { d["pan"] = pan }
         d.putNullable("compressor", compressor) { $0.dictionary }
         if let noiseReduction = noiseReduction { d["noise_reduction"] = noiseReduction }
+        if let fadeInShape = fadeInShape { d["fade_in_shape"] = fadeInShape.rawValue }
+        if let fadeOutShape = fadeOutShape { d["fade_out_shape"] = fadeOutShape.rawValue }
         return d
     }
 

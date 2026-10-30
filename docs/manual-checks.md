@@ -409,6 +409,17 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** do the link symbol and the echo ring read clearly at every height and in both appearances, and does the J-cut sound right?
 - **Source:** road map "audio" AP9 (spec §11 AU-90…AU-97); `tools/proof/ap9_split_edits_proof.py` measures the offsets in the export, not how the chrome looks or the preview sounds.
 
+**SE-25 — Duck by Speech: the music drops for the words, and the line shows where**
+- **Do:** 1. Put a voice-over with pauses (`samples/Rode-usb-mic.m4a`, or your own) on one track and music under it on another. 2. Select the voice; in the Clip tab's Ducking section turn on Duck other audio, then set Duck by to Speech. 3. Play it through headphones; then try Pre-roll 0 and Hold 0, and Pre-roll 1 s and Hold 1 s. 4. Look at the voice clip on the timeline at the S, M and L track heights, and zoom in and out. 5. Undo once.
+- **Expect:** the music dips just before each phrase and comes back in each pause long enough for the hold and release, with no click or pumping on short gaps between words; a thin yellow line runs across the voice clip's waveform, high where the music plays at full level and low where it is ducked, following the phrases at every height and zoom; the Speech choice is greyed for a clip whose speech is still being detected; one Undo puts the duck back to Clip Length.
+- **Answer:** do the defaults (0.5 s pre-roll and hold) sound natural on real speech, and is the yellow line easy to read over the waveform in both appearances?
+- **Source:** road map "audio" AP11 (spec §11 AU-110..AU-113); `tools/proof/audio_ap11_proof.py` D1–D4 measure the bed's level on an export and `core/tests/duck_speech.rs` the ramps, not how it sounds or looks.
+
+**SE-26 — Fade and crossfade shapes sound as their names say**
+- **Do:** 1. Give a music clip a 2 s fade in and a 2 s fade out; play each with In shape and Out shape on Linear, S-Curve, +3 dB and −3 dB. 2. Overlap two different takes of speech with Crossfade Audio on and play the join with Crossfade Shape on +3 dB, then Linear.
+- **Expect:** +3 dB fades are heard straight away and −3 dB fades feel long and slow to start, S-Curve eases in and out, Linear sits between; the +3 dB crossfade holds the level across the join where Linear dips audibly in the middle; no shape clicks at either end.
+- **Source:** road map "audio" AP11 (spec §11 AU-114, AU-115); `tools/proof/audio_ap11_proof.py` F1–F4 and X1 measure the shapes on an export, not how they sound.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

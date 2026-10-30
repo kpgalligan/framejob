@@ -54,12 +54,32 @@ extension AgentServer {
     /// defaults, and a misspelt key inside one is
     /// `unknown key "duck.levl" in an audio patch` instead of a dropped key
     /// and a duck the caller did not write.
+    ///
+    /// **One key IS read: `duck.mode`.** A patch setting it to `speech` is
+    /// Audio ▸ Ducking ▸ Duck by Speech, which saves each media's speech
+    /// spans from its voice cache in the same undo step (spec §11 AU-111):
+    /// `DuckSpeech.ops` is prepended, and its refusal — a clip that is not a
+    /// media clip with sound, a speech cache not written yet — is this
+    /// tool's error. Nothing else in the patch is read.
     func setAudio(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let patch = try rawPatchArg(a, "patch")
+        var ops: [ReelOp] = []
+        let mode = ((patch as? [String: Any])?["duck"] as? [String: Any])?["mode"] as? String
+        if mode == DuckMode.speech.rawValue {
+            let named = Set(clips)
+            let shown = try idScope(document).clips.filter { named.contains($0.id) }
+            do {
+                ops = try DuckSpeech.ops(
+                    for: shown, in: document.project.snapshot,
+                    cacheDirectory: document.cacheDirectory)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+        }
         return try editResult(
-            document, "Audio Properties", [.setAudioRaw(clips: clips, patch: patch)])
+            document, "Audio Properties", ops + [.setAudioRaw(clips: clips, patch: patch)])
     }
 
     /// `set_text` — the Text tab (`TextPane`) and the canvas's inline text

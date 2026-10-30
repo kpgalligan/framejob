@@ -41,7 +41,7 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 - **Ducking** on a nest clip lowers the rest of the project for the nest's whole length.
 - **Pan, the compressor and noise reduction** set on a nest clip have no effect. Open the nest (⌘↓) and set them on the clips inside.
 
-*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor` and `noise_reduction`. Setting `duck` or `compressor` to null turns it off. `get_project` reads them back.
+*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `fade_in_shape`, `fade_out_shape`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor` and `noise_reduction`. Setting `duck` or `compressor` to null turns it off. `get_project` reads them back.
 
 ## Volume
 
@@ -83,10 +83,19 @@ Some clips in a selection are skipped and the rest are still normalized: nests (
 |---|---|---|---|
 | Fade in | How long the sound takes to rise from silence at the clip's start. Quick picks: 0, 0.25, 0.5, 1, 2 s. | 0–10 s | 0 |
 | Fade out | How long the sound takes to fall to silence at the clip's end. Same quick picks. | 0–10 s | 0 |
+| In shape | The curve of the fade in: Linear, S-Curve, +3 dB or −3 dB (see below). | four shapes | Linear |
+| Out shape | The curve of the fade out, the same four. | four shapes | Linear |
 
 In the inspector, a fade length is stored as you type it, not rounded to whole frames. The section summary shows both lengths ("0.50 · 1.00 s"), or "none".
 
-A fade is a straight-line ramp in level from silence (fade in) or to silence (fade out), measured from the clip's own edges. It travels with the clip when you move it, and it stays at the edge when you trim. Where a fade in and a fade out overlap, or a fade is longer than the clip, the two multiply, which gives a dip in the middle rather than a jump.
+A fade is measured from the clip's own edges. Its shape says how the level moves across it:
+
+- **Linear**: a straight-line ramp in level, the same amount every moment. The default.
+- **S-Curve**: starts and ends gently and moves fastest in the middle.
+- **+3 dB**: rises quickly at first and levels off; halfway through it is 3 dB under full. Good for a fade in that should be heard straight away.
+- **−3 dB**: starts slowly and gathers speed; halfway through it is far quieter. Good for a fade out that should feel long.
+
+The shapes are always the clip's own setting, even with an action selected. It travels with the clip when you move it, and it stays at the edge when you trim. Where a fade in and a fade out overlap, or a fade is longer than the clip, the two multiply, which gives a dip in the middle rather than a jump.
 
 ### Fade handles on the timeline
 
@@ -99,7 +108,7 @@ Every clip with sound has a small square handle at each top corner of its audio 
 
 The handles and the inspector rows change the same two settings.
 
-*Agents:* `set_audio` with `fade_in` / `fade_out` in ticks.
+*Agents:* `set_audio` with `fade_in` / `fade_out` in ticks, and `fade_in_shape` / `fade_out_shape` (`linear`, `s_curve`, `plus_3db`, `minus_3db`).
 
 ## Ducking
 
@@ -108,21 +117,34 @@ Ducking lowers every *other* clip while this one plays. The usual use is to turn
 | Control | What it does | Range | Default |
 |---|---|---|---|
 | Duck other audio | Turns ducking on for this clip. | on / off | off |
+| Duck by | **Clip Length**: the others stay down for the clip's whole length. **Speech**: they go down only while this clip's speech plays. | Clip Length / Speech | Clip Length |
 | Level | How loud the other clips are while this one plays. Quick picks: 0, 10, 20, 30, 50 %. | 0–100 % | 20 % |
 | Attack | How long the other clips take to fall to Level, starting from this clip's first frame. Quick picks: 0.1, 0.25, 0.5, 1 s. | 0–5 s | 0.5 s |
 | Release | How long they take to come back up, starting after this clip ends. Quick picks: 0.25, 0.5, 1, 2 s. | 0–5 s | 1 s |
+| Pre-roll | With Duck by Speech, how long before each stretch of speech the others start going down. Quick picks: 0, 0.25, 0.5, 1 s. | 0–5 s | 0.5 s |
+| Hold | With Duck by Speech, how long after each stretch of speech the others stay down before the release. Same quick picks. | 0–5 s | 0.5 s |
 
-Level, Attack and Release are disabled until ducking is turned on.
+Level, Attack, Release and Duck by are disabled until ducking is turned on, and Pre-roll and Hold until Duck by is Speech.
 
-Attack and Release are stored as you type them, not rounded to whole frames.
+Attack, Release, Pre-roll and Hold are stored as you type them, not rounded to whole frames.
 
-Ducking follows the clip's length on the timeline, not whether anyone is talking. The other audio stays lowered for the whole length of the ducking clip, through pauses, and comes back up only after the clip ends. You can therefore see exactly when ducking applies by looking at the timeline. If the attack is longer than the clip, the level never fully reaches Level, and the release starts from wherever it got to.
+With **Clip Length**, ducking follows the clip's length on the timeline, not whether anyone is talking. The other audio stays lowered for the whole length of the ducking clip, through pauses, and comes back up only after the clip ends. You can therefore see exactly when ducking applies by looking at the timeline. If the attack is longer than the clip, the level never fully reaches Level, and the release starts from wherever it got to.
+
+### Duck by Speech
+
+With **Speech**, the others go down only while this clip's speech plays: the attack starts Pre-roll before each stretch of speech, the level holds until Hold after it ends, and the release follows. Stretches close enough that their pre-roll and hold meet count as one, and a breath under 0.2 s between words doesn't lift the music.
+
+- **Where the speech is comes from the clip's file.** Frame Job detects speech in every file with sound when it's imported, on your Mac, the same detection Remove Silences uses. Choosing Speech saves where that file's speech is in the project, in the same undo step, so the preview, every export and an agent all hear the same thing. A file keeps the speech it was given; it isn't detected again.
+- **Speech can't be chosen yet** while a selected file's speech is still being detected, or for a clip that isn't a file with sound (a nest, a title). Try again in a moment.
+- **The timeline shows it.** A clip that ducks by speech has a thin yellow line across its waveform: high where the others play at full level, low where they're ducked. It follows the clip's speed, reverse and speed ramps.
+- **Where one stretch's release meets the next one's attack**, the others follow whichever is lower, so the level never dips below Level.
+- **Relinking** the clip's file to a shorter one keeps the speech that still fits, and relinking it to a file with no sound forgets it.
 
 - **Overlapping duckers multiply.** Where two ducking clips overlap, their levels multiply: two at 50 % give 25 %.
 - **A silent ducking clip still ducks.** Ducking is read from the clip's place on the timeline, so a ducking clip that is muted, silenced by a solo, or has its audio switched off still lowers the others. Turn ducking off to stop it.
 - **Inside a nest**, a ducking clip lowers the rest of the project over the part of it that plays. Ducking on the nest clip itself lowers it over the nest's whole length.
 
-*Agents:* `set_audio` with `duck: {level, attack, release}`, or `duck: null` to turn it off.
+*Agents:* `set_audio` with `duck: {level, attack, release, mode, pre_roll, hold}`, or `duck: null` to turn it off. `mode: "speech"` is Duck by Speech and saves the file's speech in the same step; `set_media_speech` (`media`, `spans`) sets a file's speech spans directly, and `get_project` shows them as `media[].speech`.
 
 ## Noise Reduction
 

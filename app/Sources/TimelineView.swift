@@ -32,6 +32,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// (d)), set by `refreshTimeline` beside `update(...)`; the filmstrip
     /// and the waveform read a ramped clip through them.
     var sourceMaps: SourceMaps = { _ in nil }
+    var duckCurves: DuckCurves?
 
     /// Remove Silences' candidate spans, washed over the lanes and the ruler
     /// while its sheet is up (`TimelineView+Candidates.swift` draws them).

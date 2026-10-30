@@ -20,7 +20,7 @@ Read the first four in order to learn the editor; the rest stand alone.
 4. [Canvas, layers, text and shapes](canvas-and-layers.md) — placing a picture on the canvas, opacity, blend modes, shadows and filters, text, shape, image and background clips, and matte tracks.
 5. [Motion, actions and transitions](motion-and-transitions.md) — actions that animate a clip's properties over time, motion presets, and transitions between clips.
 6. [Speed, reverse and freeze frames](speed.md) — constant speed, fitting a clip to a length, rate stretch, speed ramps and their presets, reversing and freeze frames.
-7. [Audio](audio.md) — clip levels, fades, ducking, noise reduction, compression, pan, mute and solo, Normalize and Synchronize Audio.
+7. [Audio](audio.md) — clip levels, fades and their shapes, ducking by clip length or by speech, noise reduction, compression, pan, mute and solo, Normalize and Synchronize Audio.
 8. [Remove Silences and Remove Filler Words](cleanup-tools.md) — cutting dead air and filler words out of a spoken recording in one step.
 9. [Captions and transcription](captions.md) — importing and exporting captions, and transcribing speech on this Mac or with AssemblyAI into subtitles or word-by-word captions.
 10. [Colour grading](color-grading.md) — the Color tab, wheels, curves, looks and LUTs, adjustment clips and qualifiers, Show Ungraded and the scopes.

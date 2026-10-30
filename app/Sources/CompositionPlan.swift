@@ -114,6 +114,21 @@ struct PlanTrack: Codable, Equatable, Identifiable {
     }
 }
 
+/// A speech ducker's own multiplier (format 29, spec §11 AU-113): the line
+/// the timeline draws on the ducking clip (`TimelineView+DuckCurve.swift`).
+/// Nothing builds a composition from it — the ramps that duck are already in
+/// every other track's `ramps`.
+struct PlanDuck: Codable, Equatable {
+    let clip: UInt32
+    let ramps: [PlanRamp]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        clip = c.lenient(.clip, 0)
+        ramps = c.lenient(.ramps, [])
+    }
+}
+
 /// One `AVVideoCompositionInstruction` range. Instructions tile
 /// `[0, duration]` with no gaps or overlaps — an AVFoundation requirement.
 struct PlanInstruction: Codable, Equatable {
@@ -151,6 +166,8 @@ struct CompositionPlan: Codable, Equatable {
     /// The project's dynamic range (spec §11 HD-2): every composition of an
     /// HLG project converts in BT.2020/HLG (`CompositionBuilder`).
     let output: CanvasOutput
+    /// One per speech ducker (spec §11 AU-113); empty when the plan has none.
+    let ducks: [PlanDuck]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -163,6 +180,7 @@ struct CompositionPlan: Codable, Equatable {
         instructions = c.lenient(.instructions, [])
         warnings = c.lenient(.warnings, [])
         output = c.lenient(.output, .sdr)
+        ducks = c.lenient(.ducks, [])
     }
 
     /// Whether any video segment's media converts at step 0 (spec §11

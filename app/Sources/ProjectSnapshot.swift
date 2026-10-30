@@ -875,115 +875,6 @@ struct VideoProps: Codable, Equatable {
     var offset: CGPoint { CGPoint(x: x, y: y) }
 }
 
-/// Ducking: "lower other audio to `level` while this clip plays" (§4.3).
-/// By clip extent, never by voice activity — the core folds it into every
-/// other track's envelope.
-struct DuckProps: Codable, Equatable {
-    var level: Double
-    var attack: Ticks
-    var release: Ticks
-
-    init(level: Double = 0.2, attack: Ticks = 300_000, release: Ticks = 600_000) {
-        self.level = level
-        self.attack = attack
-        self.release = release
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        level = c.lenient(.level, 0.2)
-        attack = c.lenient(.attack, 300_000)
-        release = c.lenient(.release, 600_000)
-    }
-}
-
-/// "Smooth volume levels" (§4.3): a downward compressor over the clip's own
-/// samples. Unlike ducking, which the core resolves into ramps on other
-/// clips' envelopes, this one depends on the samples — so the model carries
-/// the parameters and the DSP happens on this side.
-struct CompressorProps: Codable, Equatable {
-    /// dBFS above which gain reduction starts.
-    var thresholdDb: Double
-    /// N:1 — 1 is no compression, 20 is effectively a limiter.
-    var ratio: Double
-    var attack: Ticks
-    var release: Ticks
-    /// dB applied after compression, to win back what it took.
-    var makeupDb: Double
-
-    init(
-        thresholdDb: Double = -18, ratio: Double = 3, attack: Ticks = 6000,
-        release: Ticks = 120_000, makeupDb: Double = 0
-    ) {
-        self.thresholdDb = thresholdDb
-        self.ratio = ratio
-        self.attack = attack
-        self.release = release
-        self.makeupDb = makeupDb
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        thresholdDb = c.lenient(.thresholdDb, -18)
-        ratio = c.lenient(.ratio, 3)
-        attack = c.lenient(.attack, 6000)
-        release = c.lenient(.release, 120_000)
-        makeupDb = c.lenient(.makeupDb, 0)
-    }
-}
-
-/// The sample half of a clip. `volume` may exceed 1, up to 32 (§5.2, §11 AU-1).
-struct AudioProps: Codable, Equatable {
-    let volume: Double
-    let muted: Bool
-    let fadeIn: Ticks
-    let fadeOut: Ticks
-    let duck: DuckProps?
-    let mono: Bool
-    /// Preserve pitch through a speed change (`scaleTimeRange` + a
-    /// time-pitch algorithm; the plan carries it per segment).
-    let keepPitch: Bool
-    /// -1 hard left, 0 centred, +1 hard right (M3).
-    let pan: Double
-    let compressor: CompressorProps?
-    /// How much background noise to remove: 0 is off (M3).
-    let noiseReduction: Double
-
-    init(
-        volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
-        duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
-        pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0
-    ) {
-        self.volume = volume
-        self.muted = muted
-        self.fadeIn = fadeIn
-        self.fadeOut = fadeOut
-        self.duck = duck
-        self.mono = mono
-        self.keepPitch = keepPitch
-        self.pan = pan
-        self.compressor = compressor
-        self.noiseReduction = noiseReduction
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        volume = c.lenient(.volume, 1)
-        muted = c.lenient(.muted, false)
-        fadeIn = c.lenient(.fadeIn, 0)
-        fadeOut = c.lenient(.fadeOut, 0)
-        duck = c.lenient(.duck)
-        mono = c.lenient(.mono, false)
-        keepPitch = c.lenient(.keepPitch, true)
-        pan = c.lenient(.pan, 0)
-        compressor = c.lenient(.compressor)
-        noiseReduction = c.lenient(.noiseReduction, 0)
-    }
-
-    /// Volume in dB for the Audio tab's read-out; -inf shows as silence.
-    var decibels: Double { volume <= 0 ? -.infinity : 20 * log10(volume) }
-}
-
 // MARK: - Clips
 
 /// What a clip plays. Internally tagged by `kind`, and one of its keys is
@@ -1234,16 +1125,23 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
 /// `curve` and `audio` are format version 7's. Their defaults here are the
 /// FILE defaults — linear and silent — and not what the core MINTS (spec
 /// §11, R5-2), because this type decodes files: a version-6 project carries
-/// neither key and must read as what it always rendered.
+/// neither key and must read as what it always rendered. `audioShape` is
+/// format 29's (spec §11 AU-115), `plus_3db` — R5-2's constant power — when
+/// absent.
 struct TransitionSnapshot: Codable, Equatable {
     let kind: TransitionKind
     let curve: Curve
     let audio: Bool
+    let audioShape: FadeShape
 
-    init(kind: TransitionKind = .crossDissolve, curve: Curve = .linear, audio: Bool = false) {
+    init(
+        kind: TransitionKind = .crossDissolve, curve: Curve = .linear, audio: Bool = false,
+        audioShape: FadeShape = .plus3Db
+    ) {
         self.kind = kind
         self.curve = curve
         self.audio = audio
+        self.audioShape = audioShape
     }
 
     init(from decoder: Decoder) throws {
@@ -1251,6 +1149,7 @@ struct TransitionSnapshot: Codable, Equatable {
         kind = c.lenient(.kind, TransitionKind.crossDissolve)
         curve = c.lenient(.curve, Curve.linear)
         audio = c.lenient(.audio, false)
+        audioShape = c.lenient(.audioShape, FadeShape.plus3Db)
     }
 }
 

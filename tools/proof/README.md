@@ -25905,3 +25905,57 @@ with the four baseline warnings):** `RC_PROOF_APP=release
 ap9_split_edits_proof.py` 10/10, its log clean (A0): the J-cut's onset − first
 frame −0.4999 s, the L-cut's offset − picture end +0.5000 s, the worst click −
 flash 0.174 ms. 10/10 on Debug too.
+
+## Road map "audio" AP11 — ducking by speech, and fade and crossfade shapes (`audio_ap11_proof.py` D1–D4, F1–F4, X1, T1, R1, P1–P2; `core/tests/duck_speech.rs`, `fade_shapes.rs`, `schema_v29.rs` and ten core mutants; spec §11 AU-110..AU-116)
+
+A duck in `speech` mode lowers the rest of the mix only while its media's
+saved speech spans play (`media[].speech`, written by `set_media_speech` in
+the same undo step as the `set_audio` that turns the mode on), widened by
+`pre_roll` and `hold`; fades take four shapes, and a transition's crossfade
+the same four with R5-2's constant power as the default, bit for bit. The
+product catalog is **104** tools (`set_media_speech`, the sixty-fourth op):
+`op_argument_proof.py` asserts `PRODUCT_TOOLS = 104` and `OPS = 64`, and
+`op_catalog_proof.py` 64 ops.
+
+- **`core/tests/duck_speech.rs`** (in `make test`): the bed's plan ramps
+  against an oracle written from AU-112 — at every ramp end, every midpoint,
+  and every 1/100 s across them — for pre-roll, hold, attack and release,
+  touching and overlapping spans merged, a release meeting the next attack
+  (the minimum, never the product), reversed, ×2, ramped and nested
+  duckers, and a speech duck with no spans; an extent duck's ramps pinned as
+  before format 29, with no `ducks`; the plan's `ducks`; `set_audio`'s
+  refusal, a pasted spanless speech duck keeping a volume edit;
+  `set_media_speech`'s sentences and `validate`'s; a relink clipping and
+  clearing spans; `pre_roll`/`hold` on an extent duck surviving a save.
+- **`core/tests/fade_shapes.rs`**: each shape's fade-in and fade-out ramp
+  ends on its formula (1e-12) and midpoints within 0.01; each crossfade
+  shape; the default crossfade's ramp ends pinned as R5-2's law wrote them,
+  text for text; `set_transition_style`'s `audio_shape`.
+- **`core/tests/schema_v29.rs`**: format 29's open, newer and round-trip
+  rows, and a file at 28 writing what it did.
+- **`audio_ap11_proof.py <dir>/agent.sock`** (the docstring has each row and
+  bound) makes its fixtures on the first run into `tools/proof/media/` with
+  `say` and `ffmpeg` (`ap11_voice.wav`, `ap11_voice_cut.wav`, `ap11_bed.wav`,
+  `ap11_silent.wav`) and reads levels by quadrature at 440 Hz over
+  11-cycle windows of `audio_wav` exports. Release, 2026-10-30: **11/11** —
+  D2 −12.040 dB held (want −12.041 ± 0.2), D3 and D4's free parts +0.000 dB,
+  D4 −12.040 dB through the pause, F1–F4 within 0.117 dB, X1 within
+  0.100 dB, T1 the last span ending at the cut file's 600,000 ticks; R1, the
+  owner's `samples/Rode-usb-mic.m4a`: 10 spans over 30.3 s, 188 bytes
+  compact, 447 in the project file.
+- **`audio_ap11_proof.py --probe`** runs P1 and P2 alone, with no instance
+  (the whole run runs them first): the probe `audio_ap11_probe.swift`,
+  compiled AS `main.swift` over `app/Sources` through `swift_build.py`,
+  commits Ducking ▸ Level through the row's own field on a clip whose Speech
+  duck came by Paste Attributes and whose media has no spans. P1 (the media's
+  voice cache written) hears `set_media_speech` then `set_audio` and the two
+  apply, as `set_audio` over MCP does (AU-111); P2 (no cache) hears the
+  `set_audio` alone and the core refuses it in its own sentence. 2026-10-30,
+  the AP11 review's fix pass: **2/2**; over the pane before the fix P1
+  FAILS (the `set_audio` alone, refused).
+
+The ten mutants (pre-roll sign, hold dropped, min → product, the reversed
+reflection skipped, the S-curve and −3 dB formulas, +3 dB's outgoing side as
+`gain(1 − p)`, the `set_audio` refusal removed or read from the merged
+props, relink's clip of `speech` skipped) each fail a named core test; the
+record is AP11's in `designs/audio.md`.

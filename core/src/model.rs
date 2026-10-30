@@ -182,6 +182,9 @@ pub struct Media {
     /// only when set, so a media with none writes the text it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<MediaColor>,
+    /// Speech spans, forward source ticks (format 29, spec §11 AU-110).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speech: Option<Vec<[Ticks; 2]>>,
 }
 
 /// The file a playable copy was made from (format version 11, spec §11
@@ -490,13 +493,16 @@ pub enum Curve {
 /// so a project made before version 7 sounds and looks exactly as it did.
 /// It is deliberately NOT what a transition the CORE mints looks like —
 /// [`Transition::minted`] is that, and spec §11's R5-2 says why the two
-/// differ.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// differ. The `Default` impl is `audio_shape.rs`'s (AU-115).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Transition {
     pub kind: TransitionKind,
     pub curve: Curve,
     pub audio: bool,
+    /// The crossfade's shape (format 29), written only when not `plus_3db`.
+    #[serde(skip_serializing_if = "FadeShape::is_plus_3db")]
+    pub audio_shape: FadeShape,
 }
 
 impl Transition {
@@ -513,6 +519,7 @@ impl Transition {
             kind,
             curve: Curve::EaseInOut,
             audio: true,
+            audio_shape: FadeShape::Plus3Db,
         }
     }
 }

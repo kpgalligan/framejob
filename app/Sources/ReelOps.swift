@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all sixty-three.
+    /// not an argument of any op and is spelled once for all sixty-four.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an
@@ -140,14 +140,14 @@ extension ReelOp {
         return copy
     }
 
-    /// The eight DOCUMENT-level ops among those `core/src/scope.rs`'s
+    /// The nine DOCUMENT-level ops among those `core/src/scope.rs`'s
     /// `refused_inside` answers `"<op> has no meaning inside nest N"` to. The
-    /// ninth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
+    /// tenth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
     /// places, not because it is the document's, so it is sent scoped.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
     /// sense that the typed factories above mirror the op table: change one,
-    /// change both. It is eight names rather than a rule, so it can be
+    /// change both. It is nine names rather than a rule, so it can be
     /// checked by eye, and it is written here rather than at a call site
     /// because two copies of it is what would drift.
     ///
@@ -170,10 +170,10 @@ extension ReelOp {
     /// paths.
     static let documentLevelNames: Set<String> = [
         "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
-        "remove_media", "set_media_color",
+        "remove_media", "set_media_color", "set_media_speech",
     ]
 
-    /// True for one of the eight above — an edit about the document rather
+    /// True for one of the nine above — an edit about the document rather
     /// than about whatever container the timeline is looking at.
     var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
@@ -873,14 +873,18 @@ extension ReelOp {
         return ReelOp(name: "add_transition", args: a.values)
     }
 
-    /// The transition's easing and whether it crossfades the two clips'
-    /// sound (§6 `set_transition_style`). A nil argument is omitted, which
-    /// the core reads as "keep"; both nil changes nothing.
-    static func setTransitionStyle(clip: UInt32, curve: Curve?, audio: Bool?) -> ReelOp {
+    /// The transition's easing, whether it crossfades the two clips' sound,
+    /// and the crossfade's shape (§6 `set_transition_style`, spec §11
+    /// AU-115). A nil argument is omitted, which the core reads as "keep";
+    /// all nil changes nothing.
+    static func setTransitionStyle(
+        clip: UInt32, curve: Curve?, audio: Bool?, audioShape: FadeShape? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("curve", curve?.rawValue)
         a.put("audio", audio)
+        a.put("audio_shape", audioShape?.rawValue)
         return ReelOp(name: "set_transition_style", args: a.values)
     }
 }
@@ -1321,5 +1325,12 @@ extension ReelOp {
     /// take by name.
     static func setMediaColorRaw(media: UInt32, color: Any) -> ReelOp {
         ReelOp(name: "set_media_color", args: ["media": media, "color": color])
+    }
+
+    /// A media's speech spans (§6 `set_media_speech`, spec §11 AU-110):
+    /// `[[start, end], …]` in forward source ticks, the wire shape
+    /// `ripple_delete_ranges` uses. `DuckSpeech.ops` is the one writer.
+    static func setMediaSpeech(media: UInt32, spans: [[Ticks]]) -> ReelOp {
+        ReelOp(name: "set_media_speech", args: ["media": media, "spans": spans])
     }
 }

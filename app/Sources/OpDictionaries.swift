@@ -132,7 +132,12 @@ extension ObscureProps {
 }
 
 extension DuckProps {
-    var dictionary: [String: Any] { ["level": level, "attack": attack, "release": release] }
+    var dictionary: [String: Any] {
+        [
+            "level": level, "attack": attack, "release": release, "mode": mode.rawValue,
+            "pre_roll": preRoll, "hold": hold,
+        ]
+    }
 }
 
 extension CompressorProps {

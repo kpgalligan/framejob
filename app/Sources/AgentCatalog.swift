@@ -70,8 +70,8 @@ extension AgentServer {
     /// `restore_graphic`, `list_graphics`, `insert_graphic`, `export_graphic`,
     /// `import_graphic`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all one hundred and three get `project`
-    /// and where all sixty-three get `scope`.
+    /// through here, so this is still where all one hundred and four get `project`
+    /// and where all sixty-four get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
     /// files build tools with it or with `opTool`, and `private` on an
@@ -84,7 +84,7 @@ extension AgentServer {
         schema["project"] = Self.projectProperty
         // Road map 2's phase 9: every §6 OP also takes the envelope's
         // `scope`, and it is injected HERE for the reason `project` is —
-        // one edit site instead of sixty-three, and the op somebody adds in
+        // one edit site instead of sixty-four, and the op somebody adds in
         // phase 10 cannot arrive with a tool that silently lacks it.
         //
         // Op-ness is the CORE's answer (`Self.opNames`, read through
@@ -128,7 +128,7 @@ extension AgentServer {
     /// injected keys are the same code and cannot come to differ: `project`
     /// on every tool, `scope` on every name the core calls an op.
     ///
-    /// **Every one of the sixty-three op tools is built here** since road
+    /// **Every one of the sixty-four op tools is built here** since road
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
     /// two graphics, the four raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
@@ -167,7 +167,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of one hundred and three
+    /// decode behind it happen once per process instead of one hundred and four
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be

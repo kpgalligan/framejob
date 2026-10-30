@@ -331,8 +331,16 @@ use crate::model::{Canvas, Project};
 /// the reader's default is none, so there is no migration step. The bump is
 /// so an older build refuses the file: it would open the pair as two
 /// unrelated clips and drop the link on save.
-/// Every number from 29 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 28;
+///
+/// Version 29 is ducking by speech and fade shapes (spec §11 AU-110..AU-116):
+/// `media.speech` (speech spans), `audio.duck`'s `mode`, `pre_roll` and
+/// `hold`, `audio.fade_in_shape` and `fade_out_shape`, and
+/// `transition_in.audio_shape`, each written only when not its default, so
+/// every other project writes exactly the text it did and there is no
+/// migration step. The bump is so an older build refuses the file rather than
+/// ducking a speech duck over its whole clip and dropping the keys on save.
+/// Every number from 30 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 29;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

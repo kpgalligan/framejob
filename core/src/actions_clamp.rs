@@ -278,6 +278,8 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
         duck.level = bounded(duck.level, 0.0, 1.0, 0.2);
         duck.attack = duck.attack.max(0);
         duck.release = duck.release.max(0);
+        duck.pre_roll = duck.pre_roll.max(0);
+        duck.hold = duck.hold.max(0);
     }
     // Pan's neutral is the CENTRE, not either end: a NaN that silently
     // threw the voice into one speaker would be worse than one that did

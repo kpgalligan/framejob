@@ -70,6 +70,8 @@ extension EditorViewController {
         // The source maps come from the same handle as the snapshot (spec
         // §11 SR-20 (d)), set first so the redraw `update` asks for reads them.
         timeline.sourceMaps = document.editedProject.sourceMap
+        // A speech duck's line, off the same handle (spec §11 AU-113).
+        timeline.duckCurves = DuckCurves(document.editedProject)
         timeline.update(
             snapshot: document.editedProject.snapshot,
             selection: document.selection,

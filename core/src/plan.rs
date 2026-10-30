@@ -7,6 +7,7 @@
 use serde_json::{Map, Value};
 
 use crate::audio::Ducker;
+use crate::audio_duck_speech::duck_ramps;
 use crate::evaluate::{json, Assignment};
 use crate::model::Project;
 use crate::time::{Ticks, TIMESCALE};
@@ -90,6 +91,20 @@ impl Project {
             })
             .collect();
 
+        // A speech duck's own multiplier (spec §11 AU-113), for the line the
+        // timeline draws on the ducking clip; none for an extent duck.
+        let ducks: Vec<Value> = duckers
+            .iter()
+            .filter_map(|ducker| {
+                let spans = ducker.spans.as_ref()?;
+                let mut entry = Map::new();
+                entry.insert("clip".to_string(), Value::from(ducker.clip));
+                let ramps = duck_ramps(ducker, spans).iter().map(json).collect();
+                entry.insert("ramps".to_string(), Value::Array(ramps));
+                Some(Value::Object(entry))
+            })
+            .collect();
+
         let instructions = self.instructions(&assignment, duration);
         let warnings = warnings_for(&instructions);
 
@@ -118,6 +133,10 @@ impl Project {
         }
         out.insert("video_tracks".to_string(), Value::Array(video_tracks));
         out.insert("audio_tracks".to_string(), Value::Array(audio_tracks));
+        // Only with a speech duck, so every other plan is the text it was.
+        if !ducks.is_empty() {
+            out.insert("ducks".to_string(), Value::Array(ducks));
+        }
         out.insert(
             "instructions".to_string(),
             Value::Array(

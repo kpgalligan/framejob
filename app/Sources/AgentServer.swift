@@ -321,6 +321,7 @@ final class AgentServer {
         "relink_media": { $0.relinkMedia },
         "remove_media": { $0.removeMedia },
         "set_media_color": { $0.setMediaColor },
+        "set_media_speech": { $0.setMediaSpeech },
         // Rendering and export (AgentServer+Render.swift, AgentServer+Export.swift)
         "render_frame": { $0.renderFrame },
         "export": { $0.exportProject },

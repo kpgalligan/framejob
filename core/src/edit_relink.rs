@@ -12,7 +12,9 @@
 //! stored one, so a probe without one clears it, and no probe keeps it. A
 //! probe never carries `color`, and a relink keeps the media's Camera Log
 //! (spec §11 GR-16): it is the person's reading of the footage, which a new
-//! path to the same footage does not change.
+//! path to the same footage does not change. A probe never carries `speech`
+//! either; a probed relink clips the stored spans to the new file or clears
+//! them (spec §11 AU-116).
 //!
 //! Cut out of `edit_track.rs`, which keeps the media list's other two ops
 //! and the two things this one shares with `add_media`: `MEDIA_KEYS` and
@@ -29,6 +31,7 @@ use crate::export_overrides::spelled;
 use crate::model::{Clip, Media, Project, Source};
 use crate::outcome::Outcome;
 use crate::source_window::SourceBound;
+use crate::time::Ticks;
 
 impl Project {
     /// Points a media at a new file, and — given its `probe` — takes the
@@ -98,6 +101,7 @@ impl Project {
                 found.has_audio = new.has_audio;
                 found.has_alpha = new.has_alpha;
                 found.original = new.original.clone();
+                found.speech = clipped_speech(found.speech.take(), new);
             }
         }
         if probed.is_some() {
@@ -131,6 +135,23 @@ impl Project {
             }
         }
     }
+}
+
+/// A probed relink's `speech` (spec §11 AU-116): the stored spans held to
+/// the new file — a span starting at or past its `duration` dropped, an end
+/// past it clamped — and `None` when none is left or the file has no audio,
+/// so `finish`'s `validate` never refuses a relink over spans. The spans are
+/// not detected again.
+fn clipped_speech(speech: Option<Vec<[Ticks; 2]>>, file: &Media) -> Option<Vec<[Ticks; 2]>> {
+    if !file.has_audio {
+        return None;
+    }
+    let kept: Vec<[Ticks; 2]> = speech?
+        .into_iter()
+        .filter(|[start, _]| *start < file.duration)
+        .map(|[start, end]| [start, end.min(file.duration)])
+        .collect();
+    (!kept.is_empty()).then_some(kept)
 }
 
 /// A relink's probe read as a media record, or the `Err` naming what is

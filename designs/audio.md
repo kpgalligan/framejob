@@ -500,6 +500,78 @@ merge. `make gate` on the merged tree: PASS 470 s (names 1, typecheck 12, fmt 5,
 
 **Owed.** SE-24 in `docs/manual-checks.md` (the glyph, the echo, a J-cut heard in the preview).
 
+### AP11's record (2026-10-30)
+
+**The owner's answer.** Asked where a ducking clip's speech spans live, the owner chose (a),
+saved in the project (`media[].speech`, written by `set_media_speech` in the same undo step that
+turns Speech on), so the plan stays a pure function of the project. Recorded as AU-110, amending
+§11's "Ducking is by clip extent"; AU-111…AU-116 hold the rest, all before the code.
+
+**Landed.** The two tolls first, each a pure move gated alone — `ProjectSnapshot.swift` (1532 →
+1423) gave `DuckProps`, `CompressorProps` and `AudioProps` to the new `AudioProps.swift` (gate
+PASS 393 s), and `edit_transition.rs` (588 → 541) gave `set_transition_style` to the new
+`edit_transition_style.rs` (gate PASS 187 s); then the decisions, the core, the app, the mirror,
+the docs and the proof.
+
+- **Core.** `model_audio.rs`: `DuckMode` (`extent`, `speech`), `Duck.mode`/`pre_roll`/`hold`
+  (`DUCK_SPEECH_PAD` 300,000 ticks, 0.5 s), `FadeShape` and `AudioProps.fade_in_shape`/
+  `fade_out_shape`; `model.rs`: `Media.speech`, `Transition.audio_shape` (its `Default`,
+  `plus_3db`, in `audio_shape.rs`). Every new key is written only when not its default, so a
+  project without them writes the text it did; format 29. `audio_duck_speech.rs` (new) maps the
+  spans and answers the speech ducker's gain (the minimum over its spans of `audio_duck.rs`'s
+  `extent_gain`), its breakpoints and the plan's `ducks`; `audio_shape.rs` (new) the four shapes
+  and a shaped fade's samples; `media_speech.rs` (new) the op and its rules (`validate` too);
+  `set_audio`'s one refusal reads the PATCH; a probed relink clips or clears `speech`. The patch
+  template carries the new keys at non-default values, since a default is no longer written and
+  the key check reads the template. 64 ops; 23 kinds with `FadeShape`.
+- **App.** The Ducking section's Duck by (Clip Length / Speech), Pre-roll and Hold; the Fades
+  section's In shape and Out shape; the Transition section's Crossfade Shape; all base-only.
+  `DuckSpeech.swift` (new) turns the cached VAD into spans and the grouped ops, and `DuckCurves`
+  reads the plan's `ducks` for `TimelineView+DuckCurve.swift`'s (new) yellow line. The Duck by
+  popup is disabled, rather than its Speech item, while Speech cannot be chosen
+  (`OptionPopupControl` has no per-item state).
+- **Mirror.** `set_media_speech` (the 104th product tool); `set_audio` prepends
+  `DuckSpeech.ops` when its patch sets `duck.mode: "speech"`; `set_transition_style` takes
+  `audio_shape`.
+
+**Measured** (the lane, `tools/proof/audio_ap11_proof.py` on Release after its gate, 11/11, and
+11/11 on Debug before it): D1 the `say` voice's speech saved as 2 spans; D2 the bed inside both
+held parts at −12.040 dB (want −12.041 ± 0.2); D3 both free parts at +0.000 dB; D4 an extent duck
+holds −12.040 dB through the pause and +0.000 dB after its release; F1–F4 every fade shape within
+0.117 dB of its formula (bound 0.5); X1 a linear crossfade within 0.100 dB of 1 − p; T1 a file cut
+inside a word saves its last span ending at its duration (600,000 ticks). **The cost AU-110
+accepted**, R1 on `samples/Rode-usb-mic.m4a`: 10 spans over 30.3 s, 188 bytes compact, 447 bytes
+in the project file's pretty JSON. Ten mutants, each killed by a named core test: pre-roll sign,
+hold dropped, min → product, reversed reflection skipped, the S-curve and −3 dB formulas, +3 dB's
+outgoing side as `gain(1 − p)` (caught only by `fade_shapes.rs`'s bit-for-bit pin of R5-2's law),
+the `set_audio` refusal removed, the refusal read from the merged props, and relink's `speech`
+clip skipped (a first run let the reflection mutant live, so `duck_speech.rs` now samples the gain
+every 1/100 s). Lane `make gate` PASS 326 s; `op_catalog_proof.py` 23/23, `op_argument_proof.py`
+173/173; the parity log clean.
+
+**Review.** One should-fix: the Ducking section's Level, Attack, Release, Pre-roll and Hold
+re-sent the whole duck with its `mode`, so on a spanless Speech duck made by Paste Attributes the
+core refused them while `set_audio` over MCP applied. Fixed: every duck edit of a Speech duck
+carries `DuckSpeech.ops` first, the Duck by popup through the same path (a cache that cannot be
+read now leaves the core's refusal rather than an edit that does nothing). `audio_ap11_probe.swift`
+(`audio_ap11_proof.py --probe`): P1 and P2 2/2, and P1 fails over the pre-fix pane; fix pass
+`make gate` PASS 476 s. The second review passed with one nit: the release/attack crossing's upper
+bound in `audio_duck_speech.rs` does not also stop at a next span ending before `s2 + attack`, so
+with Pre-roll and Hold near 0 the ramp across that corner is interpolated — filed as an issue.
+
+**Integrated.** AP9 had taken format 28, so this phase is format 29 (`format.rs`, the header,
+`schema_v29.rs`, AU-116, every doc line that named 28); AP9's `attach_audio` had taken the 63rd op
+and 103rd tool, so `set_media_speech` is the 64th and 104th (`OP_COUNT`, `scope.rs`'s pin, both op
+proofs, the count prose); AP1 and AP9 had taken SE-23 and SE-24, so this phase's checks are SE-25
+and SE-26; the AU index row and decision rows merged beside AU-90…AU-97. On the merged tree:
+`make gate` PASS 314 s (names 1, typecheck 5, fmt 3, lint 10, test 176, app 119); the merge
+touched product code (the format number, `OP_COUNT`), so on Release after it
+`audio_ap11_proof.py` 13/13 (P1–P2 and D1–R1, every figure as above), `op_catalog_proof.py`
+23/23 and `op_argument_proof.py` 174/174, the parity log clean; `spec_index_proof.py` 213/213.
+
+**Owed.** The person checks SE-25 (the speech duck by ear and its line's look) and SE-26 (the
+shapes by ear) in `docs/manual-checks.md`; the crossing-bound nit as an issue.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

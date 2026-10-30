@@ -173,9 +173,12 @@ final class AudioPane: InspectorPaneView {
     /// Fades are also the corner handles on the clip (§4.4), so the numbers
     /// here and the drag there write the same two fields. The rows store the
     /// length typed, off the frame grid (`rampTicks`); the handle's drag
-    /// snaps it to whole frames (§11 #355).
+    /// snaps it to whole frames (§11 #355). The two shape popups (format 29,
+    /// spec §11 AU-114) are base-only, as the duck is (CI-3).
     func fadeSection() -> InspectorSection {
         let binding = self.binding
+        let shapes = FadeShape.allCases
+        func shape(_ index: Int) -> FadeShape { shapes[min(max(index, 0), shapes.count - 1)] }
         return InspectorSection(
             id: "audio.fades", title: "Fades",
             summary: {
@@ -200,24 +203,62 @@ final class AudioPane: InspectorPaneView {
                     read: { ReelTime.seconds(binding.audioProps.fadeOut) },
                     ops: { binding.ops(audio: AudioPatch(fadeOut: Self.rampTicks(seconds: $0))) },
                     mixed: { binding.mixedAudio { $0.fadeOut } }),
+                inspectorPopupRow(
+                    "In shape", binding, name: "Fade In Shape", items: shapes.map { $0.title },
+                    read: { shapes.firstIndex(of: binding.audioProps.fadeInShape) ?? 0 },
+                    ops: { binding.ops(audio: AudioPatch(fadeInShape: shape($0))) },
+                    mixed: { binding.mixedAudio { $0.fadeInShape } }),
+                inspectorPopupRow(
+                    "Out shape", binding, name: "Fade Out Shape", items: shapes.map { $0.title },
+                    read: { shapes.firstIndex(of: binding.audioProps.fadeOutShape) ?? 0 },
+                    ops: { binding.ops(audio: AudioPatch(fadeOutShape: shape($0))) },
+                    mixed: { binding.mixedAudio { $0.fadeOutShape } }),
             ])
     }
 
     // MARK: Ducking
 
-    /// "Lower other audio to N % while this clip plays" — by clip EXTENT, not
-    /// voice activity (§11), which is why there is nothing to analyse and the
-    /// core can fold it into the other clips' envelopes.
+    /// "Lower other audio to N % while this clip plays" — by the clip's
+    /// length, or (Duck by Speech, format 29, spec §11 AU-110..AU-113) only
+    /// while its speech plays, widened by Pre-roll and Hold. The core folds
+    /// either into the other clips' envelopes.
     ///
     /// Every control writes a whole `DuckProps`: the patch replaces the
-    /// object, so each edit re-sends the other two values as they stand.
-    /// Attack and release are stored as typed, off the frame grid
-    /// (§11 #355).
+    /// object, so each edit re-sends the other values as they stand.
+    /// Attack, release, pre-roll and hold are stored as typed, off the frame
+    /// grid (§11 #355).
+    ///
+    /// **Choosing Speech is ONE edit with the spans** (AU-111): the
+    /// `set_media_speech` each media without spans needs, from its voice
+    /// cache (`DuckSpeech.ops`), then the `set_audio`. Every other duck edit
+    /// re-sends `mode`, so on a Speech duck it carries the same spans first,
+    /// as `AgentServer.setAudio` does: a Level edit on a pasted spanless
+    /// Speech duck saves its media's spans and applies. A media whose cache
+    /// cannot be read adds none, and the core refuses the edit in its own
+    /// sentence rather than the row doing nothing. Speech cannot be chosen
+    /// — the popup is disabled while the duck follows the clip's length —
+    /// for a selection with a clip that is not a media clip with sound, or
+    /// whose speech has not been detected yet (`DuckSpeech.problem`).
     func duckSection() -> InspectorSection {
         let binding = self.binding
         func current() -> DuckProps { binding.audioProps.duck ?? DuckProps() }
-        func ops(_ next: DuckProps) -> [ReelOp] { binding.ops(audio: AudioPatch(duck: .some(next))) }
+        func ops(_ next: DuckProps) -> [ReelOp] {
+            let set = binding.ops(audio: AudioPatch(duck: .some(next)))
+            guard next.mode == .speech else { return set }
+            let spans = (try? DuckSpeech.ops(
+                for: binding.audioClips, in: binding.snapshot,
+                cacheDirectory: binding.document?.cacheDirectory)) ?? []
+            return spans + set
+        }
         func on() -> Bool { binding.audioProps.duck != nil }
+        func speech() -> Bool { on() && current().mode == .speech }
+        func offerable() -> Bool {
+            speech()
+                || DuckSpeech.problem(
+                    for: binding.audioClips, in: binding.snapshot,
+                    cacheDirectory: binding.document?.cacheDirectory) == nil
+        }
+        let modes = DuckMode.allCases
         return InspectorSection(
             id: "audio.duck", title: "Ducking",
             summary: { on() ? String(format: "%.0f%%", current().level * 100) : "off" },
@@ -232,6 +273,16 @@ final class AudioPane: InspectorPaneView {
                             audio: AudioPatch(duck: value ? .some(DuckProps()) : .some(nil)))
                     },
                     mixed: { binding.mixedAudio { $0.duck != nil } }),
+                inspectorPopupRow(
+                    "Duck by", binding, name: "Ducking", items: ["Clip Length", "Speech"],
+                    read: { modes.firstIndex(of: current().mode) ?? 0 },
+                    ops: { index in
+                        var d = current()
+                        d.mode = modes[min(max(index, 0), modes.count - 1)]
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.mode } },
+                    enabled: { on() && offerable() }),
                 inspectorValueRow(
                     "Level", binding, name: "Duck Level", unit: "%", decimals: 0, min: 0, max: 100,
                     quick: [0, 10, 20, 30, 50],
@@ -265,6 +316,28 @@ final class AudioPane: InspectorPaneView {
                     },
                     mixed: { binding.mixedAudio { $0.duck?.release } },
                     enabled: on),
+                inspectorValueRow(
+                    "Pre-roll", binding, name: "Duck Pre-roll", unit: " s", decimals: 2, min: 0,
+                    max: 5, quick: [0, 0.25, 0.5, 1],
+                    read: { ReelTime.seconds(current().preRoll) },
+                    ops: { value in
+                        var d = current()
+                        d.preRoll = Self.rampTicks(seconds: value)
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.preRoll } },
+                    enabled: speech),
+                inspectorValueRow(
+                    "Hold", binding, name: "Duck Hold", unit: " s", decimals: 2, min: 0,
+                    max: 5, quick: [0, 0.25, 0.5, 1],
+                    read: { ReelTime.seconds(current().hold) },
+                    ops: { value in
+                        var d = current()
+                        d.hold = Self.rampTicks(seconds: value)
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.hold } },
+                    enabled: speech),
             ])
     }
 

@@ -229,3 +229,71 @@ AP9, survey A10), recorded before its code.
   selection itself stays what was clicked). Attach Audio sits after Detach Audio in the Clip menu
   on ⇧⌥⌘D (Detach Audio's ⌥⌘D plus ⇧), and as a button beside Detach Audio in the Sound tab's
   Mix section; it sends one `attach_audio` per pair in the selection.
+
+AU-110…AU-116 are AP11's (ducking by speech, and fade and crossfade shapes; survey B2, B9),
+recorded before its code.
+
+- **AU-110 — A duck can follow the ducking clip's SPEECH, from spans saved on its media
+  (owner, 2026-10-30: "(a) Saved in the project"); amends "Ducking is by clip extent"
+  (`foundations.md`).** `audio.duck.mode` is `extent` (the default, today's behaviour byte for
+  byte) or `speech`. The spans are `media[].speech`: forward-file source ticks `[start, end)`,
+  sorted, non-overlapping, `0 ≤ start < end ≤ duration`, at most `MAX_SPEECH_SPANS` (100,000),
+  written by the op `set_media_speech {media, spans}` (document-level, refused inside a scope as
+  the other media ops are). Saved rather than handed to the plan per build, so the plan stays a
+  pure function of the project: the preview, every export, `get_project` and the core's tests
+  see the same spans with no host input, and nothing changes the mix without an edit. Accepted:
+  a format bump and the file's size for long media (measured on `samples/Rode-usb-mic.m4a` in
+  AP11's record). A media's `speech` is refused, each in its own sentence, on an unknown media,
+  a media without audio, a span with `start ≥ end`, a negative start, an end past `duration`,
+  spans unsorted or overlapping, and more than the cap; equal spans are an identity. `validate`
+  holds a file to the same rules. `add_media` and a relink's probe never carry it.
+- **AU-111 — The spans come from the Silero VAD cache, frozen at their first write, in the same
+  undo step that turns Speech on.** `DuckSpeech.spans`: runs of `cache/speech/` chunks with
+  p ≥ `SilenceDetector.Settings.defaultVoiceConfidence` (0.5, one copy), gaps under 0.2 s
+  bridged, chunk i = `[i, i + 1) × MediaSpeech.chunkTicks`, each end clamped to the media's
+  `duration` (the cache rounds its chunk count up) and an empty span dropped. Choosing Duck by
+  Speech (the Audio tab, or `set_audio` with `duck.mode: "speech"` over MCP) writes
+  `set_media_speech` for each media that has no `speech` yet, then the `set_audio`, as ONE edit
+  ("Ducking"); a media that already has spans keeps them (re-detection is out of scope). A
+  missing cache refuses by name ("… its speech has not been detected yet"), as does a clip that
+  is not a media clip with audio. `set_audio` itself refuses only a PATCH that sets
+  `duck.mode: "speech"` on a clip that is not a media clip or whose media has no `speech`
+  ("audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)");
+  any other edit of a clip already holding a spanless Speech duck (made by Paste Attributes)
+  applies, and such a duck ducks nowhere.
+- **AU-112 — The speech duck's gain rule.** The media's spans are reflected for a reversed clip
+  (`[D − b, D − a]`, D the media's duration, since `in` is in the reversed stream), mapped to
+  clip time at the base rate (`(s − in) / speed`, start floored, end ceiled) or through the
+  speed map on a ramped clip, clipped to `[0, duration)`, put in project time over the part of
+  the instance that plays, expanded to `[s − pre_roll, e + hold]`, and merged where they overlap
+  or touch. Each merged span ducks exactly as an extent duck over it would (the attack from its
+  start, the level held, the release after its end); the ducker's multiplier is the MINIMUM over
+  its spans, so overlapping releases and attacks never multiply into a deeper dip. The envelope
+  is sampled at each span's four edges and where one span's release crosses the next one's
+  attack. `pre_roll` and `hold` default to 0.5 s (300,000 ticks) each, are ≥ 0, and are BASE-only like the rest
+  of the duck (CI-3); level, attack and release keep their meaning and defaults.
+- **AU-113 — The speech duck is drawn on the ducking clip.** The plan carries `ducks`: one entry
+  per Speech ducker, `{clip, ramps}`, its multiplier alone over its expanded extent (omitted
+  when there is none). The timeline strokes it as a 1 pt yellow line across the ducking clip's
+  audio region, gain 1 at the top and 0 at the bottom, so a person sees where the bed goes down
+  and comes back. Extent ducks draw nothing new.
+- **AU-114 — Fades have four shapes: Linear (the default and today's), S-curve, +3 dB and
+  −3 dB.** `audio.fade_in_shape` and `audio.fade_out_shape`; with u the fade's progress
+  (`t / fade_in`, `remaining / fade_out`): Linear `u`, S-curve `(1 − cos πu) / 2`, +3 dB
+  `sin(uπ/2)` (fast start, −3 dB at the middle), −3 dB `1 − cos(uπ/2)` (slow start). A
+  non-linear fade is sampled on the action grid (1/30 s, at most 4,096 points), as an eased
+  action is; a linear one adds no points, so its ramps are today's.
+- **AU-115 — A transition's crossfade takes the same four shapes; `plus_3db`, R5-2's constant
+  power, is the default, bit for bit.** `transition_in.audio_shape`, set by
+  `set_transition_style`'s new `audio_shape`. Over the eased progress p the incoming clip gets
+  `gain(p)` and the outgoing `gain(1 − p)`, except that +3 dB's outgoing side stays R5-2's
+  `cos(pπ/2)` code path, so every transition with no `audio_shape` plans exactly as before. A
+  minted transition keeps the default.
+- **AU-116 — Format 29, and every new key written only when not its default.**
+  `duck.mode`, `duck.pre_roll` and `duck.hold` are each written whenever they differ from their
+  defaults, in either mode (a pre-roll set on an extent duck survives a save); `fade_in_shape`
+  and `fade_out_shape` only when not `linear`; `audio_shape` only when not `plus_3db`; a media's
+  `speech` only when present. A file with none of them reads and writes the text it did. A
+  relink that probes the new file rewrites `speech` in the same edit — spans starting at or
+  past the new `duration` dropped, ends clamped to it, the list cleared when it empties or the
+  file has no audio — so a relink never fails `validate` over spans (no re-detection).

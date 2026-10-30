@@ -94,6 +94,8 @@ use crate::audio_duck::duck_gain;
 /// Re-exported from its own module so `crate::audio::Ducker` — the path
 /// `evaluate.rs` names — resolves where it always did.
 pub use crate::audio_duck::Ducker;
+use crate::audio_duck_speech::speech_breaks;
+use crate::audio_shape::fade_breaks;
 use crate::model::{AudioProps, Clip, Nest, Project, Track};
 use crate::nest::Instance;
 use crate::time::{Ticks, TIMESCALE};
@@ -271,7 +273,7 @@ impl<'a> Voice<'a> {
 /// test extends the first ramp's line across the second's span and asks
 /// whether it lands on the second's end value, which bounds the error in
 /// GAIN units — the thing that matters — rather than in slope units.
-fn coalesce(ramps: Vec<Ramp>) -> Vec<Ramp> {
+pub(crate) fn coalesce(ramps: Vec<Ramp>) -> Vec<Ramp> {
     let mut out: Vec<Ramp> = Vec::with_capacity(ramps.len());
     for ramp in ramps {
         // A zero-length ramp carries no information and AVFoundation
@@ -394,10 +396,23 @@ impl Project {
                 // obvious corners are breakpoints.
                 let props = clip.audio.unwrap_or_default();
                 if props.fade_in > 0 {
-                    breaks.push(stage.origin.saturating_add(props.fade_in));
+                    let edge = stage.origin.saturating_add(props.fade_in);
+                    breaks.push(edge);
+                    // A shaped fade is a curve, sampled like an eased action
+                    // (spec §11 AU-114); its shape read where the fade runs.
+                    let shapes = [0, props.fade_in].map(|c| self.audio_props_at(clip, c));
+                    if shapes.iter().any(|p| !p.fade_in_shape.is_linear()) {
+                        breaks.extend(fade_breaks(stage.origin, edge));
+                    }
                 }
                 if props.fade_out > 0 {
-                    breaks.push(end.saturating_sub(props.fade_out));
+                    let edge = end.saturating_sub(props.fade_out);
+                    breaks.push(edge);
+                    let from = clip.duration.saturating_sub(props.fade_out);
+                    let shapes = [from, clip.duration].map(|c| self.audio_props_at(clip, c));
+                    if shapes.iter().any(|p| !p.fade_out_shape.is_linear()) {
+                        breaks.extend(fade_breaks(edge, end));
+                    }
                 }
 
                 // The crossfade is a curve too, and an eased one is not even
@@ -432,6 +447,10 @@ impl Project {
         }
 
         for ducker in duckers {
+            if let Some(spans) = &ducker.spans {
+                breaks.extend(speech_breaks(ducker, spans));
+                continue;
+            }
             breaks.push(ducker.start);
             breaks.push(ducker.start.saturating_add(ducker.duck.attack.max(0)));
             breaks.push(ducker.end);
@@ -514,12 +533,15 @@ impl Project {
         // clip, or a pair that overlaps, multiplies — the honest reading of
         // "both are in effect here" and a dip rather than a discontinuity.
         if props.fade_in > 0 && clip_t < props.fade_in {
-            gain *= (clip_t.max(0) as f64 / props.fade_in as f64).clamp(0.0, 1.0);
+            let u = (clip_t.max(0) as f64 / props.fade_in as f64).clamp(0.0, 1.0);
+            gain *= props.fade_in_shape.gain(u);
         }
         let fade_out_start = clip.duration.saturating_sub(props.fade_out.max(0));
         if props.fade_out > 0 && clip_t > fade_out_start {
             let remaining = clip.duration.saturating_sub(clip_t).max(0) as f64;
-            gain *= (remaining / props.fade_out as f64).clamp(0.0, 1.0);
+            gain *= props
+                .fade_out_shape
+                .gain((remaining / props.fade_out as f64).clamp(0.0, 1.0));
         }
 
         gain * self.crossfade_gain(stage, t, side)

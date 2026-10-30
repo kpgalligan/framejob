@@ -88,6 +88,18 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     Ok(())
 }
 
+/// `set_audio`'s one refusal of a legal value (spec §11 AU-111).
+const NEEDS_SPEECH: &str =
+    "audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)";
+
+/// Whether the PATCH itself sets `duck.mode` to `speech` — read from the
+/// patch and never from the merged props, so a clip already holding a
+/// spanless speech duck (Paste Attributes makes one) keeps every other
+/// audio edit (spec §11 AU-111).
+fn sets_speech_duck(patch: &Value) -> bool {
+    patch.pointer("/duck/mode").and_then(Value::as_str) == Some("speech")
+}
+
 // ---- the ops -------------------------------------------------------------
 
 impl Project {
@@ -98,9 +110,19 @@ impl Project {
         self.patch_clips(clips, patch, Group::Video)
     }
 
-    /// Merges `patch` into every named clip's audio props (spec §6).
+    /// Merges `patch` into every named clip's audio props (spec §6). A patch
+    /// setting `duck.mode` to `speech` is refused on a clip that is not a
+    /// media clip or whose media has no `speech` (spec §11 AU-111).
     pub fn set_audio(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Audio)
+    }
+
+    /// Whether `clip` is a media clip whose media carries `speech`.
+    fn has_speech(&self, clip: &Clip) -> bool {
+        let Source::Media { media, .. } = clip.source else {
+            return false;
+        };
+        self.media(media).is_some_and(|m| m.speech.is_some())
     }
 
     /// Merges `patch` into every named text clip's text props (spec §6).
@@ -383,6 +405,9 @@ impl Project {
                         .ok_or_else(|| format!("clip {id} has no audio properties"))?;
                     let props = merge_group(&base, patch, group)?;
                     check_audio(&props)?;
+                    if sets_speech_duck(patch) && !self.has_speech(&clip) {
+                        return Ok(Outcome::Refused(NEEDS_SPEECH.to_string()));
+                    }
                     if let Some(slot) = next.clip_mut(id) {
                         slot.audio = Some(props);
                     }

@@ -78,7 +78,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-three op tools.
+  `AgentCatalog.opTool` prints for all sixty-four op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -136,7 +136,7 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. READ-ONLY means never written back as
   is: the stored properties are `var`, so a writer edits a COPY
   (`var s = current(); s.blur = v`) rather than rebuilding one through the
@@ -144,7 +144,13 @@ detail there.
   spell out; `MotionProps.with(_:)` is motion's per-slot copy (#357). `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`; `PlanSpeedRamp.source` is
-  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)). `ShapeProps.swift` (a pure
+  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)); `PlanDuck`
+  and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113). `AudioProps.swift`
+  (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
+  `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
+  `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles);
+  `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
+  `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
   `GradientStop`, `Gradient` and `ShapeProps`. `GradeProps.swift` holds `ColorAdjust` (a pure move out of `ProjectSnapshot.swift`, grading-2 G2-0) beside grading's other value types. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
@@ -554,6 +560,16 @@ detail there.
   the filmstrip's and the waveform's map-aware `sourceTime`
   (`TimelineView.swift` is frozen; it holds only `sourceMaps`, set in
   `refreshTimeline` from the same handle as the snapshot).
+- `DuckSpeech.swift` — Duck by Speech's Swift half (spec §11 AU-110, AU-111,
+  AU-113): `spans` (VAD probabilities → source-tick spans: p ≥
+  `defaultVoiceConfidence`, gaps under 0.2 s bridged, ends clamped to the
+  media's duration), `ops` (the `set_media_speech` each media without spans
+  needs, or a `Refusal` naming the clip or the file), `problem` (the same
+  answer without reading a cache, for the popup), and `DuckCurves` (one
+  handle's plan `ducks`, decoded lazily once, for the timeline). Every duck
+  edit of a Speech duck, in the Ducking section and over `set_audio`, puts
+  `ops` before the `set_audio`. No span→time or gain arithmetic: that is
+  the core's.
 
 **Frozen files.** `EditorViewController.swift`, `TimelineView.swift`,
 `PreviewCanvasView.swift`, `AgentServer.swift` are **frozen at current
@@ -769,7 +785,10 @@ the key map behind it.
   and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
   a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
-  overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
+  overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
+  line over its audio region from `TimelineView.duckCurves` — the frozen
+  file's one stored property for it, set in `refreshTimeline` beside
+  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
   corner so it stays above the header column when scrolled) · `+Matte` (spec
   §11 MT-7: `TimelineMatteTag` — the header tag's words, dimmed with no
   target, on its own line when the row has room above the toggles, else
@@ -1054,8 +1073,10 @@ the key map behind it.
   (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is
   `clip_state.speed`), while Keep pitch writes `set_speed` at `baseRate` and
   Fit to is ⊘, SR-21; the note reads the peak a clip names) ·
-  `AudioPane.swift` (+`Loudness`: the Volume section's Loudness and At volume
-  rows and the Normalize row's Mode popup and Target field, spec §11 AU-15) ·
+  `AudioPane.swift` (the Ducking section's Duck by, Pre-roll and Hold and the
+  Fades section's In shape and Out shape, base-only, spec §11 AU-110…AU-114;
+  +`Loudness`: the Volume section's Loudness and At volume rows and the
+  Normalize row's Mode popup and Target field, spec §11 AU-15) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -2725,7 +2746,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-three op tools is `opTool`'s** and carries no
+  **Every one of the sixty-four op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -2761,7 +2782,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and three
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and four
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

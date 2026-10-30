@@ -363,6 +363,9 @@ impl Project {
                     format!("media {}: {why}", media.id)
                 }
             })?;
+            // A media's speech spans (spec §11 AU-110), `set_media_speech`'s
+            // rules, every sentence already naming the media.
+            self.check_media_speech(media)?;
         }
         self.check_clips(&self.clips, &self.tracks, "")?;
         for nest in &self.nests {

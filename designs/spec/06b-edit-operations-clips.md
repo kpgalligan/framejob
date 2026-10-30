@@ -350,7 +350,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   duration held again against them (§11 SR-19 (g)). An **error** when `clip` is not a nest clip. The returning clips' links are mapped to their fresh ids (§11 AU-96).
 
 - **`set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape`** — Merge the patch into the
-  base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a
+  base props. Refuses if nothing changes. `set_audio` refuses a patch that ITSELF sets
+  `duck.mode` to `speech` on a clip that is not a media clip or whose media has no `speech`
+  (`audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)`,
+  format version 29, §11 AU-111); any other edit of a clip already holding such a duck applies. An unknown key, a value of the wrong JSON kind or a
   misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array
   indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad
   value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind"
@@ -458,10 +461,12 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or
   nothing left above one frame, is REFUSED, each in its own sentence. The same hard-cut `Err`s
   apply.
-- **`set_transition_style {clip, curve?, audio?}`** — Sets the transition's easing and whether it
-  crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on
+- **`set_transition_style {clip, curve?, audio?, audio_shape?}`** — Sets the transition's easing,
+  whether it crossfades the sound and the crossfade's shape (`audio_shape`, format version 29, §11
+  AU-115: `plus_3db` — R5-2's constant power, the default — `linear`, `s_curve`, `minus_3db`); an
+  absent key KEEPS. A separate op rather than two more arguments on
   `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing
   and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap —
   and a clip with no stored transition and at least one key given gets a minted `cross_dissolve`
-  with the style applied. NEITHER key given is an IDENTITY whatever the clip holds, and never mints
+  with the style applied. NO key given is an IDENTITY whatever the clip holds, and never mints
   — nothing was asked for, so there is nothing to explain. **Error** for an unknown clip.

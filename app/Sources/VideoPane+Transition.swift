@@ -14,8 +14,10 @@ import AppKit
 extension VideoPane {
     // MARK: Transition
 
-    /// The section's four rows: which transition, how it is eased, whether
-    /// it crossfades the sound, and how long the overlap is.
+    /// The section's five rows: which transition, how it is eased, whether
+    /// it crossfades the sound and in which shape (format 29, spec §11
+    /// AU-115; enabled while Crossfade Audio is on), and how long the
+    /// overlap is.
     ///
     /// **The Curve and Crossfade Audio rows READ the snapshot's lenient
     /// defaults** — `linear` and `false` — which is what a clip with no
@@ -23,7 +25,7 @@ extension VideoPane {
     /// means. They deliberately do not show what the core would MINT: the
     /// section has to say what is there.
     ///
-    /// **And when `transitionIn` is nil, each of the two sends BOTH keys.**
+    /// **And when `transitionIn` is nil, each of the three sends every key.**
     /// The Kind popup's index 0 is None, so a clip under an overlap is one
     /// click away from having no stored transition at all while still being
     /// drawn as a cross dissolve; a one-key `set_transition_style` on that
@@ -51,16 +53,23 @@ extension VideoPane {
         func stored() -> TransitionSnapshot? { binding.snapshot.clip(clip)?.transitionIn }
         func curve() -> Curve { stored()?.curve ?? .linear }
         func crossfades() -> Bool { stored()?.audio ?? false }
-        /// The style write, carrying the other row's DISPLAYED value too
-        /// whenever there is nothing stored to keep it (see the doc above).
-        func styleOps(curve next: Curve?, audio: Bool?) -> [ReelOp] {
+        let shapes = FadeShape.allCases
+        func shape() -> FadeShape { stored()?.audioShape ?? .plus3Db }
+        /// The style write, carrying the other rows' DISPLAYED values too
+        /// whenever there is nothing stored to keep them (see the doc above).
+        func styleOps(curve next: Curve?, audio: Bool?, shape nextShape: FadeShape? = nil)
+            -> [ReelOp]
+        {
             if stored() == nil {
                 return [
                     .setTransitionStyle(
-                        clip: clip, curve: next ?? curve(), audio: audio ?? crossfades())
+                        clip: clip, curve: next ?? curve(), audio: audio ?? crossfades(),
+                        audioShape: nextShape ?? shape())
                 ]
             }
-            return [.setTransitionStyle(clip: clip, curve: next, audio: audio)]
+            return [
+                .setTransitionStyle(clip: clip, curve: next, audio: audio, audioShape: nextShape)
+            ]
         }
         return InspectorSection(
             id: "video.transition", title: "Transition",
@@ -96,6 +105,15 @@ extension VideoPane {
                     "Crossfade Audio", binding, name: "Transition Audio",
                     read: crossfades,
                     ops: { value in styleOps(curve: nil, audio: value) }, resets: false),
+                inspectorPopupRow(
+                    "Crossfade Shape", binding, name: "Crossfade Shape",
+                    items: shapes.map { $0.title },
+                    read: { shapes.firstIndex(of: shape()) ?? 0 },
+                    ops: { index in
+                        styleOps(
+                            curve: nil, audio: nil,
+                            shape: shapes[min(max(index, 0), shapes.count - 1)])
+                    }, enabled: crossfades, resets: false),
                 inspectorValueRow(
                     "Duration", binding, name: "Transition Duration", unit: " s", decimals: 2,
                     min: 0.02, max: 10, quick: [0.25, 0.5, 1, 2], slider: false,

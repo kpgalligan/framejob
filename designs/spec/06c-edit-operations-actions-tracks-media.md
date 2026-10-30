@@ -192,6 +192,19 @@ The rules every op shares are §6a; the clip ops are §6b.
   a `peak` that is not a whole number is an `Err` (`color.peak must be a whole number of
   cd/m², not a string`). A `scope` is an `Err` (`set_media_color has no meaning inside nest
   4`): a nest shares the document's media.
+- **`set_media_speech {media, spans}`** — A media's speech spans (format version 29, §11 AU-110,
+  AU-111): `spans` is `[[start, end], …]` in SOURCE ticks of the file played forward, stored as
+  `media.speech` exactly as given (never snapped: the voice cache's grid is 19,200 ticks), and read
+  by every clip of the media whose `audio.duck.mode` is `speech`. An empty list is stored too — a
+  file with no speech found. Spans equal to the stored ones are an IDENTITY. `Err` for an unknown
+  media (`no media with id 9`); refused, each in its own sentence: `media 2 has no audio, so it has
+  no speech to duck by`, `media 1 speech span 0 starts at -1, before 0`, `media 1 speech span 0 ends
+  at 600000, not after its start 600000`, `media 1 speech span 0 ends at 12600000, past the media's
+  duration 12000000`, `media 1 speech span 1 starts at 600000, before span 0 ends at 1800000: speech
+  spans are sorted and do not overlap`, `media 1 carries 100001 speech spans, more than 100000`.
+  The app's Duck by Speech writes it in the same undo step as the `set_audio` that turns the mode
+  on, only for a media without spans. A `scope` is an `Err` (`set_media_speech has no meaning inside
+  nest 4`).
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

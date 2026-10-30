@@ -122,9 +122,19 @@ impl Group {
                 },
                 ..VideoProps::default()
             }),
+            // Format 29's keys are left out of `to_json` at their defaults
+            // (spec §11 AU-116), so the template holds other values to show
+            // the key check every one of them.
             Group::Audio => actions::to_json(&AudioProps {
-                duck: Some(crate::model::Duck::default()),
+                duck: Some(crate::model::Duck {
+                    mode: crate::model::DuckMode::Speech,
+                    pre_roll: 0,
+                    hold: 0,
+                    ..crate::model::Duck::default()
+                }),
                 compressor: Some(Compressor::default()),
+                fade_in_shape: crate::model::FadeShape::SCurve,
+                fade_out_shape: crate::model::FadeShape::SCurve,
                 ..AudioProps::default()
             }),
             Group::Text => actions::to_json(&TextProps {

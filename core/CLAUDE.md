@@ -31,9 +31,12 @@ governs a module now.
   never reorder. `Normal` is 0 with no `+1`, so a zeroed uniform block, an
   older recipe and a file with no `blend` key all render source-over.
 - `model_audio.rs` — the audio vocabulary: `AudioProps`, `Compressor` and
-  `Duck` and their defaults (the FIELD `Clip.audio` stays in `model.rs`),
-  re-exported through `model_props.rs`; a pure move out of it (road map
-  "audio" AP0), so the audio group's new keys land here.
+  `Duck` (with format 29's `DuckMode`, `pre_roll`, `hold` and
+  `DUCK_SPEECH_PAD`) and `FadeShape` (`fade_in_shape` / `fade_out_shape`,
+  and `Transition.audio_shape`), and their defaults, every format-29 key
+  written only when not its default (the FIELD `Clip.audio` stays in
+  `model.rs`), re-exported through `model_props.rs`; a pure move out of it
+  (road map "audio" AP0), so the audio group's new keys land here.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
   — the text, shape, region and motion vocabularies, each re-exported through
   `model_props.rs`. Text and shape are the two sources the model only
@@ -310,14 +313,14 @@ governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-three op tools in the agent catalog,
+  reader is every one of the sixty-four op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
   `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed (nineteen kinds; `Texts`, a list of strings, is
+  `Kind` is closed (twenty-three kinds; `Texts`, a list of strings, is
   `set_action_end`'s `off`), carries each vocabulary's members, and has exactly ONE
   kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
@@ -457,7 +460,8 @@ governs a module now.
   the vocabulary, which is `props_check.rs`'s reason for existing one step
   further on. `GROUPS` — every group in its order on `Clip`, the order
   `paste` and a default `paste_attributes` visit them — lives here, its one
-  home.
+  home. The audio template holds format 29's keys at NON-default values,
+  since a default is no longer written and the key check reads the template.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family, the bounds `actions_clamp.rs`'s `clamp_video` reads too). A range check is a fact about the vocabulary,
@@ -496,8 +500,16 @@ governs a module now.
   `media`-source clip of it, on the timeline and in every stored nest, whose
   duration runs past the new file's window to `source_window.rs`'s
   `duration_resnapped`. A probe's `original` replaces the stored one (none
-  clears it). No probe keeps the record (Consolidate, the open-time
-  re-anchor).
+  clears it), and a probe rewrites the media's `speech` in the same edit
+  (spans at or past the new duration dropped, ends clamped to it, cleared
+  when the list empties or the file has no audio; spec §11 AU-116), so a
+  relink never fails `validate` over spans. No probe keeps the record
+  (Consolidate, the open-time re-anchor).
+- `media_speech.rs` — a media's speech spans (format 29, spec §11 AU-110):
+  `set_media_speech` (an identity on equal spans) and `check_media_speech`
+  (audio, each span inside the file, sorted, not overlapping, at most
+  `MAX_SPEECH_SPANS` 100,000, each its own sentence; `validate` calls it
+  too).
 - `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
   things it does to the rest of the document — `check_dimension` (a
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a
@@ -530,10 +542,9 @@ governs a module now.
   `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
   `set_transition_duration`, `set_gained_transitions` (a clip that gains an
-  overlap gains a transition), `add_transition` (an overlap built from the
-  two clips' handles at a hard cut) and `set_transition_style` (curve and
-  audio crossfade). `transition.rs` is the READ half and nothing here restates
-  it. `transition_too_short`, THE too-short sentence both forms of
+  overlap gains a transition) and `add_transition` (an overlap built from
+  the two clips' handles at a hard cut). `transition.rs` is the READ half and
+  nothing here restates it. `transition_too_short`, THE too-short sentence both forms of
   `add_transition` share (spec §11 #88); `set_transition_duration` refuses on
   a track's first clip and past the pair's snapped overlap limit, naming it
   (#88, #175).
@@ -547,6 +558,11 @@ governs a module now.
   (`time::frames_in`) and the incoming clip lands on it (`time::frames_back`);
   a request under one grid frame refuses in `transition_too_short`'s words,
   right after the lock check.
+- `edit_transition_style.rs` — `set_transition_style`: a transition's curve,
+  whether it crossfades the sound and (format 29, spec §11 AU-115) the
+  crossfade's `audio_shape`, its kind untouched. Cut out of
+  `edit_transition.rs` under the size rule (road map "audio" AP11's toll, a
+  pure move).
 - `edit_action.rs` · `edit_nest.rs` · `edit_paste.rs` — the action ops and
   their no-overlap rule, plus `check_end_patch`, the END patch's door: the
   three groups §5.4 allows (a `shape` is an unknown key), a `null` that
@@ -841,8 +857,25 @@ governs a module now.
   volume actions, mute and solo (both ZERO envelopes; solo is judged per
   container in `Voice::of` — muted, or some track in the set soloed and this
   one not; mute wins — so the plan's segments never see it); ducking, the
-  one term imposed by a clip on ANOTHER track; and the constant-power
-  crossfade with the breakpoints it must be sampled at to survive coalescing.
+  one term imposed by a clip on ANOTHER track (`Ducker` carries a speech
+  duck's widened project-time `spans`, `duck_gain` dispatches a speech duck
+  to `audio_duck_speech.rs`, and `extent_gain` is the curve over one span);
+  and the crossfade, by its `audio_shape` (constant power by default), with
+  the breakpoints it must be sampled at to survive coalescing.
+- `audio_shape.rs` — fade and crossfade shapes (format 29, spec §11 AU-114,
+  AU-115): `FadeShape::gain` (linear `u` — the old expression, so a linear
+  fade plans as before — S-curve, +3 dB, −3 dB, each exactly 0 and 1 at its
+  ends), `fade_breaks` (a shaped fade sampled on the action grid) and
+  `Transition`'s `Default` (`audio_shape` `plus_3db`, R5-2's law; not a
+  derive, because `FadeShape`'s own default is the fades' `linear`).
+- `audio_duck_speech.rs` — ducking by speech (format 29, spec §11 AU-110,
+  AU-112, AU-113): `speech_in_clip` (a media's source spans in clip time,
+  reflected when reversed, through the base rate or one `SpeedMap`),
+  `Project::speech_spans` (on the played part, widened by `pre_roll` /
+  `hold`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
+  `extent_gain`), `speech_breaks` (each span's four edges and the
+  release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
+  here edits.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current, the migration
