@@ -54,7 +54,10 @@ governs a module now.
   `de_esser`, written only when set: a `VoiceKind` with no default, an
   `amount` defaulting to `VOICE_DEFAULT_AMOUNT`, an optional `pitch`; its
   ranges in `props_check.rs`, its clamp in `actions_clamp.rs`, the chains
-  Swift's); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
+  Swift's), and format 37's `Leveller` (`audio.leveller`, spec §11 AU-66:
+  `target_db`, `max_up_db`, `max_down_db`, `response`, after `voice`, written
+  only when set; its bounds `audio_dynamics.rs`'s); the FIELD `Clip.audio`
+  stays in `model.rs`. Re-exported through
   `model_props.rs`; a pure move out of it (road map "audio" AP0), so the audio
   group's new keys land here.
 - `audio_eq.rs` — the EQ's and the hum notch's bounds (format 32, spec §11
@@ -63,14 +66,15 @@ governs a module now.
   must be between 20 and 20000, not 5`, a slope that is not 12 or 24, mains not
   50 or 60), and `clamp_eq` / `clamp_hum`, run by `actions_clamp.rs`'s
   `clamp_audio` on an action's end. No sample work; the stage is Swift's.
-- `audio_dynamics.rs` — the gate's and the de-esser's bounds (format 33, spec
-  §11 AU-43, AU-45, AU-46): `check_gate` / `check_de_esser`, run by
+- `audio_dynamics.rs` — the gate's, the de-esser's and the leveller's bounds
+  (format 33, spec §11 AU-43, AU-45, AU-46; format 37, AU-66): `check_gate` /
+  `check_de_esser` / `check_leveller`, run by
   `props_check.rs`'s `check_audio` and refusing in the key's own sentence
   (`audio.gate.ratio must be between 1 and 20, not 21`; times through
   `props_check.rs`'s `ticks_in_range`), `check_compressor` /
   `check_limiter` (under a prefix: `audio.` for the clip's, run by
   `check_audio`, and the track's own key for `track_dynamics.rs`, spec §11
-  AU-150), and `clamp_gate` / `clamp_de_esser`
+  AU-150), and `clamp_gate` / `clamp_de_esser` / `clamp_leveller`
   (each field to its range, NaN to its default), run by `actions_clamp.rs`'s
   `clamp_audio` on an action's end. No sample work; the stages are Swift's.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
@@ -750,7 +754,8 @@ governs a module now.
   "audio" AP8b, spec §11 AU-86): `audio_json` writes the group with
   `isolation` present even at 0, which `actions.rs` uses for the base state
   so an action toward an Amount ramps from 0; and `HELD_AUDIO_NUMBERS` (the
-  EQ's two slopes, the hum's mains and harmonics) with `hold_audio_steps`,
+  EQ's two slopes, the hum's mains and harmonics, and the leveller's
+  `response`, each response its own curve, AU-66 (f)) with `hold_audio_steps`,
   after the spanning action's `lerp`, holding each at its start value until
   the action's end.
 - `actions_color.rs` — `blend_colors` (spec §11 G-43): after the spanning
@@ -935,7 +940,8 @@ governs a module now.
   anything else refused by name. No sample work; the stage is Swift's
   (`AudioTrackDynamics.swift`, `ExportMixRead.swift`).
 - `audio_automation.rs` — an audio segment's automation in the plan (spec
-  §11 AU-85): `TAP_KEYS` (the eleven audio keys the tap reads),
+  §11 AU-85): `TAP_KEYS` (the twelve audio keys the tap reads, the leveller
+  the twelfth since AP6b),
   `AutomationPoint`, `names_tap_key` and `Project::automation` — points at
   the voice's ends, each tap-key action's ends and the envelope's 1/30 s grid
   inside an eased one, each the innermost clip's `evaluate_clip` cut to the

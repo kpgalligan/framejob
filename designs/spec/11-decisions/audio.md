@@ -622,6 +622,23 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   the current volume as AU-26 does; with none it shows the cache figure as "≈ …", its tooltip
   saying it is before the clip's processing. No background measurement.
   (h) `AudioDynamicsModel` stays only for Enhance's makeup (AU-62); nothing else reads it.
+  (i) **Repeatability, measured (2026-10-31, AP6b step 3, the owner's order to fix the
+  non-repeat).** AP6b's first build recorded three Enhance presses on the steady `say` fixture
+  reading R0 −21.382, −21.373 and −21.321 LUFS. Measured again on the rebased tree: one trial of
+  that fixture with Enhance's chain (Rumble Cut, isolation 0.8, a gate, the de-esser, a
+  compressor) rendered five times in one process through the render's own path — the chain whole
+  and each of its keys alone — gave byte-identical PCM every time (−21.2828 LUFS whole), with the
+  reader's first buffer at offset 0 and 408 buffers each time, and the same with the isolated
+  render deleted and made again before each render; the first build's own sources
+  (`adb6cb5`) gave the same bytes; and in the app a first press and three Normalize rounds after
+  it read −21.28278599304145 each on that fixture, placed at 0 s and at 7.3 s, and
+  −21.61915860368329 on the off-mic one with the leveller on, presses 2 and 3 "made no change"
+  each time. None of the suspects —
+  the reader's head, a stage's state at a render's start, a re-rendered isolation window, a levels
+  read racing the build, the stamp placement — moves a byte, so there was no cause in the render
+  to fix, and the 0.05 dB keep stays. The first build's spread is not reproduced; its record
+  does not say how its presses were set up. `audio_ap6b_probe.py`'s R5 (three renders, the
+  isolated render wiped before the third) and `audio_ap6b_proof.py`'s P5 hold it.
 - **AU-65 — The chrome, the tool, the proof.** An "Enhance Voice" button row under the Normalize
   button in the Volume section (its tooltip the rules in a sentence); Clip ▸ Enhance Voice right
   after Normalize, no key equivalent (Normalize's reason). `enhance_voice` takes `clips` and
@@ -641,6 +658,124 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   `audio_ap6_probe.py` (E1–E3, E6–E11, mutants M1–M6 and M8–M12), the loudness probe's C1 and
   C12 with M7, and `audio_ap6_proof.py` V1–V15 over MCP and exports; how the result sounds on
   the owner's voice is manual check SE-38 (AP8a, AP10b and AP8b took SE-35…SE-37).
+
+AU-66 and AU-67 are AP6's second part (the leveller; survey B3), recorded before its code. The
+first build (a live K-weighted rider that held through pauses) stopped on its proof: a segment
+after a distance change started up to 12 dB off for about 3 s. Both are rewritten whole on
+2026-10-31 (AP6b, the owner's answer: look ahead).
+
+- **AU-66 — The leveller: a gain curve made ahead of time, applied statelessly in the tap,
+  `audio.leveller`, format 37.** (2026-10-31, AP6b, the owner's answer: look ahead.)
+  (a) **The order (amends AU-143):** isolation → voice → channels → high-pass/EQ → hum → noise
+  reduction → gate → **leveller** → de-esser → compressor → limiter → fader. The leveller is a
+  gain on the clip after the gate, so the de-esser's and the compressor's thresholds see the
+  levelled voice.
+  (b) **What the curve measures** is the material, pre-chain, as L is: the clip's `ClipLoudness`
+  reading — its 10 ms played steps, in the export's layout through pan · fold · pick, over the
+  segments the reading walked (the clip's first media's, by start); L, the gated integrated
+  loudness of that reading; and the speech mask by AU-61's rule (`media.speech`, else
+  `DuckSpeech.spans` of the VAD cache; a step's source midpoint), through
+  `AudioEnhance.speechSpans` and `speechMask`. Speed, ramps and reversal are measured on what
+  plays, as AP1's readout is. Nothing is rendered.
+  (c) **The curve.** Over the played steps, with ℓ(e) a step energy's loudness: a step is SPEECH
+  when the mask holds and ℓ(e) ≥ −70 LUFS. A BREAK is a run of at least 50 non-speech steps
+  (0.5 s); a PHRASE runs from a speech step to the last speech step before the next break. A
+  LONG phrase has at least 100 speech steps (1 s). For each step k of a long phrase,
+  u_k = ℓ(mean e over the phrase's speech steps j with |j − k| ≤ 150) − L: a 3 s window,
+  speech-only and truncated at the phrase's edges, so it never reaches across a break. r =
+  `smooth(u, tau: response / 2 in steps)` within the phrase — a one-pole pass forward then one
+  backward, each primed with its first input — which is zero-phase, so a change is anticipated
+  as much as it is followed. A short phrase takes the previous long phrase's last r, else the
+  next one's first. Steps before the first long phrase take its first r; steps after the last
+  hold its last r. A break between phrases A and B holds A's last r and, over its last 25 steps
+  (0.25 s), moves linearly in dB to B's first r, reaching it at B's first speech step. No long
+  phrase is unmeasurable ("it has no phrase with 1 s of speech"). The stored curve
+  (`AudioLevellerCurve`) is r per step, keyed by segment start: the material's level relative to
+  L. It does not depend on the target or the limits.
+  (d) **The stage.** A run's gain at a step centre is g_k = 10^(clamp(target − r_k, −max_down,
+  +max_up)/20), with the run's settings — the base's, or AU-87's anchor point's. A sample's gain
+  is the linear interpolation of g between the step centres around its tick, the tick being
+  (firstFrame + i)·perSecond/rate, the lookup frame AU-87 uses (the samples after the reducer
+  belong to t + lookupLead); one gain multiplies every channel. It is stateless: no reset, and
+  nothing carries across a cut, a seek or a clip; the output is a pure function of the absolute
+  frame, so block size, seeks, preview, export and AU-64's render agree by construction. Nothing
+  is allocated or locked on the audio thread, and `exp` runs once per step centre per run.
+  (e) **Where it is computed and what invalidates it (amends AU-42).** In Swift, in
+  `AudioDynamicsLevels`, beside L, from the same memoised reading. A clip's curves are made for
+  every `response` its base and its ends name; the memo entry keeps the curves and the spans
+  used. They are made again on a new plan text (window, trim, speed, reversal, map, media), a new
+  channel matrix, a new response, a changed `media.speech`, or a `loudness` or `speech` cache
+  post, which also rebuilds every open document levelling that media. Target, Max Boost and Max
+  Cut are applied in the tap and remake nothing. **Speech detection unavailable:** no spans (no
+  `media.speech`, no VAD cache) while `SileroVAD.isAvailable` is false — a build without the
+  model, or a model marked unavailable this process, after which `MediaImporter.speech` writes no
+  cache and never retries — is `.unmeasurable(reason: "speech detection is unavailable")`: the
+  clip plays un-levelled, its Status reads "Not levelling: speech detection is unavailable", it is
+  not in `pendingLevels`, and an export does not wait for it. The availability is read on each
+  call (a pending answer is never memoised, as a missing loudness file is not), so a model
+  marked unavailable mid-pass is seen by the export's next 0.1 s poll. **While pending** (no
+  loudness file; or no spans and no VAD cache while speech detection is available) the clip plays
+  un-levelled, Status reads "Waits for its loudness" or "Waits for its speech", and the clip is in
+  `pendingLevels`, so an export — and AU-64's render, through `withOfflineAudio` — waits for it up
+  to 300 s, then fails `loudnessUnmeasured`: "Clip N's loudness or speech has not been measured
+  yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the
+  clip's loudness, then export again." An unmeasurable clip plays un-levelled and says why. A
+  nest clip's leveller reaches nothing.
+  (f) **The model.** `audio.leveller` `{target_db −20…10 (0), max_up_db 0…24 (12), max_down_db
+  0…24 (12), response 300 000…6 000 000 ticks (1 200 000, 2 s)}`, target in dB re L, after
+  `voice`, written only when set; format 37, no migration. `set_audio` takes it (`{}` stores the
+  defaults, null clears it, each field refused by name as `audio.leveller.<field>`, an unknown
+  field such as the first build's `threshold_db` refused as an unknown key), and
+  `paste_attributes` carries it whole through `check_audio`. It is `TAP_KEYS`' twelfth key
+  (amends AU-85's deferral): the target and the limits interpolate, and **`response` joins
+  `HELD_AUDIO_NUMBERS`** (amends AU-86): it switches at an action's end, because each response
+  is its own curve made ahead of time. `clamp_leveller` holds an evaluated end to the ranges.
+  (g) **The section.** "Leveller", between Gate and De-esser, closed by default: a "Ride the
+  level" check (on writes the defaults); Target (dB re loudness, −20…10, quick −6, −3, 0, 3), Max
+  Boost (dB 0…24, quick 6, 12, 18), Max Cut (dB 0…24, quick 3, 6, 12), Response (s, 0.5…10, one
+  decimal, quick 1, 2, 4); a Status read-out ("Aims at −41.7 LUFS", L + target; "Waits for its
+  loudness"; "Waits for its speech"; "Not levelling: <reason>") and Loudness; the summary the
+  target ("0 dB") or "off". Each control writes the whole group; inside an action Response
+  writes the end like the other rows and takes effect at the end.
+- **AU-67 — Enhance turns the leveller on by the speech's short-term loudness range; the proof.**
+  (2026-10-31, AP6b, the owner's answer: look ahead.)
+  (a) **The range.** The clip's 10 ms steps where `speechMask` is true, concatenated, in 3 s
+  windows (300 steps) at a 0.1 s hop (10 steps); each window's loudness is
+  `StepLoudness.loudness` of its mean energy. EBU Tech 3342's gating applies: absolute −70 LUFS,
+  then relative −20 LU under the energy mean of what passed. The range is p95 − p10, linearly
+  interpolated (numpy's default). Under 300 speech steps there is none.
+  (b) **The rule.** Enhance owns `leveller` (AU-60's eight keys become nine). Over 6 LU it writes
+  `LevellerProps()` (the defaults); at or under 6 LU it writes null; with no range the key is left
+  out of the edit. Each case has its sentence ("Leveller: the speech's short-term loudness range
+  is 9.4 LU, above 6 LU, so the leveller is on at its defaults."). The range is measured
+  pre-chain, so a second press measures the same (AU-61's idempotence holds). `enhance_voice`'s
+  rows gain `speech_range_lu` (a number, or null).
+  (c) **Rendering (amends AU-64 (a)).** `ProcessedLoudness.needsRender` is true for a
+  `leveller`, and its memo key carries it. The solve renders the chain with the curve, so the
+  processed loudness counts the levelled voice.
+  (d) **Measured before the rule** (`audio_ap6b_probe.py`'s step-2 figures, each through a
+  probe document's own loudness and speech caches): the owner's recording 4.610 LU (so Enhance
+  writes the leveller off there: the owner's level is already even), the proof's off-mic fixture
+  (six 10 s `say` segments peaking at −6 and −18 dBFS by turns) 13.144 LU, the steady fixture
+  (all six at −6) 2.108 LU.
+  (e) **The proof.** `audio_ap6b_probe.py` rows L1–L9 and R1–R5 over `app/Sources`, with mutants
+  M1–M10, M12–M15 and M17 each killed by its named row (M16 has no edit: AU-64 (i)) and M11
+  ("leveller" out of `TAP_KEYS`) by hand against `core/tests/audio_automation.rs`;
+  `audio_ap6b_proof.py` P1–P8 over MCP and exports.
+  P2 (b) holds each segment's first 0.5 s mean gain within **±3 dB** of its settled gain (the
+  owner, 2026-10-31; ±1.5 dB was asked first): on the off-mic fixture it reads 0.56–2.41 dB,
+  because each `say` sentence's speech begins 0.06–0.29 s into its segment, so the window holds
+  the glide's end on the bed, and the sentences open 0.2–3.1 dB louder than their middles, which
+  AU-66 (c)'s window and smoothing follow as decided; a carry-over across a pause like v1's (a
+  segment starting ~12 dB off) still fails it. P3's seek row (8 s from 20 s after 12 s from 0)
+  holds the leveller's own part against a CONTROL on the same play sequence — the levelled
+  export itself placed as a clip with nothing on it, against its own export — its signed ΔI
+  less the control's within 0.01 LU, because after a seek the player hands every tap a silent
+  zero-duration buffer carrying the seek's time, which the live meter places at the seek's
+  frame (filed), so a seek's ΔI depends on the material's level there; the first play's row
+  stays absolute.
+  Whether a speaker moving off the mic sounds even, the pauses do not swell and a phrase after a
+  pause starts at its level with no audible glide is manual check SE-41.
 
 AU-68 and AU-69 are AP6's third part (Enhance the microphone when a recording lands; survey B8),
 recorded before its code.

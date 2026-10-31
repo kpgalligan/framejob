@@ -27,7 +27,7 @@ audio_ap6_proof.py's V2, V12 and V13.
   E9  `measurementPlan` on a fixture plan: only the clip's segments (an emptied
       track dropped), no ramps, track_pans empty, no video tracks or ducks, one
       instruction from 0 over the plan, the span; and on the owner's clip.
-  E10 `needsRender`: each of the eight keys true; pan, mono, channels, the
+  E10 `needsRender`: each of the nine keys (the leveller since AP6b) true; pan, mono, channels, the
       limiter, the volume, fades, a bypassed or empty EQ and an inert voice
       false.
   E11 `plan(solved:)` keeps the clip's volume at 0.04 dB and writes the solve

@@ -4,10 +4,11 @@
 //! [`EqBand`], [`HighShelf`] and [`LowPass`]), [`Hum`] and [`AudioChannels`]
 //! inside it, and the [`Gate`] and [`DeEsser`], each over a hand-written
 //! [`Default`] that says what an absent key means, and the [`Voice`]
-//! (format 34, AU-140), whose kind has none. The EQ's, the hum's and the
+//! (format 34, AU-140), whose kind has none, and the [`Leveller`] (format
+//! 37, AU-66). The EQ's, the hum's and the
 //! channel pick's bounds are `audio_eq.rs`'s (format 32, spec §11 AU-31,
-//! AU-33, AU-34); the gate's and the de-esser's `audio_dynamics.rs`'s
-//! (format 33, AU-43, AU-45).
+//! AU-33, AU-34); the gate's, the de-esser's and the leveller's
+//! `audio_dynamics.rs`'s (format 33, AU-43, AU-45; format 37, AU-66).
 //!
 //! A pure move out of `model_props.rs` (its audio section, whole) for road
 //! map "audio" AP0, before the phases that add audio keys, so the audio
@@ -78,6 +79,9 @@ pub struct AudioProps {
     /// offline by Swift; absent is off, and is not written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice: Option<Voice>,
+    /// The look-ahead leveller (format 37, spec §11 AU-66); absent is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leveller: Option<Leveller>,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -107,6 +111,7 @@ impl Default for AudioProps {
             gate: None,
             de_esser: None,
             voice: None,
+            leveller: None,
         }
     }
 }
@@ -490,6 +495,36 @@ impl Default for DeEsser {
             frequency: 6_000.0,
             threshold_db: 0.0,
             range_db: 6.0,
+        }
+    }
+}
+
+/// The leveller (spec §11 AU-66): a gain curve made ahead of time from the
+/// clip's measured loudness and its speech, smoothed both ways over
+/// `response`, bringing each phrase to `target_db` re the clip's loudness,
+/// never more than `max_up_db` up or `max_down_db` down; pauses hold. Bounds
+/// are `audio_dynamics.rs`'s; the curve and the DSP are the Swift side's.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Leveller {
+    /// dB re the clip's loudness: −20…10.
+    pub target_db: f64,
+    /// dB, 0…24.
+    pub max_up_db: f64,
+    /// dB, 0…24.
+    pub max_down_db: f64,
+    /// Ticks: 300 000…6 000 000 (0.5…10 s).
+    pub response: Ticks,
+}
+
+impl Default for Leveller {
+    /// At the loudness, 12 dB either way, 2 s.
+    fn default() -> Self {
+        Leveller {
+            target_db: 0.0,
+            max_up_db: 12.0,
+            max_down_db: 12.0,
+            response: 1_200_000,
         }
     }
 }

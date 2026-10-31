@@ -7,7 +7,9 @@
 //! and the action's), an eased one the 1/30 s grid inside; a nested segment
 //! reads its INNER clip's actions at the inner clip's origin; `isolation` is
 //! present at 0 and ramps from it; an EQ slope holds until the action's end;
-//! and a gate keyed on at an action's end appears only from that point.
+//! a gate keyed on at an action's end appears only from that point; a
+//! leveller (the twelfth tap key, AU-66) named by an end is in the points;
+//! and its response holds until the action's end (AU-66 (f)).
 
 mod common;
 
@@ -121,7 +123,8 @@ fn a_linear_pan_action_gives_exactly_four_points() {
                 "hum",
                 "channels",
                 "gate",
-                "de_esser"
+                "de_esser",
+                "leveller"
             ]
             .contains(&key.as_str()),
             "{key} is not a tap key: {}",
@@ -226,4 +229,42 @@ fn a_gate_keyed_on_appears_only_from_the_actions_end() {
     assert!(p[1]["audio"].get("gate").is_none(), "{}", p[1]);
     assert!(at(&p[2], "/audio/gate").is_object(), "{}", p[2]);
     assert!(at(&p[3], "/audio/gate").is_object(), "{}", p[3]);
+}
+
+#[test]
+fn a_leveller_named_by_an_end_is_in_the_points() {
+    let base = json!({ "leveller": {} });
+    let end = json!({ "audio": { "leveller": { "target_db": -6.0 } } });
+    let handle = one(base, "linear", end);
+    let p = points(&handle);
+    assert_eq!(times(&p), vec![0, SEC, 3 * SEC, 10 * SEC]);
+    assert_eq!(num(&p[0], "/audio/leveller/target_db"), 0.0);
+    assert_eq!(num(&p[1], "/audio/leveller/target_db"), 0.0);
+    assert_eq!(num(&p[2], "/audio/leveller/target_db"), -6.0);
+    assert_eq!(num(&p[3], "/audio/leveller/target_db"), -6.0);
+    assert_eq!(num(&p[3], "/audio/leveller/response"), 1_200_000.0);
+}
+
+#[test]
+fn a_leveller_response_holds_until_the_actions_end() {
+    let base = json!({ "leveller": { "response": 600_000 } });
+    let end = json!({ "audio": { "leveller": { "target_db": -6.0, "response": 2_400_000 } } });
+    let handle = one(base, "linear", end);
+    let midway = handle.clip_state(3, 2 * SEC).expect("clip 3 has a state");
+    assert_eq!(
+        num(&midway, "/audio/leveller/response"),
+        600_000.0,
+        "{midway}"
+    );
+    assert!((num(&midway, "/audio/leveller/target_db") + 3.0).abs() < 1e-9);
+    let late = handle
+        .clip_state(3, 3 * SEC - 1)
+        .expect("clip 3 has a state");
+    assert_eq!(num(&late, "/audio/leveller/response"), 600_000.0, "{late}");
+    let after = handle.clip_state(3, 3 * SEC).expect("clip 3 has a state");
+    assert_eq!(
+        num(&after, "/audio/leveller/response"),
+        2_400_000.0,
+        "{after}"
+    );
 }

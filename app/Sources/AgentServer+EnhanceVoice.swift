@@ -134,6 +134,7 @@ extension AgentServer {
             "floor_gap_db": level(m.floorGapDB),
             "pause_peak_dbfs": level(m.pausePeakMedianDB),
             "sibilance_share": m.sibilantShare,
+            "speech_range_lu": level(m.speechRangeLU),
             "set": row.patch.dictionary,
             "reasons": row.reasons,
             "volume": row.loudness.volume,

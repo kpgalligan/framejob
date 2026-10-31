@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume, pan, compressor and limiter. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have, and a track's compressor and limiter are exact in an export but approximate in the preview (see [Track compressor and limiter](#track-compressor-and-limiter)).
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, leveller, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume, pan, compressor and limiter. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have, and a track's compressor and limiter are exact in an export but approximate in the preview (see [Track compressor and limiter](#track-compressor-and-limiter)).
 
 ## Where audio lives
 
@@ -8,7 +8,7 @@ There is only one kind of track. Any track can hold a clip with sound, whether i
 
 The waveform shows the level of the file itself, so moving the Volume slider doesn't redraw it. It's drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track that holds only sound clips is drawn as a shorter lane than a track with pictures.
 
-When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has twelve sections, in this order:
+When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has fifteen sections, in this order:
 
 1. **Volume**: level, gain read-out, loudness read-out, Mute, Normalize and Enhance Voice
 2. **Fades**: fade in and fade out
@@ -20,10 +20,11 @@ When the selection includes at least one clip that plays sound, the Clip tab of 
 8. **Hum**: removes mains hum and its harmonics
 9. **Noise Reduction**
 10. **Gate**: turns the pauses between phrases down
-11. **De-esser**: tames harsh "s" sounds
-12. **Compressor**
-13. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
-14. **Limiter**: holds the clip's peaks under a ceiling
+11. **Leveller**: evens out a speaker who moves on and off the mic
+12. **De-esser**: tames harsh "s" sounds
+13. **Compressor**
+14. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+15. **Limiter**: holds the clip's peaks under a ceiling
 
 Voice Isolation through Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
@@ -41,6 +42,7 @@ Every section header has a summary and a Reset button that appears when the sect
 | Hum | the mains and the harmonics, for example "60 Hz · 4", or "off" |
 | Noise Reduction | the amount, for example "50%", or "off" |
 | Gate | the threshold, for example "−10 dB", or "off" |
+| Leveller | the target, for example "0 dB", or "off" |
 | De-esser | the frequency, for example "6.0 kHz", or "off" |
 | Compressor | the ratio, for example "3.0:1", or "off" |
 | Mix | "centre", "mono", or the pan position, for example "left 40" |
@@ -76,9 +78,9 @@ The section's summary reads "muted", "silent" or the gain in dB. Reset puts the 
 
 ### Animating the sound
 
-You can animate a clip's sound with actions. While an action is selected, the Volume row, Mute and the fade lengths write that action's end state, and so do Pan, Mix to mono, Channels, the EQ, Hum, Voice Isolation's Amount, Noise Reduction, the Gate, the De-esser, the Compressor and the Limiter. Numbers move smoothly across the action's span: a pan sweeps from one side to the other, an EQ band's gain rises, a compressor's threshold drifts, the isolated voice fades in. Switches change at the action's end, with no glide: Mix to mono, Channels, EQ Bypass, a pass filter's slope, Hum's mains and harmonics, and turning a section or an EQ slot on or off. Unticking a section or an EQ slot with an action selected turns it off at the action's end. What you hear in the preview is what an export writes.
+You can animate a clip's sound with actions. While an action is selected, the Volume row, Mute and the fade lengths write that action's end state, and so do Pan, Mix to mono, Channels, the EQ, Hum, Voice Isolation's Amount, Noise Reduction, the Gate, the Leveller, the De-esser, the Compressor and the Limiter. Numbers move smoothly across the action's span: a pan sweeps from one side to the other, an EQ band's gain rises, a compressor's threshold drifts, the isolated voice fades in. Switches change at the action's end, with no glide: Mix to mono, Channels, EQ Bypass, a pass filter's slope, Hum's mains and harmonics, the Leveller's Response, and turning a section or an EQ slot on or off. Unticking a section or an EQ slot with an action selected turns it off at the action's end. What you hear in the preview is what an export writes.
 
-A clip whose own Voice Isolation is off still gets its isolated voice made when an action turns the Amount up, and the gate and the de-esser measure the clip's loudness when an action turns them on. A limiter or noise reduction turned on by an action runs for the clip's whole track from the start, as one set on the clip itself does.
+A clip whose own Voice Isolation is off still gets its isolated voice made when an action turns the Amount up, and the gate, the leveller and the de-esser measure the clip's loudness when an action turns them on. A limiter or noise reduction turned on by an action runs for the clip's whole track from the start, as one set on the clip itself does.
 
 Ducking, Keep pitch, the fade shapes and the voice effect can't be animated, and neither can a nest clip's Mix to mono. They always change the clip's own settings, even with an action selected.
 
@@ -120,18 +122,19 @@ It measures the clip before any of its settings: its loudness and true peak, and
 
 - **High-pass, always:** the EQ's Rumble Cut (80 Hz, 24 dB/oct), keeping the EQ's other parts.
 - **When the pauses are noisy** (their median loudness less than 45 dB under the voice): **voice isolation** at 80 % with noise reduction off, or, on a clip isolation can't serve (a speed change, a ramp or a freeze frame), **noise reduction** at 50 %. And the **gate**, opening 10 dB above the pauses' median peak, held between −40 and −6 dB from the clip's loudness. With quiet pauses, isolation, noise reduction and the gate are turned off. With under half a second of pause there is nothing to measure, so they're left as they are.
+- **The leveller** at its defaults when the speech's loudness varies a lot from moment to moment: its short-term loudness range (3-second stretches of the speech alone, the quietest tenth to the loudest twentieth, as EBU Tech 3342 counts it) is over 6 LU. At or under 6 LU it's turned off; with under 3 seconds of speech it's left as it is.
 - **The de-esser** at its defaults when at least 5 % of the speech has a hot "s" band (6 kHz and up, within 10 dB of the clip's loudness); otherwise off.
 - **A compressor**, its threshold at the speech's median peak, 3:1, with makeup that gives back the loudness it takes.
 - **The limiter**, the clip's own kept with its ceiling at most −1 dBTP, or the default.
 - **The volume** that takes the clip to the Normalize row's target (−16 LUFS unless you chose another), measured through all of the above as the export plays it, the way Loudness Normalize measures a processed clip. The Measuring Sound sheet is up meanwhile.
 
-Everything else (hum removal, the channel choice, pan, mono, fades, ducking, Mute, Keep pitch, the EQ's other parts) is left alone. Like Normalize, it writes the clip's base settings even inside an action. Nothing it chooses depends on what it wrote, so pressing it again changes nothing, and so does Normalize at the same target afterwards. On a desktop USB microphone recording (−41.6 LUFS, its pauses 20 dB under the voice) it turns on isolation, a gate at −6 dB and a compressor at −41 dBFS with 10 dB of makeup, and the export lands at −16.0 LUFS with peaks at −1.0 dBTP and the pauses about 28 dB quieter than with Normalize alone.
+Everything else (hum removal, the channel choice, pan, mono, fades, ducking, Mute, Keep pitch, the EQ's other parts) is left alone. Like Normalize, it writes the clip's base settings even inside an action. Nothing it chooses depends on what it wrote, so pressing it again changes nothing, and so does Normalize at the same target afterwards. On a desktop USB microphone recording (−41.6 LUFS, its pauses 20 dB under the voice) it turns on isolation, a gate at −6 dB and a compressor at −41 dBFS with 10 dB of makeup, leaves the leveller off (its speech's range is 4.6 LU), and the export lands at −16.0 LUFS with peaks at −1.0 dBTP and the pauses about 28 dB quieter than with Normalize alone.
 
 It skips, by name, the clips Loudness Normalize skips, and also a clip whose speech hasn't been detected yet and one with under a second of speech. With nothing to enhance, the press beeps.
 
 **At record time.** Tick **Enhance the microphone when it lands** in the recorder panel (**File ▸ New Recording…**), under **Microphone**, and Enhance Voice runs by itself on the microphone's clips once a recording lands and their sound has been analysed, at the Normalize row's target, as its own undo step after the recording's. Undo takes the processing off and keeps the recording. See [Enhancing the microphone](screen-recording.md#enhancing-the-microphone); an agent asks for it with `record_screen {enhance: true}`.
 
-*Agents:* `enhance_voice` (`clips`; optional `target_lufs` from −50 to −5, default −16). Each row of `enhanced` gives the measurements (`measured_lufs`, `true_peak_dbtp`, `speech_seconds`, `floor_lufs`, `floor_gap_db`, `pause_peak_dbfs`, `sibilance_share`), `set` (exactly the `set_audio` keys written), `reasons` (one sentence per rule), `volume`, `processed_lufs`, `renders`, `result_lufs` and `result_true_peak_dbtp` as the last render measured them, and `limited_by`. Skips are under `skipped`. A second call answers "Enhance Voice made no change".
+*Agents:* `enhance_voice` (`clips`; optional `target_lufs` from −50 to −5, default −16). Each row of `enhanced` gives the measurements (`measured_lufs`, `true_peak_dbtp`, `speech_seconds`, `floor_lufs`, `floor_gap_db`, `pause_peak_dbfs`, `sibilance_share`, `speech_range_lu`: null with under 3 s of speech), `set` (exactly the `set_audio` keys written), `reasons` (one sentence per rule), `volume`, `processed_lufs`, `renders`, `result_lufs` and `result_true_peak_dbtp` as the last render measured them, and `limited_by`. Skips are under `skipped`. A second call answers "Enhance Voice made no change".
 
 ### Match Audio
 
@@ -347,6 +350,24 @@ The gate runs after noise reduction and before the de-esser and the compressor. 
 
 *Agents:* `set_audio` with `gate: {threshold_db, ratio, range_db, attack, hold, release}` (the times in ticks), `gate: {}` to turn it on at the defaults, or `gate: null` to turn it off.
 
+## Leveller
+
+The leveller evens out a voice that moves on and off the microphone. It works ahead of time: from the clip's measured loudness and the speech found in it, it works out how loud each phrase is and turns each one up or down toward the target, so a phrase starts at its own level rather than catching up after it begins. In the pauses it holds, so the room isn't lifted while nobody speaks, and just before the next phrase (the last quarter of a second of the pause) it moves to that phrase's level. Its checkbox is labelled **Ride the level**. The section is closed until you open it.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Ride the level | Turns the leveller on. | on / off | off |
+| Target | Where it aims, in dB from the clip's loudness. Quick picks: −6, −3, 0, 3. | −20 to 10 dB | 0 dB |
+| Max Boost | The most it turns the clip up. Quick picks: 6, 12, 18. | 0–24 dB | 12 dB |
+| Max Cut | The most it turns the clip down. Quick picks: 3, 6, 12. | 0–24 dB | 12 dB |
+| Response | How smoothly it follows the voice within a phrase: changes shorter than this are smoothed out, before and after alike. Quick picks: 1, 2, 4 s. | 0.5–10 s | 2 s |
+| Status | Read-only: where it aims, for example "Aims at −41.7 LUFS"; "Waits for its loudness" or "Waits for its speech" until the clip's analysis has run; or "Not levelling:" and why. | — | — |
+| Loudness | Read-only: the clip's loudness the target is measured from. | — | — |
+
+It measures each phrase the way a loudness meter does (the BS.1770 weighting), over about three seconds of its speech at a time, never reaching across a pause into the next phrase. A phrase shorter than a second takes the level of the phrase before it (or, at the start, the one after it), so a short "yes" or a cough doesn't get a level of its own. Like the gate's threshold, its target follows the clip's loudness. It needs the clip's speech as well as its loudness: the speech the clip's sound analysis found, or the spans saved for Duck by Speech. Until both are measured it waits, and so does an export. Where speech detection isn't available and the media has no saved speech, it doesn't level the clip and its Status says why. It works the same in the preview and in an export, from wherever playback starts. It runs after the gate, so pauses the gate has turned down stay down, and before the de-esser and the compressor, which then see the levelled voice. With an action selected, Target, Max Boost and Max Cut move smoothly across the action; Response changes at its end.
+
+*Agents:* `set_audio` with `leveller: {target_db, max_up_db, max_down_db, response}` (the response in ticks), `leveller: {}` to turn it on at the defaults, or `leveller: null` to turn it off.
+
 ## De-esser
 
 The de-esser tames sibilance — the hard "s", "sh" and "t" sounds a close microphone exaggerates. It listens to the sound above its frequency and, while that band is louder than the threshold, turns only that band down, so the rest of the voice keeps its level. Its checkbox is labelled **Reduce sibilance**.
@@ -360,7 +381,7 @@ The de-esser tames sibilance — the hard "s", "sh" and "t" sounds a close micro
 | Status | Read-only: "Acts above" and the threshold in dBFS, "Waits for its loudness", or "Not de-essing:" and why. | — | — |
 | Loudness | Read-only: the clip's loudness the threshold is measured from. | — | — |
 
-It never makes any frequency louder. Right at the Frequency it takes about half the range; the full range is reached about an octave above. Its threshold follows the clip's loudness the way the gate's does, and it runs after the gate and before the compressor.
+It never makes any frequency louder. Right at the Frequency it takes about half the range; the full range is reached about an octave above. Its threshold follows the clip's loudness the way the gate's does, and it runs after the gate and the leveller and before the compressor.
 
 *Agents:* `set_audio` with `de_esser: {frequency, threshold_db, range_db}`, `de_esser: {}` to turn it on at the defaults, or `de_esser: null` to turn it off.
 
@@ -691,8 +712,8 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
 - A voice effect also plays only at normal speed. A clip has one effect at a time. A reverb or echo tail ends with the clip, and a clip split from a take starts its effect fresh at the cut. The waveform, the Loudness read-out and Remove Silences hear the clip without its effect; Normalize in Loudness mode measures through it. On a stereo file a reverb or an echo mixes the two channels, so the channel choice picks from the effected pair.
 - Ducking, Keep pitch, the fade shapes and the voice effect can't be animated with an action; they always apply to the whole clip. A switch an action changes (a section turned on or off, the channel choice, an EQ slope, the mains) changes at the action's end without a glide, as at a cut between two clips. A voice effect is made from the clip's own Voice Isolation Amount, not an animated one.
-- On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter have no effect. Set them on the clips inside.
-- The gate and the de-esser act only once the clip's loudness has been measured; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip.
+- On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the leveller, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter have no effect. Set them on the clips inside.
+- The gate, the leveller and the de-esser act only once the clip's loudness has been measured, and the leveller once its speech has too; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip. The leveller also does nothing on a clip with no phrase of at least a second of speech, or with no speech found where speech detection isn't available.
 - The gate has no lookahead, so a sound that starts loud after a long pause can lose its first millisecond while the gate opens. Neither stage has a listen or solo control for what it removes.
 - The EQ's settings switch at a cut between two clips without a glide; the curve has no handles to drag.
 - The channel choice counts in the Loudness read-out; the EQ and hum removal don't.

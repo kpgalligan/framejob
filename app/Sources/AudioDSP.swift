@@ -3,8 +3,9 @@ import Foundation
 
 /// The sample-level audio effects the model carries and AVFoundation cannot
 /// express: the channel pick, the EQ and hum notch (`AudioEQStage.swift`),
-/// broadband noise reduction, the gate and the de-esser
-/// (`AudioGateStage.swift`, `AudioDeEsserStage.swift`), the compressor, the
+/// broadband noise reduction, the gate, the leveller and the de-esser
+/// (`AudioGateStage.swift`, `AudioLevellerStage.swift`,
+/// `AudioDeEsserStage.swift`), the compressor, the
 /// mono fold, pan and the limiter (spec §4.2, §5.2's `AudioProps`, §11 AU-3,
 /// AU-34, AU-47).
 ///
@@ -150,6 +151,9 @@ struct AudioClipDSP: Equatable {
     /// The gate and the de-esser after noise reduction (AU-47); nil when
     /// off or while the clip's level is not measured (AU-42).
     var gate: AudioGateSettings?
+    /// The leveller after the gate and before the de-esser (AU-66); nil when
+    /// off or while its curve is pending or unmeasurable.
+    var leveller: AudioLevellerSettings?
     var deEsser: AudioDeEsserSettings?
     /// The balance of the tracks the segment plays through (spec §11 AU-104),
     /// after an enclosing nest's fold and before the limiter. Set per span
@@ -160,8 +164,8 @@ struct AudioClipDSP: Equatable {
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
         mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil,
         channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil,
-        gate: AudioGateSettings? = nil, deEsser: AudioDeEsserSettings? = nil,
-        trackBalance: AudioTrackBalance = .unity
+        gate: AudioGateSettings? = nil, leveller: AudioLevellerSettings? = nil,
+        deEsser: AudioDeEsserSettings? = nil, trackBalance: AudioTrackBalance = .unity
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -174,6 +178,7 @@ struct AudioClipDSP: Equatable {
         self.channels = channels
         self.eq = eq
         self.gate = gate
+        self.leveller = leveller
         self.deEsser = deEsser
         self.trackBalance = trackBalance
     }
@@ -190,8 +195,8 @@ struct AudioClipDSP: Equatable {
     /// wrong answer.
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
-            && limiter == nil && channels == .both && eq == nil && gate == nil && deEsser == nil
-            && trackBalance == .unity
+            && limiter == nil && channels == .both && eq == nil && gate == nil && leveller == nil
+            && deEsser == nil && trackBalance == .unity
     }
 }
 
@@ -274,7 +279,8 @@ enum AudioPanLaw {
 // MARK: - The chain
 
 /// One composition audio track's effect chain: the channel pick, then the
-/// EQ and hum notch, then noise reduction, then the gate, then the de-esser,
+/// EQ and hum notch, then noise reduction, then the gate, then the leveller
+/// (AU-66), then the de-esser,
 /// then the compressor, then the Mix stage — the mono fold, then the pan,
 /// then the fold an enclosing NEST clip asked for, then the tracks' balance
 /// (AU-104) — then the limiter (spec §11 AU-3, AU-20, AU-34, AU-47). Voice isolation's crossfade runs before
@@ -310,7 +316,8 @@ enum AudioPanLaw {
 /// applies them as volume ramps, which — measured — happen downstream of a
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
 /// full order the samples actually see is isolation → channel pick → EQ and
-/// hum → noise reduction → gate → de-esser → compressor → the clip's fold →
+/// hum → noise reduction → gate → leveller → de-esser → compressor → the
+/// clip's fold →
 /// pan → an enclosing nest's fold → limiter → volume/fades/ducking, which puts
 /// the compressor before the fader exactly as an insert should be. The
 /// limiter is told the fader's base gain instead (`AudioLimiterSettings`,
@@ -327,7 +334,8 @@ final class AudioDSPChain {
     /// settings touch no sample.
     private let eq: AudioEQStage
     /// The gate and the de-esser (AU-47): no latency, so always built; nil
-    /// settings reset them and touch no sample.
+    /// settings reset them and touch no sample. The leveller between them
+    /// holds no state (AU-66): `process` is handed its run.
     private let gate: AudioGateStage
     private let deEsser: AudioDeEsserStage
 
@@ -389,11 +397,12 @@ final class AudioDSPChain {
     /// `head` is the clip the HEAD stages (the pick, the EQ and hum) read, nil
     /// for `params`: on a noise-reduced track they see samples the reducer's
     /// lead ahead of the stages after it, so `AudioTap` looks their clip up
-    /// there (AU-34).
+    /// there (AU-34). `leveller` is `params.leveller`'s run at this buffer's
+    /// lookup frame (AU-66), nil for none.
     func process(
         _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
         params: AudioClipDSP, head: AudioClipDSP? = nil,
-        panRamp: AudioPanRamp? = nil
+        panRamp: AudioPanRamp? = nil, leveller: AudioLevellerRun? = nil
     ) {
         let count = min(channels.count, channelCount)
         guard frames > 0, count > 0 else { return }
@@ -413,9 +422,10 @@ final class AudioDSPChain {
             }
         }
 
-        // The gate, then the de-esser, on the clip the compressor reads
-        // (AU-47).
+        // The gate, the leveller, then the de-esser, on the clip the
+        // compressor reads (AU-47, AU-66).
         gate.process(channels, count: count, frames: frames, settings: params.gate)
+        leveller?.apply(channels, count: count, frames: frames)
         deEsser.process(channels, count: count, frames: frames, settings: params.deEsser)
 
         compressor.process(channels, count: count, frames: frames, settings: params.compressor)

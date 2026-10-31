@@ -128,13 +128,15 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # drawn response and the slots (road map "audio" AP3); it opens EQ between
 # Channels and Hum on 09 too. `audio.gate` and `audio.de_esser` are pinned OPEN
 # so 09c shows both sections' rows and Status read-outs (road map "audio" AP4);
-# on 09 and 09b they lie below the captured height. P2's scan of the declared
+# on 09 and 09b they lie below the captured height. `audio.leveller` is pinned
+# CLOSED (its default, AU-66): on 09c its header sits closed between the Gate and
+# the De-esser. P2's scan of the declared
 # ids reads an underscore since then, which is how `media.camera_log` (pinned at
 # its default, open) was found unpinned.
 SECTIONS = {
     "audio.channels": True, "audio.compressor": True, "audio.de_esser": False,
     "audio.duck": True, "audio.eq": False, "audio.fades": True, "audio.gate": False,
-    "audio.hum": True, "audio.isolation": True, "audio.voice": True,
+    "audio.hum": True, "audio.isolation": True, "audio.leveller": True, "audio.voice": True,
     "audio.limiter": True, "audio.mix": True, "audio.noise": True, "audio.volume": False,
     "clip.timing": False,
     "doc.appearance": False, "doc.canvas": False, "doc.markers": False, "doc.rate": False,

@@ -12,7 +12,7 @@ a fresh copy of samples/Rode-usb-mic.m4a per leg (so its caches are fresh), a
 is phase5_proof's BS.1770 on an exported WAV.
 
   V1  tool door, new project: the enhance row's clip is segments[0].clip; set
-      holds the eight keys (isolation 0.8, a gate); get_project holds set;
+      holds the nine keys (isolation 0.8, a gate); get_project holds set;
       result −16 ±0.5; set equals a control enhance_voice on an imported copy
       (the volume within 0.2 dB); one undo "Enhance Voice" restores the
       landing's audio, then nothing to undo; the landing-to-answer time over 3
@@ -57,8 +57,8 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(p5.HERE))
 RODE = os.path.join(ROOT, "samples", "Rode-usb-mic.m4a")
 FIX = os.path.join(p5.WORK, "audio-ap6c-proof", str(os.getpid()))
-OWNED = ["compressor", "de_esser", "eq", "gate", "isolation", "limiter", "noise_reduction",
-         "volume"]
+OWNED = ["compressor", "de_esser", "eq", "gate", "isolation", "leveller", "limiter",
+         "noise_reduction", "volume"]
 HOLD = 3
 MIC_SENTENCE = ("enhance: true enhances the microphone's clip, so it needs microphone: true "
                 "(or source voice_over).")
@@ -175,6 +175,7 @@ def mismatches(held_group, set_, volume_db):
     for key, value in set_.items():
         held = held_group.get(key)
         if held is None:
+            # A key written null (the leveller off) is absent from the held props.
             held = defaults.get(key)
         if key == "volume" and held and value and abs(20 * np.log10(held / value)) <= volume_db:
             continue
@@ -247,7 +248,7 @@ def tool_new_project(m):
     set_ = row.get("set") or {}
     check(sorted(set_) == sorted(OWNED) and set_.get("isolation") == 0.8
           and set_.get("gate") is not None,
-          f"V1 set holds the eight keys, isolation 0.8 and a gate: {sorted(set_)}")
+          f"V1 set holds the nine keys, isolation 0.8 and a gate: {sorted(set_)}")
     held = doc.audio(clip) if clip else {}
     check(not mismatches(held, set_, 1e-6),
           f"V1 get_project holds set: {mismatches(held, set_, 1e-6)}")

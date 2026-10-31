@@ -223,7 +223,8 @@ final class ClipPane: InspectorPaneView {
                 audioPane.isolationSection(), audioPane.voiceSection(),
                 audioPane.channelsSection(),
                 audioPane.eqSection(), audioPane.humSection(),
-                audioPane.noiseSection(), audioPane.gateSection(), audioPane.deEsserSection(),
+                audioPane.noiseSection(), audioPane.gateSection(), audioPane.levellerSection(),
+                audioPane.deEsserSection(),
                 audioPane.compressorSection(), audioPane.mixSection(),
                 // Last in the clip's chain, so last here (spec §11 AU-26).
                 audioPane.limiterSection(),

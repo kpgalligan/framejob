@@ -141,9 +141,12 @@ struct AudioDSPParameters: Equatable {
     /// Each non-nest clip's base volume (the limiter's divisor, AU-22) and
     /// measured level (AU-41), which its automation's settings keep.
     private let bases: [UInt32: Base]
-    /// The gated or de-essed clips whose level is still pending (AU-42):
-    /// they play without both stages, and an export waits for them.
+    /// The gated, levelled or de-essed clips whose level or curve is still
+    /// pending (AU-42, AU-66 (e)): they play without those stages, and an
+    /// export waits for them.
     let pendingLevels: Set<UInt32>
+    /// Each levelled clip's curves by response, when ready (AU-66 (e)).
+    private let curves: [UInt32: [Ticks: AudioLevellerCurve]]
     /// Each clip's voice effect as its chain reads it, when not inert (spec
     /// §11 AU-140, AU-141): rendered offline and played in place of the
     /// clip's sound before the chain (AU-143). Base only, never on a nest clip.
@@ -171,6 +174,7 @@ struct AudioDSPParameters: Equatable {
         wantedIsolation = Set(isolation.keys)
         bases = [:]
         pendingLevels = []
+        curves = [:]
         self.voiceSettings = voiceSettings
         trackDynamics = [:]
     }
@@ -221,17 +225,22 @@ struct AudioDSPParameters: Equatable {
     /// divides by (AU-22) and the measured level (AU-41). Evaluation stays
     /// Rust's; the tap only interpolates between points (AU-87).
     ///
-    /// **The gate and the de-esser need `levels`** (AU-41, AU-42): a clip
+    /// **The gate and the de-esser need `levels`, the leveller `curves`**
+    /// (AU-41, AU-42, AU-66 (e)): a clip
     /// measured at L gets thresholds relative to L; a pending or unmeasurable
     /// one (or one `levels` does not name, which is every clip for the
     /// callers that pass none: isolation and ramp renders) gets neither, and
-    /// a pending one is in `pendingLevels`.
-    init(snapshot: ProjectSnapshot, levels: [UInt32: AudioDynamicsLevels.Level] = [:]) {
+    /// a pending one is in `pendingLevels` — as is a clip whose curve is.
+    init(
+        snapshot: ProjectSnapshot, levels: [UInt32: AudioDynamicsLevels.Level] = [:],
+        curves: [UInt32: AudioDynamicsLevels.Curves] = [:]
+    ) {
         var clips: [UInt32: AudioClipDSP] = [:]
         var isolation: [UInt32: Double] = [:]
         var wanted: Set<UInt32> = []
         var bases: [UInt32: Base] = [:]
         var pending: Set<UInt32> = []
+        var ready: [UInt32: [Ticks: AudioLevellerCurve]] = [:]
         var voiceSettings: [UInt32: VoiceSettings] = [:]
         func collect(_ list: [ClipSnapshot]) {
             for clip in list {
@@ -252,13 +261,19 @@ struct AudioDSPParameters: Equatable {
                 case .pending: pending.insert(clip.id)
                 case .unmeasurable, nil: break
                 }
+                switch curves[clip.id] {
+                case .ready(let made): ready[clip.id] = made
+                case .pending: pending.insert(clip.id)
+                case .unmeasurable, nil: break
+                }
                 bases[clip.id] = Base(volume: audio.volume, level: level)
                 if let voice = audio.voice {
                     let settings = VoiceChain.settings(voice)
                     if !VoiceChain.isInert(settings) { voiceSettings[clip.id] = settings }
                 }
                 let dsp = AudioDSPParameters.dsp(
-                    audio, volume: audio.volume, level: level, enclosingMono: false)
+                    audio, volume: audio.volume, level: level, leveller: ready[clip.id],
+                    enclosingMono: false)
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }
@@ -302,6 +317,7 @@ struct AudioDSPParameters: Equatable {
         wantedIsolation = wanted
         self.bases = bases
         pendingLevels = pending
+        self.curves = ready
         self.voiceSettings = voiceSettings
         var dynamics: [UInt32: AudioTrackDynamicsSettings] = [:]
         for track in snapshot.tracks {
@@ -313,9 +329,11 @@ struct AudioDSPParameters: Equatable {
     /// One clip's chain settings from its audio props: the base's in `init`,
     /// a point's in `AudioDSPAutomation.settings(at:)`. `volume` is the BASE
     /// volume either way (the limiter's divisor, AU-22) and `level` the base
-    /// measurement (AU-41); with no level the gate and de-esser are off.
+    /// measurement (AU-41); with no level the gate and the de-esser are off,
+    /// and with no curve for its response the leveller (AU-66).
     static func dsp(
-        _ audio: AudioProps, volume: Double, level: Double?, enclosingMono: Bool
+        _ audio: AudioProps, volume: Double, level: Double?,
+        leveller: [Ticks: AudioLevellerCurve]?, enclosingMono: Bool
     ) -> AudioClipDSP {
         AudioClipDSP(
             pan: audio.pan,
@@ -339,6 +357,10 @@ struct AudioDSPParameters: Equatable {
             eq: AudioEQSettings(eq: audio.eq, hum: audio.hum),
             // After noise reduction, before the compressor (AU-47).
             gate: level.flatMap { l in audio.gate.map { AudioGateSettings(level: l, props: $0) } },
+            // After the gate, before the de-esser (AU-66).
+            leveller: leveller.flatMap { made in
+                audio.leveller.flatMap { AudioLevellerSettings(props: $0, curves: made) }
+            },
             deEsser: level.flatMap { l in
                 audio.deEsser.map { AudioDeEsserSettings(level: l, props: $0) }
             })
@@ -351,17 +373,20 @@ struct AudioDSPParameters: Equatable {
         guard !segment.automation.isEmpty, let base = bases[segment.clip] else { return nil }
         return AudioDSPAutomation(
             points: segment.automation.sorted { $0.at < $1.at }, volume: base.volume,
-            level: base.level, enclosingMono: dsp(for: segment.clip).enclosingMono,
+            level: base.level, leveller: curves[segment.clip] ?? [:],
+            enclosingMono: dsp(for: segment.clip).enclosingMono,
             trackBalance: AudioTrackBalance(pans: segment.trackPans))
     }
 
     /// The parameters a project asks for with every gated or de-essed clip's
-    /// level resolved (AU-41, AU-42): what the preview and the export build
-    /// from. The plan is decoded only when a clip asks for a level.
+    /// level and every levelled clip's curves resolved (AU-41, AU-42, AU-66):
+    /// what the preview and the export build from. The plan is decoded only
+    /// when a clip asks for one.
     static func measured(project: ReelProject, cache: URL?) -> AudioDSPParameters {
         AudioDSPParameters(
             snapshot: project.snapshot,
-            levels: AudioDynamicsLevels.shared.levels(for: project, cache: cache))
+            levels: AudioDynamicsLevels.shared.levels(for: project, cache: cache),
+            curves: AudioDynamicsLevels.shared.curves(for: project, cache: cache))
     }
 
     /// `format.rs`'s `MAX_NEST_DEPTH`. Duplicated rather than bridged: the

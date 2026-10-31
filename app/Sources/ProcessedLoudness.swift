@@ -27,6 +27,7 @@ enum ProcessedLoudness {
         if let eq = audio.eq, !eq.bypass, eq.activeCount > 0 { return true }
         if audio.hum != nil || audio.isolation > 0 || audio.noiseReduction > 0 { return true }
         if audio.gate != nil || audio.deEsser != nil || audio.compressor != nil { return true }
+        if audio.leveller != nil { return true }
         if let voice = audio.voice, !VoiceChain.isInert(VoiceChain.settings(voice)) { return true }
         return false
     }
@@ -121,7 +122,8 @@ enum ProcessedLoudness {
         let chain = AudioProps(
             mono: a.mono, keepPitch: a.keepPitch, pan: a.pan, compressor: a.compressor,
             noiseReduction: a.noiseReduction, isolation: a.isolation, eq: a.eq, hum: a.hum,
-            channels: a.channels, gate: a.gate, deEsser: a.deEsser, voice: a.voice)
+            channels: a.channels, gate: a.gate, deEsser: a.deEsser, voice: a.voice,
+            leveller: a.leveller)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(chain), let text = String(data: data, encoding: .utf8)

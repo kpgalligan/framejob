@@ -232,8 +232,12 @@ extern "C" {
  *
  * Version 36 is a track's compressor and limiter (spec §11 AU-150):
  * `tracks[].compressor` and `tracks[].limiter`, after `pan`, each written
- * only when set; no migration step. 37 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 36
+ * only when set; no migration step.
+ *
+ * Version 37 is the leveller (spec §11 AU-66): `audio.leveller`, after
+ * `voice`, written only when set; no migration step. 38 and above, 1014
+ * included, are newer. */
+#define RC_FORMAT_VERSION 37
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

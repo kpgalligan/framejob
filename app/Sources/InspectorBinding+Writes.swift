@@ -131,8 +131,9 @@ extension InspectorBinding {
 
     /// Spec §11 AU-88 (amending CI-3, AU-21, AU-37, AU-46, AU-50): with an
     /// action selected, pan, mono, the compressor, noise reduction, the
-    /// limiter, isolation, the EQ, the hum notch, the channel pick, the gate
-    /// and the de-esser go to the action's END with volume and the fades, a
+    /// limiter, isolation, the EQ, the hum notch, the channel pick, the gate,
+    /// the leveller (AU-66) and the de-esser go to the action's END with
+    /// volume and the fades, a
     /// switch turned off there keyed off (`ReelOp.setActionEnd`); the duck,
     /// keep-pitch, the fade shapes (AU-114), the voice effect (AU-140) and a
     /// NEST clip's mono stay the clip's (`AudioPatch.routedInsideAction`).

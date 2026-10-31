@@ -1,18 +1,19 @@
 import AppKit
 
-/// The Gate and De-esser sections (spec §11 AU-48): after Noise Reduction
-/// and before Compressor, the signal's order (AU-47). `set_audio`'s `gate`
-/// and `de_esser` are their MCP mirror.
+/// The Gate, Leveller and De-esser sections (spec §11 AU-48, AU-66): after
+/// Noise Reduction and before Compressor, the signal's order (AU-47, AU-66).
+/// `set_audio`'s `gate`, `leveller` and `de_esser` are their MCP mirror.
 ///
-/// Every control writes a whole `GateProps` or `DeEsserProps`, the
-/// limiter's way; with an action selected both write the action's end (spec
+/// Every control writes a whole `GateProps`, `LevellerProps` or
+/// `DeEsserProps`, the limiter's way; with an action selected both write the action's end (spec
 /// §11 AU-88), a stage turned off there keyed off. Both thresholds are dB
 /// relative to the clip's measured loudness (AU-41): the Status read-out says
 /// where that puts the threshold in dBFS, or why the stage is not acting
 /// (AU-42), and the Loudness read-out the level it is relative to — both
 /// through the pane's `loudnessMemo`, the Volume section's own reading. The
 /// times are in milliseconds and not snapped to the frame grid, for the
-/// compressor's reason.
+/// compressor's reason. The leveller's target is relative to the same level,
+/// its Status read off its curves (AU-66 (e)).
 extension AudioPane {
 
     /// "Gate pauses", Threshold, Ratio, Range, Attack, Hold, Release, Status,
@@ -84,6 +85,78 @@ extension AudioPane {
                             return self?.dynamicsStatus(
                                 relative: current().thresholdDb, acting: "Opens above",
                                 idle: "Not gating") ?? "—"
+                        }
+                    ]),
+                inspectorRow(
+                    "Loudness",
+                    [
+                        inspectorReadout(width: 170) { [weak self] in
+                            self?.dynamicsLoudness() ?? "—"
+                        }
+                    ]),
+            ])
+    }
+
+    /// "Ride the level", Target, Max Boost, Max Cut, Response, Status,
+    /// Loudness (AU-66 (g)). The Status reads the clip's curves, made ahead of
+    /// time from its loudness and speech; Response takes effect at an
+    /// action's end (held, AU-66 (f)).
+    func levellerSection() -> InspectorSection {
+        let binding = self.binding
+        func current() -> LevellerProps { binding.audioProps.leveller ?? LevellerProps() }
+        func ops(_ next: LevellerProps) -> [ReelOp] {
+            binding.ops(audio: AudioPatch(leveller: .some(next)))
+        }
+        func on() -> Bool { binding.audioProps.leveller != nil }
+        func row(
+            _ title: String, _ name: String, unit: String, decimals: Int, min: Double,
+            max: Double, quick: [Double], width: CGFloat = InspectorMetrics.fieldWidth,
+            read: @escaping (LevellerProps) -> Double,
+            write: @escaping (inout LevellerProps, Double) -> Void
+        ) -> NSView {
+            inspectorValueRow(
+                title, binding, name: name, unit: unit, decimals: decimals, min: min, max: max,
+                quick: quick, width: width, read: { read(current()) },
+                ops: { value in
+                    var l = current()
+                    write(&l, value)
+                    return ops(l)
+                },
+                mixed: { binding.mixedAudio { $0.leveller.map(read) } }, enabled: on)
+        }
+        return InspectorSection(
+            id: "audio.leveller", title: "Leveller",
+            summary: { on() ? AudioPane.decibels(current().targetDb, "%.0f dB") : "off" },
+            reset: { binding.apply("Leveller", audio: AudioPatch(leveller: .some(nil))) },
+            defaultExpanded: false,
+            rows: [
+                inspectorCheckRow(
+                    "Ride the level", binding, name: "Leveller",
+                    read: on,
+                    ops: { value in
+                        binding.ops(
+                            audio: AudioPatch(leveller: value ? .some(LevellerProps()) : .some(nil)))
+                    },
+                    mixed: { binding.mixedAudio { $0.leveller != nil } }),
+                row(
+                    "Target", "Leveller Target", unit: " dB", decimals: 0, min: -20, max: 10,
+                    quick: [-6, -3, 0, 3], read: { $0.targetDb }, write: { $0.targetDb = $1 }),
+                row(
+                    "Max Boost", "Leveller Max Boost", unit: " dB", decimals: 0, min: 0, max: 24,
+                    quick: [6, 12, 18], read: { $0.maxUpDb }, write: { $0.maxUpDb = $1 }),
+                row(
+                    "Max Cut", "Leveller Max Cut", unit: " dB", decimals: 0, min: 0, max: 24,
+                    quick: [3, 6, 12], read: { $0.maxDownDb }, write: { $0.maxDownDb = $1 }),
+                row(
+                    "Response", "Leveller Response", unit: " s", decimals: 1, min: 0.5, max: 10,
+                    quick: [1, 2, 4], read: { AudioPane.milliseconds($0.response) / 1000 },
+                    write: { $0.response = AudioPane.ticks($1 * 1000) }),
+                inspectorRow(
+                    "Status",
+                    [
+                        inspectorReadout(width: 170) { [weak self] in
+                            guard on() else { return "off" }
+                            return self?.levellerStatus(target: current().targetDb) ?? "—"
                         }
                     ]),
                 inspectorRow(
@@ -174,10 +247,13 @@ extension AudioPane {
         return loudnessMemo.answer(for: clip.id, in: document)
     }
 
-    /// Where a relative threshold lands for the one selected clip (AU-41), or
-    /// why the stage is not acting (AU-42); "—" for a selection of several.
-    /// Short enough for the read-out: "Opens above −51.7 dBFS".
-    private func dynamicsStatus(relative: Double, acting: String, idle: String) -> String {
+    /// Where a relative threshold (or the leveller's target, in `unit`
+    /// "LUFS") lands for the one selected clip (AU-41), or why the stage is
+    /// not acting (AU-42); "—" for a selection of several. Short enough for
+    /// the read-out: "Opens above −51.7 dBFS".
+    private func dynamicsStatus(
+        relative: Double, acting: String, idle: String, unit: String = "dBFS"
+    ) -> String {
         switch dynamicsAnswer() {
         case nil: return "—"
         case .pending: return "Waits for its loudness"
@@ -187,7 +263,25 @@ extension AudioPane {
                 return reading.playedTicks < ClipLoudness.minimumPlayedTicks
                     ? "\(idle): too short" : "\(idle): too quiet"
             }
-            return "\(acting) \(AudioPane.decibels(lufs + relative, "%.1f dBFS"))"
+            return "\(acting) \(AudioPane.decibels(lufs + relative, "%.1f \(unit)"))"
+        }
+    }
+
+    /// The leveller's Status (AU-66 (g)) off its curves for the one selected
+    /// clip: "Aims at −41.7 LUFS" (L + target), "Waits for its loudness",
+    /// "Waits for its speech", "Not levelling: <reason>"; "—" for several.
+    private func levellerStatus(target: Double) -> String {
+        guard binding.isSingle, let clip = binding.primary, let document = binding.document
+        else { return "—" }
+        let curves = AudioDynamicsLevels.shared.curves(
+            for: document.editedProject, cache: document.cacheDirectory)
+        switch curves[clip.id] {
+        case nil: return "—"
+        case .pending(let what): return "Waits for its \(what)"
+        case .unmeasurable(let reason): return "Not levelling: \(reason)"
+        case .ready:
+            return dynamicsStatus(
+                relative: target, acting: "Aims at", idle: "Not levelling", unit: "LUFS")
         }
     }
 

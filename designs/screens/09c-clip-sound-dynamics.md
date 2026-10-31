@@ -33,7 +33,9 @@ Reset button. A ticked "Gate pauses" checkbox, then six rows, each a slider and
 a field with a quick-pick chevron: Threshold "−10 dB", Ratio "4.0:1", Range
 "20 dB", Attack "1 ms", Hold "50 ms" and Release "100 ms" (a wider field). Two
 read-outs follow: Status "Opens above −31.8 dBFS" and Loudness "−21.8 LUFS" —
-the threshold 10 dB under the clip's loudness. Below, the DE-ESSER section,
+the threshold 10 dB under the clip's loudness. Below, the LEVELLER section's
+header, closed, its summary "off" beside a Reset button (AP6b, spec §11 AU-66:
+the clip carries no leveller), then the DE-ESSER section,
 open, its summary "6.0 kHz" beside a Reset button, and its ticked "Reduce
 sibilance" checkbox at the foot of the capture; its Frequency, Threshold and
 Range rows and its own Status and Loudness read-outs lie below the captured

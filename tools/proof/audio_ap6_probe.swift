@@ -283,6 +283,7 @@ do {
         ("de_esser", AudioProps(deEsser: DeEsserProps())),
         ("compressor", AudioProps(compressor: CompressorProps())),
         ("voice", AudioProps(voice: VoiceProps(kind: .robot))),
+        ("leveller", AudioProps(leveller: LevellerProps())),
     ]
     let plain: [(String, AudioProps)] = [
         ("pan", AudioProps(pan: 0.5)), ("mono", AudioProps(mono: true)),
@@ -499,9 +500,10 @@ do {
         .flatMap { String(data: $0, encoding: .utf8) } ?? "?"
     print("  note E6 chose: \(json); limiter \(choice.limiter.dictionary)")
     for reason in choice.reasons { print("  note E6 reason: \(reason)") }
+    // Over 3 s of speech, so the leveller (AU-67) is among the keys too.
     check("E6", "the owner's recording: noisy pauses, so isolation, a gate and every key but "
             + "volume and limiter",
-          keys(choice) == cleaning && choice.patch.isolation == IsolationCache.defaultAmount
+          keys(choice) == (cleaning + ["leveller"]).sorted() && choice.patch.isolation == IsolationCache.defaultAmount
             && choice.limiter.ceilingDb <= AudioNormalize.ceilingDBTP
             && choice.patch.volume == nil && choice.patch.limiter == nil,
           "\(keys(choice))")

@@ -77,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `leveller`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -162,6 +162,8 @@ impl Group {
                     amount: 1.0,
                     pitch: Some(0.0),
                 }),
+                // Format 37's leveller (spec §11 AU-66).
+                leveller: Some(crate::model::Leveller::default()),
                 ..AudioProps::default()
             }),
             Group::Text => actions::to_json(&TextProps {

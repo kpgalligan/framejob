@@ -47,8 +47,8 @@ extension AudioProps {
     /// These props `f` of the way (0…1) toward `next`'s, as the plan's points
     /// are joined: a number moves linearly when its group is present on both
     /// sides; presence, a switch, an enum, `bypass`, and the EQ slopes, the
-    /// hum's mains and its harmonics (the core's `HELD_AUDIO_NUMBERS`,
-    /// AU-86) are the left point's. Keys the plan's points do not carry
+    /// hum's mains, its harmonics and the leveller's response (the core's
+    /// `HELD_AUDIO_NUMBERS`, AU-86, AU-66) are the left point's. Keys the plan's points do not carry
     /// (volume, fades, duck, keep pitch, voice) are this side's, unread.
     func interpolated(toward next: AudioProps, by f: Double) -> AudioProps {
         let compressor = both(self.compressor, next.compressor) { a, b in
@@ -102,13 +102,20 @@ extension AudioProps {
                 thresholdDb: mix(a.thresholdDb, b.thresholdDb, f),
                 rangeDb: mix(a.rangeDb, b.rangeDb, f))
         }
+        // The leveller's target and limits (AU-66); its response is the left
+        // point's, each response being its own curve (AU-66 (f)).
+        let leveller = both(self.leveller, next.leveller) { a, b in
+            LevellerProps(
+                targetDb: mix(a.targetDb, b.targetDb, f), maxUpDb: mix(a.maxUpDb, b.maxUpDb, f),
+                maxDownDb: mix(a.maxDownDb, b.maxDownDb, f), response: a.response)
+        }
         return AudioProps(
             volume: volume, muted: muted, fadeIn: fadeIn, fadeOut: fadeOut, duck: duck,
             mono: mono, keepPitch: keepPitch, pan: mix(pan, next.pan, f), compressor: compressor,
             noiseReduction: mix(noiseReduction, next.noiseReduction, f),
             fadeInShape: fadeInShape, fadeOutShape: fadeOutShape, limiter: limiter,
             isolation: mix(isolation, next.isolation, f), eq: eq, hum: hum, channels: channels,
-            gate: gate, deEsser: deEsser, voice: voice)
+            gate: gate, deEsser: deEsser, voice: voice, leveller: leveller)
     }
 }
 
@@ -116,8 +123,9 @@ extension AudioProps {
 
 /// One automated span's points and the base facts its settings keep: the
 /// limiter's divisor is the BASE volume (AU-22), the gate's and de-esser's
-/// level the base measurement (AU-41), and a nest's fold and the tracks'
-/// balance are the segment's, not the points'.
+/// level the base measurement (AU-41), the leveller's curves the clip's
+/// (AU-66), and a nest's fold and the tracks' balance are the segment's, not
+/// the points'.
 struct AudioDSPAutomation: Equatable {
     /// The control grid, in frames: a run's settings are read at its anchor
     /// and a run never crosses one of these boundaries.
@@ -127,6 +135,8 @@ struct AudioDSPAutomation: Equatable {
     let points: [PlanAudioPoint]
     let volume: Double
     let level: Double?
+    /// The clip's leveller curves by response (AU-66 (e)); none by default.
+    var leveller: [Ticks: AudioLevellerCurve] = [:]
     let enclosingMono: Bool
     let trackBalance: AudioTrackBalance
 
@@ -155,7 +165,8 @@ struct AudioDSPAutomation: Equatable {
     /// The chain's settings at `tick`.
     func settings(at tick: Double) -> AudioClipDSP {
         var dsp = AudioDSPParameters.dsp(
-            props(at: tick), volume: volume, level: level, enclosingMono: enclosingMono)
+            props(at: tick), volume: volume, level: level, leveller: leveller,
+            enclosingMono: enclosingMono)
         dsp.trackBalance = trackBalance
         return dsp
     }
@@ -268,7 +279,7 @@ extension AudioPatch {
     /// duck, Keep pitch, the fade shapes and the voice effect stay with the
     /// clip's base props, and so does a NEST clip's mono (its fold is the
     /// nest's mix, carried down at the base); everything else — volume, the
-    /// fades and the eleven tap keys — goes to the action's end, where a
+    /// fades and the twelve tap keys — goes to the action's end, where a
     /// switch turned off becomes `off` (`ReelOp.setActionEnd`).
     func routedInsideAction(nestClip: Bool) -> (base: AudioPatch?, end: AudioPatch?) {
         let base = AudioPatch(

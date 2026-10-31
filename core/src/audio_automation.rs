@@ -5,7 +5,8 @@
 //! The envelope (`audio.rs`) already carries volume, the fades, the duck
 //! and every silencing as ramps. What the tap runs — the pan, the fold, the
 //! channel pick, the EQ and hum, noise reduction, the gate, the de-esser,
-//! the compressor, the limiter and isolation's Amount — is read off
+//! the compressor, the limiter, isolation's Amount and the leveller (AU-66,
+//! the twelfth key) — is read off
 //! [`TAP_KEYS`] here instead. Evaluation stays the core's: each point is
 //! [`Project::evaluate_clip`] at its time, so a switch, a clamp and an
 //! eased curve are decided in one place and Swift only draws straight lines
@@ -27,7 +28,7 @@ use crate::time::Ticks;
 /// The audio keys the tap reads (AU-85), in the plan's order. Volume, mute,
 /// the fades, the duck and its shapes are the envelope's; `keep_pitch` is
 /// the segment's `pitch`; `voice` is an offline render.
-pub(crate) const TAP_KEYS: [&str; 11] = [
+pub(crate) const TAP_KEYS: [&str; 12] = [
     "mono",
     "pan",
     "compressor",
@@ -39,6 +40,7 @@ pub(crate) const TAP_KEYS: [&str; 11] = [
     "channels",
     "gate",
     "de_esser",
+    "leveller",
 ];
 
 /// One point of a segment's automation: the tap keys of the clip's

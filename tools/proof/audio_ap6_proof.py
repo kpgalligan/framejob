@@ -11,7 +11,7 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
 3.5 kHz (no sibilance), one high-shelved +15 dB above 5 kHz (hot sibilance).
 
   V1   the owner's recording: enhance_voice's row (measurements, `set`,
-       reasons, processed_lufs, renders) printed; `set` holds the eight keys
+       reasons, processed_lufs, renders) printed; `set` holds the nine keys
        and get_project holds them.
   V2   its export at −16 ±0.5 LUFS and ≤ −1 dBTP by both meters; limited_by
        null; |result_lufs − the export| ≤ 0.2 LU; renders ≥ 2 (R0 and a verify
@@ -71,8 +71,10 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(p5.HERE))
 RODE = os.path.join(ROOT, "samples", "Rode-usb-mic.m4a")
 RATE = 48000
-OWNED = ["compressor", "de_esser", "eq", "gate", "isolation", "limiter", "noise_reduction",
-         "volume"]
+# The leveller since AP6b (AU-67): every V-row that checks the set (V1, the owner's
+# recording) has over 3 s of speech.
+OWNED = ["compressor", "de_esser", "eq", "gate", "isolation", "leveller", "limiter",
+         "noise_reduction", "volume"]
 # V13 (b)'s and V15's EQ: high-pass 80 Hz 24 dB/oct, band 3 4 kHz +3 dB q 1, high
 # shelf 6 kHz +6 dB, every slot named as the patch writes it.
 EQ = {"high_pass": {"frequency": 80, "slope": 24}, "low_shelf": None, "band_1": None,

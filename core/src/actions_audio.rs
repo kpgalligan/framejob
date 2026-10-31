@@ -1,6 +1,6 @@
 //! The audio group's two evaluation rules beside `actions.rs`'s `merge` and
 //! `lerp` (road map "audio" AP8b, spec §11 AU-86): the group as JSON with
-//! `isolation` present even at 0, and the four numbers that are switches.
+//! `isolation` present even at 0, and the five numbers that are switches.
 //!
 //! `isolation` is written only when not 0 in the file (format 31), so
 //! `to_json` leaves a clip with none without the key — and `lerp` walks only
@@ -14,6 +14,10 @@
 //! which no stage designs, and a 50 → 60 mains passing 55. They are choices,
 //! not quantities: [`hold_audio_steps`] holds each at its start value until
 //! the action's end, which is §5.4's rule for a switch.
+//!
+//! The leveller's `response` is a quantity, but each response names its own
+//! gain curve, made ahead of time from the clip's loudness (AU-66): a
+//! response between two curves has none, so it switches at the end too.
 
 use serde_json::Value;
 
@@ -33,11 +37,12 @@ pub(crate) fn audio_json(audio: &AudioProps) -> Value {
 
 /// The audio numbers that switch at an action's end rather than glide
 /// (AU-86), as JSON pointers into the evaluated state.
-pub(crate) const HELD_AUDIO_NUMBERS: [&str; 4] = [
+pub(crate) const HELD_AUDIO_NUMBERS: [&str; 5] = [
     "/audio/eq/high_pass/slope",
     "/audio/eq/low_pass/slope",
     "/audio/hum/frequency",
     "/audio/hum/harmonics",
+    "/audio/leveller/response",
 ];
 
 /// Puts each [`HELD_AUDIO_NUMBERS`] field of `lerped` back to its value in

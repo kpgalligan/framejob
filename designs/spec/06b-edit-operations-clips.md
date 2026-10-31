@@ -357,7 +357,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `set_audio` takes the gate and the de-esser as `gate` and `de_esser` (format version 33, §11
   AU-43, AU-45, AU-46): objects that merge per key, `{}` storing the defaults and `null` clearing,
   each field refused out of range by its dotted path (`audio.gate.hold must be between 0 and
-  300000 ticks, not 400000`); both thresholds are dB relative to the clip's measured loudness. An unknown key, a value of the wrong JSON kind or a
+  300000 ticks, not 400000`); both thresholds are dB relative to the clip's measured loudness.
+  It takes the leveller as `leveller` the same way (format version 37, §11 AU-66:
+  `audio.leveller.<field>`, its target relative to the loudness too; the first build's
+  `threshold_db` is an unknown key). An unknown key, a value of the wrong JSON kind or a
   misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array
   indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad
   value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind"

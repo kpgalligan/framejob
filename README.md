@@ -61,8 +61,9 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 or only while its speech plays, voice isolation (Apple's on-device voice model,
 which also reduces room echo), sixteen voice effects (pitch, robot, telephone,
 radio, echo, reverbs and more), channel selection, EQ with voice presets, hum
-removal, noise reduction, a gate for the pauses and a de-esser, each set from
-the clip's own loudness, compressor, pan, mono and a true-peak limiter, each
+removal, noise reduction, a gate for the pauses, a leveller that evens out a
+speaker who moves on and off the mic, phrase by phrase, and a de-esser, each
+set from the clip's own loudness, compressor, pan, mono and a true-peak limiter, each
 of them animated by actions as the volume is; each
 clip's loudness and true peak in the inspector; Enhance Voice, which sets a
 voice recording up for speech from its own measurements in one step; Match

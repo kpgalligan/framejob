@@ -1,8 +1,8 @@
-//! A clip's gate and de-esser (format 33, spec §11 AU-43, AU-45, AU-46),
-//! through the FFI: `set_audio`'s two keys, every refusal sentence, `null`
-//! clearing, `{}` storing the defaults, an action's end clamped into range,
-//! and `paste_attributes` carrying both whole and checking them as a patch is
-//! checked.
+//! A clip's gate and de-esser (format 33, spec §11 AU-43, AU-45, AU-46)
+//! and leveller (format 37, AU-66), through the FFI: `set_audio`'s keys,
+//! every refusal sentence, `null` clearing, `{}` storing the defaults, an
+//! action's end clamped into range, and `paste_attributes` carrying each
+//! whole and checking it as a patch is checked.
 
 use serde_json::{json, Value};
 
@@ -260,6 +260,152 @@ fn paste_attributes_carries_both_and_checks_them() {
         "payload": {"clips": [bad], "media": []}, "groups": ["audio"]}));
     assert!(
         error.contains("audio.de_esser.range_db must be between 1 and 24, not 30"),
+        "{error}"
+    );
+}
+
+// ---- the leveller (format 37, spec §11 AU-66) -------------------------------
+
+fn leveller_defaults() -> Value {
+    json!({"target_db": 0.0, "max_up_db": 12.0, "max_down_db": 12.0,
+           "response": 1_200_000})
+}
+
+#[test]
+fn the_leveller_stores_its_defaults_merges_per_field_and_null_clears() {
+    let base = Handle::from_value(&one(json!({})));
+    let defaults = base.apply(&set(json!({"leveller": {}})));
+    assert_eq!(
+        at(&defaults.value(), "/clips/0/audio/leveller"),
+        &leveller_defaults()
+    );
+    let more = defaults.apply(&set(json!({"leveller": {"target_db": -6.0}})));
+    let value = more.value();
+    assert_eq!(num(&value, "/clips/0/audio/leveller/target_db"), -6.0);
+    assert_eq!(num(&value, "/clips/0/audio/leveller/max_up_db"), 12.0);
+    assert_eq!(num(&value, "/clips/0/audio/leveller/response"), 1_200_000.0);
+    let cleared = more.apply(&set(json!({"leveller": null})));
+    assert_eq!(cleared.to_json(), base.to_json());
+}
+
+#[test]
+fn every_leveller_bound_is_refused_in_its_own_sentence() {
+    let handle = Handle::from_value(&one(json!({})));
+    let cases: Vec<(Value, &str)> = vec![
+        (
+            json!({"leveller": {"target_db": -21.0}}),
+            "audio.leveller.target_db must be between -20 and 10, not -21",
+        ),
+        (
+            json!({"leveller": {"target_db": 11.0}}),
+            "audio.leveller.target_db must be between -20 and 10, not 11",
+        ),
+        (
+            json!({"leveller": {"max_up_db": -1.0}}),
+            "audio.leveller.max_up_db must be between 0 and 24, not -1",
+        ),
+        (
+            json!({"leveller": {"max_up_db": 25.0}}),
+            "audio.leveller.max_up_db must be between 0 and 24, not 25",
+        ),
+        (
+            json!({"leveller": {"max_down_db": -1.0}}),
+            "audio.leveller.max_down_db must be between 0 and 24, not -1",
+        ),
+        (
+            json!({"leveller": {"max_down_db": 25.0}}),
+            "audio.leveller.max_down_db must be between 0 and 24, not 25",
+        ),
+        (
+            json!({"leveller": {"response": 299_999}}),
+            "audio.leveller.response must be between 300000 and 6000000 ticks, not 299999",
+        ),
+        (
+            json!({"leveller": {"response": 6_000_001}}),
+            "audio.leveller.response must be between 300000 and 6000000 ticks, not 6000001",
+        ),
+        (
+            json!({"leveller": {"attack": 3.0}}),
+            "unknown key \"leveller.attack\" in an audio patch",
+        ),
+        (
+            json!({"leveller": {"threshold_db": -25.0}}),
+            "unknown key \"leveller.threshold_db\" in an audio patch",
+        ),
+    ];
+    for (patch, expected) in cases {
+        assert_eq!(handle.errors(&set(patch.clone())), expected, "{patch}");
+    }
+    for leveller in [
+        json!({"target_db": -20.0, "max_up_db": 0.0, "max_down_db": 0.0,
+               "response": 300_000}),
+        json!({"target_db": 10.0, "max_up_db": 24.0, "max_down_db": 24.0,
+               "response": 6_000_000}),
+    ] {
+        let applied = handle.apply(&set(json!({"leveller": leveller.clone()})));
+        assert_eq!(at(&applied.value(), "/clips/0/audio/leveller"), &leveller);
+    }
+}
+
+#[test]
+fn a_leveller_in_an_actions_end_is_clamped_into_range() {
+    let handle = Handle::from_value(&one(json!({"leveller": {}})))
+        .apply(&json!({"op": "add_action", "clip": 10, "at": 0, "duration": 2 * SEC}));
+    let action = array(&handle.value(), "/clips/0/actions")[0]["id"].clone();
+    let ended = handle.apply(&json!({
+        "op": "set_action_end", "clip": 10, "action": action,
+        "patch": {"audio": {"leveller": {"target_db": -90.0, "max_up_db": 90.0,
+            "max_down_db": -3.0, "response": 10}}}
+    }));
+    let state = ended.clip_state(10, 3 * SEC).expect("clip 10 has a state");
+    assert_eq!(
+        at(&state, "/audio/leveller"),
+        &json!({"target_db": -20.0, "max_up_db": 24.0, "max_down_db": 0.0,
+                "response": 300_000})
+    );
+    let other = ended.apply(&json!({
+        "op": "set_action_end", "clip": 10, "action": action,
+        "patch": {"audio": {"leveller": {"target_db": 90.0, "max_up_db": -9.0,
+            "max_down_db": 90.0, "response": 90_000_000}}}
+    }));
+    let state = other.clip_state(10, 3 * SEC).expect("clip 10 has a state");
+    assert_eq!(
+        at(&state, "/audio/leveller"),
+        &json!({"target_db": 10.0, "max_up_db": 0.0, "max_down_db": 24.0,
+                "response": 6_000_000})
+    );
+}
+
+#[test]
+fn paste_attributes_carries_the_leveller_and_checks_it() {
+    let handle = Handle::from_value(&json!({
+        "version": 35,
+        "canvas": {"width": 1920, "height": 1080, "fps": [30, 1]},
+        "media": [{"id": 1, "path": "/fixtures/1.m4a", "kind": "audio",
+                   "duration": 60 * SEC, "has_audio": true}],
+        "tracks": [{"id": 2, "name": "A"}],
+        "clips": [
+            {"id": 10, "track": 2, "start": 0, "duration": 5 * SEC,
+             "source": {"kind": "media", "media": 1, "in": 0},
+             "audio": {"leveller": {"target_db": -3.0, "max_up_db": 18.0}}},
+            {"id": 20, "track": 2, "start": 5 * SEC, "duration": 5 * SEC,
+             "source": {"kind": "media", "media": 1, "in": 0}, "audio": {}}
+        ],
+        "next_id": 100
+    }));
+    let source = array(&handle.value(), "/clips")[0].clone();
+    let pasted = handle.apply(&json!({"op": "paste_attributes", "clips": [20],
+        "payload": {"clips": [source.clone()], "media": []}, "groups": ["audio"]}));
+    assert_eq!(
+        at(&pasted.value(), "/clips/1/audio/leveller"),
+        at(&source, "/audio/leveller")
+    );
+    let mut bad = source;
+    bad["audio"]["leveller"]["response"] = json!(100);
+    let error = handle.errors(&json!({"op": "paste_attributes", "clips": [20],
+        "payload": {"clips": [bad], "media": []}, "groups": ["audio"]}));
+    assert!(
+        error.contains("audio.leveller.response must be between 300000 and 6000000 ticks, not 100"),
         "{error}"
     );
 }

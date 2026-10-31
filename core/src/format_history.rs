@@ -362,5 +362,10 @@
 //! `tracks[].compressor` and `tracks[].limiter`, the clip's own two types,
 //! after `pan`, each written only when set; no migration. The bump is so an
 //! older build refuses the file instead of playing every track undynamic and
-//! dropping the keys on save. Every number from 37 up, 1014 included, is
-//! newer than this build.
+//! dropping the keys on save.
+//!
+//! Version 37 is the leveller (spec §11 AU-66): `audio.leveller`,
+//! `{target_db, max_up_db, max_down_db, response}` after `voice`, written
+//! only when set; no migration. The bump is so an older build refuses a
+//! levelled file instead of playing it unlevelled and dropping the key on
+//! save. Every number from 38 up, 1014 included, is newer than this build.

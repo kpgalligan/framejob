@@ -240,8 +240,10 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
   the rules, the loudness cache's high band (version 2), the volume solved on the clip rendered
   through its own chain for Enhance and Loudness Normalize alike (the owner's answer,
   2026-10-31), the Measuring Sound sheet, the button, Clip ▸ Enhance Voice and `enhance_voice`
-  (AU-60…AU-65; its record below). Part 2: the leveller stage, `audio.leveller` (a format bump), its section, and
-  Enhance turning it on from the speech's short-term loudness range (AU-66, AU-67). Part 3:
+  (AU-60…AU-65; its record below). Part 2: the leveller, `audio.leveller` (a format bump) — after the
+  owner's answer of 2026-10-31 a gain curve made ahead of time from the clip's loudness and
+  speech and applied with no state in the tap — its section, and Enhance turning it on from the
+  speech's short-term loudness range (AU-66, AU-67; its record below). Part 3:
   "Enhance the microphone when it lands", the recorder setting and its `UserDefaults` key,
   applied after the landing as its own undo step (AU-68, AU-69; its record below).
 
@@ -1951,6 +1953,203 @@ lane's Release proofs stand.
 
 **Owed.** SE-40 for the owner: a track's compressor and limiter sound right, and the panel's
 dynamics read well.
+
+### AP6b's record (2026-10-31)
+
+AP6 part 2, the leveller (survey B3), built in lane A from `16bd934`. **Stopped before the gate
+on one acceptance row, for the owner** (below, "Asked").
+
+**Decided.** AU-66 (the stage, its order after the gate and before the de-esser, the K-weighted
+detector in L's layout, the hold, priming from L, the reset at a clip change, the level,
+`audio.leveller` at format 36 as the twelfth tap key, the section) and AU-67 (the speech's
+short-term loudness range, Enhance's 6 LU rule, `needsRender`, the proof), recorded before the
+code. The step-2 ranges, measured before the rule was built: the owner's recording 4.610 LU,
+the off-mic fixture 13.144 LU, the steady fixture 2.108 LU — so Enhance leaves the owner's
+leveller off.
+
+**Landed** (lane worktree, not yet integrated). Core: `Leveller` in `model_audio.rs` (581
+lines), `check_leveller` / `clamp_leveller` in `audio_dynamics.rs`, one line each in
+`props_check.rs` and `actions_clamp.rs`, the patch template, `TAP_KEYS` twelve, format 36 with
+its history paragraph and the header; `schema_v36.rs`, four leveller tests in
+`audio_dynamics.rs`, one in `audio_automation.rs`. App: `AudioLevellerStage.swift` (new),
+`LevellerProps`, `AudioProps.leveller`, `AudioPatch.leveller`, `interpolated`, the chain
+(`AudioDSP.swift` 565 lines) with `resetLeveller`, `dsp(_:volume:level:enclosingMono:)`,
+`AudioDSPSpan.clip`, `AudioTap`'s `levelledClip`, `wanting`, the export's sentence, the
+Leveller section and its `ClipPane` row, `needsRender` and the memo key,
+`AudioEnhance+Leveller.swift` (new), `Measurement.speechRangeLU`, `choose`'s rule,
+`speech_range_lu`, the three catalog texts. Docs: the guide's Leveller section (fifteen
+sections now; "twelve" was stale), Enhance's rule, the animated keys, the agents' keys, a Limits
+bullet, export.md's wait, menus-and-shortcuts.md, the README highlight, SE-39 (provisional),
+spec §4.3b, §5.2b, §5.4, §6b, §7.2, §7.4, §7.6, §7.8, §7.10, screen 09c's prose, the proof
+README.
+
+**Deviations.** (1) `audio_ap6_probe.swift`'s E6 expected the owner's choice to hold exactly the
+six cleaning keys; with over 3 s of speech it now holds `leveller` too (null), so E6 expects it.
+(2) P8 reads the rows' labels and the Status part: the check's title and the section header are
+drawn, not dumped as text; the section is opened with `<false/>` in the argument domain (a bare
+`NO` arrives as a string and is not read as a Bool).
+
+**Measured** (the lane; three lanes shared the machine). `cargo test --release --test
+schema_v36` 5/5, `audio_dynamics` 9/9, `audio_automation` 9/9; M11 by hand (`"leveller"` out of
+`TAP_KEYS`) fails `a_leveller_named_by_an_end_is_in_the_points`. `make lint` clean; `make
+typecheck` 0 errors and the four baseline warnings. `audio_ap6b_probe.py` 13/13: L1 +8.999,
++3.000, −3.000, +11.999 dB and one channel −0.000; L2 63 % at 1.878 s (response 1 s) and 4.776 s
+(4 s); L3 worst 0.000 dB, held 2 s bit-constant; L5 0.000 dB over the gate alone, ungated
++11.485 dB; L8 7.9 µs per 1024 stereo frames, 0.037 % of real time (best of 3); L9 the first clip
+at +11.952 dB at the cut, the second byte-identical to it alone. `--mutants` 12/12, each by its
+named row. `audio_ap6_probe.py` 9/9, `audio_ap4_probe.py` 11/11, `audio_ap8b_proof.py --probe`
+8/8, `clip_inspector2_proof.py` 33/33 (T2's Sound tab fifteen sections). On Debug,
+`audio_ap6b_proof.py` 25/28 (P8 then fixed and re-run alone, 2/2): P1 all; P2 the pauses' gain
+moved 0.000 dB and sat at most +0.457 dB over the speech before them, but the range **13.63 LU
+in, 13.96 LU out**; P3 ΔI 0.0000 LU; P4 the leveller on (13.1 LU), the export −16.00 LUFS at
+−0.9998 / −0.9999 dBTP in 2 renders, but **a second call changed the volume**; P5 null (2.1 LU);
+P6 the owner's 4.67 LU, null, a second call "made no change"; P7 6.000 dB.
+
+**Asked.** P2's "range out ≤ in − 5 LU" cannot hold on the off-mic fixture as AU-66 is decided:
+the hold carries each 10 s segment's gain through its 1.5 s pause into the next, which then
+starts 12 dB off and takes about 3 s to settle (the 2 s response behind the 0.4 s detector), and
+the 3 s windows' 95th percentile is exactly those starts. Measured on the same exports: over the
+whole segments 13.63 → 13.96 LU at the defaults, 9.78 at a 0.5 s response, 12.83 at 1 s; from
+3 s into each segment 13.31 → 5.11 LU at the defaults and 3.62 at 0.5 s. The owner chooses: (a)
+keep AU-66 and measure P2 from 3 s into each segment (recommended: the steady part is what a
+slow rider is for, and the abrupt 12 dB jump at every pause is its worst case); (b) amend AU-66
+so the gain moves faster for a while after a long hold; (c) a fixture whose level moves within
+the speech rather than across pauses.
+
+**Found.** Enhance Voice's processed solve (AU-64, AP6 part 1) does not repeat on the `say`
+fixtures: three presses on the steady one (no leveller) read R0 −21.382, −21.373 and −21.321
+LUFS and wrote volumes 1.873, 1.892 and 1.865, so a second press changes the volume by more than
+0.05 dB; on the off-mic one, with the leveller on, R0 moved 0.5 LU between the first and second
+presses (−21.775 in 4 renders, −21.275 in 2) and the third made no change. To file; P4's second
+call fails on it.
+
+**Owed (the first build).** The owner's answer on P2 — given below.
+
+**The answer (2026-10-31).** The owner chose **look ahead**: the gain a curve made ahead of time
+from the clip's loudness and speech, applied with no state, so each phrase starts at its level;
+and ordered the processed solve's non-repeat **fixed, not filed**. AU-66 and AU-67 were rewritten
+whole before the code (AU-66 (a)–(g): the order, what the curve measures, the curve, the
+stateless stage, where it is made and what invalidates it — speech detection unavailable is
+unmeasurable, never pending — the model with `response` held at an end, the section; AU-67 kept
+as built, the solve rendering through the curve), `threshold_db` (Holds Under) dropped, the
+format renumbered 37 (AP10c took 36) and the manual check SE-41 (AP12 and AP10c took SE-39 and
+SE-40).
+
+**The build (lane A, from `1190403`, the first build's `adb6cb5` picked onto it).** Core:
+`Leveller` four fields, `check_leveller` / `clamp_leveller` without the threshold, `response` the
+fifth `HELD_AUDIO_NUMBERS` entry (`actions_audio.rs`), format 37 (`format.rs`, its history
+paragraph, the header), `schema_v37.rs`, the leveller tests in `audio_dynamics.rs` (`threshold_db`
+refused as an unknown key) and `audio_automation.rs` (a response of 1 s → 4 s holds until the
+action's end). App: `AudioLevellerCurve.swift` (new: phrases, the speech-only window, `smooth`
+forward then back, the short phrases, the held and glided breaks, `value(atTick:)`),
+`AudioLevellerStage.swift` rewritten (`AudioLevellerSettings` from the props and the curve for
+the response, `AudioLevellerRun` the stateless gain on the lookup frame), `AudioDynamicsLevels`'s
+`Curves`, `levelling` and `curves(for:cache:speechDetection:)` (memoised with the `media.speech`
+and the responses used; a `speech` post drops them and rebuilds the documents levelling that
+media; `wait` waits on a pending curve), `AudioDSPParameters(snapshot:levels:curves:)` and
+`dsp(_:volume:level:leveller:enclosingMono:)`, `AudioDSPAutomation.leveller`, the chain's
+`process(…, leveller:)` (no leveller stage, no `resetLeveller`, no `AudioDSPSpan.clip`, no
+`levelledClip`), `interpolated` holding the response, the section without Holds Under and its
+Status off the curves, `loudnessUnmeasured`'s sentence, the catalog prose. Probe and proof
+rewritten for the curve (L1–L9, R1–R5, fifteen scripted mutants; P1–P8).
+
+**Step 3, the non-repeat.** Measured, not reproduced: AU-64 (i) has the figures. One trial of the
+steady fixture with Enhance's chain rendered five times in one process through the render's
+path, the whole chain and each key alone (none, EQ, isolation, gate, de-esser, compressor, noise
+reduction, hum), gave byte-identical PCM each time (−21.2828 LUFS whole; the reader's first
+buffer at offset 0, 408 buffers), also with the isolated render deleted and made again before
+each render, and also built from `adb6cb5`'s own sources; in the Debug app a first press and
+three Normalize rounds read −21.28278599304145 on the steady fixture (placed at 0 s and at
+7.3 s) and −21.61915860368329 on the off-mic one with the leveller on, presses 2 and 3 "made no
+change" each time. No code changed for it and the 0.05 dB keep stays; R5 and P5 hold it, and
+M16 has no edit to make.
+
+**Measured** (the lane; three lanes shared the machine). `cargo test --release --test
+schema_v37` 5/5, `audio_dynamics`, `audio_automation`, `schema_v36` all passing; `make lint`
+clean; `make typecheck` 0 errors and the four baseline warnings. `audio_ap6b_probe.py` 14/14: L1
+r exact to 0.000 at L − 9, − 3, + 3, − 20 and the gains 9.000, 3.000, −3.000, 12.000 dB, the
+gapped phrase ±0.000, one channel = dual mono; L2 B's first step 0.000 dB off its settled gain,
+the break held ±0.000 and the glide ±0.000 inside [A, B], the 0.5 s phrase A's value; L3 the
+midpoint ±0.005, 90 % at +80.5 and −80.5 steps (τ·ln 5 = 80.47); L4 byte-identical at 512,
+4096 and irregular buffers and from 2.5 s, the gain the curve's ±0.001 dB; L5 +12.000 dB over
+the gate alone, before the gate +12.000 dB over the input; L6 every case; L8 a 1-hour curve in
+7.7 ms, a run 7.3 µs per 1024 stereo frames (0.034 % of real time); L9 mid-phrase gains forward
+−2.46 / +10.20 dB, reversed +9.46 / −2.12, ×2 −2.61 / +10.12; R5 −21.283 LUFS three times,
+byte-identical; the step-2 figures 4.610, 13.144 and 2.108 LU again. `audio_ap6_probe.py` 9/9,
+`audio_ap4_probe.py` 11/11, `audio_ap8b_proof.py --probe` 8/8, `clip_inspector2_proof.py` 33/33.
+On Debug, `audio_ap6b_proof.py` 32/34: P1 all; P2 (a) **13.63 LU in, 2.32 out**, (c) every pause
+moved 0.000 dB, (d) every pause inside its neighbours' gains; P3 12 s from 0 ΔI 0.0000 LU; P4
+the leveller on (13.1 LU), the export −16.00 LUFS at −0.9999 / −0.9999 dBTP, the last verify
+−15.998, presses 2 and 3 "made no change"; P5 the leveller null (2.1 LU), presses 2 and 3 "made
+no change", Enhance and three Normalize rounds −21.28278599304145 (spread 0.00000 LU); P6 the
+owner's 4.67 LU, null, a second call "made no change"; P7 +0.000 dB before and −6.000 dB after;
+P8 the six rows and "Aims at −20.7 LUFS". `--mutants` 15/15 on the final probe (the first run
+14/15: M15 survived, and L4 gained its per-sample check against the curve); M11 by hand failed
+`a_leveller_named_by_an_end_is_in_the_points`. `make gate` PASS 576 s (test 336, app 223).
+
+**P2 (b), the owner's answer: ±3 dB.** The look-ahead build stopped on P2 (b) at ±1.5 dB. Each
+segment's first 0.5 s against its settled gain reads −4.04 / −2.20, +7.72 / +10.13, +1.39 / −0.45,
++7.50 / +9.65, −1.00 / −1.56 and +7.92 / +9.50 dB: worst 2.41 dB. Two causes, both measured on the
+same exports: each `say` sentence's speech begins 0.06–0.29 s after its segment's nominal start
+(the first step louder than −45 dBFS at 0.57, 12.23, 23.79, 35.14, 46.67 and 58.06 s), so the
+window holds the glide's end on the bed; and the sentences open louder than their middles — the
+material's first 1.5 s of speech against [3 s, end − 0.5 s) reads +2.10, +0.19, +3.12, +1.93,
++1.09 and +1.20 dB — which AU-66 (c)'s 3 s window and 1 s smoothing follow, as decided. The owner
+chose ±3 dB on the same measurement (AU-67 (e)): v1's carry-over, ~12 dB, still fails it.
+
+**P3's seek row, against a control.** The seek row (8 s from 20 s after 12 s from 0) read ΔI
+−0.0102 LU on Release and −0.0041 LU on Debug, the first play 0.0000. Found by instrumenting the
+tap (a Debug build with a log line per buffer, not kept): after a seek the player hands every tap
+two silent buffers whose reported duration is zero but whose start is the seek's frame (960000),
+then real audio from 963072; the tap places the first in the live meter, so the meter sums 4096
+frames of silence at [960000, 964096). Replacing those frames of the levelled export with silence
+gives −23.2635 LUFS, the meter's reading to four places. It is the meter's, not the leveller's:
+the unprocessed clip seeking to 25 s (loud speech) reads −0.0385 LU, and to 20 s 0.0000 only
+because the quiet segment there falls under the relative gate; the leveller lifts it over. Not
+placing a zero-duration buffer fixes P3 (both seeks 0.0000) but makes `audio_ap7_proof.py`'s L3
+(pause and continue, AU-72) reset on the resume, 5375 frames ahead, so it is filed, not fixed
+here. The row now holds the leveller's own part against a CONTROL on the same plays — the
+levelled export placed as a clip with nothing on it, in a project of its own, against its own
+export — its signed ΔI less the control's within 0.01 LU (AU-67 (e)); the first play's row stays
+absolute.
+
+**Measured** (the continuation; three lanes shared the machine). On Debug, `audio_ap6b_proof.py
+P2` 6/6: P2 (b) worst 2.408 dB, P3 the first play ΔI +0.0000 LU, the seek −0.0041 LU levelled and
+−0.0041 LU the control, the leveller's own −0.0000. `--mutants` 15/15 again on the final probe;
+M11 by hand failed `a_leveller_named_by_an_end_is_in_the_points` (9/10), restored 10/10. `make
+gate` PASS 84 s (names 1 s, test 82 s, the rest skipped as unchanged). Against Release:
+`audio_ap6b_proof.py` 34/34 — P2 (a) 13.63 LU in, 2.32 out, (b) worst 2.408 dB, (c) 0.000 dB,
+(d) 0.000 dB outside; P3 the first play ΔI +0.0000 LU, the seek −0.0040 LU levelled and −0.0040
+LU the control, the leveller's own −0.0000; P4 the leveller on (13.1 LU), the export −16.00 LUFS
+at −0.9999 / −0.9999 dBTP, the last verify −15.998, presses 2 and 3 "made no change"; P5 the
+leveller null (2.1 LU), Enhance and three Normalize rounds −21.28278599304145 (spread 0.00000);
+P6 the owner's 4.67 LU, null, a second call "made no change"; P7 +0.000 / −6.000 dB; P8 the six
+rows and "Aims at −20.7 LUFS". `audio_ap6_proof.py` 37/37 (V1 the nine keys, V2 −15.98 LUFS),
+`audio_ap6c_proof.py` 39/39, `loudness_normalize_proof.py` 37/37, `audio_ap12_proof.py` 16/16,
+`audio_ap8b_proof.py` 16/16, `screens.py --only 09-clip-sound,09c-clip-sound-dynamics` 7 pass, 0
+fail, 0 new problems; the instance's log printed no `Frame Job: ` line.
+
+**Review.** The first review asked one fix: AU-67 (e) and its index row named mutants M1–M10 and
+M12–M17 and rows R1–R4, where the probe runs fifteen (M16 has no edit, AU-64 (i)) and has R5; the
+fix pass (`8de7212`, three spec files) corrected both and their Lines cells (`spec_index_proof.py`
+213/213, `make gate` PASS 246 s). The second review passed with three nits, kept: the guide gives
+the owner's speech range as 4.6 LU where the app's Enhance reason reads 4.7 (4.672); the Status
+gives "no phrase with 1 s of speech" also for a reading whose step count the segments do not
+match, which cannot happen today; and the curve memo is keyed by the plan text, so editing Target
+or a cap on a clip with an action remakes its curves (≤ 100 ms per hour, L8), where AU-66 (e) says
+they remake nothing.
+
+**Integrated.** Nothing had landed since the lane's base, so the four commits applied clean;
+format 37 and SE-41 keep their numbers. The CLAUDE.md edits owed went in: app's map names
+`AudioLevellerCurve.swift` and `AudioLevellerStage.swift` (a new entry), the tap's ten effects
+and its leveller, `AudioDSPParameters(snapshot:levels:curves:)`, the held response,
+`LevellerProps`, `AudioDynamicsLevels`' curves and `speech` posts, the Leveller section and
+`AudioEnhance+Leveller`; core's map names `Leveller` (format 37), `check_leveller` /
+`clamp_leveller`, the fifth held number and the twelfth tap key. On the merged tree `make gate`
+PASS 347 s (names 1, typecheck 7 with the four baseline warnings, fmt 3, lint 10, test 193, app
+133); no product code was resolved, so the lane's Release proofs stand.
+
+**Owed.** SE-41 for the owner; the meter's seek filler, filed as an issue.
 
 ### Closing the road map
 

@@ -31,7 +31,9 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
-use crate::audio_dynamics::{check_compressor, check_de_esser, check_gate, check_limiter};
+use crate::audio_dynamics::{
+    check_compressor, check_de_esser, check_gate, check_leveller, check_limiter,
+};
 use crate::audio_eq::{check_eq, check_hum};
 use crate::grade_check::{check_curves, check_qualifier, check_wheels};
 use crate::model::{
@@ -377,6 +379,7 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     props.hum.as_ref().map(check_hum).transpose()?;
     props.gate.as_ref().map(check_gate).transpose()?;
     props.de_esser.as_ref().map(check_de_esser).transpose()?;
+    props.leveller.as_ref().map(check_leveller).transpose()?;
     if let Some(voice) = &props.voice {
         in_range("audio.voice.amount", voice.amount, 0.0, 1.0)?;
         if let Some(pitch) = voice.pitch {

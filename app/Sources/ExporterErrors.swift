@@ -123,9 +123,9 @@ extension Exporter {
             case .isolationFailed(let clip, let message):
                 return "Clip \(clip)'s isolated voice could not be rendered: \(message)."
             case .loudnessUnmeasured(let clip):
-                return "Clip \(clip)'s loudness has not been measured yet, so its gate and "
-                    + "de-esser have no threshold. Wait for the Volume section to show its "
-                    + "loudness, then export again."
+                return "Clip \(clip)'s loudness or speech has not been measured yet, so its "
+                    + "gate, leveller and de-esser cannot be set. Wait for their Status rows to "
+                    + "show the clip's loudness, then export again."
             case .voiceFailed(let clip, let message):
                 return "Clip \(clip)'s voice effect could not be rendered: \(message)."
             }

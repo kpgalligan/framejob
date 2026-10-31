@@ -154,7 +154,8 @@ detail there.
   and format 31's `AudioProps.isolation` (AU-50), and format 32's `eq`, `hum` and `channels`
   (`AudioEQProps.swift`, AU-31, AU-33, AU-34), and format 33's `gate` and `deEsser`
   (`AudioDynamicsProps.swift`, AU-43, AU-45), and format 34's `voice`
-  (`VoiceProps.swift`, AU-140);
+  (`VoiceProps.swift`, AU-140), and format 37's `leveller`
+  (`AudioDynamicsProps.swift`, AU-66);
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -1130,8 +1131,10 @@ the key map behind it.
   its Status read through the pane's `voiceMemo`; +`HumChannels` and
   +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
   Voice Effect and before Noise Reduction, animated through actions (AU-88);
-  +`Dynamics`: the Gate and De-esser sections, spec §11 AU-48, registered
-  after Noise Reduction and before Compressor, animated through actions
+  +`Dynamics`: the Gate, Leveller and De-esser sections, spec §11 AU-48,
+  AU-66 (the Leveller's Status read off `AudioDynamicsLevels.curves`),
+  registered after Noise Reduction and before Compressor, animated through
+  actions
   (AU-88), their Status and Loudness rows read through
   the pane's `loudnessMemo`) ·
   `TextPane.swift` · `ShapePane.swift` ·
@@ -1856,7 +1859,7 @@ the key map behind it.
 - `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioAutomation.swift` ·
   `AudioDSP.swift` · `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
   `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
-  `MTAudioProcessingTap` playback and export share, and the nine sample-level
+  `MTAudioProcessingTap` playback and export share, and the ten sample-level
   effects after voice isolation's crossfade, which runs first (AU-54,
   `AudioIsolation.swift`; a ready voice effect's render in its place,
   AU-143): the channel pick and the EQ and hum notch at the
@@ -1864,9 +1867,11 @@ the key map behind it.
   sample, designed at the cut; looked up `AudioTrackDSP.headLead` — SY-25's
   6,400 ticks — further ahead on a noise-reduced track, the tap's runs split at
   both lookups), noise reduction (a 512-sample delay the builder leads by,
-  SY-25), the gate and the de-esser (AU-47: read at the compressor's lookup,
-  and nil, touching no sample, until the clip's loudness is measured, AU-42),
-  the compressor, the mono fold (BEFORE
+  SY-25), the gate, the leveller and the de-esser (AU-47, AU-66: read at the
+  compressor's lookup, and nil, touching no sample, until the clip's loudness —
+  and the leveller's curve — is measured, AU-42; the leveller stateless, its
+  run made per run at the lookup frame, nothing reset), the compressor, the
+  mono fold (BEFORE
   the pan, or it is algebraically self-cancelling) and pan (constant-power,
   unity at centre), then the clip limiter (AU-20: a lookahead true-peak
   limiter last in the chain, told the clip's base volume because the fader is
@@ -1881,20 +1886,23 @@ the key map behind it.
   it (road map "audio" AP0). `AudioAutomation.swift` (road map "audio" AP8b,
   spec §11 AU-85…AU-88) reads the plan's per-segment `automation`:
   `PlanAudioPoint`, `AudioProps.interpolated` (numbers linear, presence,
-  switches and the held slope, mains and harmonics from the left),
-  `AudioDSPAutomation` (a run's settings at its anchor on the absolute
+  switches and the held slope, mains, harmonics and leveller response from the
+  left), `AudioDSPAutomation` (with the clip's leveller curves as a base fact;
+  a run's settings at its anchor on the absolute
   32-frame grid, runs cut at grid boundaries and point frames, the track-wide
   stages from any point), `AudioPanRamp` (the pan per sample, scalar) and
   `AudioPatch.routedInsideAction` (the inspector's base/end split).
   `AudioDSP.swift` keeps the parameters
   (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP` with its
-  `channels`, `eq`, `gate` and `deEsser`), the pan law and the chain (`AudioDSPChain`, whose order
-  is the channel strip's); each stage is a file of its own,
-  `AudioEQStage.swift` (AP3), `AudioCompressorStage.swift`,
+  `channels`, `eq`, `gate`, `leveller` and `deEsser`), the pan law and the
+  chain (`AudioDSPChain`, whose order is the channel strip's); each stage is a
+  file of its own, `AudioEQStage.swift` (AP3), `AudioCompressorStage.swift`,
   `AudioNoiseReductionStage.swift` and `AudioLimiterStage.swift` (the first two
-  pure moves out of it, AP0), and `AudioGateStage.swift` and
-  `AudioDeEsserStage.swift` (AP4, below).
-  `AudioTapSchedule.swift` also holds `AudioDSPParameters(snapshot:levels:)`,
+  pure moves out of it, AP0), `AudioGateStage.swift` and
+  `AudioDeEsserStage.swift` (AP4, below), and `AudioLevellerCurve.swift` and
+  `AudioLevellerStage.swift` (AP6b, below).
+  `AudioTapSchedule.swift` also holds
+  `AudioDSPParameters(snapshot:levels:curves:)`,
   `pendingLevels` and `measured(project:cache:)`, the resolution `Playback`
   and `AudioDSPSource`'s fallback use; isolation and ramp callers keep the
   levels-less init.
@@ -1930,11 +1938,26 @@ the key map behind it.
   de-esser — a 24 dB/oct Butterworth sidechain, an LR4 crossover and
   `low + g·band`, which never boosts — and `AudioDeEsserSettings` (AU-44,
   AU-45); `AudioDynamicsProps` the mirror's `GateProps` and `DeEsserProps`
-  (format 33); `AudioDynamicsLevels` each gated or de-essed clip's measured
-  loudness (its `ClipLoudness` reading, AU-41), its memo (never a pending
-  answer), the `loudness` post's drop and `.reversedMediaDidChange`, and the
-  export's `wait` (AU-42); `AudioPane+Dynamics` the Gate and De-esser
-  sections after Noise Reduction (AU-48).
+  (format 33) and `LevellerProps` (format 37); `AudioDynamicsLevels` each
+  gated, levelled or de-essed clip's measured loudness (its `ClipLoudness`
+  reading, AU-41) and each levelled clip's curves by response (`curves`,
+  AU-66 (e): pending on the loudness or the speech, unmeasurable where speech
+  detection is unavailable), their memos (never a pending answer; the curves'
+  with the `media.speech` read), the `loudness` and `speech` posts' drop and
+  `.reversedMediaDidChange`, and the export's `wait` on a pending level or
+  curve (AU-42); `AudioPane+Dynamics` the Gate, Leveller and De-esser sections
+  after Noise Reduction (AU-48, AU-66).
+- `AudioLevellerCurve.swift` · `AudioLevellerStage.swift` — road map "audio"
+  AP6b's leveller (spec §11 AU-66): `AudioLevellerCurve` the material's level
+  per 10 ms played step relative to L, made ahead of time from a
+  `ClipLoudness` reading and its speech mask (phrases split at 0.5 s breaks,
+  long phrases over a 3 s speech-only window smoothed forward then back over
+  half the response, short phrases and the edges a neighbour's value, breaks
+  held then glided over their last 0.25 s), keyed by segment start;
+  `AudioLevellerSettings` (the target, the caps and the curve for the
+  response) and `AudioLevellerRun`, the stateless gain after the gate and
+  before the de-esser: the gain at each step centre, interpolated per sample
+  on the tap's lookup frame.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` ·
@@ -2523,10 +2546,11 @@ free.
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
   "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
   over `AudioMeasureRunning`.
-- `AudioEnhance.swift` (+`Reasons`) — Enhance Voice's value type (spec §11
-  AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the rules), `jobs`,
-  `plan` over the run's outcome; `+Reasons` the loudness reason and the
-  reasons' numbers.
+- `AudioEnhance.swift` (+`Reasons`, +`Leveller`) — Enhance Voice's value type
+  (spec §11 AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the
+  rules), `jobs`, `plan` over the run's outcome; `+Reasons` the loudness
+  reason and the reasons' numbers. `+Leveller` the speech's short-term
+  loudness range and the leveller's rule (AU-67).
 - `AudioDynamicsModel.swift` — the clip's compressor at the loudness cache's
   10 ms steps, for Enhance Voice's makeup only (AU-62, AU-64 (h)).
 - `AudioPane+Enhance.swift` — the Volume section's Enhance Voice button; its

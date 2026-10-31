@@ -1,19 +1,20 @@
 //! The bounds of a clip's gate and de-esser (format 33, spec §11 AU-43,
-//! AU-45): [`check_gate`] and [`check_de_esser`], which `props_check.rs`'s
+//! AU-45) and leveller (format 37, AU-66): [`check_gate`],
+//! [`check_de_esser`] and [`check_leveller`], which `props_check.rs`'s
 //! `check_audio` runs on a direct edit and refuses in the key's own
 //! sentence; the compressor's and the limiter's, [`check_compressor`] and
 //! [`check_limiter`], which `check_audio` runs under `audio.` and
 //! `track_dynamics.rs` under a track's own key (spec §11 AU-150); and
-//! [`clamp_gate`] and [`clamp_de_esser`], which
+//! [`clamp_gate`], [`clamp_de_esser`] and [`clamp_leveller`], which
 //! `actions_clamp.rs`'s `clamp_audio` runs on an action's evaluated end,
 //! where there is nobody to tell.
 //!
-//! Both thresholds are dB relative to the clip's measured loudness (AU-41),
-//! which only the Swift side knows; the DSP is Swift's too
-//! (`AudioGateStage.swift`, `AudioDeEsserStage.swift`). Nothing here touches
-//! a sample.
+//! The thresholds (and the leveller's target) are dB relative to the clip's
+//! measured loudness (AU-41), which only the Swift side knows; the DSP is
+//! Swift's too (`AudioGateStage.swift`, `AudioDeEsserStage.swift`,
+//! `AudioLevellerStage.swift`). Nothing here touches a sample.
 
-use crate::model::{Compressor, DeEsser, Gate, Limiter};
+use crate::model::{Compressor, DeEsser, Gate, Leveller, Limiter};
 use crate::props_check::{
     in_range, ticks_in_range, ticks_positive_or_zero, COMPRESSOR_MAKEUP_MAX_DB,
     COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, LIMITER_CEILING_MIN_DB, LIMITER_RELEASE_MAX,
@@ -43,6 +44,14 @@ pub(crate) const DE_ESSER_THRESHOLD_MAX_DB: f64 = 20.0;
 /// The most the de-esser takes from the band, in dB.
 pub(crate) const DE_ESSER_RANGE_MIN_DB: f64 = 1.0;
 pub(crate) const DE_ESSER_RANGE_MAX_DB: f64 = 24.0;
+/// The leveller's target, dB re the clip's loudness.
+pub(crate) const LEVELLER_TARGET_MIN_DB: f64 = -20.0;
+pub(crate) const LEVELLER_TARGET_MAX_DB: f64 = 10.0;
+/// The most the leveller lifts or cuts, in dB (each from 0).
+pub(crate) const LEVELLER_MAX_DB: f64 = 24.0;
+/// Its response, in ticks: 0.5…10 s.
+pub(crate) const LEVELLER_RESPONSE_MIN: Ticks = 300_000;
+pub(crate) const LEVELLER_RESPONSE_MAX: Ticks = 6_000_000;
 
 /// Each of the compressor's five fields, in declaration order, each named
 /// under `prefix` (`audio.compressor` on a clip, `compressor` on a track).
@@ -132,6 +141,34 @@ pub(crate) fn check_de_esser(d: &DeEsser) -> Result<(), String> {
     )
 }
 
+/// Each of the leveller's four fields, in declaration order.
+pub(crate) fn check_leveller(l: &Leveller) -> Result<(), String> {
+    in_range(
+        "audio.leveller.target_db",
+        l.target_db,
+        LEVELLER_TARGET_MIN_DB,
+        LEVELLER_TARGET_MAX_DB,
+    )?;
+    in_range(
+        "audio.leveller.max_up_db",
+        l.max_up_db,
+        0.0,
+        LEVELLER_MAX_DB,
+    )?;
+    in_range(
+        "audio.leveller.max_down_db",
+        l.max_down_db,
+        0.0,
+        LEVELLER_MAX_DB,
+    )?;
+    ticks_in_range(
+        "audio.leveller.response",
+        l.response,
+        LEVELLER_RESPONSE_MIN,
+        LEVELLER_RESPONSE_MAX,
+    )
+}
+
 /// A NaN to the field's own default, every other number into its range.
 fn bounded(value: f64, low: f64, high: f64, neutral: f64) -> f64 {
     if value.is_nan() {
@@ -186,4 +223,22 @@ pub(crate) fn clamp_de_esser(mut d: DeEsser) -> DeEsser {
         neutral.range_db,
     );
     d
+}
+
+/// An action's evaluated leveller, every field held to `check_leveller`'s
+/// ranges.
+pub(crate) fn clamp_leveller(mut l: Leveller) -> Leveller {
+    let neutral = Leveller::default();
+    l.target_db = bounded(
+        l.target_db,
+        LEVELLER_TARGET_MIN_DB,
+        LEVELLER_TARGET_MAX_DB,
+        neutral.target_db,
+    );
+    l.max_up_db = bounded(l.max_up_db, 0.0, LEVELLER_MAX_DB, neutral.max_up_db);
+    l.max_down_db = bounded(l.max_down_db, 0.0, LEVELLER_MAX_DB, neutral.max_down_db);
+    l.response = l
+        .response
+        .clamp(LEVELLER_RESPONSE_MIN, LEVELLER_RESPONSE_MAX);
+    l
 }

@@ -26936,11 +26936,11 @@ renders: the processed solve's figures are the proof's.
 | E1 | each AU-62 rule both sides of its threshold on synthetic readings: floor − L at −44 and −46 dB, isolatable or not, the gate from the pauses' median peak + 10 − L and its −40…−6 hold, the de-esser at 6 % and 4 % and a band at L − 11, the floor a median, Rumble Cut on the clip's own EQ |
 | E2 | the compressor: the threshold the speech's median peak held to −60…0; the makeup the probe's own copy of the block-rate model gives, > 0, the loudness through it within 0.5 LU of L |
 | E3 | on the owner's recording in a probe document: `choose` over its own committed result is the same patch and an identity |
-| E6 | the owner's measurements, choices and reasons printed; isolation and a gate, no volume or limiter in the patch; the makeup gives back the loss; its job renders through the chosen patch carrying the limiter and the volume |
+| E6 | the owner's measurements, choices and reasons printed; isolation, a gate and (since AP6b) the leveller key, no volume or limiter in the patch; the makeup gives back the loss; its job renders through the chosen patch carrying the limiter and the volume |
 | E7 | the skips by name, and an unmeasured floor leaving isolation, noise reduction and the gate out |
 | E8 | `speechMask`: [start, end), any order |
 | E9 | `measurementPlan` on a fixture plan: only the clip's segments (its emptied track dropped), no ramps, `track_pans` empty, no video tracks or ducks, one instruction from 0 over the plan, the span; with a volume of 2 one constant ramp at 2, at 1 none; the owner's clip's plan |
-| E10 | `needsRender`: each of the eight keys true; pan, mono, channels, the limiter, the volume, fades, a bypassed or empty EQ and an inert voice false |
+| E10 | `needsRender`: each of the nine keys (the leveller since AP6b) true; pan, mono, channels, the limiter, the volume, fades, a bypassed or empty EQ and an inert voice false |
 | E11 | `plan(solved:)` keeps the clip's volume at 0.04 dB, writes the solve at 0.06 dB and with another limiter; a cache row is never kept |
 
 `--mutants` runs eleven, each over its own copy of `app/Sources`, killed when its named row fails:
@@ -26969,7 +26969,7 @@ runs only those parts while iterating; a recorded run sets nothing.
 
 | Row | What it holds |
 |---|---|
-| V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the eight keys, held by `get_project` |
+| V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the nine keys (the leveller since AP6b), held by `get_project` |
 | V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` null, `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
 | V3 | the pause floor at least 10 dB under a Normalize-only export's |
 | V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
@@ -27102,7 +27102,7 @@ those parts while iterating; a recorded run sets nothing.
 
 | Row | What it holds |
 |---|---|
-| V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the eight keys with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
+| V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the nine keys (the leveller since AP6b) with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
 | V2 | the tool door into a document: undo "Enhance Voice", then "Add Recording" |
 | V3 | `enhance` false on both doors: no `enhance` keys, `enhance_pending` false, no sheet, the audio the landing's after 5 s, undo's top "Add Recording" |
 | V4 | the held instance, the panel door: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", `enhance_pending` false, no sheet 2 s and 5 s after |
@@ -27182,3 +27182,87 @@ python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row
 ```
 
 The recorded runs are in `designs/audio.md`'s AP10c record.
+
+## Road map "audio" AP6 part 2 — the leveller (`audio_ap6b_probe.py` L1–L9, R1–R5, the step-2 ranges; `audio_ap6b_proof.py` P1–P8; fifteen mutants and M11 by hand; `core/tests/audio_dynamics.rs`, `audio_automation.rs`, `schema_v37.rs`; spec §11 AU-66, AU-67)
+
+**`audio_ap6b_probe.py`** compiles `audio_ap6b_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `app/Resources/Models` beside the
+binary so the product's Silero pass runs. It makes the proof's two fixtures too
+(`make_fixtures`: six 10 s `say` segments 1.5 s apart over a −60 dBFS RMS Gaussian bed, mono
+48 kHz, 24-bit; `ap6b-offmic.wav` peaks −6 and −18 dBFS by turns, `ap6b-steady.wav` all −6).
+The curve is AU-66 (c)'s, made ahead of time (`AudioLevellerCurve`); the stage applies it with
+no state (`AudioLevellerRun`).
+
+| Row | What it holds |
+|---|---|
+| L1 | constant speech at L − 9, − 3, + 3 and − 20: r = x ±0.01 and the run's gain clamp(target − r, −down, +up) ±0.01 dB; a phrase with 0.3 s silent gaps has the same r (the window is speech only); a one-channel loudness record's curve equals its dual-mono stereo copy's |
+| L2 | two long phrases 12 dB apart across a 1.5 s break: B's first speech step's gain is B's settled gain ±0.01 dB; the break holds A ±0.001 dB until its last 0.25 s, then moves linearly to B inside [A, B]; a 0.5 s phrase between them takes A's value |
+| L3 | `smooth` of a step: the midpoint ±0.01 at the step, 90 % at τ·ln 5 ±1 step on both sides (zero-phase) |
+| L4 | through an `AudioTapContext` with the target automated: 512-, 4096- and irregular buffers byte-identical; a run from 2.5 s byte-identical to the same frames from the clip's start; no curve (pending) touches nothing; after the action each sample's gain is the curve's at its own frame ±0.01 dB |
+| L5 | noise at L − 22 under a 20 dB gate: the leveller at +12 dB after the gate lifts the gated pause by 12 ±1 dB; before the gate it would open it (≥ 6 dB over the input) |
+| L6 | `AudioDynamicsLevels.curves` over the steady fixture's own caches: pending on the loudness, then on the speech; unmeasurable ("speech detection is unavailable") and not in `pendingLevels` with `speechDetection: false`; `media.speech` ready either way, used over the VAD, a change of it recomputes; no long phrase unmeasurable; a nest clip absent; an end-only leveller in `levelling` and `wanting`; an end's other response its own curve; a pending curve in `pendingLevels` |
+| L7 | `interpolated` mixes the target and the limits; `response` the left point's |
+| L8 | a 1-hour clip's curve ≤ 100 ms (best of 3); a run ≤ 1 % of real time per 1024 stereo frames |
+| L9 | a reversed and a ×2 clip of the off-mic fixture levelled on their played steps: the quiet phrase a reversed clip plays first is boosted, the loud one cut |
+| R1 | `speechRange`: constant 0; two 10 s halves 12 dB apart 12.0 ±0.1; the mask honoured; nil under 300 speech steps |
+| R2 | `levellerRule` at 5.9 (off) and 6.1 LU (on at the defaults) and with no range (left out), each sentence word for word |
+| R3 | `needsRender` for a leveller alone; the memo key differs by its chain |
+| R4 | `choose` over one input twice is equal, the leveller on above 6 LU |
+| R5 | (not with `--quick`) the steady fixture's Enhance trial rendered three times through `ProcessedLoudness.render`, its isolated render wiped before the third: byte-identical step energies (AP6b step 3) |
+
+Then the step-2 figures (AU-67 (d)): the speech range Enhance measures on the owner's recording
+and both fixtures, each through a probe document's own loudness and speech caches, printed, and
+scored that the off-mic one is over 6 LU and the steady one at or under (otherwise the rule is
+a STOP for the owner).
+
+`--mutants` runs fifteen, each over its own copy of `app/Sources` (the step-2 figures and R5
+skipped), killed when its named row fails; M11 (`"leveller"` out of `TAP_KEYS`) is by hand,
+against `core/tests/audio_automation.rs`'s `a_leveller_named_by_an_end_is_in_the_points`. M16
+(the non-repeat's fix reverted) has no edit: step 3 found the render repeating on this tree
+(`designs/audio.md`'s AP6b record), and R5 and P5 hold it.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | a break glides its whole length | L2 |
+| M2 | phrases not split at breaks | L2 |
+| M3 | the window counts pause steps | L1 |
+| M4 | the target absolute (the curve not relative to L) | L1 |
+| M5 | the boost uncapped | L1 |
+| M6 | the leveller before the gate | L5 |
+| M7 | causal one-way smoothing | L3 |
+| M8 | `response` interpolated | L7 |
+| M9 | a short phrase takes its own level | L2 |
+| M10 | the range ignores the speech mask | R1 |
+| M12 | `needsRender` omits the leveller | R3 |
+| M13 | `levelling` omits an end-only leveller | L6 |
+| M14 | the memo ignores `media.speech` | L6 |
+| M15 | the gain indexed run-relative | L4 |
+| M17 | speech detection unavailable answers pending | L6 |
+
+**`audio_ap6b_proof.py <dir>/agent.sock [P1 P2 P4 P7 P8]`** drives an instance over MCP and
+measures every export: loudness by `phase5_proof.py`'s BS.1770, true peak by
+`limiter_probe.true_peaks`, the speech's range by its own numpy over the fixture's known segments
+by AU-67's definition, and a gain as 10·log10 of Σout²/Σin² per 10 ms against the same clip's
+export with the leveller null. P8 launches a second instance with
+`-FrameJobInspectorSection.audio.leveller <false/>` (the argument domain, nothing persisted) and
+stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P5 and P6).
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s leveller: `{}` the four defaults, a field merges, null clears; each bound and `threshold_db` refused by name, changing nothing; `paste_attributes` carries it; one undo |
+| P2 | the off-mic fixture, the leveller alone, 24-bit WAV: (a) the speech's range over whole segments out ≤ in − 5 LU; (b) each segment's first 0.5 s mean gain within ±3 dB of its settled gain (the median over [3 s, end − 0.5 s); AU-67 (e): the window holds the glide's end on the bed before each sentence's first word, 0.06–0.29 s in, and the sentences open 0.2–3.1 dB louder than their middles, which the curve follows; v1's carry-over, ~12 dB, still fails); (c) each pause from 0.4 s in to 0.5 s before its end moves ≤ 0.1 dB; (d) over each whole pause the gain within the gains of the 0.5 s before and after it, ±0.5 dB; every figure printed |
+| P3 | `loudness_meter` after `play_preview` 12 s from 0 within 0.01 LU of the export over the same frames; then 8 s from 20 s (a seek), its signed ΔI less a CONTROL's within 0.01 LU — the levelled export itself placed as a clip with nothing on it in a project of its own, the same two plays after its own build, against its own export — because after a seek the player hands every tap a silent zero-duration buffer carrying the seek's time, which the live meter places at the seek's frame (filed), so a seek's ΔI depends on the material's level there; the control hears the same material through the same meter, so that part cancels and a leveller-made difference still fails |
+| P4 | `enhance_voice` on the off-mic fixture: the leveller on at its defaults and its reason; the export at −16 ±0.5 LUFS and ≤ −1 dBTP; the last verify within 0.1 LU of −16; presses 2 and 3 "made no change" |
+| P5 | the steady fixture: the leveller null and its reason; presses 2 and 3 "made no change"; three rounds of `set_audio {volume: 1}` then `normalize_clip {mode: loudness}` give `processed_lufs` equal within 0.0005 LU and equal to Enhance's |
+| P6 | the owner's recording: `speech_range_lu`, the decision and its reason printed; the decision matches the rule; a second call "made no change" |
+| P7 | the steady fixture levelled, an action over [21, 23) s taking the target 0 → −6: against the same export with no action, 0 ±0.05 dB over [12, 21) s and −6 ±0.05 dB over [23, 32) s |
+| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …" |
+
+```sh
+python3 tools/proof/audio_ap6b_probe.py             # L1–L9, R1–R5, the step-2 ranges
+python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/audio.md`'s AP6b record.

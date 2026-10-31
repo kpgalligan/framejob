@@ -281,7 +281,10 @@ final class AudioTapContext {
                 channels.withUnsafeMutableBufferPointer { pointers in
                     chain.process(
                         UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
-                        frames: length, params: params, head: head, panRamp: panRamp)
+                        frames: length, params: params, head: head, panRamp: panRamp,
+                        leveller: params.leveller.map {
+                            AudioLevellerRun(settings: $0, firstFrame: lookup, rate: sampleRate)
+                        })
                 }
                 offset += length
             }

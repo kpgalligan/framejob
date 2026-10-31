@@ -16,10 +16,11 @@ import Foundation
 /// `DuckSpeech.spans`). Nothing it reads depends on a key it writes, so a
 /// second press writes the same values and the core answers an identity.
 ///
-/// **What it writes** (AU-60, AU-62): one `set_audio` per clip, its BASE
-/// props, owning exactly `eq` (Rumble Cut on the clip's own EQ),
-/// `isolation`, `noise_reduction`, `gate`, `de_esser`, `compressor`,
-/// `limiter` and `volume`; every other key is left as it is. Volume and
+/// **What it writes** (AU-60, AU-62, AU-67): one `set_audio` per clip, its
+/// BASE props, owning exactly nine keys — `eq` (Rumble Cut on the clip's own
+/// EQ), `isolation`, `noise_reduction`, `gate`, `leveller`
+/// (`AudioEnhance+Leveller.swift`), `de_esser`, `compressor`, `limiter` and
+/// `volume`; every other key is left as it is. Volume and
 /// limiter are solved on the clip rendered through the chosen settings
 /// (AU-64), as Loudness Normalize solves a processed clip, so Normalize after
 /// Enhance changes nothing either.
@@ -61,6 +62,8 @@ enum AudioEnhance {
         let peakMedianDB: Double
         /// Every segment of the clip `IsolationCache.isolatable`.
         let isolatable: Bool
+        /// The speech's short-term loudness range, LU (AU-67); nil under 3 s.
+        let speechRangeLU: Double?
 
         /// floor − L, dB; nil without a floor.
         var floorGapDB: Double? { floorLUFS.map { $0 - lufs } }
@@ -241,7 +244,8 @@ enum AudioEnhance {
             pauseSteps: pauseLevels.count, floorLUFS: floored ? median(pauseLevels) : nil,
             pausePeakMedianDB: floored ? median(pausePeaks) : nil,
             sibilantShare: Double(sibilant) / Double(speechPeaks.count),
-            peakMedianDB: median(speechPeaks), isolatable: isolatable)
+            peakMedianDB: median(speechPeaks), isolatable: isolatable,
+            speechRangeLU: speechRange(steps: reading.steps, speech: speech))
     }
 
     /// The middle value, or the mean of the two middle ones; −∞ sorts first.
@@ -304,6 +308,10 @@ enum AudioEnhance {
                     + "is no floor to measure; isolation, noise reduction and the gate are "
                     + "left as they are.")
             }
+
+            let levelling = levellerRule(m)
+            if let leveller = levelling.leveller { patch.leveller = leveller }
+            reasons.append(levelling.reason)
 
             let hot = m.sibilantShare >= sibilanceShare
             patch.deEsser = .some(hot ? DeEsserProps() : nil)
