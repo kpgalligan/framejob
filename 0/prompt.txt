@@ -1,0 +1,14 @@
+<pasted_content id="89e3">
+I want to create an extensive set of docs. They should cover every feature of Frame Job, with examples. I also want the feature docs to record steps to run the feature. From those instructions, if a user selects the feature, it will be applied in app. Some features will require the user to do things or input
+  values. For example, increasing the volume of an audio clip requires the user to select a clip, then choose a volume. Running this help script should instruct the user to select a clip, and when they do, open the settings panel for the volume and instruct them to choose a new value. Essentially I want to build
+  tutorial walkthroughs for everything. We can also use them to create instructional videos for later.
+  This is obviously a huge amount of work, so I'd like to pick a handful of features to model this feature with. Then we can test and iterate.
+</pasted_content id="89e3">
+
+---
+
+1. Keep
+2. build a bundled practice project
+3. Tutorials
+
+Use /litecode to build
