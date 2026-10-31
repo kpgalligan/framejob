@@ -4,7 +4,7 @@ import Foundation
 /// AU-57), before the composition is built: a ramp segment's render, or a
 /// clip window's isolated voice, is READY only when its file exists as the
 /// build runs, and an export never writes a ramp silent or an isolated clip
-/// dry.
+/// dry. First, a gated or de-essed clip's measured loudness (AU-42).
 extension Exporter {
     /// Runs `build` once every renderable ramp segment and isolated window of
     /// `plan` has its file, wanting them under this export's `key` meanwhile
@@ -20,6 +20,7 @@ extension Exporter {
         cancelled: @escaping () -> Bool, then build: () throws -> T
     ) throws -> T {
         guard !settings.isImageSequence else { return try build() }
+        try waitForLevels(plan: plan, key: key, cancelled: cancelled)
         let ramped = plan.audioTracks.contains(where: { $0.segments.contains { $0.ramp != nil } })
         let dsp = AudioDSPSource.shared.parameters(for: key)
         let segments = plan.audioTracks.lazy.flatMap(\.segments)
@@ -63,5 +64,29 @@ extension Exporter {
             throw ExportError.cancelled
         }
         return try build()
+    }
+
+    /// Waits for the level of every gated or de-essed clip that plays and is
+    /// still pending (AU-42), up to `AudioDynamicsLevels.exportTimeout`; then
+    /// fails `loudnessUnmeasured` naming the first, or `cancelled`. A clip
+    /// that will never be measured (under 0.4 s, silent) is not pending and
+    /// exports ungated, as the preview plays it.
+    static func waitForLevels(
+        plan: CompositionPlan, key: Int, cancelled: @escaping () -> Bool
+    ) throws {
+        let pending = AudioDSPSource.shared.parameters(for: key).pendingLevels
+        guard !pending.isEmpty, let project = RecipeSource.shared.project(for: key) else { return }
+        let playing = Set(
+            plan.audioTracks.lazy.flatMap(\.segments)
+                .filter { $0.duration > 0 && pending.contains($0.clip) }.map(\.clip))
+        guard !playing.isEmpty else { return }
+        switch AudioDynamicsLevels.shared.wait(
+            for: playing, in: project, cache: ReverseSource.shared.resolution(for: key).cache,
+            timeout: AudioDynamicsLevels.exportTimeout, cancelled: cancelled)
+        {
+        case .landed: return
+        case .cancelled: throw ExportError.cancelled
+        case .timedOut(let clip): throw ExportError.loudnessUnmeasured(clip: clip)
+        }
     }
 }

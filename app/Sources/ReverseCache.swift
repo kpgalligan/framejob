@@ -141,6 +141,10 @@ struct ReverseResolution: Equatable {
     /// plays its render when the file `IsolationCache` names is in it when
     /// the composition is built, and dry otherwise. Nil with no cache folder.
     var isolated: URL? = nil
+    /// The document's cache folder (`intendedCacheDirectory`), where the
+    /// gate's and the de-esser's level is read from (spec §11 AU-41,
+    /// AU-42). Nil with none published: every such level is pending.
+    var cache: URL? = nil
 
     static let none = ReverseResolution(ready: [:], pending: [])
 

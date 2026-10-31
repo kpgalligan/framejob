@@ -356,8 +356,10 @@ use crate::model::{Canvas, Project};
 /// Version 32 is EQ, hum and channels (spec §11 AU-37): `audio.eq`,
 /// `audio.hum` (each written only when set) and `audio.channels` (only when
 /// not `both`); no migration. An older build would drop them on save.
-/// Every number from 33 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 32;
+/// Version 33 is the gate and de-esser (spec §11 AU-46): `audio.gate` and
+/// `audio.de_esser`, each written only when set, after `channels`; no
+/// migration. Every number from 34 up, 1014 included, is newer.
+pub const RC_FORMAT_VERSION: u32 = 33;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

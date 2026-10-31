@@ -218,9 +218,12 @@ extern "C" {
  *
  * Version 32 is EQ, hum and channels (spec §11 AU-37): `audio.eq` and
  * `audio.hum`, each written only when set, and `audio.channels`, written
- * only when not `both`; no migration step. 33 and above, 1014 included, are
- * newer. */
-#define RC_FORMAT_VERSION 32
+ * only when not `both`; no migration step.
+ *
+ * Version 33 is the gate and de-esser (spec §11 AU-46): `audio.gate` and
+ * `audio.de_esser`, each written only when set; no migration step. 34 and
+ * above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 33
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

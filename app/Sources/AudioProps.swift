@@ -156,6 +156,10 @@ struct AudioProps: Codable, Equatable {
     let eq: EqProps?
     let hum: HumProps?
     let channels: AudioChannelChoice
+    /// The gate and the de-esser, nil when off (format 33, AU-43, AU-45;
+    /// `AudioDynamicsProps.swift`).
+    let gate: GateProps?
+    let deEsser: DeEsserProps?
 
     init(
         volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
@@ -163,7 +167,8 @@ struct AudioProps: Codable, Equatable {
         pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0,
         fadeInShape: FadeShape = .linear, fadeOutShape: FadeShape = .linear,
         limiter: LimiterProps? = nil, isolation: Double = 0, eq: EqProps? = nil,
-        hum: HumProps? = nil, channels: AudioChannelChoice = .both
+        hum: HumProps? = nil, channels: AudioChannelChoice = .both, gate: GateProps? = nil,
+        deEsser: DeEsserProps? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -182,6 +187,8 @@ struct AudioProps: Codable, Equatable {
         self.eq = eq
         self.hum = hum
         self.channels = channels
+        self.gate = gate
+        self.deEsser = deEsser
     }
 
     init(from decoder: Decoder) throws {
@@ -203,6 +210,8 @@ struct AudioProps: Codable, Equatable {
         eq = c.lenient(.eq)
         hum = c.lenient(.hum)
         channels = c.lenient(.channels, AudioChannelChoice.both)
+        gate = c.lenient(.gate)
+        deEsser = c.lenient(.deEsser)
     }
 
     /// Volume in dB for the Audio tab's read-out; -inf shows as silence.

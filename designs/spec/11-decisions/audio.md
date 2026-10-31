@@ -302,6 +302,96 @@ before its code from AP0's spike S1 and the survey's measurements of the owner's
   hand against `core/tests/audio_eq.rs`; `eq_proof.py`'s rows E1–E8 over MCP and exports; how
   the presets, the notch and a pick sound on the owner's voice is manual check SE-29.
 
+AU-40…AU-49 are AP4's (the gate/expander and the de-esser; survey A5, A6), recorded before its
+code.
+
+- **AU-40 — The gate stage.** `AudioGateStage` follows the compressor's linked peak follower (the
+  max of `|x|` over the channels, falling at its 10 ms floor). Per sample: a level at or above the
+  threshold sets the hold counter to round(hold·fs) and the target to 0; else a counter above 0
+  is decremented and the target is 0; else the target is min(range, (thrDB −
+  20·log10(max(level, silence floor)))·(ratio − 1)). The reduction moves `reduction += (target −
+  reduction)·c`, c the attack coefficient when the target is below the reduction (opening) and
+  the release coefficient otherwise (closing), both one-pole from `AudioEnvelope.coefficient`;
+  the gain `AudioDSP.gain(fromDecibels: −reduction)` multiplies every channel by `vDSP_vmul`.
+  Scalar recursion and element-wise vDSP only, buffers allocated in `init`, chunks at capacity as
+  the compressor's. Fresh state is OPEN (reduction 0, follower 0, counter 0); `reset()` restores
+  it, and the tap keeps resetting at StartOfStream (S1: the silent pre-roll would otherwise start
+  the preview closed, −56 dBFS off the export). Nil settings reset the stage and touch no sample.
+  The follower and the coefficients are the compressor's, moved into `AudioEnvelope` and
+  `AudioPeakFollower` with their exact Float arithmetic, so the compressor's output is
+  byte-identical to before.
+- **AU-41 — The reference level.** L is the clip's `ClipLoudness` reading — the Volume section's
+  Loudness figure: gated BS.1770-4 integrated loudness over the clip's played window (its plan
+  audio segments of its first media in 10 ms steps, AU-12), in the export's layout (mono counted
+  twice, +3.01 LU) through pan · fold · pick (AU-11, AU-35), pre-fader (no volume, fades, ducks,
+  EQ, hum, noise reduction or isolation), which matches where the tap sits. Both stages'
+  thresholds are dBFS on their follower, L + `threshold_db`; a trim or a pan change moves L and
+  the threshold with it. On the owner's recording L = −41.67 LUFS, so the gate's default opens at
+  −51.67 dBFS, between the pause floor (−64.3 dBFS, the p10 of 50 ms RMS) and speech (−43.2, the
+  p90); the defaults are not measured beyond that, and the manual check judges them.
+- **AU-42 — No level.** Pending (no loudness file yet, or no cache folder published) and
+  unmeasurable (no reading: under 0.4 s played, or silent) leave the stage's settings nil: the
+  clip plays ungated and un-de-essed, and the section's status says why. A pending answer is
+  never memoised. When a loudness file lands or is withdrawn, `AudioDynamicsLevels` drops that
+  media's memo and posts `.reversedMediaDidChange` for each open document with a gate or
+  de-esser on that media, so the editor rebuilds with no edit. An export whose pending levels
+  hold a clip that plays waits for them (polling every 0.1 s, never on main) up to 300 s, then
+  fails `loudnessUnmeasured` naming the clip ("Clip N's loudness has not been measured yet, so
+  its gate and de-esser have no threshold. Wait for the Volume section to show its loudness, then
+  export again."); a cancel fails `.cancelled`. An unmeasurable clip exports ungated, as the
+  preview plays it.
+- **AU-43 — `audio.gate`.** `{threshold_db −40…0 (−10), ratio 1…20 (4), range_db 1…80 (20),
+  attack 0…60 000 ticks (600, 1 ms), hold 0…300 000 (30 000, 50 ms), release 600…1 200 000
+  (60 000, 100 ms)}`, threshold in dB re L; written only when set, `{}` stores the defaults,
+  `null` clears; refused by name (`audio.gate.<field>`) and clamped in an action's end.
+- **AU-44 — The de-esser is split-band, through a Linkwitz–Riley crossover.** Detection: the
+  sidechain is a 24 dB/octave Butterworth RBJ high-pass at `frequency` (two Double TDF-II
+  sections, Q 0.541 and 1.307, per channel), followed by a linked follower (10 ms fall); the
+  target is min(range, 20·log10(level) − thrDB) above the threshold (∞:1, never deeper than the
+  range) and 0 below it; attack 1 ms, release 60 ms; g = `AudioDSP.gain(fromDecibels:
+  −reduction)`. Reduction: a 4th-order Linkwitz–Riley split at `frequency` — low two
+  `AudioEQDesign.lowPass(f, q: 1/√2)` sections, band two `highPass(f, q: 1/√2)` sections, per
+  channel, Double TDF-II — and out = low + g·band. LR4's outputs are in phase at every frequency
+  and sum to a 2nd-order allpass, so |out/x| = 1 − (1 − g)·|band| lies in [g, 1]: no frequency
+  is ever boosted. `x − (1 − g)·band` is not taken: a 4th-order Butterworth high-pass is 180°
+  out at its cut, so subtracting it boosts (+2.6 dB at 6 kHz for a 6 dB range). At g = 1 the
+  output is x's allpass — flat in magnitude, shifted in phase, not x's bytes. At the cut |band|
+  = 0.5, so a 6 dB range takes 2.5 dB there, and the full range is reached about an octave
+  above. All six sections are redesigned at the cut when the frequency changes, their state
+  kept; a frequency at or above 0.49·fs is not designed and the stage passes x untouched.
+  Split-band, not wide-band: wide-band turns the whole voice down on every "s" (lisping; the
+  survey's flag). Nil settings reset the stage and touch nothing.
+- **AU-45 — `audio.de_esser`.** `{frequency 2 000…12 000 Hz (6 000), threshold_db −30…+20 (0),
+  range_db 1…24 (6)}`, written as AU-43's. The threshold is relative to L too: an absolute
+  default would never act on a quiet recording (the survey's point about the compressor's
+  −18 dB); 0 dB re L sits above ordinary speech's high band (median −22.4 dB under the voice
+  band) and under sibilant peaks (p95 −0.2 dB).
+- **AU-46 — Format 33, base-only, no op.** No migration step, the keys after `channels`;
+  base-only (`structural(audio:)`), an action's end clamped and ignored; a nest clip's gate and
+  de-esser reach nothing, as its compressor; `paste_attributes` carries them through
+  `check_audio`; no op, tool, FFI or op-table change: `set_audio` takes the two keys.
+- **AU-47 — The order (AU-54 unchanged).** … noise reduction → gate → de-esser → compressor →
+  fold → pan → nest fold → limiter. Both stages read the clip's settings at the compressor's
+  lookup, never the head's. Neither adds latency; both are built for every active track.
+- **AU-48 — The sections, after Noise Reduction and before Compressor.** Gate: a "Gate pauses"
+  check (on writes the defaults); Threshold (dB re loudness, −40…0, quick −20, −15, −10, −6),
+  Ratio (1…20, quick 2, 4, 10, 20), Range (dB 1…80, quick 10, 20, 40, 80), Attack (ms 0…100,
+  quick 1, 5, 10), Hold (ms 0…500, quick 0, 50, 100, 200), Release (ms 1…2000, quick 50, 100,
+  250, 500); a Status read-out ("Opens above −51.7 dBFS", "Waits for its loudness", "Not
+  gating: too short", "… too quiet", "… no sound") and a Loudness read-out ("−41.7 LUFS",
+  "measuring…", "—") — two rows, because one read-out holds about 27 characters and "Opens
+  above −51.7 dBFS · loudness −41.7 LUFS" was cut off in the capture; the summary "−10 dB" or
+  "off". De-esser: a "Reduce sibilance" check; Frequency (Hz 2000…12000, quick 4000, 5000,
+  6000, 8000), Threshold (dB re loudness −30…+20, quick −6, −3, 0, 3), Range (dB 1…24, quick 3,
+  6, 10), Status ("Acts above …", "Not de-essing: …") and Loudness; the summary "6.0 kHz" or
+  "off". Thresholds are whole dB in their fields. Each control writes a whole group, the
+  limiter's pattern; Reset clears.
+- **AU-49 — The proof.** `audio_ap4_probe.py`'s rows D1–D11 over the stages, the shared
+  follower, the order and the levels, with mutants M1–M9 and M11 each killed by its named row and
+  M10 (the `check_gate` call dropped) by hand against `core/tests/audio_dynamics.rs`;
+  `audio_ap4_proof.py`'s rows P1–P7 over MCP and exports; whether the defaults chatter, pump or
+  lisp on the owner's voice is a manual check.
+
 AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded before its code.
 
 - **AU-50 — `audio.isolation` 0…1, 0 off, written only when not 0, format 31.** (30 went to

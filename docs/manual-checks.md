@@ -449,6 +449,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** do the figures move smoothly, and do they reset only on a seek or Reset?
 - **Source:** road map "audio" AP7 (spec §11 AU-70…AU-76); `tools/proof/audio_ap7_proof.py` measures the arithmetic (T1–T16) and the player against an export (L1–L3), not how the column looks or moves.
 
+**SE-31 — The gate and the de-esser at their defaults sound natural on a voice**
+- **Do:** 1. Import `samples/Rode-usb-mic.m4a` (or any voice recording with pauses and "s" sounds) and select its clip; wait for the Volume section's Loudness row to show a figure. 2. In the Gate section tick Gate pauses and play through headphones, then untick and tick it again while it plays; look at its Status and Loudness rows. 3. Set Hold to 0 and play a passage with quick words, then back to 50. 4. In the De-esser section tick Reduce sibilance and play a passage full of "s" and "sh" sounds; untick and tick it again while it plays. 5. Export the clip with both on and play the export. 6. Look at both sections at the inspector's narrowest and widest, in both appearances.
+- **Expect:** the pauses get clearly quieter with no chatter (the gate fluttering open and shut on breaths or room noise) and no pumping of the noise as words start and stop; word endings and soft consonants are not clipped at Hold 50 (Hold 0 may clip them); Status reads "Opens above" a level about 10 dB under the Loudness figure; the "s" sounds are softer without the voice sounding lispy, dull or muffled; ticking either box makes no click; the export sounds like the preview; the rows and read-outs fit with nothing cut off.
+- **Answer:** are the gate's defaults (10 dB under the clip's loudness, 4:1, 20 dB range, 50 ms hold, 100 ms release) and the de-esser's (6 kHz, at the clip's loudness, 6 dB) right for this voice, and does either stage chatter, pump or lisp?
+- **Source:** road map "audio" AP4 (spec §11 AU-40..AU-49); `tools/proof/audio_ap4_probe.py` and `tools/proof/audio_ap4_proof.py` measure the curves, times, the floor and the band reduction against their analytic values, not how they sound.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

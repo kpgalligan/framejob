@@ -26,8 +26,8 @@ import Foundation
 final class AudioCompressorStage {
     /// Current gain reduction in dB, always ≥ 0. Persists across buffers.
     private var reductionDB: Float = 0
-    /// The peak follower's state — see `processChunk`. Also persists.
-    private var detectorState: Float = 0
+    /// The peak follower (`AudioEnvelopeFollower.swift`). Also persists.
+    private var follower = AudioPeakFollower()
     private let sampleRate: Double
     /// The linked detector and the per-sample gain, sized once.
     private let detector: UnsafeMutablePointer<Float>
@@ -61,15 +61,7 @@ final class AudioCompressorStage {
     /// last buffer left.
     func reset() {
         reductionDB = 0
-        detectorState = 0
-    }
-
-    /// A one-pole coefficient for a time constant in seconds. Zero seconds
-    /// means "instantly", which is a legitimate setting (a brick-wall attack)
-    /// and must not divide by zero.
-    private func coefficient(_ seconds: Double) -> Float {
-        guard seconds > 0 else { return 1 }
-        return Float(1 - exp(-1 / (seconds * sampleRate)))
+        follower.reset()
     }
 
     /// Compresses `frames` samples in place across `count` channels.
@@ -99,21 +91,12 @@ final class AudioCompressorStage {
         _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
         offset: Int, frames: Int, settings: AudioCompressorSettings?
     ) {
-        // The linked detector: |x| of the first channel, then the running
-        // maximum against every other. Vectorised — this is two passes over
-        // the buffer rather than a branch per sample per channel.
-        var wrote = false
-        for channel in 0..<count {
-            guard let data = channels[channel] else { continue }
-            if !wrote {
-                vDSP_vabs(data + offset, 1, detector, 1, vDSP_Length(frames))
-                wrote = true
-            } else {
-                vDSP_vabs(data + offset, 1, scratch, 1, vDSP_Length(frames))
-                vDSP_vmax(detector, 1, scratch, 1, detector, 1, vDSP_Length(frames))
-            }
-        }
-        guard wrote else { return }
+        // The linked detector (`AudioEnvelope.linkedPeaks`).
+        guard
+            AudioEnvelope.linkedPeaks(
+                channels, count: count, offset: offset, frames: frames, into: detector,
+                scratch: scratch)
+        else { return }
 
         let thresholdDB = Float(settings?.thresholdDB ?? 0)
         let ratio = Float(settings?.ratio ?? 1)
@@ -123,21 +106,19 @@ final class AudioCompressorStage {
         let slope = ratio > 1 ? 1 - 1 / ratio : 0
         let makeupDB = Float(settings?.makeupDB ?? 0)
         let thresholdLinear = AudioDSP.gain(fromDecibels: thresholdDB)
-        let attack = coefficient(settings?.attackSeconds ?? 0)
-        let release = coefficient(settings?.releaseSeconds ?? 0)
-        // The detector is a PEAK FOLLOWER — it jumps to each new peak and
-        // falls back at the release rate — rather than the raw |x|. A naive
-        // detector reads a waveform's own zero crossings as the level
-        // collapsing, so the gain is modulated at twice the signal's
-        // frequency: audible as distortion on anything low, and the reason a
-        // sine measured through a textbook 3:1 lands a few tenths of a dB
-        // shy of where the arithmetic says it should. The floor keeps a
-        // zero-release setting from turning the follower back into |x|.
-        let fall = Float(exp(-1 / (max(settings?.releaseSeconds ?? 0, 0.010) * sampleRate)))
+        let attack = AudioEnvelope.coefficient(
+            seconds: settings?.attackSeconds ?? 0, sampleRate: sampleRate)
+        let release = AudioEnvelope.coefficient(
+            seconds: settings?.releaseSeconds ?? 0, sampleRate: sampleRate)
+        // The detector is a PEAK FOLLOWER falling at the release rate (or
+        // its 10 ms floor), not the raw |x|: a raw detector is the reason a
+        // sine measured through a textbook 3:1 lands a few tenths of a dB shy
+        // of where the arithmetic says it should (`AudioPeakFollower`).
+        let fall = AudioEnvelope.fall(
+            seconds: settings?.releaseSeconds ?? 0, sampleRate: sampleRate)
 
         for index in 0..<frames {
-            detectorState = max(detector[index], detectorState * fall)
-            let level = detectorState
+            let level = follower.follow(detector[index], fall: fall)
             // The log is skipped entirely below the threshold, which is where
             // most samples of most material are.
             var target: Float = 0

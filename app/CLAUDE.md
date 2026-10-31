@@ -151,7 +151,8 @@ detail there.
   `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
   30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body,
   and format 31's `AudioProps.isolation` (AU-50), and format 32's `eq`, `hum` and `channels`
-  (`AudioEQProps.swift`, AU-31, AU-33, AU-34);
+  (`AudioEQProps.swift`, AU-31, AU-33, AU-34), and format 33's `gate` and `deEsser`
+  (`AudioDynamicsProps.swift`, AU-43, AU-45);
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -544,7 +545,9 @@ detail there.
   what the composition is told. `ReverseResolution.rampAudio` is the
   document's `cache/ramp-audio/` folder (speed ramps SR-12), and `isolated`
   its `cache/isolated/` (AU-52), so the export queue's capture and pin carry
-  the ramp and isolation renders with no change of its own.
+  the ramp and isolation renders with no change of its own. `cache` is the
+  document's `intendedCacheDirectory`, published by one line in
+  `ProjectDocument`, which the gate's and de-esser's levels read (AU-42).
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -976,7 +979,7 @@ the key map behind it.
   `motion`, to the BASE props (a curve never: every count animates, spec §11
   GR-34), and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
-  duck and keep-pitch there (CI-3);
+  the gate and the de-esser (AU-46), duck and keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
   and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
@@ -1089,7 +1092,10 @@ the key map behind it.
   through the pane's `IsolationCache.Memo`, dropped on
   `.reversedMediaDidChange`, which the pane observes; +`HumChannels` and
   +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
-  Voice Isolation and before Noise Reduction, base-only) ·
+  Voice Isolation and before Noise Reduction, base-only; +`Dynamics`: the Gate
+  and De-esser sections, spec §11 AU-48, registered after Noise Reduction and
+  before Compressor, base-only, their Status and Loudness rows read through
+  the pane's `loudnessMemo`) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1374,7 +1380,9 @@ the key map behind it.
   the export's wait for every ramp render it needs and every isolated window
   (`isolationFailed`) before the build (a ramp's failure fails the export as
   `rampAudioFailed`; it never writes a placeholder), its wants released by
-  `Exporter.releaseRecipeKey`.
+  `Exporter.releaseRecipeKey`, and `waitForLevels`, the wait for a gated or
+  de-essed clip's loudness still being measured (`loudnessUnmeasured` after
+  300 s, AU-42).
 - `IsolationRenderer.swift` — a clip window's isolated voice rendered offline
   (AU-51): Apple's `AUSoundIsolation` High Quality Voice at 100 %, one
   manual-rendering engine per channel in lockstep over one
@@ -1779,14 +1787,16 @@ the key map behind it.
 - `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
   `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
   `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
-  `MTAudioProcessingTap` playback and export share, and the seven sample-level
+  `MTAudioProcessingTap` playback and export share, and the nine sample-level
   effects after voice isolation's crossfade, which runs first (AU-54,
   `AudioIsolation.swift`): the channel pick and the EQ and hum notch at the
   head (AU-30, AU-34: RBJ biquads in Double over 17 fixed positions, scalar per
   sample, designed at the cut; looked up `AudioTrackDSP.headLead` — SY-25's
   6,400 ticks — further ahead on a noise-reduced track, the tap's runs split at
   both lookups), noise reduction (a 512-sample delay the builder leads by,
-  SY-25), the compressor, the mono fold (BEFORE
+  SY-25), the gate and the de-esser (AU-47: read at the compressor's lookup,
+  and nil, touching no sample, until the clip's loudness is measured, AU-42),
+  the compressor, the mono fold (BEFORE
   the pan, or it is algebraically self-cancelling) and pan (constant-power,
   unity at centre), then the clip limiter (AU-20: a lookahead true-peak
   limiter last in the chain, told the clip's base volume because the fader is
@@ -1800,11 +1810,16 @@ the key map behind it.
   `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
   it (road map "audio" AP0). `AudioDSP.swift` keeps the parameters
   (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP` with its
-  `channels` and `eq`), the pan law and the chain (`AudioDSPChain`, whose order
+  `channels`, `eq`, `gate` and `deEsser`), the pan law and the chain (`AudioDSPChain`, whose order
   is the channel strip's); each stage is a file of its own,
   `AudioEQStage.swift` (AP3), `AudioCompressorStage.swift`,
   `AudioNoiseReductionStage.swift` and `AudioLimiterStage.swift` (the first two
-  pure moves out of it, AP0).
+  pure moves out of it, AP0), and `AudioGateStage.swift` and
+  `AudioDeEsserStage.swift` (AP4, below).
+  `AudioTapSchedule.swift` also holds `AudioDSPParameters(snapshot:levels:)`,
+  `pendingLevels` and `measured(project:cache:)`, the resolution `Playback`
+  and `AudioDSPSource`'s fallback use; isolation and ramp callers keep the
+  levels-less init.
 - `AudioBiquad.swift` · `AudioEQProps.swift` · `AudioEQCurveView.swift` ·
   `AudioPane+EQ.swift` · `AudioPane+HumChannels.swift` — road map "audio" AP3
   (spec §11 AU-30..AU-38): `AudioBiquad` the RBJ design (`AudioEQSettings`,
@@ -1816,6 +1831,23 @@ the key map behind it.
   drawn response at 48 kHz; `AudioPane+EQ` the EQ section and
   `AudioPane+HumChannels` the Channels and Hum sections, after Voice Isolation
   and before Noise Reduction, all base-only.
+- `AudioEnvelopeFollower.swift` · `AudioGateStage.swift` ·
+  `AudioDeEsserStage.swift` · `AudioDynamicsProps.swift` ·
+  `AudioDynamicsLevels.swift` · `AudioPane+Dynamics.swift` — road map "audio"
+  AP4 (spec §11 AU-40..AU-48): `AudioEnvelopeFollower` the linked peak
+  detector, peak follower and one-pole coefficients the compressor, the gate
+  and the de-esser share (`AudioEnvelope`, `AudioPeakFollower`; the
+  compressor's exact Float arithmetic, so its bytes did not move, AU-40);
+  `AudioGateStage` the downward expander/gate and `AudioGateSettings` (AU-40,
+  AU-43), open when fresh or reset; `AudioDeEsserStage` the split-band
+  de-esser — a 24 dB/oct Butterworth sidechain, an LR4 crossover and
+  `low + g·band`, which never boosts — and `AudioDeEsserSettings` (AU-44,
+  AU-45); `AudioDynamicsProps` the mirror's `GateProps` and `DeEsserProps`
+  (format 33); `AudioDynamicsLevels` each gated or de-essed clip's measured
+  loudness (its `ClipLoudness` reading, AU-41), its memo (never a pending
+  answer), the `loudness` post's drop and `.reversedMediaDidChange`, and the
+  export's `wait` (AU-42); `AudioPane+Dynamics` the Gate and De-esser
+  sections after Noise Reduction (AU-48).
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·

@@ -96,12 +96,16 @@ struct AudioDSPParameters: Equatable {
     /// the tap's crossfade with the clip's isolated render, before the chain.
     /// Base only, as the rest, and never on a nest clip.
     private let isolation: [UInt32: Double]
+    /// The gated or de-essed clips whose level is still pending (AU-42):
+    /// they play without both stages, and an export waits for them.
+    let pendingLevels: Set<UInt32>
 
     static let empty = AudioDSPParameters(clips: [:], isolation: [:])
 
     private init(clips: [UInt32: AudioClipDSP], isolation: [UInt32: Double]) {
         self.clips = clips
         self.isolation = isolation
+        pendingLevels = []
     }
 
     /// Reads the settings off a project snapshot, nests included — a nested
@@ -150,9 +154,16 @@ struct AudioDSPParameters: Equatable {
     /// job. Ducking already works this way — `audio.rs`'s `duckers()` reads
     /// base props and says so — so this is the established answer rather than
     /// a new exception. An action that animates `pan` moves nothing.
-    init(snapshot: ProjectSnapshot) {
+    ///
+    /// **The gate and the de-esser need `levels`** (AU-41, AU-42): a clip
+    /// measured at L gets thresholds relative to L; a pending or unmeasurable
+    /// one (or one `levels` does not name, which is every clip for the
+    /// callers that pass none: isolation and ramp renders) gets neither, and
+    /// a pending one is in `pendingLevels`.
+    init(snapshot: ProjectSnapshot, levels: [UInt32: AudioDynamicsLevels.Level] = [:]) {
         var clips: [UInt32: AudioClipDSP] = [:]
         var isolation: [UInt32: Double] = [:]
+        var pending: Set<UInt32> = []
         func collect(_ list: [ClipSnapshot]) {
             for clip in list {
                 // A nest clip's own entry could never be looked up: its id
@@ -160,6 +171,12 @@ struct AudioDSPParameters: Equatable {
                 // goes instead.
                 guard clip.source.nestID == nil, let audio = clip.audio else { continue }
                 if audio.isolation > 0 { isolation[clip.id] = min(audio.isolation, 1) }
+                var level: Double?
+                switch levels[clip.id] {
+                case .measured(let lufs): level = lufs
+                case .pending: pending.insert(clip.id)
+                case .unmeasurable, nil: break
+                }
                 let dsp = AudioClipDSP(
                     pan: audio.pan,
                     compressor: audio.compressor.map {
@@ -180,7 +197,14 @@ struct AudioDSPParameters: Equatable {
                     },
                     // The chain's head (AU-34, AU-30).
                     channels: audio.channels,
-                    eq: AudioEQSettings(eq: audio.eq, hum: audio.hum))
+                    eq: AudioEQSettings(eq: audio.eq, hum: audio.hum),
+                    // After noise reduction, before the compressor (AU-47).
+                    gate: level.flatMap { l in
+                        audio.gate.map { AudioGateSettings(level: l, props: $0) }
+                    },
+                    deEsser: level.flatMap { l in
+                        audio.deEsser.map { AudioDeEsserSettings(level: l, props: $0) }
+                    })
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }
@@ -221,6 +245,16 @@ struct AudioDSPParameters: Equatable {
         for nest in snapshot.nests { foldMonoNests(nest.clips) }
         self.clips = clips
         self.isolation = isolation
+        pendingLevels = pending
+    }
+
+    /// The parameters a project asks for with every gated or de-essed clip's
+    /// level resolved (AU-41, AU-42): what the preview and the export build
+    /// from. The plan is decoded only when a clip asks for a level.
+    static func measured(project: ReelProject, cache: URL?) -> AudioDSPParameters {
+        AudioDSPParameters(
+            snapshot: project.snapshot,
+            levels: AudioDynamicsLevels.shared.levels(for: project, cache: cache))
     }
 
     /// `format.rs`'s `MAX_NEST_DEPTH`. Duplicated rather than bridged: the
@@ -315,6 +349,6 @@ final class AudioDSPSource {
         lock.unlock()
         if let published = published { return published }
         guard let project = RecipeSource.shared.project(for: key) else { return .empty }
-        return AudioDSPParameters(snapshot: project.snapshot)
+        return .measured(project: project, cache: ReverseSource.shared.resolution(for: key).cache)
     }
 }

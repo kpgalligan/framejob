@@ -2,9 +2,11 @@
 //! [`crate::model::Clip`] carries, and the [`Compressor`], [`Limiter`],
 //! [`Duck`], [`Equalizer`] (with its slots [`HighPass`], [`LowShelf`],
 //! [`EqBand`], [`HighShelf`] and [`LowPass`]), [`Hum`] and [`AudioChannels`]
-//! inside it, each over a hand-written [`Default`] that says what an absent
-//! key means. The EQ's, the hum's and the channel pick's bounds are
-//! `audio_eq.rs`'s (format 32, spec §11 AU-31, AU-33, AU-34).
+//! inside it, and the [`Gate`] and [`DeEsser`], each over a hand-written
+//! [`Default`] that says what an absent key means. The EQ's, the hum's and
+//! the channel pick's bounds are `audio_eq.rs`'s (format 32, spec §11 AU-31,
+//! AU-33, AU-34); the gate's and the de-esser's `audio_dynamics.rs`'s
+//! (format 33, AU-43, AU-45).
 //!
 //! A pure move out of `model_props.rs` (its audio section, whole) for road
 //! map "audio" AP0, before the phases that add audio keys, so the audio
@@ -65,6 +67,12 @@ pub struct AudioProps {
     /// AU-34), written only when not `both`.
     #[serde(skip_serializing_if = "AudioChannels::is_both")]
     pub channels: AudioChannels,
+    /// The downward expander/gate (format 33, spec §11 AU-43); absent is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate: Option<Gate>,
+    /// The split-band de-esser (format 33, spec §11 AU-45); absent is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub de_esser: Option<DeEsser>,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -91,6 +99,8 @@ impl Default for AudioProps {
             eq: None,
             hum: None,
             channels: AudioChannels::Both,
+            gate: None,
+            de_esser: None,
         }
     }
 }
@@ -412,5 +422,68 @@ pub enum AudioChannels {
 impl AudioChannels {
     pub fn is_both(&self) -> bool {
         *self == AudioChannels::Both
+    }
+}
+
+/// The downward expander/gate (spec §11 AU-40, AU-43): below
+/// `threshold_db` (dB relative to the clip's measured loudness, AU-41) the
+/// level is pushed down by `ratio − 1` dB per dB under, never more than
+/// `range_db`; `hold` keeps it open after the level falls, `attack` opens it
+/// and `release` closes it. The DSP is the Swift side's.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Gate {
+    /// dB re the clip's loudness: −40…0.
+    pub threshold_db: f64,
+    /// 1…20.
+    pub ratio: f64,
+    /// dB, 1…80: the most the gate takes away.
+    pub range_db: f64,
+    /// Ticks: 0…60 000 (100 ms).
+    pub attack: Ticks,
+    /// Ticks: 0…300 000 (500 ms).
+    pub hold: Ticks,
+    /// Ticks: 600…1 200 000 (1 ms…2 s).
+    pub release: Ticks,
+}
+
+impl Default for Gate {
+    /// 10 dB under the clip's loudness, 4:1, 20 dB deep, 1 ms to open, held
+    /// 50 ms, 100 ms to close.
+    fn default() -> Self {
+        Gate {
+            threshold_db: -10.0,
+            ratio: 4.0,
+            range_db: 20.0,
+            attack: 600,
+            hold: 30_000,
+            release: 60_000,
+        }
+    }
+}
+
+/// The split-band de-esser (spec §11 AU-44, AU-45): the band above
+/// `frequency` is turned down by as much as its sidechain passes
+/// `threshold_db` (dB relative to the clip's loudness), never more than
+/// `range_db`. The DSP is the Swift side's.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DeEsser {
+    /// Hz, 2 000…12 000: the crossover and the sidechain's cut.
+    pub frequency: f64,
+    /// dB re the clip's loudness: −30…+20.
+    pub threshold_db: f64,
+    /// dB, 1…24.
+    pub range_db: f64,
+}
+
+impl Default for DeEsser {
+    /// 6 kHz, at the clip's loudness, 6 dB deep.
+    fn default() -> Self {
+        DeEsser {
+            frequency: 6_000.0,
+            threshold_db: 0.0,
+            range_db: 6.0,
+        }
     }
 }

@@ -31,6 +31,7 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
+use crate::audio_dynamics::{check_de_esser, check_gate};
 use crate::audio_eq::{check_eq, check_hum};
 use crate::grade_check::{check_curves, check_qualifier, check_wheels};
 use crate::model::{
@@ -140,7 +141,12 @@ fn ticks_in_envelope(key: &str, value: Ticks) -> Result<(), String> {
     }
 }
 
-fn ticks_in_range(key: &str, value: Ticks, low: Ticks, high: Ticks) -> Result<(), String> {
+pub(crate) fn ticks_in_range(
+    key: &str,
+    value: Ticks,
+    low: Ticks,
+    high: Ticks,
+) -> Result<(), String> {
     if (low..=high).contains(&value) {
         Ok(())
     } else {
@@ -399,6 +405,8 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     }
     props.eq.as_ref().map(check_eq).transpose()?;
     props.hum.as_ref().map(check_hum).transpose()?;
+    props.gate.as_ref().map(check_gate).transpose()?;
+    props.de_esser.as_ref().map(check_de_esser).transpose()?;
     Ok(())
 }
 

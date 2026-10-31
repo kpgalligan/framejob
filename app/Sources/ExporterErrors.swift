@@ -79,6 +79,11 @@ extension Exporter {
         /// A clip's isolated voice (spec §11 AU-57) could not be rendered: the
         /// export waits for it as for a ramp, and stops naming the clip.
         case isolationFailed(clip: UInt32, message: String)
+        /// A gated or de-essed clip's loudness was still not measured when the
+        /// export's wait ran out (spec §11 AU-42): its thresholds are relative
+        /// to it, so the export stops naming the clip rather than writing it
+        /// ungated.
+        case loudnessUnmeasured(clip: UInt32)
 
         var errorDescription: String? {
             switch self {
@@ -114,6 +119,10 @@ extension Exporter {
                 return "Clip \(clip)'s retimed audio could not be rendered: \(message)."
             case .isolationFailed(let clip, let message):
                 return "Clip \(clip)'s isolated voice could not be rendered: \(message)."
+            case .loudnessUnmeasured(let clip):
+                return "Clip \(clip)'s loudness has not been measured yet, so its gate and "
+                    + "de-esser have no threshold. Wait for the Volume section to show its "
+                    + "loudness, then export again."
             }
         }
     }

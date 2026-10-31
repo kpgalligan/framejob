@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, channel choice, EQ, hum removal, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -18,9 +18,11 @@ When the selection includes at least one clip that plays sound, the Clip tab of 
 6. **EQ**: a high-pass, two shelves, three bands and a low-pass, with presets for voice
 7. **Hum**: removes mains hum and its harmonics
 8. **Noise Reduction**
-9. **Compressor**
-10. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
-11. **Limiter**: holds the clip's peaks under a ceiling
+9. **Gate**: turns the pauses between phrases down
+10. **De-esser**: tames harsh "s" sounds
+11. **Compressor**
+12. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+13. **Limiter**: holds the clip's peaks under a ceiling
 
 Voice Isolation through Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
@@ -36,6 +38,8 @@ Every section header has a summary and a Reset button that appears when the sect
 | EQ | how many parts are on, for example "2 on", "bypassed", or "off" |
 | Hum | the mains and the harmonics, for example "60 Hz · 4", or "off" |
 | Noise Reduction | the amount, for example "50%", or "off" |
+| Gate | the threshold, for example "−10 dB", or "off" |
+| De-esser | the frequency, for example "6.0 kHz", or "off" |
 | Compressor | the ratio, for example "3.0:1", or "off" |
 | Mix | "centre", "mono", or the pan position, for example "left 40" |
 | Limiter | the ceiling, for example "−1.0 dBTP", or "off" |
@@ -233,6 +237,45 @@ The noise reducer works out the background noise level from the clip itself, so 
 It is not a gate. It doesn't silence the gaps between words, and it can't remove sudden sounds such as a door slam. A long held note may eventually be treated as noise.
 
 *Agents:* `set_audio` with `noise_reduction` from 0 to 1.
+
+## Gate
+
+The gate turns the clip down in its pauses: when the sound falls below the threshold, it is pushed further down, so room noise and breaths between phrases get quieter while the speech itself is untouched. Its checkbox is labelled **Gate pauses**.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Gate pauses | Turns the gate on. | on / off | off |
+| Threshold | How far under the clip's loudness the gate opens. Quick picks: −20, −15, −10, −6. | −40 to 0 dB | −10 dB |
+| Ratio | How strongly sound under the threshold is turned down: at 4:1, each dB under the threshold becomes 3 dB further down. Quick picks: 2, 4, 10, 20. | 1–20 :1 | 4:1 |
+| Range | The most the gate ever takes away. Quick picks: 10, 20, 40, 80. | 1–80 dB | 20 dB |
+| Attack | How quickly it opens when the sound rises. Quick picks: 1, 5, 10 ms. | 0–100 ms | 1 ms |
+| Hold | How long it stays open after the sound falls, so the ends of words aren't clipped. Quick picks: 0, 50, 100, 200 ms. | 0–500 ms | 50 ms |
+| Release | How quickly it closes after the hold. Quick picks: 50, 100, 250, 500 ms. | 1–2000 ms | 100 ms |
+| Status | Read-only: where the threshold lands, for example "Opens above −51.7 dBFS"; "Waits for its loudness" until the clip's loudness analysis has run; or "Not gating:" and why — "too short" (under 0.4 s), "too quiet" or "no sound". | — | — |
+| Loudness | Read-only: the clip's loudness the threshold is measured from, for example "−41.7 LUFS". | — | — |
+
+**The threshold follows the clip.** It is set in dB under the clip's own loudness — the Volume section's Loudness figure, measured before the volume, fades and ducking — rather than at a fixed level, so the same setting works on a quiet recording and a loud one. A trim, a pan change or a different channel choice moves the loudness, and the threshold moves with it. Until the clip's loudness has been measured the clip plays without the gate, and the preview picks it up by itself once the measurement lands; an export waits for it (see [Exporting](export.md)).
+
+The gate runs after noise reduction and before the de-esser and the compressor. It acts on the clip's sound before the volume, so moving the Volume slider doesn't change where it opens.
+
+*Agents:* `set_audio` with `gate: {threshold_db, ratio, range_db, attack, hold, release}` (the times in ticks), `gate: {}` to turn it on at the defaults, or `gate: null` to turn it off.
+
+## De-esser
+
+The de-esser tames sibilance — the hard "s", "sh" and "t" sounds a close microphone exaggerates. It listens to the sound above its frequency and, while that band is louder than the threshold, turns only that band down, so the rest of the voice keeps its level. Its checkbox is labelled **Reduce sibilance**.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Reduce sibilance | Turns the de-esser on. | on / off | off |
+| Frequency | Where the sibilant band starts. Quick picks: 4000, 5000, 6000, 8000 Hz. | 2000–12000 Hz | 6000 Hz |
+| Threshold | How loud the band must get, relative to the clip's loudness, before it is turned down. Quick picks: −6, −3, 0, 3. | −30 to +20 dB | 0 dB |
+| Range | The most the band is turned down. Quick picks: 3, 6, 10. | 1–24 dB | 6 dB |
+| Status | Read-only: "Acts above" and the threshold in dBFS, "Waits for its loudness", or "Not de-essing:" and why. | — | — |
+| Loudness | Read-only: the clip's loudness the threshold is measured from. | — | — |
+
+It never makes any frequency louder. Right at the Frequency it takes about half the range; the full range is reached about an octave above. Its threshold follows the clip's loudness the way the gate's does, and it runs after the gate and before the compressor.
+
+*Agents:* `set_audio` with `de_esser: {frequency, threshold_db, range_db}`, `de_esser: {}` to turn it on at the defaults, or `de_esser: null` to turn it off.
 
 ## Compressor
 
@@ -501,8 +544,10 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
-- On a nest clip, pan, the channel choice, the EQ, hum removal, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
+- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
+- On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
+- The gate and the de-esser act only once the clip's loudness has been measured; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip.
+- The gate has no lookahead, so a sound that starts loud after a long pause can lose its first millisecond while the gate opens. Neither stage has a listen or solo control for what it removes.
 - The EQ's settings switch at a cut between two clips without a glide; the curve has no handles to drag.
 - The channel choice counts in the Loudness read-out; the EQ and hum removal don't.
 - Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.

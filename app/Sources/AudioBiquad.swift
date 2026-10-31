@@ -104,7 +104,7 @@ enum AudioEQDesign {
     /// Butterworth's section Qs (AU-31): one section at 1/√2 for
     /// 12 dB/octave; two at 1/(2 cos(π/8)) and 1/(2 cos(3π/8)) for 24.
     /// Literals, so the audio thread never runs a lazy initialiser.
-    private static func butterworthQ(sections: Int, index: Int) -> Double {
+    static func butterworthQ(sections: Int, index: Int) -> Double {
         if sections < 2 { return 0.707_106_781_186_547_6 }
         return index == 0 ? 0.541_196_100_146_197 : 1.306_562_964_876_376_6
     }

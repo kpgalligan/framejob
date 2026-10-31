@@ -901,6 +901,7 @@ final class ProjectDocument: NSDocument {
         var resolution = state.resolution
         resolution.rampAudio = rampAudioDirectory
         resolution.isolated = isolatedAudioDirectory
+        resolution.cache = intendedCacheDirectory
         ReverseSource.shared.publish(resolution, project: project, for: recipeKey)
     }
 

@@ -126,17 +126,22 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # OPEN so 05h shows the ranges (grading-2 G2-4); it opens the Qualifier between
 # Adjustment and Light on 05c too. `audio.eq` is pinned OPEN so 09b shows the
 # drawn response and the slots (road map "audio" AP3); it opens EQ between
-# Channels and Hum on 09 too.
+# Channels and Hum on 09 too. `audio.gate` and `audio.de_esser` are pinned OPEN
+# so 09c shows both sections' rows and Status read-outs (road map "audio" AP4);
+# on 09 and 09b they lie below the captured height. P2's scan of the declared
+# ids reads an underscore since then, which is how `media.camera_log` (pinned at
+# its default, open) was found unpinned.
 SECTIONS = {
-    "audio.channels": True, "audio.compressor": True, "audio.duck": True,
-    "audio.eq": False, "audio.fades": True, "audio.hum": True, "audio.isolation": True,
+    "audio.channels": True, "audio.compressor": True, "audio.de_esser": False,
+    "audio.duck": True, "audio.eq": False, "audio.fades": True, "audio.gate": False,
+    "audio.hum": True, "audio.isolation": True,
     "audio.limiter": True, "audio.mix": True, "audio.noise": True, "audio.volume": False,
     "clip.timing": False,
     "doc.appearance": False, "doc.canvas": False, "doc.markers": False, "doc.rate": False,
     "doc.summary": False,
     "graphic.properties": False, "graphic.size": True, "graphic.source": True,
     "graphic.timeline": True,
-    "media.files": False,
+    "media.camera_log": False, "media.files": False,
     "shape.arrows": True, "shape.fill": True, "shape.gradient": True, "shape.kind": False,
     "shape.stroke": True,
     "text.animation": True, "text.backdrop": True, "text.box": True, "text.content": False,
@@ -287,6 +292,8 @@ FIXTURES = {
              "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
     "eq": {"path": os.path.join(FIXTURE_DIR, "Eq.framejob"),
            "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
+    "dynamics": {"path": os.path.join(FIXTURE_DIR, "Dynamics.framejob"),
+                 "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -447,6 +454,8 @@ def build_fixture(mcp, name):
             ids = _ramp_ops(mcp, path)
         elif name == "eq":
             ids = _eq_ops(mcp, path)
+        elif name == "dynamics":
+            ids = _dynamics_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -669,6 +678,29 @@ def _eq_ops(mcp, path):
           patch={"eq": {"high_pass": {"frequency": 80, "slope": 24},
                         "band_3": {"frequency": 4000, "gain_db": 3, "q": 1}},
                  "hum": {}, "channels": "left"})
+    return ids
+
+
+def _dynamics_ops(mcp, path):
+    """Road map "audio" AP4 (spec §11 AU-43, AU-45, AU-48): one track, "Music",
+    holding `toneA.m4a` at 0 with the gate and the de-esser at their defaults —
+    the Gate and De-esser sections' rows and Status read-outs (09c). Waits up
+    to 60 s for the media's loudness cache, so the read-outs show the measured
+    threshold rather than the wait."""
+    _call(mcp, "set_track", path, track=1, name="Music")
+    tone = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneA.m4a"))
+    _call(mcp, "add_clip", path, media=_media_id(tone), track=1, at=0)
+    marker = os.path.join(path, "cache", "loudness", f"{_media_id(tone)}.complete.json")
+    deadline = time.monotonic() + 60
+    while not os.path.exists(marker):
+        if time.monotonic() > deadline:
+            raise FixtureError("building dynamics: toneA.m4a's loudness cache was never written")
+        time.sleep(0.1)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building dynamics: the project holds {len(clips)} clips, not 1")
+    ids = {"tone": clips[0]["id"]}
+    _call(mcp, "set_audio", path, clips=[ids["tone"]], patch={"gate": {}, "de_esser": {}})
     return ids
 
 
@@ -1013,7 +1045,7 @@ class Run:
             if not name.endswith(".swift"):
                 continue
             text = open(os.path.join(SOURCES, name), encoding="utf-8").read()
-            declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z.]+)", title:', text))
+            declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z._]+)", title:', text))
             literals |= set(re.findall(r'static let \w*Key = "((?:FrameJob|RC)[^"]*)"', text))
         pinned = {key for key, _ in PINS} | {APPEARANCE_KEY}
         problems = []

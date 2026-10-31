@@ -40,7 +40,9 @@ governs a module now.
   `Equalizer` (seven named slots — `HighPass`, `LowShelf`, `EqBand` × 3,
   `HighShelf`, `LowPass` — and `bypass`), `Hum` and `AudioChannels` (spec §11
   AU-31, AU-33, AU-34, each written only when set, `channels` only when not
-  `both`); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
+  `both`), and format 33's `Gate` and `DeEsser` (`audio.gate`,
+  `audio.de_esser`, spec §11 AU-43, AU-45, after `channels`, each written only
+  when set); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
   `model_props.rs`; a pure move out of it (road map "audio" AP0), so the audio
   group's new keys land here.
 - `audio_eq.rs` — the EQ's and the hum notch's bounds (format 32, spec §11
@@ -49,6 +51,13 @@ governs a module now.
   must be between 20 and 20000, not 5`, a slope that is not 12 or 24, mains not
   50 or 60), and `clamp_eq` / `clamp_hum`, run by `actions_clamp.rs`'s
   `clamp_audio` on an action's end. No sample work; the stage is Swift's.
+- `audio_dynamics.rs` — the gate's and the de-esser's bounds (format 33, spec
+  §11 AU-43, AU-45, AU-46): `check_gate` / `check_de_esser`, run by
+  `props_check.rs`'s `check_audio` and refusing in the key's own sentence
+  (`audio.gate.ratio must be between 1 and 20, not 21`; times through
+  `props_check.rs`'s `ticks_in_range`), and `clamp_gate` / `clamp_de_esser`
+  (each field to its range, NaN to its default), run by `actions_clamp.rs`'s
+  `clamp_audio` on an action's end. No sample work; the stages are Swift's.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
   — the text, shape, region and motion vocabularies, each re-exported through
   `model_props.rs`. Text and shape are the two sources the model only

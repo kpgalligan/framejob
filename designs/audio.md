@@ -987,6 +987,99 @@ on, not the merge, and filed. No AP7 mutant's anchor moved, so none was re-run.
 **Owed.** SE-30 (the column's look and motion, the resets a person sees) for the owner. Filed:
 the live meter's extra `jump` resets on a Bluetooth output (L2, L3 above).
 
+### AP4's record (2026-10-30)
+
+The gate/expander and the de-esser (survey A5, A6), built in lane A.
+
+**Decided.** AU-40…AU-49, recorded before the code. The one objection was taken: the draft's
+de-esser output `x − (1 − g)·band` boosted the sibilant band (a 4th-order high-pass is 180°
+out at its cut: +2.6 dB at 6 kHz for a 6 dB range), so the reduction goes through an LR4
+crossover, `low + g·band`, whose magnitude stays in [g, 1]; the 24 dB/oct Butterworth stays as
+the detection sidechain only. D6 gained the 2–12 kHz no-boost sweep and the allpass check, P5
+moved its cut to 4 kHz and gained a no-band-louder check, and mutant M11 (the subtraction) was
+added — eleven mutants, not ten.
+
+**Landed.** `audio.gate` (`{threshold_db, ratio, range_db, attack, hold, release}`) and
+`audio.de_esser` (`{frequency, threshold_db, range_db}`), each written only when set, after
+`channels`; **format 33**, `schema_v33.rs`; their bounds and clamps in a new
+`audio_dynamics.rs` (`ticks_in_range` now `pub(crate)`), called from `check_audio` and
+`clamp_audio`; the patch template's two keys at their defaults. The compressor's linked peak
+detector, follower and one-pole coefficients moved into `AudioEnvelopeFollower.swift`
+(`AudioEnvelope`, `AudioPeakFollower`) with their exact Float arithmetic, the compressor on
+them (D1: HEAD's bytes); the gate (`AudioGateStage.swift`) and the de-esser
+(`AudioDeEsserStage.swift`, `butterworthQ` no longer private) after the reducers and before
+the compressor in `AudioDSPChain`, built for every active track, read at the compressor's
+lookup; `AudioClipDSP.gate`/`.deEsser` in `isInert`. The thresholds' reference level
+(`AudioDynamicsLevels.swift`): each gated or de-essed clip's `ClipLoudness` reading, memoised
+per cache folder, plan text and channel matrix (eight plans at most), pending never kept and
+files read through a fresh loader; a `loudness` post drops the media's memo and file and posts
+`.reversedMediaDidChange` for each open document gated on it; `AudioDSPParameters(snapshot:
+levels:)`, `pendingLevels` and `.measured(project:cache:)`, used by `Playback` (one line) and
+`AudioDSPSource`'s fallback (so the export and `render_frame`); `ReverseResolution.cache`,
+published by one line in `ProjectDocument`; the export's wait (`Exporter.waitForLevels`, 0.1 s
+polls, 300 s, then `loudnessUnmeasured` naming the clip). The mirror (`AudioDynamicsProps.swift`)
+and `AudioPatch`'s two keys, base-only; the Gate and De-esser sections after Noise Reduction
+(`AudioPane+Dynamics.swift`); `set_audio`'s prose; the guide's two sections, its export page
+and limits, the README highlight, spec §4.3b, §5.2a/b, §6b, §7.2, §7.4, §7.6, §7.8 and
+§7.10; the screen 09c and the `dynamics` fixture; manual check SE-31.
+
+**Deviations, each recorded in AU-48 or here.** The Status read-out is two rows, Status
+("Opens above −31.8 dBFS", "Waits for its loudness", "Not gating: too short | too quiet | no
+sound") and Loudness ("−21.8 LUFS", "measuring…"): the planned one-line "Opens above −51.7
+dBFS · loudness −41.7 LUFS" was cut off in 09c's first capture (a read-out holds about 27
+characters). The thresholds' fields show whole dB and the Frequency and Release fields are
+the wide ones, because "−10.0 dB" and "6000 Hz" were truncated in 09's capture. Both
+followers fall at the 10 ms floor (`AudioEnvelope.fall(seconds: 0)`), the reading of "falling
+at the 10 ms floor". `measured(project:cache:)` decodes the plan only when a clip wants a
+level, in `AudioDynamicsLevels.levels`. T2 lists thirteen Sound sections, not twelve: AP5's
+Voice Isolation was already in the list.
+
+**Found on the way.** `screens.py`'s P2 scan of declared section ids did not read an
+underscore, so `audio.de_esser` read as pinned-but-undeclared and `media.camera_log` had gone
+unpinned unseen; the scan reads `_` now and `media.camera_log` is pinned at its default
+(open).
+
+**Measured** (the lane; three lanes shared the machine): `audio_ap4_probe.py` 11/11 — D2
+1.000, 5.000, 15.000 and 19.995 dB against 1, 5, 15 and 20 (±0.05), D3 +0.025 ms and +0.006 ms, D6 2.492, 3.518, 4.953 and 5.600 dB at 6, 7, 9 and
+11 kHz equal to the analytic figures to three decimals and the sweep's loudest −0.000 dB, D7
+−35.995 dBFS, D10 188,160 samples equal, D11 **71.0 µs per 1024 stereo frames, 0.33 % of real
+time** (best of 3 × 2000 runs, one run of the row); `--mutants` 10/10 (M2 killed by D10 alone);
+M10 by hand failed two of `audio_dynamics.rs`'s five tests. `audio_ap4_proof.py` 30/30 on
+Debug and on Release: P3 the gaps' floor 19.854 dB lower, the bursts' middles unchanged to
+0.001 dB; P4 −0.32 ms at hold 50 and 200 ms, the fitted release 101.6 ms; P5 the 6–9 kHz
+energy 5.42 dB lower, the tones −0.011 dB, between bursts −0.000 dB, the loudest third-octave
++0.176 dB; **P6, the owner's recording under the default gate: L −41.64 LUFS, the pause floor
+−64.30 → −76.70 dBFS (−12.39 dB), speech p90 −43.16 dBFS unchanged.** On Release,
+`phase5_proof.py` 92/92, `eq_proof.py` 33/33, `limiter_proof.py` 19/19; `eq_probe.py` 11/11,
+`limiter_probe.py` 9/9, `clip_inspector2_proof.py` 33/33, `screens.py --only
+09-clip-sound,09c-clip-sound-dynamics` 7/7, `spec_index_proof.py` 213/213; `make gate` PASS
+428 s (names 1, typecheck 6 with the four baseline warnings, fmt 3, lint 7, test 259, app 152);
+the parity log empty on both builds.
+
+**Review.** It passed with two nits. D5 primes the used gate on the voice, which ends open,
+so M2 (a reset that keeps the reduction) is killed by D10 alone: not taken, since D10 kills it
+and the set stays complete. Three lines ran past the ~100-column wrap: the doc comment in
+`AudioPane+Dynamics.swift` and the `guard` in `AudioDynamicsLevels.swift` were re-wrapped at
+integration; `Playback.swift`'s one changed line (130 columns) was kept, because wrapping it
+costs the file a line the spec held it to.
+
+**Integrated.** AP7 had landed since the lane's base `3f7ed17`; it took no format number, so
+33 stands, and it took SE-30, so this phase's check is SE-31. Conflicts were taken as unions:
+§7.4's tap row (AP7's `MixRing` beside the gate and the de-esser), the decisions index's
+`audio.md` row (AP4's segment between AP3's and AP5's, Lines 762), `manual-checks.md` and this
+record (AP7's first). The spec index's Lines cells were counted again (§7.4 70, `11-decisions/`
+15610 in 34 files; `spec_index_proof.py` 213/213). `AudioTap.swift`, `Playback.swift`,
+`screens.py`, the guide, the README and `tools/proof/README.md` merged cleanly. No conflict
+touched product code. On the merged tree: `make gate` PASS 383 s (names 1, typecheck 6 with
+the four baseline warnings, fmt 3, lint 12, test 223, app 135); because AP7's tap is what D10
+and the exports run through, `audio_ap4_probe.py` ran again, 11/11 with the lane's figures (D10
+188,160 samples, 0 differ; D11 70.2 µs, 0.33 %), and `audio_ap4_proof.py` against Release,
+30/30 with the lane's figures (P3 19.854 dB, P4 −0.32 ms, P5 5.42 dB, P6 −64.30 → −76.70
+dBFS), the parity log empty. No mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-31 for the owner (the defaults by ear: chatter, pumping, lisping). Nothing to
+file.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

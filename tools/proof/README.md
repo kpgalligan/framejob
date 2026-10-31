@@ -26022,6 +26022,107 @@ octave bands 63 Hz −2.68, 125 −1.11, 250 −2.34, 500 −1.50, 1 k −0.14, 
 `clip_inspector2_proof.py` 33/33; `screens.py --only 09b-clip-sound-eq,09-clip-sound`
 7/7.
 
+## Road map "audio" AP4 — the gate and the de-esser (`audio_ap4_probe.py` D1–D11, `audio_ap4_proof.py` P1–P7; ten mutants and one by hand; `core/tests/audio_dynamics.rs`, `schema_v33.rs`; spec §11 AU-40..AU-49)
+
+Two new instruments. **`audio_ap4_probe.py`** compiles `audio_ap4_probe.swift`
+with `app/Sources` through `swift_build.build(optimize=True)` (a failed build is
+a scored failure) and runs the product's `AudioGateStage`, `AudioDeEsserStage`,
+`AudioEnvelope`, `AudioDSPChain`, `AudioDynamicsLevels`, `AudioDSPParameters`
+and `AudioTapContext`. The probe carries a verbatim copy of 3f7ed17's
+`AudioCompressorStage` (renamed `HeadAudioCompressorStage`), the bytes D1 holds
+the shared follower to. Its fixtures, under `work/audio-ap4-probe/fixtures/`,
+are the owner's recording's first 12 s as mono 48 kHz float (`voice.f32`) and
+24-bit WAV (`voice.wav`, and three copies, one per media id a levels row builds
+a loudness cache for).
+
+| Row | What it holds |
+|---|---|
+| D1 | the compressor on the shared follower gives `HeadAudioCompressorStage`'s bytes over the owner's recording and a crest signal, 512, 4096 and irregular blocks, a 5 ms and a 200 ms release and no compressor changing every 12,000 samples |
+| D2 | steady 12 kHz tones (samples on +A, 0, −A, 0) 1, 5, 15 and 30 dB under a −30 dBFS threshold at ratio 2, range 20: the reduction min(range, (thr − level)(ratio − 1)) ±0.05 dB; a tone 3 dB over it byte-identical |
+| D3 | a −20 dBFS burst, then a −100 dBFS bed: the gain's −10 dB crossing at t_f + hold + release·ln 2 ±0.2 ms for hold 0 and 100 ms (t_f the follower's analytic fall to the threshold, or with no hold to the target ramp's midpoint) |
+| D4 | 512, 4096 and irregular blocks byte-identical through `AudioDSPChain`, the gate and the de-esser changing (two settings each, either, both, neither) every 12,000 samples |
+| D5 | after `reset()` each stage gives a fresh stage's bytes; nil settings leave every byte |
+| D6 | the de-esser at 6 kHz: tones at 6, 7, 9 and 11 kHz reduced by −20·log10(1 − (1 − g)·\|band\|) ±0.1 dB (both magnitudes from `AudioEQDesign.magnitudeDB` of the designed sections); a sweep every 250 Hz from 2 to 12 kHz at range 24 none louder than its input by more than 0.05 dB; 1 kHz alone ±0.01 dB (the allpass); 1 kHz beside a loud 7 kHz ±0.1 dB; a quiet 7 kHz beside a loud 1 kHz ±0.1 dB (the sidechain is the band) |
+| D7 | a −40 dBFS tone through a gate (threshold −30, range 20) and a compressor that is +24 dB of makeup: out at −36 ±0.1 dBFS, which only gate-then-compressor gives |
+| D8 | `AudioDynamicsLevels.levels` over a scratch loudness cache: L equal to `ClipLoudness.answer`'s; `AudioDSPParameters.measured`'s thresholds L − 10 (gate) and L − 3 (de-esser) exactly; a 0.2 s clip unmeasurable and stage-less; an unwritten media pending, in `pendingLevels` and inert; a nest clip and its inner clip absent; no cache folder all pending; and the pending clip measured once its file is written, with no invalidation |
+| D9 | `wait`: landed (the file written 0.3 s in), `timedOut(clip: 2)` after 0.3 s, `cancelled` |
+| D10 | the owner's recording under the default gate and de-esser through `AudioTapContext` under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same samples over the first 188,416 frames, and the gate turning samples down |
+| D11 | µs per 1024 stereo frames through both stages, best of 3 × 2000 runs, reported; ≤ 1 % of real time |
+
+`--mutants` runs ten, each a replacement (two for M7) in a copied `app/Sources`;
+one by hand:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `hold-ignored` | the hold counter never set | D3 |
+| M2 `reset-keeps-reduction` | the gate's `reset()` keeps its reduction | D5 or D10 |
+| M3 `threshold-not-relative` | the gate's threshold the relative value alone | D8 |
+| M4 `range-uncapped` | the target not capped at the range | D2 |
+| M5 `de-esser-wide-band` | the de-esser's gain on the whole signal | D6 |
+| M6 `de-esser-keyed-on-full-signal` | the sidechain's two high-pass sections dropped | D6 |
+| M7 `gate-after-compressor` | the gate moved after the compressor | D7 |
+| M8 `follower-floor-5ms` | `AudioEnvelope.fallFloorSeconds` 0.005 | D1 |
+| M9 `memo-holds-pending` | a pending level memoised | D8 |
+| M11 `split-as-subtraction` | the output `x − (1 − g)·band` | D6 |
+| M10 (by hand) | `check_audio` without `check_gate` | `core/tests/audio_dynamics.rs` |
+
+**`audio_ap4_proof.py <dir>/agent.sock`** drives an instance over MCP and
+measures each WAV export against the same project exported without the stage.
+L is `phase5_proof.integrated` over the dry export. Its fixtures are 16-bit
+stereo WAVs under `work/fixtures/`: `ap4-bursts.wav` (1 kHz bursts at −20 dBFS,
+0.5 s in each 2 s, over −60 dBFS RMS noise), `ap4-release.wav` (a 0.5 s
+−20 dBFS burst, then a −50 dBFS 300 Hz bed), `ap4-sibilance.wav` (300, 700,
+1200 and 2000 Hz tones with 80 ms of 6–9 kHz noise each second) and
+`ap4-rode.wav`.
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s `gate` and `de_esser` round-trip; each bound and an unknown inner key refused by name with nothing changed; `null` clears both; `{}` stores the defaults |
+| P2 | the saved file at the header's version, both keys on the set clip only and none before; set-then-cleared exports the same PCM bytes as never set |
+| P3 | ratio 20, range 20: the gaps' floor 20 ±0.5 dB under the dry export's, the bursts' middles ±0.05 dB |
+| P4 | hold 50 and 200 ms, release 100 ms: ln(1 − r/20) fitted over the release (r the reduction on the bed's samples, 2…18 dB) gives the −10 dB crossing, within ±3 ms of t_f + hold + release·ln 2 |
+| P5 | the de-esser at 4 kHz, the default threshold and range: the bursts' sidechain peaks ≥ 12 dB over L; their 6–9 kHz energy 4…6.5 dB lower; the tones' 300 Hz–2 kHz energy ±0.5 dB; between the bursts ±0.1 dB; no third-octave band 2–12.7 kHz louder than dry by more than 0.2 dB |
+| P6 | reported: the owner's recording under the default gate — the pause floor (p10 of 50 ms RMS) not raised and speech (p90) within ±1 dB |
+| P7 | `paste_attributes` carries both |
+
+`clip_inspector2_probe.swift`'s T2 Sound list names Gate and De-esser (thirteen
+sections). `screens.py` has the `dynamics` fixture (it waits for the media's
+loudness cache), pins `audio.gate` and `audio.de_esser` open for 09c, and its P2
+scan of declared section ids now reads an underscore, which found
+`media.camera_log` unpinned (pinned at its default, open).
+
+```sh
+cd core && cargo test --release --test audio_dynamics && cargo test --release --test schema_v33
+python3 tools/proof/audio_ap4_probe.py              # D1–D11
+python3 tools/proof/audio_ap4_probe.py --mutants    # M1–M9, M11
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap4_proof.py <dir>/agent.sock
+python3 tools/proof/screens.py --only 09-clip-sound,09c-clip-sound-dynamics
+```
+
+**The recorded run (2026-10-30, the lane):** `audio_ap4_probe.py` 11/11 — D1 six
+runs equal to HEAD's bytes; D2 1.000, 5.000, 15.000 and 19.995 dB (±0.05 of 1, 5,
+15 and 20) and the tone over the threshold byte-identical; D3 the crossing +0.025 ms (hold 0) and +0.006 ms
+(hold 100 ms) from the arithmetic; D6 2.492, 3.518, 4.953 and 5.600 dB at 6, 7, 9 and
+11 kHz, each equal to the analytic figure to three decimals, the sweep's loudest
+−0.000 dB (2250 Hz), 1 kHz alone −0.000 dB, beside 7 kHz −0.003 dB, the quiet 7 kHz
+0.000 dB; D7 −35.995 dBFS; D8 L −38.336 and −42.131 LUFS; D9 the timeout after
+0.316 s; D10 188,160 samples compared, none different, 54,785 turned down; D11
+71.0 µs per 1024 stereo frames, 0.33 % of real time (best of 3 × 2000 runs, three
+lanes sharing the machine). `--mutants` 10/10, each killed by its named row (M2 by
+D10; D5 alone did not fail it); M10 by hand failed two of `audio_dynamics.rs`'s five
+tests. `audio_ap4_proof.py` 30/30 on Debug and on Release after `make gate` (PASS,
+428 s): P3 L −22.03 LUFS, the gaps' floor −59.99 → −79.85 dBFS (19.854 dB), the
+bursts' middles −23.009 dBFS both; P4 the crossing −0.32 ms from the arithmetic at
+hold 50 and 200 ms, the fitted release 101.6 ms; P5 the sidechain peaks 13.5 dB over
+L (−19.10 LUFS), the 6–9 kHz energy 5.42 dB lower, the tones −0.011 dB, between the
+bursts −0.000 dB, the loudest third-octave +0.176 dB (2520 Hz); P6 L −41.64 LUFS,
+the owner's pause floor −64.30 → −76.70 dBFS (−12.39 dB), speech p90 −43.16 dBFS
+both. On Release, `phase5_proof.py` 92/92, `eq_proof.py` 33/33 (E7 "the file is
+version 33, the header's 33"), `limiter_proof.py` 19/19; `eq_probe.py` 11/11,
+`limiter_probe.py` 9/9, `clip_inspector2_proof.py` 33/33, `screens.py --only
+09-clip-sound,09c-clip-sound-dynamics` 7/7.
+
 ## Road map "audio" AP9 — split edits that keep sync, and Attach Audio (`ap9_split_edits_proof.py` A0–A9; `core/tests/link.rs`, `link_edges.rs`, `schema_v28.rs`; sixteen core mutants; spec §11 AU-90…AU-97)
 
 Detach Audio's two clips are a LINKED PAIR (`clips[].linked`, format 28):

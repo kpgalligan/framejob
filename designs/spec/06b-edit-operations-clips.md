@@ -353,7 +353,11 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   base props. Refuses if nothing changes. `set_audio` refuses a patch that ITSELF sets
   `duck.mode` to `speech` on a clip that is not a media clip or whose media has no `speech`
   (`audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)`,
-  format version 29, §11 AU-111); any other edit of a clip already holding such a duck applies. An unknown key, a value of the wrong JSON kind or a
+  format version 29, §11 AU-111); any other edit of a clip already holding such a duck applies.
+  `set_audio` takes the gate and the de-esser as `gate` and `de_esser` (format version 33, §11
+  AU-43, AU-45, AU-46): objects that merge per key, `{}` storing the defaults and `null` clearing,
+  each field refused out of range by its dotted path (`audio.gate.hold must be between 0 and
+  300000 ticks, not 400000`); both thresholds are dB relative to the clip's measured loudness. An unknown key, a value of the wrong JSON kind or a
   misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array
   indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad
   value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind"

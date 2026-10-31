@@ -27,8 +27,9 @@ row and lane; two sub-tabs, Sound (selected) and Clip. The VOLUME section is
 open, summary "+0.0 dB": a Volume slider with "100%", "Gain +0.0 dB", an
 unchecked "Mute" checkbox, and a "Normalize" button. Closed below: FADES "none",
 DUCKING "off", VOICE ISOLATION "off" and CHANNELS "Both", at the foot of the
-capture; the EQ section, open (pinned so for 09b), and HUM, NOISE REDUCTION,
-COMPRESSOR, MIX and LIMITER lie below the captured height.
+capture; the EQ section, open (pinned so for 09b), HUM, NOISE REDUCTION, the GATE
+and DE-ESSER sections, open (pinned so for 09c), and COMPRESSOR, MIX and LIMITER
+lie below the captured height.
 
 In the light capture the inspector is white with black labels; the Volume slider
 has a blue fill and a black knob, the value box, the Mute box and the Normalize

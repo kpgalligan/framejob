@@ -209,8 +209,10 @@ extension AgentServer {
         + "isolation (0–1: voice isolation, Apple's on-device voice model, which also "
         + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
         + "rendered offline, the clip plays without it until the render lands and an export "
-        + "waits for it; a clip not at ×1 plays without it)" + audioEQClause + ". duck, "
-        + "compressor, limiter, eq (and each of its slots) and hum are OBJECTS and they "
+        + "waits for it; a clip not at ×1 plays without it)" + audioEQClause
+        + audioDynamicsClause + ". duck, "
+        + "compressor, limiter, eq (and each of its slots), hum, gate and de_esser are "
+        + "OBJECTS and they "
         + "MERGE: a key you leave out keeps what is stored, and {duck: null} clears the "
         + "whole thing."
     // Format 32's keys (spec §11 AU-31..AU-34), their own typed local so the
@@ -232,6 +234,24 @@ extension AgentServer {
         + "{4000, 3, 1}), hum (null or {frequency, depth_db, harmonics}: notches at the "
         + "mains frequency, 50 or 60, default 60, and its harmonics, 1–8, default 4, each "
         + "depth_db deep, 6–60, default 30; after the EQ)"
+    // Format 33's keys (spec §11 AU-40..AU-45), their own typed local for the
+    // reason `audioEQClause` is.
+    private static let audioDynamicsClause: String =
+        ", gate (null or {threshold_db, ratio, range_db, attack, hold, release}: a "
+        + "downward expander after noise reduction that turns the pauses down; "
+        + "threshold_db is dB RELATIVE to the clip's measured loudness (the Loudness "
+        + "normalize_clip reports, before volume), -40 to 0, default -10; below it the "
+        + "level drops ratio - 1 dB per dB, ratio 1–20, default 4, never more than "
+        + "range_db, 1–80, default 20; attack 0–60000 ticks (default 600, 1 ms) opens it, "
+        + "hold 0–300000 (default 30000, 50 ms) keeps it open, release 600–1200000 "
+        + "(default 60000, 100 ms) closes it; {gate: {}} turns it on at the defaults), "
+        + "de_esser (null or {frequency, threshold_db, range_db}: after the gate, turns "
+        + "the band above frequency down on sibilance and never boosts; frequency "
+        + "2000–12000 Hz, default 6000; threshold_db relative to the clip's loudness, -30 "
+        + "to 20, default 0; range_db 1–24, default 6). Both act only once the clip's "
+        + "loudness is measured: until then it plays without them and an export waits; a "
+        + "clip too short or too quiet to measure plays without them; on a nest clip they "
+        + "do nothing"
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.

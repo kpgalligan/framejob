@@ -222,7 +222,8 @@ final class ClipPane: InspectorPaneView {
                 // The chain's head, in signal order (spec §11 AU-54, AU-38).
                 audioPane.isolationSection(), audioPane.channelsSection(),
                 audioPane.eqSection(), audioPane.humSection(),
-                audioPane.noiseSection(), audioPane.compressorSection(), audioPane.mixSection(),
+                audioPane.noiseSection(), audioPane.gateSection(), audioPane.deEsserSection(),
+                audioPane.compressorSection(), audioPane.mixSection(),
                 // Last in the clip's chain, so last here (spec §11 AU-26).
                 audioPane.limiterSection(),
             ]

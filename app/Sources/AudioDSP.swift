@@ -3,8 +3,10 @@ import Foundation
 
 /// The sample-level audio effects the model carries and AVFoundation cannot
 /// express: the channel pick, the EQ and hum notch (`AudioEQStage.swift`),
-/// broadband noise reduction, the compressor, the mono fold, pan and the
-/// limiter (spec §4.2, §5.2's `AudioProps`, §11 AU-3, AU-34).
+/// broadband noise reduction, the gate and the de-esser
+/// (`AudioGateStage.swift`, `AudioDeEsserStage.swift`), the compressor, the
+/// mono fold, pan and the limiter (spec §4.2, §5.2's `AudioProps`, §11 AU-3,
+/// AU-34, AU-47).
 ///
 /// **Why this file has no AVFoundation in it.** Volume, the fades and ducking
 /// are a gain CURVE, so `audio.rs` folds them into one envelope per
@@ -145,11 +147,16 @@ struct AudioClipDSP: Equatable {
     /// The EQ and hum notch after the pick (AU-30); nil when nothing would
     /// be designed.
     var eq: AudioEQSettings?
+    /// The gate and the de-esser after noise reduction (AU-47); nil when
+    /// off or while the clip's level is not measured (AU-42).
+    var gate: AudioGateSettings?
+    var deEsser: AudioDeEsserSettings?
 
     init(
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
         mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil,
-        channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil
+        channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil,
+        gate: AudioGateSettings? = nil, deEsser: AudioDeEsserSettings? = nil
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -161,6 +168,8 @@ struct AudioClipDSP: Equatable {
         self.limiter = limiter
         self.channels = channels
         self.eq = eq
+        self.gate = gate
+        self.deEsser = deEsser
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -175,7 +184,7 @@ struct AudioClipDSP: Equatable {
     /// wrong answer.
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
-            && limiter == nil && channels == .both && eq == nil
+            && limiter == nil && channels == .both && eq == nil && gate == nil && deEsser == nil
     }
 }
 
@@ -233,10 +242,11 @@ enum AudioPanLaw {
 // MARK: - The chain
 
 /// One composition audio track's effect chain: the channel pick, then the
-/// EQ and hum notch, then noise reduction, then the compressor, then the Mix
-/// stage — the mono fold, then the pan, then the fold an enclosing NEST clip
-/// asked for — then the limiter (spec §11 AU-3, AU-20, AU-34). Voice
-/// isolation's crossfade runs before it, in the tap (AU-53, AU-54).
+/// EQ and hum notch, then noise reduction, then the gate, then the de-esser,
+/// then the compressor, then the Mix stage — the mono fold, then the pan,
+/// then the fold an enclosing NEST clip asked for — then the limiter (spec
+/// §11 AU-3, AU-20, AU-34, AU-47). Voice isolation's crossfade runs before
+/// it, in the tap (AU-53, AU-54).
 ///
 /// **That order is the order a channel strip has**, and each step is there
 /// because of the one before it. Cleaning first means the compressor is not
@@ -268,10 +278,11 @@ enum AudioPanLaw {
 /// applies them as volume ramps, which — measured — happen downstream of a
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
 /// full order the samples actually see is isolation → channel pick → EQ and
-/// hum → noise reduction → compressor → the clip's fold → pan → an enclosing
-/// nest's fold → limiter → volume/fades/ducking, which puts the compressor
-/// before the fader exactly as an insert should be. The limiter is told the fader's base
-/// gain instead (`AudioLimiterSettings`, AU-22).
+/// hum → noise reduction → gate → de-esser → compressor → the clip's fold →
+/// pan → an enclosing nest's fold → limiter → volume/fades/ducking, which puts
+/// the compressor before the fader exactly as an insert should be. The
+/// limiter is told the fader's base gain instead (`AudioLimiterSettings`,
+/// AU-22).
 final class AudioDSPChain {
     let channelCount: Int
     private let compressor: AudioCompressorStage
@@ -283,6 +294,10 @@ final class AudioDSPChain {
     /// The EQ and hum notch (AU-30): no latency, so always built; nil
     /// settings touch no sample.
     private let eq: AudioEQStage
+    /// The gate and the de-esser (AU-47): no latency, so always built; nil
+    /// settings reset them and touch no sample.
+    private let gate: AudioGateStage
+    private let deEsser: AudioDeEsserStage
 
     /// `usesNoiseReduction` and `usesLimiter` are decided for the WHOLE track
     /// when the composition is built, not per buffer: each stage adds a fixed
@@ -295,6 +310,9 @@ final class AudioDSPChain {
         self.channelCount = max(0, channelCount)
         compressor = AudioCompressorStage(sampleRate: sampleRate, maxFrames: maxFrames)
         eq = AudioEQStage(channelCount: self.channelCount, sampleRate: sampleRate)
+        gate = AudioGateStage(sampleRate: sampleRate, maxFrames: maxFrames)
+        deEsser = AudioDeEsserStage(
+            channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
         limiter = usesLimiter && self.channelCount > 0
             ? AudioLimiterStage(
                 channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
@@ -324,6 +342,8 @@ final class AudioDSPChain {
     func reset() {
         compressor.reset()
         eq.reset()
+        gate.reset()
+        deEsser.reset()
         reducers?.forEach { $0.reset() }
         limiter?.reset()
     }
@@ -359,6 +379,11 @@ final class AudioDSPChain {
                 reducers[channel].process(data, frames: frames, amount: params.noiseReduction)
             }
         }
+
+        // The gate, then the de-esser, on the clip the compressor reads
+        // (AU-47).
+        gate.process(channels, count: count, frames: frames, settings: params.gate)
+        deEsser.process(channels, count: count, frames: frames, settings: params.deEsser)
 
         compressor.process(channels, count: count, frames: frames, settings: params.compressor)
 

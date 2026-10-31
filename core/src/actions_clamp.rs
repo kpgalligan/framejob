@@ -308,6 +308,8 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
     }
     props.eq = props.eq.map(crate::audio_eq::clamp_eq);
     props.hum = props.hum.map(crate::audio_eq::clamp_hum);
+    props.gate = props.gate.map(crate::audio_dynamics::clamp_gate);
+    props.de_esser = props.de_esser.map(crate::audio_dynamics::clamp_de_esser);
     props
 }
 

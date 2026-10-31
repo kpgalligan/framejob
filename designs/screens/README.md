@@ -154,6 +154,11 @@ Built by `screens.py` on the first screen that names one, into
   its defaults (60 Hz × 4, 30 dB) and the left channel picked, so the EQ
   section draws a response with a high-pass, four notches and a presence bump.
   Ready once `tone`'s peaks are cached.
+- `dynamics` — `Dynamics.framejob` (road map "audio" AP4, spec §11 AU-43,
+  AU-45, AU-48): one track, "Music", holding `tone` — `media/toneA.m4a` at 0 —
+  with the gate and the de-esser at their defaults (`{gate: {}, de_esser:
+  {}}`), so the Gate and De-esser sections show their rows and Status
+  read-outs. Ready once `tone`'s peaks are cached.
 
 ## Adding a screen
 
