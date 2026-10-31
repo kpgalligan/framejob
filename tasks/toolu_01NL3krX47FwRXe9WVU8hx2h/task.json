@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01NL3krX47FwRXe9WVU8hx2h",
+  "agent_id": "a2d5384daf6f46e78",
+  "subagent_type": "lc-adversary",
+  "task_description": "litecode adversary TU3 chrome",
+  "token_usage": {
+    "input_tokens": 62,
+    "cache_creation_tokens": 180925,
+    "cache_read_tokens": 4239321,
+    "output_tokens": 31681,
+    "api_call_count": 30
+  },
+  "started_at": "2026-10-31T17:09:01.079332-04:00",
+  "completed_at": "2026-10-31T17:15:17.948405-04:00"
+}

@@ -1,0 +1,91 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6A0R9MNCF821H8PZ8JWZNWQ",
+  "strategy": "manual-commit",
+  "branch": "worktree-tutorial-handler",
+  "checkpoints_count": 9,
+  "files_touched": [
+    "CLAUDE.md",
+    "CONTEXT.md",
+    "README.md",
+    "app/CLAUDE.md",
+    "app/Sources/AgentServer+DevTools.swift",
+    "app/Sources/AgentServer+Snapshot.swift",
+    "app/Sources/AgentServer+Tutorials.swift",
+    "app/Sources/AppDelegate+Tutorials.swift",
+    "app/Sources/EditorViewController+Canvas.swift",
+    "app/Sources/EditorViewController+Timeline.swift",
+    "app/Sources/EditorViewController+Toolbar.swift",
+    "app/Sources/ExportSheetController.swift",
+    "app/Sources/InspectorSection.swift",
+    "app/Sources/InspectorTabBadge.swift",
+    "app/Sources/TimelineBar.swift",
+    "app/Sources/TutorialCoach.swift",
+    "app/Sources/TutorialPanelController.swift",
+    "app/Sources/TutorialRunner.swift",
+    "app/Sources/TutorialSentence.swift",
+    "app/Sources/TutorialShowMe.swift",
+    "app/Sources/TutorialSpotlight.swift",
+    "app/Sources/TutorialTargetResolver.swift",
+    "app/Sources/TutorialTargets.swift",
+    "app/Sources/UIMenuTable.swift",
+    "app/Sources/UISnapshot.swift",
+    "designs/spec/07.9c-agent-graphics-dev-tools-transport.md",
+    "designs/spec/09-keys-and-menus.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tutorials.md",
+    "designs/spec/README.md",
+    "designs/tutorials.md",
+    "docs/developing.md",
+    "docs/guide/README.md",
+    "docs/guide/menus-and-shortcuts.md",
+    "docs/guide/tutorials.md",
+    "docs/manual-checks.md",
+    "tools/proof/README.md",
+    "tools/proof/assistant_session_proof.py",
+    "tools/proof/capture_spike/inventory.json",
+    "tools/proof/dev_tools.py",
+    "tools/proof/tutorial_check.py",
+    "tools/proof/tutorial_chrome_proof.py",
+    "tools/proof/tutorial_fixtures/facts.json",
+    "tools/proof/tutorial_probe.swift",
+    "tools/proof/v2_menu.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 72,
+    "cache_creation_tokens": 39429,
+    "cache_read_tokens": 8285170,
+    "output_tokens": 11534,
+    "api_call_count": 27,
+    "subagent_tokens": {
+      "input_tokens": 764,
+      "cache_creation_tokens": 1471682,
+      "cache_read_tokens": 83285479,
+      "output_tokens": 327927,
+      "api_call_count": 376
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

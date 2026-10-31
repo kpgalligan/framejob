@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01Lttvtr7dKVF7G47SQyDq9F",
+  "agent_id": "ad3332ae29f7f2681",
+  "subagent_type": "lc-triage",
+  "task_description": "litecode triage TU3 chrome",
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 35563,
+    "cache_read_tokens": 97687,
+    "output_tokens": 1231,
+    "api_call_count": 4
+  },
+  "started_at": "2026-10-31T16:52:27.116252-04:00",
+  "completed_at": "2026-10-31T16:52:41.816568-04:00"
+}
