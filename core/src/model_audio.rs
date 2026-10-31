@@ -46,6 +46,15 @@ pub struct AudioProps {
     /// last in the tap's chain; absent is off, and is not written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limiter: Option<Limiter>,
+    /// How much of Apple's isolated voice replaces the clip's own sound,
+    /// 0 off … 1 all of it (format 31, spec §11 AU-50), written only when
+    /// not 0 so an older file's text holds. The render is Swift's, offline.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub isolation: f64,
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
 }
 
 impl Default for AudioProps {
@@ -64,6 +73,7 @@ impl Default for AudioProps {
             fade_in_shape: FadeShape::Linear,
             fade_out_shape: FadeShape::Linear,
             limiter: None,
+            isolation: 0.0,
         }
     }
 }

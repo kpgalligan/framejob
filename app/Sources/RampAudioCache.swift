@@ -24,15 +24,23 @@ struct RampSegmentKey: Hashable {
     }
 }
 
-/// One render a ramp segment asks for: where it lands (the final `.caf`),
-/// what it reads (the media file, or the clip's reversed file) and its map.
+/// What one offline audio render makes: a ramp segment's retimed sound
+/// (spec §11 SR-6), or a clip window's isolated voice (AU-51). AP14 adds a
+/// case beside them (AU-52).
+enum OfflineAudioJob: Equatable {
+    case ramp(PlanSpeedRamp)
+    case isolation(IsolationWindow)
+}
+
+/// One render a segment asks for: where it lands (the final `.caf`), what it
+/// reads (the media file, or the clip's reversed file) and what it makes.
 struct RampAudioRequest: Equatable {
     let clip: UInt32
     let media: UInt32
     let destination: URL
     let source: URL
     let reversed: Bool
-    let ramp: PlanSpeedRamp
+    let job: OfflineAudioJob
 }
 
 /// The `cache/ramp-audio/` half of the package (spec §5.6, §11 SR-6, SR-12):
@@ -115,7 +123,7 @@ enum RampAudioCache {
         return RampAudioRequest(
             clip: segment.clip, media: segment.media,
             destination: directory.appendingPathComponent(name),
-            source: reversedFile ?? mediaFile, reversed: reversedFile != nil, ramp: ramp)
+            source: reversedFile ?? mediaFile, reversed: reversedFile != nil, job: .ramp(ramp))
     }
 
     /// What the renderer reads for `mediaFile`: the file itself, or
@@ -143,10 +151,12 @@ enum RampAudioCache {
 
     /// Removes every file in `directory` that no name in `names` prefixes —
     /// a render no owner wants any more, or a temporary of one that died.
-    /// Refuses a directory not named `ramp-audio`: this takes a URL and
-    /// removes files (`ReverseCache.prune`'s guard, for its reason).
+    /// Refuses a directory not named `ramp-audio` or `isolated` (the two the
+    /// queue renders into, AU-52): this takes a URL and removes files
+    /// (`ReverseCache.prune`'s guard, for its reason).
     static func prune(_ directory: URL, keeping names: Set<String>) {
-        guard directory.lastPathComponent == directoryName,
+        guard directory.lastPathComponent == directoryName
+            || directory.lastPathComponent == IsolationCache.directoryName,
             let files = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
         else { return }
         for file in files where !names.contains(where: { file.hasPrefix($0) }) {

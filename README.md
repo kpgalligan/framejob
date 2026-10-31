@@ -56,7 +56,8 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 → [Speed, reverse and freeze frames](docs/guide/speed.md)
 
 **Audio.** Per-clip volume, fades in four shapes, ducking for a clip's length
-or only while its speech plays, noise reduction, compressor, pan, mono and a
+or only while its speech plays, voice isolation (Apple's on-device voice model,
+which also reduces room echo), noise reduction, compressor, pan, mono and a
 true-peak limiter; each clip's loudness and true peak in the inspector, and
 Normalize to a loudness target (−16 LUFS at −1 dBTP by default, turning the
 limiter on when a clip's peaks need it) or to a peak, which matches clips;

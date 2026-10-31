@@ -76,6 +76,9 @@ extension Exporter {
         /// export waits for every ramp segment it plays and never writes one
         /// silent, so it stops, naming the clip and the renderer's reason.
         case rampAudioFailed(clip: UInt32, message: String)
+        /// A clip's isolated voice (spec §11 AU-57) could not be rendered: the
+        /// export waits for it as for a ramp, and stops naming the clip.
+        case isolationFailed(clip: UInt32, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -109,6 +112,8 @@ extension Exporter {
                     + "\(message). No file was written."
             case .rampAudioFailed(let clip, let message):
                 return "Clip \(clip)'s retimed audio could not be rendered: \(message)."
+            case .isolationFailed(let clip, let message):
+                return "Clip \(clip)'s isolated voice could not be rendered: \(message)."
             }
         }
     }

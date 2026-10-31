@@ -148,13 +148,16 @@ struct AudioProps: Codable, Equatable {
     let fadeOutShape: FadeShape
     /// The true-peak limiter, nil when off (AU-21).
     let limiter: LimiterProps?
+    /// How much of the isolated voice replaces the clip's sound, 0 off … 1
+    /// (format 31, spec §11 AU-50); rendered offline (`IsolationCache`).
+    let isolation: Double
 
     init(
         volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
         duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
         pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0,
         fadeInShape: FadeShape = .linear, fadeOutShape: FadeShape = .linear,
-        limiter: LimiterProps? = nil
+        limiter: LimiterProps? = nil, isolation: Double = 0
     ) {
         self.volume = volume
         self.muted = muted
@@ -169,6 +172,7 @@ struct AudioProps: Codable, Equatable {
         self.fadeInShape = fadeInShape
         self.fadeOutShape = fadeOutShape
         self.limiter = limiter
+        self.isolation = isolation
     }
 
     init(from decoder: Decoder) throws {
@@ -186,6 +190,7 @@ struct AudioProps: Codable, Equatable {
         fadeInShape = c.lenient(.fadeInShape, FadeShape.linear)
         fadeOutShape = c.lenient(.fadeOutShape, FadeShape.linear)
         limiter = c.lenient(.limiter)
+        isolation = c.lenient(.isolation, 0)
     }
 
     /// Volume in dB for the Audio tab's read-out; -inf shows as silence.

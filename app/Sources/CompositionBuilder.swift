@@ -123,11 +123,13 @@ enum CompositionBuilder {
         // asset, and an optimised build ends a local at its last use.
         var rampAssets: [URL: AVURLAsset] = [:]
         let ramps = rampAudioTracks(plan: plan, urls: urls, reverse: reverse, assets: &rampAssets)
+        // An isolated clip's ready renders, read into memory (AU-53).
+        let isolated = isolatedAudio(plan: plan, urls: urls, reverse: reverse, dsp: dsp)
         let (inputParameters, meters) = try withExtendedLifetime(rampAssets) {
             try addAudioTracks(
                 to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
                 metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
-                ramps: ramps)
+                ramps: ramps, isolated: isolated)
         }
 
         // Source orientation is read once per media and then attached per

@@ -900,6 +900,7 @@ final class ProjectDocument: NSDocument {
         refusedReverseMedia.formIntersection(state.jobs.map { $0.media })
         var resolution = state.resolution
         resolution.rampAudio = rampAudioDirectory
+        resolution.isolated = isolatedAudioDirectory
         ReverseSource.shared.publish(resolution, project: project, for: recipeKey)
     }
 

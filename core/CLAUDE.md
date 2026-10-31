@@ -35,8 +35,10 @@ governs a module now.
   (with format 29's `DuckMode`, `pre_roll`, `hold` and `DUCK_SPEECH_PAD`)
   and `FadeShape` (`fade_in_shape` / `fade_out_shape`, and
   `Transition.audio_shape`), and their defaults, every format-29 key
-  written only when not its default (the FIELD `Clip.audio` stays in
-  `model.rs`), re-exported through `model_props.rs`; a pure move out of it
+  written only when not its default, and `AudioProps.isolation` (format
+  31, spec §11 AU-50, 0…1, written only when not 0); the FIELD
+  `Clip.audio` stays in `model.rs`. Re-exported through `model_props.rs`; a
+  pure move out of it
   (road map "audio" AP0), so the audio group's new keys land here.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
   — the text, shape, region and motion vocabularies, each re-exported through
@@ -461,7 +463,8 @@ governs a module now.
   the vocabulary, which is `props_check.rs`'s reason for existing one step
   further on. `GROUPS` — every group in its order on `Clip`, the order
   `paste` and a default `paste_attributes` visit them — lives here, its one
-  home. The audio template holds format 29's keys at NON-default values,
+  home. The audio template holds format 29's keys and format 31's
+  `isolation` at NON-default values,
   since a default is no longer written and the key check reads the template.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /

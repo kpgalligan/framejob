@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -13,12 +13,13 @@ When the selection includes at least one clip that plays sound, the Clip tab of 
 1. **Volume**: level, gain read-out, loudness read-out, Mute and Normalize
 2. **Fades**: fade in and fade out
 3. **Ducking**: lowers every other clip while this one plays
-4. **Noise Reduction**
-5. **Compressor**
-6. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
-7. **Limiter**: holds the clip's peaks under a ceiling
+4. **Voice Isolation**
+5. **Noise Reduction**
+6. **Compressor**
+7. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+8. **Limiter**: holds the clip's peaks under a ceiling
 
-Noise Reduction, Compressor, Mix and Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
+Voice Isolation, Noise Reduction, Compressor, Mix and Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
 Every section header has a summary and a Reset button that appears when the section differs from its default. The summaries read:
 
@@ -27,6 +28,7 @@ Every section header has a summary and a Reset button that appears when the sect
 | Volume | "muted", "silent" (at 0 %), or the gain, for example "+3.5 dB" |
 | Fades | both lengths, for example "0.50 · 1.00 s", or "none" |
 | Ducking | the duck level, for example "20%", or "off" |
+| Voice Isolation | the amount, for example "80%", or "off" |
 | Noise Reduction | the amount, for example "50%", or "off" |
 | Compressor | the ratio, for example "3.0:1", or "off" |
 | Mix | "centre", "mono", or the pan position, for example "left 40" |
@@ -147,6 +149,26 @@ With **Speech**, the others go down only while this clip's speech plays: the att
 - **Inside a nest**, a ducking clip lowers the rest of the project over the part of it that plays. Ducking on the nest clip itself lowers it over the nest's whole length.
 
 *Agents:* `set_audio` with `duck: {level, attack, release, mode, pre_roll, hold}`, or `duck: null` to turn it off. `mode: "speech"` is Duck by Speech and saves the file's speech in the same step; `set_media_speech` (`media`, `spans`) sets a file's speech spans directly, and `get_project` shows them as `media[].speech`.
+
+## Voice Isolation
+
+Voice Isolation keeps the voice and removes what is around it: background noise, music, and the echo of the room. It uses Apple's on-device voice model, so nothing leaves your Mac.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Isolate voice | Turns isolation on at 80 %, or off. | on/off | off |
+| Amount | How much of the isolated voice replaces the clip's own sound. Quick picks: 50, 80, 100 %. | 0–100 % | 0 (off) |
+| Status | Read-only: "Rendering…", "Ready", "Plays without it at this speed", "Waits for the reversed copy", or "Not rendered:" and the reason. With several clips selected it reads "—". | — | Off |
+
+At 80 % the pauses between words drop by about 14 dB and keep a little of the room, so the voice doesn't sit in dead silence. At 100 % the pauses are silent. Isolation also reduces room echo, so there is no separate de-reverb control.
+
+The isolated voice is worked out once for each clip, in the background, when you turn it on. Until it is ready the clip plays without it, and the editor switches over by itself when it is. Changing Amount takes effect at once and doesn't work it out again; trimming or slipping the clip does, because the clip then plays a different part of its file. An export waits for every isolated clip to be ready ("Preparing…"), so a file is never written without it.
+
+Isolation comes first, before noise reduction and the compressor. You can use it together with Noise Reduction, which then works on the isolated sound.
+
+Isolation plays only on a clip at normal speed. A clip with a speed change, a speed ramp or a freeze frame plays without it, and the Status says so. A reversed clip is isolated once its reversed copy is ready.
+
+*Agents:* `set_audio` with `isolation` from 0 to 1 (0 is off). The render's status isn't in `get_project`; an export waits for it.
 
 ## Noise Reduction
 
@@ -409,8 +431,9 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Pan has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, noise reduction, the limiter and ducking always apply to the whole clip.
-- On a nest clip, pan, the compressor, noise reduction and the limiter have no effect. Set them on the clips inside.
+- Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
+- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
+- On a nest clip, pan, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
 - Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.
 - A linked clip's speed and direction can't change until you attach its audio.
 - Above ×12 a clip's audio is left out of the mix ([Speed](speed.md)).

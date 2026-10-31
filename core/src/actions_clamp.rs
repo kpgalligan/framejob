@@ -287,6 +287,7 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
     // nothing.
     props.pan = bounded(props.pan, -1.0, 1.0, 0.0);
     props.noise_reduction = bounded(props.noise_reduction, 0.0, 1.0, 0.0);
+    props.isolation = bounded(props.isolation, 0.0, 1.0, 0.0);
     if let Some(compressor) = props.compressor.as_mut() {
         compressor.threshold_db = bounded(
             compressor.threshold_db,

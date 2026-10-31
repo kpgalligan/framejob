@@ -85,11 +85,16 @@ struct AudioTrackDSP: Equatable {
 /// project made before this feature existed is in.
 struct AudioDSPParameters: Equatable {
     private let clips: [UInt32: AudioClipDSP]
+    /// Each clip's `audio.isolation` when above 0 (spec §11 AU-50, AU-53):
+    /// the tap's crossfade with the clip's isolated render, before the chain.
+    /// Base only, as the rest, and never on a nest clip.
+    private let isolation: [UInt32: Double]
 
-    static let empty = AudioDSPParameters(clips: [:])
+    static let empty = AudioDSPParameters(clips: [:], isolation: [:])
 
-    private init(clips: [UInt32: AudioClipDSP]) {
+    private init(clips: [UInt32: AudioClipDSP], isolation: [UInt32: Double]) {
         self.clips = clips
+        self.isolation = isolation
     }
 
     /// Reads the settings off a project snapshot, nests included — a nested
@@ -139,12 +144,14 @@ struct AudioDSPParameters: Equatable {
     /// a new exception. An action that animates `pan` moves nothing.
     init(snapshot: ProjectSnapshot) {
         var clips: [UInt32: AudioClipDSP] = [:]
+        var isolation: [UInt32: Double] = [:]
         func collect(_ list: [ClipSnapshot]) {
             for clip in list {
                 // A nest clip's own entry could never be looked up: its id
                 // names no audio segment. `fold` below is where its `mono`
                 // goes instead.
                 guard clip.source.nestID == nil, let audio = clip.audio else { continue }
+                if audio.isolation > 0 { isolation[clip.id] = min(audio.isolation, 1) }
                 let dsp = AudioClipDSP(
                     pan: audio.pan,
                     compressor: audio.compressor.map {
@@ -202,6 +209,7 @@ struct AudioDSPParameters: Equatable {
         foldMonoNests(snapshot.clips)
         for nest in snapshot.nests { foldMonoNests(nest.clips) }
         self.clips = clips
+        self.isolation = isolation
     }
 
     /// `format.rs`'s `MAX_NEST_DEPTH`. Duplicated rather than bridged: the
@@ -218,7 +226,13 @@ struct AudioDSPParameters: Equatable {
 
     func dsp(for clip: UInt32) -> AudioClipDSP { clips[clip] ?? .inert }
 
-    var isEmpty: Bool { clips.isEmpty }
+    /// The clip's isolation amount, 0 when it asks for none (AU-53).
+    func isolation(for clip: UInt32) -> Double { isolation[clip] ?? 0 }
+
+    /// Whether any clip asks for isolation.
+    var isolates: Bool { !isolation.isEmpty }
+
+    var isEmpty: Bool { clips.isEmpty && isolation.isEmpty }
 }
 
 /// The process-wide place `CompositionBuilder` finds a document's audio DSP

@@ -210,6 +210,64 @@ decisions from AU-27.
   "−1.0 dBTP" or "off", and Reset clears it. While the clip's limiter is on, the Volume
   section's At volume row reads the model's LUFS (AU-24) and `min(tp·v, ceiling)`.
 
+AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded before its code.
+
+- **AU-50 — `audio.isolation` 0…1, 0 off, written only when not 0, format 31.** (30 went to
+  AP2's limiter, which landed first.) How much of Apple's isolated voice replaces the clip's own
+  sound: `set_audio` refuses a value outside 0…1 in `in_range`'s sentence
+  (`audio.isolation must be between 0 and 1, not 1.5`), an action end's value
+  is clamped there by the evaluator, and 0 writes no key, so every other project writes the text it
+  did and there is no migration step. Base-only in this phase (AP8 animates it). Paste Attributes
+  carries it, the audio group travelling whole. On a nest clip it reaches nothing, as the
+  compressor does: set it on the clips inside.
+- **AU-51 — The render is S2's recipe.** `AVAudioUnitEffect` (`aufx`/`vois`/`appl`), parameter 1
+  = 0 (High Quality Voice) and parameter 0 = 100, in offline manual rendering at 48 kHz mono, one
+  engine per channel in lockstep over one `RampSourceReader` (per-channel feeders shaped as
+  `TimePitchFeeder`, dropping what the slowest has read), at most 4096 frames a block. A unit whose
+  `latency × 48000` rounds to anything but 4440 fails the render. 4 s of the media is fed before the
+  window (from frame 0 when the window starts sooner), then the media and zeros past the window's
+  end until its last frame is out; the first preroll + 4440 output frames are discarded. The source
+  is what the composition plays: `RampAudioCache.renderSource` (the 48 kHz copy) forward, the
+  reversed file for a reversed clip.
+- **AU-52 — The cache.** `cache/isolated/<media>-<16 hex>.caf`, FNV-1a 64 (as
+  `RampAudioCache.name`) over the media file's path, size and modification second,
+  `IsolationRenderer.version`, the reversal, the model (0), the preroll frames and the window — not
+  the Amount; 32-bit float CAF through `RampCAFWriter`. It runs on `RampAudioRenders` (its owners,
+  landing under the ledger, pruning, a failure once per launch, `-RCDevRampRenderHold`), whose owner
+  is now called when a wanted render lands OR fails, so a failure reaches the pane. A cached render
+  is never verified by re-rendering it (S2: windows starting mid-file differ by about −51 dB). AP14
+  adds a job case beside it.
+- **AU-53 — Amount is a crossfade in the tap, before the chain.** `out = dry + a·(wet − dry)`
+  (exactly `wet` at a = 1), sample-aligned through the segment's own placement
+  (`placement(of:shift:)`, so the noise reducer's and the limiter's leads compose). The wet/dry
+  offset is rounded ONCE, from the placement's source-in minus its place, `⌊(2·(in − at) + 12) /
+  25⌋ − window.firstFrame` in 48 kHz frames, so a place and a source-in off the 48 kHz grid (29.97
+  fps) cannot round apart. The render is read into memory when the composition is built (about
+  11.5 MB per channel-minute, the recorded cost). A missing render adds nothing — no span, and no
+  tap earned by isolation — so the clip plays DRY while it is pending; a tap whose rate is not
+  48 kHz passes dry. An Amount change rebuilds the composition, never the render.
+- **AU-54 — The order (amends AU-3).** isolation → channels → high-pass/EQ → hum → noise
+  reduction → gate → de-esser → compressor → limiter → fader. Isolation and noise reduction do not
+  exclude each other; noise reduction works on the crossfade.
+- **AU-55 — Which segments are isolated.** ×1 forward segments and reversed segments whose
+  reversed copy is ready; a time-scaled segment (a constant speed with Keep pitch on), a
+  ramp-rendered one (a ramp, or a constant speed with Keep pitch off) and a freeze play dry, and
+  the pane, the guide and `set_audio`'s prose say so. A reversed clip renders the reversed file
+  itself, so it aligns by construction; its floor is measured and reported. Two clips cut from one
+  take render two windows (S2: a seam about −30…−50 dB, accepted, not shown audible).
+- **AU-56 — The section.** "Voice Isolation", in the Sound tab before Noise Reduction: an "Isolate
+  voice" check (on sets `IsolationCache.defaultAmount`, 0.8: S2's pauses −14 dB with room tone
+  kept, where 1.0 makes them dead air), an Amount row 0–100 % (quick 50, 80, 100), and a Status
+  read-out — Rendering…, Ready, "Plays without it at this speed", "Waits for the reversed copy",
+  "Not rendered: <why>" — refreshed on `.reversedMediaDidChange`, which the document posts when a
+  render lands and when one fails. De-reverb (B4) is this control (S2: C50 +5.2 dB, the late tail
+  −5.3 dB on an RT60 0.6 s room): the section says it "reduces room echo", and there is no
+  separate control.
+- **AU-57 — Export and agents.** An export wants and waits for its isolation renders as it does
+  for ramps ("Preparing…"), and fails `isolationFailed` naming the clip when one cannot be
+  rendered. An agent uses `set_audio {isolation}`: no new tool, and the render's status is not in
+  `get_project`.
+
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
 AP9, survey A10), recorded before its code.
 

@@ -359,6 +359,7 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     }
     in_range("audio.pan", props.pan, -1.0, 1.0)?;
     in_range("audio.noise_reduction", props.noise_reduction, 0.0, 1.0)?;
+    in_range("audio.isolation", props.isolation, 0.0, 1.0)?;
     if let Some(compressor) = &props.compressor {
         in_range(
             "audio.compressor.threshold_db",

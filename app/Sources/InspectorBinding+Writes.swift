@@ -139,12 +139,14 @@ extension InspectorBinding {
             duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
             compressor: patch.compressor, noiseReduction: patch.noiseReduction,
             fadeInShape: patch.fadeInShape, fadeOutShape: patch.fadeOutShape,
-            limiter: patch.limiter)
+            limiter: patch.limiter, isolation: patch.isolation)
         var animatable = patch
         (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
         (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
         (animatable.fadeInShape, animatable.fadeOutShape) = (nil, nil)
         animatable.limiter = nil
+        // Base-only until AP8 animates it (spec §11 AU-50).
+        animatable.isolation = nil
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

@@ -63,6 +63,15 @@ import Foundation
 /// object's life is exactly the tap's.
 final class AudioTapContext {
     private let track: AudioTrackDSP
+    /// Voice isolation's crossfade (spec §11 AU-53, AU-54), run on the base
+    /// pointers BEFORE the chain; nil or empty when no clip has a render.
+    private let isolation: AudioIsolationTrack?
+    /// Whether `prepare` accepted a 48 kHz format: a tap at any other rate
+    /// passes dry, the renders being 48 kHz frames.
+    private var isolates = false
+    /// Where the last buffer ended, in 48 kHz composition frames, for a
+    /// buffer with no usable time.
+    private var positionFrame: Int64 = 0
     /// Where this track's levels are published, on a metering (playback)
     /// build; nil on every export and on every rendered frame. Written on the
     /// audio thread with two relaxed atomic stores and nothing else — see
@@ -88,8 +97,9 @@ final class AudioTapContext {
     /// at 48 kHz) and far shorter than any jump a scrub makes.
     private static let seekTolerance: Ticks = ReelTime.perSecond / 10
 
-    init(track: AudioTrackDSP, meter: LevelMeterSink?) {
+    init(track: AudioTrackDSP, isolation: AudioIsolationTrack?, meter: LevelMeterSink?) {
         self.track = track
+        self.isolation = isolation
         self.meter = meter
     }
 
@@ -124,6 +134,7 @@ final class AudioTapContext {
         guard float, planar, bitsPerChannel == 32, channelCount > 0 else {
             chain = nil
             channels = []
+            isolates = false
             meter?.clear()
             return
         }
@@ -139,11 +150,15 @@ final class AudioTapContext {
         channels = Array(repeating: nil, count: channelCount)
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
         position = 0
+        positionFrame = 0
+        isolates = !(isolation?.isEmpty ?? true)
+            && sampleRate == Double(IsolationRenderer.sampleRate)
     }
 
     func unprepare() {
         chain = nil
         channels = []
+        isolates = false
         meter?.clear()
     }
 
@@ -161,6 +176,26 @@ final class AudioTapContext {
         let list = UnsafeMutableAudioBufferListPointer(bufferList)
         let count = min(list.count, channels.count)
         guard count > 0 else { return }
+        let frame = time.isNumeric
+            ? CMTimeConvertScale(
+                time, timescale: CMTimeScale(IsolationRenderer.sampleRate),
+                method: .roundHalfAwayFromZero
+            ).value
+            : positionFrame
+        positionFrame = frame + Int64(frames)
+
+        // Isolation first (AU-54): the crossfade of the dry input with the
+        // clip's render, on the whole buffer, before every stage of the chain.
+        if isolates, let isolation = isolation {
+            for index in 0..<count {
+                channels[index] = list[index].mData?.assumingMemoryBound(to: Float.self)
+            }
+            channels.withUnsafeMutableBufferPointer { pointers in
+                isolation.apply(
+                    UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                    frames: frames, at: frame)
+            }
+        }
 
         if let chain = chain {
             // A seek, a loop or a fresh stream: the compressor's envelope and
@@ -266,13 +301,19 @@ enum AudioTap {
     /// from every audio track, including the ones no clip has asked anything
     /// of. That tap builds no chain and touches no sample — it fetches its
     /// source audio, hands it straight on, and measures it.
-    static func make(for track: AudioTrackDSP?, meter: LevelMeterSink?) -> MTAudioProcessingTap? {
+    ///
+    /// An `isolation` with spans earns one too (spec §11 AU-53); an empty one
+    /// — every render still pending — does not, so the clip plays dry
+    /// through exactly the path it had.
+    static func make(
+        for track: AudioTrackDSP?, isolation: AudioIsolationTrack?, meter: LevelMeterSink?
+    ) -> MTAudioProcessingTap? {
         let track = track ?? .inert
-        guard track.isActive || meter != nil else { return nil }
+        guard track.isActive || !(isolation?.isEmpty ?? true) || meter != nil else { return nil }
         // Retained here, released in `finalize` (or below, if no tap is made):
         // the tap owns the context and outlives every Swift reference to it.
         let context = Unmanaged.passRetained(
-            AudioTapContext(track: track, meter: meter)).toOpaque()
+            AudioTapContext(track: track, isolation: isolation, meter: meter)).toOpaque()
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: context,

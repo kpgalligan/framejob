@@ -137,6 +137,10 @@ struct ReverseResolution: Equatable {
     /// the file `RampAudioCache` names is in it when the composition is
     /// built, and is silent otherwise. Nil with no cache folder.
     var rampAudio: URL? = nil
+    /// The document's `cache/isolated/` (spec §11 AU-52): an isolated clip
+    /// plays its render when the file `IsolationCache` names is in it when
+    /// the composition is built, and dry otherwise. Nil with no cache folder.
+    var isolated: URL? = nil
 
     static let none = ReverseResolution(ready: [:], pending: [])
 

@@ -148,7 +148,8 @@ extension CompositionBuilder {
         to composition: AVMutableComposition, plan: CompositionPlan, urls: [UInt32: URL],
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
         assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset],
-        ramps: [RampSegmentKey: AVAssetTrack] = [:]
+        ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        isolated: [IsolationSegmentKey: IsolatedAudio] = [:]
     ) throws -> (inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack]) {
         var inputParameters: [AVAudioMixInputParameters] = []
         var meters: [LevelMeterTrack] = []
@@ -161,16 +162,22 @@ extension CompositionBuilder {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
                 let trackDSP = dsp.isEmpty
                     ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
+                // One shift for the media's place and the isolation spans'
+                // (AU-53), so the two cannot disagree about a lead.
+                let shift = AudioShift.of(
+                    segments: family.segments,
+                    usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false,
+                    usesLimiter: trackDSP?.usesLimiter ?? false)
                 if try !fillSilence(track, for: family) {
                     try fill(
                         track, segments: family.segments, mediaType: .audio, urls: urls,
                         reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
-                        shift: AudioShift.of(
-                            segments: family.segments,
-                            usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false,
-                            usesLimiter: trackDSP?.usesLimiter ?? false),
-                        ramps: ramps)
+                        shift: shift, ramps: ramps)
                 }
+                let isolation = isolated.isEmpty
+                    ? nil
+                    : AudioIsolationTrack(
+                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated)
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(
@@ -182,7 +189,7 @@ extension CompositionBuilder {
                     audioParameters(
                         for: track, segments: family.segments, ramps: planTrack.ramps,
                         onset: family.sounding.map(\.lowerBound).min(),
-                        dsp: trackDSP, meter: sink))
+                        dsp: trackDSP, isolation: isolation, meter: sink))
             }
         }
         return (inputParameters, meters)
@@ -216,7 +223,8 @@ extension CompositionBuilder {
     /// this landed does now sound different, which is the feature.
     static func audioParameters(
         for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
-        onset: Ticks?, dsp: AudioTrackDSP?, meter: LevelMeterSink?
+        onset: Ticks?, dsp: AudioTrackDSP?, isolation: AudioIsolationTrack? = nil,
+        meter: LevelMeterSink?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
         if let pitch = segments.compactMap({ $0.pitch }).first {
@@ -232,7 +240,7 @@ extension CompositionBuilder {
                 fromStartVolume: Float(leg.from), toEndVolume: Float(leg.to),
                 timeRange: CMTimeRange(start: time(leg.start), duration: time(leg.duration)))
         }
-        if let tap = AudioTap.make(for: dsp, meter: meter) {
+        if let tap = AudioTap.make(for: dsp, isolation: isolation, meter: meter) {
             parameters.audioTapProcessor = tap
         }
         return parameters

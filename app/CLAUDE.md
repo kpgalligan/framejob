@@ -149,7 +149,8 @@ detail there.
   (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
   `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
   `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
-  30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body;
+  30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body,
+  and format 31's `AudioProps.isolation` (AU-50);
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -540,8 +541,9 @@ detail there.
   and `ReverseSource`, moved whole out of `ReverseRenderer.swift` (issue
   batch B96): where a reversed asset lives (its digest name and pruning) and
   what the composition is told. `ReverseResolution.rampAudio` is the
-  document's `cache/ramp-audio/` folder (speed ramps SR-12), so the export
-  queue's capture and pin carry the ramp renders with no change of its own.
+  document's `cache/ramp-audio/` folder (speed ramps SR-12), and `isolated`
+  its `cache/isolated/` (AU-52), so the export queue's capture and pin carry
+  the ramp and isolation renders with no change of its own.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -972,8 +974,8 @@ the key map behind it.
   exception that sends a `filters` or `obscure` list of a different LENGTH, or
   `motion`, to the BASE props (a curve never: every count animates, spec §11
   GR-34), and `structural(audio:for:)` the one that sends pan, mono,
-  compressor, noise reduction, the limiter (AU-21), duck and keep-pitch there
-  (CI-3);
+  compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
+  duck and keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
   and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
@@ -1080,7 +1082,11 @@ the key map behind it.
   +`Loudness`: the Volume section's Loudness and At volume rows and the
   Normalize row's Mode popup and Target field, spec §11 AU-15; +`Limiter`: the
   Limiter section, spec §11 AU-26, registered after Mix in
-  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, base-only) ·
+  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, base-only;
+  +`Isolation`: the Voice Isolation section, spec §11 AU-56, registered
+  before Noise Reduction — Isolate voice, Amount, Status, the Status read
+  through the pane's `IsolationCache.Memo`, dropped on
+  `.reversedMediaDidChange`, which the pane observes) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1341,23 +1347,49 @@ the key map behind it.
   a deep slow-down is the owner's accepted limit (SR-15 as SR-16 widens
   it, `ramp_proof.py` L3), kept by SR1e (SR-16); written as a 32-bit float CAF through a
   `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
-- `RampAudioCache.swift` — `RampSegmentKey` (the clip, Keep pitch, glide and
-  map: equal exactly when the rendered file is), `RampAudioRequest` and the
-  file name from the media file's stat, the version and the reversal
-  (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix.
-- `RampAudioRenders.swift` — the process-wide serial render queue (SR-12):
+- `RampAudioCache.swift` — `OfflineAudioJob` (a ramp, or an isolated
+  window, §11 AU-52), `RampSegmentKey` (the clip, Keep pitch, glide and
+  map: equal exactly when the rendered file is), `RampAudioRequest` (its
+  `job`) and the file name from the media file's stat, the version and the
+  reversal (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix,
+  in `ramp-audio` or `isolated`.
+- `RampAudioRenders.swift` — the process-wide serial render queue (SR-12)
+  of every offline audio job, a ramp's or an isolated window's (AU-52):
   owners (a document's recipe key, an export's key while it writes) WANT
   file names; a render nobody wants is cancelled, one wanted again while it
   runs is not, and a cancelled or refused render still wanted is queued
   again; the finished file is renamed into place inside `CacheLedger.publish`
   so it never lands mid-save; `wait` returns only on landing, failure or
-  cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only).
+  cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only); an
+  owner's `settled` closure runs on the main queue when a render it wants
+  lands OR fails, so a failure reaches the pane.
 - `ProjectDocument+RampAudio.swift` — the document's wants after each edit,
-  the prune, and `.reversedMediaDidChange` posted when a render lands, so
-  the frozen editor rebuilds with no change. `Exporter+RampAudio.swift` —
-  the export's wait for every ramp render it needs before the build (a
-  failure fails the export as `rampAudioFailed`; it never writes a
-  placeholder), its wants released by `Exporter.releaseRecipeKey`.
+  its plans' ramp segments and isolated windows in ONE `want`, and
+  `rampAudioDidSettle` on a landing or a failure: the prune of both folders
+  and `.reversedMediaDidChange`, so the frozen editor rebuilds with no change
+  and the Voice Isolation status reads again. `Exporter+RampAudio.swift` —
+  the export's wait for every ramp render it needs and every isolated window
+  (`isolationFailed`) before the build (a ramp's failure fails the export as
+  `rampAudioFailed`; it never writes a placeholder), its wants released by
+  `Exporter.releaseRecipeKey`.
+- `IsolationRenderer.swift` — a clip window's isolated voice rendered offline
+  (AU-51): Apple's `AUSoundIsolation` High Quality Voice at 100 %, one
+  manual-rendering engine per channel in lockstep over one
+  `RampSourceReader`, 4 s of preroll, the 4440-frame latency pinned and
+  discarded, zeros past the window, a 32-bit float CAF through
+  `RampCAFWriter`. Called by `RampAudioRenders`.
+- `IsolationCache.swift` — `cache/isolated/` (AU-52, AU-55):
+  `IsolationWindow`, the name (never the Amount), `IsolationSegmentKey`,
+  which segments are isolatable (×1, no ramp, no freeze), the requests, the
+  status the pane reads (`Memo`, held per document, clip, the two handles
+  and the published `ReverseResolution`, and through a gesture), the wet
+  offset rounded ONCE (AU-53), and `CompositionBuilder.isolatedAudio` (the
+  READY renders a build reads into memory).
+- `AudioIsolation.swift` — the tap's isolation pass (AU-53, AU-54):
+  `IsolatedAudio` (a render in memory, read in 65,536-frame chunks) and
+  `IsolatedAudioStore` (path → weak object), `AudioIsolationSpan`,
+  `AudioIsolationTrack` (spans placed through `placement(of:shift:)`,
+  `dry + a·(wet − dry)` before the chain, reading only preloaded memory).
 - `RampVarispeedStream.swift` — the Keep pitch off tape glide as a stream
   (SR1c): the map read at 48 kHz from any start (negative for a
   pre-roll), dropping source behind a bound from the map's steepest
@@ -1743,7 +1775,8 @@ the key map behind it.
 - `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
   `AudioCompressorStage.swift` · `AudioNoiseReductionStage.swift` ·
   `AudioLimiterStage.swift` — the `MTAudioProcessingTap` playback and export
-  share, and the five sample-level effects: noise reduction (a 512-sample
+  share, and the five sample-level effects after voice isolation's crossfade,
+  which runs first (AU-54, `AudioIsolation.swift`): noise reduction (a 512-sample
   delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE
   the pan, or it is algebraically self-cancelling) and pan (constant-power,
   unity at centre), then the clip limiter (AU-20: a lookahead true-peak

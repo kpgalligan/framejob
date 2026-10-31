@@ -1,12 +1,15 @@
 import Foundation
 
-/// The process-wide scheduler of ramp renders (spec §11 SR-12 (c)–(g), (j)):
-/// what each OWNER wants, one serial `.utility` queue rendering one at a
-/// time, and the waits an export makes on it.
+/// The process-wide scheduler of every offline audio render (spec §11 SR-12
+/// (c)–(g), (j), AU-52): a ramp segment's retimed sound and a clip window's
+/// isolated voice (`OfflineAudioJob`), what each OWNER wants, one serial
+/// `.utility` queue rendering one at a time, and the waits an export makes
+/// on it.
 ///
-/// **Owners.** A document wants its plans' ramp segments under its
-/// `recipeKey` (`ProjectDocument+RampAudio.swift`); an export wants its
-/// plan's under its own key while it writes (`Exporter+RampAudio.swift`).
+/// **Owners.** A document wants its plans' ramp and isolation renders under
+/// its `recipeKey` in one `want` (`ProjectDocument+RampAudio.swift`); an
+/// export wants its plan's under its own key while it writes
+/// (`Exporter+RampAudio.swift`).
 /// `want` REPLACES an owner's set, so an edit that moves a map simply stops
 /// wanting the old file: a queued render no owner wants is dropped and a
 /// running one cancelled, and an edit storm costs at most the one in flight.
@@ -19,7 +22,9 @@ import Foundation
 /// render calls every owner that wants it back on the main queue.
 ///
 /// **Failure** (SR-12 (g)): a name that failed is not rendered again in this
-/// launch; one log line says why, never with the parity check's prefix.
+/// launch; one log line says why, never with the parity check's prefix. A
+/// failed render calls every owner that wants it back on the main queue too,
+/// as a landing does (AU-52), so a pane's status can say why.
 final class RampAudioRenders: @unchecked Sendable {
     static let shared = RampAudioRenders()
     /// The dev-only launch default that holds each render that many seconds,
@@ -28,14 +33,14 @@ final class RampAudioRenders: @unchecked Sendable {
     static let devHoldKey = "RCDevRampRenderHold"
 
     enum WaitError: Error, Equatable {
-        case failed(clip: UInt32, message: String), cancelled
+        case failed(request: RampAudioRequest, message: String), cancelled
     }
 
     private enum Outcome { case landed, refused, failed(String), cancelled }
 
     private let condition = NSCondition()
     private var wants: [Int: [RampAudioRequest]] = [:]
-    private var landings: [Int: () -> Void] = [:]
+    private var settlements: [Int: () -> Void] = [:]
     private var queue: [RampAudioRequest] = []
     private var running: RampAudioRequest?
     private var runningCancelled = false
@@ -46,12 +51,12 @@ final class RampAudioRenders: @unchecked Sendable {
 
     private init() {}
 
-    /// Replaces `owner`'s wanted renders; `landed` (main queue) is called after
-    /// each one of them lands. Any thread.
-    func want(_ requests: [RampAudioRequest], owner: Int, landed: (() -> Void)?) {
+    /// Replaces `owner`'s wanted renders; `settled` (main queue) is called
+    /// after each one of them lands or fails. Any thread.
+    func want(_ requests: [RampAudioRequest], owner: Int, settled: (() -> Void)?) {
         condition.lock()
         wants[owner] = requests.isEmpty ? nil : requests
-        landings[owner] = requests.isEmpty ? nil : landed
+        settlements[owner] = requests.isEmpty ? nil : settled
         reconcileLocked()
         condition.unlock()
     }
@@ -60,7 +65,7 @@ final class RampAudioRenders: @unchecked Sendable {
     func release(owner: Int) {
         condition.lock()
         wants[owner] = nil
-        landings[owner] = nil
+        settlements[owner] = nil
         reconcileLocked()
         condition.unlock()
     }
@@ -75,7 +80,7 @@ final class RampAudioRenders: @unchecked Sendable {
             if cancelled() { throw WaitError.cancelled }
             for request in requests {
                 if let message = failures[request.destination.path] {
-                    throw WaitError.failed(clip: request.clip, message: message)
+                    throw WaitError.failed(request: request, message: message)
                 }
             }
             if requests.allSatisfy({ FileManager.default.fileExists(atPath: $0.destination.path) }) {
@@ -154,10 +159,7 @@ final class RampAudioRenders: @unchecked Sendable {
             var called: [() -> Void] = []
             switch outcome {
             case .landed:
-                called = wants.compactMap { owner, requests in
-                    requests.contains(where: { $0.destination == request.destination })
-                        ? landings[owner] : nil
-                }
+                called = settledOwnersLocked(request.destination)
             case .refused, .cancelled:
                 // Wanted again while it stopped: the want skipped it as running.
                 if wantedLocked(request.destination),
@@ -167,10 +169,19 @@ final class RampAudioRenders: @unchecked Sendable {
                 }
             case .failed(let message):
                 failures[request.destination.path] = message
+                called = settledOwnersLocked(request.destination)
             }
             condition.broadcast()
             condition.unlock()
             if !called.isEmpty { DispatchQueue.main.async { called.forEach { $0() } } }
+        }
+    }
+
+    /// The closures of every owner that wants `destination`.
+    private func settledOwnersLocked(_ destination: URL) -> [() -> Void] {
+        wants.compactMap { owner, requests in
+            requests.contains(where: { $0.destination == destination })
+                ? settlements[owner] : nil
         }
     }
 
@@ -190,19 +201,38 @@ final class RampAudioRenders: @unchecked Sendable {
                 withIntermediateDirectories: true)
             hold(cancelled: cancelled)
             if cancelled() { return .cancelled }
-            let job = RampAudioRenderer.Job(
-                source: try RampAudioCache.renderSource(for: request.source),
-                map: RampAudioCache.map(of: request.ramp), keepPitch: request.ramp.keepPitch,
-                destination: landing)
-            _ = try RampAudioRenderer.render(job, cancelled: cancelled)
+            switch request.job {
+            case .ramp(let ramp):
+                let job = RampAudioRenderer.Job(
+                    source: try RampAudioCache.renderSource(for: request.source),
+                    map: RampAudioCache.map(of: ramp), keepPitch: ramp.keepPitch,
+                    destination: landing)
+                _ = try RampAudioRenderer.render(job, cancelled: cancelled)
+            case .isolation(let window):
+                // A reversed file is 48 kHz LPCM already; a forward one is
+                // read from what the composition plays (AU-51).
+                let job = IsolationRenderer.Job(
+                    source: request.reversed
+                        ? request.source : try RampAudioCache.renderSource(for: request.source),
+                    window: window, destination: landing)
+                _ = try IsolationRenderer.render(job, cancelled: cancelled)
+            }
         } catch RampAudioRenderer.RenderError.cancelled {
+            try? FileManager.default.removeItem(at: landing)
+            return .cancelled
+        } catch IsolationRenderer.RenderError.cancelled {
             try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch {
             try? FileManager.default.removeItem(at: landing)
             let why = error.localizedDescription
-            NSLog("RampAudioRenders: clip %u's ramp audio was not rendered into %@: %@",
-                request.clip, request.destination.lastPathComponent, why)
+            let kind: String
+            switch request.job {
+            case .ramp: kind = "ramp audio"
+            case .isolation: kind = "isolated voice"
+            }
+            NSLog("RampAudioRenders: clip %u's %@ was not rendered into %@: %@",
+                request.clip, kind, request.destination.lastPathComponent, why)
             return .failed(why.hasSuffix(".") ? String(why.dropLast()) : why)
         }
         let cache = request.destination.deletingLastPathComponent().deletingLastPathComponent()

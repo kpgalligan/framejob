@@ -26118,3 +26118,77 @@ whole-timeline RMS 0.0194, reported; a grain inside a duck's attack 0.0988 from 
 reported); `--mutants` 8/9 killed, each by its named row, `read-by-arrival` surviving as
 equivalent. Once `read-by-arrival` was marked equivalent in the script, `--mutants` printed
 "8/8 mutants killed (1 equivalent, not scored)", exit 0, with `read-by-arrival` failing no row.
+
+## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P9, P2b, I0–I10, I1b; ten mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
+
+A clip's `audio.isolation` crossfades its dry sound with one cached offline `AUSoundIsolation`
+render of its window, before the tap's chain (`IsolationRenderer.swift`, `IsolationCache.swift`,
+`AudioIsolation.swift`). **`audio_ap5_proof.py`** has two halves, and its docstring has every
+row:
+
+- **The probe** (`audio_ap5_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.build`, `Blank.mp4` beside the binary; a failed build is a scored FAIL). Its
+  fixtures are 48 kHz stereo float WAVs of seeded noise and synthetic "renders" written by
+  `RampCAFWriter` under the name `IsolationCache` gives the clip's window, in
+  `tools/proof/work/audio_ap5/<build>/scratch/`; projects are ops on an untitled
+  `ProjectDocument` (each op tried on a scratch handle first, so a bad op is a printed FAIL and
+  never the document's modal alert), published under a fresh key with `AudioDSPSource` and a
+  `ReverseResolution` whose `isolated` is the scratch `cache/isolated/`. P5, P6 and P8 render
+  `samples/Rode-usb-mic.m4a` through the real renderer.
+
+  | Row | What it holds |
+  |---|---|
+  | P1 | isolation 1 with no render: no tap on any track, and the mix read byte-identical to isolation 0 |
+  | P2 | a synthetic stereo render at a clip placed at 3.5 s from source 2.5 s: the read equals it sample for sample over the clip, ≤ 1e-7 alone and ≤ 1e-4 with a noise-reduced clip on the same track (the 512-sample lead; the reducer at 0 is an FFT round trip) |
+  | P2b | `wetOffset` at 20,020 / source-in 40,040 ticks is 1,602 − first, the reverse −1,602 − first, and a built span there starts at 1,602 |
+  | P3 | Amount 0.5 and 0.25 against dry + a·(render − dry), ≤ 1e-6 (0.25 because a swapped crossfade is the same at 0.5) |
+  | P4 | no request for a time-scaled, a ramped, a freeze or a pending-reverse segment; a plain one gets one |
+  | P5 | the renderer over 6 s of the recording from 10 s: the cross-correlation peak against the dry at lag 0, and the file reads back whole |
+  | P6 | the window [10, 15 s) against the whole file's render over 10–11 s: residual ≤ −40 dB |
+  | P7 | `name` differs by window and by reversal; Amount 0.5 and 1 name one file |
+  | P8 | `Exporter.withRampAudio` runs its build only once the isolation file exists |
+  | P9 | a request whose source is a text file: the owner's `settled` runs exactly once, on the main queue, and `failure(for:)` and `IsolationCache.status(of:)` carry the message |
+
+- **The instance rows** I0–I10 and I1b, on `proof_app`'s app launched by the script with
+  `-RCDevRampRenderHold 2` and stopped by its own pid, every project the recording at volume ×4
+  (so a 16-bit `audio_wav` export's quantisation sits ≥ 60 dB under it), exports decoded by
+  ffmpeg: I1 and I1b alignment (|lag| ≤ 0.5 sample by cross-correlation with a parabolic peak;
+  I1b at 29.97 fps, off the 48 kHz grid), I2 the pause floor ≥ 9 dB lower and the speech bands
+  within ±0.5 dB (S2's 400 ms classifier), I3 Amount 0.5 against the mean of I2's two exports,
+  I4 an export straight after the edit waits, I5 a trim renders anew and prunes, I6 reversed,
+  I7 ×2 plays dry (Keep pitch off sample for sample; Keep pitch on by its pause floor, ±1 dB,
+  because AVFoundation's spectral time-pitch is not deterministic: two exports of one ×2 clip
+  measured max |Δ| 0.095), I8 Paste Attributes, I9 the refusal, I10 0 writes no key and plays
+  I2's dry. `--instance` runs the I rows alone.
+
+`--mutants` runs ten, each a replacement in a copied `app/Sources` (every anchor asserted once),
+scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `latency-kept` | the 4440 latency frames not discarded | P5 |
+| `no-preroll` | no media fed before the window | P6 |
+| `amount-swapped` | `wet + a·(dry − wet)` | P3 |
+| `no-track-lead` | spans placed with `shift: .none` | P2 |
+| `pending-silent` | a pending render earns a tap that zeroes the clip | P1 |
+| `scaled-isolated` | `isolatable` lets a time-scaled segment through | P4 |
+| `export-no-wait` | the export wants no isolation render | P8 |
+| `window-not-keyed` | the window left out of the name | P7 |
+| `split-rounding` | `r(source_in) − r(at)` instead of `r(source_in − at)` | P2b |
+| `failure-silent` | a failed render calls no owner | P9 |
+
+```sh
+python3 tools/proof/audio_ap5_proof.py --probe     # P1–P9, P2b
+python3 tools/proof/audio_ap5_proof.py --mutants   # 10 mutants
+python3 tools/proof/audio_ap5_proof.py             # the probe, then I0–I10, I1b on an own instance
+```
+
+**The recorded run (2026-10-30, Release after `make gate`):** 22/22. P2 worst |out − render|
+0.0 alone and 2.09e-7 with the reducer's lead; P3 0.0 at both amounts; P5 lag 0 (the render 0.34 s
+for 6 s); P6 −293.5 dB (the window's render and the whole file's are bit-identical over 10–11 s
+once 4 s of preroll is fed); I1 lag +0.001, I1b +0.002 samples; I2 38 pause and 9 speech windows,
+the floor 14.9 dB lower, speech +0.14 dB broadband and every octave 63 Hz–8 kHz within
+−0.02…+0.29 dB; I3 −63.7 dB; I4 the export finished 2.8 s after it was sent, floor 12.0 dB lower;
+I5 lag 0.000 with the old render pruned; I6 lag +0.007, floor 10.9 dB lower; I7 Keep pitch on's
+floor moved 0.00 dB and Keep pitch off sample for sample. `--mutants` 10/10 killed, each by its
+named row alone.

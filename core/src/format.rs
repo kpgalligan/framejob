@@ -346,8 +346,14 @@ use crate::model::{Canvas, Project};
 /// reader's default is none, so there is no migration step. The bump is so
 /// an older build refuses a limited file instead of opening it unlimited and
 /// dropping the limiter on save.
-/// Every number from 31 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 30;
+///
+/// Version 31 is voice isolation (spec §11 AU-50): `audio.isolation`, after
+/// `limiter`, written only when not 0, so every other project writes
+/// exactly the text it did and there is no migration step. The bump is so an
+/// older build refuses the file rather than playing the clip unisolated and
+/// dropping the key on save.
+/// Every number from 32 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 31;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

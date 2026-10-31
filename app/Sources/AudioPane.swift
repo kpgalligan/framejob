@@ -26,12 +26,25 @@ final class AudioPane: InspectorPaneView {
     /// The Volume section's loudness readout (spec §11 AU-15), dropped by a
     /// `loudness` cache post.
     let loudnessMemo = ClipLoudness.Memo()
+    /// Voice Isolation's Status read-out (AU-56), dropped by an offline
+    /// audio settlement.
+    let isolationMemo = IsolationCache.Memo()
 
     override init(inspector: InspectorViewController) {
         super.init(inspector: inspector)
         NotificationCenter.default.addObserver(
             self, selector: #selector(loudnessCacheChanged(_:)), name: .mediaCacheDidChange,
             object: nil)
+        // An isolation render landed or failed (AU-56): Voice Isolation's
+        // status reads again.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(offlineAudioSettled(_:)), name: .reversedMediaDidChange,
+            object: nil)
+    }
+
+    @objc private func offlineAudioSettled(_ note: Notification) {
+        isolationMemo.invalidate()
+        inspector?.refresh(isLive: false)
     }
 
     @available(*, unavailable)

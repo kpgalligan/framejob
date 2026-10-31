@@ -1,13 +1,16 @@
 import Foundation
 
-/// The document's half of a ramped clip's rendered audio (spec §11 SR-12):
-/// what it wants rendered, and what it does when a render lands.
+/// The document's half of its offline audio renders (spec §11 SR-12, AU-52):
+/// a ramped clip's rendered audio and an isolated clip's voice — what it
+/// wants rendered, and what it does when a render lands or fails.
 ///
-/// The whole-timeline plan's ramp segments are wanted, and with a nest open
-/// the edited plan's too (its instances can carry different maps), under the
-/// document's `recipeKey`; `RampAudioRenders` renders them one at a time off
-/// the main thread. Nothing here blocks: a pending render is silent time in
-/// the preview until it lands, and the editor rebuilds then.
+/// The whole-timeline plan's ramp segments and isolated windows are wanted,
+/// and with a nest open the edited plan's too (its instances can carry
+/// different maps), under the document's `recipeKey`, in ONE `want` (a want
+/// replaces the owner's set); `RampAudioRenders` renders them one at a time
+/// off the main thread. Nothing here blocks: a pending ramp is silent time in
+/// the preview and a pending isolation plays dry until it lands, and the
+/// editor rebuilds then.
 extension ProjectDocument {
     /// `cache/ramp-audio/` of `intendedCacheDirectory`, published beside the
     /// plan as `ReverseResolution.rampAudio`. Not created here: the first
@@ -16,33 +19,47 @@ extension ProjectDocument {
         intendedCacheDirectory.map(RampAudioCache.directory(in:))
     }
 
-    /// Replaces the document's wanted renders with its plans' ramp segments.
-    /// Never during a live gesture (SR-12 (c)); a plan is decoded only when
-    /// its text holds a ramp. Main thread, after the resolution is published.
+    /// `cache/isolated/` of `intendedCacheDirectory` (AU-52), published as
+    /// `ReverseResolution.isolated`; made by its first render.
+    var isolatedAudioDirectory: URL? {
+        intendedCacheDirectory.map(IsolationCache.directory(in:))
+    }
+
+    /// Replaces the document's wanted renders with its plans' ramp segments
+    /// and isolated windows. Never during a live gesture (SR-12 (c)); a plan
+    /// is decoded only when its text holds a ramp or a clip is isolated.
+    /// Main thread, after the resolution is published.
     func ensureRampAudio() {
         guard !isLiveEditing else { return }
         let reverse = ReverseSource.shared.resolution(for: recipeKey)
         let urls = mediaURLs()
+        let dsp = AudioDSPParameters(snapshot: project.snapshot)
         var requests: [RampAudioRequest] = []
-        for handle in scope == nil ? [project] : [project, editedProject] {
-            guard handle.planJSON.contains("\"ramp\":"), let plan = handle.plan else { continue }
-            for request in RampAudioCache.requests(plan: plan, urls: urls, reverse: reverse)
+        func add(_ found: [RampAudioRequest]) {
+            for request in found
             where !requests.contains(where: { $0.destination == request.destination }) {
                 requests.append(request)
             }
         }
+        for handle in scope == nil ? [project] : [project, editedProject] {
+            let ramped = handle.planJSON.contains("\"ramp\":")
+            guard ramped || dsp.isolates, let plan = handle.plan else { continue }
+            if ramped { add(RampAudioCache.requests(plan: plan, urls: urls, reverse: reverse)) }
+            add(IsolationCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse))
+        }
         RampAudioRenders.shared.want(requests, owner: recipeKey) { [weak self] in
-            self?.rampAudioDidLand()
+            self?.rampAudioDidSettle()
         }
     }
 
-    /// A render this document wants landed (SR-12 (f)): the package's date
-    /// re-read (the render may have created `cache/`), every file no owner
-    /// wants pruned, and the editor told to rebuild — the plan did not
-    /// change, so only `.reversedMediaDidChange` makes it.
-    func rampAudioDidLand() {
+    /// A render this document wants landed or failed (SR-12 (f), AU-52): the
+    /// package's date re-read (the render may have created `cache/`), every
+    /// file no owner wants pruned from both folders, and the editor and the
+    /// Sound tab's status told — the plan did not change, so only
+    /// `.reversedMediaDidChange` makes the editor rebuild.
+    func rampAudioDidSettle() {
         packageContentsDidChangeOnDisk()
-        if let directory = rampAudioDirectory {
+        for directory in [rampAudioDirectory, isolatedAudioDirectory].compactMap({ $0 }) {
             RampAudioCache.prune(
                 directory, keeping: RampAudioRenders.shared.keptNames(in: directory))
         }

@@ -721,6 +721,80 @@ clean. No mutant's anchor moved, so none was re-run.
 **Owed.** SE-23 (Loudness the default, −16 LUFS through the limiter) and SE-24 (no pumping or
 distortion on speech and music) for the owner; AP2 part 2. Nothing to file.
 
+### AP5's record (2026-10-30)
+
+**Decided.** AU-50…AU-57, recorded before the code: `audio.isolation` 0…1, written only when
+not 0, base-only, carried by Paste Attributes, nothing on a nest clip; S2's render
+(`AUSoundIsolation` High Quality Voice at 100 %, one manual-rendering engine per channel over
+one `RampSourceReader`, 4 s of preroll, the 4440-frame latency pinned and discarded) into
+`cache/isolated/`, named without the Amount, on the ramp render queue; Amount a crossfade
+`dry + a·(wet − dry)` in the tap before the chain (AU-54 amends AU-3's order), dry while
+pending; ×1 and ready reversed segments only; the Voice Isolation section before Noise
+Reduction (0.8 when turned on; de-reverb is this control); the export waits. The adversary's
+two objections were taken before the code: a failed render now calls its owners too
+(`want(_:owner:settled:)`, `rampAudioDidSettle`), so the Status leaves "Rendering…"; and the
+wet offset is rounded ONCE from source-in minus place (`IsolationCache.wetOffset`), so a 29.97
+fps placement off the 48 kHz grid cannot round apart.
+
+**Landed.** Core: the field (after `limiter`), `check_audio`'s range, `clamp_audio`, the patch
+template's 0.5, format 31, `schema_v31.rs` and `isolation.rs`. Swift: `OfflineAudioJob` on
+`RampAudioRequest.job`, `RampAudioRenders` serving both kinds with `.failed` calling owners,
+`IsolationRenderer.swift` (263), `IsolationCache.swift` (261, with the review's `Memo`),
+`AudioIsolation.swift` (181), `AudioPane+Isolation.swift` (67), the tap's pass and
+`AudioTap.make(for:isolation:meter:)`, `CompositionBuilder.isolatedAudio`, `isolationFailed`,
+`ReverseResolution.isolated`, one wiring line in `ProjectDocument.swift`, `AudioProps`,
+`AudioPatch`, `structural(audio:)` base-only and `set_audio`'s prose. Docs: the guide's Voice
+Isolation section and limits, the README highlight, SE-27, spec §4.3b, §5.2a/b, §5.6, §7.2,
+§7.4, §7.8. Deviations: `AudioDSPParameters.isolates`; `IsolatedAudio` reads in 65,536-frame
+chunks (one whole read of P5's 288,000-frame CAF returned 287,744); P3 also checks Amount 0.25
+(a swapped crossfade equals at 0.5); P2's noise reduction sits on a second clip of the track;
+the pending-silent mutant has three anchors; I7's Keep pitch on leg is held to its pause floor
+(±1 dB), AVFoundation's time-pitch measured nondeterministic between two dry exports (max |Δ|
+0.095 over 331,924 of 726,400 samples); every I row sets volume ×4 (the recording is −44.7 LUFS)
+so 16-bit quantisation stays under I3's bound; split-rounding is scored on P2b alone (on I1b's
+numbers both roundings give 286,686).
+
+**Measured** (the lane, Release after its gate): `audio_ap5_proof.py` 22/22 — P2 worst 0.0
+(bound 1e-7), 2.0861626e-07 with noise reduction (1e-4); P2b 602 and −2602, the built span
+start 1602, offset −1601; P3 0.0 at 0.5 and 0.25; P5 288,000 frames, lag 0, 0.34 s wall; P6
+−293.5 dB (S2 recorded −51 dB for mid-file windows with another preroll); I1 lag +0.001 samples,
+I1b +0.002 (offset 286,686.4 samples); **I2 on the owner's recording: the pause floor 14.9 dB
+lower (S2: 10.9), speech +0.14 dB broadband, octaves 63 Hz–8 kHz within −0.02…+0.29 dB**; I3
+−63.7 dB; I4 2.8 s to finish, floor −12.0 dB; I5 a new render, the old pruned, lag +0.000; I6
+reversed lag +0.007, floor −10.9 dB; I7 no render at ×2 either way; I10 equal to the dry export
+(1,454,400 frames). `--probe` 10/10, `--mutants` 10/10 killed, `cargo test` 8/8, `make gate`
+PASS 459 s. `ramp_proof.py` on Release 36/43, the seven host state (no `speech.mov` /
+`silence.mov`; the spike probe's work folder absent); with those made, 8/9, U1 needing a pre-SR2b
+baseline no tree holds; `--only E1,K1` on Debug 4/4.
+
+**Review.** One should-fix: the Status read-out decoded the plan (two with a nest open) and
+stat'd the media on every pane refresh, about 30 a second in playback. Fixed by
+`IsolationCache.Memo` (document, clip, the two handles held weak, the published
+`ReverseResolution`; held through a gesture), dropped on `.reversedMediaDidChange`; the fix pass's
+`--probe` 10/10, `make gate` PASS 623 s, Release 22/22. The second review passed with two nits
+left: no row proves the memo invalidates, and `IsolationRenderer` takes the `min` of the lanes'
+`frameLength`s where it could fail on a mismatch.
+
+**Integrated.** AP2 had landed and taken format 30, so this phase's is 31: `format.rs`, the
+header, `schema_v31.rs` (the lane's `schema_v30.rs`, with a check that `isolation` is written
+after `limiter`; AP2's `schema_v30.rs` kept), `isolation.rs`'s fixture, AU-50, §4.3b, §5.2a/b.
+The union taken in `model_audio.rs`, `patch.rs`, `AudioProps.swift`, `TypedPatches.swift`,
+`InspectorBinding+Writes.swift`, `set_audio`'s prose, the guide (sections 1–8, Limiter last;
+the limits) and the README highlight; in `CompositionBuilder+AudioTracks.swift` the hoisted
+`AudioShift` carries AP2's `usesLimiter`, so the isolation spans compose the limiter's lead
+too (§7.2 says so). AP5's block of `11-decisions/audio.md` moved between AU-26 and AU-90, and
+the Lines cells were counted again (`spec_index_proof.py` 213/213). SE-27 was free. On the
+merged tree: `make gate` PASS 196 s (names 1, test 71, app 124), the run before it having
+passed typecheck (6 s, the four baseline warnings), fmt and lint and FAILed test on a §7.2
+Lines cell this integration's own rewrap moved; on Release `audio_ap5_proof.py` 22/22 with every figure as above, and AP2's
+`limiter_proof.py` 19/19 over the merged builder (P6 "the file is version 31, the header's
+31"), its log clean. No mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-27 for the owner (artefacts on the owner's voice at Amount 100 % and 50 %). Filed
+as issues: voice isolation on a time-scaled, ramped or freeze clip (AU-55's limit), and
+`ramp_proof.py`'s spike probe needing its work folder made first (U1 and P1 in a fresh tree)
+and U1's pre-SR2b baseline.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

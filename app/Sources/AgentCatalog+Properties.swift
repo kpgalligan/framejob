@@ -205,8 +205,13 @@ extension AgentServer {
         + "limiter (null or {ceiling_db, release}: a true-peak limiter last in the clip's "
         + "chain, ceiling_db in dBTP after the clip's base volume, -24 to 0, default -1, "
         + "release in ticks, 600 to 600000, default 60000; {limiter: {}} turns it on at "
-        + "the defaults). duck, compressor and limiter are OBJECTS and they MERGE: a key "
-        + "you leave out keeps what is stored, and {duck: null} clears the whole thing."
+        + "the defaults), "
+        + "isolation (0–1: voice isolation, Apple's on-device voice model, which also "
+        + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
+        + "rendered offline, the clip plays without it until the render lands and an export "
+        + "waits for it; a clip not at ×1 plays without it). "
+        + "duck, compressor and limiter are OBJECTS and they MERGE: a key you leave out keeps "
+        + "what is stored, and {duck: null} clears the whole thing."
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.

@@ -210,9 +210,13 @@ extern "C" {
  * Version 30 is the clip limiter (spec §11 AU-21): `audio.limiter`,
  * `{ceiling_db, release}` after `fade_out_shape`, written only when set, so
  * every project without one writes the text it did; the reader's default is
- * none, so there is no migration step. 31 and above, 1014 included, are
+ * none, so there is no migration step.
+ *
+ * Version 31 is voice isolation (spec §11 AU-50): `audio.isolation`, after
+ * `limiter`, written only when not 0, so every other project writes the text
+ * it did, and there is no migration step. 32 and above, 1014 included, are
  * newer. */
-#define RC_FORMAT_VERSION 30
+#define RC_FORMAT_VERSION 31
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

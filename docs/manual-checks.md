@@ -431,6 +431,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** +3 dB fades are heard straight away and −3 dB fades feel long and slow to start, S-Curve eases in and out, Linear sits between; the +3 dB crossfade holds the level across the join where Linear dips audibly in the middle; no shape clicks at either end.
 - **Source:** road map "audio" AP11 (spec §11 AU-114, AU-115); `tools/proof/audio_ap11_proof.py` F1–F4 and X1 measure the shapes on an export, not how they sound.
 
+**SE-27 — Voice Isolation sounds clean on a real voice at 100 % and at 50 %**
+- **Do:** 1. Put your own voice recorded in an ordinary room (`samples/Rode-usb-mic.m4a`, or a camera's own microphone) on the timeline and select it. 2. In the Clip tab's Voice Isolation section tick Isolate voice and wait for Status to read Ready. 3. Play it through headphones at Amount 100 %, then at 50 %, then with Isolate voice off. 4. Turn on Noise Reduction at 50 % as well and play it again. 5. Export it and play the export.
+- **Expect:** Status reads Rendering… for a moment and then Ready, and the preview switches over by itself; at 100 % the room, hiss and echo are gone between words and the voice keeps its own tone, with no warble, metallic edge, swallowed word endings or pumping; at 50 % the room is lower but still there and sounds natural; adding noise reduction doesn't make the voice thinner; the export sounds like the preview.
+- **Answer:** at 100 % and at 50 %, does the isolated voice sound clean and natural on your voice, or do you hear artefacts (and where)?
+- **Source:** road map "audio" AP5 (spec §11 AU-51, AU-53, AU-56); `tools/proof/audio_ap5_proof.py` I1–I10 measure alignment, the pause floor and the speech bands on exports, not how the voice sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**
