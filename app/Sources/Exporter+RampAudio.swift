@@ -25,6 +25,20 @@ extension Exporter {
         cancelled: @escaping () -> Bool, then build: () throws -> T
     ) throws -> T {
         guard !settings.isImageSequence else { return try build() }
+        return try withOfflineAudio(
+            plan: plan, urls: urls, key: key, cancelled: cancelled, then: build)
+    }
+
+    /// `withRampAudio`'s waits for a composition that has sound: the levels,
+    /// then the ramp, isolation and voice renders, each wanted under `key`.
+    /// The export calls it through `withRampAudio`; the processed loudness
+    /// measurement (`ProcessedLoudness.render`, spec §11 AU-64 (d)) calls it
+    /// directly, so a clip is measured through the very files it exports
+    /// with. Never main.
+    static func withOfflineAudio<T>(
+        plan: CompositionPlan, urls: [UInt32: URL], key: Int,
+        cancelled: @escaping () -> Bool, then build: () throws -> T
+    ) throws -> T {
         try waitForLevels(plan: plan, key: key, cancelled: cancelled)
         let ramped = plan.audioTracks.contains(where: { $0.segments.contains { $0.ramp != nil } })
         let dsp = AudioDSPSource.shared.parameters(for: key)

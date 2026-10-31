@@ -105,7 +105,15 @@ AP9, §11 AU-95: each linked pair in the selection merged back), Normalize (foll
 section's Normalize mode, Peak or Loudness, its title unchanged, §11 AU-15; road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
-a command reachable from a pane alone can be lost), Synchronize Audio (road
+a command reachable from a pane alone can be lost; in Loudness mode a clip
+with processing is measured through it under the Measuring Sound sheet, §11
+AU-64, AU-65), Enhance Voice (road map "audio" AP6, §11 AU-60…AU-65: right
+after Normalize, no key equivalent, enabled where Normalize is; each
+selected clip set up for speech from its own measurements in one undo step,
+its volume measured through the new settings under the Measuring Sound sheet
+— a bar, "Clip n of N…" and Cancel, which changes nothing — and refused at
+the inspector's foot if the project changed meanwhile; its mirror is
+`enhance_voice`), Synchronize Audio (road
 map "audio-sync" AS-1 and AS-2, §11 SY-1..SY-10: the selected clips that play
 sound lined up by their sound, one anchor kept, each mover's clock drift
 corrected by a speed change in the same undo step; it shows no drift figure,

@@ -136,7 +136,8 @@ first selected clip. With nothing selected it is the front-most track. See
 | Freeze Frame | ⇧⌘F | Holds the frame under the playhead as a still clip |
 | Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip, linked to it ([Audio](audio.md)) |
 | Attach Audio | ⇧⌥⌘D | Merges a detached sound back into its picture ([Audio](audio.md#attach-audio)) |
-| Normalize | | Sets the selected clips' volume to a loudness (the default, turning a clip's limiter on when its peaks need it) or a peak, by the mode chosen in the Volume section's Normalize row |
+| Normalize | | Sets the selected clips' volume to a loudness (the default, turning a clip's limiter on when its peaks need it) or a peak, by the mode chosen in the Volume section's Normalize row. A clip with processing is measured through it under the Measuring Sound sheet |
+| Enhance Voice | | Sets the selected clips up for speech from their own measurements: high-pass, isolation or noise reduction and a gate for noisy pauses, the de-esser, a compressor, the limiter and the volume to the Normalize row's target ([Audio](audio.md#enhance-voice)) |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
@@ -191,6 +192,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Detach Audio | Something is selected |
 | Attach Audio | A selected clip is linked to its detached sound or picture |
 | Normalize | A selected clip plays sound |
+| Enhance Voice | A selected clip plays sound |
 | Synchronize Audio | Two or more selected clips play sound |
 | Add Action | A selected clip is under the playhead |
 | Speed… | The selection includes a clip that plays a media file |

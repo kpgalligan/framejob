@@ -25766,7 +25766,7 @@ tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
 
 | Row | What it holds |
 |---|---|
-| C1 | the mono and stereo caches publish: width 2 / 5, `⌈duration·100⌉` records, marker version 1 at 100 a second and ×4 |
+| C1 | the mono and stereo caches publish: width 3 / 8 (AP6's high band, AU-63), `⌈duration·100⌉` records, marker version 2 at 100 a second and ×4 |
 | C2 | the whole recording against the meter as dual mono: ≤ 0.1 LU, TP ≤ 0.01 dB |
 | C3 | S4's ten named windows forward, each ≤ 0.1 LU of the meter on that window |
 | C4 | the same windows reversed against the meter on the reversed samples, ≤ 0.1 LU |
@@ -25777,8 +25777,9 @@ tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
 | C9 | a marker of version 0, or of 50 blocks a second, reads absent beside a valid `.bin` |
 | C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
 | C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
+| C12 | (AP6, AU-63) the high band: an 8 kHz tone's `h` within 0.05 dB of its mean square times the 6 kHz high-pass's \|H(8 kHz)\|²; a 1 kHz tone's `h` at least 60 dB under its `z` |
 
-`--mutants` runs seven, each one replacement in a copied `app/Sources` (its
+`--mutants` runs eight (seven, and AP6's `M7-high-unfiltered`), each one replacement in a copied `app/Sources` (its
 anchor asserted once), and scores each killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -25790,6 +25791,7 @@ anchor asserted once), and scores each killed when its named row fails:
 | `limited-by-nil` | the volume-alone row's `limited_by` always nil (AP2) | C8 |
 | `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
 | `version-unchecked` | the marker's version not checked | C9 |
+| `M7-high-unfiltered` | (AP6) the high band read unfiltered | C12 |
 
 **`loudness_normalize_proof.py <dir>/agent.sock`** drives an instance over
 MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
@@ -25822,8 +25824,8 @@ The eighth mutant, `target_lufs`'s range check dropped in
 must fail N2's −51 and −4 rows.
 
 ```sh
-python3 tools/proof/loudness_cache_probe.py            # C1–C11
-python3 tools/proof/loudness_cache_probe.py --mutants   # 7 mutants
+python3 tools/proof/loudness_cache_probe.py            # C1–C12
+python3 tools/proof/loudness_cache_probe.py --mutants   # 8 mutants
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
 ```
@@ -26918,3 +26920,74 @@ windows × 2 channels, worst 0.0000 dB; E2 worst 0.0057 dB; E3 worst 0.0272 dB; 
 the start, 158 before 3 s), true peak −6.013 dBTP after; E5 worst 1.00 LSB over 192,000 frames;
 E6 −55.97 dB before the end, 0.0000 dB after; V1 |ΔI| 0.0000 LU; U1 one undo step, no `Frame Job: `
 line. `--mutants` 13/13 killed. `audio_ap5_proof.py --instance` against Release 12/12.
+
+## Road map "audio" AP6 part 1 — Enhance Voice, its volume solved on the processed sound (`audio_ap6_probe.py` E1–E3, E6–E11, `audio_ap6_proof.py` V1–V15; eleven mutants; `loudness_cache_probe.py` C1, C12, M7; spec §11 AU-60…AU-65)
+
+Two instruments, and the loudness probe's rows for the cache's high band (above).
+
+**`audio_ap6_probe.py`** compiles `audio_ap6_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `app/Resources/Models` copied
+beside the binary so the product's own Silero pass runs on the owner's recording. Nothing in it
+renders: the processed solve's figures are the proof's.
+
+| Row | What it holds |
+|---|---|
+| E1 | each AU-62 rule both sides of its threshold on synthetic readings: floor − L at −44 and −46 dB, isolatable or not, the gate from the pauses' median peak + 10 − L and its −40…−6 hold, the de-esser at 6 % and 4 % and a band at L − 11, the floor a median, Rumble Cut on the clip's own EQ |
+| E2 | the compressor: the threshold the speech's median peak held to −60…0; the makeup the probe's own copy of the block-rate model gives, > 0, the loudness through it within 0.5 LU of L |
+| E3 | on the owner's recording in a probe document: `choose` over its own committed result is the same patch and an identity |
+| E6 | the owner's measurements, choices and reasons printed; isolation and a gate, no volume or limiter in the patch; the makeup gives back the loss; its job renders through the chosen patch carrying the limiter and the volume |
+| E7 | the skips by name, and an unmeasured floor leaving isolation, noise reduction and the gate out |
+| E8 | `speechMask`: [start, end), any order |
+| E9 | `measurementPlan` on a fixture plan: only the clip's segments (its emptied track dropped), no ramps, `track_pans` empty, no video tracks or ducks, one instruction from 0 over the plan, the span; with a volume of 2 one constant ramp at 2, at 1 none; the owner's clip's plan |
+| E10 | `needsRender`: each of the eight keys true; pan, mono, channels, the limiter, the volume, fades, a bypassed or empty EQ and an inert voice false |
+| E11 | `plan(solved:)` keeps the clip's volume at 0.04 dB, writes the solve at 0.06 dB and with another limiter; a cache row is never kept |
+
+`--mutants` runs eleven, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | the noisy line at −40 dB | E1 |
+| M2 | the gate 6 dB over the pause peak | E1 |
+| M3 | isolation and noise reduction swapped | E1 |
+| M4 | the sibilance gap at −20 dB | E1 |
+| M5 | a mean for the median | E1 |
+| M6 | an active EQ not rendered | E10 |
+| M8 | the speech mask inverted | E8 |
+| M9 | the compressor's makeup 0 | E6 |
+| M10 | the gate from the floor, not the pause peak | E1 |
+| M11 | the ramps kept in the measurement plan | E9 |
+| M12 | `keepVolumeDB` 0 | E11 |
+
+**`audio_ap6_proof.py <dir>/agent.sock`** drives an instance over MCP and measures every export
+with `phase5_proof.py`'s BS.1770 and `limiter_probe.true_peaks` (ceiling + 0.001 dB); the pause
+floor is `eq_proof.report`'s 10th percentile of 50 ms RMS. Its fixtures are the owner's
+recording and `say` speech (V6 low-passed at 3.5 kHz, V7 high-shelved +15 dB above 5 kHz). V8
+launches a second instance with `-FrameJobNormalizeTargetLUFS -16`, V14 one with
+`-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
+runs only those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the eight keys, held by `get_project` |
+| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` null, `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
+| V3 | the pause floor at least 10 dB under a Normalize-only export's |
+| V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
+| V5 | one undo, "Enhance Voice", then the import's audio group |
+| V6, V7 | the de-esser off and on |
+| V8 | Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds the tool's set, the volume within 0.05 dB |
+| V9 | two clips each their own, one undo |
+| V10 | skips and refused arguments, changing nothing |
+| V11 | the parity log clean |
+| V12 | ×1.5 (not isolatable): noise reduction 0.5, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5 |
+| V13 | `normalize_clip` alone at volume 2: (a) isolation 0.8 and (b) an EQ, `processed_lufs` ≠ `measured_lufs`, the export at −16 ±0.5 and a second call "made no change"; (c) a plain clip, `processed_lufs` null, `renders` 0, the cache plan's −16 |
+| V14 | the hold instance, each leg on a fresh project whose `cache/isolated/` is empty: (a) the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), `cancel_sheet`, the clip unchanged after the hold; (b) the sheet seen, `set_audio {pan: 0.2}` during the hold, and once the sheet goes only the pan changed |
+| V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
+
+```sh
+python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E11
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M12
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/audio.md`'s AP6 record.

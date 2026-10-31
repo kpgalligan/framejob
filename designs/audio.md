@@ -236,6 +236,14 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
   Enhance Voice to the Microphone clip in the landing's grouped edit.
 - **Proof:** the owner's recording to −16 LUFS ±0.5 at −1 dBTP with its pause floor lowered;
   idempotence; one undo step; a voice-over that lands enhanced.
+- **Built in three parts, by size, as AP2 was.** Part 1: Enhance Voice itself — the measurements,
+  the rules, the loudness cache's high band (version 2), the volume solved on the clip rendered
+  through its own chain for Enhance and Loudness Normalize alike (the owner's answer,
+  2026-10-31), the Measuring Sound sheet, the button, Clip ▸ Enhance Voice and `enhance_voice`
+  (AU-60…AU-65; its record below). Part 2: the leveller stage, `audio.leveller` (a format bump), its section, and
+  Enhance turning it on from the speech's short-term loudness range (AU-66, AU-67). Part 3:
+  "Enhance the microphone when it lands", the recorder setting and its `UserDefaults` key,
+  applied in the landing's grouped edit (AU-68, AU-69).
 
 ### AP7 — live loudness and true-peak metering (A8)
 
@@ -1577,6 +1585,106 @@ E3 0.0272 dB, E4 0.00 LSB and −6.013 dBTP, E5 1.00 LSB, E6 −55.97 dB, V1 0.0
 **Owed.** SE-37 for the owner. Filed at integration: review 2's nit (no probe row for the inert
 skip) and review 1's two nits (the unused isolation render for a voiced clip, `audio.eq` beside
 `audio.eq.<slot>` in one `off`). The leveller's target joins `TAP_KEYS` with AP6 part 2.
+
+### AP6's record (2026-10-31)
+
+AP6 part 1, Enhance Voice (survey B1), built in lane B from `e55de46`. Parts 2 (the leveller,
+AU-66–67) and 3 (Enhance at record time, AU-68–69) are next.
+
+**Asked.** The first attempt (WIP `c9d6e13`) solved the volume through the compressor's
+block-rate model alone and stopped at V2: the owner's recording exported at −13.95 LUFS for a
+−16 target. Measured one at a time, the gate moved the export +2.4 LU, isolation +2.6 LU and the
+EQ −0.7 LU, because cleaning the pauses changes which blocks BS.1770's relative gate counts. The
+owner answered on 2026-10-31: (A), measure the processed sound, for Enhance and for Loudness
+Normalize alike.
+
+**Decided.** AU-60…AU-65, recorded before the first attempt's code, amended before this one's:
+AU-60's doors and the three skips from the render, AU-62's last rule, AU-64 rewritten (which
+clips render, the trial, the measurement plan, the render, the solve with its verify renders to
+±0.1 LU in at most three, idempotence at 0.05 dB, the At volume memo, the model kept for the
+makeup only) and AU-65 (the Measuring Sound sheet, the two tools off main, `processed_lufs` and
+`renders`, the proof, the manual check).
+
+**Landed.** App only — no core, FFI, op, format or `UserDefaults` change. Kept from the first
+attempt: the loudness cache's high band (version 2, AU-63: `LoudnessBlocks`,
+`MediaImporter+Loudness`, `ClipLoudness`'s `stepSources` and `stepHighs`), `AudioEnhance`'s
+`read`, `measure`, `speechMask`, rules and reasons, `AudioDynamicsModel`'s `compressed` and
+`makeupDB`, the button row, Clip ▸ Enhance Voice, `UIMenuTable`, `AssistantPrompt`'s line and
+the tool sets. New: `ProcessedLoudness.swift`, `LoudnessMeasureRun.swift`,
+`AudioMeasureDoor.swift` (the one body the buttons and the menu share: Peak at once, Loudness at
+once when nothing renders, else the sheet, the stale test and the commit),
+`AudioMeasureSheetController.swift`, `AudioEnhance+Reasons.swift` (moved out when
+`AudioEnhance.swift` passed 400 lines), `OptionDisplayControl+Snapshot.swift` (dev tools, for
+V15). Changed: `AudioEnhance.plan` split into `choose`, `jobs` and `plan` over the run's
+outcome; `AudioNormalize+Loudness` gains `Solved`, `keepVolumeDB` and `plan(_:targetLUFS:solved:)`;
+At volume reads the memo or shows "≈"; `NormalizeChoice.ops` removed, both callers through the
+door; `Exporter.withOfflineAudio` extracted from `withRampAudio`; `enhance_voice` and
+`normalize_clip` off main, their rows gaining `processed_lufs` and `renders`. Docs: the guide's
+Normalize and Enhance Voice sections and limits, menus-and-shortcuts.md, mcp.md, the README
+highlight; spec §4.3b, §5.6, §7.4, §7.8, §7.9a, §9; screen 09-clip-sound; the proof README; SE-38.
+
+**Deviations.** (1) **A render reads through the clip's fader.** AU-64 (c) as specified removed
+every ramp and added 20·log10 v to a verify render's loudness; on the owner's recording that read
+a gated clip under a limiter 0.19–0.25 LU above its own export (−15.94 against −16.18), failing
+V2's 0.2 LU, while an EQ or a compressor under the limiter agreed to 0.000 LU. With the base
+volume put back as ONE constant ramp the verify render read −15.976 against the export's
+−15.976, so a render's plan carries that ramp (`measurementPlan(_:clip:volume:)`), R0's trial is
+at volume 1, and AU-64 (c) and (e) say so with the figures; the cause inside the mix was not
+found. (2) The verify loop stops at ×32 only when still short of T (AU-64 (e)). (3) `UIMenuTable`
+and the inventory read Normalize and Enhance Voice as `sheet`, the door's `presentAsSheet` a new
+pinned site. (4) `OptionControls.swift` (over the cap) changed one token, `private(set) var
+text`, and took no line. Found on the way: `loudness_cache_probe.py`'s `no-relative-gate` mutant
+still named `ClipLoudness.swift`, where AP2b's move left no anchor; it names `StepLoudness.swift`
+now and is killed by C3.
+
+**Measured** (the lane; three lanes shared the machine). `audio_ap6_probe.py` 9/9 — E6, the
+owner's recording: L −41.672 LUFS, floor −61.820 LUFS (F −20.148 dB), pause peak −55.772 dBFS,
+speech peak −40.919 dBFS, sibilant share 0.017, isolatable; chosen: Rumble Cut, isolation 0.8,
+noise reduction 0, the gate at −6 re L, de-esser off, the compressor −41 dBFS 3:1 with +10 dB
+makeup, the limiter −1 dBTP — and `--mutants` 11/11, each by its named row;
+`loudness_cache_probe.py` 12/12 and `--mutants` 8/8; `limiter_probe.py` 9/9. On Release,
+`audio_ap6_proof.py` 37/37: **V2 the owner's recording at volume 15.781, processed −38.93 LUFS,
+2 renders, result −15.98, the export −15.98 LUFS at −0.9999 dBTP by both meters**; V3 the pause
+floor −65.19 against Normalize-only −37.07 dBFS (−28.12 dB); the press 0.68, 0.67 and 0.68 s
+cold (three runs), a second press 0.19 s (Debug 3.63, 5.22 and 4.10 s); V4 both "made no
+change"; V7's sibilant share 0.314; V12 at ×1.5 noise reduction 0.5, a gate, the floor −18.95 dB
+under, 4 renders, result −16.08, the export −16.18 LUFS; V13 (a) isolation processed −40.90, the
+export −15.94, (b) the EQ −41.13, −15.91, both then "made no change", (c) a plain clip 0 renders
+to −16.00; V8 the menu's set the tool's; V14 the sheet seen under the hold, (a) cancelled and
+unchanged, (b) only the pan changed; V15 At volume "−16.0 LUFS · −1.0 dBTP", "≈ −41.6 LUFS ·
+−18.5 dBTP" after an EQ change. Also on Release: `loudness_normalize_proof.py` 37/37,
+`refusal_proof.py` 145/145, `audio_ap4_proof.py` 30/30, `audio_ap5_proof.py` 22/22,
+`voice_proof.py` 38/38, `op_argument_proof.py` 176/176 (105 product tools),
+`op_catalog_proof.py` 23/23, `screens.py --only 09-clip-sound` 6/6; the parity log empty.
+`make gate` PASS 380 s.
+
+**Review.** Passed with two nits, no fix pass: Enhance's keep rule (AU-64 (f)) compares the
+solve's limiter with the chosen one, a default `LimiterProps()` when the clip had none, so a
+first press can keep a volume within 0.05 dB on a clip that did not carry that limiter (the
+limiter is still written); and `ProcessedLoudness.Memo`'s key names no document, so two open
+projects with the same clip id, plan and chain could share an R0 for At volume. Both filed.
+
+**Integrated.** AP10b (`f334267`) and AP8b (`6e1073a`) had landed since the lane's base. No
+format bump. Conflicts taken as unions: the decisions index's `audio.md` row (the AP6 segment
+between AP5's and AP7's), README's audio highlight (AP8b's "animated by actions" and Enhance
+Voice), §7.4 (AP10b's stems row beside AP6's rows), the guide's limits (AP6's voice-effect
+bullet, AP8b's animation bullet), the proof README (this section after AP8b's) and
+`manual-checks.md`: AP10b and AP8b took SE-36 and SE-37, so this check is SE-38, and AU-65 and
+its index row say so. The Lines cells were counted again. No product code needed resolving. The
+CLAUDE.md edits owed went in: app's map names the nine new files and Normalize's door; the
+root's tool list gains `enhance_voice`, and both say one hundred and five product tools. Seen
+at integration: AU-64 (a)'s render test reads the clip's base audio only, so a stage set only on
+an action's end (AP8b) leaves the clip on the cache path; filed. On the merged tree `make gate`
+PASS 260 s (names 1, typecheck 6 with the four baseline warnings, fmt and lint skipped, test
+129, app 123). Though no resolution touched product code, the lane's code met AP8b's tap here,
+so `audio_ap6_proof.py` ran again against Release after the gate: 37/37, the press 0.70, 0.68
+and 0.70 s cold (three runs), V12 result −16.08 and the export −16.18 LUFS in 4 renders, V13
+(a) −15.94, (b) −15.91, (c) −16.00 in 0 renders, no `Frame Job: ` line.
+
+**Owed.** SE-38 for the owner (Enhance Voice by ear: pumping, clipped word starts, the pauses).
+Filed at integration: V12's last verify render read +0.73 dBTP at ×1.5 Keep pitch under a −1
+dBTP clip limiter (the export's master holds −1); the review's two nits; the render test that
+predates animated audio.
 
 ### Closing the road map
 

@@ -9,8 +9,9 @@ import Foundation
 /// `async`/`await` is confined to `MediaImporter.swift`.
 extension MediaImporter {
     /// The cache's format. A marker of another version reads as absent and the
-    /// cache is made again (no migration, SY-34's posture).
-    static let loudnessVersion = 1
+    /// cache is made again (no migration, SY-34's posture). 2 since each
+    /// record gained the high band (spec §11 AU-63).
+    static let loudnessVersion = 2
 
     /// The versioned wrapper of the file's `CacheStamp`, with what sizes a
     /// record: `blocksPerSecond` (100) and `oversample` (4) are in it so a
@@ -48,8 +49,9 @@ extension MediaImporter {
     }
 
     /// The cache, or nil until a current marker certifies a `.bin` of
-    /// exactly `⌈duration·100⌉` records whose every value is finite, with
-    /// z and tp ≥ 0 (`zLR` may be negative).
+    /// exactly `⌈duration·100⌉` records of width 3 (mono) or 8 (stereo)
+    /// whose every value is finite, with z, tp and h ≥ 0 (`zLR` and `hLR`
+    /// may be negative).
     static func loadLoudness(for media: UInt32, in cacheDir: URL) -> MediaLoudness? {
         guard let marker = readLoudnessStamp(at: loudnessMarkerURL(for: media, in: cacheDir))
         else { return nil }
@@ -57,7 +59,7 @@ extension MediaImporter {
         let count = (duration * Double(peakBucketsPerSecond)).rounded(.up)
         guard count.isFinite, count >= 0, count < Double(Int.max / 32) else { return nil }
         let records = max(1, Int(count))
-        let width = marker.channels == 1 ? 2 : 5
+        let width = marker.channels == 1 ? 3 : 8
         let url = loudnessURL(for: media, in: cacheDir)
         guard let data = try? Data(contentsOf: url),
             data.count == records * width * MemoryLayout<Float>.size
@@ -65,8 +67,8 @@ extension MediaImporter {
         let values = data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
         for (index, value) in values.enumerated() {
             guard value.isFinite else { return nil }
-            // The cross term, stereo's third value, alone may be negative.
-            if value < 0, !(width == 5 && index % 5 == 2) { return nil }
+            // The cross terms, stereo's `zLR` and `hLR`, alone may be negative.
+            if value < 0, !(width == 8 && (index % 8 == 2 || index % 8 == 7)) { return nil }
         }
         return MediaLoudness(channels: marker.channels, count: records, records: values)
     }

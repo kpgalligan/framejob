@@ -209,7 +209,8 @@ OPS = 55
 APP_STATE_TOOLS = {
     "open_project", "new_project", "save_project", "get_project", "import_media",
     "import_captions", "export_captions", "transcribe", "consolidate_media",
-    "detect_silence", "normalize_clip", "set_playhead", "set_range", "set_selection",
+    "detect_silence", "normalize_clip", "enhance_voice", "set_playhead", "set_range",
+    "set_selection",
     "set_scope", "undo", "redo", "render_frame", "export", "record_screen",
     "write_graphic", "get_graphic", "graphic_reference", "render_graphic",
     "import_graphic_font", "import_graphic_asset", "close_project",

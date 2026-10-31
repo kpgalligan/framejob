@@ -17,6 +17,8 @@ import Foundation
 /// the gating grid is anchored at the played start; 400 ms gating blocks at
 /// a 100 ms hop, counted from the whole steps; −70 LUFS then −10 LU, once.
 /// A speed other than ×1 or a ramp reads within about 0.5 LU (spike S4).
+/// Each step also carries its source midpoint and its high band (AU-61,
+/// AU-63), for Enhance Voice.
 enum ClipLoudness {
     /// One gating block: under it there is no integrated loudness.
     static let minimumPlayedTicks: Ticks = 240_000
@@ -80,6 +82,13 @@ enum ClipLoudness {
         /// Each step's true peak, linear: the max of the records its energy
         /// read, on the louder output channel.
         let stepPeaks: [Double]
+        /// Each step's source midpoint in forward-file ticks (after speed, a
+        /// ramp's map and reversal): where Enhance Voice asks whether a step
+        /// is speech (spec §11 AU-61).
+        let stepSources: [Ticks]
+        /// Each step's high-band energy (the records' `h`, AU-63), read as
+        /// `steps` reads z: the export's layout, through the same matrix.
+        let stepHighs: [Double]
     }
 
     enum Answer: Equatable {
@@ -98,6 +107,8 @@ enum ClipLoudness {
         let step = stepTicks
         var steps: [Double] = []
         var stepPeaks: [Double] = []
+        var stepSources: [Ticks] = []
+        var stepHighs: [Double] = []
         var peak = 0.0
         var played: Ticks = 0
         let ordered = segments.indices.sorted { segments[$0].start < segments[$1].start }
@@ -122,42 +133,53 @@ enum ClipLoudness {
                 let read = energy(cache, from: min(a, b), to: max(a, b), matrix)
                 steps.append(read.energy)
                 stepPeaks.append(read.peak)
+                stepSources.append(min(a, b) + abs(b - a) / 2)
+                stepHighs.append(read.high)
             }
         }
         return Reading(
             lufs: StepLoudness.integrated(steps), truePeak: peak, playedTicks: played,
-            steps: steps, stepPeaks: stepPeaks)
+            steps: steps, stepPeaks: stepPeaks, stepSources: stepSources, stepHighs: stepHighs)
     }
 
     /// One step's Σ over the output channels of the mean square: the mean of
     /// records `[⌊a/step + ½⌋, ⌊b/step + ½⌋)`, else the one record holding the
     /// midpoint. Outside the file reads as silence. Its peak is the largest
-    /// true peak of the records it read.
+    /// true peak of the records it read; its high band the same mean of `h`.
     private static func energy(
         _ cache: MediaLoudness, from a: Ticks, to b: Ticks, _ matrix: ChannelMatrix
-    ) -> (energy: Double, peak: Double) {
+    ) -> (energy: Double, peak: Double, high: Double) {
         let step = stepTicks
         let first = MediaPeaks.bucketIndex(a + step / 2, bucket: step)
         let end = MediaPeaks.bucketIndex(b + step / 2, bucket: step)
         if end > first {
             let lower = max(0, first)
             let upper = min(cache.count, end)
-            guard upper > lower else { return (0, 0) }
+            guard upper > lower else { return (0, 0, 0) }
             var sum = 0.0
             var peak = 0.0
+            var high = 0.0
             for record in lower..<upper {
                 sum += energy(cache, record, matrix)
                 peak = max(peak, truePeak(cache, record, matrix))
+                high += energy(cache, record, matrix, at: cache.highOffset)
             }
-            return (sum / Double(end - first), peak)
+            return (sum / Double(end - first), peak, high / Double(end - first))
         }
         let middle = MediaPeaks.bucketIndex(a + (b - a) / 2, bucket: step)
-        guard middle >= 0, middle < cache.count else { return (0, 0) }
-        return (energy(cache, middle, matrix), truePeak(cache, middle, matrix))
+        guard middle >= 0, middle < cache.count else { return (0, 0, 0) }
+        return (
+            energy(cache, middle, matrix), truePeak(cache, middle, matrix),
+            energy(cache, middle, matrix, at: cache.highOffset)
+        )
     }
 
-    private static func energy(_ cache: MediaLoudness, _ record: Int, _ m: ChannelMatrix) -> Double {
-        let base = record * cache.width
+    /// A record's Σ over the output channels of the mean square whose
+    /// values start at `offset`: z at 0, h at `highOffset`.
+    private static func energy(
+        _ cache: MediaLoudness, _ record: Int, _ m: ChannelMatrix, at offset: Int = 0
+    ) -> Double {
+        let base = record * cache.width + offset
         let r = cache.records
         guard cache.channels == 2 else { return 2 * Double(r[base]) }  // dual mono
         let zL = Double(r[base]), zR = Double(r[base + 1]), zLR = Double(r[base + 2])

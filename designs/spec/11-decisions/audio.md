@@ -493,6 +493,155 @@ AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded
   rendered. An agent uses `set_audio {isolation}`: no new tool, and the render's status is not in
   `get_project`.
 
+AU-60…AU-65 are AP6's first part (Enhance Voice; survey B1), recorded before its code. AP6 is
+built in three parts, by size, as AP2 was: the leveller (B3) is the second, with AU-66 and AU-67;
+Enhance at record time (B8) the third, with AU-68 and AU-69.
+
+- **AU-60 — Enhance Voice is a composite, not an op, and owns eight keys.** Clip ▸ Enhance Voice,
+  a button in the Volume section under Normalize's, and `enhance_voice {clips, target_lufs?}`
+  measure each clip (AU-61) and write ORDINARY settings a person can see and change, by the rules
+  of AU-62: `eq.high_pass` (with `bypass: false`, the rest of the EQ kept), `isolation`,
+  `noise_reduction`, `gate`, `de_esser`, `compressor`, `limiter` and `volume`, each overwritten.
+  Every other key of the audio group (hum, channels, pan, mono, fades, duck, mute, keep pitch, the
+  EQ's other slots) is left as it is. It writes BASE props even inside an action (Normalize's
+  reason), as one `set_audio` per clip — the settings differ per clip — committed as ONE undo
+  step named "Enhance Voice". The target is `NormalizeChoice.targetLUFS` for the button and the
+  menu (the Normalize row's Target field) and `target_lufs` for the tool (−50…−5, default −16,
+  refused by name outside it, never clamped). Each clip of a selection is enhanced from its own
+  measurements; a clip that cannot be is skipped by name and the rest are still enhanced:
+  Normalize's own refusals (`admit`: not a clip, a nest, no audio segment, no audio props), its
+  loudness cache not yet written, under 0.4 s played, gated out (under −70 LUFS), its speech not
+  yet detected ("its speech has not been detected yet"), and under 1 s of speech; then, from the
+  processed measurement (AU-64), its reversed copy still being made ("its reversed copy is still
+  being made."), its processing failing to render ("its processing could not be measured: …")
+  and its processed sound gated out ("is under −70 LUFS after its processing."). It is offered
+  where Normalize is (`AudioNormalize.canOffer`). **The doors** (amended 2026-10-31, the owner's
+  answer): the button and the menu share one body, `AudioMeasureDoor`, which reads, measures
+  under the Measuring Sound sheet (AU-65) and commits only when the document's project and scope
+  are still the ones it read — otherwise it beeps and puts "the project changed while its sound
+  was being measured, so nothing changed. Choose Enhance Voice again." at the inspector's foot.
+  The tool reads and commits on main and waits for the measurement off it, with the same test and
+  "… Call enhance_voice again." With nothing to enhance, or no window, the button and the menu
+  beep and the tool answers "Nothing could be enhanced." with every reason. No core, FFI, op,
+  format or `UserDefaults` change.
+- **AU-61 — What it measures, all pre-chain.** L and the true peak are the clip's `ClipLoudness`
+  reading (AU-41's: the played window, the export's layout, pan · fold · pick, pre-fader), and the
+  steps are that reading's 10 ms played steps. The speech spans are the media's saved
+  `media.speech` when it has them (AU-111), else `DuckSpeech.spans` of its Silero VAD cache (the
+  spans Duck by Speech would save; Remove Silences' threshold); a step is SPEECH when its source
+  midpoint (`ClipLoudness.Reading.stepSources`, forward-file ticks after speed, a ramp's map and
+  reversal) lies in a span, else a PAUSE. With ℓ(e) = `ClipLoudness.loudness(e)` of a step's
+  energy: the FLOOR is the median of ℓ over the pause steps (−∞ allowed), measured only with at
+  least 0.5 s (50 steps) of pause; the PAUSE PEAK the median of 20·log10 of the pause steps' true
+  peaks (dBFS, nil with the floor); the SPEECH PEAK the median of the same over the speech steps;
+  the SIBILANT SHARE the share of speech steps whose high band (`stepHighs`, AU-63) reads
+  ℓ ≥ L − 10; `isolatable` that every segment of the clip is `IsolationCache.isolatable`. A clip
+  needs at least 1 s (100 steps) of speech. Nothing measured depends on a key Enhance writes, so a
+  second press measures the same and writes the same: the core answers an identity ("made no
+  change").
+- **AU-62 — The rules.** With F = floor − L:
+  - **High-pass, always:** the EQ's Rumble Cut (`EqPreset.rumbleCut`, 80 Hz at 24 dB/octave)
+    applied to the clip's own EQ, or to an empty one.
+  - **Noisy pauses, F > −45 dB:** voice isolation at `IsolationCache.defaultAmount` (0.8) and
+    noise reduction 0 when the clip is isolatable, else noise reduction 0.5 and isolation 0; and
+    the gate at its defaults with `threshold_db = clamp(round(pause peak + 10 − L), −40, −6)` —
+    10 dB above the pauses' median true peak, in the gate detector's own units (its peak
+    follower, `AudioGateStage`), re L. F decides only WHETHER to clean and gate. **Quiet pauses,
+    F ≤ −45 (−∞ too):** isolation 0, noise reduction 0, gate off. **No floor** (under 0.5 s of
+    pause): those three keys are left out of the edit, and the row says why.
+  - **Sibilance:** the de-esser at its defaults when the sibilant share is at least 5 %, else off.
+  - **Compressor, always:** threshold `clamp(round(speech peak), −60, 0)` dBFS, ratio, attack and
+    release at their defaults (3:1, 10 ms, 200 ms), and makeup `AudioDynamicsModel.makeupDB`
+    (AU-64): the loudness the compression takes, given back, so the fader keeps its ×32 headroom
+    (the owner's recording needs ×23.4 with the limiter alone, AP2's record).
+  - **Limiter, always:** the clip's own kept with its ceiling at most −1 dBTP, else the default.
+  - **Volume and limiter:** by AU-64's processed solve, at the target, with the limiter above
+    (amended 2026-10-31).
+  Each rule's sentence goes in the answer's `reasons`: the measurement, the threshold, what it set.
+- **AU-63 — The loudness cache gains the high band (amends AU-10).** `loudnessVersion` 2; each
+  record appends `h`: mono `z, tp, h`, stereo `zL, zR, zLR, tpL, tpR, hL, hR, hLR` (width 3 and
+  8). `h` is the mean over the block's frames of x_hp² (`hLR` of xL_hp·xR_hp, which alone with
+  `zLR` may be negative), x_hp the raw samples through two `AudioEQDesign.highPass(6000, q:
+  butterworthQ(sections: 2, index: 0|1))` sections in Double — the de-esser's sidechain at its
+  default frequency — their state carried across buffers; `h` is 0 where 6 kHz is at or above
+  0.49·fs. A version-1 marker reads as absent and the cache is made again (no migration). A
+  reading's `stepHighs` read `h` through the same 2×2 matrix as z (a mono record doubled); z, tp
+  and every figure built on them are unchanged.
+- **AU-64 — The volume is solved on the processed sound (amends AU-24 and AU-26; rewritten
+  2026-10-31 by the owner's answer).** The first form ran the clip's compressor at block rate over
+  the cache's steps (`AudioDynamicsModel`) and left the gate, de-esser, isolation and noise
+  reduction out. Measured on the owner's recording, Enhance's export landed at −13.95 LUFS for a
+  −16 target, and each cleaning stage alone moved the export: the gate +2.4 LU, isolation +2.6
+  LU, the EQ −0.7 LU. The cause is that cleaning the pauses changes which blocks BS.1770's
+  relative gate counts, which no per-stage model of the loudness alone can see. So the clip is
+  measured as it will play. The owner chose this over modelling the gate, knowing a press takes
+  seconds on a long clip.
+  (a) **Which clips render.** `ProcessedLoudness.needsRender` is true when the clip's base audio
+  has an `eq` with an active slot and not bypassed, `hum`, `isolation` > 0, `noise_reduction` >
+  0, a `gate`, a `de_esser`, a `compressor` or a voice that is not inert. Pan, mono, channels
+  and the limiter are already counted or modelled by the cache reading (AU-11, AU-24), so a clip
+  with only those plans off the cache, byte for byte as before. Enhance always renders.
+  (b) **The trial.** On main, `document.project` with one `set_audio {clips: [c], patch:
+  chain}` scoped to the open nest, then `.scoped(nest)`. The first render's (R0) chain is
+  Normalize's `{limiter: null}`, or Enhance's chosen patch with `limiter: null`.
+  (c) **What is read.** The trial's plan with only the clip's audio segments (an emptied track
+  dropped), each track's `ramps` and each segment's `track_pans` removed — pre-fader, AU-11's
+  convention: no volume, fades, ducks, mute, track volume or pan — no video tracks or ducks, and
+  one instruction over the plan. The read is the span of the clip's segments. A render puts
+  back ONE constant ramp at the trial clip's base volume, the export's fader and nothing else of
+  the envelope: R0's trial is at volume 1, so R0 is pre-fader, and a verify render's loudness is
+  R as it stands. Measured on the owner's recording (AP6's record), a gated clip under a limiter
+  read with no ramp at all landed 0.19–0.25 LU above its own export, and with the ramp to
+  0.000 LU of it; an EQ or a compressor under the limiter agreed either way, and a gate with no
+  limiter exports exactly 6.021 dB louder at volume 2 than at 1. The cause inside the mix was not
+  found.
+  (d) **The render.** On `ProcessedLoudness.queue`, under a fresh `RecipeSource` key holding the
+  trial, with the document's reverse resolution published for it: the export's own waits
+  (`Exporter.withOfflineAudio`: levels, then ramp, isolation and voice renders, wanted under the
+  key), `CompositionBuilder.build`, and one `AVAssetReaderAudioMixOutput` of float stereo
+  through the built mix, placed by stamp (gaps as zeros) into a `StepLoudnessMeter`. The key is
+  dropped afterwards; its render wants are kept until the press finishes, so the verify renders
+  find the same files. Speed, ramps and reversal are measured on what plays, because the
+  composition is the export's. A reversed clip still pending, a failed wait and a gated-out
+  result are skips (AU-60).
+  (e) **The solve.** R0's steps make a reading (its integrated loudness, its largest step peak);
+  AU-24's plan gives the volume v and the limiter. With no limiter the result is R0 + 20·log10 v,
+  one render. With one, a verify render of the chain with `{volume: v, limiter}` (the stage told
+  v, AU-22) read through the fader at v gives R; while |R − T| > 0.1 LU, the volume can still
+  move toward T (not at ×32 and short) and fewer than three verify renders have run,
+  v ← min(v·10^((T − R)/20), ×32) and render again.
+  `limited_by` is `max_gain` when the last R is under T − 0.1 at ×32. Enhance and Loudness
+  Normalize solve the same way, so Normalize after Enhance measures what Enhance measured.
+  (f) **Idempotence.** A rendered clip that already carries the solved limiter and whose volume
+  is within 0.05 dB of v keeps its volume, so a second press is an identity. 0.05 dB is twice
+  the 0.025 dB a re-rendered isolation window differing by −51 dB (S2) can move a loudness. A
+  clip planned off the cache is never kept this way.
+  (g) **The readouts.** Loudness stays the material (AU-11). At volume on a clip that renders
+  reads the last R0 measured for the clip's current plan and chain (`ProcessedLoudness.Memo`, 32
+  entries, emptied when a loudness file or an offline render lands), through the limiter model at
+  the current volume as AU-26 does; with none it shows the cache figure as "≈ …", its tooltip
+  saying it is before the clip's processing. No background measurement.
+  (h) `AudioDynamicsModel` stays only for Enhance's makeup (AU-62); nothing else reads it.
+- **AU-65 — The chrome, the tool, the proof.** An "Enhance Voice" button row under the Normalize
+  button in the Volume section (its tooltip the rules in a sentence); Clip ▸ Enhance Voice right
+  after Normalize, no key equivalent (Normalize's reason). `enhance_voice` takes `clips` and
+  `target_lufs`, no `scope` (it follows the open container, as `normalize_clip`), and answers
+  `{target_lufs, ceiling_dbtp, enhanced: [{clip, media, measured_lufs, true_peak_dbtp,
+  speech_seconds, floor_lufs, floor_gap_db, pause_peak_dbfs, sibilance_share, set, reasons,
+  volume, result_lufs, result_true_peak_dbtp, limited_by}], skipped?, note?}`, `set` exactly the
+  edit's keys in `set_audio`'s spelling, plus `processed_lufs` (R0's loudness) and `renders`;
+  `result_lufs` and `result_true_peak_dbtp` are the last verify render's. **The sheet**
+  (amended 2026-10-31): while any clip renders, the button and the menu (Enhance Voice, and
+  Normalize in Loudness mode) put up the Measuring Sound sheet — a bar, "Clip n of N…" and
+  Cancel, which changes nothing — in the Synchronizing Audio sheet's shape (SY-22); with no
+  clip to render, Loudness Normalize commits at once as before, and Peak mode never renders.
+  `enhance_voice` and `normalize_clip` become off-main tools (`syncAudio`'s pattern: read and
+  commit on main, the wait off it, the assistant's Stop cancelling it); `normalize_clip`'s
+  Loudness rows gain `processed_lufs` (null off the cache) and `renders` (0 there). The proof is
+  `audio_ap6_probe.py` (E1–E3, E6–E11, mutants M1–M6 and M8–M12), the loudness probe's C1 and
+  C12 with M7, and `audio_ap6_proof.py` V1–V15 over MCP and exports; how the result sounds on
+  the owner's voice is manual check SE-38 (AP8a, AP10b and AP8b took SE-35…SE-37).
+
 AU-70…AU-78 are AP7's (live loudness and true-peak metering; survey A8), recorded before its
 code.
 

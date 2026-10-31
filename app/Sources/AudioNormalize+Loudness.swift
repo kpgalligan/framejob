@@ -41,7 +41,30 @@ extension AudioNormalize {
         var stepPeaks: [Double] = []
         /// The clip's own limiter, nil when it has none.
         var limiter: LimiterProps? = nil
+        /// On a processed reading (spec §11 AU-64 (e)), the cache's L: `lufs`
+        /// is then the clip's loudness through its own chain. nil off the cache.
+        var materialLUFS: Double? = nil
+        /// The clip's base volume as read, which a solved row keeps when the
+        /// solve lands within `keepVolumeDB` of it (AU-64 (f)).
+        var currentVolume: Double? = nil
     }
+
+    /// One rendered clip's solve (AU-64 (e)): the volume and limiter to
+    /// write, where the last render says it lands, and how many renders it
+    /// took (R0 and the verify renders).
+    struct Solved: Equatable {
+        let volume: Double
+        let limiter: LimiterProps?
+        let resultLUFS: Double
+        let resultTruePeakDBTP: Double
+        let limit: Limit?
+        let renders: Int
+    }
+
+    /// AU-64 (f): a solved volume within this of the clip's own is not
+    /// written — twice the 0.025 dB a re-rendered isolation window moves a
+    /// loudness (S2).
+    static let keepVolumeDB = 0.05
 
     /// What one clip's loudness normalise will do.
     struct LoudnessResult: Equatable {
@@ -57,6 +80,10 @@ extension AudioNormalize {
         let limit: Limit?
         /// The clip's limiter after the edit, nil when it has none.
         let limiter: LimiterProps?
+        /// R0's loudness through the clip's chain (AU-64); nil off the cache.
+        var processedLUFS: Double? = nil
+        /// The renders the solve took; 0 off the cache.
+        var renders = 0
     }
 
     struct LoudnessInput {
@@ -113,11 +140,12 @@ extension AudioNormalize {
                                 + "loudness (one 400 ms gating block)."))
                 } else if let lufs = reading.lufs, reading.truePeak > 0 {
                     let media = segments[id]?.first?.media ?? 0
+                    let audio = snapshot.clip(id)?.audio
                     readings.append(
                         LoudnessReading(
                             clip: id, media: media, lufs: lufs, truePeak: reading.truePeak,
                             steps: reading.steps, stepPeaks: reading.stepPeaks,
-                            limiter: snapshot.clip(id)?.audio?.limiter))
+                            limiter: audio?.limiter, currentVolume: audio?.volume))
                 } else {
                     problems.append(
                         Problem(
@@ -139,15 +167,24 @@ extension AudioNormalize {
     /// default; the volume is `AudioLimiterModel`'s gain for the target under
     /// that limiter. `limited_by` is `max_gain` when the volume ceiling stops
     /// it short. It may turn a clip down. A non-finite target falls back to
-    /// the default and is reported as `targetLUFS`.
-    static func plan(_ input: LoudnessInput, targetLUFS: Double = defaultTargetLUFS)
-        -> LoudnessPlan
-    {
+    /// the default and is reported as `targetLUFS`. A clip in `solved` was
+    /// measured through its chain (AU-64) and takes its solve's volume and
+    /// limiter instead (`solvedRow`).
+    static func plan(
+        _ input: LoudnessInput, targetLUFS: Double = defaultTargetLUFS,
+        solved: [UInt32: Solved] = [:]
+    ) -> LoudnessPlan {
         let target = targetLUFS.isFinite ? targetLUFS : defaultTargetLUFS
         let ceiling = pow(10, ceilingDBTP / 20)
         var ops: [ReelOp] = []
         var normalized: [LoudnessResult] = []
         for reading in input.readings {
+            if let solve = solved[reading.clip] {
+                let (op, row) = solvedRow(reading, solve)
+                ops.append(op)
+                normalized.append(row)
+                continue
+            }
             let wanted = pow(10, (target - reading.lufs) / 20)
             let first = max(0, min(wanted, maxGain))
             let row: LoudnessResult
@@ -180,6 +217,31 @@ extension AudioNormalize {
         }
         return LoudnessPlan(
             targetLUFS: target, ops: ops, normalized: normalized, skipped: input.problems)
+    }
+
+    /// A rendered clip's op and row (AU-64 (e), (f)): the solve's volume,
+    /// or the clip's own when it already carries the solved limiter and the
+    /// two are within `keepVolumeDB`, so a second press is an identity.
+    private static func solvedRow(_ reading: LoudnessReading, _ solve: Solved)
+        -> (ReelOp, LoudnessResult)
+    {
+        var volume = solve.volume
+        if solve.limiter == reading.limiter, let current = reading.currentVolume, current > 0,
+            solve.volume > 0, abs(20 * log10(solve.volume / current)) <= keepVolumeDB
+        {
+            volume = current
+        }
+        let patch = solve.limiter.map { AudioPatch(volume: volume, limiter: .some($0)) }
+            ?? AudioPatch(volume: volume)
+        var row = LoudnessResult(
+            clip: reading.clip, media: reading.media,
+            measuredLUFS: reading.materialLUFS ?? reading.lufs,
+            truePeakDBTP: 20 * log10(reading.truePeak), volume: volume,
+            resultLUFS: solve.resultLUFS, resultTruePeakDBTP: solve.resultTruePeakDBTP,
+            limit: solve.limit, limiter: solve.limiter)
+        row.processedLUFS = reading.lufs
+        row.renders = solve.renders
+        return (.setAudio(clips: [reading.clip], patch: patch), row)
     }
 
     /// The volume and the model's loudness for one reading under `limiter`.

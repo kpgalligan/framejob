@@ -491,6 +491,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does each animated setting move smoothly and sound the same in the export, and is a switch at the action's end clean?
 - **Source:** road map "audio" AP8b (spec §11 AU-85…AU-88); `tools/proof/audio_ap8b_proof.py` measures the exports against analytic gains, the preview's meter against the export, a switch's bytes and the EQ slot keyed off (E1–E6, V1, U1), not how the motion sounds or how the rows read.
 
+**SE-38 — Enhance Voice on your own voice sounds right**
+- **Do:** 1. Import `samples/Rode-usb-mic.m4a` (or a voice recording of your own made in an ordinary room) and let its analysis finish. 2. Select it and choose Clip ▸ Enhance Voice; watch the Measuring Sound sheet come and go. 3. Play it, then export it as Audio only (WAV) and play the file. 4. Undo, and compare with Normalize alone. 5. Look at the Volume section's At volume read-out after the press, then change the EQ and look again.
+- **Expect:** the voice is clear and steady at a comfortable level, close to other −16 LUFS material; the pauses are quiet but sound natural, not cut to dead silence between words; no word's first sound is clipped off by the gate; the level does not pump up and down with the speech; "s" sounds are not harsh (and not lisped when the de-esser came on); the export sounds like the preview. At volume reads about −16.0 LUFS with no "≈", and "≈ …" after the EQ change.
+- **Answer:** does the enhanced voice sound right: no pumping, no clipped word starts, natural pauses?
+- **Source:** road map "audio" AP6 part 1 (spec §11 AU-60…AU-65); `tools/proof/audio_ap6_proof.py` measures the settings, the export's loudness and true peak, the pause floor, idempotence and the sheet (V1–V15), not how it sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

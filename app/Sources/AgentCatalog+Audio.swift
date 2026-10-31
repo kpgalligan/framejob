@@ -153,7 +153,20 @@ extension AgentServer {
                     + "short (else null), result_lufs says where it lands, "
                     + "result_true_peak_dbtp is held at the limiter's ceiling, and "
                     + "measured_lufs and true_peak_dbtp are the Volume section's Loudness "
-                    + "readout. A clip that "
+                    + "readout. In loudness mode a clip with an active EQ, a hum notch, voice "
+                    + "isolation, noise reduction, a gate, a de-esser, a compressor or a voice "
+                    + "effect is measured THROUGH that processing: its window is rendered "
+                    + "offline as the export plays it, pre-fader (waiting for its isolation or "
+                    + "voice render; seconds on a long clip), the volume is solved on what comes "
+                    + "out and, with a limiter, checked by render to within 0.1 LU; "
+                    + "processed_lufs is that measurement and renders the renders it took (null "
+                    + "and 0 for a clip measured off the loudness cache alone, whose "
+                    + "true_peak_dbtp is the material's; a rendered clip's is the processed "
+                    + "one). A solved volume within 0.05 dB of the clip's own is kept, so a "
+                    + "second call still changes nothing. Such a clip is skipped by name when "
+                    + "its reversed copy is still being made, its processing cannot be "
+                    + "rendered, or it is under -70 LUFS after it; and if the project changes "
+                    + "while it measures nothing changes and the call says so. A clip that "
                     + "plays no sound, one that is silent (or under -70 LUFS, or plays under "
                     + "0.4 s) over the part that plays, and one whose waveform or loudness has "
                     + "not been analysed yet are each reported by name under skipped and the "
@@ -183,6 +196,72 @@ extension AgentServer {
                             + "should land at, in LUFS. Default -16; -14 is YouTube's playback "
                             + "reference and -23 EBU R 128's. Outside -50 to -5 is refused "
                             + "rather than clamped; refused with mode \"peak\".",
+                    ],
+                ], required: ["clips"]),
+            // Road map "audio" AP6 (spec §11 AU-60…AU-65): Clip ▸ Enhance
+            // Voice's and the Volume section's Enhance Voice button's mirror,
+            // a composite like normalize_clip.
+            tool(
+                "enhance_voice",
+                "Sets each clip up for speech from its own measurements, in one undo step — "
+                    + "Clip ▸ Enhance Voice, and the Enhance Voice button in the Clip tab's "
+                    + "Volume section (which use the Normalize row's Target). It measures, "
+                    + "before any of the clip's settings: the integrated loudness L and true "
+                    + "peak (the Volume section's Loudness readout), and over each 10 ms the "
+                    + "clip plays whether it is speech (the media's saved speech spans, else its "
+                    + "cached Silero VAD) or a pause. Then it writes ordinary settings, each one "
+                    + "visible and changeable in its section: always the EQ's Rumble Cut "
+                    + "high-pass (80 Hz, 24 dB/octave; the EQ's other slots kept); when the "
+                    + "pauses are noisy — their floor (median loudness) less than "
+                    + String(format: "%g", -AudioEnhance.noisyGapDB)
+                    + " dB under L — voice isolation at "
+                    + String(format: "%g", IsolationCache.defaultAmount)
+                    + " (noise reduction "
+                    + String(format: "%g", AudioEnhance.noiseReductionAmount)
+                    + " instead where isolation cannot serve the clip: a speed other than 1, a "
+                    + "ramp or a freeze) and the gate, opening "
+                    + String(format: "%g", AudioEnhance.gateAbovePausePeakDB)
+                    + " dB above the pauses' median true peak (threshold_db re L, held to -40 "
+                    + "… -6); with quiet pauses isolation, noise reduction and the gate are off, "
+                    + "and with under 0.5 s of pause they are left as they are; the de-esser "
+                    + "at its defaults when at least "
+                    + String(format: "%g", AudioEnhance.sibilanceShare * 100)
+                    + " % of the speech has its 6 kHz band within 10 dB of L, else off; a "
+                    + "compressor whose threshold is the speech's median true peak (dBFS, 3:1) "
+                    + "with makeup that gives back what it takes; the limiter (the clip's own "
+                    + "kept, its ceiling at most -1 dBTP, else the default); and the volume "
+                    + "that takes the clip to target_lufs, solved on the clip rendered offline "
+                    + "through those very settings as the export plays it, pre-fader (the "
+                    + "limiter told the volume and checked by render to within 0.1 LU, up to "
+                    + "three times) — normalize_clip's loudness mode measures a processed clip "
+                    + "the same way, so normalize_clip at the same target afterwards changes "
+                    + "nothing. The render waits for the clip's isolation render and takes "
+                    + "seconds on a long clip (the menu and the button show the Measuring Sound "
+                    + "sheet meanwhile); if the project changes while it measures, nothing "
+                    + "changes and the call says so. It overwrites exactly those keys of "
+                    + "set_audio (eq, isolation, noise_reduction, gate, de_esser, compressor, "
+                    + "limiter, volume) and leaves every other one (hum, channels, pan, mono, "
+                    + "fades, duck, mute). Like normalize_clip it writes BASE settings even with "
+                    + "the playhead inside an action, nothing it chooses depends on what it "
+                    + "writes, and a solved volume within 0.05 dB of the clip's own is kept, so "
+                    + "a second call changes nothing (\"made no change\"). Each row of enhanced "
+                    + "gives the measurements, set (exactly the keys written), reasons (one "
+                    + "sentence per rule: the measurement, the threshold, what it set), "
+                    + "processed_lufs (the loudness through the new settings, before the "
+                    + "volume), renders, and the volume's figures, result_lufs and "
+                    + "result_true_peak_dbtp being the last render's. A clip that plays no "
+                    + "sound, is a nest, plays under 0.4 s, is under -70 LUFS, has under 1 s of "
+                    + "speech, whose loudness or speech has not been analysed yet, whose "
+                    + "reversed copy is still being made, whose processing cannot be rendered, "
+                    + "or that is under -70 LUFS after its processing is reported by name under "
+                    + "skipped and the rest are still enhanced.",
+                [
+                    "clips": clipsProperty,
+                    "target_lufs": [
+                        "type": "number", "minimum": -50, "maximum": -5,
+                        "description": "The integrated loudness each clip should land at, in "
+                            + "LUFS. Default -16; -14 is YouTube's playback reference and -23 "
+                            + "EBU R 128's. Outside -50 to -5 is refused rather than clamped.",
                     ],
                 ], required: ["clips"]),
             // Road map "audio-sync" AS-1 (spec §11 SY-1..SY-5): Clip ▸

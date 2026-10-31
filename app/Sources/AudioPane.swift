@@ -126,6 +126,7 @@ final class AudioPane: InspectorPaneView {
                     mixed: { binding.mixedAudio { $0.muted } }),
                 modeRow,
                 inspectorButtonRow([normalize, InspectorClipTag(binding: binding)]),
+                inspectorButtonRow([enhanceButton()]),
             ])
     }
 
@@ -172,14 +173,10 @@ final class AudioPane: InspectorPaneView {
     }
 
     private func normalize() {
-        guard let document = binding.document,
-              let ops = NormalizeChoice.ops(
-                for: document, clips: AudioPane.normalizable(binding).map { $0.id })
-        else {
-            NSSound.beep()
-            return
-        }
-        binding.apply("Normalize", ops)
+        guard let document = binding.document else { return NSSound.beep() }
+        AudioMeasureDoor.press(
+            .normalize, document: document,
+            clips: AudioPane.normalizable(binding).map { $0.id }, window: window)
     }
 
     // MARK: Fades

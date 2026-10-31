@@ -4,9 +4,10 @@ import CoreMedia
 import Foundation
 
 // The loudness cache's arithmetic probe (road map "audio" AP1, spec §11
-// AU-10..AU-15), compiled with app/Sources through swift_build. Arguments:
-// the fixtures folder, a scratch folder. Prints one "ok"/"FAIL" line per row,
-// each row's name first (C1..C11), for loudness_cache_probe.py to score.
+// AU-10..AU-15; the high band, AP6's AU-63), compiled with app/Sources
+// through swift_build. Arguments: the fixtures folder, a scratch folder.
+// Prints one "ok"/"FAIL" line per row, each row's name first (C1..C12), for
+// loudness_cache_probe.py to score.
 
 final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
@@ -167,16 +168,16 @@ do {
     let stereoBytes = (try? Data(contentsOf: MediaImporter.loudnessURL(for: 2, in: stereoDir)))?.count
     let monoCount = Int((Double(rodeMedia.duration) / 6000).rounded(.up))
     let stereoCount = Int((Double(stereoMedia.duration) / 6000).rounded(.up))
-    check("C1", "mono cache published, width 2, ⌈duration·100⌉ records, marker v1 at 100/s ×4",
-          monoBuilt && monoCacheOpt?.width == 2 && monoCacheOpt?.count == monoCount
-            && monoBytes == monoCount * 8 && monoMarker?.channels == 1
-            && monoMarker?.sampleRate == 48000 && monoMarker?.version == 1
+    check("C1", "mono cache published, width 3, ⌈duration·100⌉ records, marker v2 at 100/s ×4",
+          monoBuilt && monoCacheOpt?.width == 3 && monoCacheOpt?.count == monoCount
+            && monoBytes == monoCount * 12 && monoMarker?.channels == 1
+            && monoMarker?.sampleRate == 48000 && monoMarker?.version == 2
             && monoMarker?.blocksPerSecond == 100 && monoMarker?.oversample == 4,
           "built \(monoBuilt), count \(monoCacheOpt?.count ?? -1)/\(monoCount), "
             + "bytes \(monoBytes ?? -1), marker \(String(describing: monoMarker))")
-    check("C1", "stereo cache published, width 5, 20 bytes a record",
-          stereoBuilt && stereoCacheOpt?.width == 5 && stereoCacheOpt?.count == stereoCount
-            && stereoBytes == stereoCount * 20 && stereoMarker?.channels == 2,
+    check("C1", "stereo cache published, width 8, 32 bytes a record",
+          stereoBuilt && stereoCacheOpt?.width == 8 && stereoCacheOpt?.count == stereoCount
+            && stereoBytes == stereoCount * 32 && stereoMarker?.channels == 2,
           "built \(stereoBuilt), count \(stereoCacheOpt?.count ?? -1)/\(stereoCount), "
             + "bytes \(stereoBytes ?? -1)")
 }
@@ -366,10 +367,10 @@ do {
         _ = MediaImporter.writeStamp(stamp, to: MediaImporter.loudnessMarkerURL(for: 1, in: dir))
         return MediaImporter.loadLoudness(for: 1, in: dir)
     }
-    let current = write(1, 100)
-    let stale = write(0, 100)
-    let grain = write(1, 50)
-    check("C9", "version 1 loads; version 0 and 50 blocks a second read absent",
+    let current = write(2, 100)
+    let stale = write(1, 100)
+    let grain = write(2, 50)
+    check("C9", "version 2 loads; version 1 and 50 blocks a second read absent",
           current != nil && stale == nil && grain == nil,
           "\(current != nil) \(stale != nil) \(grain != nil)")
 }
@@ -430,4 +431,57 @@ do {
     check("C11", "the first answer after the gesture recomputes without reading the file",
           memo.computations == computed + 1 && memo.reads == reads && ended == after,
           "reads \(memo.reads), computed \(memo.computations)")
+}
+
+// C12: the high band (AU-63) — an 8 kHz tone's h against the mean square of
+// its samples times the two sections' own |H(8 kHz)|², and a 1 kHz tone's h
+// at least 60 dB under its z. Records 50…249: past the filters' start.
+do {
+    func response(_ f: Double, rate: Double) -> Double {
+        guard let (a, b) = MediaImporter.LoudnessBlocks.highBand(sampleRate: rate) else { return 0 }
+        var power = 1.0
+        for s in [a, b] {
+            let w = 2 * Double.pi * f / rate
+            let (c1, s1, c2, s2) = (cos(w), sin(w), cos(2 * w), sin(2 * w))
+            let numRe = s.b0 + s.b1 * c1 + s.b2 * c2, numIm = -(s.b1 * s1 + s.b2 * s2)
+            let denRe = 1 + s.a1 * c1 + s.a2 * c2, denIm = -(s.a1 * s1 + s.a2 * s2)
+            power *= (numRe * numRe + numIm * numIm) / (denRe * denRe + denIm * denIm)
+        }
+        return power
+    }
+    for (stem, id) in [("tone8k", UInt32(5)), ("tone1k", UInt32(6))] {
+        let url = fixtures.appendingPathComponent(stem + ".wav")
+        guard let pcm = decode(url) else { check("C12", "\(stem) decodes", false); continue }
+        let media = snapshot(url, id, duration(pcm))
+        let (_, built) = build(media, url, into: cacheDir(stem))
+        guard let cache = built, cache.count > 250, pcm.channels == 1 else {
+            check("C12", "\(stem)'s mono cache builds", false)
+            continue
+        }
+        var worst = 0.0
+        var ratio = -Double.infinity
+        for record in 50..<250 {
+            let h = Double(cache.records[record * cache.width + cache.highOffset])
+            let z = Double(cache.records[record * cache.width])
+            var square = 0.0
+            for f in (record * 480)..<((record + 1) * 480) {
+                square += Double(pcm.samples[f]) * Double(pcm.samples[f])
+            }
+            square /= 480
+            if stem == "tone8k" {
+                let want = square * response(8000, rate: 48000)
+                worst = max(worst, abs(10 * log10(h / want)))
+            } else {
+                ratio = max(ratio, 10 * log10(h / z))
+            }
+        }
+        if stem == "tone8k" {
+            check("C12", "an 8 kHz tone's h within 0.05 dB of its mean square × |H(8 kHz)|² "
+                    + "(\(String(format: "%.3f", 10 * log10(response(8000, rate: 48000)))) dB)",
+                  worst <= 0.05, "worst \(String(format: "%.4f", worst)) dB")
+        } else {
+            check("C12", "a 1 kHz tone's h at least 60 dB under its z", ratio <= -60,
+                  "h − z at most \(String(format: "%.2f", ratio)) dB")
+        }
+    }
 }

@@ -5,8 +5,10 @@ import AppKit
 /// through the pane's `loudnessMemo` (`ClipLoudness.Memo`), so a live Volume
 /// or Pan drag reads no file and decodes no plan per tick; At volume is the
 /// held answer plus the current base volume, through `AudioLimiterModel` while
-/// the clip's limiter is on (AU-26). Mode and target are app-wide
-/// (`NormalizeChoice`), never an edit, so neither writes the document.
+/// the clip's limiter is on (AU-26) — on a clip with a stage the cache leaves
+/// out, the last processed R0 or "≈" the cache figure (AU-64 (g)). Mode and
+/// target are app-wide (`NormalizeChoice`), never an edit, so neither writes
+/// the document.
 extension AudioPane {
 
     /// The one clip the readout is about: exactly one selected clip Normalize
@@ -29,22 +31,53 @@ extension AudioPane {
         case .pending: return "measuring…"
         case .unavailable: return "—"
         case .reading(let reading):
-            guard gain.isFinite else { return "silent" }
-            var peak = reading.truePeak > 0 ? 20 * log10(reading.truePeak) + gain : -.infinity
-            var lufs = reading.lufs.map { $0 + gain }
-            if let limiter, reading.lufs != nil {
-                let ceiling = pow(10, limiter.ceilingDb / 20)
-                peak = min(peak, limiter.ceilingDb)
-                lufs = AudioLimiterModel.integrated(
-                    steps: reading.steps, peaks: reading.stepPeaks, gain: pow(10, gain / 20),
-                    ceiling: ceiling,
-                    releaseSeconds: Double(limiter.release) / Double(ReelTime.perSecond))
-            }
-            let peakText = peak.isFinite ? String(format: "%.1f dBTP", peak) : "−∞ dBTP"
-            guard let lufs else { return "— LUFS · " + minus(peakText) }
-            return minus(String(format: "%.1f LUFS · ", lufs) + peakText)
+            return levelText(
+                lufs: reading.lufs, truePeak: reading.truePeak, steps: reading.steps,
+                peaks: reading.stepPeaks, gain: gain, limiter: limiter)
         }
     }
+
+    /// One reading's figures at `gain` dB, through `limiter` when there is one.
+    private func levelText(
+        lufs measured: Double?, truePeak: Double, steps: [Double], peaks: [Double], gain: Double,
+        limiter: LimiterProps?
+    ) -> String {
+        guard gain.isFinite else { return "silent" }
+        var peak = truePeak > 0 ? 20 * log10(truePeak) + gain : -.infinity
+        var lufs = measured.map { $0 + gain }
+        if let limiter, measured != nil {
+            let ceiling = pow(10, limiter.ceilingDb / 20)
+            peak = min(peak, limiter.ceilingDb)
+            lufs = AudioLimiterModel.integrated(
+                steps: steps, peaks: peaks, gain: pow(10, gain / 20), ceiling: ceiling,
+                releaseSeconds: Double(limiter.release) / Double(ReelTime.perSecond))
+        }
+        let peakText = peak.isFinite ? String(format: "%.1f dBTP", peak) : "−∞ dBTP"
+        guard let lufs else { return "— LUFS · " + minus(peakText) }
+        return minus(String(format: "%.1f LUFS · ", lufs) + peakText)
+    }
+
+    /// At volume (spec §11 AU-64 (g)): on a clip whose chain has a stage the
+    /// loudness cache leaves out, the last R0 measured for its plan and chain
+    /// (`ProcessedLoudness.Memo`) at the current volume and limiter, else the
+    /// cache figure marked approximate; any other clip, the cache figure.
+    private func atVolumeText(_ audio: AudioProps) -> (text: String, approximate: Bool) {
+        let cached = loudnessText(gain: audio.decibels, limiter: audio.limiter)
+        guard ProcessedLoudness.needsRender(audio), let clip = readoutClip,
+            let document = binding.document, case .reading = loudnessAnswer()
+        else { return (cached, false) }
+        guard let processed = ProcessedLoudness.Memo.shared.reading(for: clip, in: document) else {
+            return ("≈ " + cached, true)
+        }
+        let text = levelText(
+            lufs: StepLoudness.integrated(processed.steps), truePeak: processed.peaks.max() ?? 0,
+            steps: processed.steps, peaks: processed.peaks, gain: audio.decibels,
+            limiter: audio.limiter)
+        return (text, false)
+    }
+
+    static let approximateTip =
+        "≈ before the clip's processing; Normalize or Enhance Voice measures through it."
 
     private func minus(_ text: String) -> String {
         text.replacingOccurrences(of: "-", with: "−")
@@ -55,17 +88,20 @@ extension AudioPane {
     /// clip's limiter when it has one).
     func loudnessRows() -> [NSView] {
         let binding = self.binding
+        weak var atVolume: OptionDisplayControl?
+        let readout = inspectorReadout(width: 160) { [weak self] in
+            guard let self else { return "—" }
+            let answer = self.atVolumeText(binding.audioProps)
+            atVolume?.toolTip = answer.approximate ? AudioPane.approximateTip : nil
+            return answer.text
+        }
+        atVolume = readout
         return [
             inspectorRow(
                 "Loudness", [inspectorReadout(width: 160) { [weak self] in
                     self?.loudnessText(gain: 0) ?? "—"
                 }]),
-            inspectorRow(
-                "At volume", [inspectorReadout(width: 160) { [weak self] in
-                    self?.loudnessText(
-                        gain: binding.audioProps.decibels, limiter: binding.audioProps.limiter)
-                        ?? "—"
-                }]),
+            inspectorRow("At volume", [readout]),
         ]
     }
 

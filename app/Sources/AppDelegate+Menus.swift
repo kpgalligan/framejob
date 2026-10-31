@@ -287,6 +287,10 @@ extension AppDelegate {
         // `normalize_clip` description names as this command's UI path. Three
         // spellings of one command is how the halves drift.
         menu.addItem(item("Normalize", #selector(EditorViewController.normalizeClips(_:))))
+        // Road map "audio" AP6 (spec §11 AU-65), right after Normalize: the
+        // UI path `enhance_voice` names. No key equivalent, for Normalize's
+        // reason.
+        menu.addItem(item("Enhance Voice", #selector(EditorViewController.enhanceVoice(_:))))
         // Road map "audio-sync" AS-1, beside Normalize: the UI path
         // `sync_audio` names. No key equivalent, for Normalize's reason.
         menu.addItem(

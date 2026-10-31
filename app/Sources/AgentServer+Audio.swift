@@ -22,15 +22,12 @@ import AppKit
 /// algorithm" exists to prevent, and a proof that measured the tool would then
 /// be saying nothing about the button.
 ///
-/// `normalize_clip` stays on the MAIN thread, and so out of
-/// `AgentServer.offMainTools`, on that set's stated criterion — "waits for
-/// something the main thread has to deliver or must not be doing", not
-/// "touches the disk". Reading a few hundred KB of peaks and making one
-/// arithmetic pass over it waits on nothing, which is the case
-/// `detect_silence` argues at length beside it. **`sync_audio` is the
-/// exception** (spec §11 SY-22): its `plan` is seconds of signal arithmetic
-/// on a long take, which the main thread must not be doing, so it is an
-/// off-main tool — the read and the commit hop to main, the plan does not.
+/// Both are off-main tools (`AgentServer.offMainTools`), on that set's stated
+/// criterion — "waits for something the main thread has to deliver or must
+/// not be doing", not "touches the disk". `sync_audio`'s `plan` is seconds of
+/// signal arithmetic on a long take (spec §11 SY-22); `normalize_clip` in
+/// Loudness mode may render a clip through its chain and wait for it (AU-64,
+/// AU-65). The read and the commit hop to main; the plan and the wait do not.
 extension AgentServer {
 
     /// `normalize_clip` — the Audio section's Normalize button
@@ -66,15 +63,33 @@ extension AgentServer {
     /// there is no op and the shared reply would be the identity's — which
     /// would send a caller to look at its volumes when what happened is
     /// that its peaks were not there to read.
+    ///
+    /// Off the main thread (spec §11 AU-65, `AgentServer.offMainTools`):
+    /// Loudness mode may render a clip through its chain (AU-64), seconds on a
+    /// long clip, so every document touch goes through `onMain` and the wait
+    /// is here; Peak mode is one `onMain` hop.
     func normalizeClip(_ a: [String: Any]) throws -> String {
-        let document = try target(a)
-        let clips = try clipsArg(a, "clips", document)
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
+        try requireServerThread("normalize_clip")
+        let (document, clips, mode) = try onMain {
+            () throws -> (ProjectDocument, [UInt32], AudioNormalize.Mode) in
+            let document = try self.target(a)
+            let clips = try self.clipsArg(a, "clips", document)
+            return (document, clips, try self.normalizeMode(a))
+        }
         // Loudness mode (spec §11 AU-16, AU-25): the button's and the menu's
         // default (`NormalizeChoice`), and this tool's unless it names
         // `peak_db` alone.
-        if try normalizeMode(a) == .loudness {
-            return try normalizeLoudness(a, document: document, clips: clips)
+        if mode == .loudness {
+            return try normalizeLoudness(a, document: document, clips: clips, stop: stop)
         }
+        return try onMain { try self.normalizePeak(a, document: document, clips: clips) }
+    }
+
+    /// `normalize_clip {mode: "peak"}`, on main: the button's Peak mode.
+    private func normalizePeak(_ a: [String: Any], document: ProjectDocument, clips: [UInt32])
+        throws -> String
+    {
         guard try doubleArg(a, "target_lufs") == nil else {
             throw ToolError(
                 message: "target_lufs is the loudness mode's target; with mode \"peak\" the "
@@ -294,39 +309,70 @@ extension AgentServer {
     }
 
     /// `normalize_clip {mode: "loudness"}` — the Normalize button and Clip ▸
-    /// Normalize in Loudness mode (`NormalizeChoice.ops`), through the same
-    /// `readLoudness` + `plan` pair (spec §11 AU-13, AU-14, AU-16). `peak_db`
-    /// is refused by name, and `target_lufs` outside −50…−5 is refused, never
-    /// clamped. The answer reports each clip's measured loudness and true
-    /// peak (the readout's numbers), the volume written, the clip's limiter
-    /// after the edit (AU-24), where it lands, and the volume ceiling when it
-    /// stopped it short; a note names each such clip.
+    /// Normalize in Loudness mode (`AudioMeasureDoor`), through the same
+    /// `readLoudness`, `LoudnessMeasureRun` and `plan` (spec §11 AU-13,
+    /// AU-14, AU-16, AU-64). `peak_db` is refused by name, and `target_lufs`
+    /// outside −50…−5 is refused, never clamped. The read and the run's start
+    /// are on main, the wait here, then on main the stale test (the project
+    /// or scope changed meanwhile is an error, the Measuring Sound sheet's
+    /// own rule) and the answer. The answer reports each clip's measured
+    /// loudness and true peak (the readout's numbers; for a rendered clip the
+    /// true peak is the processed one), its processed loudness and the renders
+    /// it took (null and 0 off the cache), the volume written, the clip's
+    /// limiter after the edit (AU-24), where it lands, and the volume ceiling
+    /// when it stopped it short; a note names each such clip.
     private func normalizeLoudness(
-        _ a: [String: Any], document: ProjectDocument, clips: [UInt32]
+        _ a: [String: Any], document: ProjectDocument, clips: [UInt32], stop: AgentCallCancel?
     ) throws -> String {
-        guard try doubleArg(a, "peak_db") == nil else {
-            throw ToolError(
-                message: "peak_db is the peak mode's level; with mode \"loudness\" the target "
-                    + "is target_lufs.")
+        let (run, requested, asked, scope) = try onMain {
+            () throws -> (LoudnessMeasureRun, Double, ReelProject, UInt32?) in
+            guard try self.doubleArg(a, "peak_db") == nil else {
+                throw ToolError(
+                    message: "peak_db is the peak mode's level; with mode \"loudness\" the "
+                        + "target is target_lufs.")
+            }
+            let range = AudioNormalize.targetLUFSRange
+            let requested = try self.doubleArg(a, "target_lufs")
+                ?? AudioNormalize.defaultTargetLUFS
+            guard requested.isFinite, range.contains(requested) else {
+                throw ToolError(
+                    message: "target_lufs must be a loudness from \(range.lowerBound) to "
+                        + "\(range.upperBound) LUFS, and the default is "
+                        + "\(AudioNormalize.defaultTargetLUFS).")
+            }
+            guard let input = AudioNormalize.readLoudness(from: document, clips: clips) else {
+                throw ToolError(
+                    message: "The project's audio plan could not be read, so there is no "
+                        + "loudness to measure.")
+            }
+            guard !input.isEmpty else {
+                let reasons = input.problems.map { $0.description }.joined(separator: " ")
+                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+            }
+            let run = LoudnessMeasureRun(
+                document: document, jobs: AudioMeasureDoor.normalizeJobs(input, in: document),
+                problems: input.problems, targetLUFS: requested)
+            return (run, requested, document.project, document.scope)
         }
-        let range = AudioNormalize.targetLUFSRange
-        let requested = try doubleArg(a, "target_lufs") ?? AudioNormalize.defaultTargetLUFS
-        guard requested.isFinite, range.contains(requested) else {
-            throw ToolError(
-                message: "target_lufs must be a loudness from \(range.lowerBound) to "
-                    + "\(range.upperBound) LUFS, and the default is "
-                    + "\(AudioNormalize.defaultTargetLUFS).")
+        let outcome = awaitMeasurement(run, stop: stop)
+        return try onMain {
+            defer { run.finish() }
+            let outcome = try self.measuredOutcome(
+                outcome, document: document, asked: asked, scope: scope, tool: "normalize_clip")
+            let plan = AudioNormalize.plan(
+                outcome.input, targetLUFS: requested, solved: outcome.solved)
+            guard !plan.normalized.isEmpty else {
+                let reasons = plan.skipped.map { $0.description }.joined(separator: " ")
+                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+            }
+            return try self.loudnessAnswer(plan, document: document)
         }
-        guard let input = AudioNormalize.readLoudness(from: document, clips: clips) else {
-            throw ToolError(
-                message: "The project's audio plan could not be read, so there is no loudness "
-                    + "to measure.")
-        }
-        guard !input.isEmpty else {
-            let reasons = input.problems.map { $0.description }.joined(separator: " ")
-            throw ToolError(message: "Nothing could be normalised. \(reasons)")
-        }
-        let plan = AudioNormalize.plan(input, targetLUFS: requested)
+    }
+
+    /// Loudness mode's answer to `plan`, on main.
+    private func loudnessAnswer(_ plan: AudioNormalize.LoudnessPlan, document: ProjectDocument)
+        throws -> String
+    {
         var fields: [String: Any] = [
             "mode": AudioNormalize.Mode.loudness.rawValue,
             "target_lufs": plan.targetLUFS,
@@ -344,6 +390,8 @@ extension AgentServer {
                     "limiter": result.limiter.map {
                         ["ceiling_db": $0.ceilingDb, "release": $0.release] as Any
                     } ?? NSNull(),
+                    "processed_lufs": result.processedLUFS.map(Self.jsonLevel) ?? NSNull(),
+                    "renders": result.renders,
                 ] as [String: Any]
             },
         ]

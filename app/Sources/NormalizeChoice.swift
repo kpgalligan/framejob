@@ -30,19 +30,4 @@ enum NormalizeChoice {
         }
         set { UserDefaults.standard.set(newValue, forKey: targetKey) }
     }
-
-    /// The ops the button and the menu commit for `clips` in the chosen mode;
-    /// nil for a plan this build cannot read.
-    static func ops(for document: ProjectDocument, clips: [UInt32]) -> [ReelOp]? {
-        switch mode {
-        case .peak:
-            return AudioNormalize.read(from: document, clips: clips).map {
-                AudioNormalize.plan($0).ops
-            }
-        case .loudness:
-            return AudioNormalize.readLoudness(from: document, clips: clips).map {
-                AudioNormalize.plan($0, targetLUFS: targetLUFS).ops
-            }
-        }
-    }
 }

@@ -2477,9 +2477,34 @@ free.
   `Memo` (per handle, per media file, and the held answer through a live
   edit, AU-15). `NormalizeChoice` is the mode and target in UserDefaults
   (Loudness and −16 by default, AU-25; `FrameJobNormalizeMode`,
-  `FrameJobNormalizeTargetLUFS`) and the ops the
-  button and Clip ▸ Normalize run; `normalize_clip` names its own mode and
+  `FrameJobNormalizeTargetLUFS`), which the button and Clip ▸ Normalize
+  follow, through `AudioMeasureDoor`; `normalize_clip` names its own mode and
   never reads it.
+- `ProcessedLoudness.swift` — a clip measured through its own chain (spec §11
+  AU-64): `needsRender`, the measurement plan (the clip's segments, pre-fader
+  but for one constant ramp at the trial's base volume), the render under a
+  fresh key through `Exporter.withOfflineAudio`, the build and one float mix
+  read into a `StepLoudnessMeter`, and At volume's `Memo`.
+- `LoudnessMeasureRun.swift` — one press's renders, clip by clip: R0, the
+  solve through Loudness Normalize's plan, the limiter's verify renders
+  (±0.1 LU, at most three); cancel; `finish`, which releases the render wants.
+- `AudioMeasureDoor.swift` — the one body the Volume section's Normalize and
+  Enhance Voice buttons and the Clip menu share: Peak at once, a run at once
+  when nothing renders, else the Measuring Sound sheet; the stale test; the
+  commit.
+- `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
+  "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape.
+- `AudioEnhance.swift` (+`Reasons`) — Enhance Voice's value type (spec §11
+  AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the rules), `jobs`,
+  `plan` over the run's outcome; `+Reasons` the loudness reason and the
+  reasons' numbers.
+- `AudioDynamicsModel.swift` — the clip's compressor at the loudness cache's
+  10 ms steps, for Enhance Voice's makeup only (AU-62, AU-64 (h)).
+- `AudioPane+Enhance.swift` — the Volume section's Enhance Voice button; its
+  press is the door.
+- `AgentServer+EnhanceVoice.swift` — `enhance_voice`, the mirror of Clip ▸
+  Enhance Voice, off main; and the measurement's wait and stale test
+  `normalize_clip` shares.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
   `RealFFT.swift` ·
@@ -3002,7 +3027,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and four
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and five
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -3372,6 +3397,8 @@ free.
   its subviews, never a problem (the Assistant tab's transcript, spec §11
   AI-17). It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.
+- `OptionDisplayControl+Snapshot.swift` — (dev tools) a read-out's text as an
+  `option.display` part in `snapshot_ui`'s layout dump.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `intsArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
   `requiredEnumArg` — the one reader of a string-valued enum, with its

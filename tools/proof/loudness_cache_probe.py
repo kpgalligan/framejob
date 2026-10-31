@@ -4,7 +4,7 @@
 cache built by the product's own pass, read back by `ClipLoudness`, against
 `LoudnessMeter` fed exactly each window.
 
-  C1   the files: width, size and marker, mono and stereo.
+  C1   the files: width (3 mono, 8 stereo: AU-63's high band), size and marker v2.
   C2   the whole owner's recording against the meter as dual mono (0.1 LU, TP 0.01 dB).
   C3   spike S4's ten named windows forward (0.1 LU).
   C4   the same windows reversed, against the meter on reversed samples (0.1 LU).
@@ -16,9 +16,11 @@ cache built by the product's own pass, read back by `ClipLoudness`, against
   C9   a stale-version or other-grain marker reads absent.
   C10  ClipLoudness.Memo: pending, held, then the reading after invalidate().
   C11  the memo through a live edit: the held reading, no file read, no recompute.
+  C12  the high band (AU-63): an 8 kHz tone's h within 0.05 dB of its mean square times
+       the 6 kHz sections' own |H|², and a 1 kHz tone's h at least 60 dB under its z.
 
 Build failures are scored. --sources points at a copied app/Sources tree;
---mutants runs the seven arithmetic mutants, each over its own copy, and
+--mutants runs the eight arithmetic mutants (AP6's M7 among them), each over its own copy, and
 scores each killed when its named row fails. Needs ffmpeg and
 samples/Rode-usb-mic.m4a. All output is under tools/proof/work/loudness-cache-probe.
 """
@@ -41,7 +43,7 @@ MUTANTS = [
     ("reversed-forward-order", "C4", "ClipLoudness.swift",
      "steps.append(read.energy)",
      "steps.insert(read.energy, at: pivot == nil ? steps.count : steps.count - Int(k))"),
-    ("no-relative-gate", "C3", "ClipLoudness.swift",
+    ("no-relative-gate", "C3", "StepLoudness.swift",
      "let kept = gated.filter { loudness($0) > threshold }", "let kept = gated; _ = threshold"),
     ("no-limiter", "C8", "AudioNormalize+Loudness.swift",
      "if reading.limiter == nil, reading.truePeak * first <= ceiling {",
@@ -52,6 +54,9 @@ MUTANTS = [
      "if sampleRate == LoudnessMeter.requiredSampleRate {", "if sampleRate > 0 {"),
     ("version-unchecked", "C9", "MediaImporter+Loudness.swift",
      "marker.version == loudnessVersion,", "marker.version >= 0,"),
+    # Road map "audio" AP6's M7 (spec §11 AU-63): h without the high-pass.
+    ("M7-high-unfiltered", "C12", "LoudnessBlocks.swift",
+     "Self.cascade(&band, highStages, state: &highState[channel])", "_ = highStages"),
 ]
 
 
@@ -87,6 +92,10 @@ def fixtures():
     # ffmpeg's sine is at 1/8 (-18 dBFS); -67 dB more is about -85 dBFS.
     ffmpeg("-f", "lavfi", "-i", "sine=f=1000:r=48000:d=5", "-af", "volume=-67dB",
            "-c:a", "pcm_f32le", str(FIXTURES / "quiet48.wav"))
+    # C12's tones, mono at 48 kHz: above and well under the 6 kHz high band.
+    for stem, hz in (("tone8k", 8000), ("tone1k", 1000)):
+        ffmpeg("-f", "lavfi", "-i", f"sine=f={hz}:r=48000:d=3", "-ac", "1",
+               "-c:a", "pcm_f32le", str(FIXTURES / f"{stem}.wav"))
 
 
 def build(sources, name):
@@ -140,9 +149,9 @@ def main():
         check("source probe builds", False, problem)
         return 1
     sys.stdout.write(stdout)
-    expected = [f"C{n}" for n in range(1, 12)]
+    expected = [f"C{n}" for n in range(1, 13)]
     good = all(rows.get(row) for row in expected)
-    good &= check("every row C1..C11 ran", all(row in rows for row in expected),
+    good &= check("every row C1..C12 ran", all(row in rows for row in expected),
                   ", ".join(row for row in expected if row not in rows) or "")
     passed = sum(1 for row in expected if rows.get(row))
     print(f"\n{passed}/{len(expected)} rows passed")
