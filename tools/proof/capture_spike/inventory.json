@@ -359,6 +359,13 @@
    ],
    "note": "an edit"
   },
+  "attachAudio:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Timeline.swift `func attachAudio(`"
+   ],
+   "note": "an edit"
+  },
   "addActionAtPlayhead:": {
    "verdict": "none",
    "code": [
@@ -416,6 +423,14 @@
     "app/Sources/AudioMeasureDoor.swift:125"
    ],
    "note": "presentAsSheet(AudioMeasureSheetController), the Measuring Sound sheet while the clips render through their chosen settings (AU-64, AU-65); its answer is an edit"
+  },
+  "matchAudio:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+Audio.swift `func matchAudio(`",
+    "app/Sources/EditorViewController+Audio.swift:85"
+   ],
+   "note": "presentAsSheet(AudioMatchSheetController), the Match Audio sheet (AU-121); its hand-back presses AudioMeasureDoor.pressMatch, which puts up the Measuring Sound sheet while the reference and the targets render (app/Sources/AudioMeasureDoor.swift:125, reached_after); its answer is an edit (AU-128)"
   },
   "synchronizeAudio:": {
    "verdict": "sheet",
@@ -992,6 +1007,15 @@
    "reached_after": [],
    "other_caller": ""
   },
+  "app/Sources/EditorViewController+Audio.swift:85": {
+   "token": "presentAsSheet",
+   "func": "matchAudio",
+   "reached_from": [
+    "matchAudio:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
   "app/Sources/EditorViewController+Audio.swift:172": {
    "token": "beginSheetModal",
    "func": "askToApplyWeakMatch",
@@ -1470,7 +1494,13 @@
     "normalizeClips:",
     "enhanceVoice:"
    ],
-   "reached_after": [],
+   "reached_after": [
+    {
+     "selector": "matchAudio:",
+     "via": "app/Sources/EditorViewController+Audio.swift `AudioMeasureDoor.pressMatch(`",
+     "gate": "app/Sources/AudioMeasureDoor.swift `guard loudness || eq, !clips.isEmpty else { return NSSound.beep() }` — the Match Audio sheet's Match with a reference that reads (AU-121, AU-122)"
+    }
+   ],
    "other_caller": "the Volume section's Normalize and Enhance Voice buttons (`AudioPane.normalize`, `AudioPane+Enhance`) press the same door"
   }
  }

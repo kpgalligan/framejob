@@ -138,6 +138,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Attach Audio | ⇧⌥⌘D | Merges a detached sound back into its picture ([Audio](audio.md#attach-audio)) |
 | Normalize | | Sets the selected clips' volume to a loudness (the default, turning a clip's limiter on when its peaks need it) or a peak, by the mode chosen in the Volume section's Normalize row. A clip with processing is measured through it under the Measuring Sound sheet |
 | Enhance Voice | | Sets the selected clips up for speech from their own measurements: high-pass, isolation or noise reduction and a gate for noisy pauses, the de-esser, a compressor, the limiter and the volume to the Normalize row's target ([Audio](audio.md#enhance-voice)) |
+| Match Audio… | | Gives the selected clips the loudness and the speech's tone of one of them, chosen in a sheet: their volume and limiter, and their EQ's shelves and bands, measured under the Measuring Sound sheet ([Audio](audio.md#match-audio)) |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
@@ -193,6 +194,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Attach Audio | A selected clip is linked to its detached sound or picture |
 | Normalize | A selected clip plays sound |
 | Enhance Voice | A selected clip plays sound |
+| Match Audio… | Two or more selected clips play sound |
 | Synchronize Audio | Two or more selected clips play sound |
 | Add Action | A selected clip is under the playhead |
 | Speed… | The selection includes a clip that plays a media file |

@@ -64,7 +64,8 @@ removal, noise reduction, a gate for the pauses and a de-esser, each set from
 the clip's own loudness, compressor, pan, mono and a true-peak limiter, each
 of them animated by actions as the volume is; each
 clip's loudness and true peak in the inspector; Enhance Voice, which sets a
-voice recording up for speech from its own measurements in one step; and
+voice recording up for speech from its own measurements in one step; Match
+Audio, which gives clips another clip's loudness and speech tone; and
 Normalize to a loudness
 target (−16 LUFS at −1 dBTP by default, turning the
 limiter on when a clip's peaks need it) or to a peak, which matches clips; a

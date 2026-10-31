@@ -139,13 +139,14 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # hundred-and-second; road map "audio" AP9's op tool attach_audio, spec §11 AU-95, the
 # sixty-third op and the hundred-and-third tool; AP11's op tool set_media_speech, spec §11
 # AU-110, the sixty-fourth op and the hundred-and-fourth tool; AP6's app-state
-# enhance_voice, spec §11 AU-65, the hundred-and-fifth). D3 adds no tool and renames
+# enhance_voice, spec §11 AU-65, the hundred-and-fifth; AP12's app-state match_audio,
+# spec §11 AU-128, the hundred-and-sixth). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 105
+PRODUCT_TOOLS = 106
 OPS = 64
 PARITY = "Frame Job: "
 

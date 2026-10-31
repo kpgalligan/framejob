@@ -113,7 +113,13 @@ selected clip set up for speech from its own measurements in one undo step,
 its volume measured through the new settings under the Measuring Sound sheet
 — a bar, "Clip n of N…" and Cancel, which changes nothing — and refused at
 the inspector's foot if the project changed meanwhile; its mirror is
-`enhance_voice`), Synchronize Audio (road
+`enhance_voice`), Match Audio… (road map "audio" AP12, §11 AU-121, AU-128:
+right after Enhance Voice, no key equivalent, enabled with two or more
+selected clips Normalize could measure; the Match Audio sheet picks the
+reference among them in timeline order and Loudness and EQ, both on each
+time, then the others are matched under the Measuring Sound sheet in one undo
+step, a refusal or a changed project said at the inspector's foot; its mirror
+is `match_audio`), Synchronize Audio (road
 map "audio-sync" AS-1 and AS-2, §11 SY-1..SY-10: the selected clips that play
 sound lined up by their sound, one anchor kept, each mover's clock drift
 corrected by a speed change in the same undo step; it shows no drift figure,

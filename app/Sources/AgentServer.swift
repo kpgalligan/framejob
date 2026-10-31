@@ -109,7 +109,7 @@ final class AgentServer {
         "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
         "transcribe", "record_screen", "render_graphic", "open_project", "sync_audio",
         "transcribe_for_fillers", "get_transcript", "export_graphic", "enhance_voice",
-        "normalize_clip",
+        "normalize_clip", "match_audio",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)
@@ -298,6 +298,7 @@ final class AgentServer {
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
         "enhance_voice": { $0.enhanceVoice },
+        "match_audio": { $0.matchAudio },
         "sync_audio": { $0.syncAudio },
         // Captions (AgentServer+Captions.swift, AgentServer+Transcript.swift)
         "transcribe": { $0.transcribe },

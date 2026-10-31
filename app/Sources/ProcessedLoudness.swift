@@ -149,10 +149,11 @@ enum ProcessedLoudness {
     /// caller releases its render wants when the press is done. The steps
     /// are at the trial clip's base volume, through its fader
     /// (`measurementPlan`'s `volume`): a trial at volume 1 reads pre-fader.
-    /// Never main.
+    /// `spectrum`, when given, is fed every frame the step meter is (Match
+    /// Audio's speech spectrum, spec §11 AU-124). Never main.
     static func render(
         _ trial: ReelProject, clip: UInt32, urls: [UInt32: URL], resolution: ReverseResolution,
-        cancelled: @escaping () -> Bool
+        spectrum: SpeechSpectrumMeter? = nil, cancelled: @escaping () -> Bool
     ) -> (Rendered, key: Int) {
         assert(!Thread.isMainThread)
         let key = RecipeSource.shared.register()
@@ -177,7 +178,9 @@ enum ProcessedLoudness {
             ) {
                 let built = try CompositionBuilder.build(
                     plan: measured.plan, planJSON: measured.json, urls: urls, recipeKey: key)
-                return read(built, from: measured.start, to: measured.end, cancelled: cancelled)
+                return read(
+                    built, from: measured.start, to: measured.end, spectrum: spectrum,
+                    cancelled: cancelled)
             }
         } catch Exporter.ExportError.cancelled {
             return (.cancelled, key)
@@ -197,7 +200,8 @@ enum ProcessedLoudness {
     /// each buffer placed by its stamp as `ScrubGrains.read` places it, a gap
     /// fed as zeros, and the span always fed whole.
     private static func read(
-        _ built: BuiltComposition, from start: Ticks, to end: Ticks, cancelled: () -> Bool
+        _ built: BuiltComposition, from start: Ticks, to end: Ticks,
+        spectrum: SpeechSpectrumMeter?, cancelled: () -> Bool
     ) -> Rendered {
         let rate = ExportAudioEnd.sampleRate
         let frames = ExportAudioEnd.frames(ofTicks: end - start)
@@ -223,7 +227,10 @@ enum ProcessedLoudness {
         func feedSilence(until frame: Int) {
             while fed < frame {
                 let take = min(frame - fed, 4800)
-                silence.withUnsafeBufferPointer { meter.feed($0.baseAddress!, frames: take) }
+                silence.withUnsafeBufferPointer {
+                    meter.feed($0.baseAddress!, frames: take)
+                    spectrum?.feed($0.baseAddress!, frames: take)
+                }
                 fed += take
             }
         }
@@ -257,6 +264,7 @@ enum ProcessedLoudness {
             if first < last {
                 interleaved.withUnsafeBufferPointer {
                     meter.feed($0.baseAddress! + 2 * first, frames: last - first)
+                    spectrum?.feed($0.baseAddress! + 2 * first, frames: last - first)
                 }
                 fed = offset + last
             }

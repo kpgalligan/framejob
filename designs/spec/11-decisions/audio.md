@@ -1130,6 +1130,99 @@ recorded before its code.
   past the new `duration` dropped, ends clamped to it, the list cleared when it empties or the
   file has no audio — so a relink never fails `validate` over spans (no re-detection).
 
+AU-120…AU-129 are AP12's (match one clip to another; survey B6), recorded before its code.
+
+- **AU-120 — Match Audio is a composite, not an op, and owns the level and the EQ's tonal
+  slots.** Clip ▸ Match Audio… and `match_audio {reference, clips, loudness?, eq?}` write
+  ORDINARY settings, Enhance Voice's pattern (AU-60): `volume` and `limiter` (Match Loudness,
+  AU-123) and the EQ's `low_shelf`, `band_1`, `band_2`, `band_3` and `high_shelf` with
+  `bypass: false` (Match EQ, AU-126, AU-127); every other key is left as it is. BASE props even
+  inside an action (Normalize's reason), one `set_audio` per target, all committed as ONE undo
+  step named "Match Audio". No core, FFI, op, format or `UserDefaults` change.
+- **AU-121 — The reference is picked in a sheet.** Clip ▸ Match Audio… is enabled with at least
+  two selected clips that `AudioNormalize.canOffer` passes, and opens the Match Audio sheet: a
+  "Match to" popup of those clips in timeline order (start, then track order; the first by
+  default), a Loudness and an EQ checkbox (both on, not remembered; Match disabled with both
+  off), Cancel and Match. Each item's title is `<clip name> — <track name> — m:ss (clip <id>)`
+  and each is an `NSMenuItem` carrying the clip id in `representedObject`, added through the
+  menu, never `addItem(withTitle:)` (which drops a row of the same title); the choice is read
+  from the selected item's `representedObject`, never its index or title. The other selected
+  clips are the targets. The sheet hands its choice back as the Measuring Sound sheet does:
+  stored on Match, delivered once from `viewDidDisappear` on the next main-queue turn, never
+  after Cancel; only then is the measurement pressed, so the window has no sheet attached.
+  Chosen over a "Set as Match Reference" item (session state) and the first selected clip (the
+  selection is a set, with no order).
+- **AU-122 — The reference is read from its cache, then rendered once as it plays.** It needs its
+  loudness cache reading (`ClipLoudness.answer`): Normalize's skips (not a clip, a nest, no
+  audio, still being analysed, under 0.4 s, gated out) are refusals naming the reference. It is
+  rendered ONCE through `ProcessedLoudness.render` of the press's own project, with no trial edit:
+  its chain, its limiter and its base volume as the one constant fader (AU-64 (c)), and no fades,
+  ducks or mute. T is that render's `StepLoudness.integrated`; a render gated out is a refusal.
+  T is not range-checked: it is what the reference plays at.
+- **AU-123 — Match Loudness is Loudness Normalize to T.** AU-24 and AU-64 unchanged: an inner
+  `LoudnessMeasureRun` with target T over the targets. A target's job chain is `AudioPatch(eq:
+  the matched EQ)` when EQ is on (so the volume is solved through the EQ it will have), else
+  `normalizeJobs`' rule. A target equal to the reference is skipped ("is the reference."). With
+  Loudness off, `volume` and `limiter` are not written.
+- **AU-124 — The spectra are speech-only, measured on renders.** The reference's is AU-122's
+  render. A target's is a trial `set_audio {eq: trialEQ(current), volume: 1, limiter: null}`
+  rendered pre-fader (its high- and low-pass kept, its tonal slots off). The speech mask is
+  AU-61's (`media.speech`, else the VAD cache's spans; `AudioEnhance.speechMask` over the cache
+  reading's `stepSources`); render frame f is in played step ⌊f/480⌋. An STFT of 8192 points,
+  Hann, hop 4096, at 48 kHz, power |X_L|² + |X_R|²; a frame counts when the step at its centre
+  is speech; at least 12 frames (about 1 s), else the clip lacks the speech to match. Bands
+  n = −11…+11: centre 1000·2^(n/3) (about 79 Hz to 12.7 kHz), bins in [c·2^(−1/6), c·2^(1/6));
+  each band's level 10·log10 of the mean over counted frames of the band's power.
+- **AU-125 — The curve.** D_b = Lref_b − Ltgt_b. A band's weight is 1 where both levels are
+  within 50 dB of their own loudest band, else 0; under 12 weighted bands skips the target (a
+  reference with under 12 bands within 50 dB of its own loudest is refused). The weighted mean of
+  D is removed (the level is Match Loudness's), and the curve is smoothed [1, 2, 1]/4 inside and
+  (2, 1)/3 at the ends.
+- **AU-126 — The fit.** The model is `AudioEQDesign.responseDB` of the five tonal slots at
+  48 kHz at the band centres, the drawn curve's own function. Every residual is offset-invariant:
+  r = (curve − model) − the weighted mean of (curve − model); the cost is Σ w·r², and the shelf
+  solve, the bell placement, the Levenberg–Marquardt step and `rmsDB` all use this r (the
+  broadband offset is Match Loudness's, never fitted or written). (a) The shelves first, low at
+  150 Hz and high at 6 kHz, their gains solved; then the two shelves alone, corners too, by
+  (c)'s Levenberg–Marquardt, taken as the start only when they leave no weighted band's |r| at
+  0.5 dB or above (a tilt that is one shelf then places no bell), else the corners stay at
+  150 Hz and 6 kHz (added at the build: with the corners fixed, a lone 4 kHz shelf left 1.7 dB
+  for a bell to chase and LM kept it; with the refined shelves always taken, a five-slot EQ's
+  low shelf ran to 53 Hz; P5 and P9 hold only with the test). (b) Up to three bells, greedily, at the weighted
+  band of largest |r| ≥ 0.5 dB, none within 3 bands of an earlier bell, Q from the run W of
+  adjacent same-sign bands with |r| ≥ |r_b|/2: BW = W/3 octave, Q = clamp(2^(BW/2)/(2^BW − 1),
+  0.5, 4); bands 1–3 assigned in frequency order. (c) Levenberg–Marquardt over every placed
+  parameter (log f, gain, log Q) on the weighted residual, a central-difference Jacobian, λ from
+  1e−2 (÷10 on a better step, ×10 on a worse one), clamped after each step, at most 40
+  iterations or until the relative cost change is under 1e−6; the bounds: low shelf 40–500 Hz,
+  high shelf 2–16 kHz, bells 60 Hz–12 kHz, gains ±12 dB, Q 0.5–4. (d) Rounded: f to 1 Hz, gain to
+  0.1 dB, Q to 0.01; a slot whose |gain| < 0.1 dB is nil; `rmsDB` the weighted RMS of r over the
+  rounded model.
+- **AU-127 — The target's own EQ.** Its five tonal slots are REPLACED by the fit; `high_pass` and
+  `low_pass` are kept (rendered through, so the fit is around them); `bypass: false`; hum is
+  untouched. A second press measures the same trial and writes the same EQ, and the solve's
+  0.05 dB keep rule (AU-64 (f)) holds the volume: an identity, "Match Audio made no change".
+- **AU-128 — The chrome and the tool.** The menu item, the Match Audio sheet, then the Measuring
+  Sound sheet (always: the reference renders); the stale test and its sentence, "… Choose Match
+  Audio again." and "… Call match_audio again."; a reference refusal beeps and puts its sentence
+  at the inspector's foot. `match_audio` takes no `scope` (it follows the open container) and is
+  an off-main tool (`awaitMeasurement`'s pattern, generic over the run). `loudness: false, eq:
+  false` is refused by name; a target that cannot be matched is skipped by name and the rest are
+  matched; with nothing matched, "Nothing could be matched." with every reason. It answers
+  `{reference: {clip, media, lufs, speech_seconds|null}, target_lufs|null, matched: [{clip, media,
+  set, eq|null, eq_fit_rms_db|null, volume|null, measured_lufs|null, processed_lufs|null,
+  result_lufs|null, result_true_peak_dbtp|null, limited_by|null, renders}], skipped?, note?}`,
+  `set` exactly the patch's keys in `set_audio`'s spelling. The dev-only launch default
+  `-RCDevMatchAudioAccept YES` presses Match once the sheet is up.
+- **AU-129 — The proof.** `audio_ap12_probe.py` P1–P9 over `app/Sources` with twelve mutants
+  (M1–M11, one per independent decision of the speech gate, the curve, the fit and the write;
+  the eleventh, M11, the offset-invariant residual, which only a one-sided tilt (P9) can see; the
+  twelfth, M12, AU-126 (a)'s shelf start, added with it at the build, P9's too), and
+  `audio_ap12_proof.py` A1–A8 over MCP and exports (third-octave bands by the proof's own numpy,
+  loudness by `phase5_proof.integrated`): pink noise tilted by a known EQ matched back within
+  ±1 dB a band from 100 Hz to 10 kHz and ±0.5 LU. How a match sounds on a real voice is manual
+  check SE-39.
+
 AU-130…AU-136 are AP13's (audio while scrubbing; survey B5), recorded before its code.
 
 - **AU-130 — Scrub grains are read from a composition built only for scrubbing, one

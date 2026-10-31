@@ -190,7 +190,7 @@ enum AudioEnhance {
     }
 
     /// The media's speech spans off its VAD cache, nil while it is not written.
-    private static func speechSpans(_ media: MediaSnapshot, cache: URL?) -> [[Ticks]]? {
+    static func speechSpans(_ media: MediaSnapshot, cache: URL?) -> [[Ticks]]? {
         guard let cache, let p = MediaImporter.loadSpeech(for: media.id, in: cache) else {
             return nil
         }

@@ -64,7 +64,8 @@ enum AssistantPrompt {
          ["import_captions", "transcribe", "get_transcript", "export_captions"]),
         ("audio: find silences and filler words, even out loudness, line up recordings by "
             + "their sound",
-         ["detect_silence", "detect_fillers", "normalize_clip", "enhance_voice", "sync_audio"]),
+         ["detect_silence", "detect_fillers", "normalize_clip", "enhance_voice", "match_audio",
+          "sync_audio"]),
         ("graphics: write, rename, delete, restore, export or import a module; place, change or "
             + "insert a graphic clip; its reference, fonts and assets",
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",

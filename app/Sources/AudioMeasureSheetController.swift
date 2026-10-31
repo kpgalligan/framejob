@@ -2,7 +2,9 @@ import AppKit
 
 /// The Measuring Sound sheet (road map "audio" AP6, spec §11 AU-65): up
 /// while a `LoudnessMeasureRun` renders its clips through their chains
-/// (AU-64), so the window never beach-balls on a long clip.
+/// (AU-64), or an `AudioMatchRun` its reference and targets (AU-128), so the
+/// window never beach-balls on a long clip. It takes any
+/// `AudioMeasureRunning`, held as the four closures below.
 /// `AudioSyncSheetController`'s shape: a bar, "Clip n of N…" and Cancel.
 ///
 /// The run was built on the main thread from what the press read; the sheet
@@ -14,9 +16,13 @@ import AppKit
 /// flight, releases the run's render wants and dismisses at once: nothing
 /// changes.
 final class AudioMeasureSheetController: NSViewController {
-    private let run: LoudnessMeasureRun
+    /// The run, type-erased: `begin` sets its progress and starts it,
+    /// answering whether an outcome came back (kept for `deliver`).
+    private let begin: (@escaping (Int, Int) -> Void, @escaping (Bool) -> Void) -> Void
+    private let cancelRun: () -> Void
+    private let finishRun: () -> Void
+    private let deliver: () -> Void
     private let sheetTitle: String
-    private let finished: (LoudnessMeasureRun.Outcome) -> Void
 
     private let bar = NSProgressIndicator()
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
@@ -28,15 +34,26 @@ final class AudioMeasureSheetController: NSViewController {
     private var didStart = false
     private var cancelled = false
     private var answered = false
-    private var outcome: LoudnessMeasureRun.Outcome?
+    private var hasOutcome = false
 
-    init(
-        run: LoudnessMeasureRun, title: String,
-        finished: @escaping (LoudnessMeasureRun.Outcome) -> Void
+    init<Run: AudioMeasureRunning>(
+        run: Run, title: String, finished: @escaping (Run.Outcome) -> Void
     ) {
-        self.run = run
+        let box = AudioMeasureOutcomeBox<Run.Outcome>()
+        begin = { progress, answered in
+            run.progress = progress
+            run.start { outcome in
+                box.outcome = outcome
+                answered(outcome != nil)
+            }
+        }
+        cancelRun = { run.cancel() }
+        finishRun = { run.finish() }
+        deliver = {
+            guard let outcome = box.outcome else { return }
+            finished(outcome)
+        }
         self.sheetTitle = title
-        self.finished = finished
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -70,18 +87,17 @@ final class AudioMeasureSheetController: NSViewController {
         guard !didStart else { return }
         didStart = true
         bar.startAnimation(nil)
-        run.progress = { [weak self] clip, count in
+        begin({ [weak self] clip, count in
             self?.statusLabel.stringValue = "Clip \(clip) of \(count)…"
-        }
-        run.start { [weak self] outcome in
+        }) { [weak self] answered in
             guard let self, !self.cancelled else { return }
-            guard let outcome else {
+            guard answered else {
                 self.cancelled = true
-                self.run.finish()
+                self.finishRun()
                 self.dismiss(self)
                 return
             }
-            self.outcome = outcome
+            self.hasOutcome = true
             self.dismiss(self)
         }
     }
@@ -92,17 +108,17 @@ final class AudioMeasureSheetController: NSViewController {
     override func viewDidDisappear() {
         super.viewDidDisappear()
         bar.stopAnimation(nil)
-        guard !answered, !cancelled, let outcome else { return }
+        guard !answered, !cancelled, hasOutcome else { return }
         answered = true
-        let finished = self.finished
-        DispatchQueue.main.async { finished(outcome) }
+        let deliver = self.deliver
+        DispatchQueue.main.async { deliver() }
     }
 
     @objc private func cancelClicked(_ sender: Any?) {
-        guard !cancelled, outcome == nil else { return }
+        guard !cancelled, !hasOutcome else { return }
         cancelled = true
-        run.cancel()
-        run.finish()
+        cancelRun()
+        finishRun()
         dismiss(self)
     }
 }

@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Three commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have.
 
 ## Where audio lives
 
@@ -130,6 +130,23 @@ Everything else (hum removal, the channel choice, pan, mono, fades, ducking, Mut
 It skips, by name, the clips Loudness Normalize skips, and also a clip whose speech hasn't been detected yet and one with under a second of speech. With nothing to enhance, the press beeps.
 
 *Agents:* `enhance_voice` (`clips`; optional `target_lufs` from −50 to −5, default −16). Each row of `enhanced` gives the measurements (`measured_lufs`, `true_peak_dbtp`, `speech_seconds`, `floor_lufs`, `floor_gap_db`, `pause_peak_dbfs`, `sibilance_share`), `set` (exactly the `set_audio` keys written), `reasons` (one sentence per rule), `volume`, `processed_lufs`, `renders`, `result_lufs` and `result_true_peak_dbtp` as the last render measured them, and `limited_by`. Skips are under `skipped`. A second call answers "Enhance Voice made no change".
+
+### Match Audio
+
+**Clip ▸ Match Audio…** gives the selected clips the loudness and the tone of one of them, the reference, in one undo step named "Match Audio". It's offered when at least two selected clips could play sound (the clips Normalize is offered for). Its sheet has:
+
+- **Match to**: the reference, listed in timeline order as "name — track — time (clip id)"; the first clip is chosen. The reference itself isn't changed.
+- **Loudness** and **EQ**, both on each time the sheet opens. Match is greyed with both off.
+
+Match then puts up the Measuring Sound sheet while the clips are measured:
+
+- **The reference** is played offline once, as it sounds in the timeline: through its own settings, its limiter and its volume, without fades, ducking or Mute. Its loudness is the target.
+- **Loudness** is Loudness Normalize to that target: each other clip's volume, and its limiter when the peaks need it, measured through its new settings the way Normalize measures a processed clip.
+- **EQ** compares the average spectrum of each clip's speech with the reference's, in 23 third-octave bands from 79 Hz to 12.7 kHz. The speech is what the clip's sound analysis found, or the spans saved for Duck by Speech; it needs about a second of it. Each clip is measured with its EQ's shelves and bands off, and the difference (less its overall level, which is Loudness's job) is fitted with the EQ's low shelf, three bands and high shelf, each gain within ±12 dB. Those five replace the clip's own; its high-pass, low-pass and hum removal are kept, and Bypass is turned off.
+
+Everything else (the other sections, fades, ducking, pan, Mute) is left alone. Like Normalize, it writes base settings even inside an action. Pressing it again with the same choice changes nothing. A clip that can't be matched (one Normalize would skip, one whose speech hasn't been detected yet or that has under a second of it) is skipped and the others are still matched. If the reference can't be used, or nothing can be matched, Match beeps and the reason appears at the foot of the inspector. If the project changes while the sheet is up, nothing changes and the foot of the inspector says to choose Match Audio again.
+
+*Agents:* `match_audio` (`reference`, `clips`; optional `loudness` and `eq`, both default true, refused when both are false). The answer gives `reference` (`clip`, `media`, `lufs`, `speech_seconds`), `target_lufs` (null with loudness off), and a row per clip under `matched`: `set` (exactly the `set_audio` keys written), `eq` and `eq_fit_rms_db` (how far the fitted EQ is from the measured difference), `volume`, `measured_lufs`, `processed_lufs`, `result_lufs`, `result_true_peak_dbtp`, `limited_by` and `renders`. Skips are under `skipped`. A second call answers "Match Audio made no change".
 
 ## Fades
 
@@ -658,5 +675,6 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Loudness mode's result for a limited clip with no other processing is a model of the limiter, read from the loudness analysis; the export lands within a few tenths of a LU of it (−15.9 LUFS for the −16 example above). A clip measured through its processing is checked by rendering, so its result is the render's.
 - Measuring through a clip's processing takes time in proportion to the clip's length, and the first press waits for the clip's voice isolation or voice effect to render. The At volume read-out doesn't measure on its own: it shows "≈" until Normalize or Enhance Voice has.
 - Enhance Voice sets the gate from the pauses it measured; on a voice with very soft word starts, check the gate's threshold by ear.
+- Match Audio matches the average tone of the speech, not the room, its reverb, its noise or its dynamics, and only with the EQ's five shelves and bands. It matches clips to a clip, not to a track or a mix, and the sheet doesn't remember its last choice.
 - The Loudness Meter measures only at normal speed, and only the first two channels of a track with more. It doesn't follow the export's loudness setting or its master limiter.
 - Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

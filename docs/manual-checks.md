@@ -497,6 +497,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the enhanced voice sound right: no pumping, no clipped word starts, natural pauses?
 - **Source:** road map "audio" AP6 part 1 (spec §11 AU-60…AU-65); `tools/proof/audio_ap6_proof.py` measures the settings, the export's loudness and true peak, the pause floor, idempotence and the sheet (V1–V15), not how it sounds.
 
+**SE-39 — Match Audio makes two recordings of a voice sound alike** (provisional)
+- **Do:** 1. Import two recordings of the same voice made on different microphones or in different places (or `samples/Rode-usb-mic.m4a` and a phone recording of yourself), place them one after the other and let their analysis finish. 2. Select both, choose Clip ▸ Match Audio…, read the Match to list (each row's name, track, time and clip id), keep Loudness and EQ on, and press Match; watch the Measuring Sound sheet come and go. 3. Play across the cut between them, then export Audio only (WAV) and play the file. 4. Open the matched clip's EQ section and look at the curve. 5. Undo and play the cut again.
+- **Expect:** after the match the two sound like the same voice at the same level across the cut, closer in tone than before; the matched voice is not boomy, thin or harsh; the EQ curve is a gentle shape (shelves and broad bands, no narrow spikes); the reference clip is unchanged; the export sounds like the preview; the sheet's rows are readable and the right clip is chosen.
+- **Answer:** do the matched recordings sound alike, and does the fitted EQ sound natural?
+- **Source:** road map "audio" AP12 (spec §11 AU-120…AU-129); `tools/proof/audio_ap12_proof.py` measures the exports' third-octave bands and loudness against the reference's, idempotence, the refusals and the menu (A1–A8), and `audio_ap12_probe.py` the spectrum and the fit (P1–P9), not how it sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

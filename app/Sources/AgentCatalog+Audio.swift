@@ -264,6 +264,63 @@ extension AgentServer {
                             + "EBU R 128's. Outside -50 to -5 is refused rather than clamped.",
                     ],
                 ], required: ["clips"]),
+            // Road map "audio" AP12 (spec §11 AU-120…AU-128): Clip ▸ Match
+            // Audio…'s mirror, a composite like enhance_voice.
+            tool(
+                "match_audio",
+                "Matches clips to a reference clip's loudness and tone, in one undo step — Clip "
+                    + "▸ Match Audio… (whose sheet picks the reference among the selected clips "
+                    + "and has a Loudness and an EQ box). The reference is rendered once as it "
+                    + "plays (its settings, its limiter and its volume; no fades, ducks or "
+                    + "mute) and its integrated loudness T read. loudness (default true) is "
+                    + "normalize_clip's loudness mode at target T for every clip: the volume, "
+                    + "and the limiter when the peaks need it (ceiling -1 dBTP), solved on the "
+                    + "clip rendered through its new settings. eq (default true) matches the "
+                    + "tone: each clip is rendered with its EQ's shelves and bands off (its "
+                    + "high- and low-pass kept), and both clips' average spectra are measured "
+                    + "over their speech only (the media's saved speech spans, else its cached "
+                    + "Silero VAD; at least \(SpeechSpectrumMeter.minimumFrames) "
+                    + "\(SpeechSpectrumMeter.fftSize)-point frames, about 1 s) in "
+                    + "\(SpeechSpectrumMeter.bandIndices.count) third-octave bands from 79 Hz "
+                    + "to 12.7 kHz; the difference, over the bands where both are within "
+                    + String(format: "%g", AudioMatchFit.contentRangeDB)
+                    + " dB of their loudest (at least \(AudioMatchFit.minimumBands)), less its "
+                    + "average (the level is loudness's), smoothed, is fitted by the EQ's low "
+                    + "shelf, three bands and high shelf (gains within ±"
+                    + String(format: "%g", AudioMatchFit.maxGainDB)
+                    + " dB, Q 0.5–4, a band only where the difference is at least "
+                    + String(format: "%g", AudioMatchFit.minimumBellDB)
+                    + " dB), which replace the clip's own five (its high- and low-pass and hum "
+                    + "kept, bypass off). It writes only volume, limiter and eq of set_audio, "
+                    + "BASE settings even inside an action, and a second call changes nothing "
+                    + "(\"made no change\"). Each row of matched gives set (exactly the keys "
+                    + "written), eq and eq_fit_rms_db (how far the fitted EQ is from the "
+                    + "difference, dB RMS), and normalize_clip's figures for the volume "
+                    + "(measured_lufs, processed_lufs, result_lufs, result_true_peak_dbtp, "
+                    + "limited_by) and renders. The renders take seconds on a long clip; if the "
+                    + "project changes meanwhile, nothing changes and the call says so. A "
+                    + "reference that plays no sound, is a nest, plays under 0.4 s, is under "
+                    + "-70 LUFS, has not been analysed yet or (with eq) has under 1 s of speech "
+                    + "is refused by name; a clip that cannot be matched for one of those "
+                    + "reasons, or is the reference, is reported under skipped and the rest are "
+                    + "still matched.",
+                [
+                    "reference": [
+                        "type": "integer",
+                        "description": "The clip whose loudness and tone the others take; it "
+                            + "is not changed.",
+                    ],
+                    "clips": clipsProperty,
+                    "loudness": [
+                        "type": "boolean",
+                        "description": "Match the loudness (volume and limiter). Default true.",
+                    ],
+                    "eq": [
+                        "type": "boolean",
+                        "description": "Match the tone (the EQ's shelves and bands). Default "
+                            + "true. With loudness and eq both false the call is refused.",
+                    ],
+                ], required: ["reference", "clips"]),
             // Road map "audio-sync" AS-1 (spec §11 SY-1..SY-5): Clip ▸
             // Synchronize Audio's mirror, a composite like the two above.
             tool(

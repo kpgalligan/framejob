@@ -26991,3 +26991,69 @@ python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `designs/audio.md`'s AP6 record.
+
+## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
+
+**`audio_ap12_probe.py`** compiles `audio_ap12_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure); it takes no fixture and renders
+nothing: the speech spectrum is fed synthetic buffers and the fit curves made by the EQ's own
+response.
+
+| Row | What it holds |
+|---|---|
+| P1 | `SpeechSpectrumMeter`: a 1 kHz sine at amplitude 0.5 in one channel reads 10·log10(A²/2) within 0.05 dB over 20 frames, its neighbours 60 dB down (the Hann window); each band's bins [c·2^(−1/6), c·2^(1/6)), contiguous; 20 s of seeded pink noise flat 100 Hz–10 kHz within ±1.5 dB |
+| P2 | speech gating: a pause's 4 kHz tone absent, 35 frames counted of a 3 s speech span; 11 frames nil, 12 not |
+| P3 | `AudioMatchFit.target`'s weights (both levels within 50 dB of their loudest) and the weighted mean of D removed, against the probe's own arithmetic; under 12 weighted bands nil |
+| P4 | the smoothing through `target`: [1, 2, 1]/4 inside, (2, 1)/3 at the ends |
+| P5 | a curve made by `responseDB` of a known five-slot EQ on the band centres recovered to rms ≤ 0.1 dB |
+| P6 | an off-grid curve (low shelf 250 Hz +4, bell 2.5 kHz +3 Q 1, high shelf 4 kHz −5) to rms ≤ 0.5 dB |
+| P7 | a ±20 dB curve held at ±12 dB; f to 1 Hz, gain to 0.1 dB, Q to 0.01; a flat or 0.04 dB curve sets no slot |
+| P8 | `applied` and `trialEQ` keep the passes and clear bypass; `AudioMatch.plan` writes eq and volume only, at the reference's loudness, and one part each with the other off; `AudioMatchRun.referenceProject` is the press's own project at the clip's own volume |
+| P9 | a lone 4 kHz −6 dB high shelf through `target` then `fit`: a +6 ±0.3 dB shelf at 4 ±0.5 kHz, no bell or low shelf above 0.5 dB, rms ≤ 0.1 dB |
+
+`--mutants` runs twelve, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | no smoothing | P4 |
+| M2 | every band weighted | P3 |
+| M3 | the level not removed | P3 |
+| M4 | no gain clamp in the fit | P7 |
+| M5 | the trial keeps the tonal slots | P8 |
+| M6 | the speech mask ignored | P2 |
+| M7 | the reference rendered at volume 1 | P8 |
+| M8 | the whole EQ replaced | P8 |
+| M9 | Q fixed at 1 | P5 |
+| M10 | no Levenberg–Marquardt step | P6 |
+| M11 | the residual's weighted mean kept | P9 |
+| M12 | the refined shelves never the start | P9 |
+
+**`audio_ap12_proof.py <dir>/agent.sock`** drives an instance over MCP and measures every
+export: loudness by `phase5_proof.py`'s BS.1770, each third-octave band by its own numpy (the
+meter's STFT and band edges) over the clip's own range (`set_range`, `range: "in_out"`,
+`peak_dbtp: 0`). Its fixtures are seeded pink noise, a copy of it exported through a tilt (low
+shelf 250 Hz +4, band 2.5 kHz +3 Q 1, high shelf 4 kHz −5) at −10 dB, `say` speech and a copy
+12 dB down, 2 s of silence, and the owner's recording with a tilted copy of itself (A3 is
+skipped by name without `samples/`). A7 launches a second instance with
+`-RCDevMatchAudioAccept YES` and stops it. `AP12_ONLY=pink,speech,owner,own,refuse,menu` runs
+only those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| A1 | pink noise as the reference for its tilted copy (`set_media_speech` spanning both): every band 100 Hz–10 kHz within ±1 dB of the reference's export and the loudness within ±0.5 LU; `set` eq and volume, held by `get_project` |
+| A2 | `say` speech 12 dB apart, `eq: false`: within ±0.5 LU, `set` the volume alone |
+| A3 | the owner's recording and its tilted, quieter copy (speech from the VAD cache): bands ±1 dB, ±0.5 LU |
+| A4 | with a second target: a second call "made no change"; one undo, "Match Audio", restores both |
+| A5 | a target's own high shelf replaced by a ≈ flat fit (every gain within ±1 dB), its 40 Hz high-pass kept, bands ±1 dB |
+| A6 | a missing `reference`, a silent reference, `loudness: false, eq: false` and an unknown key refused by name, changing nothing; a silent target skipped by name beside a matched one |
+| A7 | Clip ▸ Match Audio… with the dev accept holds the tool's set (the volume within 0.05 dB) |
+| A8 | the parity log clean |
+
+```sh
+python3 tools/proof/audio_ap12_probe.py             # P1–P9
+python3 tools/proof/audio_ap12_probe.py --mutants   # M1–M12
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap12_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/audio.md`'s AP12 record.

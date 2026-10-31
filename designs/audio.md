@@ -1686,6 +1686,102 @@ Filed at integration: V12's last verify render read +0.73 dBTP at ×1.5 Keep pit
 dBTP clip limiter (the export's master holds −1); the review's two nits; the render test that
 predates animated audio.
 
+### AP12's record (2026-10-31)
+
+AP12, Match Audio (survey B6), built in lane B from `16bd934`.
+
+**Decided.** AU-120…AU-129, recorded before the code: a composite owning the volume, the
+limiter and the EQ's five tonal slots; the reference picked in the Match Audio sheet; the
+reference read from its cache and rendered once as it plays; Match Loudness as Loudness
+Normalize to its loudness through an inner `LoudnessMeasureRun`; the speech-only third-octave
+spectra on renders; the curve, its weights and smoothing; the offset-invariant fit; the
+target's own EQ replaced but its passes and hum; the chrome and `match_audio`; the proof.
+
+**Landed.** App only — no core, FFI, op, format or `UserDefaults` change. New:
+`SpeechSpectrumMeter.swift` (the STFT accumulator fed beside `ProcessedLoudness.render`'s step
+meter), `AudioMatchFit.swift` (the curve, the fit, `applied`, `trialEQ`), `AudioMatch.swift`
+(`read`, `plan`), `AudioMatchRun.swift`, `AudioMatchSheetController.swift`,
+`AgentServer+MatchAudio.swift`. Changed: `AudioMeasureRunning`, the protocol
+`LoudnessMeasureRun` and `AudioMatchRun` share (in `LoudnessMeasureRun.swift`, with
+`AudioMeasureOutcomeBox`), `LoudnessMeasureRun`'s init from captured pieces and its `trial`
+made static; the Measuring Sound sheet, `AudioMeasureDoor.measure` and
+`AgentServer.awaitMeasurement`/`measuredOutcome` generic over it (their callers unchanged);
+`ProcessedLoudness.render` takes an optional spectrum meter; `AudioEnhance.speechSpans`
+internal; `AudioMeasureDoor.pressMatch`; Clip ▸ Match Audio… after Enhance Voice and its
+validator arm; `UIMenuTable`, the inventory, `AssistantPrompt`, the tool sets of
+`op_argument_proof.py` (106), `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`,
+`screens.py`'s `RCDevMatchAudioAccept`. Docs: the guide's Match Audio section and limit,
+menus-and-shortcuts.md's two rows, mcp.md, the README highlight; spec §7.4, §7.9a, §9; the
+proof README; SE-39.
+
+**Deviations.** (1) **AU-126 (a)'s shelf start.** As specified (shelves at 150 Hz and 6 kHz,
+their gains solved, then bells), P9 failed: the lone 4 kHz shelf left 1.7 dB at 6 kHz for a bell
+to chase and LM kept a 1.2 dB bell at 4.1 kHz beside a shelf at 4.8 kHz (rms 0.032). Refining the
+two shelves alone first and always taking them broke P5 (the low shelf ran to 53 Hz, rms 0.152).
+The refined shelves are now taken only when they leave no weighted band at the bell threshold
+(0.5 dB), else the corners stay at 150 Hz and 6 kHz; P5 0.000, P6 0.000, P9 a 3986 Hz +5.9 dB
+shelf alone at rms 0.040. AU-126 says so, and a twelfth mutant (M12) holds it, AU-129 too.
+(2) M7 (the reference read at volume 1) needed a seam the probe can see:
+`AudioMatchRun.referenceProject(base:scope:clip:)`, the press's own project, nil when the
+reference is not in it; P8 checks it. (3) `AudioMatchRun.Outcome` carries `refusal`: a
+reference whose render is gated out or has too little speech is known only after its render,
+and the sheet's and the tool's answers need the sentence. (4) A refusal of `nothingToMatch` from
+the door also puts its sentence at the inspector's foot, as the reference's does. (5) Found on
+the way: `attachAudio:` (AP9) was in neither `UIMenuTable` nor the inventory, so `v2_menu.py`'s
+H1 failed on the base; both rows added (`plain`, `none`).
+
+**Measured** (the lane; three lanes shared the machine). `audio_ap12_probe.py` 9/9 — P1 the
+1 kHz sine −9.031 dB (−9.031 expected), its neighbours −91.96 and −94.92; pink flat within
+0.851 dB; P2 35 frames, the pause's tone at −73.58 dB; P5 rms 0.000; P6 0.000; P7 the steep curve
+held at ±12.0; P9 above — and `--mutants` 12/12, each by its named row. `inventory.py --check`
+5/5; `v2_menu.py --only H` 5/5. On Debug, `audio_ap12_proof.py` 17/17 over two runs (the first
+run's pink part aborted waiting 60 s for a cache the loaded machine wrote 5 minutes after the
+import; the wait is now 600 s, and the second run took the pink and menu parts): A1 the tilted
+pink fitted at rms 0.035 dB, every band within 0.42 dB and the loudness 0.00 LU; A2 0.00 LU;
+A3 the owner's recording, bands within 0.51 dB, −0.29 LU; A5 a flat fit (rms 0.001) with the
+40 Hz high-pass kept, bands within 0.08 dB; A4, A6, A7 and A8 pass. `audio_ap6_proof.py` 37/37 on
+Debug after the refactor. `make gate` PASS 384 s (names 1, typecheck 6 with the four baseline
+warnings, fmt and lint skipped, test 220, app 157). On Release after it, `audio_ap12_proof.py`
+16/16 in one run: A1 the tilted pink fitted at rms 0.035 dB (low shelf 222 Hz −4.1, bands
+273 Hz −0.6, 2394 Hz −2.6, 4493 Hz +0.7, high shelf 4748 Hz +4.8 against the tilt's 250 Hz +4,
+2.5 kHz +3, 4 kHz −5), every band within 0.42 dB of the reference's export and 0.00 LU, 2 renders;
+A2 the speech 0.00 LU at volume 3.981 with 0 renders; A3 the owner's recording bands within
+0.51 dB and −0.29 LU, its speech 10.12 s; A4 "made no change" and one undo; A5 no slot fitted
+(rms 0.001), the high-pass kept, bands within 0.08 dB; A6 every refusal by name; A7 the menu's
+set the tool's; A8 no `Frame Job: ` line. Also on Release: `audio_ap6_proof.py` 37/37 (the press
+0.74, 0.83 and 1.57 s cold, three runs, three lanes loading the machine),
+`loudness_normalize_proof.py` 37/37, `op_argument_proof.py` 177/177 (106 product tools),
+`op_catalog_proof.py` 23/23, `phase9_proof.py` 244/245 (its `B.mov` made first, by the proof
+README's line, missing on this host): the forty app-state tools named; the one failure is the
+`detach_audio` row, "editing inside the nest and then opening it gives the same clip content as
+opening it and then editing — first difference at start 0, track index 0", a core edit
+comparison this phase changes nothing under (no core, graphic or proxy line differs from the
+base); filed. A second run on the same instance failed it again and also "…and edit in it" (the
+version-1 rescue), which passed in the first; not investigated further.
+
+**Review.** First pass, fix required: on the menu path a press whose every target was skipped
+only after the renders (under 1 s of speech, under 12 content bands shared) beeped with no
+sentence, though AU-128 and the guide promise "Nothing could be matched." with every reason.
+Fixed: `pressMatch`'s ops closure builds the plan and, with nothing matched, posts
+`AudioMatch.nothingMatched(plan.skipped)`, the sentence the tool throws. After it `make gate`
+PASS 413 s (names 1, typecheck 13 with the four baseline warnings, fmt and lint skipped, test
+243, app 153) and on Release `audio_ap12_proof.py` 16/16 (A7 through `pressMatch`), the parity
+log empty; no row drives the menu to that path. The second review passed with two nits, kept:
+a refusal from inside `measure`'s closure beeps twice (`refuse`, then the empty op list), and
+AU-125's smoothing reads a dropped band as 0, pulling a weighted neighbour toward it.
+
+**Integrated.** Nothing had landed since the lane's base, so the range applied without a
+conflict and SE-39 and AU-120…AU-129 keep their numbers. The CLAUDE.md edits owed went in: the
+root's tool list gains `match_audio`, it says one hundred and six product tools, and the dev
+defaults gain `-RCDevMatchAudioAccept YES`; app's map names the six new files, the protocol and
+`pressMatch`. No product code was resolved, so the Release proofs above stand. On the merged
+tree `make gate` PASS 267 s (names 1, typecheck 6 with the four baseline warnings, fmt and lint
+skipped, test 134, app 126).
+
+**Owed.** SE-39 for the owner (two recordings of a voice matched, by ear). Filed at
+integration: phase9's `detach_audio` nest row (above), with the second run's "…and edit in it"
+failure.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

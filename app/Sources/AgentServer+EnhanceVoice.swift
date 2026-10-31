@@ -145,13 +145,10 @@ extension AgentServer {
 
     /// Starts `run` on main and waits here for its outcome; the assistant's
     /// Stop cancels it (nil). Never main.
-    func awaitMeasurement(_ run: LoudnessMeasureRun, stop: AgentCallCancel?)
-        -> LoudnessMeasureRun.Outcome?
+    func awaitMeasurement<Run: AudioMeasureRunning>(_ run: Run, stop: AgentCallCancel?)
+        -> Run.Outcome?
     {
-        final class Box {
-            var outcome: LoudnessMeasureRun.Outcome?
-        }
-        let box = Box()
+        let box = AudioMeasureOutcomeBox<Run.Outcome>()
         let done = DispatchSemaphore(value: 0)
         stop?.onCancel { run.cancel() }
         onMain {
@@ -166,10 +163,10 @@ extension AgentServer {
 
     /// On main: the outcome, or an error when the run was stopped or the
     /// project or scope changed while it measured (the sheet's own test).
-    func measuredOutcome(
-        _ outcome: LoudnessMeasureRun.Outcome?, document: ProjectDocument, asked: ReelProject,
+    func measuredOutcome<O>(
+        _ outcome: O?, document: ProjectDocument, asked: ReelProject,
         scope: UInt32?, tool: String
-    ) throws -> LoudnessMeasureRun.Outcome {
+    ) throws -> O {
         guard let outcome else {
             throw ToolError(
                 message: "\(tool) was stopped while its sound was being measured, so nothing "

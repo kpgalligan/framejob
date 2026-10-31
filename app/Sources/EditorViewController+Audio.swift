@@ -67,6 +67,31 @@ extension EditorViewController {
         AudioMeasureDoor.press(.enhanceVoice, document: document, clips: ids, window: view.window)
     }
 
+    /// Clip ▸ Match Audio… (road map "audio" AP12, spec §11 AU-121, AU-128):
+    /// the Match Audio sheet over the selected clips `AudioNormalize.canOffer`
+    /// passes, then, from its hand-back, `AudioMeasureDoor.pressMatch` with
+    /// the chosen reference and the other clips — the same `AudioMatch` read
+    /// and plan and `AudioMatchRun` `match_audio` waits on. Under two clips,
+    /// no window or a sheet already up beep.
+    @objc func matchAudio(_ sender: Any?) {
+        guard let document = document else { return }
+        let snapshot = document.editedProject.snapshot
+        let candidates = AudioMatchSheetController.candidates(selectedClips, in: snapshot)
+        guard candidates.count >= 2, let window = view.window, window.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
+        let ids = candidates.map(\.clip)
+        presentAsSheet(
+            AudioMatchSheetController(candidates: candidates) { [weak self, weak document] choice in
+                guard let self, let document else { return }
+                AudioMeasureDoor.pressMatch(
+                    document: document, reference: choice.reference,
+                    clips: ids.filter { $0 != choice.reference }, loudness: choice.loudness,
+                    eq: choice.eq, window: self.view.window)
+            })
+    }
+
     /// Clip ▸ Synchronize Audio — the menu half of `sync_audio`. The same
     /// `AudioSync.read` + `plan` pair the tool calls; the anchor is SY-2's
     /// rule. The scope is the selection's clips `AudioNormalize.canOffer`
@@ -218,6 +243,10 @@ extension EditorViewController {
             // button asks it through `AudioPane.normalizable`.
             guard let snapshot = document?.editedProject.snapshot else { return false }
             return selectedClips.contains { AudioNormalize.canOffer($0, in: snapshot) }
+        case #selector(matchAudio(_:)):
+            // Two clips Normalize could measure (AU-121): one the reference.
+            guard let snapshot = document?.editedProject.snapshot else { return false }
+            return selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.count >= 2
         case #selector(synchronizeAudio(_:)):
             // Two clips that could play sound, asked of the snapshot for the
             // reason above; `read` and `plan` may still refuse, by name.

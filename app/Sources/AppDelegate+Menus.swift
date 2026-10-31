@@ -291,6 +291,8 @@ extension AppDelegate {
         // UI path `enhance_voice` names. No key equivalent, for Normalize's
         // reason.
         menu.addItem(item("Enhance Voice", #selector(EditorViewController.enhanceVoice(_:))))
+        // AP12 (spec §11 AU-121): the UI path `match_audio` names; no key.
+        menu.addItem(item("Match Audio…", #selector(EditorViewController.matchAudio(_:))))
         // Road map "audio-sync" AS-1, beside Normalize: the UI path
         // `sync_audio` names. No key equivalent, for Normalize's reason.
         menu.addItem(

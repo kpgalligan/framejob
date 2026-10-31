@@ -250,7 +250,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and five product tools (and the dev tools, road
+  stranger by name, for all one hundred and six product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -320,7 +320,7 @@ path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
-`detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `normalize_clip`, `enhance_voice`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
+`detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `normalize_clip`, `enhance_voice`, `match_audio`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `export_status`, `cancel_export`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
@@ -345,7 +345,9 @@ which puts a fault in an `av1_webm` export's audio pump or video sink so a
 proof can time the stop, spec §11 CX-15 (6); and
 `-RCDevGraphicImportAccept YES`, with which the Import Graphic sheet presses
 its own Import so a proof can see a package land (spec §11 G-47); and
-`-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
+`-RCDevMatchAudioAccept YES`, with which the Match Audio sheet presses its own
+Match so a proof can drive Clip ▸ Match Audio… to its edit (spec §11 AU-128);
+and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares

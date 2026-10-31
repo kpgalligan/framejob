@@ -1,5 +1,26 @@
 import Foundation
 
+/// A measurement the Measuring Sound sheet runs and an off-main tool waits
+/// on (spec §11 AU-65, AU-128): `LoudnessMeasureRun` and `AudioMatchRun`.
+/// `start` answers once on main, nil after `cancel`; `cancel` is any
+/// thread; `finish` releases every render key's wants, once the answer is
+/// committed or dropped. `needsRender` false means `start` answers before it
+/// returns.
+protocol AudioMeasureRunning: AnyObject {
+    associatedtype Outcome
+    var needsRender: Bool { get }
+    var progress: ((Int, Int) -> Void)? { get set }
+    func start(_ completion: @escaping (Outcome?) -> Void)
+    func cancel()
+    func finish()
+}
+
+/// One run's outcome held between its answer and its hand-back (the sheet,
+/// `AgentServer.awaitMeasurement`): a generic function cannot nest a type.
+final class AudioMeasureOutcomeBox<Outcome> {
+    var outcome: Outcome?
+}
+
 /// One press's processed measurement (spec §11 AU-64 (b), (e)): clip by
 /// clip, R0 through the clip's chain, the solve, and the limiter's verify
 /// renders. Loudness Normalize and Enhance Voice both build one, through
@@ -13,7 +34,7 @@ import Foundation
 /// stands and nothing renders. `finish` releases every render key's wants
 /// (kept between renders so the verify renders find the same files), and is
 /// owed once per run, after the commit or the cancel.
-final class LoudnessMeasureRun {
+final class LoudnessMeasureRun: AudioMeasureRunning {
     /// One clip: its reading (the cache's, with the limiter the solve uses),
     /// and the chain to render it through; nil chain, the reading stands.
     struct Job {
@@ -70,15 +91,28 @@ final class LoudnessMeasureRun {
 
     /// Main. Captures the document's project, scope, media and reverse
     /// resolution: every trial is made from what the press read.
-    init(
+    convenience init(
         document: ProjectDocument, jobs: [Job], problems: [AudioNormalize.Problem],
         targetLUFS: Double
     ) {
         assert(Thread.isMainThread)
-        base = document.project
-        scope = document.scope
-        urls = document.mediaURLs()
-        resolution = ReverseSource.shared.resolution(for: document.recipeKey)
+        self.init(
+            base: document.project, scope: document.scope, urls: document.mediaURLs(),
+            resolution: ReverseSource.shared.resolution(for: document.recipeKey), jobs: jobs,
+            problems: problems, targetLUFS: targetLUFS)
+    }
+
+    /// Main. From pieces a caller already captured from the press's
+    /// document (`AudioMatchRun`'s inner run).
+    init(
+        base: ReelProject, scope: UInt32?, urls: [UInt32: URL], resolution: ReverseResolution,
+        jobs: [Job], problems: [AudioNormalize.Problem], targetLUFS: Double
+    ) {
+        assert(Thread.isMainThread)
+        self.base = base
+        self.scope = scope
+        self.urls = urls
+        self.resolution = resolution
         self.jobs = jobs
         self.problems = problems
         self.targetLUFS = targetLUFS.isFinite ? targetLUFS : AudioNormalize.defaultTargetLUFS
@@ -251,9 +285,16 @@ final class LoudnessMeasureRun {
 
     // MARK: - The trial and the render
 
+    private func trial(_ clip: UInt32, _ patch: AudioPatch) -> ReelProject? {
+        Self.trial(base: base, scope: scope, clip: clip, patch: patch)
+    }
+
     /// AU-64 (b): the press's project with one `set_audio` of `patch` on
     /// `clip`, scoped to the nest it read in; nil when the core refuses it.
-    private func trial(_ clip: UInt32, _ patch: AudioPatch) -> ReelProject? {
+    /// Match Audio's target trials are made here too (AU-124).
+    static func trial(base: ReelProject, scope: UInt32?, clip: UInt32, patch: AudioPatch)
+        -> ReelProject?
+    {
         let op = ReelOp.setAudio(clips: [clip], patch: patch).scoped(scope)
         let handle: ReelProject
         switch try? base.applying(op) {

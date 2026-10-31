@@ -253,6 +253,8 @@ NOT_SHOWN = {
     "RCDevGraphicImportAccept": "a dev launch default with which the Import Graphic sheet "
                                 "presses its own Import (spec §11 G-47); no screen launches "
                                 "with it",
+    "RCDevMatchAudioAccept": "a dev launch default with which the Match Audio sheet presses "
+                             "its own Match (spec §11 AU-128); no screen launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

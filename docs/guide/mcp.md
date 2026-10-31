@@ -552,6 +552,7 @@ See [Timeline](timeline.md), [Canvas and layers](canvas-and-layers.md) and [HDR 
 | `detect_silence` | Reports the quiet spans, changing nothing (the read half of **Clip ▸ Remove Silences…**). |
 | `normalize_clip` | Sets each clip's volume so its loudest moment lands at `peak_db`, or with `mode: "loudness"` so its integrated loudness lands at `target_lufs` under −1 dBTP (**Clip ▸ Normalize**). A clip with processing is measured through it, so the call can take seconds. |
 | `enhance_voice` | Measures each clip's voice and pauses and writes ordinary settings for speech, with the volume to `target_lufs` measured through them (**Clip ▸ Enhance Voice**). |
+| `match_audio` | Gives `clips` the loudness of the `reference` clip as it plays and its speech's tone, as each clip's volume, limiter and EQ shelves and bands (**Clip ▸ Match Audio…**). The clips are rendered, so the call can take seconds. |
 | `sync_audio` | Lines clips up by their sound (**Clip ▸ Synchronize Audio**). |
 | `detect_fillers` | Reports filler words as ranges, changing nothing (the read half of **Clip ▸ Remove Filler Words…**). |
 | `transcribe_for_fillers` | Re-transcribes one media file with AssemblyAI, adding filler words — a paid upload. |

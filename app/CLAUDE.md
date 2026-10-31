@@ -2488,12 +2488,18 @@ free.
 - `LoudnessMeasureRun.swift` — one press's renders, clip by clip: R0, the
   solve through Loudness Normalize's plan, the limiter's verify renders
   (±0.1 LU, at most three); cancel; `finish`, which releases the render wants.
+  It also holds `AudioMeasureRunning`, the protocol the Measuring Sound sheet,
+  `AudioMeasureDoor.measure` and `AgentServer.awaitMeasurement` take (this
+  run and `AudioMatchRun`), and `AudioMeasureOutcomeBox`; `static trial`
+  makes Match Audio's target trials too.
 - `AudioMeasureDoor.swift` — the one body the Volume section's Normalize and
   Enhance Voice buttons and the Clip menu share: Peak at once, a run at once
   when nothing renders, else the Measuring Sound sheet; the stale test; the
-  commit.
+  commit. And `pressMatch`, Clip ▸ Match Audio…'s press from its sheet's
+  hand-back (spec §11 AU-128).
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
-  "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape.
+  "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
+  over `AudioMeasureRunning`.
 - `AudioEnhance.swift` (+`Reasons`) — Enhance Voice's value type (spec §11
   AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the rules), `jobs`,
   `plan` over the run's outcome; `+Reasons` the loudness reason and the
@@ -2505,6 +2511,26 @@ free.
 - `AgentServer+EnhanceVoice.swift` — `enhance_voice`, the mirror of Clip ▸
   Enhance Voice, off main; and the measurement's wait and stale test
   `normalize_clip` shares.
+- `SpeechSpectrumMeter.swift` — a render's speech-only third-octave spectrum
+  (spec §11 AU-124): an 8192-point Hann STFT, hop 4096, fed beside
+  `ProcessedLoudness.render`'s step meter; 23 bands, nil under 12 speech
+  frames.
+- `AudioMatchFit.swift` — Match EQ's curve (weights, level removed,
+  smoothing) and its fit to the EQ's five tonal slots (shelves, up to three
+  bells, Levenberg–Marquardt, rounding), `applied` and `trialEQ`
+  (AU-125…AU-127). Pure.
+- `AudioMatch.swift` — Match Audio's value type: `read` (the reference's
+  refusals, the targets' skips), `plan` over the run's outcome (AU-120,
+  AU-122, AU-123, AU-127).
+- `AudioMatchRun.swift` — one Match Audio press's renders: the reference once
+  as it plays, each target's trial for its spectrum and fit, then an inner
+  `LoudnessMeasureRun` to the reference's loudness; `referenceProject`; an
+  `AudioMeasureRunning`.
+- `AudioMatchSheetController.swift` — the Match Audio sheet (Match to,
+  Loudness, EQ), its hand-back from `viewDidDisappear` and its dev accept
+  (AU-121, AU-128).
+- `AgentServer+MatchAudio.swift` — `match_audio`, the mirror of Clip ▸ Match
+  Audio…, off main.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
   `RealFFT.swift` ·
