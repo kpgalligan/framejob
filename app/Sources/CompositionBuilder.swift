@@ -40,6 +40,11 @@ struct BuiltComposition {
     /// The composition audio tracks an export reads, or nil for all of them
     /// (the mix). A stem's build reads only its own (spec §11 AU-108 (e)).
     var audioSelection: Set<CMPersistentTrackID>? = nil
+    /// The timeline tracks in this build with a compressor or limiter, by id
+    /// (spec §11 AU-150): what the export's read sub-mixes (`ExportMixRead`,
+    /// AU-152) and what tells the meter it is approximate (AU-153). Every
+    /// build carries it, metering or not.
+    var trackDynamics: [UInt32: AudioTrackDynamicsSettings] = [:]
 
     /// A copy whose read is every composition audio track owned by one of
     /// `tracks`, the timeline track ids one stem holds.
@@ -205,7 +210,8 @@ enum CompositionBuilder {
             composition: composition,
             videoComposition: AVVideoComposition(configuration: videoConfiguration),
             videoConfiguration: videoConfiguration, audioMix: audioMix, planJSON: planJSON,
-            meters: meters, output: plan.output, recipeKey: recipeKey, audioOwners: owners)
+            meters: meters, output: plan.output, recipeKey: recipeKey, audioOwners: owners,
+            trackDynamics: dsp.trackDynamics.filter { Set(owners.values).contains($0.key) })
     }
 
     // MARK: - The media-less timeline

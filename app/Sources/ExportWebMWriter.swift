@@ -51,7 +51,7 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
     private let videoOutput: AVAssetReaderOutput
     /// The audio mix's own reader, nil for a silent movie; its output is added in `start`.
     let audioReader: AVAssetReader?
-    private var audioOutput: AVAssetReaderOutput?
+    private var audioRead: ExportMixRead?
     let fault = ExportWebMDevFault.current()
     private let pump: ExportEncodePump
     private let opus: ExportOpusEncoder?
@@ -153,13 +153,13 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
         self.completion = completion
         guard !isStopping else { return report(.failure(Exporter.ExportError.cancelled)) }
         if let audioReader {
-            let output = ExportWriter.audioReadOutput(built)
-            guard audioReader.canAdd(output) else {
+            // The mix, or the tracks' sub-mixes through their dynamics (AU-152).
+            let read = ExportMixRead(built, origin: range.start)
+            guard read.add(to: audioReader) else {
                 return report(.failure(Exporter.ExportError.failed(
                     "The audio mix could not be read for export.")))
             }
-            audioReader.add(output)
-            audioOutput = output
+            audioRead = read
         }
         let webm: ReelWebM
         do {
@@ -196,11 +196,11 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
             defer { group.leave() }
             if isStopping { videoReader.cancelReading() }
         }
-        if let opus, let output = audioOutput, let audioReader {
+        if let opus, let read = audioRead, let audioReader {
             group.enter()
             audioQueue.async { [self] in
                 defer { group.leave() }
-                pumpAudio(output, into: webm, through: opus)
+                pumpAudio(read, into: webm, through: opus)
                 // Its own reader, after its own last read (G-17).
                 if isStopping { audioReader.cancelReading() }
             }

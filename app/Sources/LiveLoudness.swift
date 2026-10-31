@@ -46,6 +46,9 @@ struct LiveLoudnessReading: Equatable {
     var lastReset: LiveLoudness.ResetReason?
     /// Playing at a rate other than ×1: nothing is measured (the footer says so).
     var offSpeed = false
+    /// The build runs track compressors or limiters, which the preview runs
+    /// per composition track (spec §11 AU-153): the footer says approximate.
+    var tracksApproximate = false
 
     static let empty = LiveLoudnessReading(
         momentaryLUFS: nil, shortTermLUFS: nil, integratedLUFS: nil, truePeakDBTP: nil,
@@ -92,7 +95,15 @@ final class LiveLoudness {
     // MARK: - The tick
 
     /// The meter timer's tick: drains every track's ring and sums what it can.
-    func consume(_ meters: [LevelMeterTrack], rate playRate: Float, now: TimeInterval) {
+    func consume(
+        _ meters: [LevelMeterTrack], rate playRate: Float, now: TimeInterval,
+        tracksApproximate: Bool = false
+    ) {
+        if reading.tracksApproximate != tracksApproximate {
+            var next = reading
+            next.tracksApproximate = tracksApproximate
+            commit(next)
+        }
         syncLanes(meters)
         var overran = false
         var drained: [(lane: LiveLoudnessLane, chunks: [MixChunk])] = []

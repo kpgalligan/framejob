@@ -121,7 +121,7 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`add_track {index?, name?}`** — Inserts (index 0 = back).
 - **`remove_track {track, with_clips=false}`** — Refuses on a non-empty track unless `with_clips`.
 - **`move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?,
-  matte?, volume?, pan?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
+  matte?, volume?, pan?, compressor?, limiter?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
   rule — while any track in the set is soloed every other is treated as muted, mute wins, audio
   only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and
   never in the plan, so a solo toggle changes ramps and nothing else. `matte` (format version 14,
@@ -134,7 +134,15 @@ The rules every op shares are §6a; the clip ops are §6b.
   outside its range is invalid input in `in_range`'s sentence (`volume must be between 0 and 4,
   not 5`). Volume is an envelope term after mute (AU-103); pan is the plan's `track_pans`
   (§7.2, AU-104). `nest` copies both from every source track but the nest clip's destination,
-  whose copy is unity and centre; `unnest` keeps neither.
+  whose copy is unity and centre; `unnest` keeps neither. `compressor` and `limiter` (format
+  version 36, §11 AU-150) are the track's dynamics, post-fader on its sub-mix (AU-151): an object
+  REPLACES the whole value, its missing keys the clip type's defaults; `null` clears it. Refused
+  as invalid input, each in its own sentence: a value neither an object nor `null` (`compressor
+  must be a json object or null, not 5`), an unknown key (`unknown key "compressor.knee" in
+  set_track`), a mistyped member (`bad value at "limiter.release" in set_track: …`), and a value
+  outside the clip's ranges under the track's key (`compressor.ratio must be between 1 and 20,
+  not 30`). Inside a `scope` either key is invalid input (`a track's compressor or limiter has no
+  meaning inside nest 5`), and `nest` gives the nest's tracks none.
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.

@@ -31,7 +31,7 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
-use crate::audio_dynamics::{check_de_esser, check_gate};
+use crate::audio_dynamics::{check_compressor, check_de_esser, check_gate, check_limiter};
 use crate::audio_eq::{check_eq, check_hum};
 use crate::grade_check::{check_curves, check_qualifier, check_wheels};
 use crate::model::{
@@ -156,7 +156,7 @@ pub(crate) fn ticks_in_range(
     }
 }
 
-fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
+pub(crate) fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
     if value >= 0 {
         Ok(())
     } else {
@@ -368,40 +368,10 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     in_range("audio.noise_reduction", props.noise_reduction, 0.0, 1.0)?;
     in_range("audio.isolation", props.isolation, 0.0, 1.0)?;
     if let Some(compressor) = &props.compressor {
-        in_range(
-            "audio.compressor.threshold_db",
-            compressor.threshold_db,
-            COMPRESSOR_THRESHOLD_MIN_DB,
-            0.0,
-        )?;
-        in_range(
-            "audio.compressor.ratio",
-            compressor.ratio,
-            1.0,
-            COMPRESSOR_RATIO_MAX,
-        )?;
-        ticks_positive_or_zero("audio.compressor.attack", compressor.attack)?;
-        ticks_positive_or_zero("audio.compressor.release", compressor.release)?;
-        in_range(
-            "audio.compressor.makeup_db",
-            compressor.makeup_db,
-            0.0,
-            COMPRESSOR_MAKEUP_MAX_DB,
-        )?;
+        check_compressor("audio.compressor", compressor)?;
     }
     if let Some(limiter) = &props.limiter {
-        in_range(
-            "audio.limiter.ceiling_db",
-            limiter.ceiling_db,
-            LIMITER_CEILING_MIN_DB,
-            0.0,
-        )?;
-        ticks_in_range(
-            "audio.limiter.release",
-            limiter.release,
-            LIMITER_RELEASE_MIN,
-            LIMITER_RELEASE_MAX,
-        )?;
+        check_limiter("audio.limiter", limiter)?;
     }
     props.eq.as_ref().map(check_eq).transpose()?;
     props.hum.as_ref().map(check_hum).transpose()?;

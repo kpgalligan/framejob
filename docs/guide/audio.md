@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume, pan, compressor and limiter. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have, and a track's compressor and limiter are exact in an export but approximate in the preview (see [Track compressor and limiter](#track-compressor-and-limiter)).
 
 ## Where audio lives
 
@@ -504,15 +504,15 @@ A clip's own **Mute** (in the Volume section) silences just that clip.
 
 ## Track volume and pan
 
-Each track has its own **volume** and **pan**, applied on top of every clip on it. Click the fifth switch in the track header (the sliders), choose **Volume and Pan…** in the track's right-click menu, or choose **Track ▸ Volume and Pan…** for the current track. A small panel opens beside the header:
+Each track has its own **volume** and **pan**, applied on top of every clip on it. Click the fifth switch in the track header (the sliders), choose **Mix…** in the track's right-click menu, or choose **Track ▸ Mix…** for the current track. A small panel opens beside the header, with the track's compressor and limiter below (see [Track compressor and limiter](#track-compressor-and-limiter)):
 
 | Control | Range | What it does |
 |---|---|---|
 | **Volume** | Off, −60 dB … +12 dB | The track's level. The quick picks are −12, −6, −3, 0, +3 and +6 dB. Dragging to the left end turns the track off. The read-out beside it shows the level as a percentage, or "Off". |
 | **Pan** | −100 (left) … 100 (right) | Leans the track's sound left or right. The quick picks are −100, −50, 0, 50 and 100. |
-| **Reset** | | Puts the volume back to 0 dB and the pan to the centre. |
+| **Reset** | | Puts the volume back to 0 dB and the pan to the centre, and turns the track's compressor and limiter off. |
 
-The sliders switch is lit while a track's volume or pan is not at its default.
+The sliders switch is lit while a track's volume or pan is not at its default, or it has a compressor or a limiter on.
 
 How track volume and pan work:
 
@@ -525,6 +525,34 @@ How track volume and pan work:
 - **The preview and the export match.** Track volume and pan sound the same in both.
 
 *Agents:* `set_track` with `volume` (0–4 as a linear gain, 1 being unity and 4 being +12 dB) and `pan` (−1 to 1).
+
+## Track compressor and limiter
+
+A track can have its own **compressor** and **limiter**, below Pan in the same panel (the fifth header switch, **Mix…** in the track's right-click menu, or **Track ▸ Mix…**). They act on the track's whole sound: every clip on it, after each clip's own processing, its volume, fades, crossfades and ducking, and after the track's volume and pan. The compressor runs first, then the limiter, whose ceiling is the highest true peak the track hands the mix.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Compressor | Turns the track's compressor on. | on / off | off |
+| Threshold | The level above which it starts turning the track down. Quick picks: −30, −24, −18, −12, −6. | −60–0 dB | −18 dB |
+| Ratio | How strongly. Quick picks: 1.5, 2, 3, 4, 8, 20. | 1–20 :1 | 3:1 |
+| Attack | Quick picks: 1, 5, 10, 30, 100 ms. | 0–200 ms | 10 ms |
+| Release | Quick picks: 50, 100, 200, 500, 1000 ms. | 10–2000 ms | 200 ms |
+| Makeup | Gain added afterwards. Quick picks: 0, 3, 6, 12. | 0–24 dB | 0 dB |
+| Limit peaks | Turns the track's limiter on. | on / off | off |
+| Ceiling | The highest true peak the track may reach. Quick picks: −1, −2, −3, −6. | −24–0 dBTP | −1 dBTP |
+| Release | How quickly the level recovers after a peak. Quick picks: 50, 100, 200, 500. | 1–1000 ms | 100 ms |
+
+How they work:
+
+- **After the fader.** Unlike a clip's compressor, which hears the clip before its volume, a track's compressor and limiter hear the track as it goes into the mix. Turning the track down turns down what reaches them: a compressor at −20 dB over a track at −6 dB compresses less.
+- **A nest's bus.** A nest's whole mix plays through the track its nest clip sits on, so a compressor or limiter on that track acts on everything inside the nest together, like a bus. A nest's own tracks have no compressor or limiter: inside an open nest both sections are greyed out, and their tooltip says "A nest's mix plays through the dynamics of the track that holds it." Nesting a selection doesn't copy them; the track the nest clip lands on keeps its own.
+- **Exact in every export.** An export plays each track with a compressor or limiter through it on its own before the tracks are mixed, and a stem of that track includes them. The master limiter still runs over the mix afterwards.
+- **Approximate in the preview.** The preview plays a track's sound in more than one piece where its clips overlap (a crossfade, or a nest's tracks), and it runs the compressor and limiter on each piece separately, so the pieces can add up past a track limiter's ceiling while editing. Measured on two clips at −1 dBFS crossfading under a limiter at −6 dBTP, the preview's true peak was 5.2 dB over the ceiling; the export held it. The Loudness Meter says "approximate" while any track has a compressor or limiter.
+- **What hears them.** The preview, the level meter and the Loudness Meter (approximately), and every export. Normalize, the Loudness read-out, Enhance Voice and Match Audio work on the clip itself, before the track, and don't.
+- **Each change is one undo step**: a drag or a typed value ("Track Compressor", "Track Limiter"), or **Reset** ("Reset Track Mix").
+- A track with a limiter plays 3.3 ms later in the preview and is placed 3.3 ms earlier to match, as a clip's limiter does.
+
+*Agents:* `set_track` with `compressor: {threshold_db, ratio, attack, release, makeup_db}` (attack and release in ticks) and `limiter: {ceiling_db, release}`. Each object replaces the whole setting (a key left out takes its default) and `null` turns it off. Refused inside a `scope`.
 
 ## Hearing a scrub
 
@@ -564,7 +592,7 @@ Click the **Reset** button at the top of the column to start measuring again. Th
 
 The meter measures only at normal speed. At any other speed, Momentary and Short-term show "—" and the column says "Measured only at normal speed."; Integrated and True peak max keep their values. A dash means there isn't a figure yet; "−∞" means digital silence.
 
-The figures are the mix as the preview plays it, before the export's loudness setting and its master limiter, and the column says so. An export with a loudness target changes the level after this point, and the master limiter holds its peaks under the ceiling, so its report can differ. The column is per window and turns off when you close the window.
+The figures are the mix as the preview plays it, before the export's loudness setting and its master limiter, and the column says so. While any track has a compressor or limiter, it says they are approximate (see [Track compressor and limiter](#track-compressor-and-limiter)). An export with a loudness target changes the level after this point, and the master limiter holds its peaks under the ceiling, so its report can differ. The column is per window and turns off when you close the window.
 
 *Agents:* there is no product tool; an agent reads loudness from an export's report or a clip's loudness read-out.
 
@@ -656,7 +684,8 @@ The screen recorder can record a microphone with the screen, or record the micro
 
 - Volume tops out at 3200 % (about +30 dB). The slider covers 0–400 %; type in the field for more.
 - Pan, a clip's or a track's, has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
-- Track volume tops out at +12 dB (×4). A track's volume and pan can't be animated, and a track has no EQ or effects of its own yet.
+- Track volume tops out at +12 dB (×4). A track's volume, pan, compressor and limiter can't be animated, and a track has no EQ or other effects of its own yet.
+- A track's compressor and limiter are approximate in the preview wherever its clips overlap (a crossfade, a nest's tracks); see [Track compressor and limiter](#track-compressor-and-limiter). A nest's own tracks have none, and scrubbing doesn't hear them.
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.

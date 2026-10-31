@@ -2,11 +2,12 @@
 //! `model.rs` whole (a pure move), which re-exports it, so every
 //! `crate::model::Track` path holds. The track vocabulary's new keys land
 //! here: format 35's `volume` and `pan` (spec §11 AU-102), each written only
-//! when not its default.
+//! when not its default, and format 36's `compressor` and `limiter` (AU-150),
+//! each written only when set.
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::TrackMatte;
+use crate::model::{Compressor, Limiter, TrackMatte};
 
 /// One kind of track only (spec §2): any clip may live on any track, and
 /// a later index in `Project::tracks` draws in front.
@@ -47,6 +48,17 @@ pub struct Track {
     /// an audio segment's `track_pans`. Written only when not 0.
     #[serde(default, skip_serializing_if = "is_centre")]
     pub pan: f64,
+    /// The track's compressor (format version 36, spec §11 AU-150, AU-151):
+    /// the clip's own type, run post-fader on the track's sub-mix before its
+    /// limiter. Timeline tracks only: on a nest's own track it is ignored
+    /// where it plays. Written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compressor: Option<Compressor>,
+    /// The track's true-peak limiter (format version 36, AU-150, AU-151):
+    /// the ceiling in dBTP on what the track hands the mix, after its
+    /// compressor. Timeline tracks only. Written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limiter: Option<Limiter>,
 }
 
 /// A track's loudest fader: ×4, +12.04 dB (spec §11 AU-102). `set_track`

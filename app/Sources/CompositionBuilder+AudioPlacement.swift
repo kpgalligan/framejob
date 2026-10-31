@@ -34,14 +34,16 @@ extension CompositionBuilder {
 
         /// The shift for one composition track: the noise lead when its tap
         /// runs noise reduction, plus the limiter's when it runs the limiter,
-        /// and the varispeed lead when its segments play `off` (a plan audio
-        /// track holds one pitch name, SY-26).
+        /// plus the limiter's again when its tap runs a TRACK limiter (a
+        /// metering build's, spec §11 AU-153), and the varispeed lead when its
+        /// segments play `off` (a plan audio track holds one pitch name, SY-26).
         static func of(
-            segments: [PlanSegment], usesNoiseReduction: Bool, usesLimiter: Bool
+            segments: [PlanSegment], usesNoiseReduction: Bool, usesLimiter: Bool,
+            usesTrackLimiter: Bool = false
         ) -> AudioShift {
             AudioShift(
                 trackLead: (usesNoiseReduction ? noiseReductionLead : 0)
-                    + (usesLimiter ? limiterLead : 0),
+                    + (usesLimiter ? limiterLead : 0) + (usesTrackLimiter ? limiterLead : 0),
                 scaledSourceLead: segments.compactMap(\.pitch).first == "off"
                     ? varispeedSourceLead : 0)
         }

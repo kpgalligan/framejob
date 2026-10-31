@@ -29,6 +29,13 @@ enum TrackMixLevel {
     }
 }
 
+extension TrackSnapshot {
+    /// Whether the track's mix is anything but unity, centre and undynamic:
+    /// what lights the header's fifth switch and enables Reset (spec §11
+    /// AU-105, AU-155).
+    var mixIsSet: Bool { volume != 1 || pan != 0 || compressor != nil || limiter != nil }
+}
+
 /// How the popover edits: the timeline's own live trio for a drag, and its
 /// one-shot edit for a field commit and Reset, so a drag is one undo step.
 struct TrackMixEdits {
@@ -40,8 +47,9 @@ struct TrackMixEdits {
 
 /// The track mix popover's content (spec §11 AU-105): Volume in dB (a slider
 /// and a field with quick picks, and the readout), Pan −100…100 (a slider and
-/// a field), and Reset. It reads the track it was last handed (`update`),
-/// and a value being dragged until the drag ends.
+/// a field), the Compressor and Limiter sections (AU-155,
+/// `TrackMixDynamics.swift`), and Reset. It reads the track it was last handed
+/// (`update`), and a value being dragged until the drag ends.
 final class TrackMixViewController: NSViewController {
     private(set) var track: TrackSnapshot
     private let edits: TrackMixEdits
@@ -56,14 +64,22 @@ final class TrackMixViewController: NSViewController {
     private var controls: [OptionControl] = []
     private var resetButton: StickerButton?
     private let titleLabel = NSTextField(labelWithString: "")
+    /// Inside an open nest: the dynamics are disabled and Reset leaves them be.
+    private let inNest: Bool
+    private let dynamics: TrackMixDynamics
 
     static let volumeQuick: [Double] = [-12, -6, -3, 0, 3, 6]
     static let panQuick: [Double] = [-100, -50, 0, 50, 100]
+    /// The rows' label column, wide enough for "Threshold".
+    static let labelWidth: CGFloat = 60
 
-    init(track: TrackSnapshot, edits: TrackMixEdits) {
+    init(track: TrackSnapshot, edits: TrackMixEdits, inNest: Bool) {
         self.track = track
         self.edits = edits
+        self.inNest = inNest
+        dynamics = TrackMixDynamics(track: track, edits: edits, inNest: inNest)
         super.init(nibName: nil, bundle: nil)
+        dynamics.changed = { [weak self] in self?.refresh() }
     }
 
     @available(*, unavailable)
@@ -118,12 +134,16 @@ final class TrackMixViewController: NSViewController {
         resetButton = reset
         let footer = NSStackView(views: [NSView(), reset])
         footer.orientation = .horizontal
-        let stack = NSStackView(views: [titleLabel, volumeRow, panRow, footer])
+        let dynamicRows = dynamics.makeRows { [unowned self] label, views in
+            self.layoutRow(label, views)
+        }
+        let rows = [volumeRow, panRow] + dynamicRows + [footer]
+        let stack = NSStackView(views: [titleLabel] + rows)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = InspectorMetrics.rowSpacing
         stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
-        for view in [volumeRow, panRow, footer] {
+        for view in rows {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
         }
         stack.widthAnchor.constraint(equalToConstant: 340).isActive = true
@@ -136,13 +156,22 @@ final class TrackMixViewController: NSViewController {
         _ label: String, _ slider: InspectorSliderControl, _ field: OptionFieldControl,
         _ readout: OptionDisplayControl?
     ) -> NSView {
-        let title = NSTextField(labelWithString: label)
-        title.font = DS.sans(11)
-        title.textColor = DS.textMuted
-        title.widthAnchor.constraint(equalToConstant: 48).isActive = true
-        let views: [NSView] = [title, slider, field] + (readout.map { [$0] } ?? [])
         controls += [slider, field] + (readout.map { [$0] } ?? [])
-        let row = NSStackView(views: views)
+        return layoutRow(label, [slider, field] + (readout.map { [$0] } ?? []))
+    }
+
+    /// A row's layout: the label column (none for a checkbox row), then its
+    /// controls, the slider taking the width the fixed ones leave.
+    private func layoutRow(_ label: String?, _ views: [NSView]) -> NSView {
+        var all = views
+        if let label {
+            let title = NSTextField(labelWithString: label)
+            title.font = DS.sans(11)
+            title.textColor = DS.textMuted
+            title.widthAnchor.constraint(equalToConstant: Self.labelWidth).isActive = true
+            all.insert(title, at: 0)
+        }
+        let row = NSStackView(views: all)
         row.orientation = .horizontal
         row.spacing = 6
         row.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -157,13 +186,16 @@ final class TrackMixViewController: NSViewController {
             liveVolume = nil
             livePan = nil
         }
+        dynamics.update(track)
         refresh()
     }
 
     private func refresh() {
         titleLabel.stringValue = track.name.isEmpty ? "Track" : track.name
         controls.forEach { $0.refresh() }
+        dynamics.refresh()
         resetButton?.isEnabled = volume != 1 || pan != 0
+            || (!inNest && (dynamics.compressor != nil || dynamics.limiter != nil))
     }
 
     // MARK: Edits
@@ -202,7 +234,13 @@ final class TrackMixViewController: NSViewController {
         edits.edit("Track Pan", [.setTrack(track: track.id, pan: value)])
     }
 
+    /// All four (AU-155); inside a nest only the two a nest's track has, a
+    /// compressor or limiter key being refused there (AU-150).
     @objc private func resetMix(_ sender: Any?) {
-        edits.edit("Reset Track Mix", [.setTrack(track: track.id, volume: 1, pan: 0)])
+        let op: ReelOp = inNest
+            ? .setTrack(track: track.id, volume: 1, pan: 0)
+            : .setTrack(
+                track: track.id, volume: 1, pan: 0, compressor: NSNull(), limiter: NSNull())
+        edits.edit("Reset Track Mix", [op])
     }
 }

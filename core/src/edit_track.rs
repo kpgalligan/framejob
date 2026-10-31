@@ -31,6 +31,7 @@ use crate::model_track::TRACK_VOLUME_MAX;
 use crate::outcome::Outcome;
 use crate::props_check::in_range;
 use crate::time::Ticks;
+use crate::track_dynamics::{read_compressor, read_limiter};
 
 /// Media dimension ceiling. Nothing decodes at this size — it exists so a
 /// probe that reports garbage (or a hand-written project) cannot put a
@@ -274,6 +275,8 @@ impl Project {
     /// every other unchanged field. `volume` (linear, 0…`TRACK_VOLUME_MAX`)
     /// and `pan` (−1…1) are the track's fader and balance (spec §11 AU-102);
     /// a value outside its range is an `Err` in `in_range`'s sentence.
+    /// `compressor` and `limiter` (spec §11 AU-150) are read by
+    /// `track_dynamics.rs`: `null` clears, an object replaces the whole value.
     #[allow(clippy::too_many_arguments)]
     pub fn set_track(
         &self,
@@ -286,6 +289,8 @@ impl Project {
         matte: Option<TrackMatte>,
         volume: Option<f64>,
         pan: Option<f64>,
+        compressor: Option<&Value>,
+        limiter: Option<&Value>,
     ) -> Result<Outcome, String> {
         self.require_track(track)?;
         if let Some(volume) = volume {
@@ -294,6 +299,8 @@ impl Project {
         if let Some(pan) = pan {
             in_range("pan", pan, -1.0, 1.0)?;
         }
+        let compressor = compressor.map(read_compressor).transpose()?;
+        let limiter = limiter.map(read_limiter).transpose()?;
         let mut next = self.clone();
         if let Some(found) = next.tracks.iter_mut().find(|t| t.id == track) {
             if let Some(name) = name {
@@ -319,6 +326,12 @@ impl Project {
             }
             if let Some(pan) = pan {
                 found.pan = pan;
+            }
+            if let Some(compressor) = compressor {
+                found.compressor = compressor;
+            }
+            if let Some(limiter) = limiter {
+                found.limiter = limiter;
             }
         }
         self.finish(next)

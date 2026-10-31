@@ -211,6 +211,17 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         // op is refused here before a view is built.
         Op::AddAdjustmentClip { .. } => Some("add_adjustment_clip"),
 
+        // A track's dynamics run on the TIMELINE's per-track sub-mixes (spec
+        // §11 AU-150): a nest's whole mix passes through the track holding
+        // its nest clip, which is the bus, and a nest's own tracks have no
+        // sub-mix of their own to compress. The rest of `set_track` means
+        // inside a nest what it means outside (below).
+        Op::SetTrack {
+            compressor,
+            limiter,
+            ..
+        } if compressor.is_some() || limiter.is_some() => Some("a track's compressor or limiter"),
+
         // ---- everything else ------------------------------------------
         // Placement, trimming, properties, actions, tracks and grouping all
         // mean in a nest exactly what they mean on the timeline, `nest` and

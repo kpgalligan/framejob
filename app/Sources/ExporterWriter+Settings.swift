@@ -60,15 +60,22 @@ extension ExportWriter {
     /// (`ExportAudioMaster.floatMixSettings`, spec §11 AU-27), which the
     /// master turns into the encoder's samples. `ExportWebMWriter` reads
     /// through it too. A stem's build (`audioSelection`, spec §11 AU-108 (e))
-    /// reads only its own tracks through a mix of only their parameters.
-    static func audioReadOutput(_ built: BuiltComposition) -> AVAssetReaderAudioMixOutput {
+    /// reads only its own tracks through a mix of only their parameters, and
+    /// so does a sub-mix of `ExportMixRead` (`only`, AU-152), both at once
+    /// for a stem's sub-mix.
+    static func audioReadOutput(
+        _ built: BuiltComposition, only: Set<CMPersistentTrackID>? = nil
+    ) -> AVAssetReaderAudioMixOutput {
         var tracks = built.composition.tracks(withMediaType: .audio)
         var mix = built.audioMix
-        if let selection = built.audioSelection {
-            tracks = tracks.filter { selection.contains($0.trackID) }
+        if built.audioSelection != nil || only != nil {
+            let reads = { (id: CMPersistentTrackID) in
+                (built.audioSelection?.contains(id) ?? true) && (only?.contains(id) ?? true)
+            }
+            tracks = tracks.filter { reads($0.trackID) }
             let selected = AVMutableAudioMix()
             selected.inputParameters = built.audioMix.inputParameters.filter {
-                selection.contains($0.trackID)
+                reads($0.trackID)
             }
             mix = selected
         }

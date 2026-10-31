@@ -56,6 +56,8 @@ impl Track {
             matte: TrackMatte::None,
             volume: 1.0,
             pan: 0.0,
+            compressor: None,
+            limiter: None,
         }
     }
 }

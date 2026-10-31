@@ -141,6 +141,7 @@ mod speed_map;
 mod speed_segments;
 pub mod time;
 mod time_bounds;
+mod track_dynamics;
 pub mod transition;
 mod transition_search;
 mod webm_ebml;

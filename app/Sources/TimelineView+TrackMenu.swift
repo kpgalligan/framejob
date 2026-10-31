@@ -4,7 +4,7 @@ import AppKit
 /// on the empty part of its lane. It carries the header's five switches —
 /// the four toggles each with a checkmark, because a menu opened on ONE track
 /// can say that track's state where the Track menu, acting on `currentTrack`,
-/// cannot, and Volume and Pan… (spec §11 AU-105), the popover the fifth opens —
+/// cannot, and Mix… (spec §11 AU-105, AU-155), the popover the fifth opens —
 /// the Matte submenu (spec §11 MT-7), and Remove Track, which is the only way to delete an EMPTY track that is
 /// not the front-most one without selecting a clip on it first (and an empty
 /// track has none to select).
@@ -44,7 +44,7 @@ extension TimelineView {
         add("Mute Audio", #selector(trackMenuToggleMuted(_:)), on: track.muted)
         add("Lock Track", #selector(trackMenuToggleLocked(_:)), on: track.locked)
         add("Solo", #selector(trackMenuToggleSolo(_:)), on: track.solo)
-        add("Volume and Pan…", #selector(trackMenuShowMix(_:)), on: false)
+        add("Mix…", #selector(trackMenuShowMix(_:)), on: false)
         menu.addItem(matteMenuItem(for: track))
         menu.addItem(.separator())
         add("Remove Track", #selector(trackMenuRemove(_:)), on: false)

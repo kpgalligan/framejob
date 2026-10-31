@@ -1676,7 +1676,7 @@ final class TimelineHeaderView: NSView {
                 (.muted, track.muted ? "speaker.slash" : "speaker.wave.2", "M", track.muted),
                 (.locked, track.locked ? "lock" : "lock.open", "L", track.locked),
                 (.solo, "headphones", "S", track.solo),
-                (.mix, "slider.horizontal.3", "V", track.volume != 1 || track.pan != 0),
+                (.mix, "slider.horizontal.3", "V", track.mixIsSet),
             ]
             for (position, toggle) in toggles.enumerated() {
                 var box = Self.buttonRect(position, height: height)

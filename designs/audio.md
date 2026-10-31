@@ -1863,6 +1863,95 @@ volume 15.8667, 2 renders, landing to answer 1.34, 1.33 and 1.32 s; V4 (a) the s
 and sounds right. Filed at integration: `audio_ap6_proof.py` V8's `-FrameJobNormalizeTargetLUFS
 -16` never reaches the app.
 
+### AP10c's record (2026-10-31)
+
+AP10 part 2b — track and bus dynamics, the master chain (survey A12; AU-109's block), built in lane
+B from `f36ace3`.
+
+**Decided.** AU-150…AU-156, recorded before the code: the two fields, format 36, `set_track`'s
+replace-or-clear rules and refusals, timeline tracks only, base-only, and the four commands that
+solve pre-track (AU-150); post-fader on the track's sub-mix, compressor then limiter (AU-151); the
+export's lockstep sub-mixes (AU-152); the preview's per-composition-track stage with ×E at `g + L`
+and ÷E at `g`, metering builds only (AU-153); the master chain left as AU-27/AU-28's (AU-154); the
+chrome (AU-155); the proof (AU-156). No owner question arose.
+
+**Landed.** Tolls first, gated and committed alone (`e65318d`, `make gate` PASS 373 s): T1
+`ExporterWriter+Pump.swift` (the pump and the master's tail out of `ExporterWriter.swift`, 592 →
+443), T2 `AgentCatalog+Tracks.swift` (the five track rows out of `AgentCatalog.swift`, 586 → 523,
+spliced back in place). Core: `Track.compressor`/`.limiter`; `track_dynamics.rs` (`present`,
+`read_compressor`, `read_limiter`); `check_compressor`/`check_limiter` moved into
+`audio_dynamics.rs` under a prefix (the clip's sentences unchanged); `Op::SetTrack`'s two fields,
+`set_track`, the op row, `refused_inside`'s guarded arm, the two `Track` literals; format 36 and
+the header; `core/tests/track_dynamics.rs` (9), `schema_v36.rs` (5), `op_nullability.rs` 80 → 82.
+Swift: `AudioTrackDynamics.swift` (settings, the stage, the envelope); `AudioDSPParameters
+.trackDynamics` (outside `isEmpty`); `AudioTrackDSP`'s `dynamics`, `trackLead` and the summed
+`lookupLead`; `AudioShift.of(usesTrackLimiter:)`; the tap's `runTrackStage` after the chain and
+before the meter; `BuiltComposition.trackDynamics`; `ExportMixRead.swift` and its readers (the
+writer's pump now takes `read:`, `audioReadOutput(_:only:)`, the WebM pump, the measurement);
+`TrackSnapshot.compressor`/`.limiter`; the meter's `tracksApproximate`, footer and
+`loudness_meter`'s key; `TrackSnapshot.mixIsSet`, `TrackMixDynamics.swift`, the popover's
+`inNest` and Reset of all four; Track ▸ Mix… and the context menu's Mix…; `setTrack`'s two
+arguments forwarded raw, the catalog's prose and two descriptions. Docs: spec §4.4, §5.2b, §6c,
+§7.4, §7.8, §7.10, §9 and the index's Lines cells; the guide's audio ("Track compressor and
+limiter", the preview statement, the meter, Limits), export, timeline, menus-and-shortcuts and mcp
+pages; the README highlight; SE-40 (and SE-33's menu path); the proof README.
+
+**Deviations.** (1) The probe rows reach further than the spec's list so seven mutants die in
+`--mutants`: B2 also measures `Exporter.measureLoudness` on a hard-compressed build against the
+undynamic one (M4 dies there as well as at T5), B4 adds a third case — a 0.9 sine under a constant
+E of 0.5 passing a −6 dBTP limiter post-fader — because removing ×E/÷E changes neither the
+identity case nor the released-limiter case (M6), and B5 adds the meter's flag and a non-metering
+build's `trackDynamics`. (2) The popover's label column is 60 pt for every row (48 before), so
+"Threshold" fits and the rails align. (3) Inside an open nest Reset sends only volume and pan: a
+`compressor` or `limiter` key there is refused (AU-150). (4) `ExportMixRead.next()` answers nil
+once its reader has failed, so the pump names the reader's error as before. (5)
+`ExporterLoudness` reads `isSubMixed` once into `subMixed` (one mutant anchor for M4).
+(6) `ExporterWriter+Audio.swift`'s head comment names `audioRead` for the renamed member. (7) M5
+(T6 on a mutated Debug build) and M8, M9 (`cargo test --test track_dynamics` on the mutated core)
+are run by hand; `--mutants` prints their anchors.
+
+**Measured** (three lanes shared the machine). Core targeted: `track_dynamics` 9, `schema_v36`
+5, `op_nullability` 2, `op_table` 8, `track_mix` 16, `export_stems` 14, all passed; `make lint`
+clean; `make typecheck` 0 errors, the four baseline warnings. Probe 5/5; regression probes
+`audio_ap8b_proof.py --probe` 8/8, `limiter_probe.py` 9/9, `audio_ap10_proof.py --probe` 4/4,
+`export_master_proof.py --probe` 3/3. Mutants 10/10: `--mutants` 7/7 (M1 by B2, M2 by B3, M3 by
+B3, M4 by B2, M6 by B4, M7 by B5, M10 by B4); by hand M5 by T6 (the mutated Debug build's
+`vp9_webm` at −10.692 LUFS against the WAV's −15.170), M8 by
+`inside_a_scope_the_dynamics_are_refused_and_the_rest_applies`, M9 by
+`nest_gives_its_tracks_none_and_the_timelines_keep_theirs`. Against Debug,
+`audio_ap10c_proof.py` 8/8 on the MCP rows. `make gate` PASS 334 s (names 1, typecheck 6 with the
+four baseline warnings, fmt 3, lint 6, test 188, app 130). On Release after the gate:
+`audio_ap10c_proof.py` 13/13 — T1 the limited stem −6.0099 / −6.0000 dBTP (Kaiser / Annex 2),
+the control +0.0395 / +0.0456; T2 −14.4929 dBFS, at track volume 0.5 −15.9980; T3 the bus's stem
+−6.0107 / −6.0000; T4 Σ stems − mix worst 1 LSB at 24 bits; T5 −16.003 LUFS, −1.0059 / −1.0000
+dBTP (gain 9.05 dB, limited 2.18 dB); T6 WAV −15.170, `vp9_webm` −15.121 LUFS, the undynamic
+`vp9_webm` −10.692; P1 the meter's true peak −0.8030 dBTP, +5.197 dB over the −6 dBTP ceiling
+through the crossfade (two hot tones each under the ceiling on its own composition track, summed;
+S3's +0.85 dB was the owner's speech), `tracks_approximate` true then false; U1 one undo step,
+the five refusals by name, the parity log empty. The regression proofs keep their figures:
+`export_master_proof.py` 11/11 (X10 −15.9125 LUFS, −0.9998 / −0.9999 dBTP),
+`audio_ap10b_proof.py` 11/11, `audio_ap10_proof.py` 16/16, `webm_export_proof.py --app release`
+29/29. `spec_index_proof.py` 213/213.
+
+**Review.** Passed with two nits, kept: `op_table.rs`'s `Argument` doc and `op_schema.rs`'s
+Nullability bullet still say only two tools give `null` a meaning, though `set_track`'s
+`compressor` and `limiter` now do (through `track_dynamics::present`); and `ExportMixRead`'s final
+drain can emit one AVFoundation buffer plus the 158-frame flush, past the "up to 4,096 frames" its
+doc and AU-152 state — harmless, since the master's chunking, `ExportAudioEnd.fit` and the Opus
+feed take any size.
+
+**Integrated.** Nothing had landed since the lane's base, so the two commits applied clean;
+format 36 and SE-40 keep their numbers. The CLAUDE.md edits owed went in: core's map gains
+`track_dynamics.rs` and names `check_compressor` / `check_limiter` and format 36's two track
+keys; app's map names `ExportMixRead.swift`, `AudioTrackDynamics.swift`,
+`TrackMixDynamics.swift`, `ExporterWriter+Pump.swift`, `AgentCatalog+Tracks.swift` and the
+header's Mix…. On the merged tree `make gate` PASS 345 s (names 1, typecheck 7 with the four
+baseline warnings, fmt 3, lint 8, test 197, app 129); no product code was resolved, so the
+lane's Release proofs stand.
+
+**Owed.** SE-40 for the owner: a track's compressor and limiter sound right, and the panel's
+dynamics read well.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

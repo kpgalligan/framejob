@@ -18,6 +18,16 @@ final class LoudnessPanelView: NSView {
     static let preMasterNote =
         "The mix as the preview plays it, before the export's loudness and master limiter."
     static let offSpeedNote = "Measured only at normal speed."
+    /// A build with track compressors or limiters (spec §11 AU-153).
+    static let approximateNote =
+        "The mix as the preview plays it, with track compressors and limiters approximate, "
+        + "before the export's loudness and master limiter."
+
+    /// The footer's sentence for a reading: off speed, approximate, or pre-master.
+    static func footerNote(_ reading: LiveLoudnessReading) -> String {
+        reading.offSpeed
+            ? offSpeedNote : reading.tracksApproximate ? approximateNote : preMasterNote
+    }
 
     private let content = NSView()
     private let title = NSTextField(labelWithString: "Loudness")
@@ -88,7 +98,7 @@ final class LoudnessPanelView: NSView {
         values[2].stringValue = Self.format(reading.integratedLUFS, unit: "LUFS")
         values[3].stringValue = Self.format(reading.truePeakDBTP, unit: "dBTP")
         values[3].textColor = (reading.truePeakDBTP ?? -.infinity) > -1 ? DS.meterClip : DS.textStrong
-        footer.stringValue = reading.offSpeed ? Self.offSpeedNote : Self.preMasterNote
+        footer.stringValue = Self.footerNote(reading)
     }
 
     /// One decimal with U+2212, "—" for none, "−∞" for digital silence.

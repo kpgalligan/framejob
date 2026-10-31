@@ -1,7 +1,7 @@
 import AppKit
 
 /// Clip identity (spec §5.2, format version 3): Clip ▸ Rename… (⇧⌘R), the
-/// Clip ▸ Label ▸ submenu, Track ▸ Volume and Pan… (spec §11 AU-105), and the
+/// Clip ▸ Label ▸ submenu, Track ▸ Mix… (spec §11 AU-105, AU-155), and the
 /// Track ▸ Solo and Track ▸ Matte items' validation — the menu
 /// halves of what the timeline does in place (`TimelineView+Rename.swift`,
 /// the header column's S) and what the Clip tab's header field does
@@ -69,7 +69,7 @@ extension EditorViewController {
 
     // MARK: - Track mix
 
-    /// Track ▸ Volume and Pan… (spec §11 AU-105): the current track's mix
+    /// Track ▸ Mix… (spec §11 AU-105, AU-155): the current track's mix
     /// popover, anchored on its header's fifth switch — the same popover the
     /// switch and the context menu open (`TimelineView+TrackMix.swift`).
     @objc func showTrackMix(_ sender: Any?) {

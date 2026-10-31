@@ -13,9 +13,10 @@ extension ExportWebMWriter {
     /// packet k's first frame is the one stamped k × 960 / 48 kHz — k × 20 ms, a whole tick of
     /// WebM's 1 ms timecode scale — which is the time it is added at. Each buffer goes through
     /// the master first (`ExportAudioMaster`, spec §11 AU-27), which places it by its stamp
-    /// too, and its latency's tail goes in before the padding.
+    /// too, and its latency's tail goes in before the padding. The mix is `read`'s
+    /// (`ExportMixRead`, spec §11 AU-152): the tracks' sub-mixes when any has dynamics.
     func pumpAudio(
-        _ output: AVAssetReaderOutput, into webm: ReelWebM, through opus: ExportOpusEncoder
+        _ read: ExportMixRead, into webm: ReelWebM, through opus: ExportOpusEncoder
     ) {
         let master = audioMaster
         var held: Data?
@@ -39,7 +40,7 @@ extension ExportWebMWriter {
                 guard !isStopping else { return }
                 reads += 1
                 try fault?.beforeAudioRead(reads)
-                guard let decoded = output.copyNextSampleBuffer() else {
+                guard let decoded = try read.next() else {
                     if let error = readFailure(of: audioReader) {
                         stopped(with: error)
                         return

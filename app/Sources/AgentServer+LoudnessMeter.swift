@@ -39,6 +39,7 @@ extension AgentServer {
             "sample_rate": reading.sampleRate.map { $0 as Any } ?? NSNull(),
             "resets": reading.resets,
             "last_reset": reading.lastReset.map { $0.rawValue as Any } ?? NSNull(),
+            "tracks_approximate": reading.tracksApproximate,
         ])
     }
 
@@ -55,7 +56,9 @@ extension AgentServer {
                 + "gated, since the last reset), true_peak_dbtp (the 4× true-peak maximum since "
                 + "the reset), from_frame and to_frame (the frames measured, [from, to), at "
                 + "sample_rate, the taps' rate), resets (how many since the window opened) and "
-                + "last_reset (manual, jump or overrun). A level is null where there is none "
+                + "last_reset (manual, jump or overrun), and tracks_approximate (the build runs "
+                + "track compressors or limiters, which the preview runs approximately, spec "
+                + "AU-153). A level is null where there is none "
                 + "and \"-inf\" for digital silence; the frames and rate are null before "
                 + "anything is measured. reset: true resets the meter first, as the column's "
                 + "Reset does. Refused, changing nothing: a project with no editor window.",

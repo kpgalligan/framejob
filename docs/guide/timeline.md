@@ -81,7 +81,7 @@ Each track has a header on the left with its name and five switches:
 | Mute Audio | speaker / crossed-out speaker | Silences the track's sound. |
 | Lock Track | open padlock / closed padlock | Protects the track from edits: its clips can't be dragged or trimmed, a marquee skips them, and ripple, insert and range edits leave them alone. The lane is hatched. |
 | Solo | headphones (both) | Silences every other track that is not soloed too. Pictures stay. Mute still wins on a track that is both muted and soloed. |
-| Volume and Pan | sliders (both) | Opens the track's volume and pan panel ([Audio](audio.md#track-volume-and-pan)). Lit while the volume or pan is not at its default. |
+| Mix | sliders (both) | Opens the track's mix panel: volume, pan, compressor and limiter ([Audio](audio.md#track-volume-and-pan)). Lit while the volume or pan is not at its default, or a compressor or limiter is on. |
 
 A lit switch is also highlighted in the accent colour, so you can read a
 track's state from the symbol or the highlight. Under a solo, the waveforms
@@ -112,8 +112,8 @@ with it.") with **Remove** and **Cancel**. The last track can't be removed.
 The **Track** menu works on the *current track*: the first selected clip's
 track, or the front-most track when nothing is selected. Besides the commands
 above it has **Hide Video**, **Mute Audio**, **Lock Track** and **Solo**,
-which flip that track's switches, and **Volume and Pan…**, which opens the
-track's volume and pan panel. Only Solo shows a checkmark there. The
+which flip that track's switches, and **Mix…**, which opens the
+track's mix panel. Only Solo shows a checkmark there. The
 **Matte ▸** submenu is described in
 [Canvas and layers](canvas-and-layers.md).
 
@@ -121,7 +121,7 @@ track's volume and pan panel. Only Solo shows a checkmark there. The
 
 Right-click (or ⌃-click) a header, or an empty part of a lane, to get that
 track's menu: **Hide Video**, **Mute Audio**, **Lock Track** and **Solo**,
-each checked when on, then **Volume and Pan…**, then **Matte ▸**, then
+each checked when on, then **Mix…**, then **Matte ▸**, then
 **Remove Track** (disabled on the last track). Right-clicking a clip opens no menu.
 
 Every switch flip, rename and reorder is one undo step. The names **Edit ▸

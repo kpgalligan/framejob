@@ -463,11 +463,16 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
     /// §11 AU-102); the core's envelope and plan apply both.
     let volume: Double
     let pan: Double
+    /// The track's compressor and limiter (format 36, spec §11 AU-150), nil
+    /// when off; post-fader on the track's sub-mix (AU-151).
+    let compressor: CompressorProps?
+    let limiter: LimiterProps?
 
     init(
         id: UInt32, name: String = "Track", hidden: Bool = false, muted: Bool = false,
         locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none,
-        volume: Double = 1, pan: Double = 0
+        volume: Double = 1, pan: Double = 0, compressor: CompressorProps? = nil,
+        limiter: LimiterProps? = nil
     ) {
         self.id = id
         self.name = name
@@ -478,6 +483,8 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         self.matte = matte
         self.volume = volume
         self.pan = pan
+        self.compressor = compressor
+        self.limiter = limiter
     }
 
     init(from decoder: Decoder) throws {
@@ -491,6 +498,8 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         matte = c.lenient(.matte, TrackMatte.none)
         volume = c.lenient(.volume, 1.0)
         pan = c.lenient(.pan, 0.0)
+        compressor = c.lenient(.compressor)
+        limiter = c.lenient(.limiter)
     }
 }
 

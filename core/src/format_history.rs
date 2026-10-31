@@ -356,5 +356,11 @@
 //! default 0), after `matte`, on the timeline's tracks and a nest's, each
 //! written only when not its default; no migration. The bump is so an older
 //! build refuses the file instead of playing every track at unity and centre
-//! and dropping the keys on save. Every number from 36 up, 1014 included, is
+//! and dropping the keys on save.
+//!
+//! Version 36 is a track's compressor and limiter (spec §11 AU-150):
+//! `tracks[].compressor` and `tracks[].limiter`, the clip's own two types,
+//! after `pan`, each written only when set; no migration. The bump is so an
+//! older build refuses the file instead of playing every track undynamic and
+//! dropping the keys on save. Every number from 37 up, 1014 included, is
 //! newer than this build.

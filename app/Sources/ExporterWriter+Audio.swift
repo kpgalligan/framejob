@@ -3,8 +3,8 @@ import AVFoundation
 // `ExportWriter`'s audio half: the audio writer input and the mix's reader output. A pure
 // move out of `ExporterWriter.swift` at its size cap (issue #378), before its readers were
 // split one per output; the members each file calls in the other lost `private` (`built`,
-// `audioOutput`, `addAudio`, `addAudioOutput`; the gain, now `audioMaster`, lost `private`),
-// and nothing else changed.
+// `audioOutput` — now `audioRead` — `addAudio`, `addAudioOutput`; the gain, now
+// `audioMaster`, lost `private`), and nothing else changed.
 extension ExportWriter {
 
     /// The audio half: every composition audio track through the plan's mix.
@@ -59,14 +59,14 @@ extension ExportWriter {
             origin: range.start, limits: built.audioSelection == nil)
     }
 
-    /// The mix's reader output (`audioReadOutput`). False when the reader
-    /// refuses it; there is no 16-bit fallback, because the master would then
-    /// meet a decode that already clipped.
+    /// The mix's read (`ExportMixRead`: `audioReadOutput`, or the tracks'
+    /// sub-mixes through their dynamics, spec §11 AU-152). False when the
+    /// reader refuses an output; there is no 16-bit fallback, because the
+    /// master would then meet a decode that already clipped.
     func addAudioOutput() -> Bool {
-        let output = Self.audioReadOutput(built)
-        guard let audioReader, audioReader.canAdd(output) else { return false }
-        audioReader.add(output)
-        audioOutput = output
+        let read = ExportMixRead(built, origin: range.start)
+        guard let audioReader, read.add(to: audioReader) else { return false }
+        audioRead = read
         return true
     }
 }

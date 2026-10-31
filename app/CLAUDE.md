@@ -793,17 +793,23 @@ the key map behind it.
   mouse-down that ended it edits too (#69)) · `+TrackMenu` (the right-click
   menu on a header or an
   empty lane: the header's five switches — the four toggles, checked, and
-  Volume and Pan…, the fifth, which opens the track's mix popover — the Matte
+  Mix…, the fifth, which opens the track's mix popover — the Matte
   submenu (spec §11 MT-7), and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
-  a clip hit answers no menu) · `+TrackMix` (the track's Volume and Pan
-  popover, spec §11 AU-105: `showTrackMix(_:)`, one `NSPopover` per timeline —
+  a clip hit answers no menu) · `+TrackMix` (the track's mix
+  popover, spec §11 AU-105, AU-155: `showTrackMix(_:)`, one `NSPopover` per timeline —
   a static table keyed by the view, since `TimelineView.swift` is frozen —
-  anchored on the header's fifth switch, editing through the timeline's live
+  anchored on the header's fifth switch, lit by `TrackSnapshot.mixIsSet`,
+  editing through the timeline's live
   trio and `onEdit`, refreshed on its document's `.projectDocumentDidChange`,
-  closed when its track is gone; its content is `TrackMixView.swift`:
-  `TrackMixViewController` (Volume in dB, Pan −100…100, Reset),
-  `TrackMixEdits` and `TrackMixLevel`, the dB rail, −60 Off … +12) ·
+  closed when its track is gone, told `inNest` when a nest is open; its
+  content is `TrackMixView.swift`:
+  `TrackMixViewController` (Volume in dB, Pan −100…100, Reset of all four
+  — only volume and pan inside a nest), `TrackMixEdits` and
+  `TrackMixLevel`, the dB rail, −60 Off … +12; and `TrackMixDynamics.swift`,
+  its Compressor and Limiter sections under Pan, each control writing the
+  whole object through `set_track` as one undo step, disabled in an open
+  nest) ·
   `+Candidates` (Remove Silences' wash, drawn not
   overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
   line over its audio region from `TimelineView.duckCurves` — the frozen
@@ -1892,6 +1898,15 @@ the key map behind it.
   `pendingLevels` and `measured(project:cache:)`, the resolution `Playback`
   and `AudioDSPSource`'s fallback use; isolation and ramp callers keep the
   levels-less init.
+- `AudioTrackDynamics.swift` — a timeline track's compressor and limiter
+  (format 36, spec §11 AU-150, AU-151, AU-153): `AudioTrackDynamicsSettings`,
+  `AudioTrackDynamicsStage` (the clip's compressor then limiter, latency 158
+  with a limiter), which the export runs on each track's sub-mix
+  (`ExportMixRead.swift`), and `AudioTrackEnvelope`, which a metering build's
+  tap gains by before the stage (×E at grid frame `g + L`) and divides by
+  after (÷E at `g`), so the preview's stage is post-fader approximately.
+  `AudioDSPParameters.trackDynamics` stays outside `isEmpty`, so a
+  non-metering build's taps are what they were.
 - `AudioBiquad.swift` · `AudioEQProps.swift` · `AudioEQCurveView.swift` ·
   `AudioPane+EQ.swift` · `AudioPane+HumChannels.swift` — road map "audio" AP3
   (spec §11 AU-30..AU-38): `AudioBiquad` the RBJ design (`AudioEQSettings`,
@@ -1922,7 +1937,14 @@ the key map behind it.
   sections after Noise Reduction (AU-48).
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
-  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExportAudioMaster.swift` ·
+  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` ·
+  `ExporterWriter+Pump.swift` (`ExportWriter`'s pump, whose `read:` is a
+  closure — the video output's, or `ExportMixRead.next` — and the master's
+  tail; a pure move out of `ExporterWriter.swift`, AP10c's toll T1) ·
+  `ExportMixRead.swift` (the export's float read, spec §11 AU-152: one mix
+  output, or the tracks' sub-mixes read in step, each through its track's
+  compressor and limiter, and summed before the master; the writer, the
+  stems, WebM and the measurement read through it) · `ExportAudioMaster.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
@@ -3023,7 +3045,9 @@ free.
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
   +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0 —, +`Graphics`,
-  +`Declarations`)
+  +`Tracks` — the five track rows, spliced back where they stood by
+  `trackTools(trackDescription:)`, a pure move out of `AgentCatalog.swift`,
+  AP10c's toll T2 —, +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own

@@ -442,72 +442,9 @@ extension AgentServer {
         // the same reason: never at the end of the catalog.
         catalog += graphicTools(
             ticks: ticks, trackDescription: trackDescription, clipDescription: clipDescription)
+        // The track rows (AgentCatalog+Tracks.swift), at the place they stood.
+        catalog += trackTools(trackDescription: trackDescription)
         catalog += [
-
-            // MARK: Tracks
-
-            opTool(
-                "add_track",
-                "Adds an empty track. INDEX 0 IS THE BACK of the layer stack — the bottom lane "
-                    + "of the timeline, drawn first — and tracks.count is the front, which is "
-                    + "what ⇧⌘N adds and where an overlay belongs.",
-                [
-                    "index": "Where in the stack (0 = back). Default: the front.",
-                    "name": "Track name, e.g. \"Titles\".",
-                ]),
-            opTool(
-                "remove_track",
-                "Removes a track. A track that still holds clips is refused unless with_clips "
-                    + "is true, which removes them with it.",
-                [
-                    "track": trackDescription,
-                    "with_clips": "Remove the track's clips too (default false).",
-                ]),
-            opTool(
-                "move_track",
-                "Reorders the layer stack: the track moves to `index`, 0 being the back. A "
-                    + "higher index draws in FRONT of the tracks below it.",
-                ["track": trackDescription, "index": "New position."]),
-            opTool(
-                "set_track",
-                "Renames a track, flips its four switches — the track header's toggles, "
-                    + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo — or sets its matte, "
-                    + "Track ▸ Matte. hidden drops its "
-                    + "picture from the composition, muted its sound; locked keeps every ripple, "
-                    + "insert and range edit off it; solo silences every OTHER track in its "
-                    + "container (the timeline, or a nest's own tracks) that is not also soloed "
-                    + "— mute wins on a track that is both, and pictures are untouched. matte "
-                    + "makes the track a matte for the track directly behind it in its "
-                    + "container: its clips are not drawn, and what they show cuts that track "
-                    + "by alpha, inverted alpha, luma or inverted luma — where the matte track "
-                    + "shows nothing, the track behind shows uncut; a back-most matte track, or "
-                    + "one in front of another matte track, cuts nothing. Its clips still "
-                    + "sound. \"none\" makes it an ordinary track again. volume is the track's "
-                    + "fader, linear 0–4 (1 is unity, 4 is +12.04 dB, 0 silent), multiplying every "
-                    + "clip's own volume on it; pan is −1 (left) … 1 (right), a constant-power "
-                    + "balance after each clip's own pan, and a mono source is not panned. Both "
-                    + "are refused outside their ranges and play through nests: a nested clip "
-                    + "hears its own track's and every enclosing nest clip's track's.",
-                [
-                    // The four switches name the MENU ITEM each one mirrors
-                    // and nothing else: what each DOES is the sentence above,
-                    // and a sentence written twice is what this candidate
-                    // exists to delete. The description an agent reads comes
-                    // with these in one tool object, so nothing is lost.
-                    "track": trackDescription,
-                    "name": "New track name.",
-                    "hidden": "Track ▸ Hide Video.",
-                    "muted": "Track ▸ Mute Audio.",
-                    "locked": "Track ▸ Lock Track.",
-                    "solo": "Track ▸ Solo.",
-                    "matte": "Track ▸ Matte; \"none\" is its Off.",
-                    "volume": "Track ▸ Volume and Pan…'s Volume, as a linear gain 0–4.",
-                    "pan": "Track ▸ Volume and Pan…'s Pan, −1–1.",
-                ]),
-            opTool(
-                "remove_empty_tracks",
-                "Removes every track that holds no clips — Track ▸ Remove Empty Tracks.",
-                [:]),
 
             // MARK: Markers
 

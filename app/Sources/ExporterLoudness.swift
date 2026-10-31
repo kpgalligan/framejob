@@ -120,14 +120,23 @@ extension Exporter {
         let limit = ExportAudioEnd.frames(ofTicks: CompositionBuilder.ticks(range.duration))
         var fed = 0
 
+        // A build whose tracks have dynamics is measured through their
+        // sub-mixes (`ExportMixRead`, spec §11 AU-152), float only: there is
+        // no 16-bit fallback for it.
+        let mixRead = ExportMixRead(built, origin: range.start)
+        let subMixed = mixRead.isSubMixed
         var isFloat = true
         var output = Exporter.mixOutput(tracks, mix: built.audioMix, float: true)
-        if !reader.canAdd(output) {
-            isFloat = false
-            output = Exporter.mixOutput(tracks, mix: built.audioMix, float: false)
-            guard reader.canAdd(output) else { return nil }
+        if subMixed {
+            guard mixRead.add(to: reader) else { return nil }
+        } else {
+            if !reader.canAdd(output) {
+                isFloat = false
+                output = Exporter.mixOutput(tracks, mix: built.audioMix, float: false)
+                guard reader.canAdd(output) else { return nil }
+            }
+            reader.add(output)
         }
-        reader.add(output)
         guard reader.startReading() else { return nil }
         lock.lock()
         measuring = true
@@ -138,7 +147,10 @@ extension Exporter {
             lock.unlock()
         }
 
-        while let sample = output.copyNextSampleBuffer() {
+        let read = { () -> CMSampleBuffer? in
+            subMixed ? (try? mixRead.next()) ?? nil : output.copyNextSampleBuffer()
+        }
+        while let sample = read() {
             guard !isCancelled else {
                 reader.cancelReading()
                 return nil

@@ -50,18 +50,29 @@ struct AudioTrackDSP: Equatable {
     /// 158-sample delay may not come and go at a cut.
     let usesLimiter: Bool
     /// How far ahead of a buffer's composition time the tap looks its spans
-    /// up: `AudioShift.limiterLead` on a limited track, else 0. The media is
-    /// placed that much earlier, so the samples entering the stages after
-    /// the noise reducer belong to `t + lookupLead`, and the limiter's delay
-    /// brings them back to `t` (AU-23).
+    /// up: `AudioShift.limiterLead` on a limited track, else 0, plus
+    /// `trackLead`. The media is placed that much earlier, so the samples
+    /// entering the stages after the noise reducer belong to
+    /// `t + lookupLead`, and the limiters' delays bring them back to `t`
+    /// (AU-23, AU-153).
     let lookupLead: Ticks
+    /// The track's compressor and limiter on a metering build (spec §11
+    /// AU-153), run after the chain with the track's envelope; nil on every
+    /// other build and for a track with neither.
+    let dynamics: AudioTrackDynamics?
+    /// `AudioShift.limiterLead` when `dynamics` has a limiter, else 0: the
+    /// track limiter's delay, made up by placement (AU-153).
+    let trackLead: Ticks
     /// How much further ahead the HEAD stages (the channel pick, the EQ and
     /// hum) look their clip up: `AudioShift.noiseReductionLead` on a
     /// noise-reduced track, else 0. They run before the reducer, whose delay
     /// is what brings the samples back to `t + lookupLead` (AU-34).
     let headLead: Ticks
 
-    init(segments: [PlanSegment], parameters: AudioDSPParameters) {
+    init(
+        segments: [PlanSegment], parameters: AudioDSPParameters,
+        dynamics: AudioTrackDynamics? = nil
+    ) {
         var spans: [AudioDSPSpan] = []
         spans.reserveCapacity(segments.count)
         for segment in segments where segment.duration > 0 {
@@ -86,7 +97,9 @@ struct AudioTrackDSP: Equatable {
             $0.dsp.noiseReduction > 0 || $0.automation?.usesNoiseReduction == true
         }
         usesLimiter = spans.contains { $0.dsp.limiter != nil || $0.automation?.usesLimiter == true }
-        lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0
+        self.dynamics = dynamics
+        trackLead = dynamics?.settings.limiter == nil ? 0 : CompositionBuilder.AudioShift.limiterLead
+        lookupLead = (usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0) + trackLead
         headLead = usesNoiseReduction ? CompositionBuilder.AudioShift.noiseReductionLead : 0
     }
 
@@ -96,6 +109,8 @@ struct AudioTrackDSP: Equatable {
         usesNoiseReduction = false
         usesLimiter = false
         lookupLead = 0
+        dynamics = nil
+        trackLead = 0
         headLead = 0
     }
 
@@ -133,6 +148,12 @@ struct AudioDSPParameters: Equatable {
     /// §11 AU-140, AU-141): rendered offline and played in place of the
     /// clip's sound before the chain (AU-143). Base only, never on a nest clip.
     private let voiceSettings: [UInt32: VoiceSettings]
+    /// Each timeline track's compressor and limiter, by track id, when it has
+    /// either (spec §11 AU-150): `snapshot.tracks` only, a nest's own tracks
+    /// having none. Not counted by `isEmpty`, so a build whose taps would be
+    /// what they were stays so (AU-153); a change still rebuilds the preview,
+    /// this being part of the parameters' equality.
+    let trackDynamics: [UInt32: AudioTrackDynamicsSettings]
 
     private struct Base: Equatable {
         let volume: Double
@@ -151,6 +172,7 @@ struct AudioDSPParameters: Equatable {
         bases = [:]
         pendingLevels = []
         self.voiceSettings = voiceSettings
+        trackDynamics = [:]
     }
 
     /// Reads the settings off a project snapshot, nests included — a nested
@@ -281,6 +303,11 @@ struct AudioDSPParameters: Equatable {
         self.bases = bases
         pendingLevels = pending
         self.voiceSettings = voiceSettings
+        var dynamics: [UInt32: AudioTrackDynamicsSettings] = [:]
+        for track in snapshot.tracks {
+            if let settings = AudioTrackDynamicsSettings(track) { dynamics[track.id] = settings }
+        }
+        trackDynamics = dynamics
     }
 
     /// One clip's chain settings from its audio props: the base's in `init`,

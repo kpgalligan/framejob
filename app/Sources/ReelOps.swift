@@ -1189,11 +1189,13 @@ extension ReelOp {
     /// any track in a container is soloed, every track that is not is
     /// silent; mute wins over solo on the same track, and pictures are
     /// untouched either way. `volume` (linear, 0…4) and `pan` (−1…1) are the
-    /// track's fader and balance (spec §11 AU-102).
+    /// track's fader and balance (spec §11 AU-102). `compressor` and `limiter`
+    /// (spec §11 AU-150) are each a `[String: Any]` object that replaces the
+    /// whole value, or `NSNull()` to clear it, forwarded as given.
     static func setTrack(
         track: UInt32, name: String? = nil, hidden: Bool? = nil, muted: Bool? = nil,
         locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil,
-        volume: Double? = nil, pan: Double? = nil
+        volume: Double? = nil, pan: Double? = nil, compressor: Any? = nil, limiter: Any? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
@@ -1205,6 +1207,8 @@ extension ReelOp {
         a.put("matte", matte?.rawValue)
         a.put("volume", volume)
         a.put("pan", pan)
+        a.put("compressor", compressor)
+        a.put("limiter", limiter)
         return ReelOp(name: "set_track", args: a.values)
     }
 

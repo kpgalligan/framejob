@@ -172,14 +172,26 @@ extension CompositionBuilder {
                 // so does a segment's automation (AU-87).
                 let pans = family.segments.contains { !$0.trackPans.isEmpty }
                 let automated = family.segments.contains { !$0.automation.isEmpty }
-                let trackDSP = dsp.isEmpty && !pans && !automated
-                    ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
+                let onset = family.sounding.map(\.lowerBound).min()
+                // The track's compressor and limiter, in a metering build's
+                // tap only (spec §11 AU-153); the export's sub-mixes run them.
+                let dynamics = metering
+                    ? planTrack.track.flatMap { dsp.trackDynamics[$0] }.map {
+                        AudioTrackDynamics(
+                            settings: $0,
+                            envelope: AudioTrackEnvelope(
+                                legs: volumeLegs(ramps: planTrack.ramps ?? [], onset: onset)))
+                    } : nil
+                let trackDSP = dsp.isEmpty && !pans && !automated && dynamics == nil
+                    ? nil
+                    : AudioTrackDSP(segments: family.segments, parameters: dsp, dynamics: dynamics)
                 // One shift for the media's place and the isolation spans'
                 // (AU-53), so the two cannot disagree about a lead.
                 let shift = AudioShift.of(
                     segments: family.segments,
                     usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false,
-                    usesLimiter: trackDSP?.usesLimiter ?? false)
+                    usesLimiter: trackDSP?.usesLimiter ?? false,
+                    usesTrackLimiter: (trackDSP?.trackLead ?? 0) > 0)
                 if try !fillSilence(track, for: family) {
                     try fill(
                         track, segments: family.segments, mediaType: .audio, urls: urls,
@@ -201,8 +213,7 @@ extension CompositionBuilder {
                 inputParameters.append(
                     audioParameters(
                         for: track, segments: family.segments, ramps: planTrack.ramps,
-                        onset: family.sounding.map(\.lowerBound).min(),
-                        dsp: trackDSP, isolation: isolation, meter: sink))
+                        onset: onset, dsp: trackDSP, isolation: isolation, meter: sink))
             }
         }
         return (inputParameters, meters, owners)

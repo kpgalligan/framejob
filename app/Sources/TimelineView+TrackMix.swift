@@ -1,10 +1,11 @@
 import AppKit
 
-/// The track mix popover (spec §11 AU-105): a track's Volume and Pan,
-/// anchored on its header's fifth switch. The switch, the context menu's
-/// Volume and Pan… and Track ▸ Volume and Pan… (on the current track) all
-/// open it through `showTrackMix(_:)`; `set_track {volume, pan}` is the MCP
-/// mirror (`AgentServer+Tracks.swift`).
+/// The track mix popover (spec §11 AU-105, AU-155): a track's Volume, Pan,
+/// Compressor and Limiter, anchored on its header's fifth switch. The switch,
+/// the context menu's Mix… and Track ▸ Mix… (on the current track) all open it
+/// through `showTrackMix(_:)`; `set_track {volume, pan, compressor, limiter}`
+/// is the MCP mirror (`AgentServer+Tracks.swift`). Inside an open nest
+/// (`breadcrumb` not empty) its dynamics are disabled.
 ///
 /// **One per timeline.** Opening it on another track closes the first. It
 /// edits through the timeline's own `onLiveBegin`/`onLiveUpdate`/`onLiveEnd`
@@ -35,7 +36,7 @@ extension TimelineView {
             liveEnd: { [weak self] name in self?.onLiveEnd?(name) },
             edit: { [weak self] name, ops in self?.onEdit?(name, ops) })
         let mix = TrackMixPopover(
-            track: track, edits: edits, timeline: self,
+            track: track, edits: edits, inNest: !breadcrumb.isEmpty, timeline: self,
             document: window?.windowController?.document as? ProjectDocument
         ) { gone in
             // Only its own entry: a popover closed for a newer one must not
@@ -56,10 +57,10 @@ final class TrackMixPopover: NSObject, NSPopoverDelegate {
     private let closed: (TrackMixPopover) -> Void
 
     init(
-        track: TrackSnapshot, edits: TrackMixEdits, timeline: TimelineView,
+        track: TrackSnapshot, edits: TrackMixEdits, inNest: Bool, timeline: TimelineView,
         document: ProjectDocument?, closed: @escaping (TrackMixPopover) -> Void
     ) {
-        content = TrackMixViewController(track: track, edits: edits)
+        content = TrackMixViewController(track: track, edits: edits, inNest: inNest)
         self.timeline = timeline
         self.closed = closed
         super.init()

@@ -536,7 +536,7 @@ See [Motion and transitions](motion-and-transitions.md).
 | `add_track` | *op* — an empty track; the front by default. |
 | `remove_track` | *op* — refused while it holds clips unless `with_clips`. |
 | `move_track` | *op* — reorders the layer stack. |
-| `set_track` | *op* — name, Hide Video, Mute Audio, Lock Track, Solo and Matte (the **Track** menu). |
+| `set_track` | *op* — name, Hide Video, Mute Audio, Lock Track, Solo and Matte (the **Track** menu), and the mix panel's volume, pan, compressor and limiter (**Track ▸ Mix…**). `compressor` and `limiter` each take the clip's own object, which replaces the whole setting, or `null`; refused inside a `scope`. |
 | `remove_empty_tracks` | *op* — **Track ▸ Remove Empty Tracks**. |
 | `add_marker` | *op* — a marker at `at`, the playhead by default; `chapter` makes it a chapter of the export. |
 | `set_marker` | *op* — moves, renames or recolours a marker, or changes its chapter flag. |

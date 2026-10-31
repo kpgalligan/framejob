@@ -1,7 +1,10 @@
 //! The bounds of a clip's gate and de-esser (format 33, spec §11 AU-43,
 //! AU-45): [`check_gate`] and [`check_de_esser`], which `props_check.rs`'s
 //! `check_audio` runs on a direct edit and refuses in the key's own
-//! sentence, and [`clamp_gate`] and [`clamp_de_esser`], which
+//! sentence; the compressor's and the limiter's, [`check_compressor`] and
+//! [`check_limiter`], which `check_audio` runs under `audio.` and
+//! `track_dynamics.rs` under a track's own key (spec §11 AU-150); and
+//! [`clamp_gate`] and [`clamp_de_esser`], which
 //! `actions_clamp.rs`'s `clamp_audio` runs on an action's evaluated end,
 //! where there is nobody to tell.
 //!
@@ -10,8 +13,12 @@
 //! (`AudioGateStage.swift`, `AudioDeEsserStage.swift`). Nothing here touches
 //! a sample.
 
-use crate::model::{DeEsser, Gate};
-use crate::props_check::{in_range, ticks_in_range};
+use crate::model::{Compressor, DeEsser, Gate, Limiter};
+use crate::props_check::{
+    in_range, ticks_in_range, ticks_positive_or_zero, COMPRESSOR_MAKEUP_MAX_DB,
+    COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, LIMITER_CEILING_MIN_DB, LIMITER_RELEASE_MAX,
+    LIMITER_RELEASE_MIN,
+};
 use crate::time::Ticks;
 
 /// The gate's threshold, dB re the clip's loudness, up to 0.
@@ -36,6 +43,47 @@ pub(crate) const DE_ESSER_THRESHOLD_MAX_DB: f64 = 20.0;
 /// The most the de-esser takes from the band, in dB.
 pub(crate) const DE_ESSER_RANGE_MIN_DB: f64 = 1.0;
 pub(crate) const DE_ESSER_RANGE_MAX_DB: f64 = 24.0;
+
+/// Each of the compressor's five fields, in declaration order, each named
+/// under `prefix` (`audio.compressor` on a clip, `compressor` on a track).
+pub(crate) fn check_compressor(prefix: &str, c: &Compressor) -> Result<(), String> {
+    in_range(
+        &format!("{prefix}.threshold_db"),
+        c.threshold_db,
+        COMPRESSOR_THRESHOLD_MIN_DB,
+        0.0,
+    )?;
+    in_range(
+        &format!("{prefix}.ratio"),
+        c.ratio,
+        1.0,
+        COMPRESSOR_RATIO_MAX,
+    )?;
+    ticks_positive_or_zero(&format!("{prefix}.attack"), c.attack)?;
+    ticks_positive_or_zero(&format!("{prefix}.release"), c.release)?;
+    in_range(
+        &format!("{prefix}.makeup_db"),
+        c.makeup_db,
+        0.0,
+        COMPRESSOR_MAKEUP_MAX_DB,
+    )
+}
+
+/// The limiter's ceiling and release, each named under `prefix`.
+pub(crate) fn check_limiter(prefix: &str, l: &Limiter) -> Result<(), String> {
+    in_range(
+        &format!("{prefix}.ceiling_db"),
+        l.ceiling_db,
+        LIMITER_CEILING_MIN_DB,
+        0.0,
+    )?;
+    ticks_in_range(
+        &format!("{prefix}.release"),
+        l.release,
+        LIMITER_RELEASE_MIN,
+        LIMITER_RELEASE_MAX,
+    )
+}
 
 /// Each of the gate's six fields, in declaration order.
 pub(crate) fn check_gate(g: &Gate) -> Result<(), String> {

@@ -27119,3 +27119,66 @@ python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `designs/audio.md`'s AP6c record.
+
+## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; ten mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
+
+A timeline track takes a compressor and a limiter (`tracks[].compressor`, `tracks[].limiter`,
+format 36, `set_track`), run post-fader on its sub-mix. Every export reads its mix through
+`ExportMixRead`: one output when no track in the read has dynamics, else one per such track and
+one for the rest, read in step through each track's `AudioTrackDynamicsStage` and summed before
+the master. The preview runs the stage in each composition track's tap with the ×E/÷E pairing
+(`AudioTrackDynamics.swift`), approximate where a track splits; the meter says so
+(`tracks_approximate`).
+
+- **`core/tests/track_dynamics.rs`** (in `make test`): an object stored whole with the clip
+  type's defaults and never merged; `null` clears, absent keeps, the same value is an identity;
+  the refusals in their sentences (not an object, an unknown key, a mistyped member, each range
+  under `compressor.` or `limiter.`); the clip's own sentences unchanged; inside a scope either
+  key refused and the rest of `set_track` applying; `nest` giving the nest's tracks none.
+  **`schema_v36.rs`**: 1–35 and 1015 open stamped current, a 35 file writes what it did, both
+  keys round-trip after `pan`. `op_nullability.rs`'s inventory pinned at 82 (74 non-plain).
+- **`audio_ap10c_proof.py <dir>/agent.sock [--only …]`** (the docstring has each row and bound)
+  makes six 6 s 24-bit fixtures on the first run (`ap10c_hot_a/b.wav` at −1 dBFS,
+  `ap10c_mid_a/b.wav` at −6, `ap10c_sine10.wav`, `ap10c_music.wav`). T1 a crossfade of two hot
+  tones under a −6 dBTP track limiter: the `tracks` stem ≤ −5.99 dBTP by `limiter_probe.py`'s two
+  meters, the control > −5.5; T2 the compressor's arithmetic and post-fader (−14.5 and −16.005
+  dBFS ± 0.05); T3 a nest bus's stem under its ceiling; T4 Σ stems − mix ≤ 2 LSB with dynamics on
+  both tracks; T5 a −16 LUFS target through a track compressor (± 0.1, ≤ −1 dBTP); T6 `vp9_webm`
+  within 0.2 LU of the WAV, the undynamic one > 3 LU off; P1 the preview's measured overshoot
+  through the crossfade with `tracks_approximate` true, then false once cleared; U1 one undo
+  step, the read-back, the refusals by name, `nest`, no `Frame Job: ` line.
+- **`audio_ap10c_proof.py --probe`** runs B1–B5 alone: the probe `audio_ap10c_probe.swift`,
+  compiled AS `main.swift` over `app/Sources` through `swift_build.py`. B1 the stage byte-identical
+  at 512, 4,096 and irregular buffers, latency 158/0; B2 `ExportMixRead` single and
+  byte-identical with no dynamics, sub-mixed and within −140 dB with an identity compressor, and
+  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project); B3 a nest
+  bus equal to a fresh stage over its plain read plus the rest; B4 the tap's ×E/÷E — identity
+  within 1e-6 (0 under 2⁻²⁰), a released limiter under a 1 → 0.1 step a pure 158-frame delay at
+  48 and 44.1 kHz, and a 0.9 sine under E 0.5 passing a −6 dBTP limiter post-fader; B5 the leads
+  (1,975 ticks, summed with a clip limiter's), a non-metering build's `trackDynamics`,
+  `mixIsSet`, the footer and the meter's flag.
+- **`audio_ap10c_proof.py --mutants`** runs the seven probe mutants over copies of
+  `app/Sources` and prints the three run by hand.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| M1 | the export never sub-mixes | B2 |
+| M2 | every track read through the dynamic group's stage | B3 |
+| M3 | a group's latency not dropped | B3 |
+| M4 | the measurement reads the plain mix | B2 |
+| M5 | the WebM writer reads the plain mix | T6 (by hand, on a mutated Debug build) |
+| M6 | the tap without ×E/÷E | B4 |
+| M7 | no track-limiter lead (placement and lookup) | B5 |
+| M8 | the scope refusal removed | `track_dynamics.rs` (by hand) |
+| M9 | `nest` copies the dynamics | `track_dynamics.rs` (by hand) |
+| M10 | the ×E read `trackLead` ahead in ticks, not L frames | B4 (44.1 kHz) |
+
+```sh
+python3 tools/proof/audio_ap10c_proof.py --probe                    # B1–B5, no app
+python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock           # B1–B5, T1–T6, P1, U1
+python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row
+```
+
+The recorded runs are in `designs/audio.md`'s AP10c record.

@@ -1,4 +1,5 @@
 import AVFoundation
+import Accelerate
 import Foundation
 
 /// Where `AudioDSP`'s effects meet AVFoundation: the parameters, the schedule
@@ -83,6 +84,13 @@ final class AudioTapContext {
     /// `NSLock` the rest of the app publishes across threads with.
     private let meter: LevelMeterSink?
     private var chain: AudioDSPChain?
+    /// The track's compressor and limiter on a metering build (spec §11
+    /// AU-153), made in `prepare`, and its two envelope buffers of
+    /// `stageFrames`: E read `latency` frames ahead, and E at the frame.
+    private var trackStage: AudioTrackDynamicsStage?
+    private var ahead: [Float] = []
+    private var behind: [Float] = []
+    private var stageFrames = 0
     /// The channel base pointers, refilled per buffer. A stored array so no
     /// allocation happens on the audio thread.
     private var channels: [UnsafeMutablePointer<Float>?] = []
@@ -137,6 +145,7 @@ final class AudioTapContext {
         let planar = formatFlags & kAudioFormatFlagIsNonInterleaved != 0
         guard float, planar, bitsPerChannel == 32, channelCount > 0 else {
             chain = nil
+            trackStage = nil
             channels = []
             isolates = false
             meter?.clear()
@@ -151,6 +160,13 @@ final class AudioTapContext {
                 channelCount: channelCount, sampleRate: sampleRate, maxFrames: maxFrames,
                 usesNoiseReduction: track.usesNoiseReduction, usesLimiter: track.usesLimiter)
             : nil
+        stageFrames = max(1, maxFrames)
+        trackStage = track.dynamics == nil
+            ? nil
+            : AudioTrackDynamicsStage(
+                channelCount: channelCount, sampleRate: sampleRate, maxFrames: stageFrames)
+        ahead = trackStage == nil ? [] : [Float](repeating: 1, count: stageFrames)
+        behind = trackStage == nil ? [] : [Float](repeating: 1, count: stageFrames)
         channels = Array(repeating: nil, count: channelCount)
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
         position = 0
@@ -162,6 +178,7 @@ final class AudioTapContext {
 
     func unprepare() {
         chain = nil
+        trackStage = nil
         channels = []
         isolates = false
         meter?.clear()
@@ -209,12 +226,13 @@ final class AudioTapContext {
             }
         }
 
+        // A seek, a loop or a fresh stream: the compressor's envelope and
+        // the reducer's delay line belong to the position we just left, and
+        // so does the track stage's state.
+        let jumped = startOfStream || abs(start - position) > Self.seekTolerance
+        if jumped { trackStage?.reset() }
         if let chain = chain {
-            // A seek, a loop or a fresh stream: the compressor's envelope and
-            // the reducer's delay line belong to the position we just left.
-            if startOfStream || abs(start - position) > Self.seekTolerance {
-                chain.reset()
-            }
+            if jumped { chain.reset() }
 
             // A buffer that straddles a cut is processed in runs, so a clip's
             // pan begins exactly at its own first sample rather than up to a
@@ -269,6 +287,7 @@ final class AudioTapContext {
             }
         }
         position = start + ticks(frames: frames)
+        runTrackStage(list, count: count, frames: frames, gridBase: gridBase)
 
         // AFTER the chain, and over the whole buffer rather than per run: what
         // the meter is asked for is the level this track hands the mix, and
@@ -300,6 +319,59 @@ final class AudioTapContext {
     private func ticks(frames: Int) -> Ticks {
         Ticks(frames) * ReelTime.perSecond / sampleRate
     }
+
+    /// The track's compressor and limiter after the chain (spec §11 AU-153),
+    /// post-fader though the tap is not: frame `gridBase + i` is gained by the
+    /// envelope at grid frame `gridBase + i + L` — the timeline frame the
+    /// track's lead put there — the stage runs and delays it L frames, and
+    /// the result is divided by the envelope at `gridBase + i`, the frame it
+    /// now sits at (0 where E < 2⁻²⁰), so the fader downstream puts back
+    /// exactly what was taken off. L is the stage's latency in frames at the
+    /// tap's own rate, never the lead in ticks, so the ×E and the ÷E of one
+    /// sample are the same number at any rate.
+    private func runTrackStage(
+        _ list: UnsafeMutableAudioBufferListPointer, count: Int, frames: Int, gridBase: Int64
+    ) {
+        guard let stage = trackStage, let dynamics = track.dynamics else { return }
+        let latency = Int64(stage.latency(dynamics.settings))
+        var offset = 0
+        while offset < frames {
+            let length = min(stageFrames, frames - offset)
+            let first = gridBase + Int64(offset)
+            for index in 0..<count {
+                channels[index] = list[index].mData?
+                    .assumingMemoryBound(to: Float.self).advanced(by: offset)
+            }
+            ahead.withUnsafeMutableBufferPointer { gains in
+                guard let e = gains.baseAddress else { return }
+                dynamics.envelope.fill(
+                    e, frames: length, fromFrame: first + latency, rate: sampleRate)
+                for index in 0..<count {
+                    guard let data = channels[index] else { continue }
+                    vDSP_vmul(data, 1, e, 1, data, 1, vDSP_Length(length))
+                }
+            }
+            channels.withUnsafeMutableBufferPointer { pointers in
+                stage.process(
+                    UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                    frames: length, settings: dynamics.settings)
+            }
+            behind.withUnsafeMutableBufferPointer { gains in
+                guard let e = gains.baseAddress else { return }
+                dynamics.envelope.fill(e, frames: length, fromFrame: first, rate: sampleRate)
+                for index in 0..<count {
+                    guard let data = channels[index] else { continue }
+                    for i in 0..<length {
+                        data[i] = e[i] >= Self.envelopeFloor ? data[i] / e[i] : 0
+                    }
+                }
+            }
+            offset += length
+        }
+    }
+
+    /// Below this the envelope is silence, and ÷E would be a gain burst.
+    static let envelopeFloor: Float = 1.0 / 1_048_576
 
     /// A lead in ticks as whole frames at the tap's rate, rounded (AU-87).
     private func leadFrames(_ ticks: Ticks) -> Int64 {

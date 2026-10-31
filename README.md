@@ -32,7 +32,8 @@ Consolidate Media copies footage into the package.
 
 **Timeline.** One kind of track that holds any clip; a frame-accurate ruler,
 filmstrips and waveforms, zoom about the cursor, snapping, markers, an in/out
-range, track mute, solo, lock, volume and pan, clip names and colour labels.
+range, track mute, solo, lock, volume, pan, compressor and limiter, clip names
+and colour labels.
 → [The timeline and playback](docs/guide/timeline.md)
 
 **Editing.** Move, nudge, trim, slip, roll, split, lift, ripple delete, close

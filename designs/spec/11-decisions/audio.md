@@ -1456,3 +1456,81 @@ AU-140…AU-149 are AP14's (voice effects; survey B10, E8 of `designs/adr/effect
   `m_k`, instance rows I0, K1–K16 (one per kind, against what E0 measured) and I2–I11, and eleven
   mutants — one per AU-14x decision plus latency-kept for AU-142's discard — each killed by its
   named row; manual check SE-32.
+
+AU-150…AU-156 are AP10's part 2b (track and bus dynamics, the master chain; survey A12),
+recorded before its code, continuing AU-109's block.
+
+- **AU-150 — `tracks[].compressor` and `tracks[].limiter`, format 36.** The clip's own two types
+  (`Compressor`, `Limiter`), after `pan`, each written only when set, so every other project
+  writes the text it did and there is no migration step. `set_track` takes both: an absent key
+  keeps the track's value, `null` clears it, and an object REPLACES the whole value — the keys it
+  leaves out take the type's defaults, never the stored value's. Refused, each in its own
+  sentence: a value neither an object nor `null` (`compressor must be a json object or null, not
+  5`), an unknown key (`unknown key "compressor.knee" in set_track`), a mistyped member (`bad
+  value at "limiter.release" in set_track: <serde's reason>`), and a value outside the clip's
+  ranges in `in_range`'s sentence under the track's key (`compressor.ratio must be between 1 and
+  20, not 30`); the clip's own sentences are unchanged (`check_compressor`, `check_limiter`
+  shared, prefix `audio.compressor` / `audio.limiter`). **Timeline tracks only:** inside a
+  `scope` either key is refused (`a track's compressor or limiter has no meaning inside nest 5`),
+  `nest` gives the nest's tracks none — the destination's own still apply over the nest clip — and
+  one written by hand on a nest's track is ignored where it plays. **Base-only, never animated:** a
+  track has no actions. **Normalize, Loudness, Enhance Voice and Match Audio solve pre-track** and
+  hear none of it: AU-64's renders are clip renders.
+- **AU-151 — Where it runs: post-fader on the track's sub-mix.** After every clip's chain, the
+  envelope (clip volume, fades, crossfades, ducks, the track's volume) and the track's pan —
+  compressor, then limiter, the ceiling in dBTP on what the track hands the mix (absolute: the
+  limiter is told volume 1); then the tracks are summed, then the master (AU-27). A nest's whole
+  mix plays through the track holding its nest clip, so that track is the nest's bus. Both stages
+  are the clip's (`AudioCompressorStage`, `AudioLimiterStage`), compressor then limiter, one
+  `AudioTrackDynamicsStage`; its latency is 158 frames with a limiter, else 0.
+- **AU-152 — The export: per-track sub-mixes read in lockstep (S3).** When no owner in the read
+  (honouring a stem's `audioSelection`) has settings, the export reads exactly what it did — one
+  `AVAssetReaderAudioMixOutput`, byte-identical. Otherwise `ExportMixRead` puts on the one reader
+  one mix output per timeline track with settings plus one for every other selected track
+  (omitted when empty), each over only its own tracks' input parameters (one tap per composition
+  track, each in exactly one output). Per group the buffers are placed by stamp from the range's
+  origin at 48 kHz (a hole is zeros, an overlap cuts the covered head, `ExportAudioMaster`'s rule),
+  run through the group's stage as they arrive, the stage's latency dropped at the head and a
+  zero flush at the group's end; `next()` reads from the group with the least buffered, an ended
+  group counting as zeros, and emits up to 4,096 summed frames stamped `origin + frame` until
+  every group is drained. The mix's writer, its stems (`ExportStemsPipeline`, unchanged), the
+  WebM writer and the loudness measurement all read through it; a sub-mixed build's measurement
+  reads float through it with no 16-bit fallback.
+- **AU-153 — The preview: per composition track, approximate (AU-100), and said.** On a metering
+  build only (`Playback`'s), a composition track whose owner has settings gets the stage in its tap
+  after the chain and before the meter. The tap is PreEffects, so the fader is downstream: the tap
+  multiplies frame `g` by the track's envelope E at grid frame `g + L` (L the stage's latency in
+  frames at the tap's own rate), runs the stage, and divides by E at `g` (0 where E < 2⁻²⁰), so a
+  sample's ×E and its ÷E, L frames later, are the same number at any rate and a step in the
+  envelope is never a gain burst. E is `volumeLegs(ramps:onset:)` exactly as `audioParameters`
+  sets it, read on the tap's absolute frame grid (AU-87's). With a track limiter the media is
+  placed 1,975 ticks earlier and the tap's lookups lead by as much (AU-23's pattern, summed with a
+  clip limiter's): placement only, so at a rate other than 48 kHz the audio is misplaced by the
+  difference as the clip limiter's lead already is, and the gain pairing is untouched. Every other
+  build — export, measurement, stems, `ProcessedLoudness`, scrub grains, thumbnails — has no track
+  stage in its taps (`AudioDSPParameters.isEmpty` excludes track dynamics). The preview runs the
+  stage per composition track, so where a track's clips share one composition track it is exact
+  and where they split (a crossfade, a nest's inner tracks) it is not: the live meter says
+  "approximate" whenever the build carries any (`tracks_approximate`), and the guide gives the
+  measured difference.
+- **AU-154 — The master chain is AU-27/AU-28's and nothing more.** The export's master is the
+  loudness gain and the true-peak limiter at `peak_dbtp`. A master bus compressor is the whole
+  timeline nested on one track with a track compressor — exact in the export — so a master stage
+  would be a second spelling of it, and the preview has no master to hear one (S3 (b)); delivery
+  needs loudness and true peak, which AP2b meets. No master compressor, EQ or trim.
+- **AU-155 — The chrome.** The track header's mix popover gains, under Pan, a Compressor section
+  (a "Compressor" checkbox; Threshold, Ratio, Attack, Release, Makeup) and a Limiter section
+  ("Limit peaks"; Ceiling, Release), with the clip sections' units, ranges and quick picks; each
+  control writes the whole object through `set_track`; a drag or a commit is one undo step
+  ("Track Compressor", "Track Limiter"); Reset ("Reset Track Mix") clears volume, pan, compressor
+  and limiter. Inside an open nest both sections are disabled with the tooltip "A nest's mix
+  plays through the dynamics of the track that holds it." The header switch is lit when any of
+  the four is set. Track ▸ Volume and Pan… and the context menu's item are renamed "Mix…" (the
+  same actions). Agents use `set_track {compressor, limiter}`: no new tool or FFI export.
+- **AU-156 — The proof.** `audio_ap10c_proof.py`: export rows T1–T6 (a track limiter through a
+  crossfade, compressor arithmetic and post-fader, a nest bus, stems summing with dynamics on
+  both tracks, a loudness target, WebM), P1 (the preview's measured overshoot and
+  `tracks_approximate`), U1 (undo, read-back, refusals, `nest`, the parity log), probe rows B1–B5
+  (the stage at any buffer size, `ExportMixRead` against the single read, a nest bus, the tap's
+  ×E/÷E at 48 and 44.1 kHz, the leads and the footer); ten mutants, each killed by a named row or
+  `core/tests/track_dynamics.rs`; manual check SE-40.

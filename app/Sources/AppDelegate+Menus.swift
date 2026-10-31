@@ -408,7 +408,7 @@ extension AppDelegate {
         menu.addItem(item("Solo", #selector(EditorViewController.toggleTrackSolo(_:))))
         // The track's mix popover (spec §11 AU-105), no key.
         menu.addItem(
-            item("Volume and Pan…", #selector(EditorViewController.showTrackMix(_:))))
+            item("Mix…", #selector(EditorViewController.showTrackMix(_:))))
         menu.addItem(submenuItem(trackMatteMenu()))
         return menu
     }

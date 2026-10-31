@@ -59,9 +59,11 @@ extension Playback {
         guard meterTimer == nil else { return }
         let timer = Timer(timeInterval: Playback.meterInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            // A build with track dynamics is approximate in the preview (AU-153).
             self.loudness.consume(
                 self.built?.meters ?? [], rate: self.rate,
-                now: ProcessInfo.processInfo.systemUptime)
+                now: ProcessInfo.processInfo.systemUptime,
+                tracksApproximate: !(self.built?.trackDynamics.isEmpty ?? true))
             LevelMeter.shared.publish(self.meterReading(), from: ObjectIdentifier(self))
         }
         RunLoop.main.add(timer, forMode: .common)

@@ -79,6 +79,9 @@ use crate::recipe_matte::matte_target;
 /// the destination track still applies over the nest clip, and a fader
 /// applied twice is not a fader applied once (where muting twice is muting
 /// once, so mute copies from it too).
+///
+/// A compressor or limiter is never copied (spec §11 AU-150): a nest's own
+/// tracks have none, and the destination's still apply over the nest clip.
 fn nested_track(project: &mut Project, from: &Track, keeps_mix: bool) -> Track {
     Track {
         id: project.allocate_id(),
@@ -90,6 +93,8 @@ fn nested_track(project: &mut Project, from: &Track, keeps_mix: bool) -> Track {
         matte: from.matte,
         volume: if keeps_mix { from.volume } else { 1.0 },
         pan: if keeps_mix { from.pan } else { 0.0 },
+        compressor: None,
+        limiter: None,
     }
 }
 

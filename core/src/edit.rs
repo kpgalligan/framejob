@@ -180,7 +180,7 @@
 //! | `add_track` | Inserts a track at `index`, or at the front when it is absent; index 0 is the back-most. The default name is `Track <count + 1>`. |
 //! | `remove_track` | Refuses on a track that still holds clips unless `with_clips`, and on the last remaining track. |
 //! | `move_track` | Reorders the stack; index 0 is the back-most. |
-//! | `set_track` | Omitted fields keep their value. `matte: "none"` switches a matte off (MT-1). `volume` (linear, 0–4, +12.04 dB at 4) and `pan` (−1–1) are the track's fader and balance, refused outside their ranges (spec §11 AU-102). |
+//! | `set_track` | Omitted fields keep their value. `matte: "none"` switches a matte off (MT-1). `volume` (linear, 0–4, +12.04 dB at 4) and `pan` (−1–1) are the track's fader and balance, refused outside their ranges (spec §11 AU-102). `compressor` and `limiter` (format 36, AU-150) are the track's dynamics, post-fader on its sub-mix (AU-151): an object replaces the whole value, its missing keys the clip type's defaults, and `null` clears it; a value that is not an object or `null`, an unknown key and a mistyped member are each an `Err` naming the key, and a value outside the clip's ranges is one in `in_range`'s sentence under `compressor.` or `limiter.`. Inside a `scope` either is an `Err` (a nest's tracks have none). |
 //! | `remove_empty_tracks` | Drops every track with no clips, keeping the back-most if that would empty the stack. |
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
@@ -625,6 +625,10 @@ pub enum Op {
         volume: Option<f64>,
         #[serde(default)]
         pan: Option<f64>,
+        #[serde(default, deserialize_with = "crate::track_dynamics::present")]
+        compressor: Option<Value>,
+        #[serde(default, deserialize_with = "crate::track_dynamics::present")]
+        limiter: Option<Value>,
     },
     /// A struct variant with no fields, not a unit one, so that
     /// `deny_unknown_fields` applies to it like every other op.
@@ -964,6 +968,8 @@ impl Project {
                 matte,
                 volume,
                 pan,
+                compressor,
+                limiter,
             } => self.set_track(
                 *track,
                 name.as_deref(),
@@ -974,6 +980,8 @@ impl Project {
                 *matte,
                 *volume,
                 *pan,
+                compressor.as_ref(),
+                limiter.as_ref(),
             ),
             Op::RemoveEmptyTracks {} => self.remove_empty_tracks(),
             Op::AddMarker {

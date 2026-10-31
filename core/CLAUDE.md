@@ -25,7 +25,9 @@ governs a module now.
   moved out of `model.rs` whole (road map "audio" AP10's toll T1) and
   re-exported by it; the track vocabulary's new keys land here: format 35's
   `volume` (0…`TRACK_VOLUME_MAX`, 4, written only when not 1) and `pan`
-  (−1…1, written only when not 0), spec §11 AU-102.
+  (−1…1, written only when not 0), spec §11 AU-102, and format 36's
+  `compressor` and `limiter` (the clip's `model_audio.rs` types, after `pan`,
+  written only when set), spec §11 AU-150.
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
   (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`,
   `Reflection`, `BlendMode`) and their defaults (the audio group's are
@@ -65,7 +67,10 @@ governs a module now.
   §11 AU-43, AU-45, AU-46): `check_gate` / `check_de_esser`, run by
   `props_check.rs`'s `check_audio` and refusing in the key's own sentence
   (`audio.gate.ratio must be between 1 and 20, not 21`; times through
-  `props_check.rs`'s `ticks_in_range`), and `clamp_gate` / `clamp_de_esser`
+  `props_check.rs`'s `ticks_in_range`), `check_compressor` /
+  `check_limiter` (under a prefix: `audio.` for the clip's, run by
+  `check_audio`, and the track's own key for `track_dynamics.rs`, spec §11
+  AU-150), and `clamp_gate` / `clamp_de_esser`
   (each field to its range, NaN to its default), run by `actions_clamp.rs`'s
   `clamp_audio` on an action's end. No sample work; the stages are Swift's.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
@@ -923,6 +928,12 @@ governs a module now.
   plan audio segment's `track_pans`: innermost first, cleared at a stage whose
   clip's base `audio.mono` is true, zeros dropped). No sample work; the
   balance is Swift's.
+- `track_dynamics.rs` — `set_track`'s `compressor` and `limiter` (format 36,
+  spec §11 AU-150): `present` (the `deserialize_with` that makes `null` a
+  value), `read_compressor`, `read_limiter` — `null` clears, an object
+  replaces the whole value with the type's defaults for what it leaves out,
+  anything else refused by name. No sample work; the stage is Swift's
+  (`AudioTrackDynamics.swift`, `ExportMixRead.swift`).
 - `audio_automation.rs` — an audio segment's automation in the plan (spec
   §11 AU-85): `TAP_KEYS` (the eleven audio keys the tap reads),
   `AutomationPoint`, `names_tap_key` and `Project::automation` — points at
