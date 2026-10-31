@@ -25,8 +25,9 @@ enum ClipLoudness {
     static var stepTicks: Ticks { MediaPeaks.bucketTicks }
 
     /// What a stereo clip's own channel settings do to the two channels, as
-    /// `out = M · in`: the base mono fold (both channels to their mean),
-    /// then the pan (`AudioPanLaw.gains`), `AudioClipDSP`'s order.
+    /// `out = M · in`: the channel pick (AU-35), then the base mono fold
+    /// (both channels to their mean), then the pan (`AudioPanLaw.gains`),
+    /// `AudioClipDSP`'s order. EQ and hum are not counted.
     struct ChannelMatrix: Equatable {
         let m00, m01, m10, m11: Double
 
@@ -47,11 +48,22 @@ enum ClipLoudness {
             let gains = AudioPanLaw.gains(props.pan)
             let left = Double(gains.left)
             let right = Double(gains.right)
-            if props.mono {
-                self.init(m00: left / 2, m01: left / 2, m10: right / 2, m11: right / 2)
-            } else {
-                self.init(m00: left, m01: 0, m10: 0, m11: right)
+            let mix = props.mono
+                ? ChannelMatrix(m00: left / 2, m01: left / 2, m10: right / 2, m11: right / 2)
+                : ChannelMatrix(m00: left, m01: 0, m10: 0, m11: right)
+            // The channel pick first (AU-34, AU-35): pan · fold · pick.
+            let pick: ChannelMatrix
+            switch props.channels {
+            case .both: pick = .identity
+            case .left: pick = ChannelMatrix(m00: 1, m01: 0, m10: 1, m11: 0)
+            case .right: pick = ChannelMatrix(m00: 0, m01: 1, m10: 0, m11: 1)
+            case .swapped: pick = ChannelMatrix(m00: 0, m01: 1, m10: 1, m11: 0)
             }
+            self.init(
+                m00: mix.m00 * pick.m00 + mix.m01 * pick.m10,
+                m01: mix.m00 * pick.m01 + mix.m01 * pick.m11,
+                m10: mix.m10 * pick.m00 + mix.m11 * pick.m10,
+                m11: mix.m10 * pick.m01 + mix.m11 * pick.m11)
         }
     }
 

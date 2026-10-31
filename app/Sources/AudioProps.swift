@@ -151,13 +151,19 @@ struct AudioProps: Codable, Equatable {
     /// How much of the isolated voice replaces the clip's sound, 0 off … 1
     /// (format 31, spec §11 AU-50); rendered offline (`IsolationCache`).
     let isolation: Double
+    /// The EQ and the hum notch, nil when off, and the channel pick
+    /// (format 32, AU-31, AU-33, AU-34; `AudioEQProps.swift`).
+    let eq: EqProps?
+    let hum: HumProps?
+    let channels: AudioChannelChoice
 
     init(
         volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
         duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
         pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0,
         fadeInShape: FadeShape = .linear, fadeOutShape: FadeShape = .linear,
-        limiter: LimiterProps? = nil, isolation: Double = 0
+        limiter: LimiterProps? = nil, isolation: Double = 0, eq: EqProps? = nil,
+        hum: HumProps? = nil, channels: AudioChannelChoice = .both
     ) {
         self.volume = volume
         self.muted = muted
@@ -173,6 +179,9 @@ struct AudioProps: Codable, Equatable {
         self.fadeOutShape = fadeOutShape
         self.limiter = limiter
         self.isolation = isolation
+        self.eq = eq
+        self.hum = hum
+        self.channels = channels
     }
 
     init(from decoder: Decoder) throws {
@@ -191,6 +200,9 @@ struct AudioProps: Codable, Equatable {
         fadeOutShape = c.lenient(.fadeOutShape, FadeShape.linear)
         limiter = c.lenient(.limiter)
         isolation = c.lenient(.isolation, 0)
+        eq = c.lenient(.eq)
+        hum = c.lenient(.hum)
+        channels = c.lenient(.channels, AudioChannelChoice.both)
     }
 
     /// Volume in dB for the Audio tab's read-out; -inf shows as silence.

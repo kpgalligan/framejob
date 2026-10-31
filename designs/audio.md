@@ -675,7 +675,7 @@ clamp, the patch template's `limiter`; the stage (`AudioLimiterStage.swift`, las
 Loudness Normalize's AU-24 plan (the row's `limiter`, `limited_by` only `max_gain`); Loudness
 the default of the button, Clip ▸ Normalize and `normalize_clip` (AU-25); the Limiter section
 after Mix and At volume through the model (AU-26, `AudioPane+Limiter.swift`); `set_audio`'s
-`limiter` in the catalog; SE-22 sets Mode to Peak first, SE-23 expects Loudness, SE-24 is new.
+`limiter` in the catalog; SE-22 sets Mode to Peak first, SE-23 expects Loudness, SE-28 is new.
 The lane wrote format 28; AP9 and AP11 had taken 28 and 29, so the integration renumbered it to
 30 in `format.rs`, the header, the schema test (the lane's `schema_v28.rs` as `schema_v30.rs`),
 AU-21, §5.2a/b and the file map, and `limiter_proof.py` P6 now reads the header's number.
@@ -718,7 +718,7 @@ file is version 30, the header's 30"), `loudness_normalize_proof.py` 37/37 (N6 �
 92/92 and AP11's `audio_ap11_proof.py` 13/13 over the merged audio group; the parity log
 clean. No mutant's anchor moved, so none was re-run.
 
-**Owed.** SE-23 (Loudness the default, −16 LUFS through the limiter) and SE-24 (no pumping or
+**Owed.** SE-23 (Loudness the default, −16 LUFS through the limiter) and SE-28 (no pumping or
 distortion on speech and music) for the owner; AP2 part 2. Nothing to file.
 
 ### AP5's record (2026-10-30)
@@ -794,6 +794,91 @@ Lines cell this integration's own rewrap moved; on Release `audio_ap5_proof.py` 
 as issues: voice isolation on a time-scaled, ramped or freeze clip (AU-55's limit), and
 `ramp_proof.py`'s spike probe needing its work folder made first (U1 and P1 in a fresh tree)
 and U1's pre-SR2b baseline.
+
+### AP3's record (2026-10-30)
+
+EQ, hum removal and channel selection (survey A3, A7, B7), built in lane A.
+
+**Decided.** AU-30…AU-39, recorded before the code. The one objection was taken: AU-33's
+plain Q = 10·k comb missed −depth once cascaded and cut the voice between harmonics, so the
+hum's Q is 10·k / A (A = 10^(−depth/40)), which holds every notch's pole bandwidth at f0/10;
+Q1's oracle uses it and gains a cascade row, and M10 (plain Q = 10·k) runs beside M5.
+
+**Landed.** `audio.eq` (seven named slots and `bypass`), `audio.hum` and `audio.channels`,
+each written only when set (`channels` only when not `both`), after `isolation`; **format
+32**, `schema_v32.rs`; their bounds and clamps in a new `audio_eq.rs`, called from
+`check_audio` and `clamp_audio`; the patch template's every new key at a non-default value.
+The stage (`AudioEQStage.swift`: 17 fixed positions, RBJ in Double, transposed direct form
+II, designed at the cut) and its arithmetic (`AudioBiquad.swift`: `AudioEQSettings`,
+`AudioEQDesign.design`, `magnitudeDB`, `responseDB`); the pick and the stage at the head of
+`AudioDSPChain`, read through `process(…head:)`; `AudioTrackDSP.headLead` (SY-25's 6,400 on a
+noise-reduced track) and the tap's runs split at both lookups; `ChannelMatrix` composing the
+pick first (AU-35); the mirror (`AudioEQProps.swift`) and `AudioPatch`'s three keys, all
+base-only; the drawn response (`AudioEQCurveView.swift`) and the Channels, EQ and Hum sections
+after Voice Isolation (`AudioPane+HumChannels.swift`, `AudioPane+EQ.swift`); `set_audio`'s prose with
+the presets' values; the guide's three sections and limits, the README highlight, spec
+§4.3b, §5.2a/b, §7.2, §7.4 and §7.10; the screen 09b and the `eq` fixture; manual check
+SE-29. AP2's limiter check had been written SE-24, which AP9 had taken, so it is SE-28 here
+and in AP2's record.
+
+**Found on the way.** `clip_inspector2_probe.swift`'s T2 still listed six Sound sections
+(AP2 had added the Limiter), so it now names ten. `screens.py`'s P2 failed on the tree as
+inherited: the four audio sections were unpinned, and so were AP1's Normalize keys and three
+dev launch keys (`RCCodecProbe`, `RCDevExportFault`, `RCDevGraphicImportAccept`); the
+Normalize keys are pinned at Loudness and −16, the three dev keys listed as not shown, and
+`audio.eq` pinned open for 09b, which opens it on 09 too (its prose says so).
+
+**Measured** (the lane, Debug then Release after its gate): `eq_probe.py` 11/11 — Q1 worst
+0.000000 dB over 30 slot and hum cases at 48 and 44.1 kHz, the cascades −0.006…−0.034 dB from
+−depth at the harmonics and −0.096…−0.105 dB midway; Q7 0.0000 dB; Q10 **135.9 µs per 1024
+stereo frames at all 17 positions, 0.64 % of real time** (S1's estimate was 17 × 7.2 = 122 µs;
+three lanes shared the machine, best of 3 × 2000 runs) — and `--mutants` 10/10; M11 by hand
+failed five of `audio_eq.rs`'s six tests. `eq_proof.py` 33/33 on Debug, so the scalar stage
+keeps AudioToolbox's deadline at `-Onone` (E2's export), and 33/33 on Release: E2 within
+0.0154 dB (a) and 0.0020 dB (b) of analytic; E3 −0.005…−0.029 dB at 30 dB and +0.003…−0.054 dB
+at 48 dB from −depth (its first run, with 1 s steps, read +0.07…+0.11 at 48 dB: the notch's
+ringing had not decayed, so the hum fixtures' steps are 2 s); E5 the voice-on-left file
+measured −43.09 (both) and −40.08 LUFS (left, +3.010 LU), normalised exports at −15.87 and
+−15.96 LUFS; E6 the onset at sample 48,001 (+0.02 ms). **E8, the owner's recording through
+Rumble Cut, De-mud and Presence:** the pause floor −64.30 → −66.65 dBFS (−2.34 dB); octave
+bands 63 Hz −2.68, 125 Hz −1.11, 250 Hz −2.34, 500 Hz −1.50, 1 kHz −0.14, 2 kHz +0.86, 4 kHz
++2.51, 8 kHz +1.30 dB. On Release: `limiter_proof.py` 19/19, `loudness_normalize_proof.py`
+37/37 (N6 −15.91 LUFS, −0.9998 / −0.9999 dBTP), `phase5_proof.py` 92/92,
+`export_offset_proof.py --only E4,E22,E27,E44,E45` 5/5; `limiter_probe.py` 9/9,
+`loudness_cache_probe.py` 11/11, `clip_inspector2_proof.py` 33/33, `screens.py --only
+09b-clip-sound-eq,09-clip-sound` 7/7, `spec_index_proof.py` 213/213; `make gate` PASS 448 s
+(names 1, typecheck 6, fmt 3, lint 12, test 284, app 142; the four baseline warnings); the
+parity log empty on both builds.
+
+**Review.** Passed with two nits, left as they are: `AudioBiquad.swift`'s `pass`/`shelf`
+replace a NaN frequency with 1000 Hz where its comment says `clamp_eq` agrees (the core uses
+each slot's own default; no JSON can carry a NaN), and an `eq: {}` with no slot on reads "0 on"
+where "off" would read better.
+
+**Integrated.** AP5 had landed and taken format 31 and SE-27, so this phase's format is 32
+(`format.rs`, the header, `schema_v32.rs` — the lane's `schema_v31.rs`, its fixture carrying
+`isolation` and the three keys read after it — AU-37, §5.2a/b, §7.10, the guide) and its check
+SE-29, the limiter's SE-28. The union taken in `model_audio.rs` (the three after `isolation`),
+`patch.rs`, `AudioProps.swift`, `TypedPatches.swift`, `InspectorBinding+Writes.swift`,
+`set_audio`'s prose (channels "first in the clip's chain after isolation"), `ClipPane`'s Sound
+list (Voice Isolation, then Channels, EQ, Hum: AU-54's order), the guide (sections 1–11, the
+limits), the README highlight, §7.4 and the decisions index; AU-34 and AU-38 name AU-54's
+crossfade and the Voice Isolation section ahead of the head, and AP3's block of
+`11-decisions/audio.md` sits before AP5's. AP5's new `AudioTapContext(track:isolation:meter:)`
+broke `eq_probe.swift` and AP2's `limiter_probe.swift`, which now pass `isolation: nil`;
+`audio.isolation` is pinned in `screens.py` (P2) and listed in `clip_inspector2_probe.swift`'s
+T2, and 09's prose names Voice Isolation, the EQ now below its captured height. On the merged
+tree: `make gate` PASS 323 s (names 1, typecheck 5 with the four baseline warnings, fmt 3, lint
+10, test 179, app 124); on Release `eq_proof.py` 33/33 with every figure as above (E7 "the file
+is version 32, the header's 32"), AP5's `audio_ap5_proof.py` 22/22 over the merged tap (I2 the
+pause floor 14.9 dB lower, I3 −63.7 dB), the parity log clean; `eq_probe.py` 11/11 (Q10 134.5
+µs, 0.63 % of real time), `limiter_probe.py` 9/9, `clip_inspector2_proof.py` 33/33, `screens.py
+--only 09b-clip-sound-eq,09-clip-sound` 7/7, `spec_index_proof.py` 213/213; `cargo test`
+`schema_v32` 5/5, `schema_v31` 4/4, `audio_eq` 6/6, `isolation` 4/4, `schema_v30` 6/6. No
+mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-29 for the owner (the presets' ±3 dB, the notch, a one-sided pick, by ear).
+Nothing to file.
 
 ### Closing the road map
 

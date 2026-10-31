@@ -193,13 +193,19 @@ struct AudioPatch: Codable, Equatable {
     var fadeOutShape: FadeShape?
     var limiter: LimiterProps??
     var isolation: Double?
+    /// Format 32 (AU-31, AU-33, AU-34): a whole `EqProps` or `HumProps`
+    /// (every slot key written), `.some(nil)` to clear; the channel pick.
+    var eq: EqProps??
+    var hum: HumProps??
+    var channels: AudioChannelChoice?
 
     init(
         volume: Double? = nil, muted: Bool? = nil, fadeIn: Ticks? = nil, fadeOut: Ticks? = nil,
         duck: DuckProps?? = nil, mono: Bool? = nil, keepPitch: Bool? = nil, pan: Double? = nil,
         compressor: CompressorProps?? = nil, noiseReduction: Double? = nil,
         fadeInShape: FadeShape? = nil, fadeOutShape: FadeShape? = nil,
-        limiter: LimiterProps?? = nil, isolation: Double? = nil
+        limiter: LimiterProps?? = nil, isolation: Double? = nil, eq: EqProps?? = nil,
+        hum: HumProps?? = nil, channels: AudioChannelChoice? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -215,6 +221,9 @@ struct AudioPatch: Codable, Equatable {
         self.fadeOutShape = fadeOutShape
         self.limiter = limiter
         self.isolation = isolation
+        self.eq = eq
+        self.hum = hum
+        self.channels = channels
     }
 
     init(from decoder: Decoder) throws {
@@ -233,6 +242,9 @@ struct AudioPatch: Codable, Equatable {
         fadeOutShape = c.lenient(.fadeOutShape)
         limiter = c.nullable(.limiter)
         isolation = c.lenient(.isolation)
+        eq = c.nullable(.eq)
+        hum = c.nullable(.hum)
+        channels = c.lenient(.channels)
     }
 
     var dictionary: [String: Any] {
@@ -251,6 +263,9 @@ struct AudioPatch: Codable, Equatable {
         if let fadeOutShape = fadeOutShape { d["fade_out_shape"] = fadeOutShape.rawValue }
         d.putNullable("limiter", limiter) { $0.dictionary }
         if let isolation = isolation { d["isolation"] = isolation }
+        d.putNullable("eq", eq) { $0.dictionary }
+        d.putNullable("hum", hum) { $0.dictionary }
+        if let channels = channels { d["channels"] = channels.rawValue }
         return d
     }
 

@@ -1,7 +1,10 @@
 //! The audio vocabulary of spec §5.2: [`AudioProps`], the `audio` group a
-//! [`crate::model::Clip`] carries, and the [`Compressor`], [`Limiter`] and
-//! [`Duck`] inside it, each over a hand-written [`Default`] that says what an absent
-//! key means.
+//! [`crate::model::Clip`] carries, and the [`Compressor`], [`Limiter`],
+//! [`Duck`], [`Equalizer`] (with its slots [`HighPass`], [`LowShelf`],
+//! [`EqBand`], [`HighShelf`] and [`LowPass`]), [`Hum`] and [`AudioChannels`]
+//! inside it, each over a hand-written [`Default`] that says what an absent
+//! key means. The EQ's, the hum's and the channel pick's bounds are
+//! `audio_eq.rs`'s (format 32, spec §11 AU-31, AU-33, AU-34).
 //!
 //! A pure move out of `model_props.rs` (its audio section, whole) for road
 //! map "audio" AP0, before the phases that add audio keys, so the audio
@@ -51,6 +54,17 @@ pub struct AudioProps {
     /// not 0 so an older file's text holds. The render is Swift's, offline.
     #[serde(skip_serializing_if = "is_zero")]
     pub isolation: f64,
+    /// The clip's EQ (format 32, spec §11 AU-31): named slots, so the group
+    /// stays `Copy` and a patch merges per slot; absent is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eq: Option<Equalizer>,
+    /// The hum notch comb (format 32, spec §11 AU-33); absent is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hum: Option<Hum>,
+    /// Which of a stereo source's channels plays (format 32, spec §11
+    /// AU-34), written only when not `both`.
+    #[serde(skip_serializing_if = "AudioChannels::is_both")]
+    pub channels: AudioChannels,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -74,6 +88,9 @@ impl Default for AudioProps {
             fade_out_shape: FadeShape::Linear,
             limiter: None,
             isolation: 0.0,
+            eq: None,
+            hum: None,
+            channels: AudioChannels::Both,
         }
     }
 }
@@ -218,5 +235,182 @@ impl Default for Duck {
             pre_roll: DUCK_SPEECH_PAD,
             hold: DUCK_SPEECH_PAD,
         }
+    }
+}
+
+/// The clip's EQ (spec §11 AU-31): seven named slots in signal order, each
+/// absent when off, and `bypass`, which keeps the settings and silences
+/// them. Each slot is written only when set, `bypass` only when true.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Equalizer {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub high_pass: Option<HighPass>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub low_shelf: Option<LowShelf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_1: Option<EqBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_2: Option<EqBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_3: Option<EqBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub high_shelf: Option<HighShelf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub low_pass: Option<LowPass>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub bypass: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+impl Default for Equalizer {
+    /// Every slot off, not bypassed.
+    fn default() -> Self {
+        Equalizer {
+            high_pass: None,
+            low_shelf: None,
+            band_1: None,
+            band_2: None,
+            band_3: None,
+            high_shelf: None,
+            low_pass: None,
+            bypass: false,
+        }
+    }
+}
+
+/// A Butterworth high-pass: `frequency` in Hz, `slope` 12 or 24 dB/octave.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HighPass {
+    pub frequency: f64,
+    pub slope: i64,
+}
+
+impl Default for HighPass {
+    /// 80 Hz at 12 dB/octave.
+    fn default() -> Self {
+        HighPass {
+            frequency: 80.0,
+            slope: 12,
+        }
+    }
+}
+
+/// A Butterworth low-pass: `frequency` in Hz, `slope` 12 or 24 dB/octave.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LowPass {
+    pub frequency: f64,
+    pub slope: i64,
+}
+
+impl Default for LowPass {
+    /// 12 kHz at 12 dB/octave.
+    fn default() -> Self {
+        LowPass {
+            frequency: 12_000.0,
+            slope: 12,
+        }
+    }
+}
+
+/// An RBJ low shelf (S = 1): its corner in Hz and its gain in dB.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LowShelf {
+    pub frequency: f64,
+    pub gain_db: f64,
+}
+
+impl Default for LowShelf {
+    /// 100 Hz, flat.
+    fn default() -> Self {
+        LowShelf {
+            frequency: 100.0,
+            gain_db: 0.0,
+        }
+    }
+}
+
+/// An RBJ high shelf (S = 1): its corner in Hz and its gain in dB.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HighShelf {
+    pub frequency: f64,
+    pub gain_db: f64,
+}
+
+impl Default for HighShelf {
+    /// 8 kHz, flat.
+    fn default() -> Self {
+        HighShelf {
+            frequency: 8_000.0,
+            gain_db: 0.0,
+        }
+    }
+}
+
+/// An RBJ peaking bell: its centre in Hz, its gain in dB and its Q.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EqBand {
+    pub frequency: f64,
+    pub gain_db: f64,
+    pub q: f64,
+}
+
+impl Default for EqBand {
+    /// 1 kHz, flat, Q 1.
+    fn default() -> Self {
+        EqBand {
+            frequency: 1_000.0,
+            gain_db: 0.0,
+            q: 1.0,
+        }
+    }
+}
+
+/// The hum notch comb (spec §11 AU-33): the mains `frequency` (50 or 60
+/// Hz), how deep each notch cuts in dB, and how many harmonics (1…8) it
+/// takes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Hum {
+    pub frequency: i64,
+    pub depth_db: f64,
+    pub harmonics: i64,
+}
+
+impl Default for Hum {
+    /// 60 Hz mains, 30 dB deep, four harmonics.
+    fn default() -> Self {
+        Hum {
+            frequency: 60,
+            depth_db: 30.0,
+            harmonics: 4,
+        }
+    }
+}
+
+/// Which channels of a stereo source play (spec §11 AU-34): `left` and
+/// `right` copy that channel into every channel, `swapped` exchanges them.
+/// A one-channel track ignores it, as it does pan.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioChannels {
+    #[default]
+    Both,
+    Left,
+    Right,
+    Swapped,
+}
+
+impl AudioChannels {
+    pub fn is_both(&self) -> bool {
+        *self == AudioChannels::Both
     }
 }

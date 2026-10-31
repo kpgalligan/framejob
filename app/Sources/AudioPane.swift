@@ -1,8 +1,11 @@
 import AppKit
 
 /// The Clip tab's AUDIO sections (spec §4.3): volume with its dB read-out,
-/// Normalize and mute, the two fades, ducking, noise reduction, the
-/// compressor, pan, mix-to-mono, Detach Audio and Attach Audio.
+/// Normalize and mute, the two fades, ducking, voice isolation
+/// (`AudioPane+Isolation.swift`), the channel pick, the EQ and the hum notch
+/// (`AudioPane+HumChannels.swift`, `AudioPane+EQ.swift`), noise reduction,
+/// the compressor, pan, mix-to-mono, Detach Audio and Attach Audio, and the
+/// limiter (`AudioPane+Limiter.swift`).
 ///
 /// **This pane is never shown**: since the six tabs became three it is a
 /// factory `ClipPane` holds and calls, last in the Clip tab, whenever at least
@@ -15,9 +18,10 @@ import AppKit
 /// measured gain (`normalize()` says why it cannot go through
 /// `InspectorBinding.ops(audio:)`).
 ///
-/// The last three sections are in SIGNAL ORDER rather than in order of
-/// familiarity: noise reduction, then the compressor, then the pan in Mix, is
-/// the order `AudioDSPChain` actually runs them in, and the order matters to
+/// The sections after Ducking are in SIGNAL ORDER rather than in order of
+/// familiarity: Voice Isolation, Channels, EQ, Hum, noise reduction, the
+/// compressor, the pan in Mix, then the Limiter, is the order the tap and
+/// `AudioDSPChain` actually run them in, and the order matters to
 /// what the numbers mean (the compressor's threshold is read against a signal
 /// the reducer has already cleaned). Volume, the fades and ducking come first
 /// in the pane and LAST in the signal, being the fader the core folds into the

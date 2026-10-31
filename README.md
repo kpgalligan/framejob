@@ -57,9 +57,10 @@ Up, Ramp Down, Speed Dip or Speed Burst in one step.
 
 **Audio.** Per-clip volume, fades in four shapes, ducking for a clip's length
 or only while its speech plays, voice isolation (Apple's on-device voice model,
-which also reduces room echo), noise reduction, compressor, pan, mono and a
-true-peak limiter; each clip's loudness and true peak in the inspector, and
-Normalize to a loudness target (−16 LUFS at −1 dBTP by default, turning the
+which also reduces room echo), channel selection, EQ with voice presets, hum
+removal, noise reduction, compressor, pan, mono and a true-peak limiter; each
+clip's loudness and true peak in the inspector, and Normalize to a loudness
+target (−16 LUFS at −1 dBTP by default, turning the
 limiter on when a clip's peaks need it) or to a peak, which matches clips;
 Synchronize Audio lines up a camera and a separate recorder by their sound,
 drift included. Detach Audio keeps the sound linked to its picture, so J- and

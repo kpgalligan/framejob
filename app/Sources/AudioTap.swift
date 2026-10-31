@@ -34,8 +34,9 @@ import Foundation
 /// `kMTAudioProcessingTapCreationFlag_PreEffects`, so the compressor sees the
 /// clip at its recorded level rather than at the level the fader is passing —
 /// an insert before the fader, which is where a compressor belongs. What IS
-/// here is everything the plan cannot carry: pan, the mono fold, the
-/// compressor and noise reduction.
+/// here is everything the plan cannot carry: voice isolation's crossfade, the
+/// channel pick, the EQ and hum notch, noise reduction, the compressor, the
+/// mono fold, pan and the limiter.
 ///
 /// **The tap also meters, and it is the only thing that can.** A meter wants
 /// the mix level, which would be a PostEffects tap — but
@@ -210,12 +211,21 @@ final class AudioTapContext {
             // they are track inserts, not per-clip effects. On a limited track
             // the spans are looked up `lookupLead` ahead: its media was placed
             // that much early, and the limiter's delay brings it back (AU-23).
+            // The head stages (pick, EQ, hum) run before the noise reducer, so
+            // on a noise-reduced track they look `headLead` further ahead, and
+            // a run ends at a cut of either lookup (AU-34).
             var offset = 0
             while offset < frames {
-                let run = self.run(
-                    from: start + track.lookupLead + ticks(frames: offset),
-                    remaining: frames - offset)
-                guard run.length > 0 else { break }
+                let at = start + track.lookupLead + ticks(frames: offset)
+                let run = self.run(from: at, remaining: frames - offset)
+                var length = run.length
+                var head: AudioClipDSP?
+                if track.headLead != 0 {
+                    let ahead = self.run(from: at + track.headLead, remaining: frames - offset)
+                    length = min(length, ahead.length)
+                    head = ahead.dsp
+                }
+                guard length > 0 else { break }
                 for index in 0..<count {
                     channels[index] = list[index].mData?
                         .assumingMemoryBound(to: Float.self).advanced(by: offset)
@@ -223,9 +233,9 @@ final class AudioTapContext {
                 channels.withUnsafeMutableBufferPointer { pointers in
                     chain.process(
                         UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
-                        frames: run.length, params: run.dsp)
+                        frames: length, params: run.dsp, head: head)
                 }
-                offset += run.length
+                offset += length
             }
         }
         position = start + ticks(frames: frames)

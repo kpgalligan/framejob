@@ -36,10 +36,19 @@ governs a module now.
   and `FadeShape` (`fade_in_shape` / `fade_out_shape`, and
   `Transition.audio_shape`), and their defaults, every format-29 key
   written only when not its default, and `AudioProps.isolation` (format
-  31, spec §11 AU-50, 0…1, written only when not 0); the FIELD
-  `Clip.audio` stays in `model.rs`. Re-exported through `model_props.rs`; a
-  pure move out of it
-  (road map "audio" AP0), so the audio group's new keys land here.
+  31, spec §11 AU-50, 0…1, written only when not 0), and format 32's
+  `Equalizer` (seven named slots — `HighPass`, `LowShelf`, `EqBand` × 3,
+  `HighShelf`, `LowPass` — and `bypass`), `Hum` and `AudioChannels` (spec §11
+  AU-31, AU-33, AU-34, each written only when set, `channels` only when not
+  `both`); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
+  `model_props.rs`; a pure move out of it (road map "audio" AP0), so the audio
+  group's new keys land here.
+- `audio_eq.rs` — the EQ's and the hum notch's bounds (format 32, spec §11
+  AU-31, AU-33, AU-37): `check_eq` / `check_hum`, run by `props_check.rs`'s
+  `check_audio` and refusing in the key's own sentence (`audio.eq.<slot>.frequency
+  must be between 20 and 20000, not 5`, a slope that is not 12 or 24, mains not
+  50 or 60), and `clamp_eq` / `clamp_hum`, run by `actions_clamp.rs`'s
+  `clamp_audio` on an action's end. No sample work; the stage is Swift's.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
   — the text, shape, region and motion vocabularies, each re-exported through
   `model_props.rs`. Text and shape are the two sources the model only
@@ -463,8 +472,9 @@ governs a module now.
   the vocabulary, which is `props_check.rs`'s reason for existing one step
   further on. `GROUPS` — every group in its order on `Clip`, the order
   `paste` and a default `paste_attributes` visit them — lives here, its one
-  home. The audio template holds format 29's keys and format 31's
-  `isolation` at NON-default values,
+  home. The audio template holds format 29's keys, format 31's
+  `isolation` and format 32's `eq` (every slot, `bypass` true), `hum` and
+  `channels` (`swapped`) at NON-default values,
   since a default is no longer written and the key check reads the template.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /

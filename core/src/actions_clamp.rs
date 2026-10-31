@@ -306,6 +306,8 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
             .release
             .clamp(LIMITER_RELEASE_MIN, LIMITER_RELEASE_MAX);
     }
+    props.eq = props.eq.map(crate::audio_eq::clamp_eq);
+    props.hum = props.hum.map(crate::audio_eq::clamp_hum);
     props
 }
 

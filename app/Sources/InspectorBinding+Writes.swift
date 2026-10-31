@@ -131,7 +131,8 @@ extension InspectorBinding {
 
     /// Spec §11 CI-3: pan, mono, compressor, noise reduction, the limiter
     /// (AU-21), duck and keep-pitch are the clip's, whatever is selected — and
-    /// the fade shapes (AU-114), as the duck is.
+    /// the fade shapes (AU-114), as the duck is, and the EQ, the hum notch and
+    /// the channel pick (AU-37).
     private func structural(audio patch: AudioPatch, for clip: ClipSnapshot)
         -> (base: AudioPatch?, animatable: AudioPatch?)
     {
@@ -139,7 +140,8 @@ extension InspectorBinding {
             duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
             compressor: patch.compressor, noiseReduction: patch.noiseReduction,
             fadeInShape: patch.fadeInShape, fadeOutShape: patch.fadeOutShape,
-            limiter: patch.limiter, isolation: patch.isolation)
+            limiter: patch.limiter, isolation: patch.isolation, eq: patch.eq, hum: patch.hum,
+            channels: patch.channels)
         var animatable = patch
         (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
         (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
@@ -147,6 +149,7 @@ extension InspectorBinding {
         animatable.limiter = nil
         // Base-only until AP8 animates it (spec §11 AU-50).
         animatable.isolation = nil
+        (animatable.eq, animatable.hum, animatable.channels) = (nil, nil, nil)
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

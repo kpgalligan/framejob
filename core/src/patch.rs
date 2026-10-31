@@ -77,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -138,6 +138,20 @@ impl Group {
                 limiter: Some(Limiter::default()),
                 // Format 31's `isolation` is not written at 0 (AU-50).
                 isolation: 0.5,
+                // Format 32's keys (spec §11 AU-37): every EQ slot present
+                // and `bypass` true, the hum, and a pick that is not `both`.
+                eq: Some(crate::model::Equalizer {
+                    high_pass: Some(crate::model::HighPass::default()),
+                    low_shelf: Some(crate::model::LowShelf::default()),
+                    band_1: Some(crate::model::EqBand::default()),
+                    band_2: Some(crate::model::EqBand::default()),
+                    band_3: Some(crate::model::EqBand::default()),
+                    high_shelf: Some(crate::model::HighShelf::default()),
+                    low_pass: Some(crate::model::LowPass::default()),
+                    bypass: true,
+                }),
+                hum: Some(crate::model::Hum::default()),
+                channels: crate::model::AudioChannels::Swapped,
                 ..AudioProps::default()
             }),
             Group::Text => actions::to_json(&TextProps {

@@ -209,9 +209,29 @@ extension AgentServer {
         + "isolation (0–1: voice isolation, Apple's on-device voice model, which also "
         + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
         + "rendered offline, the clip plays without it until the render lands and an export "
-        + "waits for it; a clip not at ×1 plays without it). "
-        + "duck, compressor and limiter are OBJECTS and they MERGE: a key you leave out keeps "
-        + "what is stored, and {duck: null} clears the whole thing."
+        + "waits for it; a clip not at ×1 plays without it)" + audioEQClause + ". duck, "
+        + "compressor, limiter, eq (and each of its slots) and hum are OBJECTS and they "
+        + "MERGE: a key you leave out keeps what is stored, and {duck: null} clears the "
+        + "whole thing."
+    // Format 32's keys (spec §11 AU-31..AU-34), their own typed local so the
+    // chain above stays short enough to type-check quickly. The presets' values
+    // are the inspector's EQ buttons (AU-32).
+    private static let audioEQClause: String =
+        ", channels (both — the default — left, right or swapped: left and right play that "
+        + "channel of a stereo source from both sides, swapped exchanges them; first in the "
+        + "clip's chain after isolation, ignored on a mono source), eq (null or {high_pass, "
+        + "low_shelf, band_1, band_2, band_3, high_shelf, low_pass, bypass}, after the "
+        + "channel pick: "
+        + "each slot null (off) or an object; high_pass and low_pass {frequency, slope}, "
+        + "frequency 20–20000 Hz, slope 12 or 24 dB/octave, defaults {80, 12} and "
+        + "{12000, 12}; low_shelf and high_shelf {frequency, gain_db}, gain -24 to 24 dB, "
+        + "defaults {100, 0} and {8000, 0}; band_1..band_3 {frequency, gain_db, q}, q "
+        + "0.1–10, default {1000, 0, 1}; bypass true keeps the settings and silences them; "
+        + "{eq: {high_pass: {}}} turns one slot on at its defaults. The inspector's presets: "
+        + "Rumble Cut is high_pass {80, 24}, De-mud band_1 {300, -3, 1}, Presence band_3 "
+        + "{4000, 3, 1}), hum (null or {frequency, depth_db, harmonics}: notches at the "
+        + "mains frequency, 50 or 60, default 60, and its harmonics, 1–8, default 4, each "
+        + "depth_db deep, 6–60, default 30; after the EQ)"
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.

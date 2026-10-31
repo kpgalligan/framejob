@@ -22,6 +22,7 @@ pub mod audio;
 pub mod audio_crossfade;
 pub mod audio_duck;
 pub mod audio_duck_speech;
+pub mod audio_eq;
 pub mod audio_shape;
 pub mod av1_mp4;
 pub mod container;

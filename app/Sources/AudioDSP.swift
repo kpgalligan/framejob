@@ -1,9 +1,10 @@
 import Accelerate
 import Foundation
 
-/// The four sample-level audio effects the model carries and AVFoundation
-/// cannot express: pan, the mono fold, the compressor and broadband noise
-/// reduction (spec §4.2, §5.2's `AudioProps`).
+/// The sample-level audio effects the model carries and AVFoundation cannot
+/// express: the channel pick, the EQ and hum notch (`AudioEQStage.swift`),
+/// broadband noise reduction, the compressor, the mono fold, pan and the
+/// limiter (spec §4.2, §5.2's `AudioProps`, §11 AU-3, AU-34).
 ///
 /// **Why this file has no AVFoundation in it.** Volume, the fades and ducking
 /// are a gain CURVE, so `audio.rs` folds them into one envelope per
@@ -139,10 +140,16 @@ struct AudioClipDSP: Equatable {
     var enclosingMono: Bool
     /// The clip's limiter, last in the chain (AU-20); nil when it has none.
     var limiter: AudioLimiterSettings?
+    /// The channel pick, the chain's head (AU-34): `.both` touches nothing.
+    var channels: AudioChannelChoice
+    /// The EQ and hum notch after the pick (AU-30); nil when nothing would
+    /// be designed.
+    var eq: AudioEQSettings?
 
     init(
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
-        mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil
+        mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil,
+        channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -152,6 +159,8 @@ struct AudioClipDSP: Equatable {
         self.mono = mono
         self.enclosingMono = enclosingMono
         self.limiter = limiter
+        self.channels = channels
+        self.eq = eq
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -166,7 +175,7 @@ struct AudioClipDSP: Equatable {
     /// wrong answer.
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
-            && limiter == nil
+            && limiter == nil && channels == .both && eq == nil
     }
 }
 
@@ -223,10 +232,11 @@ enum AudioPanLaw {
 
 // MARK: - The chain
 
-/// One composition audio track's effect chain: noise reduction, then the
-/// compressor, then the Mix stage — the mono fold, then the pan, then the
-/// fold an enclosing NEST clip asked for — then the limiter (spec §11 AU-3,
-/// AU-20).
+/// One composition audio track's effect chain: the channel pick, then the
+/// EQ and hum notch, then noise reduction, then the compressor, then the Mix
+/// stage — the mono fold, then the pan, then the fold an enclosing NEST clip
+/// asked for — then the limiter (spec §11 AU-3, AU-20, AU-34). Voice
+/// isolation's crossfade runs before it, in the tap (AU-53, AU-54).
 ///
 /// **That order is the order a channel strip has**, and each step is there
 /// because of the one before it. Cleaning first means the compressor is not
@@ -257,10 +267,10 @@ enum AudioPanLaw {
 /// folds those into the plan's envelope and `AVMutableAudioMixInputParameters`
 /// applies them as volume ramps, which — measured — happen downstream of a
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
-/// full order the samples actually see is
-/// noise reduction → compressor → the clip's fold → pan → an enclosing nest's
-/// fold → limiter → volume/fades/ducking, which puts the compressor before the
-/// fader exactly as an insert should be. The limiter is told the fader's base
+/// full order the samples actually see is isolation → channel pick → EQ and
+/// hum → noise reduction → compressor → the clip's fold → pan → an enclosing
+/// nest's fold → limiter → volume/fades/ducking, which puts the compressor
+/// before the fader exactly as an insert should be. The limiter is told the fader's base
 /// gain instead (`AudioLimiterSettings`, AU-22).
 final class AudioDSPChain {
     let channelCount: Int
@@ -270,6 +280,9 @@ final class AudioDSPChain {
     private let reducers: [AudioNoiseReductionStage]?
     /// Nil when no clip on this track has a limiter — no added latency.
     private let limiter: AudioLimiterStage?
+    /// The EQ and hum notch (AU-30): no latency, so always built; nil
+    /// settings touch no sample.
+    private let eq: AudioEQStage
 
     /// `usesNoiseReduction` and `usesLimiter` are decided for the WHOLE track
     /// when the composition is built, not per buffer: each stage adds a fixed
@@ -281,6 +294,7 @@ final class AudioDSPChain {
     ) {
         self.channelCount = max(0, channelCount)
         compressor = AudioCompressorStage(sampleRate: sampleRate, maxFrames: maxFrames)
+        eq = AudioEQStage(channelCount: self.channelCount, sampleRate: sampleRate)
         limiter = usesLimiter && self.channelCount > 0
             ? AudioLimiterStage(
                 channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
@@ -309,6 +323,7 @@ final class AudioDSPChain {
     /// tail.
     func reset() {
         compressor.reset()
+        eq.reset()
         reducers?.forEach { $0.reset() }
         limiter?.reset()
     }
@@ -318,12 +333,25 @@ final class AudioDSPChain {
     /// `params` is the clip under this buffer's timestamp. It changes at every
     /// cut on the track; the stages carry their state across the change, which
     /// is what a track insert does.
+    ///
+    /// `head` is the clip the HEAD stages (the pick, the EQ and hum) read, nil
+    /// for `params`: on a noise-reduced track they see samples the reducer's
+    /// lead ahead of the stages after it, so `AudioTap` looks their clip up
+    /// there (AU-34).
     func process(
         _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
-        params: AudioClipDSP
+        params: AudioClipDSP, head: AudioClipDSP? = nil
     ) {
         let count = min(channels.count, channelCount)
         guard frames > 0, count > 0 else { return }
+        let head = head ?? params
+
+        // The head (AU-34): which channels play, then the EQ and hum. A
+        // one-channel track ignores the pick, as it ignores pan.
+        if head.channels != .both, count >= 2 {
+            pick(channels, count: count, frames: frames, choice: head.channels)
+        }
+        eq.process(channels, count: count, frames: frames, settings: head.eq)
 
         if let reducers = reducers {
             for channel in 0..<min(count, reducers.count) {
@@ -351,6 +379,32 @@ final class AudioDSPChain {
         // Last, for the whole track once any clip on it asks (AU-23): a
         // clip without a limiter passes through it as a delay.
         limiter?.process(channels, count: count, frames: frames, settings: params.limiter)
+    }
+
+    /// The channel pick, in place (AU-34): `left` copies channel 0 into every
+    /// channel, `right` channel 1, `swapped` exchanges 0 and 1. Copies and a
+    /// scalar swap over raw pointers: nothing allocated.
+    private func pick(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int, choice: AudioChannelChoice
+    ) {
+        guard let left = channels[0], let right = channels[1] else { return }
+        switch choice {
+        case .both:
+            return
+        case .left, .right:
+            let source = choice == .left ? left : right
+            for channel in 0..<count {
+                guard let data = channels[channel], data != source else { continue }
+                data.update(from: source, count: frames)
+            }
+        case .swapped:
+            for i in 0..<frames {
+                let held = left[i]
+                left[i] = right[i]
+                right[i] = held
+            }
+        }
     }
 
     /// The pan, in place. Its own method only so the tail fold above it is

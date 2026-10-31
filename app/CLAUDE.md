@@ -150,7 +150,8 @@ detail there.
   `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
   `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
   30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body,
-  and format 31's `AudioProps.isolation` (AU-50);
+  and format 31's `AudioProps.isolation` (AU-50), and format 32's `eq`, `hum` and `channels`
+  (`AudioEQProps.swift`, AU-31, AU-33, AU-34);
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -1086,7 +1087,9 @@ the key map behind it.
   +`Isolation`: the Voice Isolation section, spec §11 AU-56, registered
   before Noise Reduction — Isolate voice, Amount, Status, the Status read
   through the pane's `IsolationCache.Memo`, dropped on
-  `.reversedMediaDidChange`, which the pane observes) ·
+  `.reversedMediaDidChange`, which the pane observes; +`HumChannels` and
+  +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
+  Voice Isolation and before Noise Reduction, base-only) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
@@ -1773,11 +1776,16 @@ the key map behind it.
   at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
   line, so it stays one integer literal.
 - `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
-  `AudioCompressorStage.swift` · `AudioNoiseReductionStage.swift` ·
-  `AudioLimiterStage.swift` — the `MTAudioProcessingTap` playback and export
-  share, and the five sample-level effects after voice isolation's crossfade,
-  which runs first (AU-54, `AudioIsolation.swift`): noise reduction (a 512-sample
-  delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE
+  `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
+  `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
+  `MTAudioProcessingTap` playback and export share, and the seven sample-level
+  effects after voice isolation's crossfade, which runs first (AU-54,
+  `AudioIsolation.swift`): the channel pick and the EQ and hum notch at the
+  head (AU-30, AU-34: RBJ biquads in Double over 17 fixed positions, scalar per
+  sample, designed at the cut; looked up `AudioTrackDSP.headLead` — SY-25's
+  6,400 ticks — further ahead on a noise-reduced track, the tap's runs split at
+  both lookups), noise reduction (a 512-sample delay the builder leads by,
+  SY-25), the compressor, the mono fold (BEFORE
   the pan, or it is algebraically self-cancelling) and pan (constant-power,
   unity at centre), then the clip limiter (AU-20: a lookahead true-peak
   limiter last in the chain, told the clip's base volume because the fader is
@@ -1790,11 +1798,23 @@ the key map behind it.
   track's tap is told when the composition is built (`AudioDSPSpan`,
   `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
   it (road map "audio" AP0). `AudioDSP.swift` keeps the parameters
-  (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP`), the pan
-  law and the chain
-  (`AudioDSPChain`, whose order is the channel strip's); each stage is a file
-  of its own, `AudioCompressorStage.swift`, `AudioNoiseReductionStage.swift`
-  and `AudioLimiterStage.swift` (the first two pure moves out of it, AP0).
+  (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP` with its
+  `channels` and `eq`), the pan law and the chain (`AudioDSPChain`, whose order
+  is the channel strip's); each stage is a file of its own,
+  `AudioEQStage.swift` (AP3), `AudioCompressorStage.swift`,
+  `AudioNoiseReductionStage.swift` and `AudioLimiterStage.swift` (the first two
+  pure moves out of it, AP0).
+- `AudioBiquad.swift` · `AudioEQProps.swift` · `AudioEQCurveView.swift` ·
+  `AudioPane+EQ.swift` · `AudioPane+HumChannels.swift` — road map "audio" AP3
+  (spec §11 AU-30..AU-38): `AudioBiquad` the RBJ design (`AudioEQSettings`,
+  `AudioEQDesign.design` into 17 fixed positions, `magnitudeDB`, `responseDB`),
+  the one design the stage runs and the curve draws; `AudioEQProps` the read-only
+  mirror's `EqProps` (whose `dictionary` writes every slot, `NSNull` when off,
+  because a patch merges per key), `HumProps`, `AudioChannelChoice` and the
+  presets (`EqPreset`, each writing only its own slot); `AudioEQCurveView` the
+  drawn response at 48 kHz; `AudioPane+EQ` the EQ section and
+  `AudioPane+HumChannels` the Channels and Hum sections, after Voice Isolation
+  and before Noise Reduction, all base-only.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
@@ -2328,8 +2348,9 @@ free.
   from the plan segment, REPLACING `volume` so a second press is a no-op,
   always to BASE props; `audioSegments(in:)` and `admit(_:in:segments:)` are
   both modes' admission. `ClipLoudness` is a clip's reading over the window
-  that plays (the export's dual mono, the clip's own mono fold and pan on
-  stereo, played-order 10 ms steps through `MediaPeaks.sourceTick` and
+  that plays (the export's dual mono; the clip's own channel pick, mono fold
+  and pan on stereo, pan · fold · pick, AU-35, the EQ and hum not counted;
+  played-order 10 ms steps through `MediaPeaks.sourceTick` and
   `ReverseMirror`, the gates once, AU-11, AU-12) and the Volume section's
   `Memo` (per handle, per media file, and the held answer through a live
   edit, AU-15). `NormalizeChoice` is the mode and target in UserDefaults

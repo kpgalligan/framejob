@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, channel choice, EQ, hum removal, noise reduction, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -8,18 +8,21 @@ There is only one kind of track. Any track can hold a clip with sound, whether i
 
 The waveform shows the level of the file itself, so moving the Volume slider doesn't redraw it. It's drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track that holds only sound clips is drawn as a shorter lane than a track with pictures.
 
-When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has seven sections, in this order:
+When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has ten sections, in this order:
 
 1. **Volume**: level, gain read-out, loudness read-out, Mute and Normalize
 2. **Fades**: fade in and fade out
 3. **Ducking**: lowers every other clip while this one plays
 4. **Voice Isolation**
-5. **Noise Reduction**
-6. **Compressor**
-7. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
-8. **Limiter**: holds the clip's peaks under a ceiling
+5. **Channels**: which channels of a stereo file play
+6. **EQ**: a high-pass, two shelves, three bands and a low-pass, with presets for voice
+7. **Hum**: removes mains hum and its harmonics
+8. **Noise Reduction**
+9. **Compressor**
+10. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+11. **Limiter**: holds the clip's peaks under a ceiling
 
-Voice Isolation, Noise Reduction, Compressor, Mix and Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
+Voice Isolation through Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
 Every section header has a summary and a Reset button that appears when the section differs from its default. The summaries read:
 
@@ -29,6 +32,9 @@ Every section header has a summary and a Reset button that appears when the sect
 | Fades | both lengths, for example "0.50 · 1.00 s", or "none" |
 | Ducking | the duck level, for example "20%", or "off" |
 | Voice Isolation | the amount, for example "80%", or "off" |
+| Channels | "Both", "Left Only", "Right Only" or "Swap Left and Right" |
+| EQ | how many parts are on, for example "2 on", "bypassed", or "off" |
+| Hum | the mains and the harmonics, for example "60 Hz · 4", or "off" |
 | Noise Reduction | the amount, for example "50%", or "off" |
 | Compressor | the ratio, for example "3.0:1", or "off" |
 | Mix | "centre", "mono", or the pan position, for example "left 40" |
@@ -164,11 +170,56 @@ At 80 % the pauses between words drop by about 14 dB and keep a little of the ro
 
 The isolated voice is worked out once for each clip, in the background, when you turn it on. Until it is ready the clip plays without it, and the editor switches over by itself when it is. Changing Amount takes effect at once and doesn't work it out again; trimming or slipping the clip does, because the clip then plays a different part of its file. An export waits for every isolated clip to be ready ("Preparing…"), so a file is never written without it.
 
-Isolation comes first, before noise reduction and the compressor. You can use it together with Noise Reduction, which then works on the isolated sound.
+Isolation comes first, before the channel choice, the EQ, noise reduction and the compressor. You can use it together with Noise Reduction, which then works on the isolated sound.
 
 Isolation plays only on a clip at normal speed. A clip with a speed change, a speed ramp or a freeze frame plays without it, and the Status says so. A reversed clip is isolated once its reversed copy is ready.
 
 *Agents:* `set_audio` with `isolation` from 0 to 1 (0 is off). The render's status isn't in `get_project`; an export waits for it.
+
+## Channels
+
+| Control | What it does | Default |
+|---|---|---|
+| Play | Both plays the file as it is. Left Only plays the left channel from both sides, Right Only the right channel, and Swap Left and Right exchanges them. | Both |
+
+Use Left Only or Right Only for a microphone recorded onto one channel of a stereo file: the voice then plays from both speakers at its own level, and the Volume section's Loudness read-out counts it that way. The choice comes right after voice isolation, before the EQ and the mono fold. A mono file has only one channel, so the choice has no effect on it.
+
+*Agents:* `set_audio` with `channels`: `"both"`, `"left"`, `"right"` or `"swapped"`.
+
+## EQ
+
+The EQ shapes the clip's tone. Its first row draws the response: how much each frequency from 20 Hz to 20 kHz is turned up or down, the hum notches included. The line is greyed while Bypass is on, and is not drawn when the selected clips' settings differ.
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Bypass | Silences the EQ without losing its settings, to compare with and without. | on / off | off |
+| Rumble Cut | Turns the High-pass on at 80 Hz and 24 dB/oct: takes out traffic, handling noise and desk thumps. | — | — |
+| De-mud | Sets Band 1 to −3 dB at 300 Hz: less boom and boxiness. | — | — |
+| Presence | Sets Band 3 to +3 dB at 4 kHz: words easier to follow. | — | — |
+| High-pass | Turns down everything below its Frequency. Slope 12 or 24 dB/oct. | 20–20000 Hz | 80 Hz, 12 dB/oct |
+| Low shelf | Turns everything below its Frequency up or down by its Gain. | ±24 dB | 100 Hz, 0 dB |
+| Band 1, 2, 3 | Turns the frequencies around its Frequency up or down by its Gain; Q sets how narrow (higher is narrower). Quick picks for Q: 0.5, 0.7, 1, 2, 4. | ±24 dB, Q 0.1–10 | 300, 1000, 4000 Hz; 0 dB; Q 1 |
+| High shelf | Turns everything above its Frequency up or down by its Gain. | ±24 dB | 8000 Hz, 0 dB |
+| Low-pass | Turns down everything above its Frequency. Slope 12 or 24 dB/oct. | 20–20000 Hz | 12000 Hz, 12 dB/oct |
+
+Each part has its own checkbox; ticking it turns that part on at its default. The presets each set only their own part and turn Bypass off, so they combine: Rumble Cut, De-mud and Presence together are a common starting point for a voice. A Gain of 0 dB changes nothing. Reset turns the whole EQ off.
+
+The EQ runs after the channel choice and before hum removal and noise reduction. It doesn't change the Loudness read-out or what Normalize measures.
+
+*Agents:* `set_audio` with `eq: {high_pass, low_shelf, band_1, band_2, band_3, high_shelf, low_pass, bypass}`: each part `null` (off) or an object — `high_pass` and `low_pass` `{frequency, slope}`, the shelves `{frequency, gain_db}`, the bands `{frequency, gain_db, q}`. A part you leave out keeps what is stored, `{eq: {high_pass: {}}}` turns one on at its defaults, and `eq: null` turns the EQ off.
+
+## Hum
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Remove hum | Turns hum removal on. | on / off | off |
+| Mains | The mains frequency where the recording was made: 50 Hz in most of the world, 60 Hz in the Americas and parts of Asia. | 50 or 60 Hz | 60 Hz |
+| Depth | How far each notch turns the hum down. Quick picks: 12, 24, 30, 48. | 6–60 dB | 30 dB |
+| Harmonics | How many notches: the mains frequency and its multiples. Quick picks: 1, 2, 4, 8. | 1–8 | 4 |
+
+Each notch is narrow — about a tenth of the mains frequency wide whatever the depth — so the voice between the notches is left alone. Hum removal runs after the EQ.
+
+*Agents:* `set_audio` with `hum: {frequency, depth_db, harmonics}`, `hum: {}` to turn it on at the defaults, or `hum: null` to turn it off.
 
 ## Noise Reduction
 
@@ -432,8 +483,10 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
-- On a nest clip, pan, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
+- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
+- On a nest clip, pan, the channel choice, the EQ, hum removal, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
+- The EQ's settings switch at a cut between two clips without a glide; the curve has no handles to drag.
+- The channel choice counts in the Loudness read-out; the EQ and hum removal don't.
 - Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.
 - A linked clip's speed and direction can't change until you attach its audio.
 - Above ×12 a clip's audio is left out of the mix ([Speed](speed.md)).

@@ -31,6 +31,7 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
+use crate::audio_eq::{check_eq, check_hum};
 use crate::grade_check::{check_curves, check_qualifier, check_wheels};
 use crate::model::{
     AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
@@ -396,6 +397,8 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
             LIMITER_RELEASE_MAX,
         )?;
     }
+    props.eq.as_ref().map(check_eq).transpose()?;
+    props.hum.as_ref().map(check_hum).transpose()?;
     Ok(())
 }
 

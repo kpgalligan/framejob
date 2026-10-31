@@ -214,9 +214,13 @@ extern "C" {
  *
  * Version 31 is voice isolation (spec §11 AU-50): `audio.isolation`, after
  * `limiter`, written only when not 0, so every other project writes the text
- * it did, and there is no migration step. 32 and above, 1014 included, are
+ * it did, and there is no migration step.
+ *
+ * Version 32 is EQ, hum and channels (spec §11 AU-37): `audio.eq` and
+ * `audio.hum`, each written only when set, and `audio.channels`, written
+ * only when not `both`; no migration step. 33 and above, 1014 included, are
  * newer. */
-#define RC_FORMAT_VERSION 31
+#define RC_FORMAT_VERSION 32
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

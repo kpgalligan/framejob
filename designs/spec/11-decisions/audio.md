@@ -210,6 +210,98 @@ decisions from AU-27.
   "−1.0 dBTP" or "off", and Reset clears it. While the clip's limiter is on, the Volume
   section's At volume row reads the model's LUFS (AU-24) and `min(tp·v, ceiling)`.
 
+AU-30…AU-39 are AP3's (EQ, hum removal and channel selection; survey A3, A7, B7), recorded
+before its code from AP0's spike S1 and the survey's measurements of the owner's recording.
+
+- **AU-30 — The EQ stage: RBJ biquads in Double, 17 fixed positions, designed at the cut.**
+  `AudioEQStage` (`AudioEQStage.swift`) runs RBJ cookbook biquads in Double, transposed direct
+  form II, scalar per sample over raw pointers (sections outer, samples inner, one channel at a
+  time; never `vDSP_biquad`, which S1 found gives different bits for different buffer sizes).
+  It has 17 FIXED positions — high-pass sections 1 and 2, the low shelf, bands 1–3, the high
+  shelf, low-pass sections 1 and 2, and hum harmonics 1…8 — so a slot present in two abutting
+  clips keeps its state across the cut, and a position that turns on starts from zero; an
+  inactive position is skipped and its state zeroed. Coefficients are designed in `process`
+  only when the run's settings differ from the last designed (no allocation, no lock), so they
+  switch at the cut sample (S1 measured the splatter of such a switch at −79 dB, accepted).
+  AP8's seam is `design` and the swap point, where a per-sample glide would go. `reset()`
+  zeroes every state and forgets the design. Two channels are not run in `SIMD2` lanes (untried
+  in S1; not taken). One stage holds the EQ then the hum, AU-3's order.
+- **AU-31 — `audio.eq`: named slots, two shelves and three bells.** `{high_pass, low_shelf,
+  band_1, band_2, band_3, high_shelf, low_pass, bypass}`, each slot null (absent, off) or an
+  object: a pass `{frequency, slope}` (Hz 20…20 000; 12 or 24 dB/octave; high-pass default
+  `{80, 12}`, low-pass `{12000, 12}`), a shelf `{frequency, gain_db}` (gain −24…24 dB; low
+  `{100, 0}`, high `{8000, 0}`), a bell `{frequency, gain_db, q}` (Q 0.1…10; `{1000, 0, 1}`).
+  Named slots rather than a list, because `AudioProps` stays `Copy` (the plan evaluates it per
+  sample point) and a patch merges per slot. Three bells because the voice's three moves each
+  get one — low-mid mud near 300 Hz, a boxy 1 kHz, presence near 4 kHz — beside the two
+  shelves; the worst case of 17 sections costs about 17 × 7.2 µs per 1024 stereo frames (S1),
+  under 1 % of real time. A 12 dB/octave slope is one Butterworth section (Q 0.7071), 24 is two
+  (Q 0.5412 and 1.3066) — never two stacked Q 0.7071 sections, which make a Linkwitz-Riley
+  slope (−6 dB at the corner). Shelves are RBJ with S = 1. A shelf or bell at exactly 0 dB is
+  not designed, and no section at or above 0.49·fs is designed. `bypass` keeps the settings
+  and silences them.
+- **AU-32 — Three presets, each writing only its own slot (and `bypass: false`), so they
+  combine.** Rumble Cut: `high_pass {80, 24}` (survey §2: 80 Hz takes about 1 dB off the
+  owner's pause noise; Premiere's Reduce Rumble cuts "below about 80 Hz", survey §3). De-mud:
+  `band_1 {300, −3, 1.0}` (survey §2: 78 % of the pause noise lies below 300 Hz, the voice
+  band's lower edge). Presence: `band_3 {4000, +3, 1.0}` (the voice band's upper edge, below the
+  5–9 kHz sibilance band). The frequencies are the survey's; the ±3 dB gains are not measured,
+  and manual check SE-29 judges them. The presets are the inspector's only; the catalog's prose
+  gives an agent the values.
+- **AU-33 — `audio.hum`: a comb of depth-scaled RBJ peaking cuts.** `{frequency, depth_db,
+  harmonics}`: mains 50 or 60 Hz (default 60), depth 6…60 dB (30), harmonics 1…8 (4). Harmonic
+  k is an RBJ peaking cut of −`depth_db` at k·f0 with Q = 10·k / A, where A =
+  10^(−depth_db/40). The RBJ cut's pole damping is 1/(A·Q), so dividing by A holds every
+  section's pole bandwidth at f0/10 at any depth, and scaling by k holds it constant across the
+  harmonics, so an upper harmonic cuts no more of the voice than the fundamental. Plain
+  Q = 10·k is not taken: cascaded, its skirts widen with depth and overlap — 60 Hz × 4 at 30 dB
+  reads −30.18…−30.90 dB at the harmonics and −2.6…−2.8 dB between them, and 50 Hz × 8 at 48 dB
+  reads −49.3…−54.9 dB and −11.9…−14.9 dB between, inside the voice's fundamental range. With
+  the scaled Q the cascade reads −depth −0.00…−0.03 dB at every harmonic and −0.10 dB midway
+  between, for both. A harmonic at or above 0.49·fs is not designed.
+- **AU-34 — `audio.channels`, the chain's head.** `both` (the default, not written), `left`,
+  `right` or `swapped`. On two or more channels `left` copies channel 0 into every channel,
+  `right` channel 1, and `swapped` exchanges 0 and 1; a one-channel (mono) track ignores it, as
+  it ignores pan. The clip chain's order, after AU-54's isolation crossfade, is channels → EQ
+  and hum → noise reduction → compressor → mono fold → pan → an enclosing nest's fold →
+  limiter. On a noise-reduced track the head stages see samples 6,400 ticks (SY-25's lead)
+  ahead of what the stages after the reducer see, so the tap looks the head's clip up at
+  `t + lookupLead + headLead` and splits a run at a cut of either lookup; a track with no noise
+  reduction has no head lead.
+- **AU-35 — What a reading counts, amended (AU-11).** On stereo media the 2×2 matrix is pan ·
+  fold · pick: the channel pick counts, before the base mono fold and pan. EQ and hum are not
+  counted, as noise reduction and the compressor are not. Peak Normalize keeps the maximum over
+  the channels (an upper bound, as it is for pan).
+- **AU-36 — The drawn curve is Swift's, from the stage's own design.**
+  `AudioEQDesign.responseDB` evaluates the same `design` the stage runs, at 48 kHz (every
+  composition audio track plays at 48 kHz, SY-23); the core does no sample work (spec §7), and
+  one function means the drawn curve IS the stage's coefficients. 256 log-spaced points from
+  20 Hz to 20 kHz, the EQ and the hum together; dimmed when bypassed; nothing drawn for a mixed
+  selection.
+- **AU-37 — Format 32, base-only, no op.** (31 went to AP5's voice isolation, which landed
+  first.) `audio.eq` and `audio.hum` are written only when set (`{}` stores the slot's
+  defaults, `null` clears a slot or the group), `audio.channels` only when not `both`, so a project without them writes the text it did and
+  there is no migration step; the bump is so an older build refuses the file rather than
+  dropping them on save. All three are base-only (`structural(audio:)`): an action's end is
+  clamped (frequencies and gains to their ranges, a slope to 24 from 18 up else 12, the mains to
+  60 from 55 up else 50, harmonics to 1…8) and the tap ignores it. A nest clip's three reach
+  nothing, as its compressor does. `paste_attributes` carries them whole through `check_audio`.
+  No op, tool, FFI or op-table change: `set_audio` takes the three keys.
+- **AU-38 — The sections, in signal order.** The Sound sub-tab reads Volume, Fades, Ducking,
+  Voice Isolation (AU-56), **Channels** (a popup: Both, Left Only, Right Only, Swap Left and
+  Right; the summary its word), **EQ** (the drawn curve; Bypass; the three Presets buttons; per slot a checkbox writing
+  that slot's default — bands 1, 2 and 3 at 300, 1000 and 4000 Hz — then Frequency (a field in
+  Hz with quick picks), Gain (dB, −24…24, quick −6, −3, 0, 3, 6), Q (0.1…10, quick 0.5, 0.7, 1,
+  2, 4) and a Slope popup (12 or 24 dB/oct); the summary "off", "bypassed" or "N on"; Reset
+  clears `eq`), **Hum** (Remove hum, writing the defaults; a Mains popup 50 or 60 Hz; Depth dB
+  6…60, quick 12, 24, 30, 48; Harmonics 1…8, quick 1, 2, 4, 8; the summary "60 Hz · 4" or
+  "off"), Noise Reduction, Compressor, Mix, Limiter. Each control writes a whole `EqProps` or
+  `HumProps`, the compressor's pattern.
+- **AU-39 — The proof.** `eq_probe.py`'s rows Q1–Q11 over the DSP, the curve and the chain, with
+  mutants M1–M10 each killed by its named row and M11 (the patch template without `hum`) by
+  hand against `core/tests/audio_eq.rs`; `eq_proof.py`'s rows E1–E8 over MCP and exports; how
+  the presets, the notch and a pick sound on the owner's voice is manual check SE-29.
+
 AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded before its code.
 
 - **AU-50 — `audio.isolation` 0…1, 0 off, written only when not 0, format 31.** (30 went to

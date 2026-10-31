@@ -272,7 +272,7 @@ final class CaptureTap {
     var callbacks = 0
 
     init(track: AudioTrackDSP) {
-        context = AudioTapContext(track: track, meter: nil)
+        context = AudioTapContext(track: track, isolation: nil, meter: nil)
         samples = .allocate(capacity: capacity)
     }
     deinit { samples.deallocate() }

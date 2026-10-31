@@ -43,6 +43,11 @@ struct AudioTrackDSP: Equatable {
     /// the noise reducer belong to `t + lookupLead`, and the limiter's delay
     /// brings them back to `t` (AU-23).
     let lookupLead: Ticks
+    /// How much further ahead the HEAD stages (the channel pick, the EQ and
+    /// hum) look their clip up: `AudioShift.noiseReductionLead` on a
+    /// noise-reduced track, else 0. They run before the reducer, whose delay
+    /// is what brings the samples back to `t + lookupLead` (AU-34).
+    let headLead: Ticks
 
     init(segments: [PlanSegment], parameters: AudioDSPParameters) {
         var spans: [AudioDSPSpan] = []
@@ -59,6 +64,7 @@ struct AudioTrackDSP: Equatable {
         usesNoiseReduction = spans.contains { $0.dsp.noiseReduction > 0 }
         usesLimiter = spans.contains { $0.dsp.limiter != nil }
         lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0
+        headLead = usesNoiseReduction ? CompositionBuilder.AudioShift.noiseReductionLead : 0
     }
 
     private init() {
@@ -67,6 +73,7 @@ struct AudioTrackDSP: Equatable {
         usesNoiseReduction = false
         usesLimiter = false
         lookupLead = 0
+        headLead = 0
     }
 
     /// A track that asks for no processing at all. What a METERING-only tap is
@@ -115,7 +122,8 @@ struct AudioDSPParameters: Equatable {
     /// everything within, and folding twice is folding once.
     ///
     /// **The nest clip's other three do NOT travel, and two of them cannot**
-    /// (nor does its limiter, AU-21, for the compressor's reason).
+    /// (nor does its limiter, AU-21, for the compressor's reason, nor its
+    /// channel pick, EQ and hum, AU-37).
     /// The compressor and the noise reducer are not linear, so running either
     /// on each contributor is a different sound from running it on the mix —
     /// bus compression is the whole reason a bus has a compressor — and the
@@ -169,7 +177,10 @@ struct AudioDSPParameters: Equatable {
                         AudioLimiterSettings(
                             ceilingDb: $0.ceilingDb, volume: audio.volume,
                             releaseSeconds: AudioDSPParameters.seconds($0.release))
-                    })
+                    },
+                    // The chain's head (AU-34, AU-30).
+                    channels: audio.channels,
+                    eq: AudioEQSettings(eq: audio.eq, hum: audio.hum))
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }

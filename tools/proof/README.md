@@ -25923,6 +25923,105 @@ Again at integration, where the format became 30 (on the merged tree, Release, a
 `export_offset_proof.py --only E4,E22,E44,E45` 4/4; `phase5_proof.py` 92/92;
 `limiter_probe.py` 9/9, L8 gap 0.090 LU.
 
+## Road map "audio" AP3 — EQ, hum removal and channel selection (`eq_probe.py` Q1–Q11, `eq_proof.py` E1–E8; ten mutants and one by hand; `core/tests/audio_eq.rs`, `schema_v32.rs`; spec §11 AU-30..AU-39)
+
+Two new instruments. **`eq_probe.py`** compiles `eq_probe.swift` with
+`app/Sources` through `swift_build.build(optimize=True)` (a failed build is a
+scored failure) and runs the product's `AudioEQDesign`, `AudioEQStage`,
+`AudioDSPChain`, `AudioTapContext`, schedule, `AudioEQCurveView.response` and
+`ClipLoudness.ChannelMatrix`. Its fixture, `work/eq-probe/fixtures/stereo.wav`,
+is the owner's recording's first 12 s on the left with a −40 dBFS 60 Hz hum
+under it and the right channel silent (24-bit, 48 kHz). Q1's responses are
+written as JSON and scored by the script's OWN numpy RBJ cookbook
+(`eq_probe.oracle(kind, params, fs)` and `magnitude_db`, which `eq_proof.py`
+imports): Butterworth section Qs (1/√2; 1/(2 cos π/8) and 1/(2 cos 3π/8)), RBJ
+shelves at S = 1, and the hum's Q = 10·k / A, A = 10^(−depth/40) (AU-33).
+
+| Row | What it holds |
+|---|---|
+| Q1 | every slot type (high-pass 12/24, low-pass 12/24, both shelves, the three bells) and each hum harmonic (60 × 8 at 30 dB, 50 × 8 at 48, 60 × 3 at 12): the designed positions are the oracle's and each one's \|H\| at 20 log-spaced frequencies (20 Hz–20 kHz, plus each k·f0 and k·f0 ± f0/20) within 0.001 dB of it, at 48 and 44.1 kHz; and `responseDB`'s whole hum cascade at 48 kHz, 60 × 4 at 30 dB and 50 × 8 at 48 dB, −depth ±0.1 dB at every k·f0 and within 0.3 dB of 0 midway between harmonics |
+| Q2 | HP and LP at 12 and 24 read −3.010 dB (±0.0005) at the corner, and the bilinear Butterworth of their order (`1/(1 + r^2n)`, prewarped) within 0.01 dB an octave beyond |
+| Q3 | 512, 4096 and irregular blocks byte-identical through `AudioDSPChain`, the clip changing every 12,000 samples between an EQ with hum, none, a second EQ swapped, the second left-picked and the first right-picked |
+| Q4 | after `reset()` a used two-channel stage gives a fresh stage's bytes on both channels |
+| Q5 | a flat shelf and bell, a bypassed EQ and no EQ design nothing (`AudioEQSettings` nil); a project whose clip carries a flat EQ and `both` is inert in `AudioDSPParameters`; the chain with inert settings and the stage with nil settings leave every byte |
+| Q6 | left, right and swapped sample-identical to their source channels; mono with left equals L in both; a one-channel chain with a right pick untouched |
+| Q7 | `AudioEQCurveView.response` against the stage's steady-state response (a 4 s sine, the last second's least-squares amplitude) at 16 of the 256 points, every slot and the hum on: within 0.01 dB |
+| Q8 | `ClipLoudness.reading` of the stereo fixture (its loudness cache built by `MediaImporter.loudness`): left reads both + 3.01 LU (±0.01), swapped reads both |
+| Q9 | the product's `AudioTapContext` (left pick, EQ, hum) under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same right-channel samples over the first 188,416 frames (limiter_probe L7's method), and sound there, which only the pick puts |
+| Q10 | µs per 1024 stereo frames with all 17 positions designed, best of 3 × 2000 runs, reported |
+| Q11 | `AudioTapContext` on a track of right-only, left-only and a noise-reduced clip, fed a left tone a block at a time: the right channel's onset at the cut ±1 ms (the head looked up `headLead` ahead), not 10.7 ms late |
+
+`--mutants` runs ten, each a replacement (two for M6) in a copied `app/Sources`;
+one by hand:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `butterworth-as-lr` | both 24 dB/oct sections at Q 1/√2 (Linkwitz-Riley) | Q1 or Q2 |
+| M2 `slope-ignored` | every pass one section | Q2 |
+| M3 `state-reset-each-run` | the stage zeroes its state at every run | Q3 |
+| M4 `reset-misses-a-channel` | `reset()` zeroes channel 0's state only | Q4 |
+| M5 `hum-constant-q` | the hum's Q not scaled by k (10 / A) | Q1 |
+| M6 `pick-after-fold` | the pick moved after the mono fold | Q6 |
+| M7 `head-lead-dropped` | the tap looks the head up at the tail's time | Q11 |
+| M8 `matrix-ignores-pick` | `ChannelMatrix` reads every clip as `both` | Q8 |
+| M9 `curve-at-44.1k` | the curve designed at 44.1 kHz | Q7 |
+| M10 `hum-q-not-depth-scaled` | the hum's Q = 10·k, not 10·k / A | Q1 |
+| M11 (by hand) | `patch.rs`'s audio template without `hum` | `core/tests/audio_eq.rs` |
+
+**`eq_proof.py <dir>/agent.sock`** drives an instance over MCP and measures
+each WAV export by least-squares amplitude per step against the dry export,
+compared with `eq_probe.oracle`. Its fixtures are 16-bit stereo WAVs under
+`work/fixtures/`: `eq-sweep.wav` (S1's 20 log-spaced tones, 1 s each, at
+0.25), `eq-hum60.wav` and `eq-hum50.wav` (each harmonic and k·f0 ± f0/20, 2 s
+each, so a 48 dB notch's ringing has decayed), `eq-pair.wav` (440 Hz with
+noise on the left, 1 kHz on the right), `eq-onset.wav` (1 s of a 1 kHz tone on
+the left only), `eq-voice-left.wav` (the owner's recording on the left only)
+and `eq-rode.wav`.
+
+| Row | What it holds |
+|---|---|
+| E1 | `set_audio`'s `eq`, `hum` and `channels` round-trip; each bound and an unknown key refused by name with nothing changed; `null` clears a slot and the groups, `both` is not written; `{eq: {high_pass: {}}}` stores `{80, 12}` |
+| E2 | the stepped sine through (a) HP24 + low shelf + three bells + high shelf + LP24 and (b) HP12 + LP12: each step ≥ −60 dB within ±0.1 dB of the analytic product |
+| E3 | hum 60 × 4 at 30 dB and 50 × 8 at 48 dB: −depth ±0.1 dB at each harmonic, and within ±0.1 dB of analytic at k·f0 ± f0/20 |
+| E4 | left, right and swapped exports sample-identical to the dry export's channels; mono with left both the left channel |
+| E5 | the voice-on-left file: `normalize_clip`'s `measured_lufs` with left = both + 3.01 (±0.05), and each normalised export at −16 ±0.5 LUFS by `phase5_proof.integrated` |
+| E6 | right-only then left-only abutting, noise reduction on a third clip: the tone's onset in the right channel at the cut ±1 ms |
+| E7 | the saved file at the header's version, the three keys on the set clip only and none before; set-then-cleared exports the same PCM bytes as never set |
+| E8 | reported: the owner's recording through Rumble Cut, De-mud and Presence — the pause floor (10th percentile of 50 ms RMS) and the octave bands 63 Hz–8 kHz, wet against dry |
+
+`clip_inspector2_probe.swift`'s T2 Sound list now names Channels, EQ, Hum and
+the Limiter (AP2 had left it at six). `screens.py` has the `eq` fixture and
+pins `audio.eq` open for 09b (and the AP1 Normalize keys, and three dev keys
+as not shown, which P2 had found unpinned).
+
+```sh
+cd core && cargo test --release --test audio_eq && cargo test --release --test schema_v32
+python3 tools/proof/eq_probe.py               # Q1–Q11
+python3 tools/proof/eq_probe.py --mutants     # M1–M10
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/eq_proof.py <dir>/agent.sock
+python3 tools/proof/screens.py --only 09b-clip-sound-eq
+```
+
+**The recorded run (2026-10-30, the lane):** `eq_probe.py` 11/11 (Q1 worst 0.000000 dB
+over 30 cases, the cascades −0.006…−0.034 dB at the harmonics and −0.096…−0.105 dB
+midway; Q7 worst 0.0000 dB; Q8 both −42.286, left −39.275 LUFS; Q9 188,416 samples
+equal; Q10 135.9 µs per 1024 stereo frames, 0.64 % of real time; Q11 the onset at
+sample 48,000) and `--mutants` 10/10, each killed by its named row; M11 by hand
+failed five of `audio_eq.rs`'s six tests. `eq_proof.py` 33/33 on Debug (E2 run on
+the Debug build: the stage keeps up at `-Onone`) and on Release after `make gate`
+(PASS, 448 s): E2 (a) within 0.0154 dB, (b) 0.0020 dB; E3 −0.005…−0.029 and
++0.003…−0.054 dB from −depth; E5 −43.09 and −40.08 LUFS measured (+3.010 LU), the
+exports at −15.87 and −15.96 LUFS; E6 the onset at sample 48,001 (+0.02 ms); E8 the
+three presets take the owner's pause floor from −64.30 to −66.65 dBFS (−2.34 dB),
+octave bands 63 Hz −2.68, 125 −1.11, 250 −2.34, 500 −1.50, 1 k −0.14, 2 k +0.86,
+4 k +2.51, 8 k +1.30 dB. On Release, `limiter_proof.py` 19/19,
+`loudness_normalize_proof.py` 37/37 (N6 −15.91 LUFS, −0.9998 / −0.9999 dBTP),
+`phase5_proof.py` 92/92 and `export_offset_proof.py --only E4,E22,E27,E44,E45`
+5/5; `limiter_probe.py` 9/9, `loudness_cache_probe.py` 11/11 and
+`clip_inspector2_proof.py` 33/33; `screens.py --only 09b-clip-sound-eq,09-clip-sound`
+7/7.
+
 ## Road map "audio" AP9 — split edits that keep sync, and Attach Audio (`ap9_split_edits_proof.py` A0–A9; `core/tests/link.rs`, `link_edges.rs`, `schema_v28.rs`; sixteen core mutants; spec §11 AU-90…AU-97)
 
 Detach Audio's two clips are a LINKED PAIR (`clips[].linked`, format 28):

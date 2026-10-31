@@ -352,8 +352,12 @@ use crate::model::{Canvas, Project};
 /// exactly the text it did and there is no migration step. The bump is so an
 /// older build refuses the file rather than playing the clip unisolated and
 /// dropping the key on save.
-/// Every number from 32 up, 1014 included, is newer than this build.
-pub const RC_FORMAT_VERSION: u32 = 31;
+///
+/// Version 32 is EQ, hum and channels (spec §11 AU-37): `audio.eq`,
+/// `audio.hum` (each written only when set) and `audio.channels` (only when
+/// not `both`); no migration. An older build would drop them on save.
+/// Every number from 33 up, 1014 included, is newer than this build.
+pub const RC_FORMAT_VERSION: u32 = 32;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;
