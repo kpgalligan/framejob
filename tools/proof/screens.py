@@ -92,10 +92,12 @@ DEFAULT_APP = str(proof_app.bundle())
 DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 
-# The three `none` menu items a screen may perform: grading GR3's view toggles
-# (spec §11 GR-4, GR-5), grading-2 G2-1's rename (GR-10) and G2-4's Show
-# Selection (GR-13), which persist nothing, so no instance's defaults move.
-VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:")
+# The four `none` menu items a screen may perform: grading GR3's view toggles
+# (spec §11 GR-4, GR-5), grading-2 G2-1's rename (GR-10), G2-4's Show
+# Selection (GR-13) and road map "audio" AP7's Loudness Meter (AU-75), which
+# persist nothing, so no instance's defaults move.
+VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:",
+                  "toggleLoudnessMeter:")
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")

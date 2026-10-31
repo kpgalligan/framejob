@@ -360,6 +360,97 @@ AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded
   rendered. An agent uses `set_audio {isolation}`: no new tool, and the render's status is not in
   `get_project`.
 
+AU-70…AU-78 are AP7's (live loudness and true-peak metering; survey A8), recorded before its
+code.
+
+- **AU-70 — The meter reads the TRUE mix, rebuilt from the taps off the audio thread.** Each tap,
+  after its chain, copies its block (pre-envelope) and first frame
+  (`round(time.value·rate/time.timescale)`; a buffer whose time is not numeric, the player's
+  silent pre-roll, is skipped) into its sink's `MixRing`, a single-producer ring that takes no
+  lock and allocates nothing. The consumer runs on the meter's existing 30 Hz main-thread timer
+  (no new `DispatchQueue` seam): it drains every ring, sums by frame index each track ×
+  `MediaPeaks.envelope(ramps, at: frame·600000/rate)` — a mono track at unity in both channels, a
+  track's first two channels only — and feeds the stereo sum to a `LoudnessMeter` at the taps'
+  rate. Frame f is summed once every track has delivered past it, except a track not sounding at
+  f (f's tick outside every one of its own `sounding` spans — a gap between clips as well as past
+  the last span; #65: the tap delivers nothing there) or more than `stallLag` (0.5 s) behind the
+  leading track; such a track is silence at f and is not waited on, and a frame it does deliver
+  after the sum has passed it is dropped. Frames a track delivers are summed as delivered. When
+  no track sounds at the reached frame the sum fills silence up to what has been delivered, and
+  with nothing delivered past it, it waits; that fill is never a `jump`, so a gap on one track or
+  on every track neither holds the sum up nor resets it, and a seek across a stretch where
+  nothing sounds is read as playing through it (its silence is below the absolute gate and does
+  not move I). Tracks reporting different rates are not measured. AVFoundation's ≤ 25 ms slew at
+  a volume step is not modelled (S3: ≤ 0.0067 LU).
+- **AU-71 — What it shows: momentary, short-term, integrated and the true-peak maximum.**
+  Momentary is the last completed 400 ms block, short-term the last 3 s (thirty 100 ms
+  sub-blocks), integrated BS.1770-4's two gates over everything measured since the last reset,
+  and the true peak the maximum since the reset (Annex 2 at 4×, which S1 found over-reads speech
+  by 0.14 dB). All four are `Loudness.swift`'s `LoudnessMeter`, made rate-generic by `KWeighting`
+  (moved into `Loudness.swift`): Tables 1–2 exactly at 48 kHz, libebur128's derivation at any
+  other rate in 8–192 kHz, the Annex 2 FIR at 4× the taps' rate. The export's 48 kHz arithmetic
+  is unchanged.
+- **AU-72 — It measures only at ×1, and says when it resets.** At any other rate the chunks are
+  discarded, M and S read "—", and I and TP hold. It resets on the panel's Reset and
+  `loudness_meter {reset}` (`manual`); on its own when a chunk starts more than `behindTolerance`
+  (1.0 s) before the frame the sum reached, or more than `aheadTolerance` (0.1 s) after it with
+  some track sounding somewhere in between (`jump`: a seek, a loop's wrap, a play from elsewhere);
+  and on a ring overrun (`overrun`). The rule is asked only of a chunk that MOVES its track —
+  continues (within the same tolerances) neither what the track delivered last nor what it
+  delivered to the measurement — once the chunks before it are summed. Measured in the player:
+  after a seek or a play from elsewhere each track first hands over a buffer or two of the old
+  position, not in step across tracks, so on a jump each track keeps what follows its own last
+  move, and a track that has not moved yet drops what continues its old stream until it moves (for
+  at most `stallLag` of frames); a move with no measurement running starts the measurement there
+  the same way, uncounted. A chunk within the tolerances continues the measurement with frames
+  before the reached frame dropped, so pause and continue and an edit's rebuild (new sinks, the
+  restore seek landing behind) neither reset nor count a frame twice. A change of the taps' rate
+  restarts the measurement as a `jump`. **A stop** (rate 0, `stopMetering` → `stop()`) drains and
+  drops what is still in the rings or pending, never summed; what the sum already reached stays
+  measured, and since the player renders ahead of the playhead that can be audio the stop left
+  unheard (0.38 s in L1's run). M, S, I and TP hold their last ×1 values, `measuring` goes false
+  and the panel is told. "—" for M and S is only while playing at another rate. The meter timer
+  runs in the run loop's `.common` modes, so menu tracking and live resize drain the rings and do
+  not overrun them. A new window starts empty.
+- **AU-73 — Pre-master.** The preview has no master stage (S3; the master limiter AP2's second part
+  adds is the export's alone, AU-22), so the meter reads the mix as the preview plays it — each
+  clip's own chain, its clip limiter (AU-20) included, since the capture follows the chain — before
+  the export's loudness setting, and the panel's footer says so. Running a master chain on the
+  rebuilt sum is a later phase's decision.
+- **AU-74 — The timeline bar's bars read the mix.** While the consumer is measuring (it summed
+  frames within `liveWindow`, 0.15 s), `Playback.meterReading()` answers the mix's sample peak
+  and RMS per channel over its last 100 ms; otherwise `LevelMeterTrack.mix` as before (#65
+  intact). This removes S3's up-to-3.85 dB over-read at ×1. The view's ballistics and
+  `LevelMeter.shared`'s claim rule are unchanged.
+- **AU-75 — Where it shows: View ▸ Loudness Meter.** ⌃⌘L, a checkmark, always enabled, after
+  Scopes: a 132 pt column at the preview pane's right edge, left of Scopes, full height, zero wide
+  and hidden when off (its width constraint at priority 999, as Scopes'). Per window; nothing
+  persists (GR-5's rule): no `UserDefaults` key.
+- **AU-76 — The column.** A 1 pt `DS.border` leading edge on `DS.chromeBackground`. Header:
+  "Loudness" (`DS.sans(11, .semibold)`, `DS.textStrong`) and a `GhostButton`
+  (`arrow.counterclockwise`, tooltip "Reset", action `resetLoudnessMeter:`). Body: a −48…0 LUFS
+  scale, linear, ticks every 6 LU labelled in `DS.mono(9)` `DS.textFaint`; two bars, M and S,
+  `DS.meterFill` on `DS.meterTrough`; the target as a 1 pt `DS.accent` line at
+  `NormalizeChoice.targetLUFS` (read at draw; −16 by default, AU-4, AU-15). Readouts: Momentary,
+  Short-term, Integrated and True peak max in `DS.sans(10)` `DS.textMuted`, values in
+  `DS.mono(11)` `DS.textStrong`, one decimal, U+2212, "LUFS"/"dBTP", "—" when there is none and
+  "−∞" for digital silence; the true peak in `DS.meterClip` above −1 dBTP. Footer, `DS.sans(10)`
+  `DS.textFaint`, wrapping: "The mix as the preview plays it, before the export's loudness
+  setting." (at ×1, paused or stopped) or, while playing at another rate, "Measured only at
+  normal speed." No animation: it redraws when the reading changes. Accessibility ids
+  `loudness.panel|momentary|short|integrated|truepeak|reset`.
+- **AU-77 — MCP: the dev tool `loudness_meter` only.** Reading the meter needs a playing preview,
+  which only the dev tool `play_preview` starts; an agent's loudness answers are the export's
+  report and AP1's per-clip readout. `loudness_meter {project?, reset?}` answers `{measuring,
+  rate, momentary_lufs, short_term_lufs, integrated_lufs, true_peak_dbtp, from_frame, to_frame,
+  sample_rate, resets, last_reset}`. The View item and Reset are view state, unmirrored (§7.9's
+  Preview Quality exemption).
+- **AU-78 — The proof.** `audio_ap7_proof.py`: the probe's rows T1–T16 (EBU Tech 3341 cases 1–5, 9
+  and 12, true-peak sines, 44.1 kHz, the mix against a reference sum, continuity, the stall,
+  overrun, rate, the bars, gaps) and eleven mutants, each anchoring a distinct branch AU-70, AU-72
+  or AU-74 adds (the sum, the continuity rules, the rate gate, the bars), killed by its named row;
+  L1–L4 over MCP against an export; SE-30 for what only a person can confirm.
+
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
 AP9, survey A10), recorded before its code.
 

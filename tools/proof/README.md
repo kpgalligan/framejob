@@ -26291,3 +26291,85 @@ the floor 14.9 dB lower, speech +0.14 dB broadband and every octave 63 Hz–8 kH
 I5 lag 0.000 with the old render pruned; I6 lag +0.007, floor 10.9 dB lower; I7 Keep pitch on's
 floor moved 0.00 dB and Keep pitch off sample for sample. `--mutants` 10/10 killed, each by its
 named row alone.
+
+## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T16, L1–L4; eleven mutants; spec §11 AU-70…AU-78)
+
+The live loudness meter (`LiveLoudness.swift`, `LiveLoudness+Sum.swift`) rebuilds the true mix on
+the main thread from each tap's `MixRing` (`LevelMeter.swift`) and measures it with the
+rate-generic `LoudnessMeter` (`Loudness.swift`). **`audio_ap7_proof.py --probe`** compiles
+`audio_ap7_probe.swift` as `main.swift` over `app/Sources` through `swift_build.build` (a failed
+build is a scored failure) and runs it: no app, no ffmpeg. Each signal is written into sinks'
+rings with `LevelMeterSink.capture` (the tap's own call) and `measure` as two or three tracks
+whose writes lead by 0, 2.7 and 13.4 ms (spike S3's per-track offsets), in chunks cycling
+1920/512/4096 frames, and `LiveLoudness.consume` runs at rate 1 after every cycle. A Tech 3341
+signal is split over three tracks at 0.5, 0.3 and 0.2 under unity envelopes.
+
+| Row | What it holds |
+|---|---|
+| T1 | Tech 3341 case 1 (20 s stereo 1 kHz at −23 dBFS): M, S and I −23.0 ±0.1 |
+| T2 | case 2 (−33 dBFS): M, S and I −33.0 ±0.1 |
+| T3–T5 | cases 3, 4 and 5 (the gates): I −23.0 ±0.1 |
+| T6 | case 9 (1.34 s at −20 / 1.66 s at −30, ×5): S −23.0 ±0.1 at every 100 ms read from 3 s |
+| T7 | case 12 (0.18 s at −20 / 0.22 s at −30, ×25): M −23.0 ±0.1 at every 100 ms read from 0.4 s |
+| T8 | true peak, cases 15–19: fs/4 at 0° and 45°, fs/6 at 60°, fs/8 at 67.5° (−6.02 dBFS), and fs/4 at 45° with every sample at 0 dBFS (+3.01 dBTP), each +0.2/−0.4 dB; each tone faded in over 20 ms (a sine switched on from silence rings the interpolator past its own peak); the rest of the 3 × 4 grid printed as `info` |
+| T9 | case 1 at 44.1 kHz (±0.1, and I within 0.02 LU of 48 kHz's) and fs/4 at 45° at 44.1 kHz |
+| T10 | the mix — a stereo tone under a 0.5 hold, mono noise under a 1 → 0.25 ramp, the tone again (correlated) under a 0 → 0.7 fade — against a fresh `LoudnessMeter` fed Σ env·x: \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.01 LU over exactly [0, 480000) |
+| T11 | a +0.5 s seek resets `jump`; a rebuild 0.3 s behind (new sinks) and a pause resumed 0.2 s behind neither reset nor double count (frames fed = to − from, I within 0.01 LU of the reference); a seek as the player delivers it — each track a buffer of the old position first, one track a second one after the other moved — resets exactly once, from the new frame |
+| T12 | a stalled track holds the sum at its last frame while the leader is under 0.5 s ahead, then is not waited on; a track past its last span is never waited on |
+| T13 | 3 s unread overruns the ring: resets `overrun`, the measurement goes on |
+| T14 | at ×2 nothing is measured (M, S nil; I, TP and `to_frame` held; `measuring` false); `stop()` holds M, S, I and TP, fires `onReading` once and empties the rings; a resume at ×1 from the reached frame continues with no reset |
+| T15 | the bars: two correlated 0.5 sines read peak 1.0; a sine and its inverse read 0.0 where the per-track sum reads 1.0 |
+| T16 | a 0.3 s and a 1 s gap between two clips on one track, and on one of two tracks: no reset, frames fed = to − from, I within 0.01 LU of the reference with silence in the gap |
+
+`--mutants` runs eleven, each a replacement in a copied `app/Sources` (its anchor asserted once),
+scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `mono-in-one-channel` | a mono track adds nothing to the right channel | T10 |
+| `envelope-dropped` | every gain 1 | T10 |
+| `summed-by-arrival` | each track's pending chunks laid end to end from the reached frame | T10 |
+| `jump-does-not-reset` | a jump is not reset | T11 |
+| `frames-before-reached-counted` | a chunk behind the reached frame rewinds the sum | T11 |
+| `stall-guard-removed` | a stalled track is always waited on | T12 |
+| `not-sounding-only-past-last-span` | a track's spans merged into one, so a gap counts as sounding | T16 |
+| `measured-at-any-rate` | the ×1 gate lets any forward rate through | T14 |
+| `short-term-over-4` | short-term over 4 sub-blocks | T6 |
+| `tables-at-every-rate` | Tables 1–2 used at every rate | T9 |
+| `bars-from-per-track-sum` | the bars are `LevelMeterTrack.mix` | T15 |
+
+**With a socket** (`python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock`, an instance
+`proof_app.py launch` started), L1–L4 drive the real player through `play_preview` and the dev
+tool `loudness_meter`. The project: a 10 s stereo tone (440/660 Hz, a 1 s fade-in) on track 1,
+mono pink noise on track 2 as two clips with a 0.4 s gap at 3.0–3.4 s (ffmpeg fixtures under
+`work/audio-ap7/`). L1 resets, plays 8 s at ×1 from 0, exports `audio_wav` and measures the
+export over `[from_frame, to_frame)` with `phase5_proof.py`'s BS.1770-4 (K-weighting from rest at
+`from_frame`, sub-blocks counted from there): \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.1 LU, \|ΔTP\| ≤ 0.2 dB,
+`resets` unchanged by the gap, `last_reset` `manual`, `measuring` false after the play. L2
+resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`. L3 resets and plays 2 s twice
+from 1 s: no reset, `from_frame` kept. L4: the tool listed with `reset` described, and the
+instance's log holds no `Frame Job: ` line. Needs ffmpeg.
+
+```sh
+python3 tools/proof/audio_ap7_proof.py --probe             # T1–T16
+python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 11 mutants
+python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock    # L1–L4
+```
+
+**What the player taught the instrument (Debug, 2026-10-30).** The first L2/L3 runs failed: a
+seek mid-play reset five times and a play after a paused seek once. The chunk log showed the
+player hands each track 4,096-frame buffers, and after a seek or a play from elsewhere first one
+or two buffers of the OLD position (sometimes the same buffer twice), not in step across tracks;
+the second track's stale buffer arrived after the first had moved. AU-72's admission now asks
+the reset rule only of a chunk that moves its track, and a track that has not moved after a jump
+drops its old stream until it does; T11's third case is that shape.
+
+**The recorded run (2026-10-30):** `--probe` 16/16 (case 1 −22.9933, cases 3–5 −23.0139,
+−23.0139, −22.9787, case 9 worst 0.0137 LU, case 12 worst 0.0396 LU, true peaks −6.0206,
+−5.9759, −6.3160, −6.0279 and +3.0550 dBTP, 44.1 kHz −22.9905; T10 |Δ| 0.0000); `--mutants`
+11/11 killed, each by its named row; L1–L4 4/4 on Release (I −13.6294 against the export's
+−13.6297, M, S and TP equal to four decimals). On the integration tree, with the host's default
+output AirPods Max over Bluetooth, `--probe` 16/16 and L1 and L4 passed (|ΔI| 0.0004), and L2 and
+L3 failed with extra `jump` resets — the same on the lane's own Release build — so a Bluetooth
+output is a host state these two rows fail on, not one they skip (`designs/audio.md`, AP7's
+record).

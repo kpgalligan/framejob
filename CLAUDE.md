@@ -330,7 +330,10 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 "Seeing the chrome" below; `play_preview`, which plays a window's preview
 for a while and answers the frames composed (#127, spec §11 G-36);
 `graphic_memory`, which answers the graphic rasters' memory budget, what is
-held and kept, and simulates memory pressure (G-37); and
+held and kept, and simulates memory pressure (G-37); `loudness_meter`, which
+answers a window's live loudness meter (momentary, short-term, integrated,
+true peak, the frames measured and its resets) and resets it (road map
+"audio" AP7, AU-77); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

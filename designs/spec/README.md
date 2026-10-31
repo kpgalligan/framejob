@@ -19,14 +19,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 |---|---|---|
 | [`01-what-this-is.md`](01-what-this-is.md) | 47 | The product in one page, its opening flow, and its non-goals. |
 | [`02-six-ideas.md`](02-six-ideas.md) | 26 | The six ideas the model is built on, and why it stays simple. |
-| [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
+| [`03-window-layout.md`](03-window-layout.md) | 71 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 171 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 141 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
 | [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 457 | The Clip tab's sections: every video, audio, text and shape section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 228 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
-| [`04.4-timeline.md`](04.4-timeline.md) | 234 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
+| [`04.4-timeline.md`](04.4-timeline.md) | 241 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
 | [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 391 | The project JSON schema (format version 32): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
@@ -44,7 +44,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 196 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 242 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 68 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 69 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 326 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 49 | What playback does after every edit: rebuild or refresh. |
@@ -52,13 +52,13 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.8-export.md`](07.8-export.md) | 658 | Export: writers, formats, loudness, the queue, the wait for ramp audio and isolated voice. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 501 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 160 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
-| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 358 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
+| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 372 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`, `loudness_meter`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 46 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, and its answer. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 120 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 208 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 211 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 15410 in 34 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 15510 in 34 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

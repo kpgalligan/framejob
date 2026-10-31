@@ -15,10 +15,15 @@ import Foundation
 /// constant below is quoted from Recommendation ITU-R BS.1770-4 (10/2015)
 /// with its table, and the coefficients are for a **48 kHz** sample rate —
 /// the only rate the standard publishes them at, and the rate
-/// `ExportWriter.decodedAudioSettings` pins the export mix to. That is why
-/// `LoudnessMeter.init` REFUSES any other rate rather than filtering with
-/// the wrong numbers: `AudioTapContext.prepare` is the precedent for
-/// checking a format instead of assuming it.
+/// `ExportWriter.decodedAudioSettings` pins the export mix to. At any other
+/// rate in `LoudnessMeter.rateRange` the K-weighting is `KWeighting`'s,
+/// derived from the same analog prototype (road map "audio" AP7, spec §11
+/// AU-71), because the live meter measures at whatever rate the player's
+/// taps run; the export still measures at 48 kHz, where the tables are used
+/// verbatim and the arithmetic is the one this header measures. A rate
+/// outside the range, like a channel count outside 1…2, is refused rather
+/// than filtered: `AudioTapContext.prepare` is the precedent for checking a
+/// format instead of assuming it.
 ///
 /// The measurement chain is:
 ///
@@ -132,8 +137,15 @@ struct LoudnessReport: Equatable {
 final class LoudnessMeter {
 
     /// The rate the coefficient tables are published at, and the rate the
-    /// export mix is decoded at. Not a default: `init` refuses anything else.
+    /// export mix is decoded at; `KWeighting` uses the tables only here.
     static let requiredSampleRate: Double = 48000
+
+    /// The rates `init` accepts (spec §11 AU-71): the live meter's taps run
+    /// at the output's rate, not the tables'.
+    static let rateRange: ClosedRange<Double> = 8000...192000
+
+    /// Short-term loudness's window in 100 ms sub-blocks: 3 s (EBU R 128).
+    static let shortTermSubBlocks = 30
 
     /// Every measurement window BS.1770-4 § 2 names, in seconds.
     ///
@@ -279,6 +291,10 @@ final class LoudnessMeter {
     /// The last four sub-block sums, oldest overwritten.
     private var ring: [Double]
     private var ringWrites = 0
+    /// The last `shortTermSubBlocks` sub-block sums, for `shortTermLUFS`.
+    private var shortRing: [Double]
+    /// The two K-weighting sections at this meter's rate (`KWeighting`).
+    private let stages: (Biquad, Biquad)
     /// One `Σᵢ Gᵢ·zᵢ` per completed 400 ms block. 100 ms apart, so ten a
     /// second — 36 000 doubles for an hour of programme, which is why the
     /// two-sweep gating can keep them all.
@@ -287,22 +303,24 @@ final class LoudnessMeter {
     private var truePeakLinear: Double = 0
     private var samplePeakLinear: Double = 0
 
-    /// nil for a rate the coefficients are not published at, or a channel
-    /// count this build cannot weight.
+    /// nil for a rate outside `rateRange`, or a channel count this build
+    /// cannot weight.
     ///
     /// **Both refusals are assertions, not conveniences.** The K-weighting
-    /// table is 48 kHz only, and filtering at another rate would answer a
-    /// number that looks right and is not. And BS.1770-4's Table 3 weights
+    /// is the standard's tables at 48 kHz and `KWeighting`'s derivation at
+    /// another rate in the range; outside it there is no weighting this
+    /// meter vouches for. And BS.1770-4's Table 3 weights
     /// the surround channels 1.41 and excludes the LFE, which needs a
     /// channel LAYOUT this meter is not handed; mono and stereo are the two
     /// cases whose weights are all 1.0 and therefore need no layout, and the
     /// export mix is stereo by `ExportWriter.decodedAudioSettings`. A
     /// surround measurement is a feature, not a widening of this guard.
     init?(sampleRate: Double, channelCount: Int) {
-        guard sampleRate == Self.requiredSampleRate, (1...2).contains(channelCount) else {
+        guard Self.rateRange.contains(sampleRate), (1...2).contains(channelCount) else {
             return nil
         }
         self.channelCount = channelCount
+        stages = KWeighting.coefficients(sampleRate: sampleRate)
         hopFrames = Int((sampleRate * Self.hopSeconds).rounded())
         blockFrames = hopFrames * Self.subBlocksPerBlock
         guard hopFrames > Self.peakTaps else { return nil }
@@ -324,6 +342,7 @@ final class LoudnessMeter {
         filterState = .allocate(capacity: channelCount * 8)
         filterState.initialize(repeating: 0, count: channelCount * 8)
         ring = Array(repeating: 0, count: Self.subBlocksPerBlock)
+        shortRing = Array(repeating: 0, count: Self.shortTermSubBlocks)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
@@ -426,7 +445,7 @@ final class LoudnessMeter {
     /// The two-stage K-weighting, in place, with this channel's state.
     private func weight(_ samples: UnsafeMutablePointer<Double>, frames: Int, channel: Int) {
         let base = filterState + channel * 8
-        for (index, section) in [Self.stage1, Self.stage2].enumerated() {
+        for (index, section) in [stages.0, stages.1].enumerated() {
             let state = base + index * 4
             var x1 = state[0], x2 = state[1], y1 = state[2], y2 = state[3]
             for n in 0..<frames {
@@ -448,6 +467,7 @@ final class LoudnessMeter {
 
     private func closeSubBlock() {
         ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum
+        shortRing[ringWrites % Self.shortTermSubBlocks] = subBlockSum
         ringWrites += 1
         subBlockSum = 0
         subBlockFilled = 0
@@ -482,14 +502,32 @@ final class LoudnessMeter {
             samplePeakDBFS: Self.decibels(samplePeakLinear))
     }
 
+    /// The momentary loudness (EBU R 128): the last completed 400 ms block,
+    /// nil before one; −∞ for a silent block.
+    var momentaryLUFS: Double? {
+        blocks.last.map(Self.loudness)
+    }
+
+    /// The short-term loudness (EBU R 128): the last `shortTermSubBlocks`
+    /// sub-blocks (3 s), ungated; nil before that many have closed.
+    var shortTermLUFS: Double? {
+        guard ringWrites >= Self.shortTermSubBlocks else { return nil }
+        return Self.loudness(
+            shortRing.reduce(0, +) / Double(hopFrames * Self.shortTermSubBlocks))
+    }
+
+    private func integrated() -> Double? {
+        Self.gatedLoudness(blocks)
+    }
+
     /// BS.1770-4 equations (5)–(7): the absolute gate, then the relative one,
-    /// applied ONCE.
+    /// applied ONCE, over `blocks`' mean squares.
     ///
     /// The mean is over the LINEAR mean squares, never over the block
     /// loudnesses. Both gates are expressed in dB, which invites averaging
     /// dB; the gates only SELECT blocks, and the answer is the loudness of
     /// the survivors' linear mean.
-    private func integrated() -> Double? {
+    static func gatedLoudness(_ blocks: [Double]) -> Double? {
         let gated = blocks.filter { $0 > 0 && Self.loudness($0) > Self.absoluteGate }
         guard !gated.isEmpty else { return nil }
         let threshold = Self.loudness(gated.reduce(0, +) / Double(gated.count))
@@ -507,5 +545,38 @@ final class LoudnessMeter {
 
     private static func decibels(_ linear: Double) -> Double {
         linear > 0 ? 20 * log10(linear) : -.infinity
+    }
+}
+
+/// BS.1770-4's K-weighting at a rate. Tables 1 and 2 at exactly 48 kHz, the
+/// standard's own numbers (`LoudnessMeter.stage1`/`stage2`); at any other
+/// rate the two sections derived from their analog prototype through the
+/// bilinear transform, libebur128's derivation, which ffmpeg 9 uses too
+/// (AP0's spike S4: within 0.005 LU of the 48 kHz path at 44.1 kHz).
+enum KWeighting {
+    static func coefficients(sampleRate: Double) -> (LoudnessMeter.Biquad, LoudnessMeter.Biquad) {
+        if sampleRate == LoudnessMeter.requiredSampleRate {
+            return (LoudnessMeter.stage1, LoudnessMeter.stage2)
+        }
+        // The high shelf, +4 dB above about 1.7 kHz.
+        var f0 = 1681.974450955533
+        let gain = 3.999843853973347
+        var q = 0.7071752369554196
+        var k = tan(Double.pi * f0 / sampleRate)
+        let vh = pow(10.0, gain / 20.0)
+        let vb = pow(vh, 0.4996667741545416)
+        let a0 = 1.0 + k / q + k * k
+        let shelf = LoudnessMeter.Biquad(
+            b0: (vh + vb * k / q + k * k) / a0, b1: 2.0 * (k * k - vh) / a0,
+            b2: (vh - vb * k / q + k * k) / a0,
+            a1: 2.0 * (k * k - 1.0) / a0, a2: (1.0 - k / q + k * k) / a0)
+        // The RLB high-pass at about 38 Hz.
+        f0 = 38.13547087602444
+        q = 0.5003270373238773
+        k = tan(Double.pi * f0 / sampleRate)
+        let d = 1.0 + k / q + k * k
+        let highPass = LoudnessMeter.Biquad(
+            b0: 1, b1: -2, b2: 1, a1: 2.0 * (k * k - 1.0) / d, a2: (1.0 - k / q + k * k) / d)
+        return (shelf, highPass)
     }
 }

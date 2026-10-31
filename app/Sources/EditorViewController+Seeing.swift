@@ -49,8 +49,8 @@ extension EditorViewController {
 
     var sdrVersionTag: PreviewTagView? { previewTag(.sdrVersion) }
 
-    /// The panel at the pane's right edge, the canvas's trailing edge pinned
-    /// to its leading one, and the tags in the void's top-left corner. Called
+    /// The panel at the pane's right edge, the loudness column between it
+    /// and the canvas, and the tags in the void's top-left corner. Called
     /// once, from `installCanvas`. A slot the panel reveals or re-picks asks
     /// for a frame through `refreshSeeing`.
     func installSeeing(beside canvas: PreviewCanvasView) {
@@ -69,10 +69,12 @@ extension EditorViewController {
             panel.topAnchor.constraint(equalTo: canvasContainer.topAnchor),
             panel.bottomAnchor.constraint(equalTo: canvasContainer.bottomAnchor),
             panel.trailingAnchor.constraint(equalTo: canvasContainer.trailingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: panel.leadingAnchor),
             tag.topAnchor.constraint(equalTo: canvasContainer.topAnchor, constant: 4),
             tag.leadingAnchor.constraint(equalTo: canvasContainer.leadingAnchor, constant: 8),
         ])
+        // The canvas's trailing edge is the loudness column's leading one, and
+        // the column's trailing edge the panel's (spec §11 AU-75).
+        installLoudnessPanel(between: canvas, and: panel)
     }
 
     // MARK: - Commands

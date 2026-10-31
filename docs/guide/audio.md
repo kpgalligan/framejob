@@ -390,13 +390,31 @@ The level meter is in the timeline bar, just left of the zoom controls. While th
 - **A peak-hold mark** that stays at the highest recent level for about 1.2 seconds and then falls.
 - **A clip cell** at the right end of each row. It lights for 2 seconds whenever a sample reaches full scale.
 
-The meter includes everything that shapes what you hear: each clip's volume, fades, ducking, mute and solo, and the compressor and other effects. When playback stops, the bars fall back to the floor. If two projects are open, the meter follows the one that is playing. On a very narrow window there isn't room for the meter, so it is hidden.
+The meter includes everything that shapes what you hear: each clip's volume, fades, ducking, mute and solo, and the compressor and other effects. At normal speed it shows the mix itself, so two tracks playing the same sound read as one louder sound, and a sound and its inverse read as silence. At other speeds it adds up each track's level, which can read a little higher than the mix. When playback stops, the bars fall back to the floor. If two projects are open, the meter follows the one that is playing. On a very narrow window there isn't room for the meter, so it is hidden.
 
 The screen recorder panel has its own meter for the microphone. See [Screen recording](screen-recording.md).
 
+## Live loudness
+
+Choose **View ▸ Loudness Meter** (⌃⌘L) to show a column at the right of the preview, left of the scopes. While the preview plays at normal speed, it measures the mix you hear, the way loudness standards (EBU R 128, ITU-R BS.1770) do:
+
+- **Two bars**, M and S, on a −48 to 0 LUFS scale. A thin line marks the Normalize target (−16 LUFS unless you changed it).
+- **Momentary**: the last 0.4 seconds.
+- **Short-term**: the last 3 seconds.
+- **Integrated**: everything measured since the last reset, with quiet passages left out as the standard says.
+- **True peak max**: the highest true peak since the last reset. It turns coral above −1 dBTP.
+
+Click the **Reset** button at the top of the column to start measuring again. The meter also starts again on its own when you jump to another place: a seek, the loop going round, or playing from somewhere else. Pausing and playing on doesn't reset it, and nor does an edit, a gap between clips or holding a menu open. When playback stops, the figures stay where they were.
+
+The meter measures only at normal speed. At any other speed, Momentary and Short-term show "—" and the column says "Measured only at normal speed."; Integrated and True peak max keep their values. A dash means there isn't a figure yet; "−∞" means digital silence.
+
+The figures are the mix as the preview plays it, before the export's loudness setting, and the column says so. An export with a loudness target changes the level after this point, so its report can differ. The column is per window and turns off when you close the window.
+
+*Agents:* there is no product tool; an agent reads loudness from an export's report or a clip's loudness read-out.
+
 ## Loudness on export
 
-The level meter shows peaks, not loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
+The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
 
 ## Synchronize Audio
 
@@ -495,4 +513,5 @@ The screen recorder can record a microphone with the screen, or record the micro
 - The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
 - The limiter holds each clip on its own. Two limited clips that overlap (in a transition, or on two tracks) can add up past the ceiling, and so can a clip whose volume an action raises above its own Volume setting, a clip inside a nest whose volume is above 100 %, and the first moments after a hard cut from a louder clip on the same track, while the level settles. There is no limiter on the whole mix yet.
 - Loudness mode's result for a limited clip is a model of the limiter, read from the loudness analysis; the export lands within a few tenths of a LU of it (−15.9 LUFS for the −16 example above).
+- The Loudness Meter measures only at normal speed, and only the first two channels of a track with more. It doesn't follow the export's loudness setting.
 - Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

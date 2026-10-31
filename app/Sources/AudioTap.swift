@@ -75,9 +75,9 @@ final class AudioTapContext {
     private var positionFrame: Int64 = 0
     /// Where this track's levels are published, on a metering (playback)
     /// build; nil on every export and on every rendered frame. Written on the
-    /// audio thread with two relaxed atomic stores and nothing else — see
-    /// `LevelMeter.swift` for why it is not the `NSLock` the rest of the app
-    /// publishes across threads with.
+    /// audio thread with two relaxed atomic stores and a copy into its
+    /// lock-free `MixRing` — see `LevelMeter.swift` for why it is not the
+    /// `NSLock` the rest of the app publishes across threads with.
     private let meter: LevelMeterSink?
     private var chain: AudioDSPChain?
     /// The channel base pointers, refilled per buffer. A stored array so no
@@ -253,6 +253,17 @@ final class AudioTapContext {
             meter.measure(
                 UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
                 frames: frames)
+        }
+        // The live loudness meter's copy (spec §11 AU-70), placed by the
+        // buffer's own time on this tap's sample grid. A buffer with no
+        // usable time (the player's silent pre-roll) is not placed at all.
+        guard time.isNumeric, time.timescale > 0 else { return }
+        let first = Int64(
+            (Double(time.value) * Double(sampleRate) / Double(time.timescale)).rounded())
+        channels.withUnsafeMutableBufferPointer { pointers in
+            meter.capture(
+                UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                frames: frames, start: first, sampleRate: Int(sampleRate))
         }
     }
 

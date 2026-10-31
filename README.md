@@ -61,10 +61,11 @@ which also reduces room echo), channel selection, EQ with voice presets, hum
 removal, noise reduction, compressor, pan, mono and a true-peak limiter; each
 clip's loudness and true peak in the inspector, and Normalize to a loudness
 target (−16 LUFS at −1 dBTP by default, turning the
-limiter on when a clip's peaks need it) or to a peak, which matches clips;
-Synchronize Audio lines up a camera and a separate recorder by their sound,
-drift included. Detach Audio keeps the sound linked to its picture, so J- and
-L-cuts stay in sync through every edit, and Attach Audio puts it back.
+limiter on when a clip's peaks need it) or to a peak, which matches clips; a
+live loudness meter for the mix as it plays; Synchronize Audio lines up a
+camera and a separate recorder by their sound, drift included. Detach Audio
+keeps the sound linked to its picture, so J- and L-cuts stay in sync through
+every edit, and Attach Audio puts it back.
 → [Audio](docs/guide/audio.md)
 
 **Clean-up tools.** Remove Silences cuts dead air by voice or by level; Remove

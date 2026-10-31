@@ -43,6 +43,7 @@
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | ⌃⌘U | View ▸ Show Ungraded — the preview (and the Preview Window) as if no clip were graded, with an "Ungraded" tag (grading GR3, §11 GR-4). A checkmark toggle; view state, not persisted; never an export or Save Frame… |
 | ⌃⌘W | View ▸ Scopes — the scopes panel beside the preview, two slots each picking Waveform, Parade, Vectorscope or Histogram (grading GR3, grading-2 G2-1, §11 GR-5, GR-10). A checkmark toggle; view state, not persisted, and the picks have no item or key |
+| ⌃⌘L | View ▸ Loudness Meter — the live loudness column left of Scopes: momentary, short-term and integrated LUFS and the true-peak maximum of the mix as the preview plays it at ×1, with a Reset (road map "audio" AP7, §11 AU-75, AU-76). A checkmark toggle; view state, not persisted |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
@@ -162,7 +163,9 @@ Show Selection (no shortcut), Show SDR Version (no shortcut) and Scopes ⌃⌘W
 H-3, §11 HD-7, HD-14 (g): four checkmark toggles about the preview, view state
 that nothing persists — none writes a default; Show Selection is disabled
 while off with no adjustment clip selected, Show SDR Version is always
-enabled and shows an HLG project's SDR version with an "SDR Version" tag)),
+enabled and shows an HLG project's SDR version with an "SDR Version" tag),
+then Loudness Meter ⌃⌘L (road map "audio" AP7, §11 AU-75: a checkmark toggle,
+always enabled, view state that writes no default)),
 Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet

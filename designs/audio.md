@@ -880,6 +880,113 @@ mutant's anchor moved, so none was re-run.
 **Owed.** SE-29 for the owner (the presets' ±3 dB, the notch, a one-sided pick, by ear).
 Nothing to file.
 
+### AP7's record (2026-10-30)
+
+**Decided.** AU-70…AU-78, recorded before the code: the true mix rebuilt on the main thread
+from each tap's post-chain block (a lock-free single-producer `MixRing` per sink) by frame ×
+the plan's envelope, a mono track in both channels, waiting for every track except one not
+sounding at the frame (a gap as well as past its last span) or 0.5 s behind; momentary,
+short-term, integrated and the true-peak maximum from `LoudnessMeter`, made rate-generic by
+`KWeighting` (moved into `Loudness.swift`); measured only at ×1, with `manual`, `jump` and
+`overrun` resets and a stop that holds the figures; pre-master (the preview has no master
+stage; each clip's own chain, AP2's clip limiter included, is in what the taps copy); the
+timeline bar's bars from the mix while measuring; View ▸ Loudness Meter (⌃⌘L), a 132 pt column
+left of Scopes, per window; the dev tool `loudness_meter` only. The adversary's three
+objections were taken before the code (gaps on one track, the timer in `.common` modes, what a
+stop does).
+
+**Landed.** `LevelMeter.swift` (564: `MixChunk`, `MixRing`, `LevelMeterSink.ring`/`capture`),
+`AudioTap.swift` (the capture after the chain, a non-numeric time skipped), `Loudness.swift`
+(582: `KWeighting` moved in verbatim from `LoudnessBlocks.swift`, `rateRange` 8–192 kHz,
+`momentaryLUFS`, `shortTermLUFS` from a 30-entry ring, `gatedLoudness`), `LiveLoudness.swift`
+(263) and `LiveLoudness+Sum.swift` (230), `LoudnessPanelView.swift` (227),
+`EditorViewController+Loudness.swift` (62), `AgentServer+LoudnessMeter.swift` (71);
+`Playback.swift` 593 → 592 (`let loudness`), `Playback+Meter.swift` (the tick consumes, the bars
+prefer the mix, the timer added to `RunLoop.main` for `.common`, `stopMetering` stops the
+meter); wiring in `EditorViewController+Seeing.swift`, the frozen `EditorViewController.swift`
+(one validator line), `AppDelegate+Menus.swift`, `AgentServer+DevTools.swift` and
+`UIMenuTable.swift` (the `toggleLoudnessMeter:` row `perform_menu_item` needs). No core, FFI,
+format, op or `UserDefaults` change.
+
+**Measured** (the figures are the runs'). `audio_ap7_proof.py --probe` 16/16: Tech 3341 case 1
+M, S, I −22.9933; case 2 −32.9933; cases 3, 4, 5 I −23.0139, −23.0139, −22.9787; case 9 S worst
+|Δ| 0.0137 LU over 121 reads; case 12 M worst 0.0396 LU over 97 reads; true peak fs/4 0°
+−6.0206, fs/4 45° −5.9759, fs/6 60° −6.3160, fs/8 67.5° −6.0279, fs/4 45° at 0 dBFS +3.0550
+dBTP; 44.1 kHz case 1 −22.9905 (0.0028 LU from 48 kHz) and fs/4 45° −5.9759; T10's mix
+against Σ env·x |ΔI|, |ΔM|, |ΔS| 0.0000 over exactly [0, 480000); T11–T16 exact frame counts
+and |ΔI| 0.0000. `--mutants` 11/11 killed, each by its named row. `loudness_cache_probe.py`
+11/11 and its 7 mutants killed (the `tables-at-44k` anchor now in `Loudness.swift`). Over MCP
+against Release (after `make gate`): L1 the meter over [0, 380928) at 48 kHz read I −13.6294,
+M −13.4048, S −13.3853, TP −9.0215 against the export's −13.6297, −13.4048, −13.3853, −9.0215
+(|ΔI| 0.0004, the rest 0.0000), the 0.4 s gap reset nothing, `measuring` false after the play;
+L2 one `jump` for a seek; L3 no reset across two plays; L4 the log clean — 4/4, twice (before
+and after the menu-table row). `phase5_proof.py` 92/92, `op_argument_proof.py` 175/175,
+`phase5_chrome.py` 82/82, `seeing_proof.py` 19/19 (Release, on the gate's first build);
+`screens.py --only 04c-editor-loudness,04b-preview-scopes,04-editor` captured all three light
+and dark, 8/8 after the review's fix pass (the first run was 7/8: P2, the defaults pin check,
+failed on keys other phases added; `FrameJobNormalizeMode` and `FrameJobNormalizeTargetLUFS`,
+which the column's target line reads, are now pinned in `screens.py` and the harness's
+`pinDefaults` at their defaults, and `RCCodecProbe`, `RCDevExportFault` and
+`RCDevGraphicImportAccept` are in `NOT_SHOWN` with reasons). The harness drew `seeing=loudness` and
+`loudness,loudnessfixed` light and dark (the column at 1003, 44, 132 × 517 pt in a 1440 × 862
+window). `make gate` PASS 602 s (names 1, typecheck 13, fmt 6, lint 18, test 327, app 235;
+three lanes' builds sharing the machine), then PASS 342 s after the `UIMenuTable` row (names 1,
+typecheck 9, test 144, app 186; fmt and lint unchanged).
+
+**Deviations.** (1) The player does not deliver a seek as the spike's 1,920-frame lockstep:
+it hands each track 4,096-frame buffers and, after a seek or a play from elsewhere, first one
+or two buffers of the OLD position (sometimes the same buffer twice), not in step across
+tracks. The first L2/L3 runs reset five times for one seek and once for a plain play. AU-72 now
+asks the reset rule only of a chunk that MOVES its track (continues neither the track's stream
+nor what it delivered to the measurement), and a track that has not moved after a jump drops its
+old stream until it does, for at most 0.5 s; T11 gained that case. (2) The stall guard compares
+the first frame a track OWES (sounds at and has not delivered), not its last delivered frame, so
+a track in a gap is not "stalled" by a leader past the gap. (3) `LiveLoudnessReading` carries
+`offSpeed` so the footer can say "Measured only at normal speed."; the spec's interface had no
+field for it. (4) `LiveLoudness` is two files (`+Sum`) under the 400-line rule. (5) T8 scores
+Tech 3341's paired cases 15–19 rather than the 3 × 4 grid, which is printed (fs/4 at 60° reads
++0.204 dB, the Annex 2 filter's ripple), and each tone fades in over 20 ms: switched on from
+silence, a sine rang the interpolator up to 0.7 dB past its own peak. (6) `screens.py`'s
+`VIEW_SELECTORS` gained `toggleLoudnessMeter:`, which `04c` needs.
+
+**Review.** The first review asked for one fix: `screens.py`'s P2 failed on defaults keys other
+phases had added, so the fix pass pinned Normalize's two keys and listed `RCCodecProbe`,
+`RCDevExportFault` and `RCDevGraphicImportAccept` in `NOT_SHOWN` (8/8; `make gate` PASS 215 s).
+The second passed with three nits, each taken at integration: `stop()`'s doc and AU-72 said
+audio rendered ahead of the playhead is never measured, but frames already summed past it stay
+(L1's meter reached 7.936 s against a pause at 7.556 s), so both now say only what is still in
+the rings is dropped; AU-73 said AP2 had not landed, and now names the clip limiter as part of
+the chain the taps copy, with no master stage in the preview; and the target line repainted
+only on a new reading, so a Normalize target changed while paused showed late — the panel now
+redraws its scale on `UserDefaults.didChangeNotification`.
+
+**Integrated.** AP2 (part 1), AP3 and AP5 had landed since the lane's base `720f0ea`. AU-70…AU-78
+were free; SE-27 was AP5's, so this phase's check is SE-30. Conflicts were taken as unions: the
+README highlight, §7.4 (the tap row keeps AP3's and AP5's chain and gains the `MixRing`; AP1's
+loudness row drops `KWeighting`, now `Loudness.swift`'s), the decisions index (AP7's rows and
+summary after AP5's, the Lines cells counted again), `11-decisions/audio.md` (AP7's block after
+AP5's), the spec index's Lines cells, the guide's limits (AP2's two limiter lines kept, AP1's
+"no limiter yet" line gone), `manual-checks.md`, `tools/proof/README.md` (AP7's section after
+AP5's) and `loudness_cache_probe.py` (AP2's `limited-by-nil` anchor, AP7's file for
+`tables-at-44k`). AP2 had already pinned `FrameJobNormalizeMode` in `screens.py` at
+`"loudness"`, AU-25's default, which was kept, and the harness's `pinDefaults` now pins
+`"loudness"` too. `AudioTap.swift` merged cleanly: the capture follows AP5's crossfade, AP3's
+head stages and AP2's limiter, whose 1,975-tick lead leaves the tap's output at its own time.
+On the merged tree: `make typecheck` 0 errors and the four baseline warnings; `--probe` 16/16
+with the lane's figures (T10 |ΔI|, |ΔM|, |ΔS| 0.0000; T16 |ΔI| 0.0000); `loudness_cache_probe.py`
+11/11 and its 7 mutants killed; `make gate` PASS 282 s (names 1, typecheck 6, test 144, app 131;
+fmt and lint unchanged). Against Release, L1 read the meter over [0, 374400) at I −13.6325,
+M −13.3803, S −13.3820, TP −9.0215 against the export's −13.6328, −13.3803, −13.3820, −9.0215
+(|ΔI| 0.0004), the gap resetting nothing, and L4 was clean (the parity log empty). L2 and L3
+failed: a seek counted two jumps (resets 2 → 4) and a play from the reached frame reset once
+more (5, 6, 6; a second run 5, 6, 7). They failed the same way on the lane's own Release app,
+launched from its worktree, with this host's default output AirPods Max over Bluetooth (the
+lane's 4/4 runs did not record their output): a host state AU-72's admission was not measured
+on, not the merge, and filed. No AP7 mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-30 (the column's look and motion, the resets a person sees) for the owner. Filed:
+the live meter's extra `jump` resets on a Bluetooth output (L2, L3 above).
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

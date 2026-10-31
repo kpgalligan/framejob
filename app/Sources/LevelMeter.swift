@@ -54,6 +54,15 @@ import Synchronization
 /// is not the one currently lighting the meter is ignored, so stopping
 /// playback in window B cannot blank window A's live meter.
 ///
+/// **The sink also carries the mix's samples** (road map "audio" AP7, spec
+/// §11 AU-70): `MixRing`, a single-producer ring each tap copies its
+/// post-chain block into, and the live loudness meter
+/// (`LiveLoudness.swift`) drains on the main thread to rebuild the true mix.
+/// Two words are not enough for samples, so the ring publishes with a
+/// release store and drains with an acquire load, and detects a block the
+/// producer overwrote before the consumer copied it rather than waiting:
+/// still no lock and no allocation on the audio thread.
+///
 /// The units, once: a `LevelMeterReading` is LINEAR magnitude, 1.0 being full
 /// scale, because that is what the samples are and what multiplies by an
 /// envelope. dBFS is a computed accessor, floored rather than allowed to reach
@@ -194,8 +203,19 @@ enum LevelMeterMath {
 final class LevelMeterSink: @unchecked Sendable {
     private let peaks = Atomic<UInt64>(0)
     private let levels = Atomic<UInt64>(0)
+    /// The tap's post-chain samples for the live loudness meter (AU-70).
+    let ring = MixRing()
 
     init() {}
+
+    /// AUDIO THREAD. Copies one buffer, first frame `start` at `sampleRate`,
+    /// into `ring`: the same pointers `measure` reads.
+    func capture(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int, start: Int64, sampleRate: Int
+    ) {
+        ring.write(channels, count: count, frames: frames, start: start, sampleRate: sampleRate)
+    }
 
     /// AUDIO THREAD. Measures one buffer of planar float channels and stores
     /// the result. Allocation-free, lock-free, and no read-modify-write: the
@@ -255,6 +275,150 @@ final class LevelMeterSink: @unchecked Sendable {
     private static func unpack(_ word: UInt64) -> (Float, Float) {
         (Float(bitPattern: UInt32(truncatingIfNeeded: word >> 32)),
          Float(bitPattern: UInt32(truncatingIfNeeded: word)))
+    }
+}
+
+/// One tap buffer as the consumer copied it out of a `MixRing`: its first
+/// frame on the composition's sample grid, and one or two channels.
+struct MixChunk: Equatable {
+    let start: Int64
+    let frames: Int
+    /// 1 or 2; `right` is empty for 1.
+    let channels: Int
+    let sampleRate: Int
+    let left: [Float]
+    let right: [Float]
+
+    var end: Int64 { start + Int64(frames) }
+}
+
+/// A tap's samples on their way to the main thread (spec §11 AU-70): one
+/// producer (the tap, on the audio thread) and one consumer (`LiveLoudness`,
+/// on the main thread).
+///
+/// **The producer never waits.** Two planes of `capacityFrames` floats and a
+/// ring of `capacityChunks` headers, written round and round. Before it
+/// writes, the producer CLAIMS the frames and the header slot it is about to
+/// overwrite (two relaxed stores, then a release fence); after, it publishes
+/// the chunk count with a release store. The consumer reads the count with
+/// an acquire load, copies each chunk, then (an acquire fence) reads the
+/// claims again: a chunk whose frames or header the producer has since
+/// claimed was overwritten while it was copied, so it is left out and the
+/// drain says `overran`. 2.73 s of 48 kHz audio is about eighty of the
+/// meter's 30 Hz ticks, so only a main thread stalled that long overruns.
+final class MixRing: @unchecked Sendable {
+    /// Per channel; 2.73 s at 48 kHz. A power of two, for the mask.
+    static let capacityFrames = 1 << 17
+    static let capacityChunks = 1024
+
+    private struct Header {
+        var start: Int64 = 0
+        var frames = 0
+        var channels = 0
+        var sampleRate = 0
+        /// Where its frames begin, counted from the ring's first write.
+        var offset: Int64 = 0
+    }
+
+    private let left: UnsafeMutablePointer<Float>
+    private let right: UnsafeMutablePointer<Float>
+    private let headers: UnsafeMutablePointer<Header>
+    /// Frames and chunks the producer has claimed (written or being written).
+    private let frameClaim = Atomic<Int64>(0)
+    private let chunkClaim = Atomic<Int64>(0)
+    /// Chunks completely written.
+    private let published = Atomic<Int64>(0)
+    /// The consumer's: the next chunk it has not drained.
+    private var drained: Int64 = 0
+
+    init() {
+        left = .allocate(capacity: Self.capacityFrames)
+        left.initialize(repeating: 0, count: Self.capacityFrames)
+        right = .allocate(capacity: Self.capacityFrames)
+        right.initialize(repeating: 0, count: Self.capacityFrames)
+        headers = .allocate(capacity: Self.capacityChunks)
+        headers.initialize(repeating: Header(), count: Self.capacityChunks)
+    }
+
+    deinit {
+        left.deallocate()
+        right.deallocate()
+        headers.deallocate()
+    }
+
+    /// AUDIO THREAD: no lock, no allocation. The first two of `count`
+    /// planar channels, `frames` each; a chunk longer than the ring is
+    /// dropped.
+    func write(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int, start: Int64, sampleRate: Int
+    ) {
+        guard frames > 0, frames <= Self.capacityFrames, count > 0, let first = channels[0]
+        else { return }
+        let second = count >= 2 ? channels[1] : nil
+        let offset = frameClaim.load(ordering: .relaxed)
+        let chunk = chunkClaim.load(ordering: .relaxed)
+        chunkClaim.store(chunk + 1, ordering: .relaxed)
+        frameClaim.store(offset + Int64(frames), ordering: .relaxed)
+        atomicMemoryFence(ordering: .releasing)
+        let at = Int(offset & Int64(Self.capacityFrames - 1))
+        let head = min(frames, Self.capacityFrames - at)
+        (left + at).update(from: first, count: head)
+        left.update(from: first + head, count: frames - head)
+        if let second {
+            (right + at).update(from: second, count: head)
+            right.update(from: second + head, count: frames - head)
+        }
+        headers[Int(chunk % Int64(Self.capacityChunks))] = Header(
+            start: start, frames: frames, channels: second == nil ? 1 : 2,
+            sampleRate: sampleRate, offset: offset)
+        published.store(chunk + 1, ordering: .releasing)
+    }
+
+    /// MAIN THREAD (the one consumer). Every chunk published since the last
+    /// drain, oldest first; one overwritten before it was copied is left out
+    /// and sets `overran`.
+    func drain() -> (chunks: [MixChunk], overran: Bool) {
+        let end = published.load(ordering: .acquiring)
+        var overran = false
+        var next = drained
+        if end - next > Int64(Self.capacityChunks) {
+            overran = true
+            next = end - Int64(Self.capacityChunks)
+        }
+        var chunks: [MixChunk] = []
+        while next < end {
+            defer { next += 1 }
+            let header = headers[Int(next % Int64(Self.capacityChunks))]
+            guard header.frames > 0, header.frames <= Self.capacityFrames,
+                (1...2).contains(header.channels)
+            else { overran = true; continue }
+            let l = copy(left, header)
+            let r = header.channels == 2 ? copy(right, header) : []
+            atomicMemoryFence(ordering: .acquiring)
+            guard chunkClaim.load(ordering: .relaxed) <= next + Int64(Self.capacityChunks),
+                frameClaim.load(ordering: .relaxed)
+                    <= header.offset + Int64(Self.capacityFrames)
+            else { overran = true; continue }
+            chunks.append(
+                MixChunk(
+                    start: header.start, frames: header.frames, channels: header.channels,
+                    sampleRate: header.sampleRate, left: l, right: r))
+        }
+        drained = end
+        return (chunks, overran)
+    }
+
+    private func copy(_ plane: UnsafeMutablePointer<Float>, _ header: Header) -> [Float] {
+        let at = Int(header.offset & Int64(Self.capacityFrames - 1))
+        let head = min(header.frames, Self.capacityFrames - at)
+        var out = [Float](repeating: 0, count: header.frames)
+        out.withUnsafeMutableBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            base.update(from: plane + at, count: head)
+            (base + head).update(from: plane, count: header.frames - head)
+        }
+        return out
     }
 }
 

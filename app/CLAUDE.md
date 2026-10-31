@@ -389,9 +389,9 @@ detail there.
   head check (`loudnessPassNeeded`), reader (`writeLoudness`: the file's own
   rate, a file of more than two channels read again as two) and one
   publication (`finishLoudness`, a `loudness` post); `LoudnessBlocks.swift` is
-  the loaded cache (`MediaLoudness`), `KWeighting` (Tables 1–2 at 48 kHz,
-  libebur128's derivation elsewhere) and the 10 ms accumulator fed beside a
-  `PeakBuckets` that validates, places and covers for it.
+  the loaded cache (`MediaLoudness`) and the 10 ms accumulator fed beside a
+  `PeakBuckets` that validates, places and covers for it (`KWeighting` is
+  `Loudness.swift`'s).
   `MediaImporter.loudness` runs after `peaks` and before `syncFeatures`; the
   in-session retry runs while either published nothing.
   `thumbnails` holds a
@@ -1566,8 +1566,9 @@ the key map behind it.
   step, and its validator arm) ·
   `EditorViewController+Seeing.swift` (View ▸ Show Ungraded, View ▸ Show
   Selection, View ▸ Show SDR Version and View ▸ Scopes, the tag stack,
-  `installSeeing`, their validator arm; spec §11 GR-4, GR-5, GR-10, GR-13,
-  HD-14) — the grade's seeing tools. Show SDR Version writes no UserDefaults
+  `installSeeing`, which puts the Loudness Meter's column between the canvas
+  and Scopes through `installLoudnessPanel`, AU-75, and their validator arm;
+  spec §11 GR-4, GR-5, GR-10, GR-13, HD-14) — the grade's seeing tools. Show SDR Version writes no UserDefaults
   (not a persisting item) and changes no pixel in an SDR project. Show
   Ungraded sets `RecipeOptions.ungraded` on the
   document's own key only, so an export or `render_frame`, which mint their
@@ -2408,7 +2409,10 @@ free.
   back. The MODEL publishes a raw peak and RMS and the VIEW owns the
   ballistics, with ONE resting appearance so the harness settles.
   `Loudness.swift` is BS.1770-4 (`LoudnessReport`, `LoudnessMeter`) with no
-  AVFoundation in it, refusing any rate but 48 kHz; its K-weighting tables,
+  AVFoundation in it, at any rate in 8–192 kHz (`KWeighting`, moved here from
+  `LoudnessBlocks` in road map "audio" AP7: Tables 1–2 at 48 kHz,
+  libebur128's derivation elsewhere), with `momentaryLUFS` and
+  `shortTermLUFS` for the live meter; its K-weighting tables,
   the Annex 2 FIR and the gates are internal, read by `LoudnessBlocks` and
   `ClipLoudness` (road map "audio" AP1); `ExportLoudness.swift`
   (a pure move out of it, road map "audio" AP0) is the export gain a target
@@ -2417,6 +2421,19 @@ free.
   counts only while one of its OWN sounding spans holds the playhead
   (`LevelMeterTrack.mix`; its format family's resolved segments, #65): a sink
   keeps its last buffer across silence.
+  Each sink also carries a `MixRing` (AP7, spec §11 AU-70): the tap copies
+  its post-chain block into it, lock-free (claims, a release fence, a
+  release publish; the drain detects an overwrite rather than waiting).
+  `LiveLoudness.swift` (+`Sum`) drains every ring on the meter's 30 Hz tick
+  (the timer is in `.common` modes) and sums the tracks by frame × envelope
+  into a `LoudnessMeter`, measured only at ×1, with `manual`, `jump` and
+  `overrun` resets; a track still on the old position after a seek drops
+  its stale buffers until it moves. While it is measuring,
+  `Playback.meterReading()` answers its bars (the mix's last 100 ms), else
+  `LevelMeterTrack.mix`. `LoudnessPanelView.swift` is View ▸ Loudness
+  Meter's 132 pt column and `EditorViewController+Loudness.swift` its
+  installation (between the canvas and Scopes), toggle, Reset and
+  validator; view state, no `UserDefaults` key.
 
 **Dialogs and windows.**
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses, and under
@@ -3081,7 +3098,9 @@ free.
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
   `select_inspector_tab` (V3), `assistant_send` and `assistant_answer`
-  (road map 12 A1), `play_preview` (#127, G-36) and `graphic_memory` (G-37); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  (road map 12 A1), `play_preview` (#127, G-36), `graphic_memory` (G-37)
+  and `loudness_meter` (road map "audio" AP7, AU-77); a dev tool is counted
+  apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+PlayPreview.swift` — `play_preview` (dev only, wholly under
   the flag; spec §11 G-36, §7.9c): plays a window's preview forward through
   the transport's own `setRate` and `seek(to:)` (an optional `seek_to` half
@@ -3102,6 +3121,12 @@ free.
   `GraphicPrefetch.memoryReport`; `pressure` simulates a memory-pressure
   level until the tool sets `normal`. `tools/proof/graphic_memory_proof.py`
   drives it.
+- `AgentServer+LoudnessMeter.swift` — `loudness_meter {reset?}` (dev only,
+  wholly under the flag, on main; spec §11 AU-77): a window's `LiveLoudness`
+  reading — `measuring`, `rate`, the four levels (null where none, `"-inf"`
+  for silence), `from_frame`/`to_frame`/`sample_rate`, `resets`,
+  `last_reset` — after an optional `manual` reset.
+  `tools/proof/audio_ap7_proof.py` drives it beside `play_preview`.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
   time and, while a trial asks, a SHA-256 of the destination's pixels;

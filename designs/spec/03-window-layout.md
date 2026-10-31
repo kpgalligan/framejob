@@ -54,6 +54,15 @@ Everything that acts on a clip is in the timeline bar, beside blade and
 ripple-delete. Document identity is the title bar's, because the OS already
 gives it a home.
 
+The preview pane can also hold two fixed columns at its right edge, each
+zero wide while off, so the canvas ends at the first one shown: View ▸
+Loudness Meter's 132 pt column (⌃⌘L, road map "audio" AP7, §11 AU-75,
+AU-76: momentary and short-term bars on a −48…0 LUFS scale with the
+Normalize target, the four figures and a footer saying the figures are the
+mix before the export's loudness setting), then View ▸ Scopes' 248 pt panel
+(⌃⌘W, §4.2) against the inspector. Both are view state per window; neither
+persists.
+
 Inspector and timeline are `NSSplitView` panes; sizes persist in
 `UserDefaults`. There is no left panel: the media library is an inspector
 tab, so the canvas gets the width. Below about 1080 pt wide,

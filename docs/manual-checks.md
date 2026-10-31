@@ -443,6 +443,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** are the presets' ±3 dB moves the right size for this voice, does the notch take the hum without colouring the voice, and does the pick play a one-sided recording at its level?
 - **Source:** road map "audio" AP3 (spec §11 AU-31..AU-34, AU-38); `tools/proof/eq_probe.py` and `tools/proof/eq_proof.py` measure the responses, the notches and the picks against their analytic values, not how they sound.
 
+**SE-30 — The Loudness Meter moves smoothly and resets only when it should**
+- **Do:** 1. Open a project with speech on one track and music on another, with a gap of half a second or more between two clips on one track. 2. Choose View ▸ Loudness Meter (⌃⌘L) and play from the start. 3. Pause and continue; then click the ruler somewhere else while playing. 4. Click the column's Reset. 5. While playing, open the View menu and hold it open for 5 s. 6. Play through the gap. 7. Look at the column in light and dark appearance.
+- **Expect:** the M and S bars, the timeline bar's meter and the four figures move smoothly with no stutter; on steady material M and S settle near each other; the accent line sits at the Normalize target (−16 unless changed); a seek and Reset clear Integrated and True peak max and start again, while pause and continue, the held menu and the gap do not; at J or L speeds M and S read "—" and the footer says "Measured only at normal speed."; every label, figure and the footer fit the column in both appearances.
+- **Answer:** do the figures move smoothly, and do they reset only on a seek or Reset?
+- **Source:** road map "audio" AP7 (spec §11 AU-70…AU-76); `tools/proof/audio_ap7_proof.py` measures the arithmetic (T1–T16) and the player against an export (L1–L3), not how the column looks or moves.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

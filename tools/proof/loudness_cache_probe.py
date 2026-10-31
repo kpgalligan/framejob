@@ -48,7 +48,7 @@ MUTANTS = [
      "if reading.limiter == nil {"),
     ("limited-by-nil", "C8", "AudioNormalize+Loudness.swift",
      "limit: wanted <= maxGain ? nil : .maxGain, limiter: nil)", "limit: nil, limiter: nil)"),
-    ("tables-at-44k", "C6", "LoudnessBlocks.swift",
+    ("tables-at-44k", "C6", "Loudness.swift",
      "if sampleRate == LoudnessMeter.requiredSampleRate {", "if sampleRate > 0 {"),
     ("version-unchecked", "C9", "MediaImporter+Loudness.swift",
      "marker.version == loudnessVersion,", "marker.version >= 0,"),

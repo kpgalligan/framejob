@@ -731,6 +731,13 @@
    ],
    "note": "view state, not persisted"
   },
+  "toggleLoudnessMeter:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Loudness.swift `func toggleLoudnessMeter(`"
+   ],
+   "note": "view state, not persisted"
+  },
   "performMiniaturize:": {
    "verdict": "framework",
    "code": [

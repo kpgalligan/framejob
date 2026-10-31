@@ -19,39 +19,6 @@ struct MediaLoudness: Equatable {
     var width: Int { channels == 1 ? 2 : 5 }
 }
 
-/// BS.1770-4's K-weighting at a rate. Tables 1 and 2 at exactly 48 kHz, the
-/// standard's own numbers (`LoudnessMeter.stage1`/`stage2`); at any other
-/// rate the two sections derived from their analog prototype through the
-/// bilinear transform, libebur128's derivation, which ffmpeg 9 uses too
-/// (AP0's spike S4: within 0.005 LU of the 48 kHz path at 44.1 kHz).
-enum KWeighting {
-    static func coefficients(sampleRate: Double) -> (LoudnessMeter.Biquad, LoudnessMeter.Biquad) {
-        if sampleRate == LoudnessMeter.requiredSampleRate {
-            return (LoudnessMeter.stage1, LoudnessMeter.stage2)
-        }
-        // The high shelf, +4 dB above about 1.7 kHz.
-        var f0 = 1681.974450955533
-        let gain = 3.999843853973347
-        var q = 0.7071752369554196
-        var k = tan(Double.pi * f0 / sampleRate)
-        let vh = pow(10.0, gain / 20.0)
-        let vb = pow(vh, 0.4996667741545416)
-        let a0 = 1.0 + k / q + k * k
-        let shelf = LoudnessMeter.Biquad(
-            b0: (vh + vb * k / q + k * k) / a0, b1: 2.0 * (k * k - vh) / a0,
-            b2: (vh - vb * k / q + k * k) / a0,
-            a1: 2.0 * (k * k - 1.0) / a0, a2: (1.0 - k / q + k * k) / a0)
-        // The RLB high-pass at about 38 Hz.
-        f0 = 38.13547087602444
-        q = 0.5003270373238773
-        k = tan(Double.pi * f0 / sampleRate)
-        let d = 1.0 + k / q + k * k
-        let highPass = LoudnessMeter.Biquad(
-            b0: 1, b1: -2, b2: 1, a1: 2.0 * (k * k - 1.0) / d, a2: (1.0 - k / q + k * k) / d)
-        return (shelf, highPass)
-    }
-}
-
 extension MediaImporter {
     /// The loudness pass's accumulator: every sample buffer the reader yields,
     /// in order. A `PeakBuckets` is fed the same buffers and is the authority

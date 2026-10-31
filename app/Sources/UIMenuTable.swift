@@ -115,6 +115,7 @@ extension UIMenu {
         "toggleShowSelection:": .plain,
         "toggleShowSDRVersion:": .plain,
         "toggleScopes:": .plain,
+        "toggleLoudnessMeter:": .plain,
         "performMiniaturize:": .framework,
         "performZoom:": .framework,
         "showExportQueue:": .window,

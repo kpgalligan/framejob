@@ -275,14 +275,15 @@ bounds it clears the range).
 | Show Selection | | Shows which pixels the selected adjustment clip's qualifier picks. Needs a selected adjustment clip to turn on |
 | Show SDR Version | | Shows an HDR project's SDR version ([HDR and colour management](hdr-and-color.md)) |
 | Scopes | ⌃⌘W | Shows the scopes panel beside the preview ([Colour grading](color-grading.md)) |
+| Loudness Meter | ⌃⌘L | Shows the live loudness column beside the preview: momentary, short-term and integrated LUFS and the true peak of what plays ([Audio](audio.md#live-loudness)) |
 
 The canvas zoom steps are Fit, 50 %, 100 % and 200 %. View ▸ Zoom In, Zoom
 Out and Zoom to Fit always act on the canvas. Zoom In is greyed at 200 %,
 and Zoom Out and Zoom to Fit at Fit. To zoom the timeline, use the timeline
 bar's controls or the gestures [below](#timeline-gestures). Show Ungraded,
-Show SDR Version and Scopes are always enabled. Snapping, Safe Areas, Hide Inspector,
+Show SDR Version, Scopes and Loudness Meter are always enabled. Snapping, Safe Areas, Hide Inspector,
 Timeline Track Height and Preview Quality are remembered between launches.
-Show Ungraded, Show Selection, Show SDR Version and Scopes are not
+Show Ungraded, Show Selection, Show SDR Version, Scopes and Loudness Meter are not
 remembered, and they never change an export.
 
 ## Window menu

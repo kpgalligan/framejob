@@ -482,6 +482,12 @@ extension AppDelegate {
             item(
                 "Scopes", #selector(EditorViewController.toggleScopes(_:)), "w",
                 [.command, .control]))
+        // Road map "audio" AP7 (spec §11 AU-75): the live loudness column,
+        // view state like Scopes.
+        menu.addItem(
+            item(
+                "Loudness Meter", #selector(EditorViewController.toggleLoudnessMeter(_:)), "l",
+                [.command, .control]))
         return menu
     }
 
