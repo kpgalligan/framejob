@@ -38,7 +38,12 @@
 //! out what is inside it ([`Nest`]). Its tracks are fresh — new ids, the
 //! source tracks' names and their `hidden`/`muted`/`locked`/`solo` flags —
 //! because the timeline's tracks stay on the timeline, holding whatever was
-//! not selected. A nested track keeps its source's `matte` only when the
+//! not selected. They copy each source track's `volume` and `pan` too, except
+//! the copy of the nest clip's own destination track, which is unity and
+//! centre: that track still applies over the nest clip, so a selection off one
+//! track sounds the same nested, and the other source tracks' clips now also
+//! get the destination's volume and pan on top of their own, as they get its
+//! mute (spec §11 AU-102). `unnest` keeps neither, as it keeps no mute. A nested track keeps its source's `matte` only when the
 //! nested track directly behind it is the copy of that matte's target (the
 //! CARRY rule): a matte pair nested together goes on cutting inside the nest,
 //! and a matte taken without its target becomes an ordinary track there.
@@ -59,7 +64,8 @@ use crate::recipe_matte::matte_target;
 
 /// A track with a fresh id, copying `from`'s name and its hidden / muted /
 /// locked / solo / matte state (the matte only provisionally: `nest_clips`
-/// keeps it by the carry rule alone).
+/// keeps it by the carry rule alone), and its volume and pan when
+/// `keeps_mix` (spec §11 AU-102).
 ///
 /// The state is copied and not cleared: a selection taken off a muted track
 /// must go on sounding the way it did, and the mute now lives on the nest's
@@ -67,7 +73,13 @@ use crate::recipe_matte::matte_target;
 /// what played before nesting plays after — even though a solo is judged
 /// per container, so inside the nest it is now judged among the nest's own
 /// tracks.
-fn nested_track(project: &mut Project, from: &Track) -> Track {
+///
+/// Volume and pan are copied from every source track but the nest clip's
+/// destination, whose copy gets `keeps_mix` false and so unity and centre:
+/// the destination track still applies over the nest clip, and a fader
+/// applied twice is not a fader applied once (where muting twice is muting
+/// once, so mute copies from it too).
+fn nested_track(project: &mut Project, from: &Track, keeps_mix: bool) -> Track {
     Track {
         id: project.allocate_id(),
         name: from.name.clone(),
@@ -76,6 +88,8 @@ fn nested_track(project: &mut Project, from: &Track) -> Track {
         locked: from.locked,
         solo: from.solo,
         matte: from.matte,
+        volume: if keeps_mix { from.volume } else { 1.0 },
+        pan: if keeps_mix { from.pan } else { 0.0 },
     }
 }
 
@@ -152,7 +166,7 @@ impl Project {
             let Some(source) = self.track(*id) else {
                 continue;
             };
-            let track = nested_track(&mut next, source);
+            let track = nested_track(&mut next, source, *id != front_track);
             mapping.push((*id, track.id));
             tracks.push(track);
         }

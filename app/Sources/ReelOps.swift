@@ -1179,10 +1179,12 @@ extension ReelOp {
     /// Omitted fields keep their value. `solo` is the fourth switch: while
     /// any track in a container is soloed, every track that is not is
     /// silent; mute wins over solo on the same track, and pictures are
-    /// untouched either way.
+    /// untouched either way. `volume` (linear, 0…4) and `pan` (−1…1) are the
+    /// track's fader and balance (spec §11 AU-102).
     static func setTrack(
         track: UInt32, name: String? = nil, hidden: Bool? = nil, muted: Bool? = nil,
-        locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil
+        locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil,
+        volume: Double? = nil, pan: Double? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
@@ -1192,6 +1194,8 @@ extension ReelOp {
         a.put("locked", locked)
         a.put("solo", solo)
         a.put("matte", matte?.rawValue)
+        a.put("volume", volume)
+        a.put("pan", pan)
         return ReelOp(name: "set_track", args: a.values)
     }
 

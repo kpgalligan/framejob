@@ -76,6 +76,11 @@ extension AgentServer {
     /// (`EditorViewController.setTrackMatte`, on the current track) and the
     /// same submenu in the track context menu (`trackMenuSetMatte`, on the
     /// clicked track), undo "Track Matte".
+    /// `volume` and `pan` (spec §11 AU-102, AU-105) mirror the track mix
+    /// popover — the header's fifth switch (`TimelineView.showTrackMix`),
+    /// Track ▸ Volume and Pan… (`EditorViewController.showTrackMix`, on the
+    /// current track) and the context menu's Volume and Pan… — whose drags
+    /// are "Track Volume" and "Track Pan" and whose Reset is "Reset Track Mix".
     func setTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
@@ -85,20 +90,23 @@ extension AgentServer {
         let locked = try boolArg(a, "locked")
         let solo = try boolArg(a, "solo")
         let matte = try enumArg(a, "matte", TrackMatte.self)
+        let volume = try doubleArg(a, "volume")
+        let pan = try doubleArg(a, "pan")
         guard
             name != nil || hidden != nil || muted != nil || locked != nil || solo != nil
-                || matte != nil
+                || matte != nil || volume != nil || pan != nil
         else {
             throw ToolError(
                 message:
-                    "set_track needs at least one of name, hidden, muted, locked, solo, matte.")
+                    "set_track needs at least one of name, hidden, muted, locked, solo, matte, "
+                    + "volume, pan.")
         }
         return try editResult(
             document, "Track Properties",
             [
                 .setTrack(
                     track: track.id, name: name, hidden: hidden, muted: muted, locked: locked,
-                    solo: solo, matte: matte)
+                    solo: solo, matte: matte, volume: volume, pan: pan)
             ])
     }
 

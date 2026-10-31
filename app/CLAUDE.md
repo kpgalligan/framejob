@@ -791,10 +791,19 @@ the key map behind it.
   (`performGroupedEdit`), so a rename is its own undo step even when the
   mouse-down that ended it edits too (#69)) · `+TrackMenu` (the right-click
   menu on a header or an
-  empty lane: the four toggles, checked, the Matte submenu (spec §11 MT-7),
-  and Remove Track through
+  empty lane: the header's five switches — the four toggles, checked, and
+  Volume and Pan…, the fifth, which opens the track's mix popover — the Matte
+  submenu (spec §11 MT-7), and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
-  a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
+  a clip hit answers no menu) · `+TrackMix` (the track's Volume and Pan
+  popover, spec §11 AU-105: `showTrackMix(_:)`, one `NSPopover` per timeline —
+  a static table keyed by the view, since `TimelineView.swift` is frozen —
+  anchored on the header's fifth switch, editing through the timeline's live
+  trio and `onEdit`, refreshed on its document's `.projectDocumentDidChange`,
+  closed when its track is gone; its content is `TrackMixView.swift`:
+  `TrackMixViewController` (Volume in dB, Pan −100…100, Reset),
+  `TrackMixEdits` and `TrackMixLevel`, the dB rail, −60 Off … +12) ·
+  `+Candidates` (Remove Silences' wash, drawn not
   overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
   line over its audio region from `TimelineView.duckCurves` — the frozen
   file's one stored property for it, set in `refreshTimeline` beside

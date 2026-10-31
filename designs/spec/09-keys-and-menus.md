@@ -141,7 +141,8 @@ key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest, Open Nest ⌘↓, Close Nest ⌘↑ — road map 2's phase 9, in the
 grouping group because going inside a nest is the third thing you do with
 one), Track (New Track,
-Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo, Matte ▸ (Off · Alpha
+Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo, Volume and Pan… (the
+current track's mix popover, no key — §11 AU-105), Matte ▸ (Off · Alpha
 · Inverted Alpha · Luma · Inverted Luma, on the current track, checked for
 its mode, undo "Track Matte", no key — §11 MT-7)), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,

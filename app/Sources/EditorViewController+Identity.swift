@@ -1,8 +1,8 @@
 import AppKit
 
 /// Clip identity (spec §5.2, format version 3): Clip ▸ Rename… (⇧⌘R), the
-/// Clip ▸ Label ▸ submenu, and the Track ▸ Solo and Track ▸ Matte items'
-/// validation — the menu
+/// Clip ▸ Label ▸ submenu, Track ▸ Volume and Pan… (spec §11 AU-105), and the
+/// Track ▸ Solo and Track ▸ Matte items' validation — the menu
 /// halves of what the timeline does in place (`TimelineView+Rename.swift`,
 /// the header column's S) and what the Clip tab's header field does
 /// (`ClipSelectionHeaderView` in `ClipPane.swift`).
@@ -67,6 +67,19 @@ extension EditorViewController {
         return .some(first)
     }
 
+    // MARK: - Track mix
+
+    /// Track ▸ Volume and Pan… (spec §11 AU-105): the current track's mix
+    /// popover, anchored on its header's fifth switch — the same popover the
+    /// switch and the context menu open (`TimelineView+TrackMix.swift`).
+    @objc func showTrackMix(_ sender: Any?) {
+        guard let track = currentTrack, let timeline = timeline else {
+            NSSound.beep()
+            return
+        }
+        timeline.showTrackMix(track)
+    }
+
     // MARK: - Validation
 
     /// The half of `validateUserInterfaceItem` this file owns. nil means "not
@@ -104,6 +117,8 @@ extension EditorViewController {
                     ? .on : .off
             }
             return track != nil
+        case #selector(showTrackMix(_:)):
+            return currentTrack != nil
         default:
             return nil
         }

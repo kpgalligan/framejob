@@ -482,7 +482,12 @@ extension AgentServer {
                     + "by alpha, inverted alpha, luma or inverted luma — where the matte track "
                     + "shows nothing, the track behind shows uncut; a back-most matte track, or "
                     + "one in front of another matte track, cuts nothing. Its clips still "
-                    + "sound. \"none\" makes it an ordinary track again.",
+                    + "sound. \"none\" makes it an ordinary track again. volume is the track's "
+                    + "fader, linear 0–4 (1 is unity, 4 is +12.04 dB, 0 silent), multiplying every "
+                    + "clip's own volume on it; pan is −1 (left) … 1 (right), a constant-power "
+                    + "balance after each clip's own pan, and a mono source is not panned. Both "
+                    + "are refused outside their ranges and play through nests: a nested clip "
+                    + "hears its own track's and every enclosing nest clip's track's.",
                 [
                     // The four switches name the MENU ITEM each one mirrors
                     // and nothing else: what each DOES is the sentence above,
@@ -496,6 +501,8 @@ extension AgentServer {
                     "locked": "Track ▸ Lock Track.",
                     "solo": "Track ▸ Solo.",
                     "matte": "Track ▸ Matte; \"none\" is its Off.",
+                    "volume": "Track ▸ Volume and Pan…'s Volume, as a linear gain 0–4.",
+                    "pan": "Track ▸ Volume and Pan…'s Pan, −1–1.",
                 ]),
             opTool(
                 "remove_empty_tracks",

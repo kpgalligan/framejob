@@ -309,6 +309,20 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   export_vp9`, `cargo fmt --check`). `wc -l core/src/export_table.rs`: 582 before, 411 after;
   `export_preset.rs` is 187. What stays is the table and its two lookups; no further seam is
   named.
+- `model.rs`: at 597 before road map "audio" AP10, it paid toll T1 first, a pure move gated with
+  T2 (`make gate` PASS 400 s): `Track` (its doc and struct) went whole to the new
+  `model_track.rs`, re-exported by `model.rs` (`pub use crate::model_track::Track`), so every
+  `crate::model::Track` path holds; nothing widened. `wc -l core/src/model.rs`: 597 before, 570
+  after. `model_track.rs` is the track vocabulary's home: AP10's `volume`, `pan` and
+  `TRACK_VOLUME_MAX` landed there (39 → 68). No further seam in `model.rs` is named; the next
+  is the media types (`Media`, `MediaOriginal`, `MediaKind`) out whole to a `model_media.rs`,
+  re-exported the same way.
+- `format.rs`: at 598 before road map "audio" AP10, it paid toll T2 with T1: the per-version
+  paragraphs of `RC_FORMAT_VERSION`'s doc (Version 2 … Version 34) went verbatim to the new
+  `format_history.rs` as its `//!` module doc (no items), and the const kept its first two doc
+  lines and one line pointing there. `wc -l core/src/format.rs`: 598 before, 250 after;
+  `format_history.rs` 352, then 359 with AP10's version-35 paragraph. A bump adds its paragraph
+  to `format_history.rs`; `format.rs` takes only the number.
 
 ## Open items
 

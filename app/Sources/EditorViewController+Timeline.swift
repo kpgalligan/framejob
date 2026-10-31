@@ -370,7 +370,8 @@ extension EditorViewController {
     /// Track ▸ Hide Video / Mute Audio / Lock Track / Solo — the same four
     /// toggles the header column draws. Solo is audio only and mute wins over
     /// it (spec §7.2); the core's envelopes apply the rule, so this is one
-    /// flag like the other three.
+    /// flag like the other three. The fifth switch, `.mix`, opens the current
+    /// track's Volume and Pan popover (spec §11 AU-105).
     func toggleTrack(_ button: TimelineHeaderButton) {
         guard let document = document, let track = currentTrack else {
             NSSound.beep()
@@ -385,6 +386,8 @@ extension EditorViewController {
             document.applyEdit("Lock Track", .setTrack(track: track.id, locked: !track.locked))
         case .solo:
             document.applyEdit("Solo Track", .setTrack(track: track.id, solo: !track.solo))
+        case .mix:
+            timeline?.showTrackMix(track)
         }
     }
 

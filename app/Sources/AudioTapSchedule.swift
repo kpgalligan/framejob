@@ -53,7 +53,9 @@ struct AudioTrackDSP: Equatable {
         var spans: [AudioDSPSpan] = []
         spans.reserveCapacity(segments.count)
         for segment in segments where segment.duration > 0 {
-            let dsp = parameters.dsp(for: segment.clip)
+            var dsp = parameters.dsp(for: segment.clip)
+            // The tracks' pans ride the plan, per segment (spec §11 AU-104).
+            dsp.trackBalance = AudioTrackBalance(pans: segment.trackPans)
             guard !dsp.isInert else { continue }
             spans.append(
                 AudioDSPSpan(

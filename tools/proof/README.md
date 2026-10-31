@@ -26551,3 +26551,61 @@ I9 the floor 13.2 dB lower. `--measure` (final table): every kind within 0.01 LU
 −29.63 LUFS. `--mutants` "10/10 mutants killed, 1 equivalent", exit 0: `latency-kept`
 survives and is scored equivalent, every chain's latency measuring 0 frames (V10 prints
 pitch +7's, at most 48 frames), so there is nothing to discard.
+
+## Road map "audio" AP10 part 1 — a track's volume and pan (`audio_ap10_proof.py` F1–F5, P1–P5, U1, V1, B1–B4; ten mutants; `core/tests/track_mix.rs`, `schema_v35.rs`; spec §11 AU-100…AU-106)
+
+A track's `volume` (linear 0…4) and `pan` (−1…1) are format 35's `tracks[]` keys: volume an
+envelope term after the mute at every stage (`audio_track.rs`'s `track_gain`, multiplied in
+`audio.rs`'s `stage_gain`), pan the plan audio segment's `track_pans`, a balance the tap applies
+after an enclosing nest's fold and before the clip limiter (`AudioTrackBalance`,
+`AudioDSPChain.process`). No new op, tool or FFI export: `set_track` takes both.
+
+- **`core/tests/track_mix.rs`** (in `make test`): `set_track` stores both, refuses each out of
+  range in `in_range`'s sentence and treats an unchanged value as an identity; the envelope at
+  track 0.5, clip 2 × track 0.25, inner × outer through a nest, a muted track at ×4 and a
+  hand-written ×9 clamped to ×4; `track_pans` innermost first, zeros dropped, cleared at a folded
+  nest clip, kept under a clip's own mono, clamped; a default project and its plan the text they
+  were; `nest` copying from every source track but the destination (unity and centre), the level
+  and pans of a nested single clip unchanged, the other source tracks' clips under both tracks;
+  `unnest` keeping neither.
+- **`core/tests/schema_v35.rs`**: format 35's open, newer and round-trip rows (after `matte`, in
+  `volume`, `pan` order, on the timeline's tracks and a nest's), and a file at 34 writing what it
+  did.
+- **`audio_ap10_proof.py <dir>/agent.sock`** (the docstring has each row and bound) makes
+  `ap10_tone.wav` (440 Hz at −12 dBFS, 48 kHz stereo, 6 s) and `ap10_tone_mono.wav` on the first
+  run into `tools/proof/media/` and reads each channel's level by quadrature at 440 Hz over
+  11-cycle windows across 1–3 s of an `audio_wav` export, in dB of the same fixture's unity
+  export. F1–F5 the fader (track, clip × track, inner × outer through a nest by `scope`, a muted
+  track at ×4, a nested clip's level and its nest track's absent keys), P1–P5 the pan (the law at
+  −1 and 0.5, inner × outer, a folded nest, a mono source, clip × track), U1 one undo step and
+  the parity log, V1 the live meter (`loudness_meter`, `play_preview` 5 s of the 6 s tone)
+  against the export's integrated loudness over the same frames, within 0.01 LU.
+- **`audio_ap10_proof.py --probe`** runs B1–B4 alone (the whole run runs them first): the probe
+  `audio_ap10_probe.swift`, compiled AS `main.swift` over `app/Sources` through `swift_build.py`
+  with `Blank.mp4` beside the binary. B1 the balance (unity, one pan the law's pair, two pans the
+  product, applied per channel and not at unity); B2 the chain's order (a 0.9 sine under a −6 dB
+  limiter and a track pan of −1 holds the ceiling in the left channel; after the limiter it would
+  be √2 over); B3 `isInert`, a schedule over a segment with `track_pans` active with no clip DSP,
+  and a project whose only processing is a track pan of −1 built by `CompositionBuilder.build`
+  and read in float (P1 offline: left +3.01 dB, right 0); B4 `TrackMixLevel`'s mapping, floor and
+  read-out.
+
+The ten mutants: M1 (the track gain not multiplied), M2 (only the innermost track's gain), M3
+(the folded-nest drop skipped), M4 (only the innermost pan kept), M5 (`track_pans` written when
+empty), M8 (`set_track`'s range check dropped), M9 (`nested_track` not copying a non-destination
+track's volume) and M10 (it copying the destination's too) each fail a named `track_mix.rs` test,
+run by hand; M6 (the builder still gating on `dsp.isEmpty`) and M7 (the balance after the
+limiter) are `--mutants`, each over its own copy of `app/Sources`, killed by B3 and B2.
+
+```sh
+python3 tools/proof/audio_ap10_proof.py --probe     # B1–B4
+python3 tools/proof/audio_ap10_proof.py --mutants   # M6, M7
+python3 tools/proof/audio_ap10_proof.py <dir>/agent.sock   # B1–B4, then F1–F5, P1–P5, U1, V1
+```
+
+**The recorded run (2026-10-31, Release after `make gate`):** 16/16. F1 and F2 −6.020 dB per
+channel, F3 −12.040, F4 silent (peak −∞ dBFS), F5 +0.000 per channel and no keys on the nest's
+track; P1 L +3.010 dB and R 0 at −1, (−5.333, +2.323) dB at 0.5; P2 (−3.010, −3.010); P3 and P4
++0.000; P5 (+4.645, −10.666); U1 one undo back to no keys, the log empty; V1 the meter −18.7034
+LUFS over [0, 233,472), the export the same, |dI| 0.0000 LU; B2 left peak 0.50045 under a
+0.50119 ceiling, right 0. `--mutants` 2/2 killed; the core's eight 8/8 killed by `track_mix.rs`.

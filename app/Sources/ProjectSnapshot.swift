@@ -459,10 +459,15 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
     /// The track's matte (format version 14, `TrackMatte.swift`); `.none`
     /// for an ordinary track and for a file that names no mode.
     let matte: TrackMatte
+    /// The track's fader, linear 0…4, and its pan, −1…1 (format 35, spec
+    /// §11 AU-102); the core's envelope and plan apply both.
+    let volume: Double
+    let pan: Double
 
     init(
         id: UInt32, name: String = "Track", hidden: Bool = false, muted: Bool = false,
-        locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none
+        locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none,
+        volume: Double = 1, pan: Double = 0
     ) {
         self.id = id
         self.name = name
@@ -471,6 +476,8 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         self.locked = locked
         self.solo = solo
         self.matte = matte
+        self.volume = volume
+        self.pan = pan
     }
 
     init(from decoder: Decoder) throws {
@@ -482,6 +489,8 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         locked = c.lenient(.locked, false)
         solo = c.lenient(.solo, false)
         matte = c.lenient(.matte, TrackMatte.none)
+        volume = c.lenient(.volume, 1.0)
+        pan = c.lenient(.pan, 0.0)
     }
 }
 

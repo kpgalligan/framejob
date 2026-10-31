@@ -151,12 +151,17 @@ struct AudioClipDSP: Equatable {
     /// off or while the clip's level is not measured (AU-42).
     var gate: AudioGateSettings?
     var deEsser: AudioDeEsserSettings?
+    /// The balance of the tracks the segment plays through (spec §11 AU-104),
+    /// after an enclosing nest's fold and before the limiter. Set per span
+    /// from the plan segment's `track_pans` (`AudioTrackDSP`), never per clip.
+    var trackBalance: AudioTrackBalance
 
     init(
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
         mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil,
         channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil,
-        gate: AudioGateSettings? = nil, deEsser: AudioDeEsserSettings? = nil
+        gate: AudioGateSettings? = nil, deEsser: AudioDeEsserSettings? = nil,
+        trackBalance: AudioTrackBalance = .unity
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -170,6 +175,7 @@ struct AudioClipDSP: Equatable {
         self.eq = eq
         self.gate = gate
         self.deEsser = deEsser
+        self.trackBalance = trackBalance
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -185,6 +191,32 @@ struct AudioClipDSP: Equatable {
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
             && limiter == nil && channels == .both && eq == nil && gate == nil && deEsser == nil
+            && trackBalance == .unity
+    }
+}
+
+// MARK: - The track balance
+
+/// The pans of the tracks a segment plays through as one balance (spec §11
+/// AU-104): the product of each pan's `AudioPanLaw` pair, so two tracks'
+/// pans compose by multiplying, as their volumes do in the envelope. Unity
+/// when there are none, and then the chain skips it.
+struct AudioTrackBalance: Equatable {
+    let left: Float
+    let right: Float
+
+    static let unity = AudioTrackBalance(pans: [])
+
+    init(pans: [Double]) {
+        var left: Float = 1
+        var right: Float = 1
+        for pan in pans {
+            let gains = AudioPanLaw.gains(pan)
+            left *= gains.left
+            right *= gains.right
+        }
+        self.left = left
+        self.right = right
     }
 }
 
@@ -244,8 +276,8 @@ enum AudioPanLaw {
 /// One composition audio track's effect chain: the channel pick, then the
 /// EQ and hum notch, then noise reduction, then the gate, then the de-esser,
 /// then the compressor, then the Mix stage — the mono fold, then the pan,
-/// then the fold an enclosing NEST clip asked for — then the limiter (spec
-/// §11 AU-3, AU-20, AU-34, AU-47). Voice isolation's crossfade runs before
+/// then the fold an enclosing NEST clip asked for, then the tracks' balance
+/// (AU-104) — then the limiter (spec §11 AU-3, AU-20, AU-34, AU-47). Voice isolation's crossfade runs before
 /// it, in the tap (AU-53, AU-54).
 ///
 /// **That order is the order a channel strip has**, and each step is there
@@ -401,6 +433,13 @@ final class AudioDSPChain {
         // the sum of the folded contributors the fold of the sum.
         if params.enclosingMono, count >= 2 { fold(channels, count: count, frames: frames) }
 
+        // The tracks' balance (AU-104), after the folds and before the limiter,
+        // so a limited clip hard-panned by its track holds its ceiling. Not
+        // entered at unity, and a one-channel track has nothing to lean.
+        if params.trackBalance != .unity, count >= 2 {
+            balance(channels, frames: frames, by: params.trackBalance)
+        }
+
         // Last, for the whole track once any clip on it asks (AU-23): a
         // clip without a limiter passes through it as a delay.
         limiter?.process(channels, count: count, frames: frames, settings: params.limiter)
@@ -449,6 +488,17 @@ final class AudioDSPChain {
         guard gains.left != 1 || gains.right != 1 else { return }
         var left = gains.left
         var right = gains.right
+        if let data = channels[0] { vDSP_vsmul(data, 1, &left, data, 1, vDSP_Length(frames)) }
+        if let data = channels[1] { vDSP_vsmul(data, 1, &right, data, 1, vDSP_Length(frames)) }
+    }
+
+    /// The tracks' balance, in place on channels 0 and 1, as `pan` leans.
+    private func balance(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
+        by balance: AudioTrackBalance
+    ) {
+        var left = balance.left
+        var right = balance.right
         if let data = channels[0] { vDSP_vsmul(data, 1, &left, data, 1, vDSP_Length(frames)) }
         if let data = channels[1] { vDSP_vsmul(data, 1, &right, data, 1, vDSP_Length(frames)) }
     }

@@ -1174,6 +1174,81 @@ samples compared, 0 differ; D11 68.4 µs, 0.32 %). No mutant's anchor moved, so 
 shifter's artefacts, lips and voice in sync). Filed at integration: a Clip ▸ Voice ▸ menu (E8's),
 not built here. #123 closed by this phase.
 
+### AP10's record (2026-10-30)
+
+Part 1 of AP10: a track's volume and pan (survey A12), built in lane C. Part 2 — per-track
+sub-mixes, track and bus dynamics, the master chain and stems — waits for AP2 part 2's float
+write pass (AU-101).
+
+**Asked.** The owner answered AP10's two questions on 2026-10-30: the preview stays approximate
+for track dynamics and says so (1 (b)), and stems are separate files (2 (a)).
+
+**Decided.** AU-100…AU-106, recorded before the code: the two answers with their reasons;
+`tracks[].volume` (0…4, default 1) and `tracks[].pan` (−1…1, default 0), format 35, each written
+only when not its default, refused outside by `set_track`, clamped where they play; `nest`
+copying both from every source track but the destination, whose copy is unity and centre (the
+adversary's objection, taken before the code: the destination track still applies over the nest
+clip), and `unnest` keeping neither; volume an envelope term after mute at every stage, heard by
+the meter, the bars and Remove Silences and not by Normalize, the Loudness read-out or the clip
+limiter; pan a balance by `AudioPanLaw` carried as the plan segment's `track_pans` (innermost
+first, cleared at a folded nest clip, zeros dropped), applied after an enclosing nest's fold and
+before the limiter; the chrome; the proof.
+
+**Landed.** Tolls first, gated together and committed alone (`make gate` PASS 400 s): T1 `Track`
+out of `model.rs` (597 → 570) to `model_track.rs`, T2 the format version paragraphs out of
+`format.rs` (598 → 250) to `format_history.rs`. Core: `volume`, `pan`, `TRACK_VOLUME_MAX` in
+`model_track.rs`; `Track::ordinary`; `set_track`'s two arguments and their refusals, the op row
+and `op_table.rs`'s two `Number` rows (and "The bound"'s sentence on a range not in whole
+numbers); `nested_track`'s `keeps_mix`; `audio_track.rs` (`track_gain`, `Voice::track_pans`);
+`Stage.track_gain` and `.track_pan` in `audio.rs`, multiplied in `stage_gain`; `Segment.track_pans`
+in `evaluate.rs`, written by `to_json(true)` only when non-empty; format 35, the header,
+`schema_v35.rs`, `track_mix.rs`. Swift: `TrackSnapshot.volume`/`.pan` (wiring only),
+`PlanSegment.trackPans`, `AudioTrackBalance` and `AudioClipDSP.trackBalance` (in `isInert`) with
+the chain's balance step, `AudioTrackDSP` setting each span's balance, the builder's gate,
+`ReelOps.setTrack`, the handler and the catalog's prose and two descriptions;
+`TimelineHeaderButton.mix` (the fifth switch, `slider.horizontal.3`, fallback V),
+`TimelineView+TrackMix.swift` (97: the extension and `TrackMixPopover`), `TrackMixView.swift` (208:
+`TrackMixLevel`, `TrackMixEdits`, `TrackMixViewController`), the context menu's and Track ▸
+Volume and Pan… with its validator, `UIMenuTable` and `inventory.json`. Docs: spec §4.4, §5.2b,
+§6c, §7.2, §7.4, §7.10, §9; the guide's Track volume and pan section and limits, timeline.md,
+menus-and-shortcuts.md, the README highlight; SE-33; the proof README.
+
+**Deviations.** `core/tests/op_nullability.rs`'s pinned count of optional arguments moved from 78
+to 80 (70 to 72 not plain), the two new `set_track` arguments. M6 is killed by B3, whose second
+half builds P1's project offline through `CompositionBuilder.build` and reads it in float, rather
+than by P1 over a per-mutant app build. V1 plays 5 s of the 6 s tone: a first run that played 8 s
+counted the meter's 0.44 s past the timeline's end, which the export does not hold, and read
+0.11 LU apart; over frames all inside the export the two agree. The popover's open state is a
+static table on `TimelineView`'s extension keyed by the view, because `TimelineView.swift` is
+frozen and took only the two wiring lines. The Volume read-out shows the linear gain as a
+percentage (and "Off" at the floor).
+
+**Measured** (the lane; Release after its gate): `audio_ap10_proof.py` 16/16 — F1, F2 −6.020 dB
+per channel, F3 −12.040, F4 silent, F5 +0.000 and no keys on the nest's track; P1 +3.010 dB and
+0 at −1, (−5.333, +2.323) at 0.5; P2 (−3.010, −3.010); P3, P4 +0.000; P5 (+4.645, −10.666); U1;
+V1 |dI| 0.0000 LU at −18.7034 LUFS; B1–B4 (B2 left 0.50045 under the 0.50119 ceiling). The same
+16/16 on Debug before the gate. `--mutants` 2/2 (M6 by B3, M7 by B2); the core's eight by hand
+against `track_mix.rs`, 8/8 killed. `cargo test` `track_mix` 16/16, `schema_v35` 5/5. `make gate`
+PASS 287 s (typecheck the four baseline warnings, test 161, app 121) after one FAIL on
+`op_nullability`'s count. The parity log empty on both builds.
+
+**Review.** Passed, with two nits, both taken at integration: `format_history.rs`'s four
+intra-doc links that resolved only inside `format.rs` (`migrate_1_to_2`, `GRADING_BRANCH_VERSION`,
+`read`, `migrate_1015_to_15`) now name `crate::format`, and `buttonRect`'s doc in the frozen
+`TimelineView.swift` says five switches.
+
+**Integrated.** The lane's base `0096d13` was still I's head, so the two commits applied with no
+conflict and format 35, SE-33 and AU-100…AU-106 stand as the lane wrote them. The CLAUDE.md
+edits owed went in: core's map gains `model_track.rs`, `audio_track.rs` and `format_history.rs`
+(`model.rs` without the track, `Track.matte` in `model_track.rs`, a bump's paragraph in the
+format rules), app's `+TrackMenu` says five switches and gains `+TrackMix` with
+`TrackMixView.swift`. On the merged tree `make gate` PASS 331 s (names 1, typecheck 6 with the
+four baseline warnings, fmt 3, lint 10, test 190, app 121). Only doc comments changed in product
+code at integration, so the lane's Release proof (16/16) stands.
+
+**Owed.** SE-33 for the owner. Filed at integration: the road-map candidate, an exact audio
+preview through `AVAudioEngine` (AU-100). Part 2 continues at AU-107.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

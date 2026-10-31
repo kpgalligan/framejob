@@ -12,14 +12,20 @@ governs a module now.
 ## Module map
 
 - `lib.rs` — module declarations and re-exports only. No implementation code.
-- `model.rs` — the spec §5.2 SHAPE: the project, its tracks, clips, sources,
-  actions, markers and nests, with the serde defaults that say what an absent
-  key means. The struct field names ARE the JSON keys. Nothing else lives here
-  but `CanvasOutput` (`Canvas.output`, `sdr` or `hlg`, written only when
-  `hlg`, format 23, spec §11 HD-2).
+- `model.rs` — the spec §5.2 SHAPE: the project, its clips, sources,
+  actions, markers and nests (a track is `model_track.rs`, re-exported), with
+  the serde defaults that say what an absent key means. The struct field
+  names ARE the JSON keys. Nothing else lives here but `CanvasOutput`
+  (`Canvas.output`, `sdr` or `hlg`, written only when `hlg`, format 23, spec
+  §11 HD-2).
 - `model_canvas.rs` — `CanvasBlending` (`Canvas.blending`, `encoded` or
   `linear`, written only when `linear`, format 24, spec §11 GR-18, HD-16),
   re-exported by `model.rs`; the recipe canvas carries it only when linear.
+- `model_track.rs` — a track (`Track`, spec §5.2's `tracks[]` and a nest's),
+  moved out of `model.rs` whole (road map "audio" AP10's toll T1) and
+  re-exported by it; the track vocabulary's new keys land here: format 35's
+  `volume` (0…`TRACK_VOLUME_MAX`, 4, written only when not 1) and `pan`
+  (−1…1, written only when not 0), spec §11 AU-102.
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
   (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`,
   `Reflection`, `BlendMode`) and their defaults (the audio group's are
@@ -226,8 +232,8 @@ governs a module now.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD
-  `Track.matte` stays in `model.rs`, skipped when `none` (an ordinary track
-  writes no key), as `ColorAdjust`'s nine tone keys are when 0.
+  `Track.matte` stays in `model_track.rs`, skipped when `none` (an ordinary
+  track writes no key), as `ColorAdjust`'s nine tone keys are when 0.
 - `model_color.rs` — `normalise_color`, G-12's colour grammar (hex,
   `rgb()`/`rgba()`, `hsl()`/`hsla()` and the CSS named colours, from
   svgtypes' table) to lowercase `#rrggbb[aa]`; out of range is refused,
@@ -903,11 +909,20 @@ governs a module now.
   `extent_gain`), `speech_breaks` (each span's four edges and the
   release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
   here edits.
+- `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
+  AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
+  `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the
+  plan audio segment's `track_pans`: innermost first, cleared at a stage whose
+  clip's base `audio.mono` is true, zeros dropped). No sample work; the
+  balance is Swift's.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current, the migration
   hook; a file numbered 1015 (the grading branch's builds) is read as 15
   (spec §11 GR-9).
+- `format_history.rs` — what each format version added, as its `//!` doc,
+  moved verbatim from `RC_FORMAT_VERSION`'s doc (AP10's toll T2); no items. A
+  bump adds its paragraph here and only the number in `format.rs`.
 - `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs` ·
   `export_container.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
@@ -1102,7 +1117,8 @@ SHAPE adds a step at the migration hook (`migrate_1_to_2`). Each bump gets a
 `schema_vN.rs` test that opens the previous versions' fixtures and reads the
 new keys' ORDER off the written text, since a parsed `Value` sorts them.
 **Nothing that checks the version writes the current number as a
-literal**, so a bump edits `format.rs` and the header and no test or proof:
+literal**, so a bump edits `format.rs` (and `format_history.rs`'s paragraph)
+and the header and no test or proof:
 - The "one past the current version, refused" tests in
   `core/tests/schema_v3.rs` and `core/tests/model_tests.rs` compute
   `RC_FORMAT_VERSION + 1` and assert the refusal's whole message with

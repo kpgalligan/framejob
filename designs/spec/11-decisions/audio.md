@@ -626,6 +626,68 @@ AP9, survey A10), recorded before its code.
   on ⇧⌥⌘D (Detach Audio's ⌥⌘D plus ⇧), and as a button beside Detach Audio in the Sound tab's
   Mix section; it sends one `attach_audio` per pair in the selection.
 
+AU-100…AU-106 are AP10's (tracks, buses and stems; survey A12, A11), recorded before its code.
+AP10 is built in two parts: part 1 is a track's volume and pan; part 2 (per-track sub-mixes, track
+and bus dynamics, the master chain, stems) continues at AU-107 once AP2 part 2's float write pass
+has landed.
+
+- **AU-100 — The preview stays approximate for track dynamics, and says so (owner, 2026-10-30,
+  answer 1 (b)).** Linear track stages — the fader, the pan, later a track EQ — are exact per
+  composition track in the preview and the export alike. Track and bus dynamics run per
+  composition track in the preview, where S3 measured the difference: a limiter's ceiling
+  +0.85 dB over through a crossfade, a nest bus +1.4–1.8 dB; the preview has no master chain; the
+  guide and the meter say where preview and export differ. The export is exact through per-track
+  sub-mixes (S3: −147.7 dB against the reference). Reason: an exact preview — S3's
+  `AVAudioEngine` route, 0.02 ppm of drift, 60–150 ms to start — means rewriting the transport
+  (Playback's audio, AP7's meter feed, AP13's scrub, picture-to-audio sync), so it is a road-map
+  candidate issue, not part of AP10.
+- **AU-101 — Stems are separate files (owner, 2026-10-30, answer 2 (a)).** One file per track, or
+  per chosen set of tracks, written by one export job. Reason: every NLE and DAW reads separate
+  files, where many apps import only a multitrack movie's first audio track. Stems are part 2's.
+- **AU-102 — `tracks[].volume` and `tracks[].pan`, format 35.** `volume` is linear, 0…4 (+12.04 dB,
+  `TRACK_VOLUME_MAX`), default 1, written only when not 1; `pan` is −1…1, default 0, written only
+  when not 0 — after `matte`, on the timeline's tracks and a nest's alike, so every other project
+  writes the text it did and there is no migration step. `set_track` takes both and refuses
+  outside the range in `in_range`'s sentence (`volume must be between 0 and 4, not 5`, `pan must be
+  between -1 and 1, not 2`); a hand-written value outside is clamped where it plays. `nest` copies
+  volume and pan from every source track EXCEPT the nest clip's destination (`front_track`),
+  whose copy is unity and centre: the destination track still applies over the nest clip, so a
+  selection taken off one track sounds the same nested. (Mute is copied from every track, the
+  destination's too, because muting twice is muting once; a fader applied twice is not.) A
+  selection's clips from the OTHER source tracks then also get the destination track's volume and
+  pan on top of their own, as they already get its mute. `unnest` keeps neither on the way out,
+  as it keeps no mute: the clips land on the timeline's own tracks.
+- **AU-103 — Volume is an envelope term after mute, at every stage.** It multiplies each stage's
+  gain in `audio.rs` exactly where the track's mute zeroes it — the stage per track, the container
+  per depth — so a nested clip's sound is scaled by its own track's volume and by every enclosing
+  nest clip's track's. Solo and mute precedence are unchanged. Being in the envelope, the live
+  meter, the timeline bar's bars and Remove Silences hear it; Normalize, the Loudness read-out and
+  the clip limiter do not (they read the clip, AU-11, AU-22), so a track at ×4 can take a limited
+  clip past its ceiling.
+- **AU-104 — Pan is a balance by `AudioPanLaw`, after an enclosing nest's fold and before the clip
+  limiter.** Each audio segment of the plan carries `track_pans`: the pans of the tracks its voice
+  passes through, innermost first, clamped to ±1, zeros dropped, the key absent when none remain.
+  A stage whose nest clip's base `audio.mono` is true clears the pans collected inside it, since
+  that fold flattens them. The tap applies the product of the pans' constant-power pairs to
+  channels 0 and 1 after the clip's own pan and an enclosing nest's fold, and before the limiter;
+  it is skipped at unity, so an untouched project's samples stay bit-identical, and a segment with
+  `track_pans` gets a tap even when no clip asks for DSP. A track pan has no effect on a mono
+  source (its composition track has one channel, as a clip pan has none). A nest CLIP's own pan
+  still reaches nothing; only track pans travel, through the plan.
+- **AU-105 — The chrome.** A fifth header switch, `slider.horizontal.3` (fallback "V"), lit when
+  a track's volume is not 1 or its pan not 0, opens a popover on the track: Volume in dB, −60…+12
+  (the floor reads "Off" and writes 0; quick picks −12, −6, −3, 0, 3, 6) and Pan −100…100 (quick
+  picks −100, −50, 0, 50, 100, writing `pan / 100`), each a slider and a field, and Reset. A drag
+  is one undo step ("Track Volume", "Track Pan"); a field commit is one, and Reset is "Reset Track
+  Mix". Track ▸ Volume and Pan… (no key) and the header's context menu open the same popover on
+  the current track. Agents use `set_track {volume, pan}`: no new op, tool or FFI export.
+- **AU-106 — The proof.** `audio_ap10_proof.py`: export rows F1–F5 (fader arithmetic: track,
+  track × clip, inner × outer through a nest, the nest's unchanged level, a muted track at ×4),
+  P1–P5 (pan: the law, inner × outer, a folded nest, a mono source, clip × track), U1 (one undo
+  step, the read-back, no keys at defaults), V1 (the live meter against the export), and probe rows
+  B1–B4 (the balance, the chain order, `isInert`, `TrackMixLevel`); ten mutants, each killed by a
+  named row or `core/tests/track_mix.rs`; manual check SE-33 for the popover's feel.
+
 AU-110…AU-116 are AP11's (ducking by speech, and fade and crossfade shapes; survey B2, B9),
 recorded before its code.
 

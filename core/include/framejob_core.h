@@ -224,9 +224,12 @@ extern "C" {
  * `audio.de_esser`, each written only when set; no migration step.
  *
  * Version 34 is voice effects (spec §11 AU-140): `audio.voice`, after
- * `de_esser`, written only when set; no migration step. 35 and above, 1014
- * included, are newer. */
-#define RC_FORMAT_VERSION 34
+ * `de_esser`, written only when set; no migration step.
+ *
+ * Version 35 is a track's volume and pan (spec §11 AU-102): `tracks[].volume`
+ * and `tracks[].pan`, after `matte`, each written only when not its default;
+ * no migration step. 36 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 35
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

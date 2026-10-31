@@ -54,6 +54,8 @@ impl Track {
             locked: false,
             solo: false,
             matte: TrackMatte::None,
+            volume: 1.0,
+            pan: 0.0,
         }
     }
 }

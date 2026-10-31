@@ -535,6 +535,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   overlay and `QualifierPick.sample`). `EditorViewController+Eyedropper.swift` (322 → 339) gave
   its overlay's body to `CanvasPickOverlay`, which `CanvasEyedropperView` and the new
   `QualifierPickView` subclass. `ProjectSnapshot.swift`'s named seam is unchanged.
+  Road map "audio" AP10 gave it wiring only (`TrackSnapshot.volume` and `.pan`: the fields, their
+  init parameters and their lenient decode): 1436 → 1445. The named seam is unchanged.
 - `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
   `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
   extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,

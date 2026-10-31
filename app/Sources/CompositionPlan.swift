@@ -21,6 +21,9 @@ struct PlanSegment: Codable, Equatable {
     /// A RAMPED clip's one audio segment (spec §11 SR-6, SR-10): the map its
     /// rendered sound follows. Nil on every other segment.
     let ramp: PlanSpeedRamp?
+    /// An audio segment's track pans, innermost first (spec §11 AU-104):
+    /// the tap's balance after the clip's own pan. Empty when no track pans.
+    let trackPans: [Double]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -33,6 +36,7 @@ struct PlanSegment: Codable, Equatable {
         pitch = c.lenient(.pitch)
         input = c.lenient(.input)
         ramp = c.lenient(.ramp)
+        trackPans = c.lenient(.trackPans, [])
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the

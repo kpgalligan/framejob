@@ -36,6 +36,9 @@
 //! A bound is SOURCED from the constant that enforces it and never retyped
 //! here, which is what `core/tests/op_table.rs` checks by putting each end
 //! to the core and reading the refusal — including the numbers in it.
+//! A refused range that is not whole numbers (`set_track`'s `volume`
+//! 0–4 and `pan` −1–1) is stated in the tool's prose until [`Bound`]
+//! widens.
 //!
 //! ### The kinds
 //!
@@ -322,7 +325,8 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("move_track", &[req("track", Id), req("index", Index)]),
     op("set_track",
        &[req("track", Id), opt("name", Text), opt("hidden", Boolean), opt("muted", Boolean),
-         opt("locked", Boolean), opt("solo", Boolean), opt("matte", Matte)]),
+         opt("locked", Boolean), opt("solo", Boolean), opt("matte", Matte),
+         opt("volume", Number), opt("pan", Number)]),
     op("remove_empty_tracks", &[]),
     op("add_marker",
        &[req("at", Ticks), opt("name", Text), opt("chapter", Boolean), opt("color", Text)]),

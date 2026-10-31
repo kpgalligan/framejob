@@ -59,6 +59,10 @@ pub use crate::model_canvas::CanvasBlending;
 /// its own for the reason `model_props.rs` is.
 pub use crate::model_media_color::{CameraGamut, LogCurve, MediaColor};
 
+/// A track (spec §5.2's `tracks[]`), a file of its own so this one stays
+/// clear of the cap.
+pub use crate::model_track::Track;
+
 /// Linear RGBA, each channel 0..1. Alpha is premultiplied by nothing — the
 /// renderer decides.
 pub type Color = [f64; 4];
@@ -212,37 +216,6 @@ pub enum MediaKind {
 }
 
 // ---- tracks and markers --------------------------------------------------
-
-/// One kind of track only (spec §2): any clip may live on any track, and
-/// a later index in `Project::tracks` draws in front.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Track {
-    pub id: u32,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub hidden: bool,
-    #[serde(default)]
-    pub muted: bool,
-    /// Locked tracks are skipped by ripple, insert-time and hit-testing.
-    #[serde(default)]
-    pub locked: bool,
-    /// Solo (format version 3): while ANY track in this container — the
-    /// timeline, or one nest's own tracks — is soloed, every track that is
-    /// not is silent, and a track that is both muted and soloed stays
-    /// silent, because mute wins. Audio only: a solo hides nothing, and it
-    /// is applied as a gain envelope in `audio.rs`, never in the plan.
-    #[serde(default)]
-    pub solo: bool,
-    /// Matte (format version 14, spec §11 MT-1): `none` is an ordinary
-    /// track; any other mode makes the track's clips draw nothing on the
-    /// canvas and cut the track directly behind (MT-2, MT-3). Written only
-    /// when not `none` — this file's one `skip_serializing_if`, the model's
-    /// first (tone's nine keys in `model_props.rs` are the rest) — so an
-    /// ordinary track and every older file round-trip byte for byte.
-    #[serde(default, skip_serializing_if = "TrackMatte::is_none")]
-    pub matte: TrackMatte,
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Marker {

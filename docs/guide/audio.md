@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -443,6 +443,30 @@ A clip's own **Mute** (in the Volume section) silences just that clip.
 
 *Agents:* `set_track` (`track`, plus `muted`, `solo`, `hidden` or `locked`).
 
+## Track volume and pan
+
+Each track has its own **volume** and **pan**, applied on top of every clip on it. Click the fifth switch in the track header (the sliders), choose **Volume and Pan…** in the track's right-click menu, or choose **Track ▸ Volume and Pan…** for the current track. A small panel opens beside the header:
+
+| Control | Range | What it does |
+|---|---|---|
+| **Volume** | Off, −60 dB … +12 dB | The track's level. The quick picks are −12, −6, −3, 0, +3 and +6 dB. Dragging to the left end turns the track off. The read-out beside it shows the level as a percentage, or "Off". |
+| **Pan** | −100 (left) … 100 (right) | Leans the track's sound left or right. The quick picks are −100, −50, 0, 50 and 100. |
+| **Reset** | | Puts the volume back to 0 dB and the pan to the centre. |
+
+The sliders switch is lit while a track's volume or pan is not at its default.
+
+How track volume and pan work:
+
+- **They multiply what's on the track.** A clip at 200 % on a track at −12 dB plays at −6 dB. Two pans multiply too: a clip panned left on a track panned left leans further left.
+- **Mute still wins.** A muted track is silent whatever its volume.
+- **Pan is a balance, like a clip's pan.** It keeps the overall loudness steady as it moves, and it has no effect on a mono source.
+- **Nests hear their tracks.** A clip inside a nest plays through its own track inside the nest and through the track the nest clip sits on. Nesting a selection from one track keeps its sound: the nest's copy of that track starts at 0 dB and centre, because the track the nest clip lands on still applies. Clips from the selection's other tracks keep their own track's volume and pan inside the nest, and also get the destination track's. Un-nesting puts the clips back on the timeline's tracks without the nest's track settings. If a nest clip has **Mix to mono** on, pans of the tracks inside it no longer apply.
+- **What hears it.** The level meter, the timeline's bars and Remove Silences include track volume. Normalize, the Loudness read-out and a clip's limiter read the clip itself and don't, so a track turned up can take a limited clip past its ceiling.
+- **Each change is one undo step**: a drag ("Track Volume", "Track Pan"), a typed value or quick pick, or **Reset** ("Reset Track Mix").
+- **The preview and the export match.** Track volume and pan sound the same in both.
+
+*Agents:* `set_track` with `volume` (0–4 as a linear gain, 1 being unity and 4 being +12 dB) and `pan` (−1 to 1).
+
 ## Hearing a scrub
 
 When you click or drag along the ruler, you hear the sound under the playhead. Each time the playhead reaches a new frame, Frame Job plays about 80 ms of the mix forward from it, with a 5 ms fade at each end so the pieces don't click. Hold the mouse still and the sound stops within about a tenth of a second; let go and it stops.
@@ -570,7 +594,8 @@ The screen recorder can record a microphone with the screen, or record the micro
 ## Limits
 
 - Volume tops out at 3200 % (about +30 dB). The slider covers 0–400 %; type in the field for more.
-- Pan has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
+- Pan, a clip's or a track's, has no effect on a mono source, and Mix to mono has no effect on a one-channel source.
+- Track volume tops out at +12 dB (×4). A track's volume and pan can't be animated, and a track has no EQ or effects of its own yet.
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.

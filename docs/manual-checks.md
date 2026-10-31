@@ -461,6 +461,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does each effect sound right on your voice (which do not, and how), does Robot sound like a robot, are the pitch shifter's artefacts acceptable, and do lips and voice stay in sync?
 - **Source:** road map "audio" AP14 (spec §11 AU-141, AU-142, AU-146); `tools/proof/voice_proof.py` measures each effect against E0's numbers (pitch, band tilt, sidebands, echo times, reverb tails, loudness and sync), not how it sounds.
 
+**SE-33 — A track's Volume and Pan panel reads and feels right**
+- **Do:** 1. Put a stereo music or voice clip on a track and play it through headphones. 2. Click the track header's fifth switch (the sliders); drag Volume down to −12 dB and back to 0 while it plays, then drag Pan from −100 to 100 and back. 3. Type 6 in the Volume field and press Return; pick −50 from Pan's quick picks. 4. Press Reset. 5. Open the same panel from the header's right-click menu and from Track ▸ Volume and Pan…, and press ⌘Z after a drag. 6. Remove the track (or undo the track's creation) while the panel is open. 7. Look at the panel and the lit switch in light and dark appearance.
+- **Expect:** the sound follows the drag smoothly with no clicks or zipper noise; Pan moves the sound from the left speaker to the right with no dip in the middle; the drag is one undo step that puts the level back; Reset returns to 0 dB and centre and greys itself; the switch lights while the volume or pan is not at its default; "Off" shows at the left end of Volume; the panel closes when its track is gone; the labels, fields and read-out fit in both appearances.
+- **Answer:** does the panel's level and pan feel right while playing, and is anything cut off or unclear?
+- **Source:** road map "audio" AP10 part 1 (spec §11 AU-104, AU-105); `tools/proof/audio_ap10_proof.py` measures the fader and pan arithmetic on exports and the meter against the export (F1–F5, P1–P5, V1), not how the panel feels.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

@@ -577,6 +577,13 @@
    ],
    "note": "an edit or a playhead move"
   },
+  "showTrackMix:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Identity.swift `func showTrackMix(`"
+   ],
+   "note": "a popover on the current track; its controls edit"
+  },
   "setTrackMatte:": {
    "verdict": "none",
    "code": [

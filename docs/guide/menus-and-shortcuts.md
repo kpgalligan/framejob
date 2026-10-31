@@ -230,13 +230,14 @@ field.
 | Mute Audio | | Mutes the current track's sound |
 | Lock Track | | Locks the current track so its clips can't be edited |
 | Solo | | Plays only this track's sound. A checkmark shows when it is on |
+| Volume and Pan… | | Opens the current track's volume and pan panel ([Audio](audio.md#track-volume-and-pan)) |
 | Matte ▸ Off · Alpha · Inverted Alpha · Luma · Inverted Luma | | Makes the current track a matte that cuts the track behind it. A checkmark shows the track's mode ([Canvas and layers](canvas-and-layers.md)) |
 
 These items act on the current track. To act on a particular track, use that
 track's context menu ([below](#context-menus)).
 
 *Agents:* `add_track`, `remove_track`, `remove_empty_tracks`, `set_track`
-(hidden, muted, locked, solo, matte), `move_track`.
+(hidden, muted, locked, solo, matte, volume, pan), `move_track`.
 
 ## Mark menu
 
@@ -401,7 +402,7 @@ instead ([below](#preview-canvas-gestures)).
 | Drag | Track header | Moves the track up or down the stack |
 | Double-click | Track header | Renames the track |
 | ⌥-click | Track header | Selects every clip on that track |
-| Click | Header buttons (eye, speaker, lock, headphones) | Hide Video, Mute Audio, Lock Track, Solo |
+| Click | Header buttons (eye, speaker, lock, headphones, sliders) | Hide Video, Mute Audio, Lock Track, Solo, and the Volume and Pan panel |
 | Click | Breadcrumb in the corner, while a nest is open | Comes back out by one level |
 | Hold ⌘ while dragging | Any drag that snaps | Turns snapping off for that drag, even when you press ⌘ partway through |
 | Pinch, or ⌥ / ⌘ with the scroll wheel | Anywhere on the timeline | Zooms around the pointer |
@@ -504,6 +505,7 @@ The menu is for the track you clicked:
 
 - **Hide Video**, **Mute Audio**, **Lock Track**, **Solo**, each with a
   checkmark showing that track's state
+- **Volume and Pan…**, the track's volume and pan panel
 - **Matte ▸** Off · Alpha · Inverted Alpha · Luma · Inverted Luma, with a
   checkmark on the track's mode
 - **Remove Track**. You are asked first if the track holds clips. Greyed

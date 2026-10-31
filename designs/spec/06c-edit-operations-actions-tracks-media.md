@@ -117,7 +117,7 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`add_track {index?, name?}`** — Inserts (index 0 = back).
 - **`remove_track {track, with_clips=false}`** — Refuses on a non-empty track unless `with_clips`.
 - **`move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?,
-  matte?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
+  matte?, volume?, pan?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
   rule — while any track in the set is soloed every other is treated as muted, mute wins, audio
   only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and
   never in the plan, so a solo toggle changes ramps and nothing else. `matte` (format version 14,
@@ -125,7 +125,12 @@ The rules every op shares are §6a; the clip ops are §6b.
   switches a matte off, an unknown name is invalid input naming the five, and re-choosing the
   current mode is an identity. It changes the recipe alone (§7.3's `matte` and `mattes`), never
   the plan: a matte track's clips decode and sound as on any track. `move_track` and
-  `remove_track` change which track is behind a matte, visibly (MT-2).
+  `remove_track` change which track is behind a matte, visibly (MT-2). `volume` (linear, 0–4)
+  and `pan` (−1–1) are the track's fader and balance (format version 35, §11 AU-102): a value
+  outside its range is invalid input in `in_range`'s sentence (`volume must be between 0 and 4,
+  not 5`). Volume is an envelope term after mute (AU-103); pan is the plan's `track_pans`
+  (§7.2, AU-104). `nest` copies both from every source track but the nest clip's destination,
+  whose copy is unity and centre; `unnest` keeps neither.
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.

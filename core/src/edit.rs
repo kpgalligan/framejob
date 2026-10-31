@@ -180,7 +180,7 @@
 //! | `add_track` | Inserts a track at `index`, or at the front when it is absent; index 0 is the back-most. The default name is `Track <count + 1>`. |
 //! | `remove_track` | Refuses on a track that still holds clips unless `with_clips`, and on the last remaining track. |
 //! | `move_track` | Reorders the stack; index 0 is the back-most. |
-//! | `set_track` | Omitted fields keep their value. `matte: "none"` switches a matte off (MT-1). |
+//! | `set_track` | Omitted fields keep their value. `matte: "none"` switches a matte off (MT-1). `volume` (linear, 0–4, +12.04 dB at 4) and `pan` (−1–1) are the track's fader and balance, refused outside their ranges (spec §11 AU-102). |
 //! | `remove_empty_tracks` | Drops every track with no clips, keeping the back-most if that would empty the stack. |
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
@@ -621,6 +621,10 @@ pub enum Op {
         solo: Option<bool>,
         #[serde(default)]
         matte: Option<TrackMatte>,
+        #[serde(default)]
+        volume: Option<f64>,
+        #[serde(default)]
+        pan: Option<f64>,
     },
     /// A struct variant with no fields, not a unit one, so that
     /// `deny_unknown_fields` applies to it like every other op.
@@ -958,6 +962,8 @@ impl Project {
                 locked,
                 solo,
                 matte,
+                volume,
+                pan,
             } => self.set_track(
                 *track,
                 name.as_deref(),
@@ -966,6 +972,8 @@ impl Project {
                 *locked,
                 *solo,
                 *matte,
+                *volume,
+                *pan,
             ),
             Op::RemoveEmptyTracks {} => self.remove_empty_tracks(),
             Op::AddMarker {

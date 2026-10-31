@@ -161,7 +161,9 @@ extension CompositionBuilder {
                 assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
-                let trackDSP = dsp.isEmpty
+                // A track pan alone asks for a tap too (spec §11 AU-104).
+                let pans = family.segments.contains { !$0.trackPans.isEmpty }
+                let trackDSP = dsp.isEmpty && !pans
                     ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
                 // One shift for the media's place and the isolation spans'
                 // (AU-53), so the two cannot disagree about a lead.

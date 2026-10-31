@@ -1607,8 +1607,8 @@ final class TimelineHeaderView: NSView {
         return hit === self ? nil : hit
     }
 
-    /// The four toggles (eye, speaker, lock, headphones), laid out from the
-    /// row's bottom-left. `local` is the
+    /// The five switches (eye, speaker, lock, headphones, sliders), laid out
+    /// from the row's bottom-left. `local` is the
     /// point relative to the ROW's top-left corner; the content view's hit
     /// test is the only caller, which is why the geometry lives here beside
     /// the drawing that has to agree with it.
@@ -1625,7 +1625,7 @@ final class TimelineHeaderView: NSView {
     }
 
     static func button(at local: CGPoint, height: CGFloat) -> TimelineHeaderButton? {
-        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked, .solo]
+        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked, .solo, .mix]
         for (index, button) in buttons.enumerated()
         where buttonRect(index, height: height).insetBy(dx: -1, dy: -1).contains(local) {
             return button
@@ -1664,6 +1664,7 @@ final class TimelineHeaderView: NSView {
                 (.muted, track.muted ? "speaker.slash" : "speaker.wave.2", "M", track.muted),
                 (.locked, track.locked ? "lock" : "lock.open", "L", track.locked),
                 (.solo, "headphones", "S", track.solo),
+                (.mix, "slider.horizontal.3", "V", track.volume != 1 || track.pan != 0),
             ]
             for (position, toggle) in toggles.enumerated() {
                 var box = Self.buttonRect(position, height: height)
