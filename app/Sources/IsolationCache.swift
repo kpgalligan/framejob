@@ -106,7 +106,7 @@ enum IsolationCache {
         for s: PlanSegment, dsp: AudioDSPParameters, urls: [UInt32: URL],
         reverse: ReverseResolution
     ) -> RampAudioRequest? {
-        guard dsp.isolation(for: s.clip) > 0, isolatable(s), let directory = reverse.isolated,
+        guard dsp.wantsIsolation(s.clip), isolatable(s), let directory = reverse.isolated,
             let mediaFile = urls[s.media], !reverse.pending.contains(s.clip)
         else { return nil }
         let reversedFile = reverse.ready[s.clip]
@@ -155,7 +155,7 @@ enum IsolationCache {
     /// `ensureRampAudio`).
     static func status(of clip: UInt32, in document: ProjectDocument) -> IsolationStatus {
         let dsp = AudioDSPParameters(snapshot: document.project.snapshot)
-        guard dsp.isolation(for: clip) > 0 else { return .off }
+        guard dsp.wantsIsolation(clip) else { return .off }
         let reverse = ReverseSource.shared.resolution(for: document.recipeKey)
         let urls = document.mediaURLs()
         var states: [IsolationStatus] = []

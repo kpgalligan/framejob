@@ -105,7 +105,8 @@ detail there.
   an `Optional<T>.none` widened to `Any?` is a non-nil `Any` wrapping a nil.
   The typed `setActionEnd` LIFTS every top-level null out of its patch into
   `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
-  at the end); `setActionEndRaw`'s nulls stay removals, which is what
+  at the end), and a null slot inside `audio.eq` into `audio.eq.<slot>`
+  (AU-88); `setActionEndRaw`'s nulls stay removals, which is what
   `clearOps` and every agent call send, and it writes `off` only when non-empty and `schema` only when non-nil
   (the agent door fills it for a graphic end from the module's current
   revision, spec §11 G-34).
@@ -1113,7 +1114,8 @@ the key map behind it.
   +`Loudness`: the Volume section's Loudness and At volume rows and the
   Normalize row's Mode popup and Target field, spec §11 AU-15; +`Limiter`: the
   Limiter section, spec §11 AU-26, registered after Mix in
-  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, base-only;
+  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, animated
+  through actions (AU-88);
   +`Isolation`: the Voice Isolation section, spec §11 AU-56, registered
   before Noise Reduction — Isolate voice, Amount, Status, the Status read
   through the pane's `IsolationCache.Memo`, dropped on
@@ -1121,9 +1123,10 @@ the key map behind it.
   Effect section, spec §11 AU-146, registered right after Voice Isolation,
   its Status read through the pane's `voiceMemo`; +`HumChannels` and
   +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
-  Voice Effect and before Noise Reduction, base-only; +`Dynamics`: the Gate
-  and De-esser sections, spec §11 AU-48, registered after Noise Reduction and
-  before Compressor, base-only, their Status and Loudness rows read through
+  Voice Effect and before Noise Reduction, animated through actions (AU-88);
+  +`Dynamics`: the Gate and De-esser sections, spec §11 AU-48, registered
+  after Noise Reduction and before Compressor, animated through actions
+  (AU-88), their Status and Loudness rows read through
   the pane's `loudnessMemo`) ·
   `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -1844,8 +1847,8 @@ the key map behind it.
   `GraphicLibrary.maxSide`, since an error card is drawn through `bitmap(_:)`
   at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
   line, so it stays one integer literal.
-- `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioDSP.swift` ·
-  `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
+- `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioAutomation.swift` ·
+  `AudioDSP.swift` · `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
   `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
   `MTAudioProcessingTap` playback and export share, and the nine sample-level
   effects after voice isolation's crossfade, which runs first (AU-54,
@@ -1869,7 +1872,15 @@ the key map behind it.
   (`AudioTapContext`, `AudioTap.make`); `AudioTapSchedule.swift` is what a
   track's tap is told when the composition is built (`AudioDSPSpan`,
   `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
-  it (road map "audio" AP0). `AudioDSP.swift` keeps the parameters
+  it (road map "audio" AP0). `AudioAutomation.swift` (road map "audio" AP8b,
+  spec §11 AU-85…AU-88) reads the plan's per-segment `automation`:
+  `PlanAudioPoint`, `AudioProps.interpolated` (numbers linear, presence,
+  switches and the held slope, mains and harmonics from the left),
+  `AudioDSPAutomation` (a run's settings at its anchor on the absolute
+  32-frame grid, runs cut at grid boundaries and point frames, the track-wide
+  stages from any point), `AudioPanRamp` (the pan per sample, scalar) and
+  `AudioPatch.routedInsideAction` (the inspector's base/end split).
+  `AudioDSP.swift` keeps the parameters
   (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP` with its
   `channels`, `eq`, `gate` and `deEsser`), the pan law and the chain (`AudioDSPChain`, whose order
   is the channel strip's); each stage is a file of its own,
@@ -1891,7 +1902,7 @@ the key map behind it.
   presets (`EqPreset`, each writing only its own slot); `AudioEQCurveView` the
   drawn response at 48 kHz; `AudioPane+EQ` the EQ section and
   `AudioPane+HumChannels` the Channels and Hum sections, after Voice Effect
-  and before Noise Reduction, all base-only.
+  and before Noise Reduction, all animated through actions (AU-88).
 - `AudioEnvelopeFollower.swift` · `AudioGateStage.swift` ·
   `AudioDeEsserStage.swift` · `AudioDynamicsProps.swift` ·
   `AudioDynamicsLevels.swift` · `AudioPane+Dynamics.swift` — road map "audio"

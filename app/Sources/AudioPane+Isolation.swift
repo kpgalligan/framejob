@@ -4,8 +4,8 @@ import AppKit
 /// on-device voice model, rendered offline per clip window and crossfaded
 /// with the clip's own sound by Amount before every other stage (AU-53,
 /// AU-54). It also reduces room echo (B4's verdict), so there is no separate
-/// de-reverb control. Base-only: with an action selected it still writes the
-/// clip (AU-50).
+/// de-reverb control. With an action selected it writes the action's end,
+/// and the Amount animates, from 0 when the base has none (AU-88).
 extension AudioPane {
     func isolationSection() -> InspectorSection {
         let binding = self.binding

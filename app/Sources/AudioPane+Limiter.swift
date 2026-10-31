@@ -10,8 +10,8 @@ extension AudioPane {
     ///
     /// Every control writes a whole `LimiterProps`, the compressor's way: the
     /// patch replaces the object, so each edit re-sends the other value as it
-    /// stands. Base-only (`structural(audio:)`): with an action selected it
-    /// still writes the clip.
+    /// stands. With an action selected it writes the action's end, "Limit
+    /// peaks" turned off there keying it off (spec §11 AU-88).
     ///
     /// The ceiling holds AFTER the clip's fader at its base volume (AU-22):
     /// fades and ducks only lower it, so it is what the clip sends the mix at

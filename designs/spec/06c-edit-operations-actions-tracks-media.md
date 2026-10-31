@@ -59,7 +59,11 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`set_action_end {clip, action, patch, off?, schema?}`** — Merges into the end patch; a key set to `null`
   removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`,
   `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that
-  optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`,
+  optional property OFF at the end (§5.4, §11 CI-14), and `audio.eq.<slot>` — `high_pass`,
+  `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` or `low_pass` — writes it at that slot
+  of the end's `eq`, one EQ slot keyed off (§11 AU-88), the only three-part path (an unknown slot
+  is an **error** naming the seven, any other deeper path the `"group.key"` one); a malformed
+  path, `video.motion`,
   `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
   also names are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a

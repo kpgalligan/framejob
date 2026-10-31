@@ -30,7 +30,7 @@ extension Exporter {
         let dsp = AudioDSPSource.shared.parameters(for: key)
         let segments = plan.audioTracks.lazy.flatMap(\.segments)
         let isolated = segments.contains {
-            dsp.isolation(for: $0.clip) > 0 && IsolationCache.isolatable($0)
+            dsp.wantsIsolation($0.clip) && IsolationCache.isolatable($0)
         }
         let voiced = segments.contains {
             dsp.voice(for: $0.clip) != nil && IsolationCache.isolatable($0)
@@ -48,7 +48,7 @@ extension Exporter {
         }
         if isolated, reverse.isolated == nil,
             let orphan = segments.first(where: {
-                dsp.isolation(for: $0.clip) > 0 && IsolationCache.isolatable($0)
+                dsp.wantsIsolation($0.clip) && IsolationCache.isolatable($0)
                     && urls[$0.media] != nil && !reverse.pending.contains($0.clip)
             })
         {

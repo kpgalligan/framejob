@@ -12,6 +12,7 @@
 //! Declarations and re-exports only — no implementation lives here.
 
 pub mod actions;
+mod actions_audio;
 mod actions_clamp;
 mod actions_color;
 mod actions_curves;
@@ -19,6 +20,7 @@ mod actions_graphic;
 mod actions_qualifier;
 pub mod agent;
 pub mod audio;
+mod audio_automation;
 pub mod audio_crossfade;
 pub mod audio_duck;
 pub mod audio_duck_speech;

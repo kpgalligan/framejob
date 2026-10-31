@@ -1486,6 +1486,98 @@ gate` PASS 457 s (names 2, typecheck 13 with the four baseline warnings, fmt 3, 
 with no plan, the queue line unread by S1, names without Unicode normalization). Part 2b
 continues at AU-150.
 
+### AP8b's record (2026-10-31)
+
+Part 2 of AP8, **AP8b**: every other audio parameter as action ends (survey A9), built in lane C
+from `e55de46`. The leveller's target is left out: AP6 part 2 had not landed (`git log` at
+`e55de46` has no AP6); it joins `TAP_KEYS` when it does.
+
+**Decided.** AU-85…AU-89, recorded before the code: the plan's per-segment `automation` (points at
+the voice's ends, each tap-key action's ends and the envelope's 1/30 s grid inside an eased one,
+each the core's `evaluate_clip` cut to the eleven tap keys; absent otherwise, so every other plan
+is the text it was); `isolation` present at 0 and the slopes, mains and harmonics held to the
+action's end (core and Swift); the tap's anchor on an absolute 32-frame grid in lookup frames, runs
+cut at grid boundaries and point frames (the head's too), pan per sample, the Amount per frame,
+switches at a point's frame with no glide, `usesLimiter`/`usesNoiseReduction` from any point;
+renders and levels wanted from an end, the routing inside an action (amending CI-3, AU-21, AU-37,
+AU-46, AU-50) and `off`'s `audio.eq.<slot>` (extending CI-14); the proof. The spec review's three
+objections were taken: `isolates` follows a wanted set, so a clip whose base Amount is 0 is
+rendered and crossfaded from its end; the held numbers are held in Swift too (they are Ints
+there); an EQ slot unticked inside an action keys that slot off rather than vanishing as a
+removal.
+
+**Landed.** Core (no format, FFI, op or op-table change): `audio_automation.rs` (121: `TAP_KEYS`,
+`AutomationPoint`, `names_tap_key`, `Project::automation`), `actions_audio.rs` (56: `audio_json`,
+`HELD_AUDIO_NUMBERS`, `hold_audio_steps`); wiring in `actions.rs` (587), `plan.rs`'s
+`audio_segment` over `track.voices`, `edit_action.rs`'s `OffPath` and `EQ_SLOTS` (595),
+`audio.rs`'s `Voice.start`/`end` `pub(crate)`; `core/tests/audio_automation.rs` (8 tests) and
+three `action_off.rs` cases. App: `AudioAutomation.swift` (283: `PlanAudioPoint`,
+`AudioProps.interpolated`, `AudioDSPAutomation`, `AudioPanRamp`, `routedInsideAction`);
+`PlanSegment.automation`; `AudioDSPSpan.automation`, `AudioTrackDSP`'s spans and track-wide
+stages from points, `AudioDSPParameters`' static `dsp`, bases, wanted set, `automation(for:)` and
+`wantsIsolation` (`AudioTapSchedule.swift`, 445 after the fix); the tap's anchors and caps (`AudioTap.swift`,
+432); `AudioDSPChain.process`'s `panRamp` (`AudioDSP.swift`, 546); `AudioIsolationAmount` and the
+per-frame Amount (`AudioIsolation.swift`, 241); `wantsIsolation` at `IsolationCache`'s request and
+status and `Exporter+RampAudio`'s two sites; `AudioDynamicsLevels.wanting` from ends; the
+builder's tap for an automated family; `ReelOp.setActionEnd`'s EQ slot lift;
+`structural(audio:for:)` through `routedInsideAction`; the catalog's `set_action_end` and
+`set_audio` prose and `set_action_end`'s UI-path comment; the Sound panes' doc comments. Docs:
+spec §4.3a, §4.3b, §5.2b, §5.4, §6c, §7.2, §7.4, §7.10 and the indexes' Lines cells, CI-3's and
+CI-14's sentences; the guide's "Animating the sound" and Limits, motion-and-transitions.md's
+never-animated list, the README highlight; SE-37; the proof README.
+
+**Deviations.** E4 compares the limiter-on export with the plain one over [158 samples, 3 s − 158
+samples) rather than everything before 3 s: the clip limiter's 158 samples (AU-20) are both the
+head its lead cannot place before 0 (AU-23's head cost, 157 samples differing at the start) and
+its lookahead, which turns the gain down 158 samples before the first limited sample (158 samples
+differing before 3 s); both are the limiter's own behaviour, not the automation's. Outside the
+spec's file list: `docs/guide/motion-and-transitions.md`, whose never-animated list named Pan, Mix
+to mono, Noise Reduction and the Compressor.
+
+**Measured** (the lane, on the Debug app): `audio_ap8b_proof.py --probe` 8/8 — A2 63 points, the
+512-, 4096- and irregular-buffer renders byte-identical; A3 the per-sample pan's worst error 0.0;
+A5 the Amount's worst error 1.47e-08 over 4 amounts. The MCP run 16/16 — E1 120 windows × 2
+channels, worst 0.0000 dB; E2 worst 0.0057 dB; E3 worst 0.0272 dB; E4 0.00 LSB over the window,
+true peak −6.013 dBTP after; E5 worst 1.00 LSB over 192,000 frames; E6 −55.97 dB before, 0.0000 dB
+after, the end stored as `{"audio": {"eq": {"high_pass": null}}}`; V1 |ΔI| 0.0000 LU; U1 one undo
+step, no `Frame Job: ` line. `--mutants` 13/13 killed. Regressions: `eq_probe.py` 11/11,
+`limiter_probe.py` 9/9, `audio_ap4_probe.py` 11/11, `audio_ap5_proof.py --probe` 10/10,
+`audio_ap10_proof.py --probe` 4/4, `voice_proof.py --probe` 11/11; `spec_index_proof.py`
+213/213; `make typecheck` the four baseline warnings; `make gate` PASS 394 s (names 1, typecheck 6,
+fmt 3, lint 1, test 220, app 163). Against Release after the gate: the MCP run 16/16 with the
+figures above, no `Frame Job: ` line; `audio_ap5_proof.py --instance` 12/12 (I0–I10, I1b).
+
+**Review.** Review 1 found one should-fix: a segment whose automation was inert at every point
+fell back to the clip's base settings (a nest clip seen only after its inner clip's action keyed
+the compressor off still ran the base compressor). Fixed in the lane (`68c20fb`): such a segment
+is skipped, and the inert drop stays for a segment with no automation; sound for the track pans,
+because `settings(at:)` carries the segment's `trackBalance`. That pass: `make typecheck` the four
+baseline warnings, `--probe` 8/8, the six regression probes all-pass, `make gate` PASS 512 s, the
+Release MCP run 16/16 with no `Frame Job: ` line, `audio_ap5_proof.py --instance` 12/12;
+`--mutants` not re-run (no mutant anchor in the changed file). Review 2 passed, with one nit: no
+probe row or mutant covers the skip. Review 1's two nits were left as instructed: a voiced clip
+with an action-only isolation asks for an isolation render it never plays (AU-143 voices from the
+base), and `off: ["audio.eq", "audio.eq.high_pass"]` is accepted with the whole-EQ `off` dropped.
+
+**Integrated.** AP10b (`f334267`) had landed since the lane's base. The phase bumps no format.
+Conflicts were taken as unions: `CompositionBuilder+AudioTracks.swift` (AP10b's `owners` line
+beside this phase's automated tap), the decisions index's `audio.md` row (AU-85…AU-89 between
+AP8a's and AP9's), the proof README (this section after AP10b's), this record after AP10b's, and
+the spec indexes' Lines cells counted again (`spec_index_proof.py` 213/213). AP10b took SE-36, so
+this phase's check is SE-37 (AU-89 and its index row follow). The CLAUDE.md edits owed went in:
+core's map names `actions_audio.rs` and `audio_automation.rs`; app's tap entry names
+`AudioAutomation.swift`, and the EQ, Hum, Channels, Limiter, Gate and De-esser sections read
+"animated through actions (AU-88)"; both maps' `off` sentences gained `audio.eq.<slot>`.
+On the merged tree `make gate` PASS 324 s (names 1, typecheck 6 with the four baseline warnings,
+fmt 3, lint 8, test 186, app 121). The resolution touched a Swift file, so the proofs ran again
+against Release after the gate: `audio_ap8b_proof.py` 16/16 with the lane's figures (E2 0.0057 dB,
+E3 0.0272 dB, E4 0.00 LSB and −6.013 dBTP, E5 1.00 LSB, E6 −55.97 dB, V1 0.0000 LU), no
+`Frame Job: ` line; `audio_ap5_proof.py --instance` 12/12.
+
+**Owed.** SE-37 for the owner. Filed at integration: review 2's nit (no probe row for the inert
+skip) and review 1's two nits (the unused isolation render for a voiced clip, `audio.eq` beside
+`audio.eq.<slot>` in one `off`). The leveller's target joins `TAP_KEYS` with AP6 part 2.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

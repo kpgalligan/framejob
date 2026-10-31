@@ -9,8 +9,8 @@ import AppKit
 /// per slot a checkbox writing that slot's default and its Frequency, Gain,
 /// Q and Slope. Every control writes a whole `EqProps`, the compressor's way
 /// (`EqProps.dictionary` writes every slot, so a patch that merges per key
-/// still turns one off). Base-only (`structural(audio:)`): with an action
-/// selected it still writes the clip.
+/// still turns one off). With an action selected it writes the action's end,
+/// where a slot turned off is keyed off as `audio.eq.<slot>` (spec §11 AU-88).
 extension AudioPane {
 
     func eqSection() -> InspectorSection {

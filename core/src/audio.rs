@@ -179,8 +179,8 @@ pub(crate) fn covers(start: Ticks, end: Ticks, t: Ticks, side: Side) -> bool {
 #[derive(Debug, Clone)]
 pub struct Voice<'a> {
     /// The span in PROJECT time, already clipped to every nest clip above.
-    start: Ticks,
-    end: Ticks,
+    pub(crate) start: Ticks,
+    pub(crate) end: Ticks,
     pub(crate) stages: Vec<Stage<'a>>,
 }
 

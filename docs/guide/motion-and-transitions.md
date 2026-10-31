@@ -44,7 +44,7 @@ A new action from **Add Action** is **Linear**. A zoom action is **Ease In Out**
 Some things are never animated. These rows write the clip itself, whatever is selected, and are marked ⊘ in the Clip tab:
 
 - The Motion presets section (below).
-- In the Sound sub-tab: Pan, Mix to mono, Ducking, Noise Reduction and the Compressor.
+- In the Sound sub-tab: Ducking, the fade shapes, the Voice Effect, and a nest clip's Mix to mono. Every other audio setting animates ([Audio](audio.md#animating-the-sound)).
 - In the Clip sub-tab's Speed section: Keep pitch and Fit to.
 - **Adding or removing** a filter or an obscure region. Changing a value inside an existing entry still animates.
 - A shape's own properties in the Shape sub-tab (its kind, stroke, fill, gradient and arrows). Its position, scale and opacity animate like any clip's.

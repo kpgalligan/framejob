@@ -6,7 +6,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::audio::Ducker;
+use crate::audio::{Ducker, Voice};
 use crate::audio_duck_speech::duck_ramps;
 use crate::evaluate::{json, Assignment};
 use crate::model::Project;
@@ -75,7 +75,14 @@ impl Project {
                 out.insert("track".to_string(), Value::from(track.track));
                 out.insert(
                     "segments".to_string(),
-                    Value::Array(track.segments.iter().map(|s| s.to_json(true)).collect()),
+                    Value::Array(
+                        track
+                            .segments
+                            .iter()
+                            .zip(&track.voices)
+                            .map(|(s, voice)| self.audio_segment(s.to_json(true), voice))
+                            .collect(),
+                    ),
                 );
                 // The envelope is computed from the voices, not the
                 // segments: fades, actions, mute and ducking all live in the
@@ -180,6 +187,19 @@ impl Project {
             if !input.is_null() {
                 segment.insert("input".to_string(), input);
             }
+        }
+        segment
+    }
+
+    /// An audio segment as the plan publishes it: with `automation` — the
+    /// points `audio_automation.rs` evaluates for its voice — ONLY when its
+    /// clip has an action naming a tap key (spec §11 AU-85), after
+    /// `track_pans`, so every other plan is the text it was. `voice` is the
+    /// segment's own: `CompTrack.voices` is one per audio segment, in order.
+    fn audio_segment(&self, mut segment: Value, voice: &Voice<'_>) -> Value {
+        let points = self.automation(voice);
+        if let (false, Value::Object(fields)) = (points.is_empty(), &mut segment) {
+            fields.insert("automation".to_string(), json(&points));
         }
         segment
     }

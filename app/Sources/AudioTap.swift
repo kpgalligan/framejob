@@ -73,6 +73,9 @@ final class AudioTapContext {
     /// Where the last buffer ended, in 48 kHz composition frames, for a
     /// buffer with no usable time.
     private var positionFrame: Int64 = 0
+    /// The same at the tap's own rate: the automation's absolute grid
+    /// (AU-87) for a buffer with no usable time.
+    private var gridPosition: Int64 = 0
     /// Where this track's levels are published, on a metering (playback)
     /// build; nil on every export and on every rendered frame. Written on the
     /// audio thread with two relaxed atomic stores and a copy into its
@@ -152,6 +155,7 @@ final class AudioTapContext {
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
         position = 0
         positionFrame = 0
+        gridPosition = 0
         isolates = !(isolation?.isEmpty ?? true)
             && sampleRate == Double(IsolationRenderer.sampleRate)
     }
@@ -184,6 +188,13 @@ final class AudioTapContext {
             ).value
             : positionFrame
         positionFrame = frame + Int64(frames)
+        // The buffer's first frame at the tap's rate, the automation's grid.
+        let gridBase = time.isNumeric
+            ? CMTimeConvertScale(
+                time, timescale: CMTimeScale(sampleRate), method: .roundHalfAwayFromZero
+            ).value
+            : gridPosition
+        gridPosition = gridBase + Int64(frames)
 
         // Isolation first (AU-54): the crossfade of the dry input with the
         // clip's render, on the whole buffer, before every stage of the chain.
@@ -213,17 +224,36 @@ final class AudioTapContext {
             // that much early, and the limiter's delay brings it back (AU-23).
             // The head stages (pick, EQ, hum) run before the noise reducer, so
             // on a noise-reduced track they look `headLead` further ahead, and
-            // a run ends at a cut of either lookup (AU-34).
+            // a run ends at a cut of either lookup (AU-34). An automated
+            // span's run takes its settings at its anchor on the absolute
+            // grid and ends at a grid boundary or a point (AU-87), the
+            // head's included; pan then moves per sample.
             var offset = 0
             while offset < frames {
                 let at = start + track.lookupLead + ticks(frames: offset)
                 let run = self.run(from: at, remaining: frames - offset)
                 var length = run.length
+                var params = run.dsp
                 var head: AudioClipDSP?
+                var panRamp: AudioPanRamp?
+                let lookup = gridBase + Int64(offset) + leadFrames(track.lookupLead)
+                if let index = run.span, let automation = track.spans[index].automation {
+                    let control = automation.control(
+                        atFrame: lookup, spanStart: track.spans[index].start, rate: sampleRate)
+                    (params, panRamp) = (control.settings, control.pan)
+                    length = min(length, control.frames)
+                }
                 if track.headLead != 0 {
                     let ahead = self.run(from: at + track.headLead, remaining: frames - offset)
                     length = min(length, ahead.length)
                     head = ahead.dsp
+                    if let index = ahead.span, let automation = track.spans[index].automation {
+                        let control = automation.control(
+                            atFrame: lookup + leadFrames(track.headLead),
+                            spanStart: track.spans[index].start, rate: sampleRate)
+                        head = control.settings
+                        length = min(length, control.frames)
+                    }
                 }
                 guard length > 0 else { break }
                 for index in 0..<count {
@@ -233,7 +263,7 @@ final class AudioTapContext {
                 channels.withUnsafeMutableBufferPointer { pointers in
                     chain.process(
                         UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
-                        frames: length, params: run.dsp, head: head)
+                        frames: length, params: params, head: head, panRamp: panRamp)
                 }
                 offset += length
             }
@@ -271,24 +301,32 @@ final class AudioTapContext {
         Ticks(frames) * ReelTime.perSecond / sampleRate
     }
 
+    /// A lead in ticks as whole frames at the tap's rate, rounded (AU-87).
+    private func leadFrames(_ ticks: Ticks) -> Int64 {
+        (ticks * sampleRate + ReelTime.perSecond / 2) / ReelTime.perSecond
+    }
+
     private func samples(_ ticks: Ticks) -> Int {
         let value = max(ticks, 0) * sampleRate / ReelTime.perSecond
         return value > Ticks(Int.max) ? Int.max : Int(value)
     }
 
-    /// The longest run from `at` over which one clip's settings hold, and
-    /// those settings. A gap between clips is a run of inert samples rather
-    /// than a stop, so the silence between two panned clips stays silence.
-    private func run(from at: Ticks, remaining: Int) -> (length: Int, dsp: AudioClipDSP) {
+    /// The longest run from `at` over which one clip's settings hold, those
+    /// settings, and the span's index. A gap between clips is a run of inert
+    /// samples rather than a stop, so the silence between two panned clips
+    /// stays silence.
+    private func run(from at: Ticks, remaining: Int)
+        -> (length: Int, dsp: AudioClipDSP, span: Int?)
+    {
         guard let index = span(covering: at) else {
             // Not inside any span: run to whichever comes first, the next
             // span's start or the end of the buffer.
             guard let next = track.spans.first(where: { $0.start > at })?.start
-            else { return (remaining, .inert) }
-            return (min(remaining, max(1, samples(next - at))), .inert)
+            else { return (remaining, .inert, nil) }
+            return (min(remaining, max(1, samples(next - at))), .inert, nil)
         }
         let span = track.spans[index]
-        return (min(remaining, max(1, samples(span.end - at))), span.dsp)
+        return (min(remaining, max(1, samples(span.end - at))), span.dsp, index)
     }
 
     /// Binary search rather than a carried cursor: a scrub jumps anywhere, and

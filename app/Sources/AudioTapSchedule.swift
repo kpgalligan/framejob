@@ -17,7 +17,19 @@ struct AudioDSPSpan: Equatable {
     let start: Ticks
     /// Exclusive.
     let end: Ticks
+    /// The clip's base settings; what every run reads on a span without
+    /// `automation`.
     let dsp: AudioClipDSP
+    /// The clip's automation when it moves the tap's settings (spec §11
+    /// AU-87): each run then reads its settings at its anchor instead.
+    let automation: AudioDSPAutomation?
+
+    init(start: Ticks, end: Ticks, dsp: AudioClipDSP, automation: AudioDSPAutomation? = nil) {
+        self.start = start
+        self.end = end
+        self.dsp = dsp
+        self.automation = automation
+    }
 }
 
 /// What one composition audio track's tap needs to know, decided once when
@@ -56,15 +68,24 @@ struct AudioTrackDSP: Equatable {
             var dsp = parameters.dsp(for: segment.clip)
             // The tracks' pans ride the plan, per segment (spec §11 AU-104).
             dsp.trackBalance = AudioTrackBalance(pans: segment.trackPans)
-            guard !dsp.isInert else { continue }
+            // The clip's actions, when they move anything the tap runs (AU-87).
+            // Inert points are the segment's whole state, so the base does
+            // not stand in for them: nothing runs there.
+            let automation = parameters.automation(for: segment)
+            if let automation, automation.isInert { continue }
+            guard !dsp.isInert || automation != nil else { continue }
             spans.append(
                 AudioDSPSpan(
-                    start: segment.start, end: segment.start + segment.duration, dsp: dsp))
+                    start: segment.start, end: segment.start + segment.duration, dsp: dsp,
+                    automation: automation))
         }
         self.spans = spans
         isActive = !spans.isEmpty
-        usesNoiseReduction = spans.contains { $0.dsp.noiseReduction > 0 }
-        usesLimiter = spans.contains { $0.dsp.limiter != nil }
+        // A stage switched on at an action's end runs for the whole track too.
+        usesNoiseReduction = spans.contains {
+            $0.dsp.noiseReduction > 0 || $0.automation?.usesNoiseReduction == true
+        }
+        usesLimiter = spans.contains { $0.dsp.limiter != nil || $0.automation?.usesLimiter == true }
         lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0
         headLead = usesNoiseReduction ? CompositionBuilder.AudioShift.noiseReductionLead : 0
     }
@@ -96,8 +117,15 @@ struct AudioDSPParameters: Equatable {
     private let clips: [UInt32: AudioClipDSP]
     /// Each clip's `audio.isolation` when above 0 (spec §11 AU-50, AU-53):
     /// the tap's crossfade with the clip's isolated render, before the chain.
-    /// Base only, as the rest, and never on a nest clip.
+    /// The BASE amount, never on a nest clip; an action's amounts ride the
+    /// plan's automation (AU-88).
     private let isolation: [UInt32: Double]
+    /// The clips whose isolated render is wanted: the base asks, or any
+    /// action end's `audio.isolation` is above 0 (AU-88). Never a nest clip.
+    private let wantedIsolation: Set<UInt32>
+    /// Each non-nest clip's base volume (the limiter's divisor, AU-22) and
+    /// measured level (AU-41), which its automation's settings keep.
+    private let bases: [UInt32: Base]
     /// The gated or de-essed clips whose level is still pending (AU-42):
     /// they play without both stages, and an export waits for them.
     let pendingLevels: Set<UInt32>
@@ -105,6 +133,11 @@ struct AudioDSPParameters: Equatable {
     /// §11 AU-140, AU-141): rendered offline and played in place of the
     /// clip's sound before the chain (AU-143). Base only, never on a nest clip.
     private let voiceSettings: [UInt32: VoiceSettings]
+
+    private struct Base: Equatable {
+        let volume: Double
+        let level: Double?
+    }
 
     static let empty = AudioDSPParameters(clips: [:], isolation: [:], voiceSettings: [:])
 
@@ -114,6 +147,8 @@ struct AudioDSPParameters: Equatable {
     ) {
         self.clips = clips
         self.isolation = isolation
+        wantedIsolation = Set(isolation.keys)
+        bases = [:]
         pendingLevels = []
         self.voiceSettings = voiceSettings
     }
@@ -157,13 +192,12 @@ struct AudioDSPParameters: Equatable {
     /// clip that asked; the alternative — fold only when every nest clip
     /// showing the nest agrees — makes the checkbox do nothing at all.
     ///
-    /// **Base properties only, never through actions.** A clip's numbers can
-    /// be animated (`actions.rs` lerps any of them), and none of the four is
-    /// read at the animated value: the plan carries no per-tick audio, the
-    /// tap would have to evaluate the action itself, and evaluation is Rust's
-    /// job. Ducking already works this way — `audio.rs`'s `duckers()` reads
-    /// base props and says so — so this is the established answer rather than
-    /// a new exception. An action that animates `pan` moves nothing.
+    /// **These are the BASE settings; actions move them through the plan.**
+    /// A clip whose actions name a tap key has its segment's `automation`,
+    /// points the core evaluated (spec §11 AU-85), and `automation(for:)`
+    /// pairs them with the base facts they keep: the volume the limiter
+    /// divides by (AU-22) and the measured level (AU-41). Evaluation stays
+    /// Rust's; the tap only interpolates between points (AU-87).
     ///
     /// **The gate and the de-esser need `levels`** (AU-41, AU-42): a clip
     /// measured at L gets thresholds relative to L; a pending or unmeasurable
@@ -173,6 +207,8 @@ struct AudioDSPParameters: Equatable {
     init(snapshot: ProjectSnapshot, levels: [UInt32: AudioDynamicsLevels.Level] = [:]) {
         var clips: [UInt32: AudioClipDSP] = [:]
         var isolation: [UInt32: Double] = [:]
+        var wanted: Set<UInt32> = []
+        var bases: [UInt32: Base] = [:]
         var pending: Set<UInt32> = []
         var voiceSettings: [UInt32: VoiceSettings] = [:]
         func collect(_ list: [ClipSnapshot]) {
@@ -180,46 +216,27 @@ struct AudioDSPParameters: Equatable {
                 // A nest clip's own entry could never be looked up: its id
                 // names no audio segment. `fold` below is where its `mono`
                 // goes instead.
-                guard clip.source.nestID == nil, let audio = clip.audio else { continue }
+                guard clip.source.nestID == nil else { continue }
+                let audio = clip.audio ?? AudioProps()
                 if audio.isolation > 0 { isolation[clip.id] = min(audio.isolation, 1) }
+                if audio.isolation > 0
+                    || clip.actions.contains(where: { ($0.end.audio?.isolation ?? 0) > 0 })
+                {
+                    wanted.insert(clip.id)
+                }
                 var level: Double?
                 switch levels[clip.id] {
                 case .measured(let lufs): level = lufs
                 case .pending: pending.insert(clip.id)
                 case .unmeasurable, nil: break
                 }
+                bases[clip.id] = Base(volume: audio.volume, level: level)
                 if let voice = audio.voice {
                     let settings = VoiceChain.settings(voice)
                     if !VoiceChain.isInert(settings) { voiceSettings[clip.id] = settings }
                 }
-                let dsp = AudioClipDSP(
-                    pan: audio.pan,
-                    compressor: audio.compressor.map {
-                        AudioCompressorSettings(
-                            thresholdDB: $0.thresholdDb, ratio: $0.ratio,
-                            attackSeconds: AudioDSPParameters.seconds($0.attack),
-                            releaseSeconds: AudioDSPParameters.seconds($0.release),
-                            makeupDB: $0.makeupDb)
-                    },
-                    noiseReduction: audio.noiseReduction,
-                    mono: audio.mono,
-                    // Told the clip's BASE volume, the fader's gain before
-                    // fades and ducks lower it (AU-22).
-                    limiter: audio.limiter.map {
-                        AudioLimiterSettings(
-                            ceilingDb: $0.ceilingDb, volume: audio.volume,
-                            releaseSeconds: AudioDSPParameters.seconds($0.release))
-                    },
-                    // The chain's head (AU-34, AU-30).
-                    channels: audio.channels,
-                    eq: AudioEQSettings(eq: audio.eq, hum: audio.hum),
-                    // After noise reduction, before the compressor (AU-47).
-                    gate: level.flatMap { l in
-                        audio.gate.map { AudioGateSettings(level: l, props: $0) }
-                    },
-                    deEsser: level.flatMap { l in
-                        audio.deEsser.map { AudioDeEsserSettings(level: l, props: $0) }
-                    })
+                let dsp = AudioDSPParameters.dsp(
+                    audio, volume: audio.volume, level: level, enclosingMono: false)
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }
@@ -260,8 +277,55 @@ struct AudioDSPParameters: Equatable {
         for nest in snapshot.nests { foldMonoNests(nest.clips) }
         self.clips = clips
         self.isolation = isolation
+        wantedIsolation = wanted
+        self.bases = bases
         pendingLevels = pending
         self.voiceSettings = voiceSettings
+    }
+
+    /// One clip's chain settings from its audio props: the base's in `init`,
+    /// a point's in `AudioDSPAutomation.settings(at:)`. `volume` is the BASE
+    /// volume either way (the limiter's divisor, AU-22) and `level` the base
+    /// measurement (AU-41); with no level the gate and de-esser are off.
+    static func dsp(
+        _ audio: AudioProps, volume: Double, level: Double?, enclosingMono: Bool
+    ) -> AudioClipDSP {
+        AudioClipDSP(
+            pan: audio.pan,
+            compressor: audio.compressor.map {
+                AudioCompressorSettings(
+                    thresholdDB: $0.thresholdDb, ratio: $0.ratio,
+                    attackSeconds: seconds($0.attack), releaseSeconds: seconds($0.release),
+                    makeupDB: $0.makeupDb)
+            },
+            noiseReduction: audio.noiseReduction,
+            mono: audio.mono,
+            enclosingMono: enclosingMono,
+            // Told the clip's BASE volume, the fader's gain before fades and
+            // ducks lower it (AU-22).
+            limiter: audio.limiter.map {
+                AudioLimiterSettings(
+                    ceilingDb: $0.ceilingDb, volume: volume, releaseSeconds: seconds($0.release))
+            },
+            // The chain's head (AU-34, AU-30).
+            channels: audio.channels,
+            eq: AudioEQSettings(eq: audio.eq, hum: audio.hum),
+            // After noise reduction, before the compressor (AU-47).
+            gate: level.flatMap { l in audio.gate.map { AudioGateSettings(level: l, props: $0) } },
+            deEsser: level.flatMap { l in
+                audio.deEsser.map { AudioDeEsserSettings(level: l, props: $0) }
+            })
+    }
+
+    /// The segment's automation with the base facts its settings keep (spec
+    /// §11 AU-87, AU-88); nil when the plan gives it no points, or for a clip
+    /// with no base here (a nest clip, whose keys reach nothing).
+    func automation(for segment: PlanSegment) -> AudioDSPAutomation? {
+        guard !segment.automation.isEmpty, let base = bases[segment.clip] else { return nil }
+        return AudioDSPAutomation(
+            points: segment.automation.sorted { $0.at < $1.at }, volume: base.volume,
+            level: base.level, enclosingMono: dsp(for: segment.clip).enclosingMono,
+            trackBalance: AudioTrackBalance(pans: segment.trackPans))
     }
 
     /// The parameters a project asks for with every gated or de-essed clip's
@@ -287,11 +351,16 @@ struct AudioDSPParameters: Equatable {
 
     func dsp(for clip: UInt32) -> AudioClipDSP { clips[clip] ?? .inert }
 
-    /// The clip's isolation amount, 0 when it asks for none (AU-53).
+    /// The clip's BASE isolation amount, 0 when it asks for none (AU-53); a
+    /// voiced clip's render is made from it (AU-143).
     func isolation(for clip: UInt32) -> Double { isolation[clip] ?? 0 }
 
-    /// Whether any clip asks for isolation.
-    var isolates: Bool { !isolation.isEmpty }
+    /// Whether the clip's isolated render is wanted: its base or any action
+    /// end asks (AU-88).
+    func wantsIsolation(_ clip: UInt32) -> Bool { wantedIsolation.contains(clip) }
+
+    /// Whether any clip wants isolation.
+    var isolates: Bool { !wantedIsolation.isEmpty }
 
     /// The clip's voice effect, nil when it has none or an inert one (AU-141).
     func voice(for clip: UInt32) -> VoiceSettings? { voiceSettings[clip] }
@@ -299,7 +368,7 @@ struct AudioDSPParameters: Equatable {
     /// Whether any clip has a voice effect.
     var voices: Bool { !voiceSettings.isEmpty }
 
-    var isEmpty: Bool { clips.isEmpty && isolation.isEmpty && voiceSettings.isEmpty }
+    var isEmpty: Bool { clips.isEmpty && wantedIsolation.isEmpty && voiceSettings.isEmpty }
 }
 
 /// The process-wide place `CompositionBuilder` finds a document's audio DSP

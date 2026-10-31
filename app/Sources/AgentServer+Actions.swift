@@ -211,7 +211,12 @@ extension AgentServer {
     /// Rate with the action selected (`VideoPane.rateOps`, spec §11 SR-21 (a)).
     /// A patch naming only `audio.volume` is also a drag on the timeline's
     /// volume line where an action's end is in force, and its ⌥-press's new
-    /// point (`VolumeLineSession`, spec §11 AU-82, AU-83).
+    /// point (`VolumeLineSession`, spec §11 AU-82, AU-83). A patch naming
+    /// `audio` is also the Sound tab's Mix, Channels, EQ, Hum, Noise
+    /// Reduction, Gate, De-esser, Compressor, Limiter and Voice Isolation
+    /// sections with an action selected, a switch turned off there an `off`
+    /// path, an EQ slot `audio.eq.<slot>` (`AudioPatch.routedInsideAction`,
+    /// spec §11 AU-88).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and

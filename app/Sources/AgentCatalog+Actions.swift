@@ -147,7 +147,14 @@ extension AgentServer {
                     + "may aim past what a stored property could hold. Two keys are refused: "
                     + "video.motion, a preset anchored to the clip's two ends rather than a value "
                     + "to ramp between (set it with set_video), and text.words, whose times belong "
-                    + "to speech. A GRAPHIC clip's props are a fourth group, graphic: {props: "
+                    + "to speech. In audio, every key the sound's effects read animates — pan, "
+                    + "mono, channels, eq, hum, noise_reduction, gate, de_esser, compressor, "
+                    + "limiter and isolation, beside volume and the fades: numbers ramp, and a "
+                    + "switch (a group or an EQ slot turned on, mono, channels, an EQ slope, "
+                    + "hum's frequency and harmonics) changes when the action ENDS; isolation "
+                    + "ramps from 0 on a clip with none. duck, keep_pitch, the fade shapes and "
+                    + "voice are stored but never animate. "
+                    + "A GRAPHIC clip's props are a fourth group, graphic: {props: "
                     + "{<key>: <value>}}, keyed by its module's schema and checked as set_graphic "
                     + "checks them, min and max included, against the module as graphics/ holds it "
                     + "NOW; the app reads that schema, so never send one. A number and a colour "
@@ -180,9 +187,11 @@ extension AgentServer {
                     "action": "Action id.",
                     "patch": "{video?: {...}, audio?: {...}, text?: {...}, graphic?: {props: "
                         + "{...}}, speed?: number} — the properties the animation ends at.",
-                    "off": "\"group.key\" paths (video.shadow, text.width) to switch OFF at the "
-                        + "end — stored as null, where a null in patch removes. Optional keys "
-                        + "only; never graphic.",
+                    "off": "\"group.key\" paths (video.shadow, text.width, audio.limiter) to "
+                        + "switch OFF at the end — stored as null, where a null in patch removes. "
+                        + "Optional keys only; never graphic. One deeper path: "
+                        + "audio.eq.<slot> (high_pass, low_shelf, band_1, band_2, band_3, "
+                        + "high_shelf, low_pass) switches that EQ slot off at the end.",
                 ]),
             opTool(
                 "remove_action",

@@ -73,7 +73,13 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 
 The section's summary reads "muted", "silent" or the gain in dB. Reset puts the volume back to 100 % and turns Mute off.
 
-You can animate volume, Mute and the fades with actions. While an action is selected, the Volume row, the Mute checkbox and the Fade in and Fade out rows write that action's end state, so a level moves across the action's span. Pan, Mix to mono, Keep pitch, the compressor, noise reduction, the limiter and ducking can't be animated. They always change the clip's own settings, even with an action selected.
+### Animating the sound
+
+You can animate a clip's sound with actions. While an action is selected, the Volume row, Mute and the fade lengths write that action's end state, and so do Pan, Mix to mono, Channels, the EQ, Hum, Voice Isolation's Amount, Noise Reduction, the Gate, the De-esser, the Compressor and the Limiter. Numbers move smoothly across the action's span: a pan sweeps from one side to the other, an EQ band's gain rises, a compressor's threshold drifts, the isolated voice fades in. Switches change at the action's end, with no glide: Mix to mono, Channels, EQ Bypass, a pass filter's slope, Hum's mains and harmonics, and turning a section or an EQ slot on or off. Unticking a section or an EQ slot with an action selected turns it off at the action's end. What you hear in the preview is what an export writes.
+
+A clip whose own Voice Isolation is off still gets its isolated voice made when an action turns the Amount up, and the gate and the de-esser measure the clip's loudness when an action turns them on. A limiter or noise reduction turned on by an action runs for the clip's whole track from the start, as one set on the clip itself does.
+
+Ducking, Keep pitch, the fade shapes and the voice effect can't be animated, and neither can a nest clip's Mix to mono. They always change the clip's own settings, even with an action selected.
 
 ### The volume line
 
@@ -615,7 +621,7 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
 - A voice effect also plays only at normal speed. A clip has one effect at a time. A reverb or echo tail ends with the clip, and a clip split from a take starts its effect fresh at the cut. The waveform, Normalize's reading and Remove Silences hear the clip without its effect. On a stereo file a reverb or an echo mixes the two channels, so the channel choice picks from the effected pair.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, the voice effect, noise reduction, the limiter and ducking always apply to the whole clip.
+- Ducking, Keep pitch, the fade shapes and the voice effect can't be animated with an action; they always apply to the whole clip. A switch an action changes (a section turned on or off, the channel choice, an EQ slope, the mains) changes at the action's end without a glide, as at a cut between two clips. A voice effect is made from the clip's own Voice Isolation Amount, not an animated one.
 - On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter have no effect. Set them on the clips inside.
 - The gate and the de-esser act only once the clip's loudness has been measured; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip.
 - The gate has no lookahead, so a sound that starts loud after a long pause can lose its first millisecond while the gate opens. Neither stage has a listen or solo control for what it removes.

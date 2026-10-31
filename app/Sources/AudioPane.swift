@@ -194,7 +194,7 @@ final class AudioPane: InspectorPaneView {
     /// here and the drag there write the same two fields. The rows store the
     /// length typed, off the frame grid (`rampTicks`); the handle's drag
     /// snaps it to whole frames (§11 #355). The two shape popups (format 29,
-    /// spec §11 AU-114) are base-only, as the duck is (CI-3).
+    /// spec §11 AU-114) are base-only, as the duck is (CI-3, AU-88).
     func fadeSection() -> InspectorSection {
         let binding = self.binding
         let shapes = FadeShape.allCases

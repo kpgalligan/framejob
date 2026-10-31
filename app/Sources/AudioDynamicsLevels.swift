@@ -80,10 +80,19 @@ final class AudioDynamicsLevels {
     }
 
     /// The clips of `snapshot` that ask for a level: not a nest clip (whose
-    /// gate and de-esser reach nothing, AU-46), with a gate or a de-esser.
+    /// gate and de-esser reach nothing, AU-46), with a gate or a de-esser on
+    /// the base or keyed on at any action's end (AU-88).
     static func wanting(_ snapshot: ProjectSnapshot) -> [ClipSnapshot] {
-        (snapshot.clips + snapshot.nests.flatMap(\.clips)).filter {
-            $0.source.nestID == nil && ($0.audio?.gate != nil || $0.audio?.deEsser != nil)
+        func ended(_ clip: ClipSnapshot) -> Bool {
+            clip.actions.contains {
+                if case .some(.some) = $0.end.audio?.gate { return true }
+                if case .some(.some) = $0.end.audio?.deEsser { return true }
+                return false
+            }
+        }
+        return (snapshot.clips + snapshot.nests.flatMap(\.clips)).filter {
+            $0.source.nestID == nil
+                && ($0.audio?.gate != nil || $0.audio?.deEsser != nil || ended($0))
         }
     }
 

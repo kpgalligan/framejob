@@ -24,6 +24,10 @@ struct PlanSegment: Codable, Equatable {
     /// An audio segment's track pans, innermost first (spec §11 AU-104):
     /// the tap's balance after the clip's own pan. Empty when no track pans.
     let trackPans: [Double]
+    /// An audio segment's automation (spec §11 AU-85): the tap keys of its
+    /// clip's evaluated audio at each point, sorted; empty when no action on
+    /// the clip names a tap key (`AudioAutomation.swift`).
+    let automation: [PlanAudioPoint]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -37,6 +41,7 @@ struct PlanSegment: Codable, Equatable {
         input = c.lenient(.input)
         ramp = c.lenient(.ramp)
         trackPans = c.lenient(.trackPans, [])
+        automation = c.lenient(.automation, [])
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the

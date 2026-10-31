@@ -3,7 +3,7 @@ import AppKit
 /// The Channels and Hum sections (spec §11 AU-33, AU-34, AU-38): the channel
 /// pick heads the clip's chain, so Channels comes first after Ducking; the
 /// hum notch follows the EQ. `set_audio`'s `channels` and `hum` are their MCP
-/// mirrors. Both are base-only (`structural(audio:)`).
+/// mirrors. With an action selected both write the action's end (AU-88).
 extension AudioPane {
 
     /// One popup: Both, Left Only, Right Only, Swap Left and Right. A

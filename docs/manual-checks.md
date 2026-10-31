@@ -485,6 +485,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** do the stems line up and sum to the mix in your editor, and is the Stems row clear?
 - **Source:** road map "audio" AP10 part 2a (spec §11 AU-108); `tools/proof/audio_ap10b_proof.py` measures the stems' sum against the mix sample for sample, the names, the refusals and the cancel, not how another editor reads the files.
 
+**SE-37 — Animated pan, EQ, compressor and isolation sound smooth, and a switch at an action's end is clean**
+- **Do:** 1. Put `samples/Rode-usb-mic.m4a` (or any voice) on the timeline, play the playhead to 2 s and Add Action (⌥⌘K); drag its band to run 2 s–6 s. 2. With the action selected, set Pan to +100 % in the Sound sub-tab, play across the action on headphones, then export Audio only (WAV) and play the export. 3. Undo, and do the same with the EQ's Band 2 Gain at +12 dB, then the Compressor (turned on on the clip itself at Threshold −40 dB) at Threshold 0 dB at the action's end, then Voice Isolation's Amount from off to 100 %. 4. Undo, tick Limit peaks with the action selected, set its Ceiling to −12 dBTP, and play across the action's end; then tick an EQ High-pass on the clip itself (no action selected), select the action and untick High-pass, and play across its end. 5. Look at the Sound sub-tab's rows with the action selected in light and dark appearance.
+- **Expect:** the pan sweeps smoothly from the centre to the right with no steps, zipper noise or clicks; the EQ boost, the compressor's squeeze and the isolated voice each fade in smoothly across the action; the export sounds like the preview; the limiter and the high-pass switch at the action's end with at most a faint tick, as at a cut between two clips, never a pop; the animated rows carry the action marks (◆, "at end" on a switch) and none of them reads ⊘, while Ducking, the fade shapes and the Voice Effect still do.
+- **Answer:** does each animated setting move smoothly and sound the same in the export, and is a switch at the action's end clean?
+- **Source:** road map "audio" AP8b (spec §11 AU-85…AU-88); `tools/proof/audio_ap8b_proof.py` measures the exports against analytic gains, the preview's meter against the export, a switch's bytes and the EQ slot keyed off (E1–E6, V1, U1), not how the motion sounds or how the rows read.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

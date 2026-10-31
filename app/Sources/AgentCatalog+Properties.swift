@@ -360,7 +360,11 @@ extension AgentServer {
                 "set_audio",
                 "Changes the clips' BASE audio properties — volume, mute, fades, ducking, mono, "
                     + "pitch preservation, pan, compression and noise reduction. Merges like "
-                    + "set_video; duck or compressor set to null removes it.",
+                    + "set_video; duck or compressor set to null removes it. To animate one, "
+                    + "use an action's set_action_end: volume, mute, the fades and every key the "
+                    + "sound's effects read animate there (pan, mono, channels, eq, hum, "
+                    + "noise_reduction, gate, de_esser, compressor, limiter, isolation); duck, "
+                    + "keep_pitch, the fade shapes and voice are this tool's alone.",
                 ["clips": clipsDescription, "patch": audioPatchDescription]),
             opTool(
                 "set_text",

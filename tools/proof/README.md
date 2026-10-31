@@ -26858,3 +26858,63 @@ exports over 1,454,400 frames; S6 the stem −0.4587 / −0.4460 dBTP (Kaiser / 
 −1.0127 / −1.0000; S7 the three sentences; S8 failed with nothing written and the media unchanged;
 C1 cancelled at progress 0.8973 with stems 1–2 on disk, nothing left; B1, B2. The mutants 7/7
 killed (the table). `export_master_proof.py` 11/11 on the same instance.
+
+## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A8, E1–E6, V1, U1; thirteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
+
+The plan carries each audio segment's `automation` (`core/src/audio_automation.rs`, AU-85): the
+clip's evaluated tap keys at the voice's ends, each tap-key action's ends and the 1/30 s grid
+inside an eased one. The tap reads a run's settings at its anchor on an absolute 32-frame grid,
+moves the pan per sample and isolation's Amount per frame (`AudioAutomation.swift`, AU-87); the
+inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>` (AU-88).
+
+- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A8,
+  then makes its fixtures into `tools/proof/media/` (five 6 s stereo 24-bit sines: `ap8b_440`,
+  `ap8b_1k`, `ap8b_4k`, `ap8b_200`, `ap8b_hot`) and drives the caller's instance: E1–E6 against
+  24-bit `audio_wav` exports, each a new project with one clip and one action over [1 s, 3 s),
+  levels by quadrature over 1,200-sample windows against the fixture's plain export; E5 on
+  `samples/Rode-usb-mic.m4a` trimmed to 4 s; V1 AP10's meter recipe on E2's project; U1 one
+  undo step and the log. Projects and exports go to `work/audio_ap8b/mcp/`, cleared per run.
+- **`audio_ap8b_proof.py --probe`**: the probe `audio_ap8b_probe.swift`, compiled AS
+  `main.swift` over `app/Sources` through `swift_build.py`, its projects made in-process
+  (`ReelProject.from(json:)`) with the core's own plans: A1 `AudioProps.interpolated` (numbers,
+  discretes and presence from the left, the slope, mains and harmonics held at f 0.5 and 0.99);
+  A2 an eased EQ gain and pan through `AudioTapContext` at 512-, 4096- and irregular buffers,
+  byte-identical; A3 the per-sample pan against `AudioPanLaw.gains(pan(t_n))`; A4
+  `usesLimiter` / `usesNoiseReduction` from a point, and a track's lead from an end alone; A5 the
+  Amount per frame from a base of 0 over a written wet render; A6 `routedInsideAction`; A7
+  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift.
+- **`audio_ap8b_proof.py --mutants`**: M4–M12 each over its own copy of `app/Sources`, killed
+  when its named row fails; M1–M3 and M13 in one copy of `core/` under
+  `work/audio_ap8b/core-mutants/` (`graphic/` beside it as a symlink, the target folder
+  `work/audio_ap8b-core-target/`, seeded from `core/target` by `cp -c` and kept), each file
+  restored after its `cargo test --release --test <file>`, killed when its named test fails.
+
+| Mutant | What it breaks | Killed by |
+|---|---|---|
+| M1 | the action-edge points dropped | `audio_automation.rs` `a_linear_pan_action_gives_exactly_four_points` |
+| M2 | `isolation` not written at 0 | `audio_automation.rs` `isolation_is_present_at_zero_and_ramps_from_it` |
+| M3 | the core's hold removed | `audio_automation.rs` `an_eq_slope_holds_until_the_actions_end` |
+| M4 | the grid anchored on the run's first frame | A2 |
+| M5 | discretes from the right point | A1 |
+| M6 | `usesLimiter` ignoring the points | A4 |
+| M7 | the pan constant per run | A3 |
+| M8 | the base Amount only | A5 |
+| M9 | the EQ kept with the base | A6 |
+| M10 | `wanting` ignoring action ends | A7 |
+| M11 | the held slope glided in Swift | A1 |
+| M12 | the lift ignoring a null EQ slot | A8 |
+| M13 | `key_off` ignoring the slot | `action_off.rs` `off_keys_one_eq_slot_off_at_the_end` |
+
+```sh
+python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A8
+python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M13
+python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A8, then E1–E6, V1, U1
+```
+
+**The recorded run (2026-10-31, after `make gate` PASS 394 s, against Release):** 16/16. A2 63
+points, the three renders byte-identical; A3 worst 0.0; A5 worst 1.47e-08 over 4 amounts; E1 120
+windows × 2 channels, worst 0.0000 dB; E2 worst 0.0057 dB; E3 worst 0.0272 dB; E4 0.00 LSB over
+[158, 3 s − 158) samples (the limiter's head cost and lookahead outside it: 157 samples differ at
+the start, 158 before 3 s), true peak −6.013 dBTP after; E5 worst 1.00 LSB over 192,000 frames;
+E6 −55.97 dB before the end, 0.0000 dB after; V1 |ΔI| 0.0000 LU; U1 one undo step, no `Frame Job: `
+line. `--mutants` 13/13 killed. `audio_ap5_proof.py --instance` against Release 12/12.

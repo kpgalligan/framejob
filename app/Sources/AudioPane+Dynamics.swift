@@ -5,8 +5,8 @@ import AppKit
 /// and `de_esser` are their MCP mirror.
 ///
 /// Every control writes a whole `GateProps` or `DeEsserProps`, the
-/// limiter's way; both are base-only (`structural(audio:)`), so with an
-/// action selected they still write the clip. Both thresholds are dB
+/// limiter's way; with an action selected both write the action's end (spec
+/// §11 AU-88), a stage turned off there keyed off. Both thresholds are dB
 /// relative to the clip's measured loudness (AU-41): the Status read-out says
 /// where that puts the threshold in dBFS, or why the stage is not acting
 /// (AU-42), and the Loudness read-out the level it is relative to — both

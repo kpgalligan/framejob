@@ -654,6 +654,68 @@ AP8 is built in two parts: AP8a draws a clip's gain envelope and edits it throug
   the scale, targets, the drag's arithmetic, points added and split, one undo step, the hit order
   and modifiers, the paint) and thirteen mutants, each killed by its named row; manual check SE-35.
 
+AU-85…AU-89 are AP8's second part, AP8b (every other audio parameter as action ends; survey A9),
+recorded before its code. The leveller's target is left out: AP6 part 2, which adds it, has not
+landed (`git log` at `e55de46` has no AP6).
+
+- **AU-85 — The plan carries each audio segment's automation.** An audio segment carries
+  `automation`, a list of `{at, audio}` points, when its innermost clip (`voice.stages[0]`) has an
+  action whose end's `audio` names a tap key — `mono`, `pan`, `compressor`, `noise_reduction`,
+  `limiter`, `isolation`, `eq`, `hum`, `channels`, `gate`, `de_esser` (`TAP_KEYS`,
+  `core/src/audio_automation.rs`); otherwise the key is absent and the plan is the text it was.
+  The points are at the voice's start and end, at each such action's start and end, and on
+  `ACTION_SAMPLE` / `MAX_ACTION_SAMPLES`'s grid (1/30 s, the envelope's) inside a non-linear one,
+  clipped to the voice, sorted and deduplicated; `at` is project ticks. Each point is
+  `evaluate_clip` at `at − origin`, its audio filtered to `TAP_KEYS`. Swift only interpolates,
+  linearly between two points: a number when its group is present on both sides, a tick field
+  rounded; everything else — presence, a switch, an enum, `bypass` — comes from the left point,
+  and so do the four `HELD_AUDIO_NUMBERS` (`eq.high_pass.slope`, `eq.low_pass.slope`,
+  `hum.frequency`, `hum.harmonics`), Ints in Swift and switches by AU-86. Not animated, each for
+  its reason: volume, mute and the fades (the envelope, `audio.rs`); the duck and the fade shapes
+  (read from the base by `audio.rs`); `keep_pitch` (the plan's `pitch`); `voice` (an offline
+  render); a nest clip's own keys (a segment names the innermost clip). The leveller's target is
+  deferred to AP6 part 2.
+- **AU-86 — Evaluation.** The evaluated audio group writes `isolation` even at 0
+  (`actions_audio.rs`'s `audio_json`), so an action toward 0.8 ramps from 0 rather than
+  switching at its end. The two slopes, the hum's mains and its harmonics are switches: they hold
+  their start value until the action's end, in the core (`hold_audio_steps`, after the lerp) and
+  in Swift. Every other rule is §5.4's.
+- **AU-87 — The tap reads the automation on an absolute sample grid.** For an automated span the
+  settings of a run come from the points at the run's ANCHOR: the latest of the 32-frame grid
+  boundary at or before the run's first frame, the frame of the point to its left and the span's
+  start, all in lookup frames, `round(time·rate) + offset + lead·rate/perSecond`. A run never
+  crosses a grid boundary or a point frame, its own or the head's (at `+ headLead`), so the
+  settings of a sample do not depend on how the buffers fall: preview and export agree, and a
+  render at 512, 4096 or irregular buffers is byte-identical. Pan is computed per sample from the
+  two points around the sample's tick (`AudioPanRamp`), isolation's Amount per input frame
+  (`AudioIsolationSpan.amounts`). A switch takes effect at its point's frame, with no glide, as at
+  a cut (AU-30; S1 measured its splatter at −79 dB). `usesLimiter` and `usesNoiseReduction` are
+  true when any point asks, so a limiter switched on at an action's end has its lead for the
+  whole track (AU-23). A span with no automation runs today's path unchanged.
+- **AU-88 — Wanted renders, what stays on the base, and the EQ slot keyed off.** An isolation
+  render and a gate or de-esser level are wanted when the base or any action end asks
+  (`AudioDSPParameters.wantsIsolation`, `AudioDynamicsLevels.wanting`), so a clip whose base
+  isolation is 0 is requested, loaded and crossfaded by its automation's amounts. A voiced clip
+  keeps its base isolation (AU-143); the limiter keeps its base volume as its divisor (AU-22),
+  and the level L keeps the base pan, fold and pick (AU-41). Inside an action the inspector sends
+  pan, mono, compressor, noise reduction, limiter, isolation, EQ, hum, channels, gate and
+  de-esser to the action's end, and a switch turned off there becomes `off` (CI-14). The duck,
+  Keep pitch, the fade shapes, the voice effect and a NEST clip's mono stay with the base. This
+  amends CI-3, AU-21, AU-37, AU-46 and AU-50. It extends CI-14: `off` accepts
+  `audio.eq.<slot>`, one of the seven slots (`high_pass`, `low_shelf`, `band_1`, `band_2`,
+  `band_3`, `high_shelf`, `low_pass`), which stores `null` at that slot of the end's `eq` — the
+  only three-part path; any other path of more than two parts keeps the "group.key" sentence, an
+  unknown slot is refused naming the seven, and a slot the patch also names is refused in the
+  both-sentence. `ReelOp.setActionEnd` lifts an `NSNull` slot inside `audio.eq` into that path.
+  Agents use `set_action_end`; there is no new tool, op or format.
+- **AU-89 — The proof.** `audio_ap8b_proof.py`: probe rows A1–A8 over `app/Sources` (the
+  interpolation and its held numbers, an automated EQ and pan block-size invariant, the per-sample
+  pan, the track-wide stages from a point, the Amount per frame, the routing, the wanted sets,
+  the EQ lift); MCP rows E1–E6 against 24-bit WAV exports (a pan, an EQ gain, a compressor
+  threshold, a limiter switched on at an end, isolation's Amount from base 0, an EQ slot keyed
+  off), V1 the live meter against the export, U1 one undo step; thirteen mutants, each killed by
+  a named row or core test; manual check SE-37.
+
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
 AP9, survey A10), recorded before its code.
 

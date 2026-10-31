@@ -392,7 +392,8 @@ final class AudioDSPChain {
     /// there (AU-34).
     func process(
         _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
-        params: AudioClipDSP, head: AudioClipDSP? = nil
+        params: AudioClipDSP, head: AudioClipDSP? = nil,
+        panRamp: AudioPanRamp? = nil
     ) {
         let count = min(channels.count, channelCount)
         guard frames > 0, count > 0 else { return }
@@ -426,7 +427,10 @@ final class AudioDSPChain {
         // construction rather than by argument.
         if params.mono, count >= 2 { fold(channels, count: count, frames: frames) }
 
-        pan(channels, count: count, frames: frames, position: params.pan)
+        // An automated pan moves per sample (AU-87, `AudioAutomation.swift`).
+        if let panRamp, count >= 2 {
+            panRamp.apply(channels, frames: frames)
+        } else { pan(channels, count: count, frames: frames, position: params.pan) }
 
         // The tail: the fold a nest clip ABOVE this one asked for, after
         // everything this clip does to its own channels, which is what makes

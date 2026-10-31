@@ -606,8 +606,9 @@ governs a module now.
   (G-34 (c), `edit_action_graphic.rs`), and `actions_clamp.rs`'s
   `clamp_video` is the last line of defence for them. `set_action_end`'s
   `off` (spec §11 CI-14) is the one way to STORE a `null` — the optional
-  property keyed OFF at the end — written after the merge and the prune;
-  `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
+  property keyed OFF at the end — written after the merge and the prune; its
+  paths are `group.key`, and `audio.eq.<slot>` (one of `EQ_SLOTS`, AU-88)
+  is the only three-part one; `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
   and `merge_group`'s read of a `null` for an unknown or a required key),
   and a non-object group slot is replaced by `{}`, never indexed. `set_action`
   refuses `action_past_end` only when the new end is past the clip's end AND
@@ -740,6 +741,13 @@ governs a module now.
   centres are more than 180° apart, so the centre animates the short
   way round (350 → 10 through 0); `clamp_qualifier` brings it back
   into [0, 360).
+- `actions_audio.rs` — the audio group's two evaluation rules (road map
+  "audio" AP8b, spec §11 AU-86): `audio_json` writes the group with
+  `isolation` present even at 0, which `actions.rs` uses for the base state
+  so an action toward an Amount ramps from 0; and `HELD_AUDIO_NUMBERS` (the
+  EQ's two slopes, the hum's mains and harmonics) with `hold_audio_steps`,
+  after the spanning action's `lerp`, holding each at its start value until
+  the action's end.
 - `actions_color.rs` — `blend_colors` (spec §11 G-43): after the spanning
   action's `lerp`, each of the model's colours — `COLOR_POINTERS`' eight
   `[r, g, b, a]` in `video` and `text` and `CHROMA_KEY_POINTER`'s `[r, g,
@@ -915,6 +923,13 @@ governs a module now.
   plan audio segment's `track_pans`: innermost first, cleared at a stage whose
   clip's base `audio.mono` is true, zeros dropped). No sample work; the
   balance is Swift's.
+- `audio_automation.rs` — an audio segment's automation in the plan (spec
+  §11 AU-85): `TAP_KEYS` (the eleven audio keys the tap reads),
+  `AutomationPoint`, `names_tap_key` and `Project::automation` — points at
+  the voice's ends, each tap-key action's ends and the envelope's 1/30 s grid
+  inside an eased one, each the innermost clip's `evaluate_clip` cut to the
+  tap keys; `plan.rs`'s `audio_segment` publishes them as `automation` only
+  when non-empty. No sample work; the interpolation is Swift's.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current, the migration

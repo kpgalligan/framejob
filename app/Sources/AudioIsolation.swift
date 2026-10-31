@@ -86,6 +86,13 @@ final class IsolatedAudioStore {
     }
 }
 
+/// One automation point's Amount at a composition input frame (spec §11
+/// AU-87): the span's amount between two of these is the straight line.
+struct AudioIsolationAmount: Equatable {
+    let frame: Int64
+    let amount: Double
+}
+
 /// One isolated segment on a composition audio track.
 struct AudioIsolationSpan {
     /// Composition input frames, `[startFrame, endFrame)`.
@@ -93,8 +100,24 @@ struct AudioIsolationSpan {
     let endFrame: Int64
     /// Wet index = frame + wetOffset (`IsolationCache.wetOffset`).
     let wetOffset: Int64
+    /// The constant Amount; read only when `amounts` is empty.
     let amount: Float
     let audio: IsolatedAudio
+    /// The Amount per input frame when an action moves it (AU-87): sorted,
+    /// before the first the first's, after the last the last's. Empty when
+    /// constant.
+    var amounts: [AudioIsolationAmount] = []
+
+    /// The Amount at input `frame`, `k` the last entry at or before it.
+    fileprivate func amount(at frame: Int64, from k: Int) -> Float {
+        let a = amounts[k]
+        guard k + 1 < amounts.count, frame > a.frame else { return Float(a.amount) }
+        let b = amounts[k + 1]
+        let width = Double(b.frame - a.frame)
+        guard width > 0 else { return Float(b.amount) }
+        let f = min(Double(frame - a.frame) / width, 1)
+        return Float(a.amount + (b.amount - a.amount) * f)
+    }
 }
 
 /// One composition audio track's isolation pass: its spans, sorted. A ready
@@ -110,7 +133,9 @@ struct AudioIsolationTrack {
     /// whose render is loaded, placed through `placement(of:shift:)` so the
     /// track's leads compose: `[r(at), r(at + duration))` with `r` the
     /// nearest frame, and the wet offset rounded once (AU-53). A segment in
-    /// `voiced` takes its voice render at amount 1 instead (AU-143).
+    /// `voiced` takes its voice render at amount 1 instead (AU-143). A
+    /// segment whose automation moves the Amount is kept even at a base of 0,
+    /// its amounts placed by the same shift (AU-87, AU-88).
     init(
         segments: [PlanSegment], shift: CompositionBuilder.AudioShift,
         dsp: AudioDSPParameters, renders: [IsolationSegmentKey: IsolatedAudio],
@@ -121,7 +146,8 @@ struct AudioIsolationTrack {
             let key = IsolationSegmentKey(s)
             let voice = voiced[key]
             let amount = voice == nil ? dsp.isolation(for: s.clip) : 1
-            guard amount > 0, let audio = voice ?? renders[key],
+            let amounts = voice == nil ? Self.amounts(of: s, base: amount, shift: shift, dsp: dsp) : []
+            guard amount > 0 || !amounts.isEmpty, let audio = voice ?? renders[key],
                 let p = CompositionBuilder.placement(of: s, shift: shift)
             else { continue }
             let start = IsolationCache.frame(ofTicks: p.at)
@@ -132,9 +158,26 @@ struct AudioIsolationTrack {
                     startFrame: start, endFrame: end,
                     wetOffset: IsolationCache.wetOffset(
                         at: p.at, sourceIn: p.sourceIn, window: IsolationCache.window(of: s)),
-                    amount: Float(min(amount, 1)), audio: audio))
+                    amount: Float(min(amount, 1)), audio: audio, amounts: amounts))
         }
         self.spans = spans.sorted { $0.startFrame < $1.startFrame }
+    }
+
+    /// The segment's Amount at each automation point, at the input frame its
+    /// time is placed at (the track's lead taken off, as `placement` does);
+    /// empty when no point moves it from `base`.
+    private static func amounts(
+        of s: PlanSegment, base: Double, shift: CompositionBuilder.AudioShift,
+        dsp: AudioDSPParameters
+    ) -> [AudioIsolationAmount] {
+        guard let automation = dsp.automation(for: s) else { return [] }
+        let out = automation.points.map {
+            AudioIsolationAmount(
+                frame: IsolationCache.frame(ofTicks: $0.at - shift.trackLead),
+                amount: min(max($0.audio.isolation, 0), 1))
+        }
+        let constant = out.allSatisfy { $0.amount == min(max(base, 0), 1) }
+        return constant ? [] : out
     }
 
     /// The first span whose end is past `frame`.
@@ -175,7 +218,17 @@ struct AudioIsolationTrack {
                 for c in 0..<min(count, channels.count) {
                     guard let out = channels[c]?.advanced(by: offset) else { continue }
                     let wet = span.audio.samples(channel: c).advanced(by: wetStart)
-                    if a >= 1 {
+                    if !span.amounts.isEmpty {
+                        // An Amount per input frame (AU-87).
+                        var k = 0
+                        for i in 0..<n {
+                            let at = lo + Int64(i)
+                            while k + 1 < span.amounts.count, span.amounts[k + 1].frame <= at {
+                                k += 1
+                            }
+                            out[i] += span.amount(at: at, from: k) * (wet[i] - out[i])
+                        }
+                    } else if a >= 1 {
                         for i in 0..<n { out[i] = wet[i] }
                     } else {
                         for i in 0..<n { out[i] += a * (wet[i] - out[i]) }

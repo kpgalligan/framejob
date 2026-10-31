@@ -32,6 +32,7 @@
 use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
+use crate::actions_audio::{audio_json, hold_audio_steps};
 use crate::actions_clamp::{clamp_audio, clamp_text, clamp_video};
 use crate::actions_color::blend_colors;
 use crate::actions_curves::{
@@ -413,7 +414,7 @@ impl Project {
 
         let mut fields = Map::new();
         fields.insert("video".to_string(), video_json(&base_video));
-        fields.insert("audio".to_string(), to_json(&base_audio));
+        fields.insert("audio".to_string(), audio_json(&base_audio));
         // A patch may only reach `text` on a clip that HAS text: evaluation
         // resolves properties, it never decides what kind of layer a clip
         // is. Leaving the key out makes a stray text patch a no-op.
@@ -448,6 +449,7 @@ impl Project {
             let mut lerped = lerp(&state, &target, eased);
             // The colours in OKLab from the two ends (spec §11 G-43).
             blend_colors(&state, &target, eased, &mut lerped);
+            hold_audio_steps(&state, &mut lerped);
             state = lerped;
             spanning = Some((target, eased));
         }

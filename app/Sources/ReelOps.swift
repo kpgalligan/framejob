@@ -1122,7 +1122,8 @@ extension ReelOp {
     /// the inspector turned OFF (`VideoPatch.shadow`'s double optional) — is
     /// LIFTED out of the patch into `off`, so the end state holds the
     /// property off rather than losing the key (spec §11 CI-14). Removal
-    /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls.
+    /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls. A
+    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88).
     /// `graphic`'s one value is its `props` map, so the lift never touches
     /// it; `schema` is the module's current revision, which a graphic end
     /// needs (spec §11 G-34 (c), (l)).
@@ -1136,6 +1137,14 @@ extension ReelOp {
             for (key, value) in fields where value is NSNull {
                 off.append("\(group).\(key)")
                 fields[key] = nil
+            }
+            // An EQ slot turned off is a null one level down (AU-88).
+            if group == "audio", var eq = fields["eq"] as? [String: Any] {
+                for (slot, value) in eq where value is NSNull {
+                    off.append("audio.eq.\(slot)")
+                    eq[slot] = nil
+                }
+                fields["eq"] = eq
             }
             groups[group] = fields
         }
