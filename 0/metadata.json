@@ -1,0 +1,198 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M68GHEB5T8JYKXF7C9ZY2DD0",
+  "session_id": "9bb0487d-a352-45e3-9da8-07b6f4762c27",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-31T08:17:10.966552Z",
+  "branch": "worktree-audio-updates",
+  "checkpoints_count": 3,
+  "save_step_count": 2,
+  "files_touched": [
+    "README.md",
+    "app/Sources/AgentCatalog+Audio.swift",
+    "app/Sources/AgentServer+Audio.swift",
+    "app/Sources/AgentServer+EnhanceVoice.swift",
+    "app/Sources/AgentServer.swift",
+    "app/Sources/AppDelegate+Menus.swift",
+    "app/Sources/AssistantPrompt.swift",
+    "app/Sources/AudioDynamicsModel.swift",
+    "app/Sources/AudioEnhance+Reasons.swift",
+    "app/Sources/AudioEnhance.swift",
+    "app/Sources/AudioMeasureDoor.swift",
+    "app/Sources/AudioMeasureSheetController.swift",
+    "app/Sources/AudioNormalize+Loudness.swift",
+    "app/Sources/AudioPane+Enhance.swift",
+    "app/Sources/AudioPane+Loudness.swift",
+    "app/Sources/AudioPane.swift",
+    "app/Sources/ClipLoudness.swift",
+    "app/Sources/EditorViewController+Audio.swift",
+    "app/Sources/Exporter+RampAudio.swift",
+    "app/Sources/LoudnessBlocks.swift",
+    "app/Sources/LoudnessMeasureRun.swift",
+    "app/Sources/MediaImporter+Loudness.swift",
+    "app/Sources/NormalizeChoice.swift",
+    "app/Sources/OptionControls.swift",
+    "app/Sources/OptionDisplayControl+Snapshot.swift",
+    "app/Sources/ProcessedLoudness.swift",
+    "app/Sources/UIMenuTable.swift",
+    "designs/audio.md",
+    "designs/screens/09-clip-sound.md",
+    "designs/spec/04.3b-inspector-clip-sections.md",
+    "designs/spec/05.6-persistence.md",
+    "designs/spec/07.4-swift-file-map.md",
+    "designs/spec/07.8-export.md",
+    "designs/spec/07.9a-agent-tools.md",
+    "designs/spec/09-keys-and-menus.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/audio.md",
+    "designs/spec/README.md",
+    "docs/guide/audio.md",
+    "docs/guide/mcp.md",
+    "docs/guide/menus-and-shortcuts.md",
+    "docs/manual-checks.md",
+    "tools/proof/README.md",
+    "tools/proof/audio_ap6_probe.py",
+    "tools/proof/audio_ap6_probe.swift",
+    "tools/proof/audio_ap6_proof.py",
+    "tools/proof/capture_spike/inventory.json",
+    "tools/proof/loudness_cache_probe.py",
+    "tools/proof/loudness_cache_probe.swift",
+    "tools/proof/op_argument_proof.py",
+    "tools/proof/phase9_proof.py",
+    "tools/proof/recording_probe.py",
+    "tools/proof/recording_proof.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "9f3b35b5c861",
+  "checkpoint_transcript_start": 2779,
+  "transcript_lines_at_start": 2779,
+  "compact_transcript_start": 315,
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 309628,
+    "cache_read_tokens": 6559926,
+    "output_tokens": 22180,
+    "api_call_count": 24,
+    "subagent_tokens": {
+      "input_tokens": 4310,
+      "cache_creation_tokens": 11598836,
+      "cache_read_tokens": 451396358,
+      "output_tokens": 1742026,
+      "api_call_count": 2149
+    }
+  },
+  "redaction": {
+    "replacements": 2,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 2,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01PxwAYdDXv3DVFJXctGvAUB",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:research"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "438751756b21",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 981,
+        "end": 982,
+        "entry_ids": [
+          "bcfca604-c0ae-437e-bd9d-fcf254557d5c"
+        ],
+        "tool_use_id": "toolu_01PxwAYdDXv3DVFJXctGvAUB"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01PxwAYdDXv3DVFJXctGvAUB"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:research",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01My13Tew2YG2TisJPLnE1mh",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "workflow-authoring"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "cc1987a56985",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1514,
+        "end": 1515,
+        "entry_ids": [
+          "a6a280f4-dc33-41aa-9dc3-46cf28efd9df"
+        ],
+        "tool_use_id": "toolu_01My13Tew2YG2TisJPLnE1mh"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01My13Tew2YG2TisJPLnE1mh"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: workflow-authoring",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01NQeXHiBatVSAzKEvMZnvdd",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "litecode"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2ceae105f992",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1842,
+        "end": 1843,
+        "entry_ids": [
+          "cfc7160a-88fe-4cd3-a61b-e2574673d654"
+        ],
+        "tool_use_id": "toolu_01NQeXHiBatVSAzKEvMZnvdd"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01NQeXHiBatVSAzKEvMZnvdd"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: litecode",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 19
+  }
+}
