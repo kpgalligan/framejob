@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XQpNzNeUeoNZzvT8uCRR1p",
+  "agent_id": "a12c8a9104529361c",
+  "subagent_type": "lc-adversary",
+  "task_description": "litecode adversary TU2 runner",
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 198871,
+    "cache_read_tokens": 2963513,
+    "output_tokens": 26027,
+    "api_call_count": 22
+  },
+  "started_at": "2026-10-31T15:33:32.531132-04:00",
+  "completed_at": "2026-10-31T15:38:52.636315-04:00"
+}

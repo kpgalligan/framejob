@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_014TYARg3eBoFDr4JG35Wg9R",
+  "agent_id": "aeaab34895de7bc97",
+  "subagent_type": "lc-reviewer",
+  "task_description": "litecode review TU2 runner",
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 201451,
+    "cache_read_tokens": 2014500,
+    "output_tokens": 21745,
+    "api_call_count": 17
+  },
+  "started_at": "2026-10-31T16:21:27.727564-04:00",
+  "completed_at": "2026-10-31T16:25:38.52348-04:00"
+}

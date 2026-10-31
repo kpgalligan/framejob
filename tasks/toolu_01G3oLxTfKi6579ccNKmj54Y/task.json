@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01G3oLxTfKi6579ccNKmj54Y",
+  "agent_id": "a6bb0c8311a186aca",
+  "subagent_type": "lc-designer",
+  "task_description": "litecode final design TU2 runner",
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 81584,
+    "cache_read_tokens": 905086,
+    "output_tokens": 25227,
+    "api_call_count": 17
+  },
+  "started_at": "2026-10-31T15:38:58.943757-04:00",
+  "completed_at": "2026-10-31T15:43:19.791451-04:00"
+}
