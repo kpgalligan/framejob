@@ -321,17 +321,7 @@ enum GraphicSchemaRows {
             : InspectorNameField(
                 read: read, write: { [weak binding] in binding?.apply(name, write($0)) },
                 enabled: { true }, onEdit: { [weak binding] in binding?.edited() })
-        if !entry.multiline {
-            // 170 wide, giving way only to the "at end" tag while the
-            // selected action keys the row (G-34 (l), O1).
-            control.translatesAutoresizingMaskIntoConstraints = false
-            control.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
-            let width = control.widthAnchor.constraint(equalToConstant: 170)
-            width.priority = NSLayoutConstraint.Priority(249)
-            width.isActive = true
-            control.setContentCompressionResistancePriority(
-                NSLayoutConstraint.Priority(248), for: .horizontal)
-        }
+        // Either control takes the row's width (`inspectorRow`, spec §11 G-48).
         return inspectorRow(
             entry.label, [control], mixed: mixed, binding: binding, writes: write(read()),
             discrete: true, default: .derived(binding, name: name, read: read, ops: write))

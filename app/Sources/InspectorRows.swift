@@ -48,6 +48,15 @@ func inspectorRow(
             NSLayoutConstraint.Priority(749), for: .horizontal)
         if narrowing is OptionCheckboxControl { narrowing.clipsToBounds = true }
     }
+    // A one-line name field takes the row's width, whatever its text's
+    // (spec §11 G-48): it hugs nothing, and it resists compression below the
+    // tag's 750, so a keyed row narrows the field to show "at end" whole and
+    // a long text scrolls inside it rather than widening the row.
+    for name in controls.compactMap({ $0 as? InspectorNameField }) {
+        name.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        name.setContentCompressionResistancePriority(
+            NSLayoutConstraint.Priority(248), for: .horizontal)
+    }
     var views: [NSView] = [gutter]
     if let field {
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -63,11 +72,12 @@ func inspectorRow(
     // A slider is the row's stretchy element, so a row that has one gets NO
     // trailing spacer — two views hugging at the same priority would split
     // the free space and leave the slider half as wide as it should be. The
-    // Content area, the Wheels row (GR-11), the Curves row (GR-12) and a
-    // qualifier range's strip (GR-13) stretch the same way.
+    // Content area, a one-line name field (G-48), the Wheels row (GR-11), the
+    // Curves row (GR-12) and a qualifier range's strip (GR-13) stretch the
+    // same way.
     if !controls.contains(where: {
-        $0 is InspectorSliderControl || $0 is InspectorTextArea || $0 is ColorWheelsView
-            || $0 is CurvesView || $0 is RangeStripControl
+        $0 is InspectorSliderControl || $0 is InspectorTextArea || $0 is InspectorNameField
+            || $0 is ColorWheelsView || $0 is CurvesView || $0 is RangeStripControl
     }) {
         let trailing = NSView()
         trailing.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)

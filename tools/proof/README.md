@@ -17663,8 +17663,9 @@ sub-tab's Properties rows read the action's END (`InspectorBinding.graphicProps`
 and a row's write is ONE `set_action_end` naming `graphic.props.<key>` with the
 module's current schema (`InspectorBinding.ops(graphic:…)`), an asset staying
 the clip's `set_graphic`; the rows carry the other tabs' marks — ◆, "at end"
-on the checkbox, the pop-up and the string row (whose 170 pt field narrows only
-while keyed), the mint segment and coral tick, ×, Clear and `◆N` (a stale end
+on the checkbox, the pop-up and the string row (whose field narrows only while
+keyed, and since G-48 fills the row otherwise: K6b at `DS.panelWidth` and 440,
+the mutants `name-field-spacer` and `name-field-resists`), the mint segment and coral tick, ×, Clear and `◆N` (a stale end
 key counted, O4) — the end's own stale rows (O2), ⊘ on Width, Height and Follow
 Clip (O6), Reset writing the end (O7), the band's label naming graphic keys
 and the zoom test (O3), and the Text tab's keyed Content row reading "at end"

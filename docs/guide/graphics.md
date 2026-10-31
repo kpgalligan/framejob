@@ -303,7 +303,7 @@ the module's label and its help text as the tooltip:
 | color | A colour well |
 | enum | A pop-up of the module's options |
 | asset | A pop-up: **None**, then every picture in the project's graphics assets, then any picture name the selected clips, the selected action's end or the module's default refers to that the folder doesn't have, so a missing picture still shows by name |
-| string | A one-line field, or a text area when the module marks it multiline |
+| string | A one-line field the width of the inspector, or a text area when the module marks it `multiline: true` (Return applies, ⇧Return starts a new line) |
 
 With no action selected, setting a value back to the module's default
 clears it, so the clip follows the module's default if it changes later. The

@@ -916,7 +916,9 @@ the key map behind it.
   `OptionCheckboxControl`, clipped to its bounds so its title stops at its edge — holds its
   intrinsic width only at compression resistance 749, below the one-line tag's 750, so a keyed
   row short of room narrows that control and never the tag (O8, G-34 (l): Font ▸ Family, a
-  filter's and an obscure region's kind, a module's boolean with a long label)) ·
+  filter's and an obscure region's kind, a module's boolean with a long label); and an
+  `InspectorNameField` — a graphic's one-line string, a marker's name — takes the row's width,
+  hugging at 1 with no trailing spacer and resisting compression at 248, below the tag (G-48)) ·
   `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
   block knob snapped to device pixels (CI-6) and, keyed, the mint segment
   from the action's start value and the coral playhead tick; it maps and

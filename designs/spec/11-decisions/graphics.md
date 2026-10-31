@@ -1704,7 +1704,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   width away by growing tall, so a row short of room squeezed it into a
   sliver instead of narrowing a control. What gives way is fixed by
   priority, below the tag's compression resistance (750): the one-line
-  string field (≤ 170 required, == 170 at 249, O1) and, in `inspectorRow`,
+  string field (≤ 170 required, == 170 at 249, O1; G-48 drops the cap,
+  the field taking the row at 248) and, in `inspectorRow`,
   the row's widest pop-up, or in a row with no pop-up its widest checkbox
   (its intrinsic width held at 749). A row with room is untouched; the rows
   the tag leaves short at `DS.panelWidth` are Font ▸ Family (150 → 140), a
@@ -2547,3 +2548,18 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Accepted:** two font files of one family in a project draw with
   whichever the engine picks; a module that does not compile is still
   imported, and the Graphic dialog lists it with its error.
+- **G-48 — An inspector's one-line string field takes the row's width;
+  amends G-34 (l)'s O1 and O8** (the owner, 2026-10-30). A module's
+  `string` prop without `multiline`, and the Document tab's marker name,
+  are an `InspectorNameField` that stretches to the row's trailing edge at
+  any inspector width, where it was capped at 170 pt (≤ 170 required,
+  == 170 at 249). `inspectorRow` owns the rule for every such field: it
+  hugs at 1, the row gets no trailing spacer (a slider's and the Content
+  area's reason), and it resists compression at 248, below the "at end"
+  tag's 750, so O1's keyed row still narrows the field to show the tag
+  whole (O8) and a text longer than the field scrolls inside it rather
+  than widening the row. The marker name keeps its 120 pt floor. A
+  `multiline: true` string was already the Text tab's `InspectorTextArea`,
+  the row's full width and 72 pt tall, and is unchanged; it takes K-4's
+  Return (⇧Return a new line). The clip header's name field was already
+  pinned edge to edge and is unchanged.

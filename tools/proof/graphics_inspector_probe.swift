@@ -947,9 +947,17 @@ check("K6a key({title: \"Hello\"}): Title is ◆ at end (.keyedAtEnd) and its ta
       k6title?.gutter.mark == .keyedAtEnd && atEndShown(k6title), gutterMark(k6title))
 
 /// Properties laid out at `DS.panelWidth`: (tag whole, row inside the section, field width).
-func titleLayout() -> (tagWhole: Bool, inside: Bool, field: CGFloat, detail: String) {
-    guard let section = section("graphic.properties") else { return (false, false, -1, "none") }
-    let host = NSView(frame: NSRect(x: 0, y: 0, width: DS.panelWidth, height: 3000))
+/// Since G-48 also the room right of the field — 0 when it fills the row — at `width`, and
+/// whether the field yields: its horizontal compression resistance below the tag's, so a keyed
+/// row short of room is never a tie the solver may settle either way (O8).
+typealias TitleLayout = (
+    tagWhole: Bool, inside: Bool, field: CGFloat, room: CGFloat, yields: Bool, detail: String
+)
+func titleLayout(width: CGFloat = DS.panelWidth) -> TitleLayout {
+    guard let section = section("graphic.properties") else {
+        return (false, false, -1, -1, false, "none")
+    }
+    let host = NSView(frame: NSRect(x: 0, y: 0, width: width, height: 3000))
     section.removeFromSuperview()
     section.translatesAutoresizingMaskIntoConstraints = false
     host.addSubview(section)
@@ -961,35 +969,53 @@ func titleLayout() -> (tagWhole: Bool, inside: Bool, field: CGFloat, detail: Str
     host.layoutSubtreeIfNeeded()
     guard let title = row(section, "Title"),
           let field = walk(title).first(where: { $0 is InspectorNameField })
-    else { return (false, false, -1, "no Title row") }
-    let tag = walk(title).compactMap { $0 as? InspectorRowTag }.first { !$0.isHidden }
+    else { return (false, false, -1, -1, false, "no Title row") }
+    let tags = walk(title).compactMap { $0 as? InspectorRowTag }
+    let tag = tags.first { !$0.isHidden }
     let tagWhole = tag.map { $0.frame.width + 0.5 >= $0.fittingSize.width } ?? true
     let maxX = title.convert(title.bounds, to: section).maxX
+    let room = maxX - field.convert(field.bounds, to: section).maxX
     let inside = maxX <= section.bounds.width + 0.5
-    return (tagWhole, inside, field.frame.width,
-            "tag \(tag.map { "\($0.frame.width)/\($0.fittingSize.width)" } ?? "hidden"), row maxX "
-              + "\(maxX) in \(section.bounds.width), field \(field.frame.width)")
+    let fieldResists = field.contentCompressionResistancePriority(for: .horizontal).rawValue
+    let tagResists = tags.first?.contentCompressionResistancePriority(for: .horizontal).rawValue
+    let yields = tagResists.map { fieldResists < $0 } ?? false
+    return (tagWhole, inside, field.frame.width, room, yields,
+            "at \(width): tag \(tag.map { "\($0.frame.width)/\($0.fittingSize.width)" } ?? "hidden"), "
+              + "row maxX \(maxX) in \(section.bounds.width), field \(field.frame.width), room right "
+              + "\(room), resistance field \(fieldResists) / tag "
+              + "\(tagResists.map { "\($0)" } ?? "none")")
 }
+/// A keyed field ends before the row's 6 pt spacing and the whole tag, and yields to it.
+func keyedRoom(_ layout: TitleLayout) -> Bool {
+    layout.tagWhole && layout.inside && layout.field > 0 && layout.room > 6 && layout.yields
+}
+/// A field with nothing after it fills the row.
+func fills(_ layout: TitleLayout) -> Bool { layout.inside && abs(layout.room) < 0.5 }
 let longTitle = "The Long Road to a Motion Graphic"
 let k6short = titleLayout()
 key(["title": longTitle])
 let k6long = titleLayout()
+let k6wideKeyed = titleLayout(width: 440)
 document.selectAction(nil)
 base(["title": "Hello"])
 let k6baseShort = titleLayout()
+let k6baseWide = titleLayout(width: 440)
 base(["title": longTitle])
 let k6baseLong = titleLayout()
 base(["title": NSNull()])
 document.selectAction(actionID)
-check("K6b laid out at DS.panelWidth, keyed with a short and with title-card's long title: the "
-        + "tag is whole, the row inside the section, the field narrower than 170; CONTROL, nothing "
-        + "selected: both titles leave the field at exactly 170, the row inside",
-      k6short.tagWhole && k6short.inside && k6short.field < 170 && k6short.field > 0
-        && k6long.tagWhole && k6long.inside && k6long.field < 170 && k6long.field > 0
-        && k6baseShort.inside && k6baseShort.field == 170
-        && k6baseLong.inside && k6baseLong.field == 170,
-      [k6short.detail, k6long.detail, k6baseShort.detail, k6baseLong.detail]
-        .joined(separator: " ¶ "))
+check("K6b (G-48) at DS.panelWidth and at 440, keyed with a short and with title-card's long "
+        + "title: the tag is whole, the row inside the section, the field ending before the tag "
+        + "and resisting compression below it; "
+        + "nothing selected: the field fills the row whatever its text, and at 440 it is wider by "
+        + "exactly the 440 − DS.panelWidth more",
+      keyedRoom(k6short) && keyedRoom(k6long) && keyedRoom(k6wideKeyed)
+        && k6wideKeyed.field > k6long.field
+        && fills(k6baseShort) && fills(k6baseLong) && fills(k6baseWide)
+        && k6baseLong.field == k6baseShort.field
+        && abs(k6baseWide.field - k6baseShort.field - (440 - DS.panelWidth)) < 0.5,
+      [k6short.detail, k6long.detail, k6wideKeyed.detail, k6baseShort.detail, k6baseLong.detail,
+       k6baseWide.detail].joined(separator: " ¶ "))
 
 // K7 a colour is ◆ with no tag.
 fresh(["color": "#2d7ff9"])

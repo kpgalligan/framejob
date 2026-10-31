@@ -112,8 +112,9 @@ K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I
     the mark ◆, the field reads the END, and the section's, tab's and strip's counts
     are 1; K4 the slider's start 90, now 120 at mid-span, keyed; K5 a checkbox and a
     pop-up are ◆ "at end"; K6a/K6b the string row too, and laid out at
-    `DS.panelWidth` its field narrows below 170 for a whole tag only while keyed
-    (CONTROL: exactly 170 with nothing selected); K7 the colour well ◆, no tag;
+    `DS.panelWidth` and at 440 its field ends before a whole tag only while keyed
+    (CONTROL: with nothing selected it fills the row whatever its text, wider at
+    440 by exactly the width added, spec §11 G-48); K7 the colour well ◆, no tag;
     K8a–K8d (graphics gaps phase 3, #249, spec §11 G-42, in K8's place) the asset is
     the end's: K8a Logo is not ⊘ and its write(1) is exactly one `set_action_end
     {graphic: {props: {logo: "red.png"}}}` with a schema, the end's logo red.png and
@@ -217,7 +218,10 @@ Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
   stored-read        `graphicProps` reads the stored props — K3a K4;
   paths-flat         an end's `graphic` group is one path — K3a K10 K11 K13;
   string-continuous  the string row is not discrete — K6a K6b;
-  title-fixed-width  the Title field's 170 is required — K6b;
+  name-field-spacer  (G-48, in title-fixed-width's place) a name field's row gets
+                     its trailing spacer back — K6b;
+  name-field-resists (G-48) the name field resists compression at its default, so
+                     a long title widens the row — K6b;
   schema-dropped     the typed `setActionEnd` drops `schema` — K2 K5 K9 K17 (K8a K8b
                      since graphics gaps phase 3: an asset end with no schema is refused);
   end-stale-dropped  `endProps()` answers nothing — K12 K19c (K19c since graphics gaps
@@ -397,9 +401,12 @@ MUTANTS = {
         "", ["K3a", "K10", "K11", "K13"]),
     "string-continuous": (
         "GraphicSchemaRows.swift", "discrete: true", "discrete: false", ["K6a", "K6b"]),
-    "title-fixed-width": (
-        "GraphicSchemaRows.swift",
-        "            width.priority = NSLayoutConstraint.Priority(249)\n", "", ["K6b"]),
+    "name-field-spacer": (
+        "InspectorRows.swift", " || $0 is InspectorNameField\n", "\n", ["K6b"]),
+    "name-field-resists": (
+        "InspectorRows.swift",
+        "        name.setContentCompressionResistancePriority(\n"
+        "            NSLayoutConstraint.Priority(248), for: .horizontal)\n", "", ["K6b"]),
     "asset-held": (
         "GraphicSchema.swift", "var animatable: Bool { animate }",
         "var animatable: Bool { animate && type != \"asset\" }", ["K8a", "K8b", "K17"]),
