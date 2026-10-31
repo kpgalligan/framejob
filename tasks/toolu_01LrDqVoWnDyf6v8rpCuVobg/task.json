@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01LrDqVoWnDyf6v8rpCuVobg",
+  "agent_id": "aa6156eeccb0138a9",
+  "subagent_type": "lc-reviewer",
+  "task_description": "litecode review TU0+TU1",
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 177187,
+    "cache_read_tokens": 1051834,
+    "output_tokens": 14269,
+    "api_call_count": 13
+  },
+  "started_at": "2026-10-31T14:01:23.601277-04:00",
+  "completed_at": "2026-10-31T14:04:08.839531-04:00"
+}

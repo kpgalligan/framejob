@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01BNmnoe997bSGNsjyvBD6ZK",
+  "agent_id": "a7feb8c31f8996e96",
+  "subagent_type": "lc-designer",
+  "task_description": "litecode final design TU0+TU1",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 49159,
+    "cache_read_tokens": 211935,
+    "output_tokens": 3777,
+    "api_call_count": 6
+  },
+  "started_at": "2026-10-31T13:33:22.681009-04:00",
+  "completed_at": "2026-10-31T13:34:07.241722-04:00"
+}

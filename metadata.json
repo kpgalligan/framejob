@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M69J6GB6V5J3SP107K9A9GJS",
+  "strategy": "manual-commit",
+  "branch": "worktree-tutorial-handler",
+  "checkpoints_count": 7,
+  "files_touched": [
+    "CONTEXT.md",
+    "Makefile",
+    "app/Sources/TutorialTargets.swift",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tutorials.md",
+    "designs/spec/README.md",
+    "designs/tutorials.md",
+    "docs/developing.md",
+    "docs/guide/audio.md",
+    "docs/guide/canvas-and-layers.md",
+    "docs/guide/editing.md",
+    "docs/guide/export.md",
+    "docs/guide/motion-and-transitions.md",
+    "project.yml",
+    "tools/proof/README.md",
+    "tools/proof/gate.py",
+    "tools/proof/proof_app.py",
+    "tools/proof/tutorial_check.py",
+    "tools/proof/tutorial_fixtures/facts.json",
+    "tools/proof/tutorial_fixtures/guide/model.md",
+    "tools/proof/tutorial_fixtures/inventory.json",
+    "tools/proof/tutorial_fixtures/sources/Sections.swift",
+    "tools/proof/tutorial_probe.swift",
+    "tools/tutorials/tutorial_extract.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 74,
+    "cache_creation_tokens": 40875,
+    "cache_read_tokens": 5127246,
+    "output_tokens": 13975,
+    "api_call_count": 30,
+    "subagent_tokens": {
+      "input_tokens": 496,
+      "cache_creation_tokens": 1028802,
+      "cache_read_tokens": 34168670,
+      "output_tokens": 188022,
+      "api_call_count": 245
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

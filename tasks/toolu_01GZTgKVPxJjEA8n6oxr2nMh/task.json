@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01GZTgKVPxJjEA8n6oxr2nMh",
+  "agent_id": "aa1c19ac6421fb410",
+  "subagent_type": "lc-triage",
+  "task_description": "litecode triage TU0+TU1",
+  "token_usage": {
+    "input_tokens": 4,
+    "cache_creation_tokens": 32415,
+    "cache_read_tokens": 27984,
+    "output_tokens": 608,
+    "api_call_count": 2
+  },
+  "started_at": "2026-10-31T13:08:47.052546-04:00",
+  "completed_at": "2026-10-31T13:08:54.45585-04:00"
+}
