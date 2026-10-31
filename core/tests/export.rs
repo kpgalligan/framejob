@@ -782,6 +782,10 @@ fn alpha_is_the_only_key_the_settings_grew() {
         if want.id == "vp9_webm" || want.id == "vp9_alpha_webm" {
             plain.push("writer".to_string());
         }
+        // The bit depth (spec §11 AU-29), on the two uncompressed rows only.
+        if want.id == "audio_wav" || want.id == "audio_aiff" {
+            plain.push("audio_bits".to_string());
+        }
         plain.sort();
         assert_eq!(
             keys_of(&settings(&handle, want.id, None)),
@@ -1514,53 +1518,39 @@ fn a_loudness_figure_that_is_not_a_decibel_in_range_errors() {
         ("peak_dbtp", json!("-1 dBTP")),
         ("peak_dbtp", json!(true)),
     ] {
-        // A ceiling needs a target to be legal at all, so the bad ceilings
-        // are sent with a good target: otherwise the pairing rule would
-        // refuse them first and this test would prove nothing about the
-        // range.
-        let mut overrides = one(key, bad.clone());
-        if key == "peak_dbtp" {
-            overrides
-                .as_object_mut()
-                .expect("one() builds an object")
-                .insert("loudness_lufs".to_string(), json!(-14.0));
-        }
-        let msg = refusal(&handle, "audio_wav", &overrides);
+        let msg = refusal(&handle, "audio_wav", &one(key, bad.clone()));
         assert_contains(&msg, key);
         assert_contains(&msg, &bad.to_string());
     }
 }
 
-/// The one place an override refuses because of what ANOTHER override
-/// says, and the reason it is worth the exception: normalisation is
-/// gain-only with no limiter, so the ceiling exists solely to cap a gain a
-/// target computed. Asked for alone it would be accepted, echoed and
-/// silently do nothing — the one failure shape this table has no
-/// precedent for.
+/// A ceiling alone is legal (spec §11 AU-27): it is the export's master
+/// limiter's, which runs with or without a target, so it resolves and is
+/// echoed like every other override, and no target is summoned with it.
+/// Until AP2 part 2 it was refused, normalisation being gain-only.
 #[test]
-fn a_peak_ceiling_with_no_target_is_refused_by_name() {
+fn a_peak_ceiling_with_no_target_is_accepted_and_echoed() {
     let handle = project();
-    let msg = refusal(&handle, "audio_wav", &json!({"peak_dbtp": -1.0}));
-    assert_contains(&msg, "peak_dbtp");
-    assert_contains(&msg, "loudness_lufs");
+    for overrides in [
+        json!({"peak_dbtp": -3.0}),
+        json!({"peak_dbtp": -3.0, "loudness_lufs": null}),
+    ] {
+        let out = settings(&handle, "audio_wav", Some(&overrides));
+        assert_eq!(num(&out, "/peak_dbtp"), -3.0);
+        assert!(
+            out.get("loudness_lufs").is_none(),
+            "a ceiling pulled a target in with it: {out}"
+        );
+    }
 
-    // An explicitly null target is the same as an absent one everywhere
-    // else, and is here too.
-    let msg = refusal(
-        &handle,
-        "audio_wav",
-        &json!({"peak_dbtp": -1.0, "loudness_lufs": null}),
-    );
-    assert_contains(&msg, "peak_dbtp");
-
-    // And with a target it resolves, so the refusal is about the pairing
-    // and not about the ceiling being unwelcome.
+    // And with a target it resolves as before.
     let out = settings(
         &handle,
         "audio_wav",
         Some(&json!({"peak_dbtp": -1.0, "loudness_lufs": -16.0})),
     );
     assert_eq!(num(&out, "/peak_dbtp"), -1.0);
+    assert_eq!(num(&out, "/loudness_lufs"), -16.0);
 }
 
 #[test]

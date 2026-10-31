@@ -145,6 +145,7 @@ extension ExportSheetController {
         choice.inOutRange = rangePopup.indexOfSelectedItem == 1
         choice.burnInTimecode = currentApplies.burnIn && recipeOptions.burnInTimecode
         choice.encoderSpeed = encoderSpeedChoice.rawValue
+        choice.audioBits = audioBitsChoice
         return choice
     }
 
@@ -198,6 +199,7 @@ extension ExportSheetController {
         rangePopup.selectItem(at: choice.inOutRange && range != nil ? 1 : 0)
         burnInCheckbox.state = choice.burnInTimecode ? .on : .off
         applySpeed(choice)
+        applyAudioBits(choice)
     }
 
     /// Step 2, after the listing. A row whose id this format does not offer —
@@ -371,12 +373,9 @@ extension ExportSheetController {
                 overrides["audio_bitrate"] = tier.audioBitsPerSecond
             }
         }
-        // Both loudness keys together, always: the core refuses a
-        // `peak_dbtp` with no `loudness_lufs` by name, because normalisation
-        // is gain-only and a ceiling with nothing to cap would be a key
-        // accepted, echoed and silently inert
-        // (`export_overrides.rs::loudness`). The ceiling is fixed at
-        // −1 dBTP in this phase and the hint says so.
+        // Both loudness keys together: the ceiling, fixed at −1 dBTP and
+        // named in the hint, is the master limiter's (spec §11 AU-27), which
+        // holds −1 unsent too, so a ceiling goes only beside a target.
         if let target = currentLoudness {
             overrides["loudness_lufs"] = target
             overrides["peak_dbtp"] = Self.peakCeilingDBTP
@@ -387,6 +386,7 @@ extension ExportSheetController {
         // in/out range, silently.
         if let picture = dynamicRangeOverride() { overrides["dynamic_range"] = picture }
         if let speed = encoderSpeedOverride() { overrides["encoder_speed"] = speed }
+        if let bits = audioBitsOverride() { overrides["audio_bits"] = bits }
         if rangePopup.indexOfSelectedItem == 1, let range = range {
             overrides["range"] = [
                 "start": range.start,
@@ -442,6 +442,7 @@ extension ExportSheetController {
         burnInCheckbox.isEnabled = applies.burnIn
         syncDynamicRange(applies)
         syncSpeed(applies)
+        syncAudioBits(applies)
 
         guard let settings = resolved else {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."
@@ -523,6 +524,7 @@ extension ExportSheetController {
         // A frame-sequence preset's codec IS its container: "GIF · GIF".
         if container != parts[0] { parts.append(container) }
         if let speed = settings.encoderSpeed { parts.append(speed.menuName) }
+        if settings.audioBits == 24 { parts.append("24-bit") }
         if let rate = settings.videoBitrate {
             // A bundled encoder's rate is a soft cap (spec §11 CX-13).
             parts.append((settings.writer == nil ? "" : "usually ≤ ") + Self.rateText(rate))

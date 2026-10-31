@@ -1249,6 +1249,90 @@ code at integration, so the lane's Release proof (16/16) stands.
 **Owed.** SE-33 for the owner. Filed at integration: the road-map candidate, an exact audio
 preview through `AVAudioEngine` (AU-100). Part 2 continues at AU-107.
 
+### AP2b's record (2026-10-30)
+
+Part 2 of AP2: every export through a float master (gain, the true-peak master limiter,
+16 or 24 bits), closing #86. The lane started from `79b3216`.
+
+**Decided.** AU-27…AU-29, recorded before the code: the master always on at the export's
+`peak_dbtp`, −1 dBTP by default, with no off switch, its 158 frames compensated and its input
+placed by stamp (AU-27, amending §7.8's pairing rule and AU-73's footer sentence); the gain
+solved through `AudioLimiterModel` over pass 1's 10 ms steps, capped at +40 dB, rounded to
+nearest, `limited_db` and `capped_by_gain` replacing `capped_by_peak` (AU-28); `audio_bits` 16
+or 24 on WAV and AIFF only, rounded once from float, never dithered (AU-29). The spec review's
+three objections were taken: `ScrubGrains.swift`'s two mentions of the old symbol renamed; the
+master places by stamp before the limiter so its count-based stamps stay the timeline's (M1–M3,
+MA9); a non-finite measured peak keeps gain 0 and passes through unclamped.
+
+**Landed.** Core: `export_overrides::audio_bits`, `loudness()` without the pairing refusal,
+`Preset::takes_audio_bits` and `"audio_bits": [16, 24]` on the two LPCM rows, `export.rs`'s
+read, refusal and echo (16 when not asked), the header's comments; `core/tests/export_audio_bits.rs`
+(6 tests) and `export.rs`'s ceiling-alone test. Swift: `ExportAudioMaster.swift` (replacing
+`ExporterAudioGain.swift`, `git rm`), `StepLoudness.swift` (`StepLoudness` moved verbatim out
+of `ClipLoudness`, and `StepLoudnessMeter`), `ExportLoudness`'s new `resolve` and report,
+pass 1 feeding the step meter, both writers' pumps through the master with its tail before the
+padding, `ExportAudioEnd`'s silence at the master's depth, 24-bit LPCM writer settings,
+`ExportSettings.audioBits` and `masterCeilingDBTP`, the sheet's Bit depth row
+(`ExportSheetAudioBits.swift`, after Quality, remembered in `ExportChoice`), the `export` tool's
+`audio_bits` and result keys, and the meter's footer. `ExporterWriter.swift` is 592 lines,
+`ExportSheetResolve.swift` 583.
+
+**Two choices inside the spec.** `ExportLoudness.masterReleaseSeconds` (0.1) is the one
+spelling of the master's release, which `ExportAudioMaster.releaseSeconds` reads, because
+`ExportLoudness.swift` has to stay free of AVFoundation for `phase5_chrome.py` §9. And a buffer
+with no numeric stamp is skipped by the master (nil), as the pump skipped it before.
+
+**Measured** (the lane, Debug): `export_master_proof.py` 11/11 and `--probe` 3/3 — X1, X2 and
+X3 (AU-22's cases: two limited clips through a crossfade, a nest at volume 2, an action
+raising volume) −0.9998 / −0.9998 dBTP by the Kaiser and Annex 2 meters, each reading 0.0000
+to 0.0002 with `peak_dbtp` 0; X5 the hot un-normalised mix −1.0127 / −0.9999 dBTP, no
+full-scale sample, `limited_db` 7.03; X6 an un-normalised mix under the ceiling decodes
+identical to its source, first and last 158 frames included; X7 24-bit WAV and AIFF with 99.5 %
+of samples using their low 8 bits; X8 a −90 dBFS float tone ×32 at −149.1 dBFS of residual at
+24 bits against −101.4 at 16; X9 the crest fixture at −14.0086 LUFS; **X10 the owner's
+recording raw to −16: −15.9125 LUFS, −0.9998 / −0.9999 dBTP**. `phase5_proof.py` 90/90 (the
+crest leg, 3 dB short before, at −14.0086 LUFS), `phase5_chrome.py` 81/81, `limiter_proof.py`
+19/19, `export_gain_proof.py --against` the base build's reference 36/36 (G1 byte-identical on
+all seven presets, so G1's rule stands unpinned), `export_offset_proof.py` E4, E20, E22, E44,
+E45, E46 6/6 (E46 − E4 +0.000 ms), `loudness_normalize_proof.py` 37/37, `webm_export_proof.py`
+`--probe` 10/10 and in full 29/29. Nine mutants, all killed by their named rows (MA1 X1 at
++1.42 dBTP; MA2 E4 and E46 at +3.292 ms; MA3 X6; MA4 X7 and X8; MA5 X10 at −17.10 LUFS; MA6
+X1; MA7 X5 and X8; MA8 `export_audio_bits.rs`; MA9 M1 and M2). `make gate` PASS 385 s (names
+2, typecheck 13 with the four baseline warnings, fmt 6, lint 8, test 214, app 143). On Release
+after it: `export_master_proof.py` 11/11 with the same figures (X10 −15.9125 LUFS, −0.9998 /
+−0.9999 dBTP), `--probe` 3/3, `phase5_proof.py` 90/90, `limiter_proof.py` 19/19,
+`export_offset_proof.py` E4, E20, E44, E46 4/4, `screens.py --only 12-export-sheet` 6/6; the
+parity log clean.
+
+**Review.** Review 1 found two should-fix stale texts, both fixed in the lane (`42a5ffd`): spec
+§7.8's pass-2 sentence (still "`target − measured`, capped" and a 16-bit decode for an ungained
+export) now reads the float mix through the master for every export and leaves the gain's rule to
+AU-28; `docs/guide/mcp.md`'s `export` lists `audio_bits` and drops the "`peak_dbtp` without
+`loudness_lufs` is refused" sentence. `make gate` PASS 223 s after it (only Markdown changed, so
+the Release proofs stood). Review 2 passed with no new finding.
+
+**Integrated.** AP14 and AP10 had landed since the lane's base `79b3216`. The phase bumps no
+format. Conflicts were taken as unions: the decisions index's `audio.md` row (AU-27..AU-29 after
+AU-20..AU-26), the guide's opening paragraph (AP14's voice effect and AP10's track volume and pan
+beside the master's clause), the proof README (this phase's section after AP10's), and the spec
+indexes' Lines cells, counted again (`spec_index_proof.py` 213/213). AP14 and AP10 took SE-32 and
+SE-33, so this phase's check is SE-34. AP14's `voice_probe.swift` and AP10's
+`audio_ap10_probe.swift` called `ExportWriter.audioReadOutput(built, gained: true)`, which this
+phase removed; both now call `audioReadOutput(built)`, the same float read. The CLAUDE.md edits
+owed went in: app's map names `ExportAudioMaster.swift`, `StepLoudness.swift` and
+`ExportSheetAudioBits.swift` (and no longer `ExporterAudioGain.swift` or `mixClipped`), core's
+export line says `audio_bits` is 16 or 24 and only on the LPCM rows. On the merged tree `make
+gate` PASS 303 s (names 1, typecheck 6 with the four baseline warnings, fmt 3, lint 6, test 170,
+app 118). No product code changed at integration; because the master now meets AP10's and AP14's
+exports, their proofs ran again on Release with this phase's: `export_master_proof.py` 11/11 with
+the lane's figures (X10 −15.9125 LUFS, −0.9998 / −0.9999 dBTP), `audio_ap10_proof.py` 16/16
+(V1 |dI| 0.0000 LU), `voice_proof.py` 38/38 — I3 now reads pitch −0.10, lofi −0.20 and distorted
+−0.50 LU against the dry −29.60 LUFS (inside its ±1 LU; the master holds those kinds' peaks at
+×4), every other figure AP14's; the parity log empty.
+
+**Owed.** SE-34 (the master's sound on music and speech, the Bit depth row) for the owner;
+SE-28 stands. #86 closed by this phase. Nothing to file.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

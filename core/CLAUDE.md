@@ -929,9 +929,8 @@ governs a module now.
   a canvas, a duration, a rate and an override against a preset row; in an
   HLG project a video row's settings name the picture it writes as `color`,
   `hlg`, `pq` or `sdr`, from `dynamic_range.rs`); how an
-  override is READ and REFUSED, naming the key and the value (`peak_dbtp`
-  without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
-  would be a key accepted and silently inert; `describe` shortens a value
+  override is READ and REFUSED, naming the key and the value (`audio_bits`
+  is 16 or 24 and only on the LPCM rows; `describe` shortens a value
   and `spelled` gives a vocabulary value's JSON spelling for any sentence
   in the crate); the sizes the sheet offers and
   `fit_within`, and `even_size` — on every row AVFoundation writes but

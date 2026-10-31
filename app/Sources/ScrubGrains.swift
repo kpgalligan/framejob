@@ -55,7 +55,7 @@ enum ScrubGrains {
     }
 
     /// `frames` frames of `built`'s mix from `start`, as the export's float
-    /// read gives them (`ExportAudioGain.floatMixSettings`, the build's own
+    /// read gives them (`ExportAudioMaster.floatMixSettings`, the build's own
     /// `audioMix`), split into two channels; nil when the composition has
     /// no audio track or the reader refuses. Unwindowed.
     ///
@@ -77,7 +77,7 @@ enum ScrubGrains {
             let reader = try? AVAssetReader(asset: built.composition)
         else { return nil }
         let output = AVAssetReaderAudioMixOutput(
-            audioTracks: tracks, audioSettings: ExportAudioGain.floatMixSettings)
+            audioTracks: tracks, audioSettings: ExportAudioMaster.floatMixSettings)
         output.audioMix = built.audioMix
         // Nothing here writes a sample back (`ExporterLoudness.mixOutput`).
         output.alwaysCopiesSampleData = false

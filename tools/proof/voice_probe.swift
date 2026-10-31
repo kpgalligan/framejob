@@ -244,7 +244,7 @@ typealias Stereo = (left: [Float], right: [Float])
 /// The export's float read of the whole timeline, placed by presentation time.
 func exportRead(_ built: BuiltComposition) -> Stereo? {
     guard let reader = try? AVAssetReader(asset: built.composition) else { return nil }
-    let output = ExportWriter.audioReadOutput(built, gained: true)
+    let output = ExportWriter.audioReadOutput(built)
     guard reader.canAdd(output) else { return nil }
     reader.add(output)
     guard reader.startReading() else { return nil }

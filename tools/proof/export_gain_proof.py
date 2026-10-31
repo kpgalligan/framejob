@@ -1,5 +1,8 @@
 """Issue batch B60 — a normalised export gains the float mix and quantises
-once (#86 part 1), proved per audio preset ACROSS two builds.
+once (#86 part 1), proved per audio preset ACROSS two builds. Since road map
+"audio" AP2 part 2 (spec §11 AU-27) EVERY export reads the float mix and goes
+through the master limiter at −1 dBTP, normalised or not, so G5 is inverted:
+an un-normalised hot mix is limited, not clipped.
 
     python3 tools/proof/export_gain_proof.py <dir>/agent.sock --record <dir>
     python3 tools/proof/export_gain_proof.py <dir>/agent.sock --against <dir>
@@ -33,7 +36,8 @@ Within-build rows:
 - **G4**, per preset, the `hot` export: no decoded sample at −32768 or
   32767; this script's BS.1770-4 integrated loudness of the decode within
   ±0.5 LU of the report's; no "clipped" in the summary.
-- **G5**: `hotplain` says "clipped" and holds full-scale samples.
+- **G5** (AU-27, inverted from B60's): `hotplain` holds no full-scale sample
+  and its summary does not say "clipped" — the master limited it.
 
 Cross-build rows (`--against`):
 - **G1**, per preset: `plain` decodes byte-identical to the reference's.
@@ -204,7 +208,7 @@ def within(got):
     _, data, report = got["audio_wav"]["hotplain"]
     clipped = full_scale(data)
     summary = (report or {}).get("summary", "")
-    row("G5", "clipped" in summary and clipped > 0,
+    row("G5", "clipped" not in summary and clipped == 0,
         f"hot un-normalised WAV: {clipped} full-scale samples, summary “{summary}”")
     return g0
 

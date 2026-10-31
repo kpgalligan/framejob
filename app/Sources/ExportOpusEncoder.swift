@@ -1,8 +1,8 @@
 import AVFoundation
 
 /// The `av1_webm` row's sound (spec §11 CX-7, CX-15 (5)): the export's 16-bit interleaved
-/// 48 kHz stereo mix (`ExportWriter.decodedAudioSettings`, or `ExportAudioGain`'s output in
-/// that shape) encoded to Opus by AudioToolbox's `AVAudioConverter`, in 20 ms packets.
+/// 48 kHz stereo mix (`ExportAudioMaster`'s output, in `ExportWriter.decodedAudioSettings`'
+/// shape) encoded to Opus by AudioToolbox's `AVAudioConverter`, in 20 ms packets.
 ///
 /// **A 960-frame FIFO** sits in front of the converter, so it is handed whole packets'
 /// worth of frames whatever size the reader's buffers come in; packet k is timed at

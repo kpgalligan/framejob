@@ -79,20 +79,15 @@ The five parts, and what each is measured with:
   and a 45° fs/4 sine — whose samples all sit at ±0.7071 of its real
   amplitude — must read at least 2.5 dB above its sample peak.
 
-  **Two more claims are about the report itself**, and both are about a
-  number that is right in the ordinary case and wrong in one particular one.
-  The ceiling is SWEPT across the gain's own 0.01 dB grid — five ceilings
-  0.002 dB apart — because a cap quantised to the nearest step lands over the
-  ceiling for about half the measured peaks it could meet, so a single
-  fixture answers "the true peak does not exceed the ceiling" by luck rather
-  than by construction. And a mix driven PAST full scale is exported both
-  ways. Normalised, the write pass reads the same float mix the measurement
-  read and quantises once after the gain (spec §11 #86), so the file holds no
-  full-scale sample, measures what the report says and is not called
-  clipped. Un-normalised, the 16-bit decode still clips it, and the report
-  has to say whose numbers it is publishing.
-  `phase5_chrome.py`'s section 9 sweeps the same arithmetic 200 peaks at a
-  time with no export in it at all.
+  **Since road map "audio" AP2 part 2 every export runs a master limiter**
+  (spec §11 AU-27, AU-28) at its `peak_dbtp`, −1 dBTP by default, and the
+  gain is solved through it: the crest fixture, whose −14 LUFS target the
+  ceiling once capped 3 dB short, now lands within ±0.5 LU of −14 with its
+  true peak at the ceiling and `limited_db` saying how far the master took
+  it down. A mix driven PAST full scale is exported both ways, and both
+  files hold no full-scale sample, sit under the ceiling and are never
+  called clipped. `phase5_chrome.py`'s section 9 sweeps the same arithmetic
+  200 peaks at a time with no export in it at all.
 
 * **5e WAV and AIFF** — `ffprobe` reports 48 kHz LPCM for both (little-endian
   in the RIFF, big-endian in the IFF, which is the container's decision), the
@@ -410,7 +405,7 @@ FIXTURE_EXPRESSIONS = {
     ),
     # 5d's ceiling. A −20 dBFS tone with one 10 ms burst near full scale: a
     # peak-to-loudness ratio near 19 dB, so a −14 LUFS target with a −1 dBTP
-    # ceiling is capped by the PEAK and the file lands quieter than asked.
+    # ceiling has the master limit the burst (spec §11 AU-27).
     "crest.wav": (
         "0.1*sin(2*PI*440*t)+0.85*sin(2*PI*1000*t)*between(t,2,2.01)",
         "0.1*sin(2*PI*440*t)+0.85*sin(2*PI*1000*t)*between(t,2,2.01)",
@@ -609,9 +604,10 @@ def catalog_part(mcp):
             f"export declares {key} as a number bounded {low}…{high}: "
             f"{field.get('minimum')}…{field.get('maximum')}",
         )
+    ceiling_prose = export["properties"].get("peak_dbtp", {}).get("description", "")
     check(
-        "REFUSED" in export["properties"].get("peak_dbtp", {}).get("description", ""),
-        "and says peak_dbtp on its own is REFUSED rather than accepted and left inert",
+        "master limiter" in ceiling_prose and "without loudness_lufs" in ceiling_prose,
+        "and says peak_dbtp is the master limiter's ceiling, legal on its own (spec §11 AU-27)",
     )
 
     patch = schema_of("set_audio")["properties"].get("patch", {}).get("description", "")
@@ -1028,8 +1024,11 @@ def loudness_part(mcp):
     check(
         normalized["loudness"]["target_lufs"] == -14
         and normalized["loudness"]["ceiling_dbtp"] == -1
-        and normalized["loudness"]["capped_by_peak"] is False,
-        f"the target and the ceiling are echoed as asked, uncapped: {normalized['loudness']}",
+        and "capped_by_peak" not in normalized["loudness"]
+        and normalized["loudness"]["capped_by_gain"] is False
+        and normalized["loudness"]["limited_db"] == 0,
+        f"the target and the ceiling are echoed as asked, nothing limited or capped: "
+        f"{normalized['loudness']}",
     )
     check(
         norm_bytes != off_bytes,
@@ -1048,24 +1047,31 @@ def loudness_part(mcp):
     )
 
     # The ceiling, where it actually bites. A 19 dB peak-to-loudness ratio
-    # means −14 LUFS would need +5.8 dB and the peak has −0.6 dB of room, so
-    # the file must land QUIETER than the target and say so.
+    # means −14 LUFS needs +5.8 dB and the peak has −0.6 dB of room, so the
+    # master limits the burst and the file lands ON the target (spec §11
+    # AU-27, AU-28).
     print("\n5d — the true-peak ceiling, where it bites")
     c = Session(mcp, "phase5-crest")
     c.place("crest.wav")
-    _, capped, result = c.wav("capped", loudness_lufs=-14, peak_dbtp=-1)
+    _, limited, result = c.wav("limited", loudness_lufs=-14, peak_dbtp=-1)
     report = result["loudness"]
+    landed = integrated(channels(limited))
     check(
-        report["capped_by_peak"] is True,
-        f"a −14 LUFS target over a peaky programme is capped by the −1 dBTP ceiling "
-        f"({report['capped_by_peak']}, gain {report['gain_db']})",
+        close(landed, -14.0, 0.5),
+        f"a −14 LUFS target over a peaky programme lands within ±0.5 LU of it by this "
+        f"script's own BS.1770 ({fmt(landed)} LUFS)",
+    )
+    check(
+        report["limited_db"] > 0 and "capped_by_peak" not in report,
+        f"and the report says the master limited the peak ({report['limited_db']} dB, gain "
+        f"{report['gain_db']}; {report['summary']})",
     )
     check(
         report["true_peak_dbtp"] <= -1.0 + 1e-9,
         f"the reported true peak does not exceed the ceiling ({fmt(report['true_peak_dbtp'])} "
         "dBTP)",
     )
-    peak = db(true_peak(channels(capped)))
+    peak = db(true_peak(channels(limited)))
     check(
         peak <= -1.0 + 0.3,
         f"and this script's own 4× oversampling pass over the file agrees within the "
@@ -1076,61 +1082,11 @@ def loudness_part(mcp):
         f"the two true-peak measurements agree ({fmt(peak)} here, "
         f"{fmt(report['true_peak_dbtp'])} reported)",
     )
-    landed = integrated(channels(capped))
-    check(
-        landed < -14.0 - 3,
-        f"and the file lands well BELOW the target it was asked for, which is what a "
-        f"ceiling that bites means ({fmt(landed)} LUFS against −14)",
-    )
 
-    # The ceiling swept ACROSS the gain's 0.01 dB grid. One export can only
-    # ask about one measured true peak, and whether a round-to-nearest
-    # quantisation of the cap lands over the ceiling or under it depends on
-    # where that peak falls in the grid — so a single fixture answers this by
-    # coin toss. Five ceilings 0.002 dB apart move the same peak through five
-    # phases of one 0.01 dB step, and five points spaced a fifth of a step
-    # apart cannot all miss the half of it that rounds the wrong way.
-    # `phase5_chrome.py`'s section 9 sweeps 200 peaks against the same
-    # arithmetic without exporting anything; this is the end-to-end half.
-    ceilings = [-1.0, -1.002, -1.004, -1.006, -1.008]
-    reports = []
-    for index, ceiling in enumerate(ceilings):
-        # `export` rather than `wav`: the claim is about the REPORT, and the
-        # file each of these five wrote is the one the check above already
-        # decoded and measured.
-        swept = c.export(f"sweep{index}", loudness_lufs=-14, peak_dbtp=ceiling)
-        reports.append(swept["loudness"])
-    over = [
-        (ceiling, r["true_peak_dbtp"]) for ceiling, r in zip(ceilings, reports)
-        if r["true_peak_dbtp"] > ceiling + 1e-9
-    ]
-    check(
-        not over,
-        f"and no ceiling in a five-step sweep across the gain's 0.01 dB grid is EXCEEDED "
-        f"— the cap is quantised toward more attenuation, never toward less "
-        f"({'all five at or under' if not over else over})",
-    )
-    # The same five, under the round-to-NEAREST the cap used to get: the
-    # measured peak is the report's own true peak less its gain, so this is
-    # arithmetic over what the app just answered rather than a second guess.
-    nearest = [
-        ceiling for ceiling, r in zip(ceilings, reports)
-        if round((ceiling - (r["true_peak_dbtp"] - r["gain_db"])) / 0.01) * 0.01
-        > (ceiling - (r["true_peak_dbtp"] - r["gain_db"])) + 1e-12
-    ]
-    check(
-        len(nearest) >= 1,
-        f"…and the sweep is not vacuous: {len(nearest)} of the five would have landed "
-        f"over the ceiling had the cap been rounded to the NEAREST hundredth "
-        f"({[f'{x:g}' for x in nearest]})",
-    )
-
-    # A mix past full scale. The measure pass reads 32-bit float, and since
-    # #86 so does the write pass of a NORMALISED export: the gain is applied
-    # to the float mix and quantised once, so the file is the measured signal
-    # turned down, unclipped. Only the same mix written with NO gain goes
-    # through the 16-bit decode, which saturates, and that report must say so.
-    print("\n5d — a mix past full scale: gained in float, clipped only without a gain")
+    # A mix past full scale. Every export reads the float mix and goes through
+    # the master (spec §11 AU-27), so the file is the measured signal gained
+    # and limited at the ceiling, unclipped — normalised or not.
+    print("\n5d — a mix past full scale: limited by the master, normalised or not")
     o = Session(mcp, "phase5-overscale")
     hot_clip = o.place("half.wav")
     # A half-scale tone at ×4: +6 dBFS of mix, which is
@@ -1138,16 +1094,18 @@ def loudness_part(mcp):
     o.op("set_audio", clips=[hot_clip], patch={"volume": 4})
     _, hot, hot_result = o.wav("hot", loudness_lufs=-14, peak_dbtp=-1)
     report = hot_result["loudness"]
-    mix_peak = report["sample_peak_dbfs"] - report["gain_db"]
+    _, raw, raw_result = o.wav("hot-plain")
+    raw_report = raw_result["loudness"]
+    mix_peak = raw_report["sample_peak_dbfs"] + raw_report["limited_db"]
     check(
         mix_peak > 1.0,
         f"the mix really did pass full scale, or nothing below is a check — the measure "
-        f"pass reads float and saw {fmt(mix_peak)} dBFS before the gain",
+        f"pass reads float and saw it {fmt(raw_report['limited_db'])} dB over the "
+        f"−1 dBTP ceiling",
     )
     check(
         "clipped" not in report["summary"],
-        f"the normalised export does NOT say the mix clipped: it was gained in float "
-        f"before it was quantised ({report['summary']})",
+        f"the normalised export does NOT say the mix clipped ({report['summary']})",
     )
     written = integrated(channels(hot))
     check(
@@ -1161,17 +1119,19 @@ def loudness_part(mcp):
         full == 0,
         f"and no decoded sample sits at full scale ({full} at −32768 or 32767)",
     )
-    _, raw, raw_result = o.wav("hot-plain")
     raw_full = sum(1 for s in samples(raw) if s in (-32768, 32767))
+    raw_peak = db(true_peak(channels(raw)))
     check(
-        "clipped" in raw_result["loudness"]["summary"] and raw_full > 0,
-        f"but the same mix exported WITHOUT a gain is clipped by the 16-bit decode and "
-        f"says so ({raw_full} full-scale samples; {raw_result['loudness']['summary']})",
+        "clipped" not in raw_report["summary"] and raw_full == 0
+        and raw_peak <= -1.0 + 0.3,
+        f"and the same mix exported WITHOUT a gain is limited too: no full-scale sample "
+        f"({raw_full}), true peak {fmt(raw_peak)} dBTP by this script, no \"clipped\" "
+        f"({raw_report['summary']})",
     )
     check(
         "clipped" not in plain["loudness"]["summary"],
-        f"while an export INSIDE full scale says nothing of the sort, so the sentence "
-        f"means something ({plain['loudness']['summary']})",
+        f"while an export INSIDE full scale says nothing of the sort either "
+        f"({plain['loudness']['summary']})",
     )
 
     # The two invariants a tolerance alone cannot carry. fs/4 at 45° is the
@@ -1218,8 +1178,8 @@ def overrides_part(mcp):
     )
     result = s.export("noceiling", loudness_lufs=-20)
     check(
-        result["loudness"]["ceiling_dbtp"] == 0,
-        f"a target with no ceiling gets full scale, which is 'do not push it past 0 dBTP' "
+        result["loudness"]["ceiling_dbtp"] == -1,
+        f"a target with no ceiling gets the master's default, −1 dBTP (spec §11 AU-27) "
         f"({result['loudness']['ceiling_dbtp']})",
     )
 
@@ -1237,13 +1197,11 @@ def overrides_part(mcp):
             f"{arguments} is refused by name, with the value in the message: {message[:110]!r}",
         )
 
-    message = s.error(
-        "export", preset="audio_wav",
-        path=os.path.join(WORK, f"{s.name}-{os.getpid()}-bad"), peak_dbtp=-1) or ""
+    result = s.export("ceilingalone", peak_dbtp=-3)
     check(
-        "peak_dbtp" in message and "loudness_lufs" in message and "gain-only" in message,
-        f"and a ceiling with no target is refused rather than accepted and left inert — "
-        f"normalisation is gain-only, so it would have nothing to cap: {message[:130]!r}",
+        result["loudness"]["ceiling_dbtp"] == -3 and "target_lufs" not in result["loudness"],
+        f"and a ceiling with no target is accepted and echoed: it is the master limiter's "
+        f"(spec §11 AU-27) ({result['loudness']['ceiling_dbtp']})",
     )
     message = s.error(
         "export", preset="audio_wav",

@@ -35,7 +35,7 @@ extension ExportWriter: ExportPipeline {}
 
 /// A pipeline the loudness normalisation's gain is handed to after the pick (`Exporter`'s
 /// one caller): the `AVAssetWriter` path and the WebM one (spec §11 CX-15 (2)), each
-/// applying it with `ExportAudioGain` before the end of the sound is cut.
+/// applying it in its `ExportAudioMaster` before the end of the sound is cut.
 protocol ExportAudioNormalizing: AnyObject {
     func normalizeAudio(byLinearGain gain: Float)
 }

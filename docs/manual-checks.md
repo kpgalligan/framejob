@@ -467,6 +467,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the panel's level and pan feel right while playing, and is anything cut off or unclear?
 - **Source:** road map "audio" AP10 part 1 (spec §11 AU-104, AU-105); `tools/proof/audio_ap10_proof.py` measures the fader and pan arithmetic on exports and the meter against the export (F1–F5, P1–P5, V1), not how the panel feels.
 
+**SE-34 — The export's master limiter doesn't pump on music or speech, and the Bit depth row fits**
+- **Do:** 1. Put a loud music bed under `samples/Rode-usb-mic.m4a` (or any voice) on a second track, with both clips turned up until the timeline bar's meter touches the top. 2. Export Audio only (WAV) with Loudness Off and play the file; then again at −14 LUFS and play that. Note each export's "peaks limited by …" figure. 3. Export the voice alone at −16 LUFS and play it. 4. Pick Audio only (WAV), then H.264, and look at the Bit depth row (after Quality) in light and dark appearance; pick 24-bit on WAV and export.
+- **Expect:** the music's beat and the voice's loud syllables come through without the level audibly ducking and swelling around them (pumping), without crackle or distortion on the peaks, and the quiet passages are not pulled up between beats; a figure of a few dB sounds like the preview turned up, and only a very large one (10 dB or more) may be heard as squashed; the Bit depth row reads 16-bit or 24-bit, is live on WAV and AIFF and greyed out on H.264 showing the last choice, and fits with nothing cut off; the 24-bit file plays and the footnote reads `LPCM · WAV · 24-bit`.
+- **Answer:** at what "peaks limited by" figure does the master start to be audible on music, and on speech — and does it ever pump or distort below that?
+- **Source:** road map "audio" AP2 part 2 (spec §11 AU-27..AU-29); `tools/proof/export_master_proof.py` measures every peak against the ceiling by two meters, the latency compensation and the 24-bit files' low bits, not how the limiting sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

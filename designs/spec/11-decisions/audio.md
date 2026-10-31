@@ -210,6 +210,49 @@ decisions from AU-27.
   "−1.0 dBTP" or "off", and Reset clears it. While the clip's limiter is on, the Volume
   section's At volume row reads the model's LUFS (AU-24) and `min(tp·v, ceiling)`.
 
+AU-27…AU-29 are AP2's second part (the export's float decode and #86, the master limiter,
+`audio_bits`), recorded before its code from AP0's spikes S1 and S3 and part 1's record.
+
+- **AU-27 — The master.** Every export with sound (every row but GIF and APNG; image sequences
+  have none) reads the mix as 32-bit float (`ExportAudioMaster.floatMixSettings`; no 16-bit
+  decode is left), applies the export gain, then a master limiter — `AudioLimiterStage` exactly
+  as AU-20 (the Kaiser β 10 64-tap and Annex 2 detector, the 159-sample hold, the box mean, one
+  gain for both channels) — with its release 100 ms, fixed, and its ceiling the export's
+  `peak_dbtp` (−20…0). It is **always on, at −1 dBTP by default** (AU-4's ceiling), for
+  normalised and un-normalised exports alike; there is no off switch, and 0 dBTP is the loosest.
+  Its 158 frames are compensated in the file: the head dropped and the tail flushed, so output
+  frame k is input frame k, and a mix under the ceiling is written exactly as the float mix
+  rounded. The master places its input by stamp before the limiter — a hole in the reader's
+  stamps fed as zeros, an overlap's covered head cut, as CX-15 (5)'s `align` — so its
+  count-based output stamps are the timeline's and the sound stays placed at its stamps. A
+  ceiling alone is legal (amends spec §7.8's pairing rule: `peak_dbtp` without `loudness_lufs`
+  is the master's ceiling, accepted and echoed). Nothing clips any more, so the report's
+  "clipped" summary (`mixClipped`) is retired. It holds AU-22's accepted cases (an action above
+  base, a nest clip's volume above 1, #87's slew at a cut, two overlapping limited clips). The
+  preview has no master (S3); the loudness meter's footer says it reads the mix before the
+  export's loudness and master limiter (amends AU-73's sentence).
+- **AU-28 — The gain under the master.** Pass 1 also records 10 ms steps
+  (`StepLoudnessMeter`: per 480-frame step the summed K-weighted mean square and the true peak);
+  the gain is `AudioLimiterModel.gain` over them at the master's ceiling and 100 ms, capped at
+  +40 dB, rounded to the NEAREST 0.01 dB (the cap's round-down rule is gone: the limiter holds
+  the ceiling). Under 40 steps, or with no float read: the unlimited `target − integrated` (0
+  with no loudness). The report: `integrated_lufs` the model's figure at that gain (also with no
+  target), `true_peak_dbtp` min(measured + gain, ceiling), `limited_db` max(0, measured + gain −
+  ceiling), `capped_by_gain` when the +40 dB cap decided; `capped_by_peak` is removed. A
+  non-finite measured true peak keeps the old handling: the model is not run, the gain is 0,
+  `integrated_lufs` is the measured figure, `true_peak_dbtp` passes through unclamped (the
+  summary still says "Silent" for −∞ and "Peak not measurable (a non-finite sample in the mix)"
+  for +∞), and `limited_db` is 0.
+- **AU-29 — `audio_bits` and rounding.** 16 or 24 on `audio_wav` and `audio_aiff` only (ProRes
+  keeps 16-bit), refused by name elsewhere, 16 by default; those preset rows list `[16, 24]`.
+  24-bit is packed signed, in the container's byte order chosen by the writer as 16-bit is.
+  Both depths are rounded to nearest once from float (`vDSP_vfixr16`, `vDSP_vfixr32`), clipped
+  first, with **no dither** at either depth: 24-bit's rounding sits at −144 dBFS, and 16-bit
+  follows the picture's rule (output not dithered; #375's part 2 dropped by the owner) and keeps
+  every export deterministic. The Export sheet's Bit depth popup (16-bit, 24-bit) sits after
+  Quality, live only on those rows and remembered in `ExportChoice`; the `export` tool takes
+  `audio_bits`.
+
 AU-30…AU-39 are AP3's (EQ, hum removal and channel selection; survey A3, A7, B7), recorded
 before its code from AP0's spike S1 and the survey's measurements of the owner's recording.
 

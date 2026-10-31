@@ -474,7 +474,8 @@ char *rc_normalise_color(const char *text);
    row is the default the export sheet opens on.
 
    Three of the rows are audio only: `audio_m4a` (AAC) is what you send,
-   and `audio_wav` / `audio_aiff` are 16-bit LPCM at 48 kHz — what you hand
+   and `audio_wav` / `audio_aiff` are LPCM at 48 kHz, 16-bit or 24 (their
+   rows alone list `audio_bits`, [16, 24], spec 11 AU-29) — what you hand
    to somebody else's tool, where a second lossy generation is the one
    thing you cannot take back. A row's `avf_preset` means only
    "AVFoundation can write this row": `null` is what routes an export to
@@ -530,20 +531,22 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * `range`, `optimize_for_network`, the two bitrates in bits per second
  * (`video_bitrate`, `audio_bitrate`) and the two loudness figures
  * (`loudness_lufs`, the integrated target an export is normalised to,
- * -70..0; `peak_dbtp`, the true-peak ceiling the gain is capped against,
- * -20..0) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
+ * -70..0; `peak_dbtp`, the true-peak ceiling of the export's master
+ * limiter, -20..0, spec 11 AU-27) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
  * HLG project's 10-bit rows default to hlg, its other video rows write sdr
  * and refuse hlg and pq, and an SDR project refuses hlg and pq) and
  * `encoder_speed` ("faster", "balanced" or "smaller", spec 11 CX-12: taken
  * only by a row whose preset lists encoder speeds, balanced there when
- * absent, and an error naming the row on any other). Absent
+ * absent, and an error naming the row on any other) and `audio_bits` (16
+ * or 24, spec 11 AU-29: taken only by the WAV and AIFF rows, whose
+ * presets list the depths, 16 there when absent, and an error naming the
+ * row on any other). Absent
  * and explicit null both mean "use the preset", an unknown key is ignored
  * so a newer UI still gets an export, and a value out of range or of the
- * wrong type is an error naming the key and the value. One pairing rule,
- * and it is the table's only one: a `peak_dbtp` with no `loudness_lufs` is
- * an error, because normalisation is gain-only and a ceiling with nothing
- * to cap would be accepted, echoed and silently inert. Neither loudness
- * key appears in the resolved settings unless it was asked for.
+ * wrong type is an error naming the key and the value. Either loudness key
+ * may come alone: the ceiling is the master limiter's, which every export
+ * with sound runs, −1 dBTP when not asked. Neither loudness key appears in
+ * the resolved settings unless it was asked for.
  *
  * Note what is NOT in that list: there is no `size` key. A size is two
  * numbers here. `rc_export_sizes`' row ids ("1080p", "document") are the
@@ -591,7 +594,9 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * `vp9_alpha_webm`, spec 11 CX-12, CX-16, CX-17) adds `writer` at the end
  * ("svt_av1" or "libvpx"), and the two AV1 rows then `encoder_speed` (the
  * speed asked, else "balanced"); no other row's settings carry either key,
- * and the two VP9 rows' carry no speed. */
+ * and the two VP9 rows' carry no speed. `audio_wav` and `audio_aiff` add
+ * `audio_bits` at the end (the depth asked, else 16); no other row's
+ * settings carry it. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

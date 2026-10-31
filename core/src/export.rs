@@ -30,6 +30,10 @@
 //! carry either key, and the two VP9 rows' carry no speed, libvpx having one
 //! (CX-3).
 //!
+//! The two uncompressed audio rows, `audio_wav` and `audio_aiff`, carry
+//! `audio_bits`, 16 or 24 (spec §11 AU-29): 16 when not asked, and refused
+//! by name on every other row.
+//!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
 //! same rows, so a preset cannot exist in the menu and not in the resolver.
@@ -43,8 +47,8 @@
 use serde_json::{Map, Value};
 
 use crate::export_overrides::{
-    boolean, dynamic_range, encoder_speed, fps as fps_override, loudness, object, positive_u32,
-    range as range_override,
+    audio_bits as audio_bits_override, boolean, dynamic_range, encoder_speed, fps as fps_override,
+    loudness, object, positive_u32, range as range_override,
 };
 use crate::export_table::{fps_json, EncoderSpeed};
 use crate::model::Project;
@@ -79,8 +83,9 @@ impl Project {
     /// bitrates `video_bitrate` / `audio_bitrate` (bits per second,
     /// strictly positive), the two loudness figures `loudness_lufs` /
     /// `peak_dbtp`, `dynamic_range` (`hlg`, `pq` or `sdr`, spec §11
-    /// HD-14) and `encoder_speed` (`faster`, `balanced` or `smaller`, on a
-    /// row whose bundled encoder has speeds, CX-12, CX-16); anything else in the object is ignored, so a newer UI
+    /// HD-14), `encoder_speed` (`faster`, `balanced` or `smaller`, on a
+    /// row whose bundled encoder has speeds, CX-12, CX-16) and `audio_bits`
+    /// (16 or 24, on `audio_wav` and `audio_aiff`, AU-29); anything else in the object is ignored, so a newer UI
     /// can send fields this build does not know. Each is read and refused
     /// by `export_overrides.rs`, which is where the spelling of every one
     /// of them lives.
@@ -95,10 +100,9 @@ impl Project {
     /// output can actually carry.
     ///
     /// The two loudness figures follow the bitrates exactly — emitted only
-    /// when asked for, accepted by every preset — with one difference the
-    /// reader states and argues: a `peak_dbtp` with no `loudness_lufs` is
-    /// an `Err`, because normalisation is gain-only and a ceiling with
-    /// nothing to cap would be a key accepted, echoed and silently inert.
+    /// when asked for, accepted by every preset, either one alone: the
+    /// ceiling is the export's master limiter's (spec §11 AU-27), which runs
+    /// with or without a target.
     ///
     /// The range is snapped to the export's frame grid and clamped to the
     /// project, because an `AVAssetExportSession` `timeRange` that begins
@@ -132,6 +136,19 @@ impl Project {
                 ))
             }
             (asked, true) => Some(asked.unwrap_or(EncoderSpeed::Balanced)),
+            (None, false) => None,
+        };
+        // The uncompressed rows' bit depth (spec §11 AU-29), on the speed's
+        // terms: read on any row so a 20 is named, refused on a row that
+        // has no depth to choose, and 16 on those rows when not asked.
+        let bits = match (audio_bits_override(overrides)?, preset.takes_audio_bits()) {
+            (Some(_), false) => {
+                return Err(format!(
+                    "{} has no bit depth; audio_bits applies to audio_wav and audio_aiff",
+                    preset.id
+                ))
+            }
+            (asked, true) => Some(asked.unwrap_or(16)),
             (None, false) => None,
         };
 
@@ -184,11 +201,11 @@ impl Project {
         let video_bitrate = positive_u32(overrides, "video_bitrate")?;
         let audio_bitrate = positive_u32(overrides, "audio_bitrate")?;
 
-        // The integrated loudness target and the true-peak ceiling that
-        // caps the gain it asks for, on the bitrates' terms: emitted only
-        // when asked for, so an absent `loudness_lufs` reaches Swift as an
-        // absent key and means "do not normalise". The reader is the one
-        // place their bounds and their pairing rule live.
+        // The integrated loudness target and the master limiter's true-peak
+        // ceiling, on the bitrates' terms: emitted only when asked for, so
+        // an absent `loudness_lufs` reaches Swift as an absent key and means
+        // "do not normalise", and an absent `peak_dbtp` the master's default
+        // (spec §11 AU-27). The reader is the one place their bounds live.
         let (loudness_lufs, peak_dbtp) = loudness(overrides)?;
 
         let optimize = boolean(
@@ -284,6 +301,11 @@ impl Project {
         }
         if let Some(speed) = speed {
             out.insert("encoder_speed".to_string(), Value::from(speed.as_str()));
+        }
+        // The depth on the two uncompressed rows only, so every other row's
+        // settings are the text they were (spec §11 AU-29).
+        if let Some(bits) = bits {
+            out.insert("audio_bits".to_string(), Value::from(bits));
         }
         Ok(Value::Object(out))
     }

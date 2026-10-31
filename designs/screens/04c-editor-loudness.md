@@ -42,7 +42,7 @@ fill from the bottom to the momentary and short-term levels, and the values read
 like "−18.4 LUFS" and "−0.6 dBTP" (the true peak in coral above −1 dBTP).
 
 At the foot, wrapping over two or three lines in faint small type: "The mix as the
-preview plays it, before the export's loudness setting." While the preview plays at
+preview plays it, before the export's loudness and master limiter." While the preview plays at
 another speed it reads "Measured only at normal speed." instead.
 
 In the light capture the column is white with black and grey text; in the dark one

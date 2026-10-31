@@ -69,7 +69,8 @@ passed):
   reads A1's project through `ExportWriter`'s two outputs on one reader and on two readers,
   each on a thread of its own, from builds of their own: 150 frames each, every frame's
   64RGBAHalf bytes equal, the I010 of frames 0, 75 and 149 byte-equal, and 240,000 frames of
-  16-bit sound equal sample for sample.
+  float sound (since AP2 part 2 every export reads the float mix, spec §11 AU-27) equal
+  sample for sample.
 * F1–F3 — G-17's windows closed on the WebM path: W9's 24-clip 1080p project exported as
   `av1_webm` on an instance launched with `-RCDevWebMFault` (`ExportWebMDevFault`): F1
   `audio@40` (the audio pump fails at its 40th read), F2 `video@30` (the video sink fails at
@@ -179,8 +180,8 @@ MUTANTS = {
          "                track: ReelWebM.video, ptsNs: Self.nanoseconds(time), key: key || true,\n")]},
     "gain-skipped": {"rows": ["W11"], "anchors": [
         (f"{SOURCES}/ExportWebMWriter.swift",
-         "        audioGain = ExportAudioGain(linearGain: gain)\n",
-         "        _ = ExportAudioGain(linearGain: gain)\n")]},
+         "        audioMaster?.linearGain = gain\n",
+         "        _ = gain\n")]},
     "opus-length-exact": {"rows": ["P3", "P4"], "probe": True, "anchors": [
         (f"{SOURCES}/ExportOpusEncoder.swift",
          "        guard bytes % frameBytes == 0 else {\n",

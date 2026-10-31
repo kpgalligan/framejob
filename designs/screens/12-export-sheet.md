@@ -13,18 +13,20 @@
 
 The Export sheet (File ▸ Export…, or the toolbar's Export… button) slides down
 over the editor window. Here the person chooses what file to make from the
-project — format, AV1's speed, size, rate, quality, loudness and range — and either writes it
+project — format, AV1's speed, size, rate, quality, a WAV's or AIFF's bit depth, loudness and range — and either writes it
 now or adds it to a queue.
 
 Under the bold title "Export", a long paragraph explains the card: the format
 decides the codec and container; size, frame rate and range start as the
-document's; what loudness normalisation does; that a preset remembers choices
+document's; what loudness normalisation does and that every export's sound goes through a
+master limiter that keeps its true peak under −1 dBTP; that a preset remembers choices
 rather than numbers; how burned-in timecode reads; and what Add to Queue does.
 
 Then a column of labelled rows: Preset "Custom", with a gear pop-up beside it;
 Format "H.264 (MP4)"; Speed "Balanced", dimmed (it is live only on AV1 (MP4));
 Size "Document size · 960 × 540", with two dimmed number
 fields, 960 × 540, under it; Frame rate "Project rate"; Quality "Format default";
+Bit depth "16-bit", dimmed (it is live only on Audio only (WAV) and (AIFF));
 Loudness "Off", with a dimmed "-14" field beside it; Range "Whole project",
 dimmed; and an unchecked "Burn in timecode". A monospaced summary line reads
 "960 × 540 · 30 fps · 00:00:05:07", and under it, on a line of its own, the

@@ -17,12 +17,12 @@ import AVFoundation
 ///
 /// One instance per export, used only on its writer's audio queue — `ExportWriter`'s, or
 /// `ExportWebMWriter`'s, whose Opus tail is cut to `target` and whose sound is placed at its
-/// stamps through `align` first (spec §11 CX-15 (5)).
+/// stamps through `align` first (spec §11 CX-15 (5)). Its silence is at the depth of the
+/// export's master (`ExportAudioMaster`, spec §11 AU-29): 16-bit, or 24 on a 24-bit WAV or AIFF.
 final class ExportAudioEnd {
 
     static let sampleRate = 48_000
     private static let channels = 2
-    private static let bytesPerFrame = channels * MemoryLayout<Int16>.size
     /// The longest silence one pad buffer carries: one second.
     private static let padChunk = sampleRate
 
@@ -34,13 +34,16 @@ final class ExportAudioEnd {
     }
 
     let target: Int
+    /// The silence's depth: the master's, 16 or 24.
+    let bits: Int
     /// Frames handed on so far, counted IN ORDER, not from presentation stamps.
     private(set) var written = 0
     /// The silence still to append once the read is dry; nil until then.
     private var pending: [CMSampleBuffer]?
 
-    init(range: CMTimeRange) {
+    init(range: CMTimeRange, bits: Int = 16) {
         target = Self.frames(ofTicks: CompositionBuilder.ticks(range.duration))
+        self.bits = bits == 24 ? 24 : 16
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
@@ -86,11 +89,11 @@ final class ExportAudioEnd {
         if frame > written {
             let end = min(frame, target)
             var gap: [CMSampleBuffer] = []
-            if end > written, let format = Self.padFormat() {
+            if end > written, let format = padFormat() {
                 var at = written
                 while at < end {
                     let count = min(Self.padChunk, end - at)
-                    guard let buffer = Self.silence(
+                    guard let buffer = silence(
                         frames: count,
                         at: CMTime(value: CMTimeValue(at), timescale: CMTimeScale(Self.sampleRate)),
                         format: format)
@@ -115,18 +118,18 @@ final class ExportAudioEnd {
         return [cut]
     }
 
-    /// Zero buffers from `written` to `target` in the shape of
-    /// `ExportWriter.decodedAudioSettings` (48 kHz, 2 channels, signed 16-bit
-    /// little-endian, interleaved), at most one second each, stamped
+    /// Zero buffers from `written` to `target` in the shape of the master's
+    /// output (48 kHz, 2 channels, packed signed `bits`-bit little-endian,
+    /// interleaved), at most one second each, stamped
     /// contiguously from written / 48 000; sets `written` to `target`. Empty
     /// when none is owed, or when CoreMedia refuses a buffer.
     func padding() -> [CMSampleBuffer] {
-        guard written < target, let format = Self.padFormat() else { return [] }
+        guard written < target, let format = padFormat() else { return [] }
         var buffers: [CMSampleBuffer] = []
         var at = written
         while at < target {
             let count = min(Self.padChunk, target - at)
-            guard let buffer = Self.silence(
+            guard let buffer = silence(
                 frames: count, at: CMTime(value: CMTimeValue(at), timescale: CMTimeScale(Self.sampleRate)),
                 format: format)
             else { return [] }
@@ -152,13 +155,15 @@ final class ExportAudioEnd {
 
     // MARK: - The silence
 
-    private static func padFormat() -> CMAudioFormatDescription? {
+    private var bytesPerFrame: Int { Self.channels * bits / 8 }
+
+    private func padFormat() -> CMAudioFormatDescription? {
         var description = AudioStreamBasicDescription(
-            mSampleRate: Float64(sampleRate), mFormatID: kAudioFormatLinearPCM,
+            mSampleRate: Float64(Self.sampleRate), mFormatID: kAudioFormatLinearPCM,
             mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
             mBytesPerPacket: UInt32(bytesPerFrame), mFramesPerPacket: 1,
-            mBytesPerFrame: UInt32(bytesPerFrame), mChannelsPerFrame: UInt32(channels),
-            mBitsPerChannel: 16, mReserved: 0)
+            mBytesPerFrame: UInt32(bytesPerFrame), mChannelsPerFrame: UInt32(Self.channels),
+            mBitsPerChannel: UInt32(bits), mReserved: 0)
         var layout = AudioChannelLayout()
         layout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
         var format: CMAudioFormatDescription?
@@ -171,7 +176,7 @@ final class ExportAudioEnd {
         return format
     }
 
-    private static func silence(
+    private func silence(
         frames: Int, at time: CMTime, format: CMAudioFormatDescription
     ) -> CMSampleBuffer? {
         let bytes = frames * bytesPerFrame

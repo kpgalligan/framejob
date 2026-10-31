@@ -17,13 +17,13 @@
 // `AVAudioMix` and taps), its reads on two threads at once as the writer runs them, the
 // row's settings' outputs (`ExportWriter.videoReadOutput` / `audioReadOutput`):
 //
-//   R1  `av1_webm`, the 16-bit decode. Frames: the same count, every frame's 64RGBAHalf
-//       bytes equal, and the I010 the encoder is handed (`ExportI010Converter`, the row's
-//       size and picture) byte-equal for the first, middle and last frame; sound: the same
-//       16-bit PCM, sample for sample
-//   R2  `h264`, the 16-bit decode: the same frames and sound, no I010 (#378)
-//   R3  `h264`, gained: the float mix a normalised export reads (8 bytes a frame), the
-//       same frames and the same float sound, sample for sample (#378)
+//   R1  `av1_webm`. Frames: the same count, every frame's 64RGBAHalf bytes equal, and the
+//       I010 the encoder is handed (`ExportI010Converter`, the row's size and picture)
+//       byte-equal for the first, middle and last frame; sound: the same float mix (8 bytes
+//       a frame), sample for sample
+//   R2  `h264`: the same frames and sound, no I010 (#378)
+//   R3  `h264` again: since AP2 part 2 every export reads the float mix (spec §11 AU-27),
+//       so R3 is R2's read, kept so the row ids stay (#378)
 // Each wants 150 frames and 240,000 frames of sound.
 import AVFoundation
 import Foundation
@@ -104,10 +104,10 @@ func planes(_ frame: I010Frame) -> Data {
 }
 
 /// One configuration: `split` two readers (one output each), else one reader with both;
-/// `preset`'s outputs, the sound the float mix when `gained`; the I010 of the frames in
+/// `preset`'s outputs, the sound the float mix every export reads; the I010 of the frames in
 /// `keep` (none for an empty set).
 func read(
-    _ project: ReelProject, urls: [UInt32: URL], preset: String, gained: Bool, split: Bool,
+    _ project: ReelProject, urls: [UInt32: URL], preset: String, split: Bool,
     keep: Set<Int>
 ) throws -> Read {
     guard let plan = project.plan else { throw ProbeError("no plan") }
@@ -120,7 +120,7 @@ func read(
     let settings = try ReelExport.settings(project, preset: preset)
     let range = Exporter.timeRange(settings, composition: built.composition)
     let videoOutput = ExportWriter.videoReadOutput(built, settings: settings)
-    let audioOutput = ExportWriter.audioReadOutput(built, gained: gained)
+    let audioOutput = ExportWriter.audioReadOutput(built)
     let videoReader = try AVAssetReader(asset: built.composition)
     let audioReader = split ? try AVAssetReader(asset: built.composition) : videoReader
     videoReader.timeRange = range
@@ -183,18 +183,18 @@ func read(
 }
 
 /// One row: A1's project read on one reader and on two, compared. `frameBytes` is the
-/// sound's bytes a frame (4 for the 16-bit decode, 8 for the float mix).
+/// sound's bytes a frame (8, the float mix).
 func compare(
-    _ name: String, media: URL, preset: String, gained: Bool, keep: Set<Int>, frameBytes: Int
+    _ name: String, media: URL, preset: String, keep: Set<Int>, frameBytes: Int
 ) {
     do {
         let project = try a1(media)
         var urls: [UInt32: URL] = [:]
         for item in project.snapshot.media { urls[item.id] = URL(fileURLWithPath: item.path) }
         let one = try read(
-            project, urls: urls, preset: preset, gained: gained, split: false, keep: keep)
+            project, urls: urls, preset: preset, split: false, keep: keep)
         let two = try read(
-            project, urls: urls, preset: preset, gained: gained, split: true, keep: keep)
+            project, urls: urls, preset: preset, split: true, keep: keep)
         let unequal = zip(one.frames, two.frames).enumerated()
             .filter { $0.element.0 != $0.element.1 }.map(\.offset)
         let i010 = keep.sorted().map { (index: $0, equal: one.i010[$0] != nil && one.i010[$0] == two.i010[$0],
@@ -224,16 +224,16 @@ if arguments.count > 1 {
         ? Set(arguments[3].split(separator: ",").map(String.init)) : ["R1", "R2", "R3"]
     if asked.contains("R1") {
         compare("R1 two readers (one output each) read A1's project as one reader with both",
-                media: media, preset: "av1_webm", gained: false, keep: [0, 75, 149],
-                frameBytes: 4)
+                media: media, preset: "av1_webm", keep: [0, 75, 149],
+                frameBytes: 8)
     }
     if asked.contains("R2") {
         compare("R2 two readers read A1's project as h264 as one reader with both",
-                media: media, preset: "h264", gained: false, keep: [], frameBytes: 4)
+                media: media, preset: "h264", keep: [], frameBytes: 8)
     }
     if asked.contains("R3") {
         compare("R3 two readers read A1's project as h264 with the float mix as one reader with both",
-                media: media, preset: "h264", gained: true, keep: [], frameBytes: 8)
+                media: media, preset: "h264", keep: [], frameBytes: 8)
     }
 } else {
     check("R1 two readers (one output each) read A1's project as one reader with both", false,

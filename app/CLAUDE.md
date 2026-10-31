@@ -1897,7 +1897,7 @@ the key map behind it.
   sections after Noise Reduction (AU-48).
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
-  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
+  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExportAudioMaster.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
@@ -1913,6 +1913,8 @@ the key map behind it.
   `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
   `ExportAV1Track.swift` · `ExportEncodePump.swift` (picks SVT-AV1 or libvpx by the settings'
   `writer`; straightens `vp9_alpha_webm`'s frames first, G-35) · `ExportSheetSpeed.swift` ·
+  `ExportSheetAudioBits.swift` (the sheet's Bit depth row after Quality, live on `audio_wav`
+  and `audio_aiff` only, spec §11 AU-29) ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
   the WebM writer; `append` carries the `alpha` packet) · `ExportWebMWriter.swift` ·
   `ExportWebMWriter+Audio.swift` (the WebM audio pump, C5's toll T2) · `ExportWebMLayout.swift` ·
@@ -1928,13 +1930,16 @@ the key map behind it.
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
   or a deep VP9 track, §11 PR-12). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
-  32-bit float, then the write: un-normalised from a 16-bit decode (a mix
-  past full scale clips there, and `mixClipped` says so); normalised from the
-  same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). Where the sound ends is `ExportAudioEnd`'s
+  32-bit float (its 10 ms steps kept by `StepLoudnessMeter`, AU-28), then
+  the write from the same float decode, normalised or not, through
+  `ExportAudioMaster` (spec §11 AU-27..AU-29): each buffer placed by its
+  stamp, the gain, the master `AudioLimiterStage` at `peak_dbtp` (−1 dBTP by
+  default, always on), its 158 frames compensated (the head dropped,
+  `finish()`'s tail handed on before the padding), rounded once to 16 or 24
+  bits, never dithered. Where the sound ends is `ExportAudioEnd`'s
   (spec §11 #337): exactly round(range × 48 000) frames, the crossing buffer
-  cut, later buffers read and dropped, a short read padded with 16-bit
-  silence; the measurement feeds the same count. The alpha movie rows' frames (`prores_4444`,
+  cut, later buffers read and dropped, a short read padded with silence at
+  the master's depth; the measurement feeds the same count. The alpha movie rows' frames (`prores_4444`,
   `hevc_alpha`) are straightened in the video pump before `retimed`:
   un-premultiplied, each transparent pixel within 4 px of a visible one
   filled with the nearest one's colour, and labelled `StraightAlpha`, with
@@ -2418,7 +2423,11 @@ free.
   `disfluencies` and `refresh` true), its jobs and its `CloudEstimate` line,
   shared by the sheet and `transcribe_for_fillers`.
 - `AudioNormalize.swift` (+`Loudness`) · `ClipLoudness.swift` ·
-  `AudioLimiterModel.swift` · `NormalizeChoice.swift` — Normalize Clip as a
+  `StepLoudness.swift` · `AudioLimiterModel.swift` · `NormalizeChoice.swift`
+  — `StepLoudness` is BS.1770's gating over 10 ms steps (`integrated`,
+  `loudness`, moved out of `ClipLoudness`), read by `ClipLoudness`,
+  `AudioLimiterModel` and the export, and `StepLoudnessMeter` the export's
+  pass-1 steps and step peaks (spec §11 AU-28). Normalize Clip as a
   value type: peaks (Peak mode) or the loudness cache (Loudness mode, spec §11
   AU-24: −16 LUFS by default; a clip whose true peak fits −1 dBTP gets its
   volume alone, any other gets `{volume, limiter}` with the volume solved
@@ -2495,8 +2504,10 @@ free.
   the Annex 2 FIR and the gates are internal, read by `LoudnessBlocks` and
   `ClipLoudness` (road map "audio" AP1); `ExportLoudness.swift`
   (a pure move out of it, road map "audio" AP0) is the export gain a target
-  and a ceiling ask for and the export's summary line, and
-  `phase5_chrome.py`'s section 9 compiles the two alone. A metered track
+  asks for, solved through `AudioLimiterModel` at the master's ceiling
+  (AU-28), and the export's summary line, and `phase5_chrome.py`'s section 9
+  compiles it with `Loudness.swift`, `StepLoudness.swift` and
+  `AudioLimiterModel.swift` alone, so it stays free of AVFoundation. A metered track
   counts only while one of its OWN sounding spans holds the playhead
   (`LevelMeterTrack.mix`; its format family's resolved segments, #65): a sink
   keeps its last buffer across silence.

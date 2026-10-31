@@ -11,7 +11,7 @@ import Foundation
 /// `min(1, ceiling / (peak · gain))`; an envelope that falls to a lower need
 /// at once and rises toward a higher one by the release's one-pole over the
 /// step, `env + (need − env)(1 − e^(−0.01/release))`; and the step's energy
-/// times `gain² · env²`, gated by `ClipLoudness.integrated`. It is the stage's
+/// times `gain² · env²`, gated by `StepLoudness.integrated`. It is the stage's
 /// gain path (`AudioLimiterStage`) seen 10 ms at a time: the stage's hold and
 /// box mean sit inside one step, and its release is the same pole. It reads
 /// within 0.3 LU of the stage on the owner's recording (the limiter probe's
@@ -38,7 +38,7 @@ enum AudioLimiterModel {
             env = need < env ? need : env + (need - env) * rise
             limited.append(energy * gain * gain * env * env)
         }
-        return ClipLoudness.integrated(limited)
+        return StepLoudness.integrated(limited)
     }
 
     /// The gain that brings `steps` to `targetLUFS` under the limiter, found
@@ -58,7 +58,7 @@ enum AudioLimiterModel {
                 steps: steps, peaks: peaks, gain: gain, ceiling: ceiling,
                 releaseSeconds: releaseSeconds) ?? -.infinity
         }
-        guard let unlimited = ClipLoudness.integrated(steps) else { return maxGain }
+        guard let unlimited = StepLoudness.integrated(steps) else { return maxGain }
         var low = min(pow(10, (targetLUFS - unlimited) / 20), maxGain)
         if loudness(low) >= targetLUFS - tolerance { return low }
         var high = maxGain

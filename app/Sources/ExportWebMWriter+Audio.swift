@@ -11,11 +11,13 @@ extension ExportWebMWriter {
     /// (`ExportAudioEnd.align`: silence for a gap, the covered head cut), so the stream the
     /// encoder is fed is the timeline's sound frame for frame from the range's start, and
     /// packet k's first frame is the one stamped k × 960 / 48 kHz — k × 20 ms, a whole tick of
-    /// WebM's 1 ms timecode scale — which is the time it is added at.
+    /// WebM's 1 ms timecode scale — which is the time it is added at. Each buffer goes through
+    /// the master first (`ExportAudioMaster`, spec §11 AU-27), which places it by its stamp
+    /// too, and its latency's tail goes in before the padding.
     func pumpAudio(
         _ output: AVAssetReaderOutput, into webm: ReelWebM, through opus: ExportOpusEncoder
     ) {
-        let gain = audioGain
+        let master = audioMaster
         var held: Data?
         var added: Int64 = 0
         let packetNs = Int64(ExportOpusEncoder.framesPerPacket) * 1_000_000_000 / 48_000
@@ -44,23 +46,11 @@ extension ExportWebMWriter {
                     }
                     break
                 }
-                let time = CMSampleBufferGetPresentationTimeStamp(decoded) - range.start
-                guard time.isNumeric, time >= .zero else { continue }
-                if gain != nil, CMSampleBufferGetNumSamples(decoded) == 0 { continue }
-                guard let sample = gain == nil ? decoded : gain?.apply(to: decoded) else {
-                    stopped(with: Exporter.ExportError.failed(
-                        "The loudness gain could not be applied to a sample."))
-                    return
-                }
-                let frame = CMTimeConvertScale(
-                    time, timescale: CMTimeScale(ExportAudioEnd.sampleRate),
-                    method: .roundHalfAwayFromZero
-                ).value
-                for placed in audioEnd.align(sample, at: Int(frame)) {
-                    guard let fitted = audioEnd.fit(placed) else { continue }
-                    try feed(try opus.encode(fitted))
-                }
+                guard let sample = try master.map({ try $0.apply(to: decoded) }) ?? decoded
+                else { continue }
+                try place(sample, opus, feed)
             }
+            if let tail = try master?.finish() { try place(tail, opus, feed) }
             for silence in audioEnd.padding() {
                 try feed(try opus.encode(silence))
             }
@@ -85,6 +75,22 @@ extension ExportWebMWriter {
             try webm.endTrack(ReelWebM.audio)
         } catch {
             stopped(with: error)
+        }
+    }
+
+    /// One mastered buffer at its stamp (`align`), cut at the range (`fit`), encoded and fed.
+    private func place(
+        _ sample: CMSampleBuffer, _ opus: ExportOpusEncoder, _ feed: ([Data]) throws -> Void
+    ) throws {
+        let time = CMSampleBufferGetPresentationTimeStamp(sample) - range.start
+        guard time.isNumeric, time >= .zero else { return }
+        let frame = CMTimeConvertScale(
+            time, timescale: CMTimeScale(ExportAudioEnd.sampleRate),
+            method: .roundHalfAwayFromZero
+        ).value
+        for placed in audioEnd.align(sample, at: Int(frame)) {
+            guard let fitted = audioEnd.fit(placed) else { continue }
+            try feed(try opus.encode(fitted))
         }
     }
 }

@@ -360,9 +360,9 @@ enum ReelExport {
     /// bitrates the Quality popup writes and the two loudness figures its
     /// Loudness popup does) against the project. Throws with the core's
     /// message for an unknown preset or bad overrides, so the sheet can show
-    /// it verbatim — including the one PAIRING rule among them, that a
-    /// `peak_dbtp` with no `loudness_lufs` is refused rather than accepted
-    /// and left inert (`export_overrides.rs`).
+    /// it verbatim — a depth on a row without one, `audio_bits` (spec §11
+    /// AU-29), among them; a `peak_dbtp` alone is the master's ceiling and
+    /// resolves (AU-27; `export_overrides.rs`).
     static func settings(
         _ p: ReelProject, preset: String, overrides: [String: Any]? = nil
     ) throws -> ExportSettings {

@@ -50,8 +50,10 @@ extension ExportSheetController {
     /// took the word. Anything else is "Custom…" and the field beside it.
     static let loudnessTargets: [Double] = [-14, -16, -23]
 
-    /// The true-peak ceiling every normalised export is capped against, in
-    /// dBTP. FIXED in phase 5 rather than made a control: five presets and
+    /// The true-peak ceiling of the master limiter every export with sound
+    /// runs (spec §11 AU-27), in dBTP, sent only beside a loudness target —
+    /// unsent, the master holds the same −1 (`ExportLoudness.defaultCeiling`).
+    /// FIXED in phase 5 rather than made a control: five presets and
     /// one broadcast-standard ceiling is what people actually pick, the sheet
     /// is already six control rows deep, and the `export` tool keeps
     /// `peak_dbtp` for a script that needs −0.3 or −2.0. The hint says the
@@ -206,6 +208,10 @@ extension ExportSheetController {
         /// The Speed popup is live only on a row whose bundled encoder has
         /// speeds (spec §11 CX-12 (2); not `vp9_webm`, CX-16 (2)).
         var encoderSpeed: Bool { !(preset?.encoderSpeeds.isEmpty ?? true) }
+
+        /// The Bit depth popup is live only on a row that lists depths: the
+        /// uncompressed WAV and AIFF rows (spec §11 AU-29).
+        var audioBits: Bool { !(preset?.audioBits.isEmpty ?? true) }
 
         /// The video rate is a soft cap on every row a bundled encoder writes
         /// (spec §11 CX-13, CX-16 (7)), whether or not it has speeds.

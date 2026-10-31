@@ -56,15 +56,14 @@ extension ExportWriter {
     }
 
     /// The mix's reader output: every composition audio track through the
-    /// plan's mix, as the 16-bit decode, or `gained` the float mix the
-    /// measurement read (`ExportAudioGain.floatMixSettings`).
-    /// `ExportWebMWriter` reads through it too.
-    static func audioReadOutput(
-        _ built: BuiltComposition, gained: Bool
-    ) -> AVAssetReaderAudioMixOutput {
+    /// plan's mix, as the float mix the measurement read
+    /// (`ExportAudioMaster.floatMixSettings`, spec §11 AU-27), which the
+    /// master turns into the encoder's samples. `ExportWebMWriter` reads
+    /// through it too.
+    static func audioReadOutput(_ built: BuiltComposition) -> AVAssetReaderAudioMixOutput {
         let output = AVAssetReaderAudioMixOutput(
             audioTracks: built.composition.tracks(withMediaType: .audio),
-            audioSettings: gained ? ExportAudioGain.floatMixSettings : decodedAudioSettings)
+            audioSettings: ExportAudioMaster.floatMixSettings)
         output.audioMix = built.audioMix
         // AVFoundation's own default, kept explicit because the other reader
         // in this tree (`MediaImporter.peaks`) turns it off.
@@ -439,17 +438,13 @@ extension ExportWriter {
         return clamped - (clamped % 2)
     }
 
-    /// What comes OUT of the mix for an export with no gain: 16-bit
-    /// interleaved LPCM. The same format the ProRes path writes, and one
-    /// every encoder here takes without a conversion in between.
-    ///
-    /// **It SATURATES.** A mix past full scale written with no gain is
-    /// clipped here, and `ExportLoudness.mixClipped` reports it. A gained
-    /// export does not read this dictionary: it reads the float mix the
-    /// measurement read and `ExportAudioGain` quantises it once, after the
-    /// gain, into this same 16-bit shape (spec §11 #86). This dictionary is
-    /// kept for the un-normalised read because changing it would change
-    /// every such export's bytes.
+    /// The shape of the master's 16-bit output (`ExportAudioMaster`, spec §11
+    /// AU-27): 48 kHz, 2 channels, 16-bit interleaved little-endian LPCM. The
+    /// same format the ProRes path writes, and the one AAC, Opus and ProRes
+    /// are fed. Nothing reads the mix in it any more: every export reads the
+    /// float mix and the master quantises it once, after the gain and the
+    /// limiter (#86). A 24-bit WAV or AIFF is the same shape at 24 bits
+    /// (`audioSettings`, AU-29).
     static let decodedAudioSettings: [String: Any] = [
         AVFormatIDKey: Int(kAudioFormatLinearPCM),
         AVSampleRateKey: 48000,
@@ -469,9 +464,9 @@ extension ExportWriter {
     /// the CONTAINER decides the byte order.** ProRes has since M2 (§7.8
     /// pairs the profile with uncompressed sound), and phase 5's `audio_wav`
     /// / `audio_aiff` rows carry the codec `lpcm` outright. The dictionary handed to the encoder is then literally
-    /// `decodedAudioSettings`, so nothing is converted on the way: an export
-    /// with no gain reads the mix in it, and on a gained export
-    /// `ExportAudioGain` produces it from the float read. The exception is
+    /// `decodedAudioSettings` — at 24 bits when `settings.audioBits` asks
+    /// (spec §11 AU-29) — so nothing is converted on the way:
+    /// `ExportAudioMaster` produces that shape from the float read. The exception is
     /// AIFF, which is big-endian by definition where WAV and QuickTime are
     /// little. Getting that flag wrong is not a subtle bug, and it was measured rather than
     /// reasoned about: on macOS 26.5.1 `AVAssetWriter.canAdd` answers FALSE
@@ -494,10 +489,10 @@ extension ExportWriter {
                 AVEncoderBitRateKey: settings.audioBitrate.map { max(1, $0) } ?? 192_000,
             ]
         }
-        guard settings.container.lowercased() == "aiff" else { return decodedAudioSettings }
-        var bigEndian = decodedAudioSettings
-        bigEndian[AVLinearPCMIsBigEndianKey] = true
-        return bigEndian
+        var lpcm = decodedAudioSettings
+        if settings.audioBits == 24 { lpcm[AVLinearPCMBitDepthKey] = 24 }
+        if settings.container.lowercased() == "aiff" { lpcm[AVLinearPCMIsBigEndianKey] = true }
+        return lpcm
     }
 
     /// Whether this container can hold a chapter track (see `addChapters`).

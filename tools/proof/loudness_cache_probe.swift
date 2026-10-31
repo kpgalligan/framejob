@@ -304,7 +304,7 @@ do {
         let steps = [Double](repeating: pow(10, (lufs - LoudnessMeter.offset) / 10), count: 100)
         let peaks = (0..<100).map { $0 % every == every - 1 ? loud : quiet }
         return AudioNormalize.LoudnessReading(
-            clip: clip, media: 9, lufs: ClipLoudness.integrated(steps) ?? .nan,
+            clip: clip, media: 9, lufs: StepLoudness.integrated(steps) ?? .nan,
             truePeak: max(quiet, loud), steps: steps, stepPeaks: peaks, limiter: limiter)
     }
     let input = AudioNormalize.LoudnessInput(readings: [

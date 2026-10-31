@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume and pan. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have.
 
 ## Where audio lives
 
@@ -338,6 +338,8 @@ The limiter holds the clip's peaks under a ceiling, so a quiet recording can be 
 
 The limiter is last in the clip's chain, after the Mix section, and it knows the clip's volume: the ceiling is where the clip's peaks land *after* the Volume slider, so turning the volume up makes the limiter work harder rather than pushing the clip past the ceiling. Fades and ducking only turn a clip down, so they never take it over the ceiling either. Normalize in Loudness mode turns it on for you when a clip needs it.
 
+Each clip's limiter holds that clip alone. Every export also runs a **master limiter** over the whole mix, the same kind of limiter at −1 dBTP (or the export's own ceiling), so two limited clips crossfading, a nest turned up or an action raising a clip's volume still can't take the file past it. The preview has no master limiter. See [Exporting](export.md#loudness).
+
 A track that has a limited clip on it plays every clip on it 3.3 ms later inside Frame Job and places them 3.3 ms earlier to match, so everything still lands on its frame. As with noise reduction, a clip that starts within the first 3.3 ms of the timeline loses that much of its start, and the last 3.3 ms of the track are not heard.
 
 *Agents:* `set_audio` with `limiter: {ceiling_db, release}` (`ceiling_db` from −24 to 0, `release` in ticks from 600 to 600000; `limiter: {}` turns it on at the defaults), or `limiter: null` to turn it off.
@@ -505,13 +507,13 @@ Click the **Reset** button at the top of the column to start measuring again. Th
 
 The meter measures only at normal speed. At any other speed, Momentary and Short-term show "—" and the column says "Measured only at normal speed."; Integrated and True peak max keep their values. A dash means there isn't a figure yet; "−∞" means digital silence.
 
-The figures are the mix as the preview plays it, before the export's loudness setting, and the column says so. An export with a loudness target changes the level after this point, so its report can differ. The column is per window and turns off when you close the window.
+The figures are the mix as the preview plays it, before the export's loudness setting and its master limiter, and the column says so. An export with a loudness target changes the level after this point, and the master limiter holds its peaks under the ceiling, so its report can differ. The column is per window and turns off when you close the window.
 
 *Agents:* there is no product tool; an agent reads loudness from an export's report or a clip's loudness read-out.
 
 ## Loudness on export
 
-The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
+The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option: the export reaches it through its master limiter, which holds every export's peaks under −1 dBTP. A WAV or AIFF can be written at 24 bits. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
 
 ## Synchronize Audio
 
@@ -612,7 +614,7 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Synchronize Audio corrects drift only up to 0.2 % from ×1. It doesn't work on nests, reversed clips, ramped clips, or clips playing at other rates.
 - Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".
 - The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
-- The limiter holds each clip on its own. Two limited clips that overlap (in a transition, or on two tracks) can add up past the ceiling, and so can a clip whose volume an action raises above its own Volume setting, a clip inside a nest whose volume is above 100 %, and the first moments after a hard cut from a louder clip on the same track, while the level settles. There is no limiter on the whole mix yet.
+- The limiter holds each clip on its own. Two limited clips that overlap (in a transition, or on two tracks) can add up past the ceiling, and so can a clip whose volume an action raises above its own Volume setting, a clip inside a nest whose volume is above 100 %, and the first moments after a hard cut from a louder clip on the same track, while the level settles. In an export the master limiter catches all of these; the preview has no master limiter, so they can sound louder while editing.
 - Loudness mode's result for a limited clip is a model of the limiter, read from the loudness analysis; the export lands within a few tenths of a LU of it (−15.9 LUFS for the −16 example above).
-- The Loudness Meter measures only at normal speed, and only the first two channels of a track with more. It doesn't follow the export's loudness setting.
+- The Loudness Meter measures only at normal speed, and only the first two channels of a track with more. It doesn't follow the export's loudness setting or its master limiter.
 - Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

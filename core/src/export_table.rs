@@ -320,17 +320,14 @@ const PRESETS: [Preset; 15] = [
     // The codec is `lpcm`, not a container spelling, because the container
     // and the codec are separate questions here and `ExportWriter` has to
     // answer the codec one to pick its `AVAssetWriterInput` settings: the
-    // decoded mix is already 16-bit little-endian interleaved 48 kHz LPCM
-    // (it is what the ProRes row writes), so a WAV is that dictionary
-    // written straight out and an AIFF is the same samples big-endian,
-    // which the CONTAINER decides.
+    // mix is read as float and quantised once by the export's master
+    // (spec §11 AU-27) to interleaved 48 kHz LPCM, so a WAV is those
+    // samples little-endian and an AIFF the same samples big-endian, which
+    // the CONTAINER decides.
     //
-    // 16-bit, and 24 deliberately deferred: 24 would mean widening the
-    // decode settings the mix is read through, which is the same
-    // dictionary every other preset's encoder consumes, and a silent
-    // format mismatch there is a file of noise rather than an error. A
-    // depth is a request rather than a row when it comes (an `audio_bits`
-    // override beside the bitrates), and it needs measuring first.
+    // 16-bit by default, and 24 an override rather than a row: the
+    // `audio_bits` request beside the bitrates (AU-29), offered on these
+    // two rows only (`Preset::takes_audio_bits`).
     Preset {
         id: "audio_wav",
         name: "Audio only (WAV)",

@@ -10,7 +10,8 @@ Annex 2's phases, both over |x|), never read back from the app alone.
       value round-trips, each bound and an unknown key is refused by name and
       changes nothing, null clears it.
   P2  S1's crest signal (halved, stereo) at volume 8 under -1 dBTP: the export's
-      true peak <= -1 + 0.001 dB by both meters (unlimited it reads about +8).
+      true peak <= -1 + 0.001 dB by both meters. Unlimited, the export's own master
+      limiter (spec §11 AU-27) holds it at 0 dBTP: <= 0.001 and > -0.5.
   P3  the same under -3 dBTP: <= -3 + 0.001 dB.
   P4  a clip at volume 1 then one at volume 8 abutting it, both under -1 dBTP:
       <= -1 + 0.001 dB across the cut; and a quiet clip with no limiter at
@@ -19,6 +20,8 @@ Annex 2's phases, both over |x|), never read back from the app alone.
       and fails the second leg: the first cannot see it, since the fader's
       slew from 1 to 8 at the cut, #87, holds the crest clip's first 3.3 ms
       near x1).
+  P2-P4 export with `peak_dbtp=0`, the master's loosest ceiling, so the export's
+  master limiter (AU-27, -1 dBTP by default) never hides a clip-limiter fault.
   P5  a limiter set then cleared exports the same PCM bytes as one never set.
   P6  the saved file is at the header's RC_FORMAT_VERSION (format_version(),
       never a literal: 30 when AU-21 landed) and carries "limiter" only on the
@@ -127,13 +130,15 @@ def ceiling_rows(m):
         clip = s.place(FIXTURE)
         s.op("set_audio", clips=[clip],
              patch={"volume": 8, "limiter": {"ceiling_db": ceiling}})
-        kaiser, annex, under = peaks(s.export(row.lower()), ceiling)
+        kaiser, annex, under = peaks(s.export(row.lower(), peak_dbtp=0), ceiling)
         check(under, f"{row} the export's true peak {kaiser:.4f} (Kaiser) / {annex:.4f} "
               f"(Annex 2) dBTP at or under {ceiling:g} + 0.001")
         if row == "P2":
             s.op("set_audio", clips=[clip], patch={"limiter": None})
-            kaiser, annex, _ = peaks(s.export("p2-unlimited"), ceiling)
-            check(kaiser > 6, f"P2 and without the limiter it reads {kaiser:.2f} dBTP")
+            kaiser, annex, _ = peaks(s.export("p2-unlimited", peak_dbtp=0), ceiling)
+            check(-0.5 < kaiser <= 0.001 and annex <= 0.001,
+                  f"P2 and without the clip limiter the master holds it at 0 dBTP: "
+                  f"{kaiser:.4f} (Kaiser) / {annex:.4f} (Annex 2)")
         m.call("close_project", project=s.path, discard=True)
 
 
@@ -146,7 +151,7 @@ def cut_rows(m):
     s.op("set_audio", clips=[first], patch={"volume": 1, "limiter": {}})
     s.op("set_audio", clips=[second], patch={"volume": 8, "limiter": {}})
     check(s.clip(second)["start"] == end, f"P4 the clips abut at {end} ticks")
-    kaiser, annex, under = peaks(s.export("p4"), -1.0)
+    kaiser, annex, under = peaks(s.export("p4", peak_dbtp=0), -1.0)
     check(under, f"P4 the export's true peak {kaiser:.4f} (Kaiser) / {annex:.4f} (Annex 2) "
           "dBTP at or under -1 + 0.001 across the cut")
     m.call("close_project", project=s.path, discard=True)
@@ -158,7 +163,7 @@ def cut_rows(m):
     second = s.place(FIXTURE, at=end)
     s.op("set_audio", clips=[first], patch={"volume": 8})
     s.op("set_audio", clips=[second], patch={"volume": 8, "limiter": {}})
-    kaiser, annex, under = peaks(s.export("p4-lead"), -1.0)
+    kaiser, annex, under = peaks(s.export("p4-lead", peak_dbtp=0), -1.0)
     check(under, f"P4 the export's true peak {kaiser:.4f} (Kaiser) / {annex:.4f} (Annex 2) "
           "dBTP at or under -1 + 0.001: the crest clip's first 3.3 ms meet its own limiter")
     m.call("close_project", project=s.path, discard=True)

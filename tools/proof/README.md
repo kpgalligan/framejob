@@ -12833,7 +12833,9 @@ expected. After step 2, `ExporterWriter.swift` is 782 lines and
     ±full scale, BS.1770-4 (`phase5_proof.integrated`) within ±0.5 LU of the
     report, and no "clipped" in the summary.
   - **G5**: the hot un-normalised WAV says "clipped" and holds full-scale
-    samples.
+    samples. (Inverted by road map "audio" AP2 part 2, spec §11 AU-27: the
+    master limits it, so it holds no full-scale sample and says nothing of
+    clipping; see that section.)
   - **G1** (`--against`), per preset: the un-normalised decode is
     byte-identical to the reference's. Where G0 failed, it is an instrument
     failure instead.
@@ -25880,7 +25882,7 @@ in `work/fixtures/limiter-crest.wav`, beside a 1 kHz tone at 0.02, `limiter-quie
 | Row | What it holds |
 |---|---|
 | P1 | `set_audio`'s `limiter`: `{}` the defaults, a value round-trips, each bound and an unknown key refused by name with nothing changed, `null` clears it |
-| P2 | the crest fixture at volume 8 under −1 dBTP: ≤ −1 + 0.001 dB by both meters (and above +6 dBTP without the limiter) |
+| P2 | the crest fixture at volume 8 under −1 dBTP: ≤ −1 + 0.001 dB by both meters (and above +6 dBTP without the limiter; since AP2 part 2, P2–P4 export with `peak_dbtp=0` and the unlimited leg reads ≤ 0.001 and > −0.5 dBTP, the export's master holding it) |
 | P3 | the same under −3 dBTP |
 | P4 | a clip at volume 1 then one at volume 8 abutting it, both under −1 dBTP: ≤ −1 + 0.001 dB across the cut; and a quiet clip with no limiter at volume 8 then the crest clip at volume 8 under −1 dBTP, the same — the leg the tap's lookup lead decides (the first cannot: the fader's slew from 1 to 8 at the cut, #87, holds the crest clip's first 3.3 ms near ×1) |
 | P5 | a limiter set then cleared exports the same PCM bytes as one never set |
@@ -26609,3 +26611,123 @@ track; P1 L +3.010 dB and R 0 at −1, (−5.333, +2.323) dB at 0.5; P2 (−3.01
 +0.000; P5 (+4.645, −10.666); U1 one undo back to no keys, the log empty; V1 the meter −18.7034
 LUFS over [0, 233,472), the export the same, |dI| 0.0000 LU; B2 left peak 0.50045 under a
 0.50119 ceiling, right 0. `--mutants` 2/2 killed; the core's eight 8/8 killed by `track_mix.rs`.
+
+## Road map "audio" AP2, part 2 — every export through a float master (`export_master_proof.py` X1–X11, M1–M3; nine mutants; `export_offset_proof.py` E46; `phase5_proof.py` 5d and `phase5_chrome.py` §9 re-pinned; `core/tests/export_audio_bits.rs`; spec §11 AU-27..AU-29, closing #86)
+
+Every export with sound now reads the mix as float, places each buffer by its
+stamp, gains it, holds it under its `peak_dbtp` (−1 dBTP by default) with
+`AudioLimiterStage`, compensates the stage's 158 frames and rounds once to 16
+or 24 bits (`ExportAudioMaster.swift`, which replaced `ExporterAudioGain.swift`).
+The gain is solved through `AudioLimiterModel` over pass 1's 10 ms steps
+(`StepLoudnessMeter`, `StepLoudness.swift`). `audio_bits` (16 or 24) is taken by
+`audio_wav` and `audio_aiff` alone.
+
+**`export_master_proof.py <dir>/agent.sock [--only …]`** drives an instance over
+MCP; every ceiling is measured on the file by `limiter_probe.true_peaks` (the
+64-tap Kaiser β 10 oversampler AND Annex 2's phases), every loudness by
+`phase5_proof.integrated`. Fixtures: `limiter-crest.wav` (S1's crest signal
+halved, as `limiter_proof.py` writes it), phase 5's `half.wav` and `crest.wav`,
+`master-quiet.wav` (a 0.02 sine, 16-bit) and `master-faint-f32.wav` (a −90 dBFS
+440 Hz sine, float32), all 48 kHz stereo; the owner's
+`samples/Rode-usb-mic.m4a` for X10.
+
+| Row | What it holds |
+|---|---|
+| X1 | two limited crest clips (×8, clip limiter −1) through a 1 s cross-dissolve (`add_transition`, `ripple`), no `peak_dbtp`: ≤ −1 + 0.001 dBTP by both meters; with `peak_dbtp` 0 the same project reads over −1 (AU-22's case is real) |
+| X2 | a nest clip at volume 2 around a limited clip (×8, −1): the same two legs |
+| X3 | an action raising a limited clip (−1) from volume 1 to 4: the same two legs |
+| X4 | `peak_dbtp` −3 alone: accepted, `ceiling_dbtp` −3 echoed, no `target_lufs`, ≤ −3 + 0.001 by both meters |
+| X5 | `half.wav` at volume 4 un-normalised: no full-scale sample, ≤ −1 + 0.001 by both meters, 0.5–2.5 s within −50 dB of a fitted 440 Hz sine, `limited_db` 7.0 ± 0.2, no "clipped" |
+| X6 | `half.wav` un-normalised (under the ceiling) decodes identical to its own PCM, first and last 158 frames included |
+| X7 | `audio_bits` 24: ffprobe `pcm_s24le` (WAV) and `pcm_s24be` (AIFF), the two alike; a quiet tone normalised to −20 LUFS has non-zero low 8 bits in ≥ 90 % of samples; its 16-bit twin is it rounded within 1 LSB; `audio_bits` echoed 24, 24, 16 |
+| X8 | the −90 dBFS float tone at volume 32 un-normalised: sine-fit residual ≤ −120 dBFS at 24 bits, ≥ −105 at 16 |
+| X9 | phase 5's crest fixture to −14 LUFS: within ±0.5 LU, ≤ −1 + 0.001 by both meters |
+| X10 | the owner's recording raw, to −16 LUFS: within ±0.5 LU, ≤ −1 + 0.001 by both meters (skipped by name when the file is absent) |
+| X11 | `audio_bits` refused on `h264` ("h264 has no bit depth; …") and as 20 ("export audio_bits must be 16 or 24, not 20"); the loudness result has `limited_db` and `capped_by_gain` and no `capped_by_peak` |
+
+**`export_master_proof.py --probe`** (no app) builds `export_master_probe.swift`
+with `app/Sources` through `swift_build` (a probe that will not build is a scored
+failure) and drives `ExportAudioMaster` (24-bit, gain 1, origin 0, a signal far
+under the ceiling, each input sample a distinct multiple of 2⁻¹⁵):
+
+| Row | What it holds |
+|---|---|
+| M1 | buffers at frames 0..4095 then 4200..: output frames 4096..4199 are 0, frame 4200 holds buffer 2's first sample, one contiguous stream |
+| M2 | buffers at 0..4095 then 3996..: buffer 2's frame 100 lands at output 4096, nothing doubled, 8,092 frames |
+| M3 | a first buffer at frame 480: the first output stamp is 480 / 48 000 s and every sample k sits at 480 + k |
+
+**Changed rows.** `export_gain_proof.py` G5 is inverted (the hot
+un-normalised WAV holds no full-scale sample and says nothing of clipping); G1
+is unchanged and held byte-identical against a reference recorded on the base
+build (`79b3216`), every preset. `limiter_proof.py` P2–P4 export with
+`peak_dbtp=0`, so the master never hides a clip-limiter fault, and P2's
+unlimited leg now reads ≤ 0.001 and > −0.5 dBTP. `export_offset_proof.py`
+E46 (`clicks48` at F206 at volume 4, the master acting) holds every click on
+its frame under E4's pin; its hand mutant M27 keeps the master's head and must
+fail E4 and E46. `phase5_proof.py` 5d: the crest leg lands within ±0.5 LU of
+−14 by its own BS.1770 with its true peak ≤ −1 + 0.3 and `limited_db` > 0 (the
+five-ceiling sweep and its non-vacuity check are gone, nothing being capped
+any more); `hot-plain` holds no full-scale sample, says nothing of clipping and
+reads ≤ −1 + 0.3; `noceiling` reports −1; a ceiling alone is accepted and
+echoed; the catalog check reads `peak_dbtp`'s prose as the master's ceiling.
+`phase5_chrome.py` §9 compiles `Loudness.swift`, `ExportLoudness.swift`,
+`StepLoudness.swift` and `AudioLimiterModel.swift`: no reported peak over the
+ceiling across a 200-peak sweep (with `limited_db` the excess), the gain
+rounded to nearest unlimited and through the model, a limited model case
+landing on its target with a gain above the unlimited one, the +40 dB cap,
+a +∞ peak answering gain 0, +∞, `limited_db` 0 and "Peak not measurable …",
+−∞ answering "Silent", and no "clipped" anywhere. `webm_readers_probe.swift`
+lost its `gained` dimension (every read is the float mix; R3 is R2's read,
+kept so the row ids stay) and `webm_export_proof.py`'s `gain-skipped` mutant
+follows the WebM writer's new line (`audioMaster?.linearGain = gain`).
+`audio_ap5_probe.swift`, `scrub_audio_probe.swift`,
+`ramp_spike/ramp_spike_probe.swift` and `loudness_cache_probe.swift` name the
+moved symbols (`ExportAudioMaster.floatMixSettings`,
+`ExportWriter.audioReadOutput(_:)`, `StepLoudness.integrated`).
+
+**Mutants**, by hand on Debug (each one edit, the app rebuilt and its row run):
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| MA1 | the master's `stage.process` skipped | X1 (+1.42 dBTP) |
+| MA2 (M27) | the master's 158-frame head kept | E4, E46 (+3.292 ms) |
+| MA3 | `finish()` answers no tail | X6 (316 samples, the last 158 frames) |
+| MA4 | 24-bit written as the 16-bit rounding × 256 | X7 (0.0 % low bits), X8 (−101.4 dBFS) |
+| MA5 | the gain `target − integrated`, no model | X10 (−17.10 LUFS) |
+| MA6 | the default ceiling 0 dBTP | X1 (0.0000 / 0.0002 dBTP) |
+| MA7 | an un-normalised export reads the 16-bit decode and skips the master | X5 (192,480 full-scale samples), X8 |
+| MA8 | `takes_audio_bits` true on every row | `export_audio_bits.rs` (2 tests) |
+| MA9 | the master stamps by count without placing | M1, M2 |
+
+```sh
+python3 tools/proof/export_master_proof.py --probe          # M1–M3, no app
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/export_master_proof.py <dir>/agent.sock # X1–X11
+python3 tools/proof/phase5_proof.py <dir>/agent.sock
+python3 tools/proof/limiter_proof.py <dir>/agent.sock
+python3 tools/proof/export_gain_proof.py <dir>/agent.sock --against <reference>
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E4,E20,E22,E44,E45,E46
+```
+
+**Measured on Debug (2026-10-31):** `export_master_proof.py` 11/11 — X1, X2, X3
+−0.9998 / −0.9998 dBTP (Kaiser / Annex 2) and 0.0000 to 0.0002 with
+`peak_dbtp` 0; X4 −2.9993 / −2.9998; X5 0 full-scale samples, −1.0127 /
+−0.9999 dBTP, −93.9 dB from the fitted sine, `limited_db` 7.033; X6 identical,
+144,000 frames; X7 99.5 % low bits used, the twin within 1 LSB; X8 −149.1 dBFS
+at 24 bits, −101.4 at 16; X9 −14.0086 LUFS, −1.0085 / −1.0000 dBTP; X10
+−15.9125 LUFS, −0.9998 / −0.9999 dBTP. `--probe` 3/3. `phase5_proof.py` 90/90
+(the crest leg −14.0086 LUFS, gain 6.61 dB, `limited_db` 7.17; `hot-plain`
+−0.9999 dBTP). `phase5_chrome.py` 81/81. `limiter_proof.py` 19/19.
+`export_gain_proof.py --against` the base build's reference 36/36, G1
+byte-identical on all seven presets. `export_offset_proof.py --only
+E4,E20,E22,E44,E45,E46` 6/6 (E46 − E4 +0.000 ms). `loudness_normalize_proof.py`
+37/37. `webm_export_proof.py --probe` 10/10 and in full 29/29 (W11 −16.0
+LUFS). The nine mutants: all killed, each by its named row.
+
+**The recorded run (Release, after `make gate` PASS 385 s, 2026-10-31):**
+`export_master_proof.py` 11/11 with the same figures as Debug (X10 −15.9125 LUFS,
+−0.9998 / −0.9999 dBTP; X9 −14.0086 LUFS); `--probe` 3/3; `phase5_proof.py` 90/90;
+`limiter_proof.py` 19/19 (P2 −0.9995 / −0.9998 dBTP, its unlimited leg held at
+0.0005 / 0.0001 by the master); `export_offset_proof.py --only E4,E20,E44,E46` 4/4
+(E46 − E4 +0.000 ms); `screens.py --only 12-export-sheet` 6/6, the Bit depth row
+"16-bit", dimmed on H.264, after Quality in both appearances.

@@ -125,32 +125,8 @@ enum ClipLoudness {
             }
         }
         return Reading(
-            lufs: integrated(steps), truePeak: peak, playedTicks: played, steps: steps,
-            stepPeaks: stepPeaks)
-    }
-
-    /// BS.1770-4's gating over 10 ms steps: block j is the mean of steps
-    /// `[10j, 10j + 40)`, `⌊(N − 40)/10⌋ + 1` of them; the absolute gate, then
-    /// the relative one, once (`LoudnessMeter.integrated`'s rule).
-    static func integrated(_ steps: [Double]) -> Double? {
-        guard steps.count >= 40 else { return nil }
-        let count = (steps.count - 40) / 10 + 1
-        var blocks: [Double] = []
-        blocks.reserveCapacity(count)
-        for j in 0..<count {
-            blocks.append(steps[(10 * j)..<(10 * j + 40)].reduce(0, +) / 40)
-        }
-        let gated = blocks.filter { $0 > 0 && loudness($0) > LoudnessMeter.absoluteGate }
-        guard !gated.isEmpty else { return nil }
-        let threshold = loudness(gated.reduce(0, +) / Double(gated.count))
-            + LoudnessMeter.relativeGate
-        let kept = gated.filter { loudness($0) > threshold }
-        guard !kept.isEmpty else { return nil }
-        return loudness(kept.reduce(0, +) / Double(kept.count))
-    }
-
-    static func loudness(_ meanSquare: Double) -> Double {
-        meanSquare > 0 ? LoudnessMeter.offset + 10 * log10(meanSquare) : -.infinity
+            lufs: StepLoudness.integrated(steps), truePeak: peak, playedTicks: played,
+            steps: steps, stepPeaks: stepPeaks)
     }
 
     /// One step's Σ over the output channels of the mean square: the mean of

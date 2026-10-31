@@ -38,20 +38,16 @@ extension Exporter {
 
     // MARK: - Measuring the mix
 
-    /// What the measurement READS: `ExportAudioGain.floatMixSettings`, the
-    /// one float dictionary, and the same one the write pass reads whenever a
-    /// gain applies (spec §11 #86). So a normalised export's gain is applied
-    /// to exactly the signal measured here. An export with no gain is written
-    /// from `ExportWriter.decodedAudioSettings`, the 16-bit decode it always
-    /// had, so its bytes do not change.
+    /// What the measurement READS: `ExportAudioMaster.floatMixSettings`, the
+    /// one float dictionary, and the same one every export's write pass reads
+    /// (spec §11 #86, AU-27). So the gain is applied to exactly the signal
+    /// measured here, and the master limits it.
     ///
     /// **Why float.** Int16 SATURATES. A mix hotter than full scale — which
     /// is exactly the material loudness normalisation exists for — would be
     /// measured clipped, and its true peak would be pinned at 0 dBTP by the
     /// decode rather than by the signal. Read as float, the overshoot is
-    /// measured whole, the true-peak ceiling turns it down, and the gained
-    /// file holds it unclipped. Only a hot mix written with NO gain is
-    /// clipped, by its 16-bit decode, and `ExportLoudness.mixClipped` says so.
+    /// measured whole and the master holds it at its ceiling.
     ///
     /// **Why the rate and the channel count are the writer's.** BS.1770-4
     /// sums weighted channel powers and left and right both carry 1.0, so
@@ -61,7 +57,7 @@ extension Exporter {
     /// is a silent 3 dB error.
     private static let measureSampleRate: Double = 48000
     private static let measureChannelCount = 2
-    private static let measureAudioSettings = ExportAudioGain.floatMixSettings
+    private static let measureAudioSettings = ExportAudioMaster.floatMixSettings
 
     /// The same, in the writer's own 16-bit integer. Nothing in this tree had
     /// asked an `AVAssetReaderAudioMixOutput` for float before phase 5, so
@@ -76,7 +72,8 @@ extension Exporter {
     /// against its −23.0). So this dictionary is insurance and not a path
     /// anything here has taken; if it ever is taken, the loudness of a mix
     /// with no headroom problem is unaffected and the true peak of one that
-    /// has is pinned at 0 dBTP.
+    /// has is pinned at 0 dBTP. A fallback read records no 10 ms steps, so
+    /// the gain is then the unlimited one (spec §11 AU-28).
     private static let measureFallbackAudioSettings: [String: Any] = [
         AVFormatIDKey: Int(kAudioFormatLinearPCM),
         AVSampleRateKey: 48000,
@@ -93,7 +90,9 @@ extension Exporter {
     /// The range is the SETTINGS' — `Exporter.timeRange`, the same one the
     /// writer will read — and not the composition's own duration, or the
     /// measurement would cover a different span than the file. No video
-    /// output is added, which is the whole reason the pass is cheap.
+    /// output is added, which is the whole reason the pass is cheap. A float
+    /// read also feeds `StepLoudnessMeter`, whose 10 ms steps the gain is
+    /// solved over under the master (spec §11 AU-28).
     ///
     /// nil for a composition with no sound, for a read this Mac refuses, and
     /// for a cancel. A nil is "no loudness figure", never a failed export:
@@ -113,6 +112,7 @@ extension Exporter {
                 sampleRate: Exporter.measureSampleRate,
                 channelCount: Exporter.measureChannelCount)
         else { return nil }
+        let stepMeter = StepLoudnessMeter()
         let range = Exporter.timeRange(settings, composition: built.composition)
         let seconds = max(0, CMTimeGetSeconds(range.duration))
         reader.timeRange = range
@@ -143,7 +143,9 @@ extension Exporter {
                 reader.cancelReading()
                 return nil
             }
-            fed += feed(sample, to: meter, float: isFloat, limit: limit - fed)
+            fed += feed(
+                sample, to: meter, steps: isFloat ? stepMeter : nil, float: isFloat,
+                limit: limit - fed)
             guard seconds > 0 else { continue }
             let elapsed = CMTimeGetSeconds(
                 CMSampleBufferGetPresentationTimeStamp(sample) - range.start)
@@ -151,8 +153,10 @@ extension Exporter {
         }
         guard reader.status == .completed else { return nil }
         setMeasureProgress(1)
+        let measuredSteps = isFloat ? stepMeter.finish() : (steps: [], peaks: [])
         return ExportLoudness.resolve(
-            measured: meter.finish(), target: settings.loudnessLufs, ceiling: settings.peakDbtp)
+            measured: meter.finish(), steps: measuredSteps.steps, peaks: measuredSteps.peaks,
+            target: settings.loudnessLufs, ceiling: settings.masterCeilingDBTP)
     }
 
     /// One read-only output over the plan's mix — the same taps, the same
@@ -170,15 +174,16 @@ extension Exporter {
         return output
     }
 
-    /// One sample buffer into the meter, at most `limit` frames of it; the
-    /// frames fed.
+    /// One sample buffer into the meter, and on a float read the step meter
+    /// too, at most `limit` frames of it; the frames fed.
     ///
     /// A `CMBlockBuffer` may be several non-contiguous chunks, and
     /// `CMBlockBufferGetDataPointer` on the first one silently truncates the
     /// buffer — the trap `MediaImporter.peaks` records and
     /// `ReverseRenderer.appendAudioBytes` avoids the same way.
     private func feed(
-        _ sample: CMSampleBuffer, to meter: LoudnessMeter, float: Bool, limit: Int
+        _ sample: CMSampleBuffer, to meter: LoudnessMeter, steps: StepLoudnessMeter?,
+        float: Bool, limit: Int
     ) -> Int {
         guard limit > 0, let block = CMSampleBufferGetDataBuffer(sample) else { return 0 }
         let width = float ? MemoryLayout<Float>.size : MemoryLayout<Int16>.size
@@ -191,8 +196,9 @@ extension Exporter {
             == kCMBlockBufferNoErr
         else { return 0 }
         if float {
-            meter.feed(
-                bytes.bindMemory(to: Float.self, capacity: byteCount / width), frames: frames)
+            let floats = bytes.bindMemory(to: Float.self, capacity: byteCount / width)
+            meter.feed(floats, frames: frames)
+            steps?.feed(floats, frames: frames)
         } else {
             meter.feedInt16(
                 bytes.bindMemory(to: Int16.self, capacity: byteCount / width), frames: frames)

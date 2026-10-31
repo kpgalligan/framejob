@@ -18,13 +18,14 @@ import AVFoundation
 ///
 /// **The two samples it touches** are made here because this is where the
 /// export's samples exist, and both are export-only by definition. One is
-/// the loudness normalisation's gain: the preview and the file still share
+/// the sound's master (spec §11 AU-27): the preview and the file still share
 /// one description of the sound (the mix, the ramps and the taps) and differ
-/// only by a number the export was asked for. `Exporter` measured that
-/// number a moment earlier from a float read of the mix; a gained export
-/// reads the same float mix and `ExportAudioGain` multiplies and quantises it
-/// once to the 16-bit format every encoder here takes (spec §11 #86). An
-/// export with no gain reads the 16-bit decode it always read. The other is
+/// by the loudness gain the export was asked for and the master limiter the
+/// preview has none of. `Exporter` measured the gain a moment earlier from a
+/// float read of the mix; every export reads the same float mix and
+/// `ExportAudioMaster` gains it, limits it at the export's ceiling and
+/// quantises it once to the 16- or 24-bit samples the encoder takes (#86,
+/// AU-29). The other is
 /// the alpha movie rows' picture (`prores_4444`, `hevc_alpha`): the
 /// compositor's premultiplied frame is un-premultiplied, its transparent
 /// pixels' colour filled from the nearest visible one, and labelled
@@ -99,16 +100,13 @@ final class ExportWriter {
     /// Called once, on the main thread, and then dropped.
     private var completion: ((Result<URL, any Error>) -> Void)?
 
-    /// The loudness normalisation's gain, or nil when there is none — and
-    /// nil is not a multiply by one: the audio is then read as the 16-bit
-    /// decode and `pump` never enters the gain path, so an export that was
-    /// not normalised is byte-identical to one from before this file knew
-    /// what loudness was, by construction rather than by argument.
+    /// The sound's master (spec §11 AU-27): the gain, the limiter and the
+    /// quantiser every audio buffer goes through; nil for a silent movie.
     ///
-    /// Written once, on the main thread, between `init` and `start`; read
-    /// by `start` and then only on `audioQueue`. Not under the lock for that
-    /// reason and no other.
-    private(set) var audioGain: ExportAudioGain?
+    /// Made by `addAudio` in `init`; its gain is set once, on the main thread,
+    /// between `init` and `start`; read then only on `audioQueue`. Not under
+    /// the lock for that reason and no other.
+    var audioMaster: ExportAudioMaster?
 
     /// What the video pump makes of each frame (spec §11 G-35, PR-3;
     /// `frameForm`), set once by `addVideo` in `init` and read only by
@@ -138,7 +136,7 @@ final class ExportWriter {
         self.destination = url
         self.range = Exporter.timeRange(settings, composition: built.composition)
         self.totalSeconds = max(0, CMTimeGetSeconds(range.duration))
-        self.audioEnd = ExportAudioEnd(range: range)
+        self.audioEnd = ExportAudioEnd(range: range, bits: settings.audioBits ?? 16)
 
         let hasAudio = !built.composition.tracks(withMediaType: .audio).isEmpty
         do {
@@ -161,9 +159,9 @@ final class ExportWriter {
         fatalError("ExportWriter does not support NSCoder")
     }
 
-    /// Multiplies every audio sample by `gain` on the way to the encoder —
-    /// the second half of a loudness-normalised export (`Exporter`'s
-    /// measurement pass is the first).
+    /// Sets the master's gain, which multiplies every audio sample on the way
+    /// to the limiter — the second half of a loudness-normalised export
+    /// (`Exporter`'s measurement pass is the first).
     ///
     /// Main thread, after `init` and before `start`: the gain is the
     /// measurement's answer, and the measurement runs on the build queue
@@ -173,11 +171,10 @@ final class ExportWriter {
     /// A non-finite or non-positive gain is ignored rather than obeyed. A
     /// gain is a number derived from a measurement, and a measurement of
     /// digital silence is −∞; multiplying a file by that would be a silent
-    /// export reported as a success. A gain of exactly 1 is ignored too, so
-    /// it keeps the un-normalised read.
+    /// export reported as a success. A gain of exactly 1 is the master's own.
     func normalizeAudio(byLinearGain gain: Float) {
         guard gain.isFinite, gain > 0, gain != 1 else { return }
-        audioGain = ExportAudioGain(linearGain: gain)
+        audioMaster?.linearGain = gain
     }
 
     // MARK: - Tracks
@@ -290,10 +287,10 @@ final class ExportWriter {
         }
         if let input = audioInput, let output = audioOutput, let audioReader {
             // Audio drives the bar only when there is no picture to drive it,
-            // and it is the only pump that can carry a gain.
+            // and it is the only pump with a master.
             pump(
                 input, from: output, reading: audioReader, on: audioQueue, group: group,
-                tracksProgress: videoInput == nil, gain: audioGain, end: audioEnd)
+                tracksProgress: videoInput == nil, master: audioMaster, end: audioEnd)
         }
         if let input = chapterInput {
             pumpChapters(input, on: chapterQueue, group: group)
@@ -343,9 +340,8 @@ final class ExportWriter {
     /// has room, so the "have I already finished?" flag lives outside it and
     /// is only ever touched on `queue`, which is serial.
     ///
-    /// `gain` is nil for every pump but the audio one, and nil for the audio
-    /// one too unless the export asked to be normalised — which is what
-    /// keeps an ordinary export on exactly the samples it had before.
+    /// `master` is the audio pump's alone (spec §11 AU-27): each buffer goes
+    /// through it first, and its latency's tail (`finish`) before the padding.
     /// `frames` is non-nil only for the video pump of a row `frameForm`
     /// names: each frame is then converted by it (`ExportFrames`). `reader` is
     /// the output's own, which `stop` cancels after the last read when the
@@ -354,7 +350,7 @@ final class ExportWriter {
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput,
         reading reader: AVAssetReader, on queue: DispatchQueue, group: DispatchGroup,
-        tracksProgress: Bool, gain: ExportAudioGain? = nil, frames: ExportFrames? = nil,
+        tracksProgress: Bool, master: ExportAudioMaster? = nil, frames: ExportFrames? = nil,
         end: ExportAudioEnd? = nil
     ) {
         group.enter()
@@ -392,7 +388,12 @@ final class ExportWriter {
                     if let error = self.readFailure(of: reader) {
                         self.stopped(with: error)
                     } else if let end = end, !self.isStopping {
-                        // Silence up to the range's end, while the input has room (#337).
+                        // The master's tail, once, then silence up to the range's end,
+                        // while the input has room (#337).
+                        if !end.isPadding, !self.appendTail(of: master, to: input, end: end) {
+                            stop()
+                            return
+                        }
                         guard let padded = end.pad(input) else { return }
                         if !padded {
                             self.stopped(with: self.writer.error
@@ -402,23 +403,23 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                let time = CMSampleBufferGetPresentationTimeStamp(decoded) - self.range.start
+                // The master makes a NEW integer buffer from the float one,
+                // placed by its stamp (nil while its head is in the latency).
+                let sample: CMSampleBuffer
+                do {
+                    guard let mastered = try master.map({ try $0.apply(to: decoded) }) ?? decoded
+                    else { continue }
+                    sample = mastered
+                } catch {
+                    self.stopped(with: error)
+                    stop()
+                    return
+                }
+                let time = CMSampleBufferGetPresentationTimeStamp(sample) - self.range.start
                 // A sample that starts before the range does not belong to
                 // this file. The reader clips to `timeRange`, so this is a
                 // boundary frame, not a common case.
                 guard time.isNumeric, time >= .zero else { continue }
-                // An empty buffer has nothing to gain and is not malformed:
-                // it is skipped, as the old Int16 kernel passed it through.
-                if gain != nil, CMSampleBufferGetNumSamples(decoded) == 0 { continue }
-                // The gain makes a NEW 16-bit buffer from the float one,
-                // before `retimed`; with no gain the decode goes on as read.
-                guard let sample = gain == nil ? decoded : gain?.apply(to: decoded) else {
-                    self.stopped(
-                        with: Exporter.ExportError.failed(
-                            "The loudness gain could not be applied to a sample."))
-                    stop()
-                    return
-                }
                 // A `frameForm` row's frame, converted (spec §11 G-35, PR-3),
                 // before `retimed`; any other goes on as read.
                 guard let ready = frames == nil ? sample : frames?.convert(sample) else {
@@ -454,6 +455,28 @@ final class ExportWriter {
                 }
                 if tracksProgress { self.advance(to: time) }
             }
+        }
+    }
+
+    /// The master's tail (`ExportAudioMaster.finish`) through `retimed` and
+    /// `end.fit` into `input`: true when it is in or there is none, false
+    /// after recording the failure.
+    private func appendTail(
+        of master: ExportAudioMaster?, to input: AVAssetWriterInput, end: ExportAudioEnd
+    ) -> Bool {
+        do {
+            guard let tail = try master?.finish() else { return true }
+            guard let rebased = Self.retimed(tail, by: range.start) else {
+                throw Exporter.ExportError.failed("A sample could not be re-timed for the file.")
+            }
+            guard let fitted = end.fit(rebased) else { return true }
+            guard input.append(fitted) else {
+                throw writer.error ?? Exporter.ExportError.failed("The file could not be written.")
+            }
+            return true
+        } catch {
+            stopped(with: error)
+            return false
         }
     }
 

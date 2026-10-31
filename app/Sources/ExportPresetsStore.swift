@@ -94,6 +94,10 @@ struct ExportChoice: Codable, Equatable {
     /// row so the popup keeps it across formats; only `av1` sends it.
     var encoderSpeed: String?
 
+    /// The Bit depth popup's last choice (16 or 24, spec §11 AU-29), stored on every row so
+    /// the popup keeps it across formats; only `audio_wav` and `audio_aiff` send it.
+    var audioBits: Int?
+
     /// The file's spelling. Snake case because a person can open
     /// `ExportPresets.json` in an editor, and because `burn_in_timecode` is
     /// then the same string the core's recipe options use — one name for one
@@ -109,13 +113,14 @@ struct ExportChoice: Codable, Equatable {
         case inOutRange = "in_out_range"
         case burnInTimecode = "burn_in_timecode"
         case encoderSpeed = "encoder_speed"
+        case audioBits = "audio_bits"
     }
 
     init(
         name: String = "", presetID: String = "", sizeRow: String? = nil,
         customSize: [Int]? = nil, fps: [Int]? = nil, qualityTier: String? = nil,
         loudness: Double? = nil, inOutRange: Bool = false, burnInTimecode: Bool = false,
-        encoderSpeed: String? = nil
+        encoderSpeed: String? = nil, audioBits: Int? = nil
     ) {
         self.name = name
         self.presetID = presetID
@@ -127,6 +132,7 @@ struct ExportChoice: Codable, Equatable {
         self.inOutRange = inOutRange
         self.burnInTimecode = burnInTimecode
         self.encoderSpeed = encoderSpeed
+        self.audioBits = audioBits
     }
 
     /// Every key optional, every absence a default.
@@ -149,6 +155,7 @@ struct ExportChoice: Codable, Equatable {
         inOutRange = (try? c.decodeIfPresent(Bool.self, forKey: .inOutRange)) ?? false
         burnInTimecode = (try? c.decodeIfPresent(Bool.self, forKey: .burnInTimecode)) ?? false
         encoderSpeed = try? c.decodeIfPresent(String.self, forKey: .encoderSpeed)
+        audioBits = try? c.decodeIfPresent(Int.self, forKey: .audioBits)
     }
 }
 

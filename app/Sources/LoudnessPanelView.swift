@@ -15,7 +15,8 @@ import AppKit
 /// column off and the meter empty.
 final class LoudnessPanelView: NSView {
     static let width: CGFloat = 132
-    static let preMasterNote = "The mix as the preview plays it, before the export's loudness setting."
+    static let preMasterNote =
+        "The mix as the preview plays it, before the export's loudness and master limiter."
     static let offSpeedNote = "Measured only at normal speed."
 
     private let content = NSView()

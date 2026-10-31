@@ -176,6 +176,9 @@ final class ExportSheetController: NSViewController {
     /// The Speed row and its choice (`ExportSheetSpeed.swift`, spec §11 CX-12 (2)).
     let speedPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     var encoderSpeedChoice: EncoderSpeed = .balanced
+    /// The Bit depth row and its choice (`ExportSheetAudioBits.swift`, spec §11 AU-29).
+    let audioBitsPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var audioBitsChoice = 16
     let summaryLabel = NSTextField(wrappingLabelWithString: "")
     let footnote = sheetFootnote("")
     var exportButton: NSButton!
@@ -320,6 +323,7 @@ final class ExportSheetController: NSViewController {
         rebuildPresetPopup(selecting: nil)
         configureDynamicRange()
         configureSpeed()
+        configureAudioBits()
 
         // THE ORDER BELOW IS LOAD-BEARING and `apply(_:)` is where it is
         // written down. The remembered choice has to reach the format popup
@@ -355,6 +359,7 @@ final class ExportSheetController: NSViewController {
             ],
             [fieldLabel("Frame rate:"), ratePopup],
             [fieldLabel("Quality:"), qualityPopup],
+            [fieldLabel("Bit depth:"), audioBitsPopup],
             // ONE row, popup and field together: 186 + 6 + 64 fits the 318
             // points the 480-wide card leaves beside a 106 label column.
             [fieldLabel("Loudness:"), sheetRow([loudnessPopup, loudnessField])],
@@ -386,8 +391,8 @@ final class ExportSheetController: NSViewController {
             hint: "The format decides the codec and the container. Size, frame rate and "
                 + "range start as the document's and quality as the format's; a GIF or an "
                 + "APNG starts at its own cap and rate. Loudness normalises the whole mix "
-                + "by one gain — no limiter — capped so its true peak stays under "
-                + "−1 dBTP. A preset remembers the choices on this card rather than the "
+                + "by one gain, and every export's sound goes through a master limiter "
+                + "that keeps its true peak under −1 dBTP. A preset remembers the choices on this card rather than the "
                 + "numbers they resolve to, so it means the same thing on a document of "
                 + "another size. Burn in timecode writes the time into the picture on "
                 + "export only — the preview never shows it — and it reads PROJECT time, "

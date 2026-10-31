@@ -156,34 +156,39 @@ const PEAK_MAX: f64 = 0.0;
 
 /// The two loudness overrides, read together: `loudness_lufs`, the
 /// integrated target the export is normalised to, and `peak_dbtp`, the
-/// true-peak ceiling the gain is capped against.
+/// true-peak ceiling of the export's master limiter.
 ///
-/// **`peak_dbtp` without `loudness_lufs` is an `Err`.** Everywhere else in
-/// this file an override that the chosen format cannot use is accepted and
-/// echoed (a GIF takes an audio bitrate), because the format flags say
-/// what the output can carry and one rule for reading beats two. This one
-/// is not that case: a ceiling is not a thing the format cannot use, it is
-/// a thing that has nothing to act on. Normalisation is gain-only with no
-/// limiter, so the ceiling exists solely to cap a gain that a target
-/// computed; asked for on its own it would mean "turn the programme down
-/// until its peak fits", which is peak normalisation — a different feature
-/// with a different sound — and the crate has no precedent for a key that
-/// is accepted, echoed and silently inert.
+/// **Either may come alone** (spec §11 AU-27). Every export with sound runs
+/// through a master limiter at `peak_dbtp`, −1 dBTP when it is not asked
+/// for, so a ceiling on its own is not inert: it is the limiter's ceiling,
+/// with or without a target, and is accepted and echoed as every other
+/// override is.
 ///
 /// Both are emitted by the resolver only when asked for, exactly as the
 /// bitrates are: an absent `loudness_lufs` is "do not normalise", which is
-/// what `ExportSettings.loudnessLufs == nil` says on the Swift side.
+/// what `ExportSettings.loudnessLufs == nil` says on the Swift side, and an
+/// absent `peak_dbtp` is the master's default ceiling there.
 pub(crate) fn loudness(overrides: Option<&Value>) -> Result<(Option<f64>, Option<f64>), String> {
     let target = decibels(overrides, "loudness_lufs", LOUDNESS_MIN, LOUDNESS_MAX)?;
     let ceiling = decibels(overrides, "peak_dbtp", PEAK_MIN, PEAK_MAX)?;
-    if target.is_none() && ceiling.is_some() {
-        return Err(
-            "export peak_dbtp needs a loudness_lufs to be the ceiling for: normalisation \
-             is gain-only, so a ceiling on its own would change nothing"
-                .to_string(),
-        );
-    }
     Ok((target, ceiling))
+}
+
+/// The `audio_bits` override (spec §11 AU-29): 16 or 24, `None` when absent
+/// or null. Whether the row takes one is the resolver's question
+/// (`Preset::takes_audio_bits`); this answers only whether the value is one
+/// of the two depths, so a 20 or a string is refused by name on any row.
+pub(crate) fn audio_bits(overrides: Option<&Value>) -> Result<Option<u32>, String> {
+    let Some(value) = field(overrides, "audio_bits") else {
+        return Ok(None);
+    };
+    match value.as_u64() {
+        Some(bits @ (16 | 24)) => Ok(Some(bits as u32)),
+        _ => Err(format!(
+            "export audio_bits must be 16 or 24, not {}",
+            describe(value)
+        )),
+    }
 }
 
 /// True or false, or `default` when the key is absent — the shape every

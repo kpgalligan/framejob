@@ -3,8 +3,8 @@ import AVFoundation
 // `ExportWriter`'s audio half: the audio writer input and the mix's reader output. A pure
 // move out of `ExporterWriter.swift` at its size cap (issue #378), before its readers were
 // split one per output; the members each file calls in the other lost `private` (`built`,
-// `audioOutput`, `addAudio`, `addAudioOutput`; `audioGain` became `private(set)`), and
-// nothing else changed.
+// `audioOutput`, `addAudio`, `addAudioOutput`; the gain, now `audioMaster`, lost `private`),
+// and nothing else changed.
 extension ExportWriter {
 
     /// The audio half: every composition audio track through the plan's mix.
@@ -33,9 +33,10 @@ extension ExportWriter {
     /// movie, and the track is simply not added. It IS an error when the
     /// preset writes nothing else.
     ///
-    /// This adds the writer INPUT only. The reader output is added by `start`
-    /// (`addAudioOutput`), because its format depends on the gain, which
-    /// arrives after `init`.
+    /// This adds the writer INPUT and the sound's master (`ExportAudioMaster`,
+    /// spec §11 AU-27: the settings' depth and ceiling, placed from the
+    /// range's start). The reader output is added by `start`
+    /// (`addAudioOutput`).
     func addAudio(settings: ExportSettings) throws {
         let tracks = built.composition.tracks(withMediaType: .audio)
         guard !tracks.isEmpty else {
@@ -50,13 +51,16 @@ extension ExportWriter {
         }
         writer.add(input)
         audioInput = input
+        audioMaster = ExportAudioMaster(
+            bits: settings.audioBits ?? 16, ceilingDBTP: settings.masterCeilingDBTP,
+            origin: range.start)
     }
 
     /// The mix's reader output (`audioReadOutput`). False when the reader
-    /// refuses it; there is no 16-bit fallback for a gained export, because
-    /// the gain would then meet a decode that already clipped.
+    /// refuses it; there is no 16-bit fallback, because the master would then
+    /// meet a decode that already clipped.
     func addAudioOutput() -> Bool {
-        let output = Self.audioReadOutput(built, gained: audioGain != nil)
+        let output = Self.audioReadOutput(built)
         guard let audioReader, audioReader.canAdd(output) else { return false }
         audioReader.add(output)
         audioOutput = output
