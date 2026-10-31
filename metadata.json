@@ -1,0 +1,91 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M69PAQ1EP5K3088M4YQAGN6Q",
+  "strategy": "manual-commit",
+  "branch": "worktree-tutorial-handler",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "Makefile",
+    "app/Resources/Practice/PROVENANCE.md",
+    "app/Resources/Practice/Practice Project.framejob/media/Dawn.mov",
+    "app/Resources/Practice/Practice Project.framejob/media/Night.mov",
+    "app/Resources/Practice/Practice Project.framejob/media/Sea.mov",
+    "app/Resources/Practice/Practice Project.framejob/project.json",
+    "app/Resources/Practice/SHA256SUMS",
+    "app/Sources/AgentCatalog.swift",
+    "app/Sources/AgentServer+Project.swift",
+    "app/Sources/AppDelegate+Menus.swift",
+    "app/Sources/AppDelegate+Tutorials.swift",
+    "app/Sources/AppDelegate.swift",
+    "app/Sources/MediaConsolidator.swift",
+    "app/Sources/PracticeProject.swift",
+    "app/Sources/ProjectDocument+CacheSaves.swift",
+    "app/Sources/ProjectDocument+PracticeMedia.swift",
+    "app/Sources/ProjectDocumentController.swift",
+    "app/Sources/TutorialClipFacts.swift",
+    "app/Sources/UIMenuTable.swift",
+    "designs/spec/07.9a-agent-tools.md",
+    "designs/spec/09-keys-and-menus.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tutorials.md",
+    "designs/spec/README.md",
+    "designs/tutorials.md",
+    "docs/developing.md",
+    "docs/guide/mcp.md",
+    "docs/guide/menus-and-shortcuts.md",
+    "docs/guide/projects-and-media.md",
+    "docs/manual-checks.md",
+    "project.yml",
+    "tools/practice/make_practice.py",
+    "tools/practice/practice_generator.swift",
+    "tools/practice/practice_media.swift",
+    "tools/proof/README.md",
+    "tools/proof/capture_spike/inventory.json",
+    "tools/proof/graphics_menu_probe.swift",
+    "tools/proof/graphics_menu_proof.py",
+    "tools/proof/practice_project_proof.py",
+    "tools/proof/tutorial_check.py",
+    "tools/proof/tutorial_fixtures/facts.json",
+    "tools/proof/tutorial_fixtures/practice/Practice Project.framejob/project.json",
+    "tools/proof/tutorial_fixtures/practice/SHA256SUMS",
+    "tools/proof/tutorial_probe.swift",
+    "tools/tutorials/tutorial_extract.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 68,
+    "cache_creation_tokens": 40578,
+    "cache_read_tokens": 5978757,
+    "output_tokens": 15000,
+    "api_call_count": 28,
+    "subagent_tokens": {
+      "input_tokens": 652,
+      "cache_creation_tokens": 1150875,
+      "cache_read_tokens": 59833004,
+      "output_tokens": 298576,
+      "api_call_count": 323
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
