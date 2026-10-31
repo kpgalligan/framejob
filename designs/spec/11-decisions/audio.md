@@ -584,6 +584,76 @@ code.
   or AU-74 adds (the sum, the continuity rules, the rate gate, the bars), killed by its named row;
   L1–L4 over MCP against an export; SE-30 for what only a person can confirm.
 
+AU-80…AU-84 are AP8's first part, AP8a (the volume line; survey A9), recorded before its code.
+AP8 is built in two parts: AP8a draws a clip's gain envelope and edits it through actions; AP8b
+(every other audio parameter as action ends) continues at AU-85.
+
+- **AU-80 — The volume line edits through ACTIONS, not keyframes (owner, 2026-10-30, the road
+  map's "Asked at AP8", option (a)).** A point on the line is an action's end (`end.audio.volume`);
+  a drag writes `set_audio {volume}` or that end; nothing is persisted that actions do not already
+  persist. Reason: it keeps spec §2's "Actions, not keyframes", which every phase since has built
+  on; it is app-only (no core, FFI, op, tool, format or `UserDefaults` change); and AP8b animates
+  every other audio parameter as action ends through the same model. What it costs, accepted
+  with it: each point is a span, one action band per point; a point joins the previous one by a
+  ramp from it (the clip's start counts as the first); a point cannot go inside an action that
+  also animates another property; a point inside an EASED volume action reshapes the ease on both
+  sides (AU-83); a point's time moves with its band, not on the line; and an agent makes in two to
+  four tool calls (`add_action`, `set_action`, `set_action_end`) what the gesture makes in one
+  step. Keyframes (option (b), lifting §2) were declined.
+- **AU-81 — What is drawn: what is heard from the clip, within the handle the timeline shows.**
+  Every clip with sound — not a nest clip — draws, over its waveform, the gain of the plan audio
+  track holding its audio segment, cut to that segment: the plan's ramps, which carry the clip's
+  volume and its actions, fades, crossfades, ducks, its track's volume (AU-103) and every
+  silencing (clip mute, track mute, a solo elsewhere, `enabled.audio` false: `core/src/audio.rs`'s
+  module doc), so a silenced clip's line lies on the floor. A drag edits only the clip's OWN
+  volume, relatively (AU-82), so on a silenced clip the line stays on the floor while the readout
+  moves. Inside an open nest the timeline reads the scoped handle, whose plan is the nest's own
+  mix: the line there leaves out the enclosing nest clip's and tracks' volume, fades, mute and
+  solo. The scale is dB, top `20·log10(32)` = +30.103 dB (`AudioNormalize.maxGain`) and bottom
+  −60 dB; a gain at or under 0.001 draws at the bottom and one above 32 (a track's volume can carry
+  the plan there) at the top. The line's rect is the clip's audio region with its top raised to
+  the action lane's bottom where they overlap, inset 1 pt top and bottom; drawn when it is at
+  least 12 pt tall and the plan has the clip's segment. A polyline through every ramp's (start,
+  from)–(end, to), white 85 %, 1 pt, clipped to the rect; a 5 pt square in the action colour at
+  each action end naming `audio.volume` inside the clip, centred on the line — drawing only, not a
+  hit target. The envelope is the core's, read through the plan and memoised per handle as the
+  speech duck's line is (AU-113); never recomputed in Swift.
+- **AU-82 — The drag: vertical, relative, in dB, on the level in force.** A plain press on the
+  line selects the clip and edits the level in force at the press: inside an action naming
+  `audio.volume`, that action's end; else the latest action ENDED at or before the press naming
+  it; else the clip's base `set_audio {volume}`. Each tick the value is
+  `clamp(max(v0, 0.001)·10^(Δ/20), 0, 32)` for Δ the dB the pointer moved on the line's scale, and
+  0 when the pointer is below the press AND at the rect's bottom (1 pt above it or lower) — the
+  "below the press" keeps a press on a floor line (a silenced clip's) from writing 0 without a
+  downward move. Beside the pointer, the clip's own resulting value: "+2.5 dB", one decimal,
+  "−∞ dB" at 0. One undo step, "Set Volume"; none when nothing moved. Live through the
+  document's live edit, so `check_audio`'s 0…32 is met by the clamp before the core sees a value.
+- **AU-83 — ⌥-press on the line adds a point, as an action.** At the press's clip time snapped to
+  the frame, t: inside an action A whose end names ONLY `audio.volume` (no other group, no other
+  audio key), A is split at t — A shortened to `t − A.start`, a new action `[t, A.end)` ending at
+  A's end volume and carrying A's curve when it is not linear — and the point dragged is A's new
+  end, starting at the evaluated volume at t; a press under one frame from A's start beeps (a
+  zero-length action is refused, and a live edit swallows refusals). For a linear A the click
+  alone leaves what is heard unchanged; for an eased A both halves carry its curve, so the values
+  at t and at A's end are kept and the shape between is re-eased on each side. Inside any other
+  action or one a trim left running past the clip's end (`add_action` would refuse the split's
+  second half), or under one frame after the latest action end at or before t (any kind: actions never
+  overlap), a beep and nothing. Otherwise a new action `[prevEnd, t)` (prevEnd that latest end,
+  else 0; the core's default curve, linear) ending at the evaluated volume at t, so the click alone
+  changes nothing heard. The new id is the base's `next_id`. The click adds the point at once; the
+  drag continues as AU-82 on that end; one undo step, "Add Volume Point".
+- **AU-84 — The line's hit, the modifiers, the mirror and the proof.** The hit test asks for the
+  line after the fade handles, the action band and the two edge grabs, and before the clip body:
+  within the line's rect and 3 pt of the line at the pointer's x. A locked track's clip is the
+  clip, as before. A press on the line with ⇧ (toggle membership; ⌥⇧ slip) or a double-click
+  (rename) goes to the clip's own arm unchanged; only a plain press and one whose modifiers
+  include ⌥ but not ⇧ are volume gestures, and ⌥-drag on the body away from the line stays
+  Duplicate. The agent's mirror is the ops the gesture sends — `set_audio`, `add_action`,
+  `set_action`, `set_action_end` — whose handlers name the volume line; no new tool. The proof is
+  `volume_line_proof.py`: probe rows V1–V9 over `app/Sources` (the drawn line against the plan,
+  the scale, targets, the drag's arithmetic, points added and split, one undo step, the hit order
+  and modifiers, the paint) and thirteen mutants, each killed by its named row; manual check SE-35.
+
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
 AP9, survey A10), recorded before its code.
 

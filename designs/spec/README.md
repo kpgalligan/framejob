@@ -26,13 +26,13 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 141 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
 | [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 485 | The Clip tab's sections: every video, audio, text and shape section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 228 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
-| [`04.4-timeline.md`](04.4-timeline.md) | 246 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
+| [`04.4-timeline.md`](04.4-timeline.md) | 269 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
 | [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 391 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
 | [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 288 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
-| [`05.4-actions.md`](05.4-actions.md) | 156 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
+| [`05.4-actions.md`](05.4-actions.md) | 166 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
 | [`05.6-persistence.md`](05.6-persistence.md) | 268 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
@@ -44,7 +44,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 196 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 273 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 73 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 75 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 326 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 56 | What playback does after every edit: rebuild or refresh. |
@@ -56,9 +56,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 46 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, and its answer. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 124 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 212 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 214 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 15837 in 34 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 15912 in 34 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

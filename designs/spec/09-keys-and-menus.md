@@ -46,6 +46,8 @@
 | ⌃⌘L | View ▸ Loudness Meter — the live loudness column left of Scopes: momentary, short-term and integrated LUFS and the true-peak maximum of the mix as the preview plays it at ×1, with a Reset (road map "audio" AP7, §11 AU-75, AU-76). A checkmark toggle; view state, not persisted |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
+| Drag a clip's volume line | Set the level in force there, in dB, one step "Set Volume" (road map "audio" AP8a, §11 AU-82); ⇧ and a double-click on the line act on the clip |
+| ⌥-click / ⌥-drag a clip's volume line | Add a volume point there as an action (or split the volume action under it), then drag it; one step "Add Volume Point" (§11 AU-83) |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
 | ⌥-drag a media clip's END edge | Rate stretch (on the start edge ⌥ trims like a bare drag) |
 | ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |

@@ -391,6 +391,8 @@ instead ([below](#preview-canvas-gestures)).
 | ⌥-drag | Clip's end edge | Rate stretch: changes the speed so the clip fills the new length. Works only on a clip that plays a media file. On the start edge, ⌥ trims as usual |
 | ⌥⇧-drag | Clip edge | Roll: moves the cut between this clip and the clip touching it. Does nothing where there is no touching clip |
 | Drag | Fade handle on a clip | Sets that clip's audio fade-in or fade-out |
+| Drag | Volume line on a clip | Changes the level in force there, in dB (see [Audio](audio.md#the-volume-line)) |
+| ⌥-click or ⌥-drag | Volume line on a clip | Adds a volume point there as an action, then sets its level |
 | Click | Action band | Selects the clip and that action. The Clip tab then edits the action's end values; ⎋ deselects the action |
 | Drag | Action band | Moves the action in time |
 | Drag | Edge of an action band | Changes the action's length |

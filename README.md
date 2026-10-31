@@ -55,7 +55,8 @@ reverse, freeze frame, and speed ramps — **Clip ▸ Speed Ramp…** makes a Ra
 Up, Ramp Down, Speed Dip or Speed Burst in one step.
 → [Speed, reverse and freeze frames](docs/guide/speed.md)
 
-**Audio.** Per-clip volume, fades in four shapes, ducking for a clip's length
+**Audio.** Per-clip volume, drawn as a line on each clip that you drag and
+⌥-click to add points, fades in four shapes, ducking for a clip's length
 or only while its speech plays, voice isolation (Apple's on-device voice model,
 which also reduces room echo), sixteen voice effects (pitch, robot, telephone,
 radio, echo, reverbs and more), channel selection, EQ with voice presets, hum

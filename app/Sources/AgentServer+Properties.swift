@@ -44,8 +44,9 @@ extension AgentServer {
             document, "Video Properties", [.setVideoRaw(clips: clips, patch: patch)])
     }
 
-    /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
-    /// handles (`FadeHandleSession`).
+    /// `set_audio` — the Audio tab (`AudioPane`), the timeline's fade
+    /// handles (`FadeHandleSession`) and a drag on its volume line where the
+    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
     /// after D1·3, `archive/roadmap-7.md` §2.4). Its group holds no

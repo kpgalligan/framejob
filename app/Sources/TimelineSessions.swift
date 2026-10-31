@@ -49,6 +49,9 @@ enum TimelineHit: Equatable {
     /// selects the clip and the action, then resizes that end (spec §11
     /// CI-11). A band 15 pt wide or less has none and is all `.action`.
     case actionEdge(clip: UInt32, action: UInt32, TimelineEdge)
+    /// The clip's volume line (`TimelineView+VolumeLine.swift`, spec §11
+    /// AU-84): the clip and the project time of the press.
+    case volumeLine(UInt32, Ticks)
     /// Empty lane: a marquee. The row is for the double-click, which closes
     /// the gap it landed in.
     case lane(row: Int, time: Ticks)

@@ -179,6 +179,11 @@ where one ends and the next begins.
   solo, it draws faded.
 - **Fade handles**: small white squares at the top corners of the audio part.
   Drag one inward to fade (see [Audio](audio.md)).
+- **Volume line**: a thin white line over the waveform showing the level you
+  hear from the clip, with small squares where a volume action ends. Drag it
+  to change the level, or ⌥-click it to add a point (see
+  [Audio](audio.md#the-volume-line)). A silenced clip's line lies along the
+  bottom.
 - **Motion marks**: small wedges at the ends of the name strip for an active
   In or Out motion, and a wave glyph for a During motion (see
   [Motion and transitions](motion-and-transitions.md)).

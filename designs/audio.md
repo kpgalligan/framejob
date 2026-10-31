@@ -246,15 +246,19 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
 
 ### AP8 — every audio parameter animates; the volume line (A9)
 
-- Pan, EQ gains and frequencies, gate, de-esser, compressor and limiter settings, isolation's
-  Amount and the leveller's target as action ends; the tap's schedule carries per-parameter
-  ramps from the core, not one constant per span. Switches (a stage on or off) still change at
-  an action's end, as booleans do (§5.4).
-- **The volume line:** each clip draws its envelope over its waveform; dragging it edits the
+Built in two parts once the owner answered the question below with (a), actions (2026-10-30,
+AU-80): **AP8a** the volume line, app-only (AU-80…AU-84); **AP8b** every other audio parameter as
+action ends through the same model (AU-85…).
+
+- **AP8b:** pan, EQ gains and frequencies, gate, de-esser, compressor and limiter settings,
+  isolation's Amount and the leveller's target as action ends; the tap's schedule carries
+  per-parameter ramps from the core, not one constant per span. Switches (a stage on or off)
+  still change at an action's end, as booleans do (§5.4).
+- **AP8a, the volume line:** each clip draws its envelope over its waveform; dragging it edits the
   level. **Asked at AP8:** edit through actions (a point is an action's end, which keeps §2's
-  "Actions, not keyframes"; recommended) or add keyframes (lifting it).
-- **Proof:** exports of an animated pan and EQ against analytic gains; the line drawn where
-  the plan's ramps are.
+  "Actions, not keyframes"; recommended) or add keyframes (lifting it). Answered (a).
+- **Proof:** the line drawn where the plan's ramps are (AP8a); exports of an animated pan and EQ
+  against analytic gains (AP8b).
 
 ### AP9 — split edits (A10)
 
@@ -1332,6 +1336,76 @@ the lane's figures (X10 −15.9125 LUFS, −0.9998 / −0.9999 dBTP), `audio_ap1
 
 **Owed.** SE-34 (the master's sound on music and speech, the Bit depth row) for the owner;
 SE-28 stands. #86 closed by this phase. Nothing to file.
+
+### AP8's record (2026-10-30)
+
+Part 1 of AP8, **AP8a**: the volume line (survey A9), built in lane C from `83eb9e1`. AP8b —
+every other audio parameter as action ends — is the next part and continues at AU-85.
+
+**Asked.** The owner answered AP8's question on 2026-10-30: (a), through actions (AU-80).
+
+**Decided.** AU-80…AU-84, recorded before the code: the line edits through actions, with what
+that costs; what is drawn (the plan's ramps for the clip's audio segment, every silencing on the
+floor, the nest's own mix inside a nest, the dB scale +30.103…−60, the rect below the action
+lane); the drag on the level in force, its floor rule and readout; ⌥-press adding a point as an
+action or a split, with the one-frame beeps; the hit order, the modifiers, the mirror and the
+proof. The spec review's five objections were taken: a split under one frame from the action's
+start beeps (M10); a silenced clip's floor line writes 0 only on a move below the press (M11);
+⇧, ⌥⇧ and double-clicks on the line reach the clip's own arm through `resolvingVolumeLine`
+(M12); a split of an eased action re-eases both halves, recorded rather than refused; inside an
+open nest the line is the nest's own mix.
+
+**Landed.** App only — no core, FFI, op, tool, format or `UserDefaults` change. `VolumeLine.swift`
+(248: `VolumeScale`, `VolumeLines`, `VolumeLineTarget`, `VolumeLine`, `VolumeLineSession`,
+`TimelineHit.resolvingVolumeLine`), `TimelineView+VolumeLine.swift` (198: `VolumeLineGeometry`,
+the drawing and readout, `volumeLineHit`, the three gesture phases); wiring in the frozen
+`TimelineView.swift` (two stored properties, one call in `hit(at:)`, the resolved switch and one
+arm in each phase), `TimelineSessions.swift` (`.volumeLine`), `TimelineClipDrawing.swift` (one
+call) and `EditorViewController+Timeline.swift` (`volumeLines` beside `duckCurves`); UI-path
+comments on `add_action`, `set_action`, `set_action_end` and `set_audio`. Docs: spec §4.4, §5.4,
+§7.4, §9; the guide's Volume line section, timeline.md, menus-and-shortcuts.md, the README
+highlight; SE-35; the screen catalog's 04-editor prose; the proof README.
+
+**Deviations.** V3 adds 4.5 s (after the pan-only action) to the spec's four times, so M5 (the
+held rule ignoring "names volume") has a time that tells it apart. The drawing call passes the
+clip's lane rect rather than `regions.audio`, so the drawing and the hit test share one
+`volumeLineGeometry`. `VolumeLines` keeps its handle as `project`, which ⌥'s evaluated volume is
+read from. The probe's fixture sets no curve on the linear action (the core's default; a
+`set_action` to linear is an identity). V8's fade-handle and band rows check the order only (the
+line's rect starts below the lane); the edge grab is the real conflict and kills M8. The proof is
+in-process only, so it has no Release instance to drive; Release was driven by `screens.py`.
+
+**Measured** (the lane): `volume_line_proof.py --probe` 9/9 — V1 12 vertices from 6 plan ramps,
+worst 0.000 pt; V2 the inverse within 1.4e-14 dB; V4 +6.0206 dB from 0.5 → 1.000000; V5 the
+gain's worst change over 300 frames 0.0; V6 the linear split's worst change 4.4e-16, the eased
+halves both `ease_in_out`; V7 "Set Volume" and "Add Volume Point", each one undo; V9 3/3 —
+`--mutants` 12/12 killed; `spec_index_proof.py` 213/213; `make typecheck` the four baseline
+warnings; `make gate` PASS 367 s (names 1, typecheck 6, fmt 3, lint 13, test 218, app 126);
+`screens.py --only 04-editor,09-clip-sound` against Release 7/7, 0 new problems, no `Frame Job: `
+line.
+
+**Review.** Review 1 found one should-fix: an ⌥-press inside a volume-only action that a trim left
+past the clip's end built an `add_action` the core refuses (`action_past_end`), which the live
+edit swallowed with no beep. Fixed in the lane (`93636d8`): `VolumeLine.point` answers nil there
+(AU-83, spec §4.4, the guide); V6 gained the case on the fixture trimmed to 1.5 s and mutant M13
+drops the check. Fix pass: `--probe` 9/9; M1–M9 and M11–M13 killed, M10 (its anchor moved with
+the guard) re-pointed and killed by V6 in its own run; `spec_index_proof.py` 213/213; `make gate`
+PASS 358 s; `screens.py` not re-run (the fix is off the drawing path). Its nit — a ⌥-press in the
+clip's last partial frame snaps up to the clip's end and beeps — was left; review 2 passed and
+carried it.
+
+**Integrated.** AP2b (`3012143`) had landed since the lane's base. The phase bumps no format.
+Conflicts were taken as unions: the decisions index's `audio.md` row (AU-80…AU-84 beside
+AU-27…AU-29; AU-83's and AU-84's index cells brought to the fix's text and thirteen mutants), the
+proof README (this phase's section after AP2b's), SE-35 after AP2b's SE-34, this record after
+AP2b's, and the spec indexes' Lines cells counted again. app/CLAUDE.md's map names
+`+VolumeLine` and `VolumeLine.swift` beside `+DuckCurve`. No product code changed at
+integration. On the merged tree `volume_line_proof.py --probe` 9/9 with the lane's figures,
+`spec_index_proof.py` 213/213, and `make gate` PASS 254 s (names 1, typecheck 6 with the four
+baseline warnings, fmt and lint skipped, unchanged, test 129, app 118).
+
+**Owed.** SE-35 for the owner. Filed at integration: the ⌥-press in a clip's last partial frame
+snapping up to the clip's end (review 1's nit). AP8b is the road map's next part, not owed work.
 
 ### Closing the road map
 

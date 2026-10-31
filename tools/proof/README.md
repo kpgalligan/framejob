@@ -26731,3 +26731,64 @@ LUFS). The nine mutants: all killed, each by its named row.
 0.0005 / 0.0001 by the master); `export_offset_proof.py --only E4,E20,E44,E46` 4/4
 (E46 − E4 +0.000 ms); `screens.py --only 12-export-sheet` 6/6, the Bit depth row
 "16-bit", dimmed on H.264, after Quality in both appearances.
+
+## Road map "audio" AP8a — the volume line (`volume_line_proof.py` V1–V9; thirteen mutants; spec §11 AU-80…AU-84)
+
+Every clip with sound but a nest clip draws the plan's gain envelope for its audio segment as a
+line over its waveform (`VolumeLines`, `VolumeScale`, `TimelineView+VolumeLine.swift`); a drag
+edits the level in force there and ⌥-press adds a point, both through ordinary actions
+(`VolumeLine.target`, `VolumeLine.point`, `VolumeLineSession`). No core, FFI, op, tool, format or
+`UserDefaults` change, so there is no instance to drive: every row is in-process.
+
+- **`volume_line_proof.py --probe`**: the probe `volume_line_probe.swift`, compiled AS
+  `main.swift` over `app/Sources` through `swift_build.py`, with `Compositor.metal` built into a
+  `default.metallib` beside it (`editor_keys_undo_proof.build_shader`). Its fixture is built by
+  ops over a 10 s tone it writes (`tone.caf` in its scratch folder): track A at volume 0.5 with the
+  main clip (volume 0.5, a 0.5 s fade in, a linear volume action [1 s, 2 s) to 2.0, a pan-only
+  action [3 s, 4 s)), track B a clip at 6 s ducking by extent, track C muted with a second clip;
+  the same with the volume action ease in-out for V6's eased rows. V1 the drawn vertices against
+  the plan's ramps through a scale on a rect the probe computes (≤ 0.01 pt), one point at the
+  volume action's end, the muted clip's line on the floor; V2 the scale; V3 the targets at 0.5,
+  1.5, 2.5, 3.5 and 4.5 s; V4 the drag's arithmetic; V5 a point after the last action and the
+  gain unchanged at every frame; V6 a split and its eased form, and a press inside an action a
+  trim left past the clip's end beeping (nil); V7 one undo step each through an
+  offscreen `EditorViewController`; V8 the hit order, `resolvingVolumeLine` and a ⇧-press on a
+  line; V9 the paint with and without the line (`cacheDisplay`).
+- **`volume_line_proof.py --mutants`**: each over its own copy of `app/Sources`, killed when its
+  named row fails.
+
+| Mutant | What it breaks | Killed by |
+|---|---|---|
+| M1 | the scale's top +12 dB, not +30.103 | V2 |
+| M2 | the bottom writes 0.001, not 0 | V4 |
+| M3 | no 0.001 floor under a drag's start | V4 |
+| M4 | the inside-an-action target rule dropped | V3 |
+| M5 | the held rule taking any ended action, not one naming the volume | V3 |
+| M6 | a new point starting at the clip's start, not the last action's end | V5 |
+| M7 | a split dropping the action's curve | V6 |
+| M8 | the line hit before the edge grabs | V8 |
+| M9 | the line rect not raised below the action lane | V1 |
+| M10 | the split's one-frame-from-start check dropped | V6 |
+| M11 | `atBottom` without "below the press" | V4 |
+| M12 | `resolvingVolumeLine` ignoring ⇧ | V8 |
+| M13 | the split's past-the-clip's-end check dropped | V6 |
+
+```sh
+python3 tools/proof/volume_line_proof.py --probe     # V1–V9
+python3 tools/proof/volume_line_proof.py --mutants   # M1–M13
+```
+
+**The recorded run (2026-10-31, after `make gate` PASS):** `--probe` 9/9. V1 12 vertices from 6
+plan ramps (5 distinct gains), worst 0.000 pt, the rect's top at the lane's bottom, one point at
+the volume action's end, the muted clip's line on the floor; V2 the inverse within 1.4e-14 dB;
+V4 +6.0206 dB from 0.5 → 1.000000; V5 the gain's worst change over 300 frames 0.0; V6 the
+linear split's worst change 4.4e-16, the eased halves both `ease_in_out`; V7 "Set Volume" and
+"Add Volume Point", each undone to the original JSON; V9 3/3 differ on the line, 3/3 equal 4 pt
+off. `--mutants` 12/12 killed.
+
+**The fix pass (2026-10-31):** ⌥ inside a volume action a trim left past the clip's end built an
+`add_action` the core refuses (`action_past_end`), swallowed by the live edit with no beep; the
+split now answers nil there. `--probe` 9/9, V6 adding "trimmed to 1.5 s, the action ends 2.000000
+s past the clip's 1.500000 s: true; ⌥ at 1.25 s nil"; `--mutants` M1–M9 and M11–M13 killed (M13
+by V6), M10's anchor moved with the guard and, re-pointed, killed by V6 in its own run; `make
+gate` PASS 358 s.

@@ -473,6 +473,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** at what "peaks limited by" figure does the master start to be audible on music, and on speech — and does it ever pump or distort below that?
 - **Source:** road map "audio" AP2 part 2 (spec §11 AU-27..AU-29); `tools/proof/export_master_proof.py` measures every peak against the ceiling by two meters, the latency compensation and the 24-bit files' low bits, not how the limiting sounds.
 
+**SE-35 — The volume line reads clearly, drags well, and a point added is heard**
+- **Do:** 1. Put a voice or music clip on the timeline at the Medium and then the Large track height; give it a 1 s fade in, and put a speech-ducking clip on another track over part of it. 2. Look at the white line over its waveform in light and dark appearance. 3. Drag the line up and down while the clip plays, watching the readout beside the pointer; drag it below where you pressed down to the bottom. 4. ⌥-click the line twice, at two places a second or more apart, then ⌥-drag a third point down by about 10 dB, and play across all three. 5. Press ⌘Z after each step. 6. ⇧-click the line of a second clip, and double-click the line. 7. Mute the track and look at the line.
+- **Expect:** the line follows the fade, the duck's dips and the volume actions where you hear them, and reads against the waveform and the clip colour in both appearances; the action squares sit on the line at each point; a drag moves the level smoothly with no clicks or zipper noise, the readout shows the clip's own level in dB with one decimal and "−∞ dB" at the bottom; a ⌥-click adds a band on the action lane and changes nothing you hear until you drag; the dragged point is heard as a ramp from the previous point; each step is one ⌘Z; ⇧-click adds the second clip to the selection and a double-click renames; a muted track's line lies along the bottom.
+- **Answer:** is the line easy to see and grab, does dragging and adding points feel right, and does what you hear match the line?
+- **Source:** road map "audio" AP8a (spec §11 AU-81…AU-84); `tools/proof/volume_line_proof.py` measures the line against the plan, the drag's arithmetic, the points' ops, the hit order and one undo step (V1–V9), not how it looks, feels or sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

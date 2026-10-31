@@ -127,6 +127,7 @@ extension TimelineContentView {
             let muted = clip.audioProps.muted || track.muted || silencedBySolo
             drawWaveform(clip, in: regions.audio, owner: owner, visible: visible, muted: muted)
             drawDuckCurve(clip, in: regions.audio, owner: owner, visible: visible)
+            drawVolumeLine(clip, rect: rect, owner: owner, visible: visible)
         }
         drawActionWash(clip, body: body, owner: owner)
         drawNameStrip(clip, in: body, owner: owner)

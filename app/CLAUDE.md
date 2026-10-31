@@ -807,7 +807,21 @@ the key map behind it.
   overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
   line over its audio region from `TimelineView.duckCurves` — the frozen
   file's one stored property for it, set in `refreshTimeline` beside
-  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
+  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+VolumeLine`
+  (the volume line on the timeline, spec §11 AU-81, AU-82, AU-84:
+  `volumeLineGeometry` — what the drawing and the hit both read —
+  `drawVolumeLine`, called after the duck line by `TimelineClipDrawing.swift`,
+  with the drag's readout, `volumeLineHit`, asked by `hit(at:)` before the
+  clip body, and `beginVolumeLine` / `continueVolumeLine` / `endVolumeLine`
+  over the frozen file's `volumeLines`, set by `refreshTimeline`, and
+  `volumeDrag`; its model is `VolumeLine.swift`, AU-80…AU-84: `VolumeScale`,
+  the dB scale, +30.103 dB at the top and −60 at the bottom; `VolumeLines`,
+  one handle's plan decoded lazily once, each clip's ramps cut to its audio
+  segment, and `gain(at:in:)`; `VolumeLineTarget` and `VolumeLine` — what a
+  drag edits, the ops a ⌥ point is made of, the drag's arithmetic, the
+  readout; `VolumeLineSession`; and `TimelineHit.resolvingVolumeLine(flags:
+  clicks:)`, which sends ⇧ and double-clicks on the line to the clip's arm) ·
+  `+NestScope` (the breadcrumb, painted LAST in the ruler's
   corner so it stays above the header column when scrolled) · `+Matte` (spec
   §11 MT-7: `TimelineMatteTag` — the header tag's words, dimmed with no
   target, on its own line when the row has room above the toggles, else
