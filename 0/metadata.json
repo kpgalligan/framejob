@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M69DKPWXZ68XPTSZGS1MZD3R",
+  "session_id": "92fb208f-b576-497f-a18b-ce0d110e2dd1",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-31T16:45:14.379587Z",
+  "branch": "worktree-ux-updates",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    "app/CLAUDE.md",
+    "app/Sources/GraphicSchemaRows.swift",
+    "app/Sources/InspectorRows.swift",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/graphics.md",
+    "designs/spec/README.md",
+    "docs/guide/graphics.md",
+    "tools/proof/README.md",
+    "tools/proof/graphics_inspector_probe.swift",
+    "tools/proof/graphics_inspector_proof.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "92b9ee67c9d3",
+  "checkpoint_transcript_start": 826,
+  "transcript_lines_at_start": 826,
+  "compact_transcript_start": 113,
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 353751,
+    "cache_read_tokens": 13732749,
+    "output_tokens": 28000,
+    "api_call_count": 46
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 4
+  }
+}

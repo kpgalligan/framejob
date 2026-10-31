@@ -1,0 +1,5 @@
+The text fields in properties have fixed width, even when they could have more space [Image #1]. The single line text fields should take up available width. I also think we should have a multiline text entry option (if we don't already). Defined with the parameter metadata.
+
+---
+
+Commit and merge the changes with main, then we'll close this worktree
