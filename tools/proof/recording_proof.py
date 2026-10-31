@@ -459,6 +459,8 @@ RECORD_PROPERTIES = {
     "camera",
     # Camera-recording CR2a (spec §11 CAM-6): the camera's format.
     "camera_format",
+    # Road map "audio" AP6 part 3 (spec §11 AU-69): Enhance Voice after the landing.
+    "enhance",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of

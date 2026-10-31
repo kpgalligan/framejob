@@ -333,7 +333,10 @@ for a while and answers the frames composed (#127, spec §11 G-36);
 held and kept, and simulates memory pressure (G-37); `loudness_meter`, which
 answers a window's live loudness meter (momentary, short-term, integrated,
 true peak, the frames measured and its resets) and resets it (road map
-"audio" AP7, AU-77); and
+"audio" AP7, AU-77); `land_recording`, which lands fixture files as a
+finished recording through the recorder panel's door or `record_screen`'s,
+so a proof can watch Enhance the microphone when it lands without a
+microphone grant (spec §11 AU-69); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

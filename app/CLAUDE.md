@@ -2496,7 +2496,8 @@ free.
   Enhance Voice buttons and the Clip menu share: Peak at once, a run at once
   when nothing renders, else the Measuring Sound sheet; the stale test; the
   commit. And `pressMatch`, Clip ▸ Match Audio…'s press from its sheet's
-  hand-back (spec §11 AU-128).
+  hand-back (spec §11 AU-128), and `enhanceLanded`, a landing's follow (spec
+  §11 AU-68), through the same `measure` with refusals in place of beeps.
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
   "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
   over `AudioMeasureRunning`.
@@ -2846,9 +2847,11 @@ free.
   live with it, the warm-up is spent before the countdown, and the press
   reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
   CAM-11). The panel
-  remembers ten `FrameJobRecording…` keys (the Camera's, the Format's and
-  `FrameJobRecordingCameraBeside` among them; the type doc lists them), and a
-  probe or the harness that touches them handles all ten. The
+  remembers eleven `FrameJobRecording…` keys (the Camera's, the Format's,
+  `FrameJobRecordingCameraBeside` and the eleventh,
+  `FrameJobRecordingEnhanceMicrophone` — "Enhance the microphone when it
+  lands", spec §11 AU-69 — among them; the type doc lists them), and a probe
+  or the harness that touches them handles all eleven. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -2935,6 +2938,15 @@ free.
   start minus its offset, floored and head-trimmed through the voices'
   shared `headTrimmed`, then put in the bottom-right corner by one
   `set_video`, read back.
+- `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
+  AU-68): the recording's voice paths and clips, readiness and busy, the
+  pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
+  landing, ended before a step acts, `.enhance` through
+  `AudioMeasureDoor.enhanceLanded`). `record_screen {enhance}` polls the same
+  `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`.
+- `AgentServer+LandRecording.swift` — the dev tool `land_recording` (spec §11
+  AU-69 (e)): fixture files landed as a finished recording through the
+  panel's `recordingEnded` or `record_screen`'s landing.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`

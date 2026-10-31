@@ -642,6 +642,71 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   C12 with M7, and `audio_ap6_proof.py` V1–V15 over MCP and exports; how the result sounds on
   the owner's voice is manual check SE-38 (AP8a, AP10b and AP8b took SE-35…SE-37).
 
+AU-68 and AU-69 are AP6's third part (Enhance the microphone when a recording lands; survey B8),
+recorded before its code.
+
+- **AU-68 — A follow-up, not part of the landing.** The landing commits at once and is unchanged:
+  `RecordingLanding`, `ProjectDocument.untitled(around:)`, the step names, the notes, the panel's
+  note and reveal, and `record_screen`'s fields. Enhance Voice (AU-60…AU-65, unchanged) follows as
+  its OWN undo step, "Enhance Voice", once the voice's caches exist.
+  (a) **The voice clips** are every clip in the open container whose media path is one of the
+  recording's voice paths: each segment's `micDescriptor`, each `unreadable[].micDescriptor`, and
+  for a voice-over each segment's `descriptor` (`RecordingEnhance.voicePaths`). Never the
+  picture's, the camera's or the system audio's; none without a microphone.
+  (b) **Readiness.** Each voice clip's media has a current loudness cache
+  (`MediaImporter.loudnessIsCurrent`), and `media.speech`, or a current speech cache
+  (`speechIsCurrent`), or `SileroVAD.isAvailable` false — Enhance then skips the clip in its own
+  sentence.
+  (c) **Busy** is any of: `document.isLiveEditing`; `document.scope` other than the landing's;
+  and at the panel only, no editor window or a sheet already on it.
+  (d) **`decide`**, in this order: no voice clip still present → `.drop` (quietly at the panel);
+  analysed and not busy → `.enhance`; 300 s since the landing (`waitLimit`) → `.giveUp`;
+  otherwise `.wait`.
+  (e) **The panel** runs a repeating 0.5 s timer (`RecorderPanelController.landingRetryInterval`)
+  in the run loop's DEFAULT mode, the landing's retry trick, so it pauses during a drag. On any
+  step but `.wait` the timer is invalidated and the landing's pending entry removed FIRST, then
+  the step acts, so nothing the sheet does (Cancel, no outcome, a stale answer) can leave a timer
+  that puts it back up. `.enhance` runs `AudioMeasureDoor.enhanceLanded`: the press's own
+  `measure` under the Measuring Sound sheet at `NormalizeChoice.targetLUFS`, committed with
+  `performGroupedEdit` (a timer is not an AppKit event) as "Enhance Voice"; Cancel changes
+  nothing. Nothing to enhance, a stale answer and `.giveUp` are a refusal of `enhance_voice` at
+  the inspector's foot (`projectDocumentDidRefuse`); nothing beeps and the panel's note is not
+  touched. `.giveUp`'s sentence: "Enhance Voice did not run on the recording: its microphone was
+  not ready to measure within 5 minutes. Select its clip and choose Clip ▸ Enhance Voice."
+  (f) **The tool** (`record_screen {enhance: true}`) polls `decide` through `onMain` every 0.5 s
+  on the server thread, then runs `enhance_voice`'s own body at −16 LUFS
+  (`AudioNormalize.defaultTargetLUFS`; a tool reads no `UserDefaults`). The answer gains
+  `enhance`, the `enhance_voice` answer object, or `enhance_error`, a string: any refusal of that
+  body, "No microphone clip landed on the timeline, so there was nothing to enhance." for
+  `.drop`, and `.giveUp`'s sentence ending "Call enhance_voice with its clips." for `.giveUp`.
+  The top-level `project` is read again after the enhance.
+  (g) **Undo.** Edit ▸ Undo reads "Undo Enhance Voice", then for a document landing "Undo Add
+  Recording"; for a new project it then reads the remainder's step (Add Microphone, Add
+  Camera…, Add Recording Segments), or nothing when the first file is the document.
+  (h) **Why.** The loudness and speech caches, and isolation's render, cannot exist before the
+  media is in a project. Holding the landing for them would hold the files' landing, the note and
+  the answer behind analysis that can fail; a separate step lets ⌘Z take the processing off and
+  keep the recording.
+- **AU-69 — The setting, the argument and the proof.** (a) A checkbox, "Enhance the microphone
+  when it lands", on a row with no label directly under Microphone; enabled only while the panel
+  is idle with a microphone chosen (any source), greyed otherwise with its value kept; its tooltip
+  names AU-68's step. `RecordingChoice.enhanceMicrophone` is true only when it is ticked and a
+  microphone is chosen. (b) Its key, `FrameJobRecordingEnhanceMicrophone`, is the panel's
+  eleventh: written on change, restored on show, absent reading off; the harness and `screens.py`
+  pin it. (c) **Default off**: Enhance writes eight settings, renders isolation and puts up a
+  sheet, so a recording lands as recorded unless asked; the tool's default matches. (d)
+  `record_screen` gains `enhance` (boolean, default false), read after `place` and before the
+  Microphone grant, so both of its refusals are among the caller's own mistakes: "enhance: true
+  enhances the microphone's clip, so it needs microphone: true (or source voice_over)." and then
+  "enhance: true needs place: true — with place: false the microphone lands as media with no clip
+  to enhance."; a non-boolean is `boolArg`'s sentence. (e) **The dev tool `land_recording`**
+  (Debug and Release only) hands fixture files to the product's own code after `onFinish` — the
+  panel's `recordingEnded` or the tool's landing — because the recorder needs the Microphone grant
+  and a voice at the microphone, while a proof's instance records room tone under the terminal's
+  grants. (f) The proof is `audio_ap6c_probe.py` (P1–P5, mutants M1–M9) and `audio_ap6c_proof.py`
+  (V1–V8, over MCP, `land_recording` and exports); how a real voice-over on the RØDE sounds is
+  manual check REC-19.
+
 AU-70…AU-78 are AP7's (live loudness and true-peak metering; survey A8), recorded before its
 code.
 

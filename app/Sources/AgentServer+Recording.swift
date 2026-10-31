@@ -23,7 +23,8 @@ import ScreenCaptureKit
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
 /// missing or outside 1…600, then `source` (its value; for `voice_over`
 /// the screen-only arguments given, then `microphone: false`), `display`
-/// with `window`, a `rate` or `size` outside the vocabulary,
+/// with `window`, a `rate` or `size` outside the vocabulary, `enhance: true`
+/// without a microphone and then with `place: false` (spec §11 AU-69),
 /// `microphone: true` (implied by a voice-over) with the Microphone grant
 /// absent (the status WORD in the sentence), and a `project` naming nothing
 /// open, answered by `target(_:)`'s own sentence and never turned into a
@@ -121,6 +122,8 @@ extension AgentServer {
         let includeFrameJob =
             !screen ? false : try boolArg(a, "include_framejob_windows") ?? false
         let place = try boolArg(a, "place") ?? true
+        // AU-69 (d): after `place`, before any grant.
+        let enhance = try recordingEnhance(a, microphone: microphone, place: place)
         let folder = try recordingFolder(a)
         if microphone {
             let status = RecordingGrant.microphoneStatus
@@ -181,7 +184,7 @@ extension AgentServer {
             microphone: microphoneID, systemAudio: systemAudio,
             showClicks: showClicks, rate: rate, resolution: resolution,
             destination: destination, folder: folder ?? RecordingFiles.folder(),
-            camera: cameraPick?.id, cameraFormat: cameraPick?.format)
+            camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(
@@ -191,8 +194,9 @@ extension AgentServer {
         //    thread — a wait on main would hold the gesture it waits for.
         awaitGestureEnd(destination)
 
-        // 7. The landing, on main, through the door the panel does not use.
-        return try onMain { try self.land(result, place: place) }
+        // 7. The landing, on main, through the door the panel does not use;
+        //    then, with `enhance`, Enhance Voice as its own step (AU-68 (f)).
+        return try landAndEnhance(result, place: place)
     }
 
     // MARK: - The recording

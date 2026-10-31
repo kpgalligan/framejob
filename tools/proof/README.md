@@ -10641,11 +10641,12 @@ full), and three are `recording_proof.py`'s.
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
 - **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
-  the panel's row reads false and its title; `out["keys"]` lists ten (seven
+  the panel's row reads false and its title; `out["keys"]` lists eleven (seven
   until camera-recording CR1c added `FrameJobRecordingCamera`, eight until CR2a
   added `FrameJobRecordingCameraFormat`, nine until CR3c added
-  `FrameJobRecordingCameraBeside`), the harness pins
-  all ten by value (`"FrameJobRecordingIncludeFrameJobWindows":
+  `FrameJobRecordingCameraBeside`, ten until road map "audio" AP6 part 3 added
+  `FrameJobRecordingEnhanceMicrophone`), the harness pins
+  all eleven by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
   `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
@@ -27057,3 +27058,64 @@ python3 tools/proof/audio_ap12_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `designs/audio.md`'s AP12 record.
+
+## Road map "audio" AP6 part 3 — Enhance the microphone when it lands (`audio_ap6c_probe.py` P1–P5, `audio_ap6c_proof.py` V1–V8; nine mutants; spec §11 AU-68, AU-69)
+
+Two instruments, and the panel's eleventh key in the recorder's own (`recording_probe.py` 5d and
+D3, `camera_recording_probe.swift` P3 and P20, the harness and `screens.py` pin it false).
+
+**`audio_ap6c_probe.py`** compiles `audio_ap6c_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), `app/Resources/Models` copied beside
+the binary. The panel is `RecorderPanelController.shared`, never shown, under grant doors that
+read and ask nothing, and the eleven `FrameJobRecording…` values are put back at the end.
+
+| Row | What it holds |
+|---|---|
+| P1 | the box: its title and key, its row directly under Microphone with no label, its tooltip naming the step; an absent key restores off; `persistChoices` writes it and `restoreChoices` reads it back; Microphone Off greys it with its value kept and the choice false; a microphone makes it live on a display, Microphone Only and Camera with the choice true; unticked the choice false; greyed while counting down and recording |
+| P2 | `voicePaths`: a voice-over's files; a screen recording's microphone files and a left-out segment's, never a movie or the camera; none without a microphone |
+| P3 | `decide`'s table: drop before enhance before give-up, 299 s waits and 300 s gives up, busy waits |
+| P4 | `recordingEnhance`: absent, false and null false; "yes" `boolArg`'s sentence; the microphone sentence, the place sentence, the microphone sentence first when both are wrong |
+| P5 | the follow's end: after `.drop` (`tick` driven) and after `.enhance` (the follow's own timer over a silent voice measured in a document with its editor window, refused under −70 LUFS at the inspector's foot), not pending, its timer invalid, one refusal |
+
+`--mutants` runs nine, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | an absent key restores on | P1 |
+| M2 | `currentChoice` ignores a missing microphone | P1 |
+| M3 | the movie is a voice path | P2 |
+| M4 | `waitLimit` 3 s | P3 |
+| M5 | busy ignored | P3 |
+| M6 | give-up before drop | P3 |
+| M7 | `enhance: true` admitted without a microphone | P4 |
+| M8 | `enhance: true` admitted with `place: false` | P4 |
+| M9 | the follow keeps its timer after a step | P5 |
+
+**`audio_ap6c_proof.py <dir>/agent.sock`** drives an instance over MCP. The recorder needs the
+Microphone grant and a voice, so the dev tool `land_recording` hands fixture files to the
+product's own code after `onFinish`: door `tool` is `record_screen`'s landing, door `panel` the
+recorder panel's `recordingEnded`. Fixtures in `work/audio-ap6c-proof/<pid>/`: a fresh copy of
+`samples/Rode-usb-mic.m4a` per leg, a 5 s silent AAC and a 5 s `testsrc` movie with a 440 Hz track
+(ffmpeg). V4 launches a second instance with `-RCDevRampRenderHold 3
+-FrameJobNormalizeTargetLUFS -18` and stops it. `AP6C_ONLY=v1,v2,v3,v4,v5,v6,v7,v8` runs only
+those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the eight keys with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
+| V2 | the tool door into a document: undo "Enhance Voice", then "Add Recording" |
+| V3 | `enhance` false on both doors: no `enhance` keys, `enhance_pending` false, no sheet, the audio the landing's after 5 s, undo's top "Add Recording" |
+| V4 | the held instance, the panel door: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", `enhance_pending` false, no sheet 2 s and 5 s after |
+| V5 | a movie and its microphone: only `mic_clip` enhanced, the movie clip's sound untouched |
+| V6 | `record_screen`'s refusals, exact, the project byte-identical: `enhance` "yes"; true on a screen with no microphone; `voice_over` with `place: false`; `seconds` 0 and `rate` 24 first; `source` camera |
+| V7 | a silent file: `enhance_error` "Nothing could be enhanced. …−70 LUFS…", undo's top "Add Recording"; the panel door with `follow_wait` 30: `enhance_pending` false, the clip untouched |
+| V8 | `record_screen` declares `enhance` (boolean, described); `land_recording`'s seven arguments; `follow_wait` with door `tool` refused by name; the parity log clean |
+
+```sh
+python3 tools/proof/audio_ap6c_probe.py             # P1–P5
+python3 tools/proof/audio_ap6c_probe.py --mutants   # M1–M9
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/audio.md`'s AP6c record.

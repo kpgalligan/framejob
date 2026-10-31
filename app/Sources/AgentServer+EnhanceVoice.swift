@@ -24,6 +24,31 @@ extension AgentServer {
     /// and where the last render lands); the skips by name. A second
     /// identical call is an identity: "Enhance Voice made no change".
     func enhanceVoice(_ a: [String: Any]) throws -> String {
+        try requireServerThread("enhance_voice")
+        let (document, clips, requested) = try onMain {
+            () throws -> (ProjectDocument, [UInt32], Double) in
+            let document = try self.target(a)
+            let clips = try self.clipsArg(a, "clips", document)
+            let range = AudioNormalize.targetLUFSRange
+            let requested = try self.doubleArg(a, "target_lufs")
+                ?? AudioNormalize.defaultTargetLUFS
+            guard requested.isFinite, range.contains(requested) else {
+                throw ToolError(
+                    message: "target_lufs must be a loudness from \(range.lowerBound) to "
+                        + "\(range.upperBound) LUFS, and the default is "
+                        + "\(AudioNormalize.defaultTargetLUFS).")
+            }
+            return (document, clips, requested)
+        }
+        return try enhanceVoice(document: document, clips: clips, targetLUFS: requested)
+    }
+
+    /// `enhance_voice`'s body over clips and a target already read — also
+    /// `record_screen {enhance}`'s (spec §11 AU-68 (f)): a read hop, the wait
+    /// here, the commit hop. SERVER THREAD.
+    func enhanceVoice(document: ProjectDocument, clips: [UInt32], targetLUFS requested: Double)
+        throws -> String
+    {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("enhance_voice")
         struct Read {
@@ -36,17 +61,6 @@ extension AgentServer {
             let scope: UInt32?
         }
         let read = try onMain { () throws -> Read in
-            let document = try self.target(a)
-            let clips = try self.clipsArg(a, "clips", document)
-            let range = AudioNormalize.targetLUFSRange
-            let requested = try self.doubleArg(a, "target_lufs")
-                ?? AudioNormalize.defaultTargetLUFS
-            guard requested.isFinite, range.contains(requested) else {
-                throw ToolError(
-                    message: "target_lufs must be a loudness from \(range.lowerBound) to "
-                        + "\(range.upperBound) LUFS, and the default is "
-                        + "\(AudioNormalize.defaultTargetLUFS).")
-            }
             guard let input = AudioEnhance.read(from: document, clips: clips) else {
                 throw ToolError(
                     message: "The project's audio plan could not be read, so there is no "

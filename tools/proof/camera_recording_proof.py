@@ -97,6 +97,7 @@ SEC = 600_000
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
     "size", "place", "path", "include_framejob_windows", "source", "camera", "camera_format",
+    "enhance",
 }
 CAMERA_STRANGERS = ["display", "window", "system_audio", "show_clicks", "size",
                     "include_framejob_windows", "rate"]
@@ -215,7 +216,7 @@ def catalog_part(mcp):
     properties = schema.get("properties") or {}
     declared = set(properties)
     check(declared == RECORD_PROPERTIES | {"project"},
-          f"record_screen declares its fourteen arguments plus project: "
+          f"record_screen declares its fifteen arguments plus project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(properties.get("camera", {}).get("type") == "string",

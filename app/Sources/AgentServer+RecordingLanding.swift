@@ -40,7 +40,11 @@ extension AgentServer {
     /// commit; the new project's snapshot, read by path), and `note` is the
     /// door's sentences in order: `place: false`, a closed target, what the
     /// landing could NOT place (each naming its file), then `resultNotes(result)`.
-    func land(_ result: RecordingResult, place: Bool) throws -> String {
+    /// Answers the document it landed in beside the answer, for
+    /// `landAndEnhance`.
+    func land(_ result: RecordingResult, place: Bool) throws
+        -> (answer: String, document: ProjectDocument)
+    {
         var fields: [String: Any]
         var notes: [String] = []
         switch RecordingLanding.resolve(result.choice.destination) {
@@ -72,7 +76,7 @@ extension AgentServer {
             // `editResult` commits and does not build caches; `importMedia`
             // calls this after its own commit for the same reason.
             document.generateCaches()
-            return answer
+            return (answer, document)
         case .newProject:
             let document: ProjectDocument
             var landingNotes: [String] = []
@@ -104,7 +108,67 @@ extension AgentServer {
             if !notes.isEmpty { fields["note"] = notes.joined(separator: " ") }
             fields["ok"] = true
             fields["project"] = summary(document)
-            return try jsonResult(fields)
+            return (try jsonResult(fields), document)
         }
+    }
+
+    /// SERVER THREAD. `land` on main; then, when the choice asks for it,
+    /// Enhance Voice over the recording's voice clips as its own step (spec
+    /// §11 AU-68 (f)): `decide` polled through `onMain` every
+    /// `RecordingEnhance.checkInterval`, then `enhance_voice`'s own body at
+    /// its default target (a tool reads no `UserDefaults`). The answer is
+    /// `land`'s with `enhance` (that body's answer) or `enhance_error`, and
+    /// `project` read again.
+    func landAndEnhance(_ result: RecordingResult, place: Bool) throws -> String {
+        let stop = AgentLane.shared.callCancel
+        let (answer, document) = try onMain { try self.land(result, place: place) }
+        guard result.choice.enhanceMicrophone else { return answer }
+        let (clips, scope) = onMain {
+            (RecordingEnhance.voiceClips(of: result, in: document), document.scope)
+        }
+        let started = Date()
+        var step = RecordingEnhance.Step.wait
+        while step == .wait, stop?.isCancelled != true {
+            step = onMain { () -> RecordingEnhance.Step in
+                let present = RecordingEnhance.present(clips, in: document)
+                return RecordingEnhance.decide(
+                    clips: present, analysed: RecordingEnhance.isAnalysed(present, in: document),
+                    busy: RecordingEnhance.isBusy(document, scope: scope),
+                    elapsed: Date().timeIntervalSince(started))
+            }
+            if step == .wait { Thread.sleep(forTimeInterval: RecordingEnhance.checkInterval) }
+        }
+        var fields = Self.resultObject(answer) ?? [:]
+        switch step {
+        case .enhance(let ids):
+            do {
+                let enhanced = try enhanceVoice(
+                    document: document, clips: ids, targetLUFS: AudioNormalize.defaultTargetLUFS)
+                fields["enhance"] = Self.resultObject(enhanced) ?? enhanced
+            } catch let error as ToolError {
+                fields["enhance_error"] = error.message
+            }
+        case .drop:
+            fields["enhance_error"] = RecordingEnhance.noVoiceSentence
+        case .giveUp:
+            fields["enhance_error"] = RecordingEnhance.notReadyToolSentence
+        case .wait:
+            fields["enhance_error"] =
+                "record_screen was stopped while the microphone's sound was being analysed, so "
+                + "Enhance Voice did not run."
+        }
+        fields["project"] = onMain { self.summary(document) }
+        return try jsonResult(fields)
+    }
+
+    /// The object a `jsonResult` envelope's text holds, nil for anything else.
+    private static func resultObject(_ envelope: String) -> [String: Any]? {
+        guard
+            let call = (try? JSONSerialization.jsonObject(with: Data(envelope.utf8)))
+                as? [String: Any],
+            let content = call["content"] as? [[String: Any]],
+            let text = content.first?["text"] as? String
+        else { return nil }
+        return (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
     }
 }

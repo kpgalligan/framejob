@@ -21,6 +21,12 @@ import AppKit
 ///   `finishSynchronizeAudio` does.
 ///
 /// Nothing to do, a second press, no window and a sheet already up all beep.
+///
+/// **A landing's follow** (spec §11 AU-68) is another caller:
+/// `enhanceLanded`, Enhance Voice over a recording's voice clips once their
+/// caches exist. It shares `measure`, with a refusal at the inspector's foot
+/// wherever a press beeps, and commits as its own group, since a timer's
+/// firing is not an AppKit event either.
 enum AudioMeasureDoor {
     enum Command {
         case normalize, enhanceVoice, matchAudio
@@ -135,6 +141,35 @@ enum AudioMeasureDoor {
             userInfo: ["refusal": ReelRefusal(op: Command.matchAudio.tool, reason: reason)])
     }
 
+    /// Enhance Voice over a landed recording's voice clips (AU-68 (e)), at
+    /// Normalize's target: the press's `measure` with refusals in place of
+    /// beeps, nothing called back. Main.
+    static func enhanceLanded(document: ProjectDocument, clips: [UInt32], window: NSWindow) {
+        let refuse = { (reason: String) in RecordingEnhance.refuse(reason, in: document) }
+        guard let input = AudioEnhance.read(from: document, clips: clips) else {
+            return refuse(
+                "The project's audio plan could not be read, so there is no voice to measure.")
+        }
+        guard !input.isEmpty else { return refuse(nothingReason(input.problems)) }
+        let target = NormalizeChoice.targetLUFS
+        let choices = AudioEnhance.choose(input)
+        let run = LoudnessMeasureRun(
+            document: document, jobs: AudioEnhance.jobs(input, choices),
+            problems: input.problems, targetLUFS: target)
+        let plan = { (outcome: LoudnessMeasureRun.Outcome) in
+            AudioEnhance.plan(input, choices: choices, outcome: outcome, targetLUFS: target)
+        }
+        measure(
+            .enhanceVoice, run: run, document: document, window: window, refuse: refuse,
+            empty: { nothingReason(plan($0).skipped) }
+        ) { plan($0).ops }
+    }
+
+    /// `enhance_voice`'s sentence for nothing measured or nothing planned.
+    static func nothingReason(_ problems: [AudioNormalize.Problem]) -> String {
+        "Nothing could be enhanced. " + problems.map { $0.description }.joined(separator: " ")
+    }
+
     /// Loudness Normalize's jobs: a clip whose chain has a stage the cache
     /// leaves out renders with no change to its settings (the run takes its
     /// limiter off for R0); any other reading stands (AU-64 (a)). Main.
@@ -151,16 +186,26 @@ enum AudioMeasureDoor {
     }
 
     /// Runs `run` at once when nothing renders, else under the sheet, and
-    /// commits `ops` of its outcome.
+    /// commits `ops` of its outcome. With `refuse` (a landing's follow) each
+    /// beep is that refusal instead — `empty` says why nothing was planned —
+    /// and the commit is grouped.
     private static func measure<Run: AudioMeasureRunning>(
         _ command: Command, run: Run, document: ProjectDocument,
-        window: NSWindow?, ops: @escaping (Run.Outcome) -> [ReelOp]
+        window: NSWindow?, refuse: ((String) -> Void)? = nil,
+        empty: ((Run.Outcome) -> String)? = nil,
+        ops: @escaping (Run.Outcome) -> [ReelOp]
     ) {
+        let stopped = "\(command.tool) was stopped while its sound was being measured."
         guard run.needsRender else {
             // No render: the run answers before `start` returns, inside the event.
             run.start { outcome in
-                guard let outcome else { return NSSound.beep() }
-                commit(command.name, ops(outcome), document: document)
+                guard let outcome else { return fail(refuse, stopped) }
+                guard let refuse else {
+                    return commit(command.name, ops(outcome), document: document)
+                }
+                let planned = ops(outcome)
+                guard !planned.isEmpty else { return refuse(empty?(outcome) ?? stopped) }
+                document.performGroupedEdit(command.name, planned)
             }
             run.finish()
             return
@@ -168,7 +213,7 @@ enum AudioMeasureDoor {
         guard let window, window.attachedSheet == nil, let host = window.contentViewController
         else {
             run.finish()
-            return NSSound.beep()
+            return fail(refuse, "A sheet was already up on the project's window, so nothing changed.")
         }
         let asked = document.project
         let scope = document.scope
@@ -177,6 +222,7 @@ enum AudioMeasureDoor {
                 defer { run.finish() }
                 guard let document else { return }
                 guard document.project === asked, document.scope == scope else {
+                    if let refuse { return refuse(staleReason(again: "Choose \(command.name) again.")) }
                     NSSound.beep()
                     NotificationCenter.default.post(
                         name: .projectDocumentDidRefuse, object: document,
@@ -188,9 +234,15 @@ enum AudioMeasureDoor {
                     return
                 }
                 let planned = ops(outcome)
-                guard !planned.isEmpty else { return NSSound.beep() }
+                guard !planned.isEmpty else { return fail(refuse, empty?(outcome) ?? stopped) }
                 document.performGroupedEdit(command.name, planned)
             })
+    }
+
+    /// The press beeps; a landing's follow says `reason` at the inspector's foot.
+    private static func fail(_ refuse: ((String) -> Void)?, _ reason: String) {
+        guard let refuse else { return NSSound.beep() }
+        refuse(reason)
     }
 
     /// Inside the event: `applyEdit`, which beeps at an identity; an empty

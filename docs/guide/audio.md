@@ -129,6 +129,8 @@ Everything else (hum removal, the channel choice, pan, mono, fades, ducking, Mut
 
 It skips, by name, the clips Loudness Normalize skips, and also a clip whose speech hasn't been detected yet and one with under a second of speech. With nothing to enhance, the press beeps.
 
+**At record time.** Tick **Enhance the microphone when it lands** in the recorder panel (**File ▸ New Recording…**), under **Microphone**, and Enhance Voice runs by itself on the microphone's clips once a recording lands and their sound has been analysed, at the Normalize row's target, as its own undo step after the recording's. Undo takes the processing off and keeps the recording. See [Enhancing the microphone](screen-recording.md#enhancing-the-microphone); an agent asks for it with `record_screen {enhance: true}`.
+
 *Agents:* `enhance_voice` (`clips`; optional `target_lufs` from −50 to −5, default −16). Each row of `enhanced` gives the measurements (`measured_lufs`, `true_peak_dbtp`, `speech_seconds`, `floor_lufs`, `floor_gap_db`, `pause_peak_dbfs`, `sibilance_share`), `set` (exactly the `set_audio` keys written), `reasons` (one sentence per rule), `volume`, `processed_lufs`, `renders`, `result_lufs` and `result_true_peak_dbtp` as the last render measured them, and `limited_by`. Skips are under `skipped`. A second call answers "Enhance Voice made no change".
 
 ### Match Audio

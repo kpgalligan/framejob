@@ -16,7 +16,8 @@ import Foundation
 /// `recordingUnreadableClause`, `recordingResultClause` and
 /// `recordingVoiceOverClause`), still hoisted for the type checker's budget;
 /// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, and CR3b's
-/// `recordingCameraBesideClause` (CAM-10) a sixth, for the same.
+/// `recordingCameraBesideClause` (CAM-10) a sixth, and AP6 part 3's
+/// `recordingEnhanceClause` (AU-69) a seventh, for the same.
 /// It is SPLICED back in where it left — LAST, after `cancel_export` — so the
 /// catalog's order, which `recording_probe.py` reads and `tools/list`
 /// publishes, and the description `recording_proof.py` section 0 reads, are
@@ -180,6 +181,20 @@ extension AgentServer {
             + "each further segment, because the camera's file is probed too, and a timeout "
             + "names the camera files after the movies. The recorder panel's Record the "
             + "camera too box, with a display or a window, makes the same recording."
+        // AP6 part 3's enhance paragraph (spec §11 AU-68, AU-69), hoisted for the same
+        // budget reason; audio_ap6c_proof.py reads its phrases.
+        let recordingEnhanceClause: String =
+            " ENHANCE: enhance: true runs enhance_voice over the recording's MICROPHONE clips — "
+            + "each segment's microphone file, or a voice-over's files; never the picture, a "
+            + "camera or the system audio — once their loudness and speech have been analysed, "
+            + "at −16 LUFS, as its OWN undo step named Enhance Voice after the landing's (undo "
+            + "takes the processing off and keeps the recording). The call waits for that "
+            + "analysis, up to 5 minutes, and the answer then also carries enhance — "
+            + "enhance_voice's own answer — or enhance_error, a sentence saying why it did not "
+            + "run (nothing measurable, no microphone clip on the timeline, or not analysed "
+            + "within 5 minutes); project is read after it. The landing itself is the same "
+            + "either way. The recorder panel's Enhance the microphone when it lands box does "
+            + "the same."
         return [
             // MARK: Recording
             //
@@ -229,7 +244,8 @@ extension AgentServer {
                     + "\"Frame Job\", or grant the terminal. THE REFUSAL ORDER is fixed: your own "
                     + "mistakes first (seconds missing or outside 1…600, a source outside the "
                     + "vocabulary and the arguments that source refuses, display and window "
-                    + "both given, a rate or size outside the vocabulary, microphone: true "
+                    + "both given, a rate or size outside the vocabulary, enhance: true "
+                    + "without a microphone and then with place: false, microphone: true "
                     + "without the Microphone grant, a project naming nothing open), then for "
                     + "a camera recording or a camera beside the screen the camera lookup, "
                     + "then its camera_format, then the Camera grant, then for a screen "
@@ -239,7 +255,8 @@ extension AgentServer {
                     + "that, by name; then the recording itself. "
                     + recordingPauseClause
                     + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
-                    + recordingCameraClause + recordingCameraBesideClause,
+                    + recordingCameraClause + recordingCameraBesideClause
+                    + recordingEnhanceClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
@@ -350,6 +367,14 @@ extension AgentServer {
                             + "NEW project the picture is the document, so its clips — one "
                             + "per segment, the first at 0 — are on the timeline whatever "
                             + "place says, and the answer notes it.",
+                    ],
+                    "enhance": [
+                        "type": "boolean",
+                        "description": "Run enhance_voice over the microphone's clips once they "
+                            + "land and their sound is analysed, as its own undo step (default "
+                            + "false); the answer gains enhance or enhance_error. Refused "
+                            + "without microphone: true (or source voice_over), and with "
+                            + "place: false.",
                     ],
                     "path": [
                         "type": "string",

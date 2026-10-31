@@ -1086,7 +1086,7 @@ Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1),
 screens + 4; D2 choosing it greys System
 Audio, Show Clicks and Size with their values kept, Microphone, Rate and
 Record Into live, the size note `voiceOverSizeNote`; D3 the display key
-(a sentinel) and the set of ten `FrameJobRecording…` keys unchanged, the row
+(a sentinel) and the set of eleven `FrameJobRecording…` keys unchanged, the row
 kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
 brings the three back; D5 Microphone Off refuses with
 `microphoneOffSentence`, no screen read, no microphone request; D6 a
@@ -1100,7 +1100,8 @@ D9 the Pause / Resume button; D10 `record_screen`'s `recordingSourceKind`
 voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
 rows at Microphone Only (screens + 4 since CR1c's Camera row, whose key makes
 5d's eight, CR2a's Format popup's key its nine, and camera-recording CR3c's "Record the camera
-too" key its ten, spec §11 CAM-11), 7c's arguments gain `source` (and,
+too" key its ten, spec §11 CAM-11; road map "audio" AP6 part 3's "Enhance the microphone
+when it lands" key its eleven, spec §11 AU-69), 7c's arguments gain `source` (and,
 with camera-recording CR1b, spec §11 CAM-4, `camera`, and CR2a's `camera_format`; D10's vocabulary
 sentence lists `screen, voice_over, camera` since) and 7d's
 phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
@@ -3732,13 +3733,14 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
                     "topKept": abs(grown.maxY - before.maxY) < 0.5,
                     "back": abs(back.height - before.height) < 0.5,
                     "noteShown": noteShownWhileSet, "noteHiddenAfter": panel.noteLabel.isHidden]
-    // The ten keys the harness pins are the panel's own, by name.
+    // The eleven keys the harness pins are the panel's own, by name.
     out["keys"] = [RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
                    RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
                    RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
                    RecorderPanelController.includeFrameJobWindowsKey,
                    RecorderPanelController.cameraKey, RecorderPanelController.cameraFormatKey,
-                   RecorderPanelController.cameraBesideKey]
+                   RecorderPanelController.cameraBesideKey,
+                   RecorderPanelController.enhanceMicrophoneKey]
 
     // AccentButton stores its fill.
     let plain = AccentButton(title: "x", symbol: nil, fallback: "", tooltip: "", action: nil)
@@ -5538,7 +5540,7 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
 
 /// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
 /// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
-/// and `AgentServer.shared`'s argument reader. The ten `FrameJobRecording…`
+/// and `AgentServer.shared`'s argument reader. The eleven `FrameJobRecording…`
 /// values are put back as they were at the end, so the probe's own defaults
 /// domain is left as it was found.
 func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
@@ -5550,6 +5552,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
         RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
+        RecorderPanelController.enhanceMicrophoneKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -7696,8 +7699,8 @@ def section_chrome(binary, sources):
     check("5d: … and setNote(\"\") hides it and shrinks the window back",
           rf.get("back") is True and rf.get("noteHiddenAfter") is True, f"{rf}")
     keys = answer.get("keys") or []
-    check("5d: ten distinct FrameJobRecording… keys",
-          len(set(keys)) == 10 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
+    check("5d: eleven distinct FrameJobRecording… keys",
+          len(set(keys)) == 11 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
     harness = open(HARNESS_MAIN).read()
     # The pins are spelled as string LITERALS in the harness, not as
     # `RecorderPanelController.<key>`, so that a tree from before the recorder
@@ -7705,7 +7708,7 @@ def section_chrome(binary, sources):
     # (the phase-5 cross-build); the probe reads the constants' VALUES off the
     # app and looks for each of those strings in the harness's text.
     check("5d: the harness pins every one of them by VALUE",
-          len(keys) == 10 and all(f'"{k}"' in harness for k in keys), f"{keys}")
+          len(keys) == 11 and all(f'"{k}"' in harness for k in keys), f"{keys}")
     print("  5e — AccentButton(fill:) and RecorderStatusItem.label")
     a = answer.get("accent") or {}
     check("5e: AccentButton's default fill is DS.accent", a.get("defaultIsAccent") is True, f"{a}")
@@ -8748,13 +8751,14 @@ APP_STATE_TOOLS = [
 # `cancel_export` (#326) after `export`, and `get_transcript` (CT-4) after `transcribe`.
 FILE_GROUP_ORDER = [
     "import_media", "import_captions", "consolidate_media", "add_media", "relink_media",
-    "remove_media", "set_media_color", "transcribe", "get_transcript", "export_captions",
+    "remove_media", "set_media_color", "set_media_speech", "transcribe", "get_transcript",
+    "export_captions",
     "render_frame", "export",
     "export_status", "cancel_export",
 ]
 RECORD_SCREEN_ARGUMENTS = [
-    "camera", "camera_format", "display", "include_framejob_windows", "microphone", "path", "place",
-    "project", "rate", "seconds", "show_clicks", "size", "source", "system_audio", "window",
+    "camera", "camera_format", "display", "enhance", "include_framejob_windows", "microphone", "path",
+    "place", "project", "rate", "seconds", "show_clicks", "size", "source", "system_audio", "window",
 ]
 
 
@@ -8783,13 +8787,14 @@ def section_catalog(binary, sources):
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
           f"{sorted(set(APP_STATE_TOOLS) & set(ops))}")
-    check("7b: the LAST fifteen are the old file's ten file rows in its order, set_media_color "
-          "after remove_media, get_transcript after transcribe, export_status and cancel_export "
-          "after export, then record_screen",
-          names[-15:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-15:]}")
+    last = len(FILE_GROUP_ORDER) + 1
+    check("7b: the LAST sixteen are the old file's ten file rows in its order, set_media_color "
+          "and set_media_speech after remove_media, get_transcript after transcribe, "
+          "export_status and cancel_export after export, then record_screen",
+          names[-last:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-last:]}")
     check("7b: … so everything before them is the groups that stayed and the clip rows — none "
-          "of the fourteen appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-15]),
-          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-15]))}")
+          "of the fifteen appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-last]),
+          f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-last]))}")
     by = {t.get("name"): t for t in tools}
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
@@ -9806,7 +9811,7 @@ def section_voiceover_doors(binary, sources):
     check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
           "FrameJobRecording… keys is unchanged — session only",
           d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
-          and len(d3.get("keysAfter") or []) == 10, f"{d3}")
+          and len(d3.get("keysAfter") or []) == 11, f"{d3}")
     check("D3: rebuildSources() + restoreChoices() keep the row",
           d3.get("kept") is True and d3.get("keptSource") is True, f"{d3}")
 

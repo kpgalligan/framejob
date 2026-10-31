@@ -233,7 +233,7 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
 - **Leveller (B3):** a slow gain-rider stage for a speaker who moves on and off the mic, off by
   default, turned on by Enhance Voice when the speech's short-term loudness range calls for it.
 - **At record time (B8):** a recorder setting, "Enhance the microphone when it lands", applying
-  Enhance Voice to the Microphone clip in the landing's grouped edit.
+  Enhance Voice to the Microphone clip after the landing, as its own undo step (AU-68).
 - **Proof:** the owner's recording to −16 LUFS ±0.5 at −1 dBTP with its pause floor lowered;
   idempotence; one undo step; a voice-over that lands enhanced.
 - **Built in three parts, by size, as AP2 was.** Part 1: Enhance Voice itself — the measurements,
@@ -243,7 +243,7 @@ mixing block and can be reordered freely; only AP12 needs AP3, and AP6 needs AP2
   (AU-60…AU-65; its record below). Part 2: the leveller stage, `audio.leveller` (a format bump), its section, and
   Enhance turning it on from the speech's short-term loudness range (AU-66, AU-67). Part 3:
   "Enhance the microphone when it lands", the recorder setting and its `UserDefaults` key,
-  applied in the landing's grouped edit (AU-68, AU-69).
+  applied after the landing as its own undo step (AU-68, AU-69; its record below).
 
 ### AP7 — live loudness and true-peak metering (A8)
 
@@ -1781,6 +1781,87 @@ skipped, test 134, app 126).
 **Owed.** SE-39 for the owner (two recordings of a voice matched, by ear). Filed at
 integration: phase9's `detach_audio` nest row (above), with the second run's "…and edit in it"
 failure.
+
+### AP6c's record (2026-10-31)
+
+AP6 part 3, "Enhance the microphone when it lands" (survey B8), built in lane C from `16bd934`.
+
+**Decided.** AU-68 and AU-69, recorded before the code. The question the brief asked — does the
+landing wait for the voice's caches, or does Enhance follow — is answered by AU-68: a follow-up,
+its own undo step "Enhance Voice", the landing unchanged; the setting, its key (the panel's
+eleventh, default off), `record_screen`'s `enhance` and its place in the refusal order by AU-69.
+
+**Landed.** App only — no core, FFI, op or format change; one `UserDefaults` key,
+`FrameJobRecordingEnhanceMicrophone`. New: `RecordingEnhance.swift` (the voice paths and clips,
+readiness, busy, the pure `decide`, the panel's follow), `AgentServer+LandRecording.swift` (the dev
+tool `land_recording`). Changed: `RecordingChoice.enhanceMicrophone`; the panel's box under
+Microphone (`RecorderPanelController`, `+Rows`, `+VoiceOver`, and `+Devices` so the box follows a
+microphone that comes or goes); `+Landing` calls `RecordingEnhance.follow` after each successful
+arm; `AudioMeasureDoor.enhanceLanded` shares the press's `measure`, which takes an optional refusal
+(beeps unchanged for the press) and commits grouped for a follow; `enhance_voice`'s body extracted
+as `enhanceVoice(document:clips:targetLUFS:)`; `record_screen` reads `enhance` after `place`
+(`recordingEnhance`), and its landing is `landAndEnhance` (`land` also answers the document);
+the catalog's `enhance` property, its refusal-order sentence and a seventh hoisted clause. Docs:
+the guide's screen-recording (the controls row, the remembered list, "Enhancing the microphone",
+`enhance` for agents), audio ("At record time") and mcp pages; spec §7.4, §7.9c, §7.9d; screen
+16's prose; the proof README; REC-19.
+
+**Deviations.** (1) `RecordingEnhance.timer(of:)`, an accessor the spec's interface did not list,
+so P5 can read the follow's timer back. (2) A second landing into a document whose follow is
+still running joins it (its clips added, the clock and scope started again) rather than running
+a second timer. (3) `AgentServer+RecordingLanding` unwraps the `jsonResult` envelopes of `land`'s
+and `enhance_voice`'s answers before merging them (the first Debug run caught the merge of two
+envelopes). (4) `+Devices.swift`, outside the spec's list: one line so a hot-plugged microphone
+greys or frees the box. Found on the way and fixed: `recording_probe.py` 7b's file group predated
+AP11's `set_media_speech` (failing since `439c595`); it lists it now. And `audio_ap6_proof.py` V8's
+`-FrameJobNormalizeTargetLUFS -16` never reaches the app (a bare `-16` parses as a flag; the
+argument domain wants `<real>-16</real>`), harmless there because −16 is the default; this proof's
+V4 passes `<real>-18</real>`.
+
+**Measured** (the lane; three lanes shared the machine). `audio_ap6c_probe.py` 5/5 and
+`--mutants` 9/9, each by its named row. Against Debug, `audio_ap6c_proof.py` 39/39 on the second
+run; the first, under the other lanes' load, saw the voice's caches not written for about eleven
+minutes (two tool-door legs gave up at 300 s, and a plain import's loudness was still pending after
+60 s), then recovered; the same legs passed alone in 6.8 s and 7.1 s. On Release after the gate:
+`audio_ap6c_proof.py` 39/39 — V1 the RØDE copy: isolation 0.8, a gate at −6, the compressor
+−41 dBFS 3:1 with +10 dB makeup, the limiter −1 dBTP, volume 15.8667, 2 renders, result
+−15.97 LUFS, equal to a control `enhance_voice` on an imported copy; landing to answer 7.93,
+1.32 and 1.33 s (three runs, the first cold); V4 (a) the sheet seen, gone after 3.77 s, the export
+−17.98 LUFS at Normalize's −18. Also on Release: `audio_ap6_proof.py` 37/37 (the press 0.68, 0.68,
+0.73 s), `loudness_normalize_proof.py` 37/37, `recording_proof.py --no-screen --no-microphone`
+142/142 (sections 5 and 6 skipped by those flags), `camera_recording_proof.py` 59/59 (its two
+new-project rows skipped: a project was open on the shared instance), `op_argument_proof.py`
+177/177, `op_catalog_proof.py` 23/23, `screens.py --only 16-recorder-panel` 6/6; the parity log
+empty. `recording_probe.py` 1220/1222 whole, the two 7b rows then fixed and `--only catalog` 31/31;
+`camera_recording_probe.py` all checks passed; `spec_index_proof.py` 213/213. `make gate` PASS
+403 s (names 1, typecheck 6 with the four baseline warnings, fmt and lint skipped, test 232,
+app 164).
+
+**Review.** Passed with three nits, kept: `enhanceLanded` repeats the press's Enhance setup
+(`read`, `choose`, the run, the plan at Normalize's target) rather than sharing a helper, so the
+two can drift; the extraction splits `enhance_voice`'s one read hop in two, so an edit between
+them changes only the skip sentence; and V8's bare `-16` in `audio_ap6_proof.py` was neither fixed
+nor filed (filed at integration).
+
+**Integrated.** AP12 had landed since the lane's base, so five files met it. `AudioMeasureDoor`:
+AP12's `pressMatch` and its `refuse` kept beside `enhanceLanded` and `nothingReason`, and
+`measure` both generic over `AudioMeasureRunning` (AP12) and taking the follow's `refuse` and
+`empty` over `Run.Outcome` (this phase). The rest were unions: AP12's record then this one, the
+proof README's two sections, the decisions index row with both blocks; the Lines cells counted
+again. AU-68, AU-69 and REC-19 keep their numbers. The CLAUDE.md edits owed went in: app's map
+names `RecordingEnhance.swift`, `AgentServer+LandRecording.swift`, `enhanceLanded` and the
+panel's eleven keys; the root's dev tools gain `land_recording`. On the merged tree `make gate`
+PASS 261 s (names 1, typecheck 6 with the four baseline warnings, fmt and lint skipped, test 130,
+app 124). Since the door's resolution is product code, on Release after it:
+`audio_ap6c_proof.py` 39/39 twice (the second run to read V1's notes: result −15.97 LUFS,
+volume 15.8667, 2 renders, landing to answer 1.34, 1.33 and 1.32 s; V4 (a) the sheet gone after
+3.87 s, the export −17.98 LUFS), `audio_ap12_proof.py` 16/16 (A3 bands within 0.51 dB and
+−0.29 LU, A5 within 0.08 dB), `audio_ap6_proof.py` 37/37 (the press 0.80, 0.68 and 0.68 s), no
+`Frame Job: ` line; `audio_ap6c_probe.py` 5/5 and `recording_probe.py --only catalog` 31/31.
+
+**Owed.** REC-19 for the owner: a real voice-over on the RØDE with the box ticked lands enhanced
+and sounds right. Filed at integration: `audio_ap6_proof.py` V8's `-FrameJobNormalizeTargetLUFS
+-16` never reaches the app.
 
 ### Closing the road map
 

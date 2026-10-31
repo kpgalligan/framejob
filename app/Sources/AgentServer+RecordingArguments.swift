@@ -97,6 +97,23 @@ extension AgentServer {
         return (display ?? 0, windowID)
     }
 
+    /// `enhance` (spec §11 AU-69 (d)), default false: true needs a microphone,
+    /// then a clip to enhance — `place` — refused in that order.
+    func recordingEnhance(_ a: [String: Any], microphone: Bool, place: Bool) throws -> Bool {
+        guard try boolArg(a, "enhance") ?? false else { return false }
+        guard microphone else {
+            throw ToolError(
+                message: "enhance: true enhances the microphone's clip, so it needs "
+                    + "microphone: true (or source voice_over).")
+        }
+        guard place else {
+            throw ToolError(
+                message: "enhance: true needs place: true — with place: false the microphone "
+                    + "lands as media with no clip to enhance.")
+        }
+        return true
+    }
+
     /// `size`: `nominal` (default) or `best`, `requestedFrameFormat`'s form.
     func recordingResolution(_ a: [String: Any]) throws -> RecordingResolution {
         try enumArg(a, "size", RecordingResolution.self, folding: true) ?? .nominal
