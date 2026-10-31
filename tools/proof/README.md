@@ -26255,7 +26255,7 @@ The ten mutants (pre-roll sign, hold dropped, min → product, the reversed
 reflection skipped, the S-curve and −3 dB formulas, +3 dB's outgoing side as
 `gain(1 − p)`, the `set_audio` refusal removed or read from the merged
 props, relink's clip of `speech` skipped) each fail a named core test; the
-record is AP11's in `designs/audio.md`.
+record is AP11's in `archive/audio.md`.
 
 ## Road map "audio" AP13 — audio while scrubbing (`scrub_audio_probe.py` G1–G7, C1–C3, E1–E5; nine mutants; spec §11 AU-130…AU-136)
 
@@ -26477,7 +26477,7 @@ drops its old stream until it does; T11's third case is that shape.
 −13.6297, M, S and TP equal to four decimals). On the integration tree, with the host's default
 output AirPods Max over Bluetooth, `--probe` 16/16 and L1 and L4 passed (|ΔI| 0.0004), and L2 and
 L3 failed with extra `jump` resets — the same on the lane's own Release build — so a Bluetooth
-output is a host state these two rows fail on, not one they skip (`designs/audio.md`, AP7's
+output is a host state these two rows fail on, not one they skip (`archive/audio.md`, AP7's
 record).
 ## Road map "audio" AP14 — voice effects (`voice_proof.py` V1–V11, `--measure`, I0, K1–K16, I2–I11; eleven mutants; `core/tests/voice.rs`, `schema_v34.rs`; spec §11 AU-140…AU-149)
 
@@ -26991,7 +26991,7 @@ make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
 
-The recorded runs are in `designs/audio.md`'s AP6 record.
+The recorded runs are in `archive/audio.md`'s AP6 record.
 
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 
@@ -27057,7 +27057,7 @@ make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap12_proof.py <dir>/agent.sock
 ```
 
-The recorded runs are in `designs/audio.md`'s AP12 record.
+The recorded runs are in `archive/audio.md`'s AP12 record.
 
 ## Road map "audio" AP6 part 3 — Enhance the microphone when it lands (`audio_ap6c_probe.py` P1–P5, `audio_ap6c_proof.py` V1–V8; nine mutants; spec §11 AU-68, AU-69)
 
@@ -27118,7 +27118,7 @@ make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
 ```
 
-The recorded runs are in `designs/audio.md`'s AP6c record.
+The recorded runs are in `archive/audio.md`'s AP6c record.
 
 ## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; ten mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
 
@@ -27181,7 +27181,7 @@ python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock           # B1–B5, T
 python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row
 ```
 
-The recorded runs are in `designs/audio.md`'s AP10c record.
+The recorded runs are in `archive/audio.md`'s AP10c record.
 
 ## Road map "audio" AP6 part 2 — the leveller (`audio_ap6b_probe.py` L1–L9, R1–R5, the step-2 ranges; `audio_ap6b_proof.py` P1–P8; fifteen mutants and M11 by hand; `core/tests/audio_dynamics.rs`, `audio_automation.rs`, `schema_v37.rs`; spec §11 AU-66, AU-67)
 
@@ -27219,7 +27219,7 @@ a STOP for the owner).
 skipped), killed when its named row fails; M11 (`"leveller"` out of `TAP_KEYS`) is by hand,
 against `core/tests/audio_automation.rs`'s `a_leveller_named_by_an_end_is_in_the_points`. M16
 (the non-repeat's fix reverted) has no edit: step 3 found the render repeating on this tree
-(`designs/audio.md`'s AP6b record), and R5 and P5 hold it.
+(`archive/audio.md`'s AP6b record), and R5 and P5 hold it.
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -27265,4 +27265,4 @@ make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 ```
 
-The recorded runs are in `designs/audio.md`'s AP6b record.
+The recorded runs are in `archive/audio.md`'s AP6b record.

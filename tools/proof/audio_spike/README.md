@@ -4,7 +4,8 @@ Each folder holds one spike's `record.md` (its rule, written before its runs, th
 and its verdict), the logs it printed, and the scripts it wrote. They ran in a scratch folder against
 the tree at `9e47f56`; copies of product code they compiled are not kept here
 (`git show 9e47f56:<path>` gives them back), nor are their audio files and binaries. The verdicts are
-folded into `designs/audio.md`'s AP0 record, which is what a phase reads.
+folded into `archive/audio.md`'s AP0 record and condensed in `designs/adr/audio.md`, which is what
+a later phase reads.
 
 | Folder | Question |
 |---|---|

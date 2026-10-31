@@ -1,6 +1,6 @@
 # Spike S1 — own DSP or Apple's units for the live audio stages
 
-Road map "audio", AP0 (`designs/audio.md`), decision AU-3 (`designs/spec/11-decisions/audio.md`).
+Road map "audio", AP0 (`archive/audio.md`), decision AU-3 (`designs/spec/11-decisions/audio.md`).
 Product code read at commit `9e47f56` (`AudioDSP.swift`, `AudioTap.swift`,
 `CompositionBuilder+AudioTracks.swift`), never the working tree. Everything below lives in
 `/private/tmp/claude-501/-Users-kevingalligan-devel-framejob/9bb0487d-a352-45e3-9da8-07b6f4762c27/scratchpad/ap0/S1/`.

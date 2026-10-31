@@ -52,7 +52,7 @@ is over 6 LU and the steady one at or under it (else the rule is a STOP).
 scored killed when its named row fails (the step-2 figures and R5 skipped);
 build failures are scored. M11 (`"leveller"` out of `TAP_KEYS`) is by hand
 against core/tests/audio_automation.rs. M16 (the non-repeat's fix reverted)
-has no edit to make: step 3 found nothing to fix (designs/audio.md's AP6b
+has no edit to make: step 3 found nothing to fix (archive/audio.md's AP6b
 record). Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
 under tools/proof/work/audio-ap6b-probe.
 """

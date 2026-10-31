@@ -7,6 +7,11 @@ The owner's pass over a clip's sound, begun 2026-10-30 to turn a desktop USB mic
 recording into usable audio for a video. Its IDs are the AU- series. Each was recorded before
 its code.
 
+The road map that made AU-2…AU-156 is closed (2026-10-31): its condensed record is
+`designs/adr/audio.md`, the original `archive/audio.md` (AP0 the plan and spikes S1–S4, then one
+record per phase, in the order they landed), and the survey it came from
+`archive/audio-survey.md`.
+
 - **AU-1 — `audio.volume`'s ceiling is ×32 (+30.1 dB), not ×4; the Volume slider keeps its
   0–400 % travel and the field beside it takes the rest (owner, 2026-10-30: "400% should not be
   a hard max").** The owner's recording `samples/Rode-usb-mic.m4a` (a RØDE USB microphone,
@@ -37,7 +42,7 @@ its code.
     an un-normalised export clip there (phase 5d's 16-bit decode, which says so); a normalised
     export gains in float (#86) and does not. Normalize itself still lands at −1 dBFS.
 
-AU-2…AU-4 open road map "audio" (`designs/audio.md`, from `designs/audio-survey.md`'s tiers A
+AU-2…AU-4 open road map "audio" (`archive/audio.md`, from `archive/audio-survey.md`'s tiers A
 and B), recorded at its AP0 from the owner's answers of 2026-10-30 to the road map's five
 choices ("Yes, lift scopes, and allow Apple's built-in audio effects", then "OK" to each of the
 rest), before any of its code. **Numbering from here:** each phase records its decisions in a
@@ -75,7 +80,7 @@ parallel lanes never claim one ID; AP0's are AU-2…AU-9.
   loudness mode's arguments.
 
 AU-10…AU-17 are AP1's (loudness you can see and target), recorded before its code from AP0's
-spike S4 (`designs/audio.md`'s AP0 record).
+spike S4 (`archive/audio.md`'s AP0 record).
 
 - **AU-10 — A per-media loudness cache at 10 ms, S4's format, on the cache lane after peaks.**
   `cache/loudness/<id>.bin` beside a marker `cache/loudness/<id>.complete.json`
@@ -1065,7 +1070,7 @@ landed (`git log` at `e55de46` has no AP6).
   off), V1 the live meter against the export, U1 one undo step; thirteen mutants, each killed by
   a named row or core test; manual check SE-37.
 
-AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`designs/audio.md`
+AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`archive/audio.md`
 AP9, survey A10), recorded before its code.
 
 - **AU-90 — The model is a LINKED PAIR: Detach Audio's two clips name each other in

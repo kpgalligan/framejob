@@ -1,6 +1,6 @@
 # Spike S2 — voice isolation (`AUSoundIsolation`), rendered offline
 
-Road map "audio", AP0's spike S2 (`designs/audio.md` AP0, AP5; `designs/audio-survey.md` §2, A4,
+Road map "audio", AP0's spike S2 (`archive/audio.md` AP0, AP5; `archive/audio-survey.md` §2, A4,
 B4; spec §11 AU-3). Run 2026-10-30 on the owner's M2 Max (96 GB), macOS 26.5.1 (25F80),
 Xcode's macOS SDK, against product code read at `9e47f56`. Scratch only: nothing in the tree
 changed.
