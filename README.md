@@ -110,7 +110,8 @@ microphone-only voice-over.
 (10-bit, with HDR, from its own encoder built in, at three speeds; Opus sound
 in the WebM), VP9 in WebM for every browser (8-bit, or 10-bit with HDR, also
 built in, with Opus) and with alpha for transparent web video, ProRes 422 and 4444,
-M4A, WAV and AIFF (16- or 24-bit), GIF and animated PNG; loudness targets
+M4A, WAV and AIFF (16- or 24-bit, with stems: a file per track beside the
+mix), GIF and animated PNG; loudness targets
 reached through a true-peak master limiter on every export, presets, an Export
 Queue that runs while you edit, and single frames as stills.
 → [Exporting](docs/guide/export.md)

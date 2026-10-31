@@ -179,6 +179,9 @@ final class ExportSheetController: NSViewController {
     /// The Bit depth row and its choice (`ExportSheetAudioBits.swift`, spec §11 AU-29).
     let audioBitsPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     var audioBitsChoice = 16
+    /// The Stems row and its choice (`ExportSheetStems.swift`, spec §11 AU-108).
+    let stemsPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var stemsChoice: String?
     let summaryLabel = NSTextField(wrappingLabelWithString: "")
     let footnote = sheetFootnote("")
     var exportButton: NSButton!
@@ -324,6 +327,7 @@ final class ExportSheetController: NSViewController {
         configureDynamicRange()
         configureSpeed()
         configureAudioBits()
+        configureStems()
 
         // THE ORDER BELOW IS LOAD-BEARING and `apply(_:)` is where it is
         // written down. The remembered choice has to reach the format popup
@@ -360,6 +364,7 @@ final class ExportSheetController: NSViewController {
             [fieldLabel("Frame rate:"), ratePopup],
             [fieldLabel("Quality:"), qualityPopup],
             [fieldLabel("Bit depth:"), audioBitsPopup],
+            [fieldLabel("Stems:"), stemsPopup],
             // ONE row, popup and field together: 186 + 6 + 64 fits the 318
             // points the 480-wide card leaves beside a 106 label column.
             [fieldLabel("Loudness:"), sheetRow([loudnessPopup, loudnessField])],

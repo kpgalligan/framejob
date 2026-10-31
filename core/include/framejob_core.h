@@ -475,7 +475,8 @@ char *rc_normalise_color(const char *text);
 
    Three of the rows are audio only: `audio_m4a` (AAC) is what you send,
    and `audio_wav` / `audio_aiff` are LPCM at 48 kHz, 16-bit or 24 (their
-   rows alone list `audio_bits`, [16, 24], spec 11 AU-29) — what you hand
+   rows alone list `audio_bits`, [16, 24], spec 11 AU-29; all three list
+   `stems`, ["tracks", "names"], spec 11 AU-108) — what you hand
    to somebody else's tool, where a second lossy generation is the one
    thing you cannot take back. A row's `avf_preset` means only
    "AVFoundation can write this row": `null` is what routes an export to
@@ -540,7 +541,9 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * absent, and an error naming the row on any other) and `audio_bits` (16
  * or 24, spec 11 AU-29: taken only by the WAV and AIFF rows, whose
  * presets list the depths, 16 there when absent, and an error naming the
- * row on any other). Absent
+ * row on any other) and `stems` ("tracks" or "names", spec 11 AU-108:
+ * taken only by the three audio rows, whose presets list the modes, and an
+ * error naming the row on any other; refused when no track is heard). Absent
  * and explicit null both mean "use the preset", an unknown key is ignored
  * so a newer UI still gets an export, and a value out of range or of the
  * wrong type is an error naming the key and the value. Either loudness key
@@ -596,7 +599,9 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * speed asked, else "balanced"); no other row's settings carry either key,
  * and the two VP9 rows' carry no speed. `audio_wav` and `audio_aiff` add
  * `audio_bits` at the end (the depth asked, else 16); no other row's
- * settings carry it. */
+ * settings carry it. An audio row asked for `stems` ends with `stems`, the
+ * mode resolved to `[{name, tracks}]`: each file's name and the timeline
+ * track ids it holds, in order; without it the settings carry no key. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

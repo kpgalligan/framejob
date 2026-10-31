@@ -51,6 +51,16 @@ extension AgentServer {
         if let bits = settings.audioBits {
             result["audio_bits"] = bits
         }
+        // Each stem written beside the mix, in order (spec §11 AU-108); absent without.
+        if !settings.stems.isEmpty {
+            let mix = URL(fileURLWithPath: path)
+            result["stems"] = settings.stems.map {
+                [
+                    "name": $0.name, "tracks": $0.tracks,
+                    "path": ExportStemsPipeline.url(for: $0, mix: mix).path,
+                ] as [String: Any]
+            }
+        }
         if let measured = loudnessResult(loudness) {
             result["loudness"] = measured
         }

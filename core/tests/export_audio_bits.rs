@@ -96,7 +96,8 @@ fn the_two_lpcm_rows_are_written_out_whole() {
                 "size": null,
                 "fps": null,
                 "avf_preset": "AVAssetExportPresetAppleM4A",
-                "audio_bits": [16, 24]
+                "audio_bits": [16, 24],
+                "stems": ["tracks", "names"]
             })
         );
     }

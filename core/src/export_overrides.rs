@@ -239,6 +239,32 @@ pub(crate) fn encoder_speed(overrides: Option<&Value>) -> Result<Option<EncoderS
     }
 }
 
+/// How an audio export groups its stems (spec §11 AU-108 (b)): one per
+/// heard timeline track, or one per track name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StemsMode {
+    Tracks,
+    Names,
+}
+
+/// The `stems` override (spec §11 AU-108): `tracks` or `names`, `None` when
+/// absent or null. Whether the row takes one is the resolver's question
+/// (`Preset::takes_stems`); this answers only whether it is one of the two
+/// words, so a misspelling is refused by name on any row.
+pub(crate) fn stems(overrides: Option<&Value>) -> Result<Option<StemsMode>, String> {
+    let Some(value) = field(overrides, "stems") else {
+        return Ok(None);
+    };
+    match value.as_str() {
+        Some("tracks") => Ok(Some(StemsMode::Tracks)),
+        Some("names") => Ok(Some(StemsMode::Names)),
+        _ => Err(format!(
+            "export stems must be \"tracks\" or \"names\", not {}",
+            describe(value)
+        )),
+    }
+}
+
 // ---- compound values -----------------------------------------------------
 
 /// The `fps` override as `[num, den]`, or `default` when it is absent.

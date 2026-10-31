@@ -801,6 +801,56 @@ has landed.
   B1–B4 (the balance, the chain order, `isInert`, `TrackMixLevel`); ten mutants, each killed by a
   named row or `core/tests/track_mix.rs`; manual check SE-33 for the popover's feel.
 
+AU-107…AU-109 are AP10 part 2a's (stems; survey A11), recorded before its code. Part 2 is built
+in two: 2a labels the plan and writes stems; 2b (track and bus dynamics, the master chain, the
+preview's statement) records its decisions from AU-150.
+
+- **AU-107 — The plan labels its audio tracks.** Each `audio_tracks[]` entry is `{"id", "track",
+  "segments", "ramps"}`: `track` (u32) is the id of the `Project::tracks` entry whose walk in
+  `assign` placed it, so a nest's contents carry the nest clip's track. Written always; the plan
+  is not persisted, so there is no format bump. Swift keeps the map composition track → timeline
+  track per build (`BuiltComposition.audioOwners`), the family split by source format included:
+  a composition track never carries two top-level timeline tracks (S3 Q1), so a selection by
+  timeline track is a selection of whole composition tracks.
+- **AU-108 — Stems (AU-101's).** (a) On the three audio rows only (`audio_m4a`, `audio_wav`,
+  `audio_aiff`, whose presets list `stems: ["tracks", "names"]`); a movie row refuses (`<id> has
+  no stems; stems applies to audio_m4a, audio_wav and audio_aiff`), and a value but the two words
+  is refused by name on any row. (b) `tracks`: one stem per heard timeline track; `names`: heard
+  tracks whose trimmed names match case-insensitively are one stem, named by the first's
+  spelling, and an unnamed track is its own. Heard = has a plan audio track labelled with it and
+  is not `silenced` (mute, solo) among the timeline's tracks; none heard is refused (`stems: no
+  track is heard, so there is no stem to write`). Order: timeline order of each stem's first
+  track. (c) A name is the trimmed track name, else `Track N` (N = index + 1, the header's label),
+  `/` and `:` replaced by `-`; a name equal case-insensitively to an earlier stem's gets
+  ` (Track N)`, and one still equal to an earlier stem's ` (Track N, 2)`, ` (Track N, 3)` and on,
+  the first no earlier stem holds, so no two stems share a file. The settings end with `stems: [{name, tracks}]` only when asked. (d) Files
+  `<mix name without extension> - <name>.<mix extension>` beside the mix; an existing file at a
+  stem's path is replaced without asking (the save panel asks only about the mix), except that a
+  stem path naming one of the project's media files (symlinks resolved, case-insensitive) refuses
+  the job before any stem file is touched, with `ExportStemsPipeline.SourceCollision`'s sentence
+  (`The stem “<file name>” would replace media this project uses; export under another name.`);
+  the guide says both. (e) **Pre-master:** a stem is its tracks' sub-mix exactly as the mix plays
+  them (clips, envelope, ducks, track volume and pan, taps), with no loudness gain and no master
+  limiter (`ExportAudioMaster(limits: false)`), rounded once at the job's depth and clipped only
+  at full scale — so the stems sum to the mix within rounding wherever the master neither gains
+  nor limits; the guide says so. (f) One job: the mix, then each stem in order, each from a fresh
+  build of the same plan on the export's key (fresh taps, `ExporterLoudness.swift`'s reason)
+  reading only its composition tracks, on one serial queue `com.kgalligan.framejob.export.stems`;
+  progress is `(finished + current) / (1 + N)` of the write's share; a failure or a cancel leaves
+  nothing (the pipeline removes the mix and each stem it finished); the line reads "Exported
+  “Mix.wav” and 3 stems."; the `export_status` result lists each stem's `{name, tracks, path}`.
+  (g) Not measured: the loudness report is the mix's.
+- **AU-109 — The proof, and part 2b.** Part 2a's proof is `audio_ap10b_proof.py`: S1–S8 (two
+  tracks' stems summing to the mix within 2 LSB at 24 bits, `names` grouping, a loudness target
+  leaving every stem byte-identical, mute and solo, a real recording's stem against the soloed
+  export, a stem's peak above the master's ceiling, the refusals, a source collision), C1 (a
+  cancel inside the last stem leaving nothing) and probe rows B1–B2 (the unlimited master, the
+  file names, the summary and the collision test); seven mutants, each killed by a named row or
+  `core/tests/export_stems.rs`; manual check SE-36. Part 2b (track and bus dynamics exact in the
+  export through sub-mixes summed before the master, approximate in the preview and stated, the
+  master chain's decision) records its decisions from AU-150, the first block no phase holds
+  (AU-110… are AP11's).
+
 AU-110…AU-116 are AP11's (ducking by speech, and fade and crossfade shapes; survey B2, B9),
 recorded before its code.
 

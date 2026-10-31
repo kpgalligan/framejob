@@ -26,6 +26,7 @@ From top to bottom:
 | **Frame rate** | **Project rate**, or a fixed rate. | Project rate |
 | **Quality** | **Format default**, or a bit-rate tier. | Format default |
 | **Bit depth** | **16-bit** or **24-bit**, for WAV and AIFF. See [Bit depth](#bit-depth). | 16-bit |
+| **Stems** | **None**, **One per Track** or **One per Track Name**: also write each track's sound as its own file, for the audio formats. See [Stems](#stems). | None |
 | **Loudness** | **Off**, a loudness target, or **Custom…** with a LUFS field. | Off |
 | **Range** | **Whole project**, or **In/out range** when one is set. | Whole project |
 | **Burn in timecode** | Draws the project timecode into the picture. | Off |
@@ -122,6 +123,18 @@ The four tiers set a video rate from the frame's size, so a tier means the same 
 ### Bit depth
 
 The **Bit depth** row sits under Quality. It is live only on **Audio only (WAV)** and **Audio only (AIFF)**; on every other format it is greyed out and keeps your last choice. **16-bit** is the default; **24-bit** keeps detail 16-bit cannot, which matters most for a quiet recording you are going to raise or process later. Both are rounded once from the mix, never dithered. ProRes's sound stays 16-bit. The choice is remembered with the rest of the sheet and stored in presets.
+
+### Stems
+
+The **Stems** row sits under Bit depth. It is live only on **Audio only (M4A)**, **Audio only (WAV)** and **Audio only (AIFF)**; on every other format it is greyed out and keeps your last choice. With a choice other than **None**, the export writes the mix and, beside it, one file per stem, in the same format, for mixing or mastering in another editor.
+
+- **One per Track** writes one stem for each track you can hear.
+- **One per Track Name** writes one stem for each track name: tracks whose names match, ignoring case and spaces at either end, share one file, named the way the first of them is spelled. A track with no name gets its own.
+- A muted track has no stem, and while any track is soloed only the soloed tracks have one. A track with no sound on it (only pictures, or nothing) has none. If no track can be heard, the export is refused: "stems: no track is heard, so there is no stem to write".
+- A stem is named after the mix and its track: exporting `Mix.wav` writes `Mix - Dialogue.wav` and `Mix - Music.wav`. A track with no name is called by its header's label, `Track 3`. A `/` or `:` in a track name is written as `-`, and a second stem whose name an earlier one already has, ignoring case, gets its track's label after it: `vo (Track 2)`. If an earlier stem already has that name too, a count follows the label, `vo (Track 2, 2)`, so no two stems share a file.
+- **An existing file at a stem's name is replaced without asking.** The save panel asks only about the mix. The one exception: if a stem's file would be one of the project's own media files, the export stops before writing any stem, with "The stem “Mix - Dialogue.wav” would replace media this project uses; export under another name."
+- Each stem holds its tracks' sound exactly as the mix plays it, with the clips' and tracks' volume, pan, fades, ducking and effects, but **before the master**: no loudness target is applied to it and the master limiter does not touch it. So the stems added together are the mix, to within the last bit, wherever the master neither raised the level nor limited a peak. A stem can therefore peak higher than the mix; it is clipped only at full scale.
+- The stems are written one after another after the mix, and the progress bar counts them. The finish line reads "Exported “Mix.wav” and 3 stems.", and the footnote under the sheet says "3 stems". The loudness figures are the mix's. Cancelling, or a failure part-way, removes the mix and every stem already written.
 
 ### Loudness
 
@@ -306,6 +319,7 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 | `loudness_lufs` | Loudness | −70 to 0. |
 | `peak_dbtp` | (fixed at −1 on the sheet) | −20 to 0: the master limiter's ceiling, −1 when absent. Legal with or without `loudness_lufs`. |
 | `audio_bits` | Bit depth | `16` (default) or `24`. `audio_wav` and `audio_aiff` only; refused on every other format. |
+| `stems` | Stems | `tracks` or `names`. `audio_m4a`, `audio_wav` and `audio_aiff` only; refused on every other format and when no track can be heard. See [Stems](#stems). |
 | `burn_in_timecode` | Burn in timecode | |
 | `dynamic_range` | Dynamic Range | `hlg`, `pq` or `sdr`. |
 | `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` and `av1_webm` only; refused on every other format, `vp9_webm` and `vp9_alpha_webm` included. |
@@ -316,7 +330,7 @@ Every refusal comes back from `export` itself, before anything is queued: a bad 
 
 - `export_status {export_id}` answers the job's row without waiting: `queued`, `running` (with `progress` from 0 to 1 and `phase`), `done`, `failed` or `cancelled`. Call it again after a pause until the job finishes.
   - Every answer has `path` and `elapsed` (seconds).
-  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), `audio_bits` for WAV and AIFF, any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp` (the master limiter's), `limited_db` (how far it turned the loudest peak down), `capped_by_gain` (the 40 dB limit decided the gain) and `target_lufs`.
+  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), `audio_bits` for WAV and AIFF, `stems` (`[{name, tracks, path}]`, each file beside the mix) when stems were asked, any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp` (the master limiter's), `limited_db` (how far it turned the loudest peak down), `capped_by_gain` (the 40 dB limit decided the gain) and `target_lufs`.
   - `queued` adds `waiting`, the row's "Waiting for memory: …" sentence, while an AV1 or VP9 job waits for memory.
   - `queued` and `running` add `estimated_seconds` for `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`: the export sheet's estimate of the whole export, in whole seconds.
   - `failed` and `cancelled` add `reason`, the queue row's sentence.

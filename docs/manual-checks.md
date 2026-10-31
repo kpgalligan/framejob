@@ -479,6 +479,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** is the line easy to see and grab, does dragging and adding points feel right, and does what you hear match the line?
 - **Source:** road map "audio" AP8a (spec §11 AU-81…AU-84); `tools/proof/volume_line_proof.py` measures the line against the plan, the drag's arithmetic, the points' ops, the hit order and one undo step (V1–V9), not how it looks, feels or sounds.
 
+**SE-36 — Stems and the mix line up in another editor and play as the mix** (provisional)
+- **Do:** 1. Put a voice (`samples/Rode-usb-mic.m4a`) on a track named Dialogue and a music bed on a track named Music, overlapping, at moderate levels (the timeline bar's meter well under the top). 2. Export Audio only (WAV), 24-bit, Loudness Off, with Stems ▸ One per Track, and note the finish line and the three files beside each other in the Finder. 3. Import the mix and both stems into another editor (Logic, GarageBand, Audacity, DaVinci Resolve or Reaper) at time zero on three tracks. 4. Play the two stems together with the mix muted, then the mix alone; invert the mix's polarity and play all three. 5. Look at the export sheet's Stems row on Audio only (WAV) and on H.264, in light and dark appearance.
+- **Expect:** the finish line reads "Exported “Mix.wav” and 2 stems."; the stems start at zero with the mix, run as long as it, and played together sound like the mix; with the mix inverted the three cancel to silence (or a faint hiss at the last bit); the Stems row reads None, One per Track or One per Track Name, is live on the three audio formats and greyed out on H.264 showing the last choice, and fits with nothing cut off.
+- **Answer:** do the stems line up and sum to the mix in your editor, and is the Stems row clear?
+- **Source:** road map "audio" AP10 part 2a (spec §11 AU-108); `tools/proof/audio_ap10b_proof.py` measures the stems' sum against the mix sample for sample, the names, the refusals and the cancel, not how another editor reads the files.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

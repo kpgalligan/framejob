@@ -37,6 +37,12 @@ import AVFoundation
 /// clip, because both wrap rather than saturate. No dither at either depth
 /// (AU-29).
 ///
+/// **A stem's master does not limit** (`limits` false, spec §11 AU-108 (e)):
+/// no stage call, nothing dropped and no flush, so output frame k is
+/// `round(clip(input k × gain))` — placement, the gain (1 for a stem) and the
+/// quantiser unchanged. Every other export is made with `limits` true, which
+/// is everything above, exactly.
+///
 /// The export's audio pump queue only: every buffer is this object's own.
 final class ExportAudioMaster {
 
@@ -69,6 +75,8 @@ final class ExportAudioMaster {
     let origin: CMTime
     /// The loudness gain (`ExportWriter.normalizeAudio`); 1 when not normalised.
     var linearGain: Float = 1
+    /// False for a stem: the limiter is skipped, with its latency.
+    let limits: Bool
 
     private let stage: AudioLimiterStage
     private let settings: AudioLimiterSettings
@@ -90,8 +98,10 @@ final class ExportAudioMaster {
     private var finished = false
     private var format: CMAudioFormatDescription?
 
-    init(bits: Int, ceilingDBTP: Double, origin: CMTime) {
+    init(bits: Int, ceilingDBTP: Double, origin: CMTime, limits: Bool = true) {
         self.bits = bits == 24 ? 24 : 16
+        self.limits = limits
+        toDrop = limits ? AudioLimiterStage.latency : 0
         let dbtp = ceilingDBTP.isFinite ? ceilingDBTP : ExportLoudness.defaultCeiling
         ceiling = Float(pow(10, dbtp / 20))
         self.origin = origin
@@ -180,10 +190,12 @@ final class ExportAudioMaster {
     }
 
     /// The last `AudioLimiterStage.latency` frames, flushed with zeros once;
-    /// nil when nothing was ever fed, or on a second call.
+    /// nil when nothing was ever fed, on a second call, and without `limits`
+    /// (there is no latency to flush).
     func finish() throws -> CMSampleBuffer? {
         guard let start = firstFrame, !finished else { return nil }
         finished = true
+        guard limits else { return nil }
         output.removeAll(keepingCapacity: true)
         feedZeros(AudioLimiterStage.latency)
         return try quantised(at: start)
@@ -219,7 +231,9 @@ final class ExportAudioMaster {
     /// The stage over `left` and `right`, its output interleaved onto
     /// `output` after the latency's frames are dropped.
     private func run(frames: Int) {
-        stage.process(planes, count: Self.channels, frames: frames, settings: settings)
+        if limits {
+            stage.process(planes, count: Self.channels, frames: frames, settings: settings)
+        }
         let drop = min(toDrop, frames)
         toDrop -= drop
         let keep = frames - drop

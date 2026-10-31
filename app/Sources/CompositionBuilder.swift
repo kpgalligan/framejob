@@ -31,6 +31,23 @@ struct BuiltComposition {
     /// The plan's dynamic range: what `Playback.previewComposition` recolours
     /// for Show SDR Version (spec §11 HD-14 (g)).
     let output: CanvasOutput
+    /// The document's `RecipeSource` slot this was built on, so a stem's
+    /// fresh build reads the same renders (spec §11 AU-108 (f)).
+    var recipeKey: Int = 0
+    /// Every composition audio track id → the timeline track it plays under
+    /// (spec §11 AU-107), each format family included.
+    var audioOwners: [CMPersistentTrackID: UInt32] = [:]
+    /// The composition audio tracks an export reads, or nil for all of them
+    /// (the mix). A stem's build reads only its own (spec §11 AU-108 (e)).
+    var audioSelection: Set<CMPersistentTrackID>? = nil
+
+    /// A copy whose read is every composition audio track owned by one of
+    /// `tracks`, the timeline track ids one stem holds.
+    func selectingAudio(of tracks: Set<UInt32>) -> BuiltComposition {
+        var copy = self
+        copy.audioSelection = Set(audioOwners.filter { tracks.contains($0.value) }.keys)
+        return copy
+    }
 }
 
 /// Plan JSON → `AVMutableComposition` + an `AVVideoComposition` built from an
@@ -127,7 +144,7 @@ enum CompositionBuilder {
         let isolated = isolatedAudio(plan: plan, urls: urls, reverse: reverse, dsp: dsp)
         // A voiced clip's ready renders, in place of its isolation (AU-143).
         let voiced = voicedAudio(plan: plan, urls: urls, reverse: reverse, dsp: dsp)
-        let (inputParameters, meters) = try withExtendedLifetime(rampAssets) {
+        let (inputParameters, meters, owners) = try withExtendedLifetime(rampAssets) {
             try addAudioTracks(
                 to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
                 metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
@@ -188,7 +205,7 @@ enum CompositionBuilder {
             composition: composition,
             videoComposition: AVVideoComposition(configuration: videoConfiguration),
             videoConfiguration: videoConfiguration, audioMix: audioMix, planJSON: planJSON,
-            meters: meters, output: plan.output)
+            meters: meters, output: plan.output, recipeKey: recipeKey, audioOwners: owners)
     }
 
     // MARK: - The media-less timeline

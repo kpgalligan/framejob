@@ -1407,6 +1407,85 @@ baseline warnings, fmt and lint skipped, unchanged, test 129, app 118).
 **Owed.** SE-35 for the owner. Filed at integration: the ⌥-press in a clip's last partial frame
 snapping up to the clip's end (review 1's nit). AP8b is the road map's next part, not owed work.
 
+### AP10b's record (2026-10-31)
+
+AP10b is AP10's part 2, split in two: 2a (this) labels the plan's audio tracks and writes stems
+(survey A11, AU-101's answer); 2b — track and bus dynamics, the master chain, the preview's
+statement — is its own spec and records its decisions from AU-150. The lane started from
+`3012143`.
+
+**Decided.** AU-107…AU-109, recorded before the code: the plan's `track` label and Swift's
+composition-track owners (AU-107); stems on the three audio rows only, `tracks` or `names`, heard
+= labelled and not silenced, the names and the suffix, the files beside the mix replacing what is
+there except one of the project's media (refused before any stem is touched, the adversary's
+objection), pre-master stems (no loudness gain, no limiter), one job with a fresh build per stem,
+nothing left by a failure or a cancel (AU-108); the proof, and 2b's block (AU-109).
+
+**Landed.** Core: `CompTrack.track`, set by `assign` per timeline track; the plan's `track` after
+`id`; `audio::silenced` `pub(crate)`; `StemsMode` and `stems()` in `export_overrides.rs`;
+`takes_stems` and the presets' `stems` in `export_preset.rs`; `export_stems.rs` (`Stem`,
+`Project::export_stems`); `export.rs` reading, refusing and writing `stems` last; the header's
+two comments; `core/tests/export_stems.rs` (13 tests, 14 after the fix). Swift: `PlanTrack.track`;
+`addAudioTracks`' `owners`; `BuiltComposition.recipeKey`, `.audioOwners`, `.audioSelection`,
+`selectingAudio(of:)`; `audioReadOutput` and `addAudio` reading only a selection's tracks through
+a mix of only their parameters; `ExportAudioMaster(limits:)`; `ExportStems.swift` (the pipeline,
+203 lines); `Exporter.pipeline` wrapping the mix's writer; `ExportStem`, `ExportSettings.stems`,
+`ExportPreset.stems`; `ExportSheetStems.swift` and the sheet's five wiring lines; `ExportChoice.stems`;
+the two success lines; the tool's forwarding, the result's `stems` and the catalog. Docs: spec
+§7.2, §7.4, §7.8, §7.9a, §7.10, the spec index; the guide's export (the Stems row, `### Stems`,
+the tool rows), audio and mcp pages, the README highlight; SE-36; the screen catalog's Stems row;
+the proof README.
+
+**Deviations.** `core/tests/export_audio_bits.rs` pins the WAV and AIFF preset rows written out
+whole, so both gained `"stems": ["tracks", "names"]` (a file outside the spec's list, changed only
+there). The fixtures add `ap10b_tone.wav` at −12.5 dBFS beside the spec's two: ×4 is then −0.46
+dBFS, over −1 dBTP and under full scale, which S6 needs (AP10's −12 dBFS tone at ×4 is over full
+scale). S1 does not read the queue row's line: `export_status`'s `done` carries none and
+`snapshot_ui` cannot capture the Export Queue window, so the line's wording rests on `summary`
+(B2), which both success lines append, and on SE-36.
+
+**Measured** (Release, after the gate): `audio_ap10b_proof.py` 11/11 — S1 and S2 Σ stems − mix
+worst 0 LSB at 24 bits; S3 both stems identical to S1's at a −1.46 dB loudness gain, the mix
+not; S4 stems A, C with B muted and C alone with C soloed; S5 both stems identical to their
+soloed exports over 1,454,400 frames (worst 0 LSB); S6 the stem −0.4587 / −0.4460 dBTP
+(Kaiser / Annex 2), the mix −1.0127 / −1.0000; S7 the three sentences; S8 the job failed with
+SourceCollision's sentence, the media unchanged, nothing written; C1 cancelled at progress 0.8973
+with stems 1–2 on disk, nothing left; B1, B2. The same 11/11 on Debug before the gate (C1 at
+0.8754). `export_master_proof.py` 11/11 on Release, its figures AP2b's (X10 −15.9125 LUFS,
+−0.9998 / −0.9999 dBTP). `screens.py --only 12-export-sheet` 6/6, 0 new problems, the Stems row
+under Bit depth in both looks. Mutants 7/7 killed: M1 (8 `export_stems.rs` tests), M4 (3), M5 (1)
+by hand; M2 by S6 (the stem at −1.0127 / −1.0000), M3 by S3, M6 by C1 (`Mix - One.wav`, `Mix -
+Two.wav` left), M7 by S8 and B2, each on a mutated Debug build. `make gate` PASS 528 s (names 1,
+typecheck 6 with the four baseline warnings, fmt 3, lint 6, test 309, app 203). The parity log
+empty on both builds.
+
+**Review.** Review 1 found one should-fix: ` (Track N)` added once did not make a name unique
+("a (Track 3)", "A", "a" gave two stems one file). Fixed in the lane (`72302dc`): a name still
+taken gets ` (Track N, 2)`, ` (Track N, 3)` and on, ignoring case, stated in AU-108 (c), spec
+§7.8 and §7.10 and the guide; `core/tests/export_stems.rs` gained
+`a_suffixed_name_an_earlier_stem_holds_gets_a_count` (14 passed), `spec_index_proof.py` 213/213,
+`make gate` PASS 531 s (typecheck skipped, no Swift changed); the Release proofs stood (the
+proof's tracks never reach the branch). Review 2 passed, carrying three nits left unaddressed:
+with `project.plan` nil the job writes only the mix while the result still lists stem paths;
+S1 does not read the queue line (the deviation above); stem names compared without Unicode
+normalization, so NFC and NFD spellings of one name could share a file.
+
+**Integrated.** AP8 (`e55de46`) had landed since the lane's base. The phase bumps no format.
+Conflicts were taken as unions: the decisions index's `audio.md` row (AU-107…AU-109 after
+AU-100…AU-106, beside AP8a's AU-80…AU-84), the proof README (this phase's section after
+AP8a's), this record after AP8's, and the spec indexes' Lines cells counted again. AP8 took
+SE-35, so this phase's check is SE-36. The decisions index gained AU-107…AU-109's rows, which
+the lane had not written. The CLAUDE.md edits owed went in: app's map names
+`ExportSheetStems.swift` and `ExportStems.swift` and its `DispatchQueue` seams the stems
+builds' queue; core's map names `export_stems.rs`. No product code changed at integration, so
+the lane's Release proofs stand. On the merged tree `spec_index_proof.py` 213/213 and `make
+gate` PASS 457 s (names 2, typecheck 13 with the four baseline warnings, fmt 3, lint 10, test
+284, app 143).
+
+**Owed.** SE-36 for the owner. Filed at integration: review 2's three nits (the stems listed
+with no plan, the queue line unread by S1, names without Unicode normalization). Part 2b
+continues at AU-150.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

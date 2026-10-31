@@ -335,6 +335,21 @@ extension AgentServer {
                             + "float mix, never dithered. Refused on every other preset "
                             + "(ProRes keeps 16).",
                     ],
+                    // The sheet's Stems popup (spec §11 AU-108).
+                    "stems": [
+                        "type": "string", "enum": ["tracks", "names"],
+                        "description": "Also write stems beside the mix, on audio_m4a, "
+                            + "audio_wav and audio_aiff — the sheet's Stems popup: tracks (one "
+                            + "file per heard timeline track) or names (heard tracks whose "
+                            + "names match, ignoring case, share one file). Each is named "
+                            + "'<file> - <track name>.<ext>' (an unnamed track 'Track N'), "
+                            + "replacing any file there, and holds its tracks' sound before "
+                            + "the master: no loudness gain and no limiter, so the stems sum "
+                            + "to the mix where the master changed nothing. Muted and "
+                            + "solo-silenced tracks have none. Refused on a movie preset, "
+                            + "when no track is heard, and when a stem's path is one of the "
+                            + "project's media. Omit for none.",
+                    ],
                     "burn_in_timecode": burnInProperty,
                     // The sheet's Dynamic Range popup (spec §11 HD-5, HD-14).
                     "dynamic_range": [
@@ -376,7 +391,8 @@ extension AgentServer {
                     + "(preset, container, codec, width, height, fps [num, den], start, "
                     + "duration), burn_in_timecode, dynamic_range in an HLG project (the "
                     + "picture written), encoder_speed on av1 and av1_webm, audio_bits on "
-                    + "audio_wav and audio_aiff, loudness for every format "
+                    + "audio_wav and audio_aiff, stems [{name, tracks, path}] when stems was "
+                    + "asked (each file beside the mix), loudness for every format "
                     + "that carries sound, normalised or not — summary, integrated_lufs, "
                     + "true_peak_dbtp, "
                     + "sample_peak_dbfs, gain_db, ceiling_dbtp (the master limiter's), "

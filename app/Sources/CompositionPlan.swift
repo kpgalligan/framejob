@@ -109,12 +109,16 @@ struct PlanTrack: Codable, Equatable, Identifiable {
     /// Audio only: the envelope covering the whole extent, fades, volume
     /// actions and ducking already folded in.
     let ramps: [PlanRamp]?
+    /// Audio only: the timeline track it plays under (spec §11 AU-107), a
+    /// nest's contents under the nest clip's; nil on a video track.
+    let track: UInt32?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenient(.id, 0)
         segments = c.lenient(.segments, [])
         ramps = c.lenient(.ramps)
+        track = c.lenient(.track)
     }
 }
 

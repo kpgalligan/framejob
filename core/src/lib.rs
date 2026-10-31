@@ -72,6 +72,7 @@ mod export_encoder;
 pub mod export_overrides;
 mod export_preset;
 pub mod export_size;
+mod export_stems;
 pub mod export_table;
 pub mod ffi;
 pub mod ffi_agent;

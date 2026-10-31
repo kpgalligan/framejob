@@ -143,7 +143,9 @@ extension CompositionBuilder {
     /// one meter per composition track, carrying its family's sounding spans
     /// so `LevelMeterTrack.mix` counts it only while one of them holds the
     /// playhead (#65). A family's members never sound at the same instant, so
-    /// the sum over the meters that sound is right.
+    /// the sum over the meters that sound is right. `owners` maps every
+    /// family's composition track id to its plan track's timeline `track`
+    /// (spec §11 AU-107), for the stems' read (`BuiltComposition.audioOwners`).
     static func addAudioTracks(
         to composition: AVMutableComposition, plan: CompositionPlan, urls: [UInt32: URL],
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
@@ -151,9 +153,13 @@ extension CompositionBuilder {
         ramps: [RampSegmentKey: AVAssetTrack] = [:],
         isolated: [IsolationSegmentKey: IsolatedAudio] = [:],
         voiced: [IsolationSegmentKey: IsolatedAudio] = [:]
-    ) throws -> (inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack]) {
+    ) throws -> (
+        inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack],
+        owners: [CMPersistentTrackID: UInt32]
+    ) {
         var inputParameters: [AVAudioMixInputParameters] = []
         var meters: [LevelMeterTrack] = []
+        var owners: [CMPersistentTrackID: UInt32] = [:]
         var nextID = firstExtraTrackID(plan)
         for planTrack in plan.audioTracks {
             let families = audioFamilies(
@@ -161,6 +167,7 @@ extension CompositionBuilder {
                 assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
+                if let owner = planTrack.track { owners[track.trackID] = owner }
                 // A track pan alone asks for a tap too (spec §11 AU-104).
                 let pans = family.segments.contains { !$0.trackPans.isEmpty }
                 let trackDSP = dsp.isEmpty && !pans
@@ -196,7 +203,7 @@ extension CompositionBuilder {
                         dsp: trackDSP, isolation: isolation, meter: sink))
             }
         }
-        return (inputParameters, meters)
+        return (inputParameters, meters, owners)
     }
 
     // MARK: - Audio

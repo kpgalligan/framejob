@@ -1929,6 +1929,14 @@ the key map behind it.
   `writer`; straightens `vp9_alpha_webm`'s frames first, G-35) · `ExportSheetSpeed.swift` ·
   `ExportSheetAudioBits.swift` (the sheet's Bit depth row after Quality, live on `audio_wav`
   and `audio_aiff` only, spec §11 AU-29) ·
+  `ExportSheetStems.swift` (the export card's Stems row after Bit depth — None, One per
+  Track, One per Track Name — live on the three audio rows, spec §11 AU-108) ·
+  `ExportStems.swift` (the stems pipeline, spec §11 AU-108: `ExportStemsPipeline` wraps the
+  mix's `ExportWriter`, then writes each stem from a fresh build on the export's key read
+  through only its composition tracks (`BuiltComposition.selectingAudio`) into an
+  `ExportWriter` whose master neither gains nor limits (`ExportAudioMaster(limits: false)`);
+  the file names, `summary`, the source-collision refusal, nothing left by a failure or a
+  cancel) ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
   the WebM writer; `append` carries the `alpha` packet) · `ExportWebMWriter.swift` ·
   `ExportWebMWriter+Audio.swift` (the WebM audio pump, C5's toll T2) · `ExportWebMLayout.swift` ·
@@ -3539,7 +3547,9 @@ queue (`MediaImporter.CacheLane`, spec §11 #367), the export
 progress timer, the AV1 encode queue (`ExportEncodePump`'s
 `com.kgalligan.framejob.export.encode`, with its `DispatchSemaphore(3)` between the
 video pump and the encoder, spec §11 CX-12), the WebM writer's two pump queues
-(`com.kgalligan.framejob.export.webm.video` and `.audio`, CX-15), `Transcriber`'s serial queue, `CloudTranscriber`'s serial
+(`com.kgalligan.framejob.export.webm.video` and `.audio`, CX-15), the stems builds
+(`ExportStemsPipeline`'s `com.kgalligan.framejob.export.stems`, spec §11 AU-108),
+`Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`

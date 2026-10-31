@@ -941,6 +941,11 @@ governs a module now.
   name), and `alpha` means "this ENCODING carries an alpha channel" — true for
   `prores_4444`, `hevc_alpha` and `apng`, false for `gif`, which has one palette index and
   no partial value — never "the canvas is translucent".
+- `export_stems.rs` — an audio export's stems (spec §11 AU-107, AU-108):
+  `Stem` and `Project::export_stems(StemsMode)` — heard tracks (labelled by
+  `CompTrack::track`, not `silenced`) grouped per track or per trimmed name
+  ignoring case, ordered, named (`Track N`, `/` and `:` as `-`, ` (Track N)`
+  then ` (Track N, k)` until unique), none heard refused; read by `export.rs`.
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
   and a callback. Copied from Rasterize; do not add domain knowledge. Since

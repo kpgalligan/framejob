@@ -70,6 +70,9 @@ impl Project {
             .map(|track| {
                 let mut out = Map::new();
                 out.insert("id".to_string(), Value::from(track.id));
+                // The timeline track it plays under (spec §11 AU-107), for
+                // Swift's stems.
+                out.insert("track".to_string(), Value::from(track.track));
                 out.insert(
                     "segments".to_string(),
                     Value::Array(track.segments.iter().map(|s| s.to_json(true)).collect()),

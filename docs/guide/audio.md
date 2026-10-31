@@ -526,6 +526,8 @@ The figures are the mix as the preview plays it, before the export's loudness se
 
 The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option: the export reaches it through its master limiter, which holds every export's peaks under −1 dBTP. A WAV or AIFF can be written at 24 bits. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
 
+An audio export can also write **stems**: each track's sound, or each track name's, as its own file beside the mix, for mixing or mastering in another editor. A stem is its tracks' sound before the master, with no loudness target and no master limiter, so the stems add up to the mix. Choose them in the export sheet's **Stems** row. See [Stems](export.md#stems).
+
 ## Synchronize Audio
 
 **Clip ▸ Synchronize Audio** lines up two or more clips by their sound. The usual case is a camera clip and a separate audio recorder that captured the same moment. Select the clips, each on its own track, and choose the command. One clip, the **anchor**, stays where it is. Every other clip slides along its own track until its sound plays at the same moment as the anchor's.

@@ -26792,3 +26792,69 @@ split now answers nil there. `--probe` 9/9, V6 adding "trimmed to 1.5 s, the act
 s past the clip's 1.500000 s: true; ⌥ at 1.25 s nil"; `--mutants` M1–M9 and M11–M13 killed (M13
 by V6), M10's anchor moved with the guard and, re-pointed, killed by V6 in its own run; `make
 gate` PASS 358 s.
+
+## Road map "audio" AP10 part 2a — stems (`audio_ap10b_proof.py` S1–S8, C1, B1–B2; seven mutants; `core/tests/export_stems.rs`; spec §11 AU-107…AU-109)
+
+The plan labels each audio track with its timeline track (`track`, AU-107), and the three audio
+rows take `stems` (`tracks` or `names`): the mix, then one file per stem beside it, each its
+tracks' sound before the master (`ExportStemsPipeline`, `ExportAudioMaster(limits: false)`,
+AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
+
+- **`core/tests/export_stems.rs`** (in `make test`): the label (two top-level tracks, a nest's
+  contents under the nest clip's track, overlapping clips on one track); both modes' grouping,
+  order and names (`Track N`, the ` (Track N)` suffix, `/` and `:` as `-`); a muted track, a
+  track silenced by a solo and a track of pictures alone without a stem; each refusal; `presets()`
+  listing `stems` on exactly the three audio rows; settings without `stems` carrying no key.
+  `export_audio_bits.rs`'s WAV and AIFF rows, written out whole, gained `stems`.
+- **`audio_ap10b_proof.py <dir>/agent.sock [--only …]`** (the docstring has each row and bound)
+  makes `ap10b_tone.wav` (440 Hz at −12.5 dBFS, 6 s), `ap10b_music.wav` (three sines and pink
+  noise near −20 dBFS RMS, 6 s, 24-bit) and `ap10b_long.m4a` (600 s of 440 Hz at −20 dBFS, AAC)
+  on the first run into `tools/proof/media/`, and decodes every export to PCM integers at its
+  own depth. S1 two tracks' stems by `tracks` at AU-108's names, Σ stems − mix ≤ 2 LSB at 24
+  bits on every sample; S2 `names` grouping "Music" and "music" and naming an unnamed track
+  "Track 3", Σ as S1; S3 a loudness target leaving every stem identical to S1's and the mix
+  not; S4 no stem for a muted or solo-silenced track; S5 `samples/Rode-usb-mic.m4a` beside the
+  music, each stem identical to the soloed export of its track (skipped by name without the
+  sample); S6 a tone at ×4 whose stem's true peak is over −1 dBTP by `limiter_probe.py`'s two
+  meters while the mix's is under −1 + 0.001; S7 the three refusals by name; S8 a stem path that
+  is the project's media failing the job with nothing written and the media byte-identical; C1
+  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with stems
+  1–2 on disk first, leaving no file.
+- **`audio_ap10b_proof.py --probe`** runs B1–B2 alone (the whole run runs them first): the
+  probe `audio_ap10b_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.py`. B1 `ExportAudioMaster(limits: false)` at 24 bits over two buffers past the
+  ceiling and past full scale: `round(clip(input))` frame for frame from stamp 0, no tail, where
+  the default master changes them; B2 `url(for:mix:)`, `summary`, `collision` (exact, case-only,
+  a symlink, none) and `SourceCollision`'s sentence.
+
+The queue row's success line is not read over MCP — `export_status`'s `done` carries no line and
+`snapshot_ui` cannot capture the Export Queue window — so its wording rests on `summary` (B2),
+which both success lines append, and on SE-36.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| M1 | every audio `CompTrack` labelled with the first timeline track | `export_stems.rs` (8 tests) |
+| M2 | a stem's master limits (`limits: true`) | S6 (the stem at −1.0127 / −1.0000 dBTP) |
+| M3 | `normalizeAudio` forwarded to each stem's writer | S3 (both stems differ from S1's) |
+| M4 | `silenced` not checked | `export_stems.rs` (3 tests) |
+| M5 | `names` grouping case-sensitive | `export_stems.rs` (`names_mode_groups_…`) |
+| M6 | no removal on a failure or a cancel | C1 (`Mix - One.wav`, `Mix - Two.wav` left) |
+| M7 | `collision` never answers | S8 (the media overwritten, `Mix.wav` written), B2 |
+
+M1, M4 and M5 by hand against `export_stems.rs`; M2, M3, M6 and M7 by hand on a mutated Debug
+build with `--only`.
+
+```sh
+python3 tools/proof/audio_ap10b_proof.py --probe                    # B1–B2, no app
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock           # B1–B2, S1–S8, C1
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock --only S6 # one row
+```
+
+**The recorded run (2026-10-31, Release after `make gate`):** 11/11. S1 and S2 Σ stems − mix
+worst 0 LSB at 24 bits; S3 both stems identical to S1's at a −1.46 dB loudness gain, the mix
+not; S4 A and C with B muted, C alone with C soloed; S5 both stems identical to their soloed
+exports over 1,454,400 frames; S6 the stem −0.4587 / −0.4460 dBTP (Kaiser / Annex 2), the mix
+−1.0127 / −1.0000; S7 the three sentences; S8 failed with nothing written and the media unchanged;
+C1 cancelled at progress 0.8973 with stems 1–2 on disk, nothing left; B1, B2. The mutants 7/7
+killed (the table). `export_master_proof.py` 11/11 on the same instance.

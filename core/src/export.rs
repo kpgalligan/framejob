@@ -34,6 +34,10 @@
 //! `audio_bits`, 16 or 24 (spec §11 AU-29): 16 when not asked, and refused
 //! by name on every other row.
 //!
+//! The three audio rows take `stems`, `tracks` or `names` (spec §11
+//! AU-108): asked, the settings end with `stems`, the files beside the mix
+//! resolved to `[{name, tracks}]` by `export_stems.rs`; a movie row refuses.
+//!
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
 //! same rows, so a preset cannot exist in the menu and not in the resolver.
@@ -48,7 +52,7 @@ use serde_json::{Map, Value};
 
 use crate::export_overrides::{
     audio_bits as audio_bits_override, boolean, dynamic_range, encoder_speed, fps as fps_override,
-    loudness, object, positive_u32, range as range_override,
+    loudness, object, positive_u32, range as range_override, stems as stems_override,
 };
 use crate::export_table::{fps_json, EncoderSpeed};
 use crate::model::Project;
@@ -85,7 +89,9 @@ impl Project {
     /// `peak_dbtp`, `dynamic_range` (`hlg`, `pq` or `sdr`, spec §11
     /// HD-14), `encoder_speed` (`faster`, `balanced` or `smaller`, on a
     /// row whose bundled encoder has speeds, CX-12, CX-16) and `audio_bits`
-    /// (16 or 24, on `audio_wav` and `audio_aiff`, AU-29); anything else in the object is ignored, so a newer UI
+    /// (16 or 24, on `audio_wav` and `audio_aiff`, AU-29) and `stems`
+    /// (`tracks` or `names`, on the three audio rows, resolved to
+    /// `[{name, tracks}]` last in the settings, AU-108); anything else in the object is ignored, so a newer UI
     /// can send fields this build does not know. Each is read and refused
     /// by `export_overrides.rs`, which is where the spelling of every one
     /// of them lives.
@@ -150,6 +156,19 @@ impl Project {
             }
             (asked, true) => Some(asked.unwrap_or(16)),
             (None, false) => None,
+        };
+        // The stems (spec §11 AU-108 (a)), on the depth's terms: read on any
+        // row so a misspelling is named, refused on a movie row, and
+        // resolved to the files they are only when asked.
+        let stems = match (stems_override(overrides)?, preset.takes_stems()) {
+            (Some(_), false) => {
+                return Err(format!(
+                    "{} has no stems; stems applies to audio_m4a, audio_wav and audio_aiff",
+                    preset.id
+                ))
+            }
+            (Some(mode), true) => Some(self.export_stems(mode)?),
+            (None, _) => None,
         };
 
         // Size: the preset's cap if it has one, else the canvas — a movie
@@ -306,6 +325,12 @@ impl Project {
         // settings are the text they were (spec §11 AU-29).
         if let Some(bits) = bits {
             out.insert("audio_bits".to_string(), Value::from(bits));
+        }
+        // The stems last, and only when asked, so every other export's
+        // settings are the text they were (spec §11 AU-108).
+        if let Some(stems) = stems {
+            let stems = stems.iter().map(|stem| stem.to_json()).collect();
+            out.insert("stems".to_string(), Value::Array(stems));
         }
         Ok(Value::Object(out))
     }

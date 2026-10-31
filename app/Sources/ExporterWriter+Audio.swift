@@ -38,7 +38,10 @@ extension ExportWriter {
     /// range's start). The reader output is added by `start`
     /// (`addAudioOutput`).
     func addAudio(settings: ExportSettings) throws {
-        let tracks = built.composition.tracks(withMediaType: .audio)
+        // A stem's build reads only its own tracks (spec §11 AU-108 (e)).
+        let tracks = built.composition.tracks(withMediaType: .audio).filter {
+            built.audioSelection?.contains($0.trackID) ?? true
+        }
         guard !tracks.isEmpty else {
             if settings.isAudioOnly { throw Exporter.ExportError.emptyTimeline }
             return
@@ -53,7 +56,7 @@ extension ExportWriter {
         audioInput = input
         audioMaster = ExportAudioMaster(
             bits: settings.audioBits ?? 16, ceilingDBTP: settings.masterCeilingDBTP,
-            origin: range.start)
+            origin: range.start, limits: built.audioSelection == nil)
     }
 
     /// The mix's reader output (`audioReadOutput`). False when the reader

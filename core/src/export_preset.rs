@@ -150,6 +150,12 @@ impl Preset {
         self.codec == "lpcm"
     }
 
+    /// True for the three audio-only rows, `audio_m4a`, `audio_wav` and
+    /// `audio_aiff`, the rows `stems` applies to (spec §11 AU-108 (a)).
+    pub(crate) fn takes_stems(&self) -> bool {
+        !self.video
+    }
+
     pub(crate) fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("id".to_string(), Value::from(self.id));
@@ -191,6 +197,10 @@ impl Preset {
         if self.takes_audio_bits() {
             let bits = [16, 24].iter().map(|b| Value::from(*b));
             out.insert("audio_bits".to_string(), bits.collect());
+        }
+        if self.takes_stems() {
+            let modes = ["tracks", "names"].iter().map(|m| Value::from(*m));
+            out.insert("stems".to_string(), modes.collect());
         }
         Value::Object(out)
     }

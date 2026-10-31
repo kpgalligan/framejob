@@ -208,6 +208,11 @@ impl Segment {
 #[derive(Debug, Clone)]
 pub(crate) struct CompTrack<'a> {
     pub(crate) id: u32,
+    /// On an AUDIO track, the id of the timeline track whose walk in
+    /// [`Project::assign`] placed it — a nest's contents carry the nest
+    /// clip's track — written as the plan's `track` (spec §11 AU-107). Zero
+    /// until `assign` labels it, and on every video track.
+    pub(crate) track: u32,
     pub(crate) segments: Vec<Segment>,
     /// One per segment, in the same order, on an AUDIO track; empty on a
     /// video track, which needs no envelope. A segment alone cannot say how
@@ -275,6 +280,7 @@ fn place<'a>(
             *next_id = next_id.saturating_add(1);
             tracks.push(CompTrack {
                 id,
+                track: 0,
                 segments: unit,
                 voices: voice.into_iter().collect(),
             });
@@ -506,6 +512,9 @@ impl Project {
                 }
             }
             assignment.video.extend(video);
+            for comp in &mut audio {
+                comp.track = track.id;
+            }
             assignment.audio.extend(audio);
         }
         assignment

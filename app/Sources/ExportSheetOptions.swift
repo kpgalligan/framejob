@@ -213,6 +213,10 @@ extension ExportSheetController {
         /// uncompressed WAV and AIFF rows (spec §11 AU-29).
         var audioBits: Bool { !(preset?.audioBits.isEmpty ?? true) }
 
+        /// The Stems popup is live only on a row that lists modes: the three
+        /// audio rows (spec §11 AU-108 (a)).
+        var stems: Bool { !(preset?.stems.isEmpty ?? true) }
+
         /// The video rate is a soft cap on every row a bundled encoder writes
         /// (spec §11 CX-13, CX-16 (7)), whether or not it has speeds.
         var softCap: Bool { preset?.writer != nil }

@@ -28,7 +28,8 @@ extension AgentServer {
     /// The finished job's answer carries the sound the file actually holds —
     /// its integrated loudness and true peak, measured on the way through —
     /// for every format that has any, whether `loudness_lufs` was asked for
-    /// or not.
+    /// or not, and, with `stems` (the sheet's Stems popup, spec §11 AU-108),
+    /// each stem file beside the mix.
     func exportProject(_ a: [String: Any]) throws -> String {
         // The clock `export_status`'s `elapsed` runs on, read before any check.
         let started = ProcessInfo.processInfo.systemUptime
@@ -124,6 +125,12 @@ extension AgentServer {
             // same terms: the core reads 16 or 24 and refuses a row without a depth.
             if let bits = a["audio_bits"] {
                 overrides["audio_bits"] = bits
+            }
+            // The sheet's Stems popup (spec §11 AU-108), forwarded unread on the same
+            // terms: the core reads "tracks" or "names", refuses a movie row, and refuses
+            // a project with no track heard.
+            if let stems = a["stems"] {
+                overrides["stems"] = stems
             }
             let settings: ExportSettings
             do {

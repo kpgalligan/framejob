@@ -221,7 +221,7 @@ pub(crate) struct Stage<'a> {
 /// mute button lie. The test is on the set alone, never on what the tracks
 /// hold, so a soloed track with nothing audible on it still silences the
 /// rest.
-fn silenced(set: &[Track], track: &Track) -> bool {
+pub(crate) fn silenced(set: &[Track], track: &Track) -> bool {
     track.muted || (set.iter().any(|t| t.solo) && !track.solo)
 }
 

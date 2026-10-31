@@ -59,12 +59,22 @@ extension ExportWriter {
     /// plan's mix, as the float mix the measurement read
     /// (`ExportAudioMaster.floatMixSettings`, spec §11 AU-27), which the
     /// master turns into the encoder's samples. `ExportWebMWriter` reads
-    /// through it too.
+    /// through it too. A stem's build (`audioSelection`, spec §11 AU-108 (e))
+    /// reads only its own tracks through a mix of only their parameters.
     static func audioReadOutput(_ built: BuiltComposition) -> AVAssetReaderAudioMixOutput {
+        var tracks = built.composition.tracks(withMediaType: .audio)
+        var mix = built.audioMix
+        if let selection = built.audioSelection {
+            tracks = tracks.filter { selection.contains($0.trackID) }
+            let selected = AVMutableAudioMix()
+            selected.inputParameters = built.audioMix.inputParameters.filter {
+                selection.contains($0.trackID)
+            }
+            mix = selected
+        }
         let output = AVAssetReaderAudioMixOutput(
-            audioTracks: built.composition.tracks(withMediaType: .audio),
-            audioSettings: ExportAudioMaster.floatMixSettings)
-        output.audioMix = built.audioMix
+            audioTracks: tracks, audioSettings: ExportAudioMaster.floatMixSettings)
+        output.audioMix = mix
         // AVFoundation's own default, kept explicit because the other reader
         // in this tree (`MediaImporter.peaks`) turns it off.
         output.alwaysCopiesSampleData = true
