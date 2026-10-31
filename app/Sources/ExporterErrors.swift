@@ -84,6 +84,9 @@ extension Exporter {
         /// to it, so the export stops naming the clip rather than writing it
         /// ungated.
         case loudnessUnmeasured(clip: UInt32)
+        /// A clip's voice effect (spec §11 AU-147) could not be rendered: the
+        /// export waits for it as for its isolation, and stops naming the clip.
+        case voiceFailed(clip: UInt32, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -123,6 +126,8 @@ extension Exporter {
                 return "Clip \(clip)'s loudness has not been measured yet, so its gate and "
                     + "de-esser have no threshold. Wait for the Volume section to show its "
                     + "loudness, then export again."
+            case .voiceFailed(let clip, let message):
+                return "Clip \(clip)'s voice effect could not be rendered: \(message)."
             }
         }
     }

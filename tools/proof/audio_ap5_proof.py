@@ -157,15 +157,18 @@ def probe_rows(sources=ROOT / "app/Sources"):
 
 # ---- mutants ---------------------------------------------------------------------
 
+# The builder's text since AP14 (a voiced render rides the same pass).
 SILENT_BUILDER_OLD = (
-    "                let isolation = isolated.isEmpty\n"
+    "                let isolation = isolated.isEmpty && voiced.isEmpty\n"
     "                    ? nil\n"
     "                    : AudioIsolationTrack(\n"
-    "                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated)\n")
+    "                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated,\n"
+    "                        voiced: voiced)\n")
 SILENT_BUILDER_NEW = (
     "                let isolation = dsp.isolates\n"
     "                    ? AudioIsolationTrack(\n"
-    "                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated)\n"
+    "                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated,\n"
+    "                        voiced: voiced)\n"
     "                    : nil\n")
 
 # name, rows any one of which must fail, [(file, before exactly once, after)].

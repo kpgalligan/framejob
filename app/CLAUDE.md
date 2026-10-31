@@ -152,7 +152,8 @@ detail there.
   30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body,
   and format 31's `AudioProps.isolation` (AU-50), and format 32's `eq`, `hum` and `channels`
   (`AudioEQProps.swift`, AU-31, AU-33, AU-34), and format 33's `gate` and `deEsser`
-  (`AudioDynamicsProps.swift`, AU-43, AU-45);
+  (`AudioDynamicsProps.swift`, AU-43, AU-45), and format 34's `voice`
+  (`VoiceProps.swift`, AU-140);
   `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
   `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
@@ -548,6 +549,8 @@ detail there.
   the ramp and isolation renders with no change of its own. `cache` is the
   document's `intendedCacheDirectory`, published by one line in
   `ProjectDocument`, which the gate's and de-esser's levels read (AU-42).
+  `voiced` is computed, `isolated`'s sibling `cache/voiced/` (AU-144), so
+  it needs no line of its own.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -979,7 +982,8 @@ the key map behind it.
   `motion`, to the BASE props (a curve never: every count animates, spec §11
   GR-34), and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
-  the gate and the de-esser (AU-46), duck and keep-pitch there (CI-3);
+  the gate and the de-esser (AU-46), the voice effect (AU-140), duck and
+  keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
   and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
@@ -1090,9 +1094,11 @@ the key map behind it.
   +`Isolation`: the Voice Isolation section, spec §11 AU-56, registered
   before Noise Reduction — Isolate voice, Amount, Status, the Status read
   through the pane's `IsolationCache.Memo`, dropped on
-  `.reversedMediaDidChange`, which the pane observes; +`HumChannels` and
+  `.reversedMediaDidChange`, which the pane observes; +`Voice`: the Voice
+  Effect section, spec §11 AU-146, registered right after Voice Isolation,
+  its Status read through the pane's `voiceMemo`; +`HumChannels` and
   +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
-  Voice Isolation and before Noise Reduction, base-only; +`Dynamics`: the Gate
+  Voice Effect and before Noise Reduction, base-only; +`Dynamics`: the Gate
   and De-esser sections, spec §11 AU-48, registered after Noise Reduction and
   before Compressor, base-only, their Status and Loudness rows read through
   the pane's `loudnessMemo`) ·
@@ -1356,14 +1362,15 @@ the key map behind it.
   a deep slow-down is the owner's accepted limit (SR-15 as SR-16 widens
   it, `ramp_proof.py` L3), kept by SR1e (SR-16); written as a 32-bit float CAF through a
   `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
-- `RampAudioCache.swift` — `OfflineAudioJob` (a ramp, or an isolated
-  window, §11 AU-52), `RampSegmentKey` (the clip, Keep pitch, glide and
+- `RampAudioCache.swift` — `OfflineAudioJob` (a ramp, an isolated
+  window, §11 AU-52, or a voiced one, AU-144), `RampSegmentKey` (the clip, Keep pitch, glide and
   map: equal exactly when the rendered file is), `RampAudioRequest` (its
   `job`) and the file name from the media file's stat, the version and the
   reversal (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix,
-  in `ramp-audio` or `isolated`.
+  in `ramp-audio`, `isolated` or `voiced`.
 - `RampAudioRenders.swift` — the process-wide serial render queue (SR-12)
-  of every offline audio job, a ramp's or an isolated window's (AU-52):
+  of every offline audio job, a ramp's, an isolated window's (AU-52) or a
+  voiced window's (AU-144):
   owners (a document's recipe key, an export's key while it writes) WANT
   file names; a render nobody wants is cancelled, one wanted again while it
   runs is not, and a cancelled or refused render still wanted is queued
@@ -1373,16 +1380,19 @@ the key map behind it.
   owner's `settled` closure runs on the main queue when a render it wants
   lands OR fails, so a failure reaches the pane.
 - `ProjectDocument+RampAudio.swift` — the document's wants after each edit,
-  its plans' ramp segments and isolated windows in ONE `want`, and
-  `rampAudioDidSettle` on a landing or a failure: the prune of both folders
-  and `.reversedMediaDidChange`, so the frozen editor rebuilds with no change
-  and the Voice Isolation status reads again. `Exporter+RampAudio.swift` —
-  the export's wait for every ramp render it needs and every isolated window
-  (`isolationFailed`) before the build (a ramp's failure fails the export as
-  `rampAudioFailed`; it never writes a placeholder), its wants released by
-  `Exporter.releaseRecipeKey`, and `waitForLevels`, the wait for a gated or
-  de-essed clip's loudness still being measured (`loudnessUnmeasured` after
-  300 s, AU-42).
+  its plans' ramp segments, isolated windows and voiced windows in ONE
+  `want`, and `rampAudioDidSettle` on a landing or a failure: the prune of
+  the three folders, the wants made again (a voice waiting for its
+  isolation is wanted once that lands, AU-143) and
+  `.reversedMediaDidChange`, so the frozen editor rebuilds with no change
+  and the Voice Isolation and Voice Effect statuses read again.
+  `Exporter+RampAudio.swift` — the export's wait for every ramp render it
+  needs and every isolated window (`isolationFailed`), then a second wait
+  for every voiced window (`voiceFailed`, AU-147), before the build (a
+  ramp's failure fails the export as `rampAudioFailed`; it never writes a
+  placeholder), its wants released by `Exporter.releaseRecipeKey`, and
+  `waitForLevels`, the wait for a gated or de-essed clip's loudness still
+  being measured (`loudnessUnmeasured` after 300 s, AU-42).
 - `IsolationRenderer.swift` — a clip window's isolated voice rendered offline
   (AU-51): Apple's `AUSoundIsolation` High Quality Voice at 100 %, one
   manual-rendering engine per channel in lockstep over one
@@ -1393,7 +1403,8 @@ the key map behind it.
   `IsolationWindow`, the name (never the Amount), `IsolationSegmentKey`,
   which segments are isolatable (×1, no ramp, no freeze), the requests, the
   status the pane reads (`Memo`, held per document, clip, the two handles
-  and the published `ReverseResolution`, and through a gesture), the wet
+  and the published `ReverseResolution`, and through a gesture;
+  `Memo(compute:)` holds Voice Effect's status too), the wet
   offset rounded ONCE (AU-53), and `CompositionBuilder.isolatedAudio` (the
   READY renders a build reads into memory).
 - `AudioIsolation.swift` — the tap's isolation pass (AU-53, AU-54):
@@ -1401,6 +1412,32 @@ the key map behind it.
   `IsolatedAudioStore` (path → weak object), `AudioIsolationSpan`,
   `AudioIsolationTrack` (spans placed through `placement(of:shift:)`,
   `dry + a·(wet − dry)` before the chain, reading only preloaded memory).
+  A ready voiced segment's render (AU-143) is a span at amount 1 in place
+  of its isolation crossfade (`voiced:`).
+- `VoiceProps.swift` — `audio.voice`'s Swift model (AU-140): `VoiceKind` in
+  E8's order, `VoiceGroup`, the popup titles ("Voice: Pitch" … "Space:
+  Cathedral"), each kind's own pitch; `dictionary` always carries `pitch`,
+  `NSNull` when unset, so a kind change drops a stored one.
+- `VoiceChain.swift` — the AU-141 table: `VoiceSettings` (semitones 0
+  unless the kind reads pitch), each kind's chain as `Stage` values
+  (TimePitch → EQ → Distortion → Delay → Reverb, scaled by the amount,
+  band edges by `geo`), inertness, the measured makeup per kind, the units
+  built (presets by `auAudioUnit.currentPreset`, every other parameter set
+  and clamped to its tree), and `version`, part of the cache key.
+- `VoiceRenderer.swift` — a clip window's voice effect rendered offline
+  (AU-142): `writeInput` (the window as a stereo CAF, crossfaded with the
+  isolated render when the clip isolates), then an `AVAudioPlayerNode` and
+  the chain at 48 kHz stereo in 4,096-frame offline calls, the chain's
+  latency discarded, cut at the window's end, mono as `(L+R)/2`, makeup in
+  float, through `RampCAFWriter`. Called by `RampAudioRenders`.
+- `VoiceCache.swift` — `cache/voiced/` (AU-144, AU-145): `VoiceJob`, the
+  name, the request (AU-55's segments, and an isolating clip's only once
+  its isolated file is on disk), the requests, the Voice Effect status, and
+  `CompositionBuilder.voicedAudio` (the READY renders a build reads into
+  memory).
+- `AudioPane+Voice.swift` — the Sound tab's Voice Effect section (AU-146),
+  after Voice Isolation: Effect popup (a kind writes `pitch: null`;
+  `voiceChoice`), Amount, Pitch for pitch/high/deep only, Status.
 - `RampVarispeedStream.swift` — the Keep pitch off tape glide as a stream
   (SR1c): the map read at 48 kHz from any start (negative for a
   pre-roll), dropping source behind a bound from the map's steepest
@@ -1789,7 +1826,8 @@ the key map behind it.
   `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
   `MTAudioProcessingTap` playback and export share, and the nine sample-level
   effects after voice isolation's crossfade, which runs first (AU-54,
-  `AudioIsolation.swift`): the channel pick and the EQ and hum notch at the
+  `AudioIsolation.swift`; a ready voice effect's render in its place,
+  AU-143): the channel pick and the EQ and hum notch at the
   head (AU-30, AU-34: RBJ biquads in Double over 17 fixed positions, scalar per
   sample, designed at the cut; looked up `AudioTrackDSP.headLead` — SY-25's
   6,400 ticks — further ahead on a noise-reduced track, the tap's runs split at
@@ -1829,7 +1867,7 @@ the key map behind it.
   because a patch merges per key), `HumProps`, `AudioChannelChoice` and the
   presets (`EqPreset`, each writing only its own slot); `AudioEQCurveView` the
   drawn response at 48 kHz; `AudioPane+EQ` the EQ section and
-  `AudioPane+HumChannels` the Channels and Hum sections, after Voice Isolation
+  `AudioPane+HumChannels` the Channels and Hum sections, after Voice Effect
   and before Noise Reduction, all base-only.
 - `AudioEnvelopeFollower.swift` · `AudioGateStage.swift` ·
   `AudioDeEsserStage.swift` · `AudioDynamicsProps.swift` ·

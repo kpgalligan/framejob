@@ -1080,6 +1080,100 @@ dBFS), the parity log empty. No mutant's anchor moved, so none was re-run.
 **Owed.** SE-31 for the owner (the defaults by ear: chatter, pumping, lisping). Nothing to
 file.
 
+### AP14's record (2026-10-30)
+
+Voice effects (survey B10, E8 of `designs/adr/effects-survey.md`, #123), built in lane C.
+
+**Decided.** AU-140…AU-149, recorded before the code: `audio.voice` `{kind, amount, pitch}`
+(sixteen kinds in E8's order, no default kind, amount 0…1 default 1, pitch −12…12 optional and
+read only by pitch, high and deep, absent the kind's own 0, +5, −5), format 34, written only when
+set, merged key by key, base-only; each kind a fixed chain TimePitch → EQ → Distortion → Delay →
+Reverb scaled by the amount, with a per-kind makeup; E8's render contract with the chain's latency
+discarded; isolation → voice (the voice rendered from the isolation crossfade, waiting for its
+file); `cache/voiced/` on the ramp render queue; AU-55's segments; the Voice Effect section; the
+export's second wait and `voiceFailed`; the limits; the proof. The adversary's two objections were
+taken before the code: the latency discard (V10 and the latency-kept mutant) and a kind change
+sending `pitch: null` (V11).
+
+**Landed.** Core: `VoiceKind`, `Voice`, `VOICE_DEFAULT_AMOUNT` and `AudioProps.voice` after
+`de_esser`, `check_audio`'s two ranges, `clamp_audio`, the patch template's voice, format 34,
+`schema_v34.rs` and `voice.rs`. Swift: `VoiceProps.swift` (103), `VoiceChain.swift` (297),
+`VoiceRenderer.swift` (262), `VoiceCache.swift` (183), `AudioPane+Voice.swift` (81); the voices
+in `AudioDSPParameters`, the voiced span in `AudioIsolationTrack` (one `placement` call and the
+crossfade line kept), `CompositionBuilder.voicedAudio` and its wiring, `OfflineAudioJob.voice`,
+`RampAudioRenders`' arm, `IsolationCache.Memo(compute:)`, `ReverseResolution.voiced`,
+`ProjectDocument+RampAudio`'s third folder and its settle wanting again, the export's second wait,
+`voiceFailed`, `AudioProps`, `AudioPatch`, `structural(audio:)` and `set_audio`'s prose. Docs: the
+guide's Voice Effect section and limits, the README highlight, SE-32, spec §4.3b, §5.2a/b, §5.6,
+§6, §7.2, §7.4, §7.8, §7.10.
+
+**Deviations.** The makeup is measured as I3's export reads it (the fader at ×4, both channels):
+read at the recording's own −44.7 LUFS, the −70 LUFS gate made robot, telephone and distorted read
+7.90, 2.18 and 5.96 dB, and distorted then exported 3.0 LU low; at ×4 they are 8.70, 2.64 and
+8.89. K7 reads bright at its bell's 3 kHz octave (+3.3 dB): at 4 kHz the chain lifts +2.7 dB, under
+the sketch's +3, and the row reports it; the chain is AU-141's, so a larger bell would be the
+owner's change. The burst is −6 dBFS RMS, and V9 uses it where the sketch said a click. A failed
+voice render whose source cannot be read says so in the voice's words ("The voice effect's source
+cannot be read"), where `RampAudioCache.renderSource`'s sentence named retimed audio.
+`clip_inspector2_probe.swift`'s T2 and `screens.py`'s `SECTIONS` list the new `audio.voice`
+section.
+
+**Measured** (the lane; Release after its gate): `voice_proof.py` 38/38 — V2 worst 0.0 alone and
+2.09e-7 behind the reducer's lead; V5 and V7 equal to the reference sample for sample, every chain's
+latency 0 frames; V9 room 0.45 s, cathedral 4.07 s; V10 both envelope peaks at 0 ms; K1–K3 and I2
+within 0.00 cents; K4 the 940 and 1060 Hz sidebands +87.8 and +87.7 dB over the 1 kHz bin; K5
++9.8, K6 +9.8 dB; K8 −25.5 / −28.3, K9 −25.4 / −19.3 dB; K10 +60.6 dB; K11 −9.6 dB; K12 +0.02 and
++0.04 ms; K13–K16 0.430, 0.340, 1.600 and 3.650 s (E0: 239 ms, 246 ms, 2.20 s, 5.79 s, a different
+measure); I3 dry −29.60 LUFS and every kind within 0.10 LU; I5 2.3 s to finish; I9 the floor 13.2
+dB lower. `--measure` with the final table: every kind within 0.01 LU of −29.63 LUFS. `--mutants`
+"10/10 mutants killed, 1 equivalent", exit 0: `latency-kept` survives and is scored equivalent,
+every chain's latency measuring 0 frames (V10 prints pitch +7's). `cargo test` `voice` 7/7,
+`schema_v33` 4/4 (now `schema_v34`), `schema_v32` 5/5, `schema_v31` 4/4, `isolation` 4/4.
+`make gate` PASS 414 s (names 1, typecheck 6 with the four baseline warnings, fmt 3, lint 16, test
+227, app 160). On Release `audio_ap5_proof.py --instance` 12/12 (I2 the floor 14.9 dB lower, I3
+−63.7 dB), `--mutants` 10/10 over the re-anchored builder; `clip_inspector2_proof.py` 33/33;
+`screens.py --only 09-clip-sound,09b-clip-sound-eq` 7/7. The parity log empty on both builds. One
+Debug run of the instance rows read room's I3 export 12.10 LU low, exactly the ×4 fader missing
+over the whole file; I3 alone again on Debug and the Release run read it at +0.00, and it did not
+recur.
+
+**Review.** Review 1's should-fix: `voice_proof.py --mutants` exited 1 on the equivalent
+`latency-kept`. Fixed in the lane (`equivalence()` reads V10's pitch +7 latency from the mutant's
+own output and leaves a surviving `latency-kept` at 48 frames or fewer out of the score; a build
+failure or a missing anchor still scores a failure); `--mutants` then exit 0 and `make gate` PASS
+296 s. Review 2 passed with two nits carried from review 1, both taken at integration: the doc
+comment of `ensureRampAudio` now names voiced windows and a voice effect, and `model_audio.rs`'s
+`//!` paragraph is wrapped again.
+
+**Integrated.** AP7 and AP4 had landed since the lane's base `3f7ed17`. AP4 took format 33 and
+`schema_v33.rs`, so this phase's format is 34: `format.rs` (598 lines), the header,
+`schema_v34.rs` (versions 1–33 open stamped current, a file at 33 with no voice writes what it did,
+the voice round-trips after `de_esser`), `voice.rs`'s fixture, AU-140, §5.2a/b's titles, §4.3b, §6
+and the decisions index. AP7 and AP4 took SE-30 and SE-31, so this phase's check is SE-32.
+Conflicts were taken as unions: the core's field, check, clamp and template (the voice after the
+gate and the de-esser); `AudioProps`, `AudioPatch` and `structural(audio:)`; `AudioDSPParameters`
+(the voices beside AP4's `pendingLevels` and `measured`); `ReverseResolution` (AP4's stored
+`cache` beside the computed `voiced`); both `ExportError` cases; `Exporter+RampAudio` (AP4's
+`waitForLevels` first, then the two render waits, P8's anchor line still once); `set_audio`'s
+prose (both clauses; gate, de_esser and voice in the MERGE sentence); the Sound tab's order (Voice
+Effect after Voice Isolation, Gate and De-esser after Noise Reduction) in T2, now fourteen
+sections, and `screens.py`; the guide, the README highlight, §5.2b, §7.2, §7.4, §7.8 (the voice
+wait after the isolation wait, then the loudness wait), the decisions index's `audio.md` row, the
+proof README and this record (after AP4's). The spec indexes' Lines cells were counted again
+(`spec_index_proof.py` 213/213). On the merged tree: `cargo test` `voice` 7/7, `schema_v34` 4/4,
+`schema_v33` 5/5, `audio_dynamics` 5/5; `make typecheck` 0 errors and the four baseline
+warnings; `make gate` PASS 369 s (names 1, typecheck 6, fmt 3, lint 25, test 175, app 159).
+Because the merge touched product code, `voice_proof.py` ran again against Release: 38/38, every
+figure the lane's (V5 and V7 worst |Δ| 0.0, V9 0.45 / 4.07 s, K7 +3.3 dB with 4 kHz +2.7, K13–K16
+0.430, 0.340, 1.600, 3.650 s, I3 every kind within 0.10 LU of −29.60 LUFS, I9 13.2 dB), the
+parity log empty. `clip_inspector2_proof.py` 33/33 on Release (T2's Sound tab fourteen sections in
+order), and, over the merged `AudioDSPParameters`, `audio_ap4_probe.py` 11/11 (D10 188,160
+samples compared, 0 differ; D11 68.4 µs, 0.32 %). No mutant's anchor moved, so none was re-run.
+
+**Owed.** SE-32 for the owner (each kind on the owner's voice; Robot's character, the pitch
+shifter's artefacts, lips and voice in sync). Filed at integration: a Clip ▸ Voice ▸ menu (E8's),
+not built here. #123 closed by this phase.
+
 ### Closing the road map
 
 The ADR in `designs/adr/audio.md`, this file and the survey archived with their rows in

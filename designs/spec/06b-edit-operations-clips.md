@@ -384,6 +384,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded
   unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is
   normalised to `null` before the range checks run, so one clip has one spelling of "no motion".
+  `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
+  merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
+  **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.
   `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11
   W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is
   not the content's token count is an **error** in the rule's own words — `this text is timed word

@@ -1,8 +1,9 @@
 import Foundation
 
 /// The process-wide scheduler of every offline audio render (spec §11 SR-12
-/// (c)–(g), (j), AU-52): a ramp segment's retimed sound and a clip window's
-/// isolated voice (`OfflineAudioJob`), what each OWNER wants, one serial
+/// (c)–(g), (j), AU-52, AU-144): a ramp segment's retimed sound, a clip
+/// window's isolated voice and its voice effect (`OfflineAudioJob`), what
+/// each OWNER wants, one serial
 /// `.utility` queue rendering one at a time, and the waits an export makes
 /// on it.
 ///
@@ -216,11 +217,27 @@ final class RampAudioRenders: @unchecked Sendable {
                         ? request.source : try RampAudioCache.renderSource(for: request.source),
                     window: window, destination: landing)
                 _ = try IsolationRenderer.render(job, cancelled: cancelled)
+            case .voice(let voice):
+                // The source as `.isolation`'s (AU-142), a refusal in the
+                // voice's words; the isolated render it crossfades from is
+                // named in the job.
+                let source: URL
+                do {
+                    source = request.reversed
+                        ? request.source : try RampAudioCache.renderSource(for: request.source)
+                } catch RampAudioRenderer.RenderError.unreadable(let why) {
+                    throw VoiceRenderer.RenderError.unreadable(why)
+                }
+                let job = VoiceRenderer.Job(source: source, job: voice, destination: landing)
+                _ = try VoiceRenderer.render(job, cancelled: cancelled)
             }
         } catch RampAudioRenderer.RenderError.cancelled {
             try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch IsolationRenderer.RenderError.cancelled {
+            try? FileManager.default.removeItem(at: landing)
+            return .cancelled
+        } catch VoiceRenderer.RenderError.cancelled {
             try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch {
@@ -230,6 +247,7 @@ final class RampAudioRenders: @unchecked Sendable {
             switch request.job {
             case .ramp: kind = "ramp audio"
             case .isolation: kind = "isolated voice"
+            case .voice: kind = "voice effect"
             }
             NSLog("RampAudioRenders: clip %u's %@ was not rendered into %@: %@",
                 request.clip, kind, request.destination.lastPathComponent, why)

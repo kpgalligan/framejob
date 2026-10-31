@@ -99,13 +99,21 @@ struct AudioDSPParameters: Equatable {
     /// The gated or de-essed clips whose level is still pending (AU-42):
     /// they play without both stages, and an export waits for them.
     let pendingLevels: Set<UInt32>
+    /// Each clip's voice effect as its chain reads it, when not inert (spec
+    /// §11 AU-140, AU-141): rendered offline and played in place of the
+    /// clip's sound before the chain (AU-143). Base only, never on a nest clip.
+    private let voiceSettings: [UInt32: VoiceSettings]
 
-    static let empty = AudioDSPParameters(clips: [:], isolation: [:])
+    static let empty = AudioDSPParameters(clips: [:], isolation: [:], voiceSettings: [:])
 
-    private init(clips: [UInt32: AudioClipDSP], isolation: [UInt32: Double]) {
+    private init(
+        clips: [UInt32: AudioClipDSP], isolation: [UInt32: Double],
+        voiceSettings: [UInt32: VoiceSettings]
+    ) {
         self.clips = clips
         self.isolation = isolation
         pendingLevels = []
+        self.voiceSettings = voiceSettings
     }
 
     /// Reads the settings off a project snapshot, nests included — a nested
@@ -164,6 +172,7 @@ struct AudioDSPParameters: Equatable {
         var clips: [UInt32: AudioClipDSP] = [:]
         var isolation: [UInt32: Double] = [:]
         var pending: Set<UInt32> = []
+        var voiceSettings: [UInt32: VoiceSettings] = [:]
         func collect(_ list: [ClipSnapshot]) {
             for clip in list {
                 // A nest clip's own entry could never be looked up: its id
@@ -176,6 +185,10 @@ struct AudioDSPParameters: Equatable {
                 case .measured(let lufs): level = lufs
                 case .pending: pending.insert(clip.id)
                 case .unmeasurable, nil: break
+                }
+                if let voice = audio.voice {
+                    let settings = VoiceChain.settings(voice)
+                    if !VoiceChain.isInert(settings) { voiceSettings[clip.id] = settings }
                 }
                 let dsp = AudioClipDSP(
                     pan: audio.pan,
@@ -246,6 +259,7 @@ struct AudioDSPParameters: Equatable {
         self.clips = clips
         self.isolation = isolation
         pendingLevels = pending
+        self.voiceSettings = voiceSettings
     }
 
     /// The parameters a project asks for with every gated or de-essed clip's
@@ -277,7 +291,13 @@ struct AudioDSPParameters: Equatable {
     /// Whether any clip asks for isolation.
     var isolates: Bool { !isolation.isEmpty }
 
-    var isEmpty: Bool { clips.isEmpty && isolation.isEmpty }
+    /// The clip's voice effect, nil when it has none or an inert one (AU-141).
+    func voice(for clip: UInt32) -> VoiceSettings? { voiceSettings[clip] }
+
+    /// Whether any clip has a voice effect.
+    var voices: Bool { !voiceSettings.isEmpty }
+
+    var isEmpty: Bool { clips.isEmpty && isolation.isEmpty && voiceSettings.isEmpty }
 }
 
 /// The process-wide place `CompositionBuilder` finds a document's audio DSP

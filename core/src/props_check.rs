@@ -407,6 +407,12 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     props.hum.as_ref().map(check_hum).transpose()?;
     props.gate.as_ref().map(check_gate).transpose()?;
     props.de_esser.as_ref().map(check_de_esser).transpose()?;
+    if let Some(voice) = &props.voice {
+        in_range("audio.voice.amount", voice.amount, 0.0, 1.0)?;
+        if let Some(pitch) = voice.pitch {
+            in_range("audio.voice.pitch", pitch, -12.0, 12.0)?;
+        }
+    }
     Ok(())
 }
 

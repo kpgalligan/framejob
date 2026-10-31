@@ -198,7 +198,8 @@ enum IsolationCache {
     /// playhead tick — or that comes mid-gesture (no render is wanted until
     /// it ends, SR-12 (c)) does not decode the plans again. Its owner calls
     /// `invalidate()` on `.reversedMediaDidChange`, which is how a render
-    /// landing or failing reaches it.
+    /// landing or failing reaches it. `compute` is the status it holds —
+    /// isolation's, or the Voice Effect section's (`VoiceCache.status`).
     final class Memo {
         private weak var document: ProjectDocument?
         private weak var project: ReelProject?
@@ -206,6 +207,14 @@ enum IsolationCache {
         private var clip: UInt32?
         private var resolution: ReverseResolution?
         private var held: IsolationStatus?
+        private let compute: (UInt32, ProjectDocument) -> IsolationStatus
+
+        init(
+            compute: @escaping (UInt32, ProjectDocument) -> IsolationStatus =
+                IsolationCache.status(of:in:)
+        ) {
+            self.compute = compute
+        }
 
         func status(of clip: UInt32, in document: ProjectDocument) -> IsolationStatus {
             let resolution = ReverseSource.shared.resolution(for: document.recipeKey)
@@ -216,7 +225,7 @@ enum IsolationCache {
             {
                 return held
             }
-            let status = IsolationCache.status(of: clip, in: document)
+            let status = compute(clip, document)
             self.document = document
             project = document.project
             edited = document.editedProject

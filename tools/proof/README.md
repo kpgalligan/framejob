@@ -26474,3 +26474,80 @@ output AirPods Max over Bluetooth, `--probe` 16/16 and L1 and L4 passed (|ΔI| 0
 L3 failed with extra `jump` resets — the same on the lane's own Release build — so a Bluetooth
 output is a host state these two rows fail on, not one they skip (`designs/audio.md`, AP7's
 record).
+## Road map "audio" AP14 — voice effects (`voice_proof.py` V1–V11, `--measure`, I0, K1–K16, I2–I11; eleven mutants; `core/tests/voice.rs`, `schema_v34.rs`; spec §11 AU-140…AU-149)
+
+A clip's `audio.voice` (`{kind, amount, pitch}`, sixteen kinds) is one cached offline render of
+its window through a fixed chain of Apple's units (`VoiceChain.swift`, `VoiceRenderer.swift`,
+`VoiceCache.swift`), played by AP5's tap pass in place of the clip's sound. **`voice_proof.py`**
+has three halves, and its docstring has every row:
+
+- **The probe** (`voice_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.build`, `Blank.mp4` beside the binary; a failed build is a scored FAIL). Its
+  fixtures are 48 kHz float WAVs written by `AVAudioFile` — seeded stereo noise, 220 Hz tone
+  bursts (100 ms on, 100 ms off), a 50 ms noise burst at −6 dBFS RMS at 0.5 s in 10 s — and
+  synthetic renders written by `RampCAFWriter` under the names `IsolationCache` and
+  `VoiceCache` give, in `tools/proof/work/voice/<build>/scratch/`; projects are ops on an
+  untitled `ProjectDocument` published under a fresh key with a `ReverseResolution` whose
+  `isolated` is the scratch `cache/isolated/` (so `voiced` is `cache/voiced/`).
+
+  | Row | What it holds |
+  |---|---|
+  | V1 | hall with no render: no tap, the mix read byte-identical to no voice; isolation 0.6 ready and the voice pending: one span, isolation's amount and render |
+  | V2 | a synthetic voiced render with isolation 0.5 and its render present: the read equals the voiced render at the placement, ≤ 1e-7 alone and ≤ 1e-4 behind the noise reducer's lead |
+  | V3 | no request for amount 0, pitch at 0 st, a time-scaled, ramped, freeze or pending-reverse segment, or an isolating clip whose isolated file is missing; once present, the request names it |
+  | V4 | the name changes with window, kind, amount, semitones, isolation and reversal, not with `pitch` on a kind that does not read it |
+  | V5 | `VoiceRenderer.render` against the probe's reference engine (fx_common's loop at 4,096-frame calls, the same latency discard, then makeup) for lofi, radio, robot, pitch +7 and hall: equal sample for sample, exactly the window's length |
+  | V6 | `writeInput` equals `dry + i·(iso − dry)` at i = 0.4 |
+  | V7 | hall on the mono recording: a mono file equal to the reference's `(L+R)/2` |
+  | V8 | `Exporter.withRampAudio` builds only once the voice file exists; an unreadable source fails it `voiceFailed` naming the clip |
+  | V9 | room's and cathedral's tails after the burst ≥ 3 s apart (presets in effect from sample 0) |
+  | V10 | sync on the tone bursts: the 1 ms RMS envelope of pitch +7 and robot against the dry's peaks at 0 ± 1 ms; each chain's latency printed |
+  | V11 | a kind change sends `pitch: null` (`VoiceProps.dictionary`, `AudioPane.voiceChoice`) |
+
+- **`--measure`** renders the owner's recording through each kind at amount 1 (pitch at +7) and
+  prints `m_k`, the dry recording's integrated loudness less the render's without makeup, both
+  read as an export at ×4 reads them (the fader at ×4, the mono sound in both channels): the
+  recording is −44.7 LUFS, and near the −70 LUFS gate integrated loudness is not linear in level.
+  `VoiceChain.makeupDb` is its output.
+
+- **The instance rows** I0, K1–K16 and I2–I11, on `proof_app`'s app launched by the script with
+  `-RCDevRampRenderHold 2` and stopped by its own pid, on ffmpeg's fixtures (48 kHz mono WAV:
+  tones at 220 Hz and 1 kHz, white noise, a click, the burst) and, for I3 and I9, the recording
+  at volume ×4; exports `audio_wav`, decoded by ffmpeg; I3's loudness is ffmpeg's `ebur128`.
+  K7 reads bright at its bell's 3 kHz octave: at 4 kHz the chain lifts about +2.6 dB, below the
+  sketch's +3, and that figure is reported beside it.
+
+`--mutants` runs eleven, each a replacement in a copied `app/Sources` (every anchor asserted
+once), scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `call-size-1024` | `VoiceRenderer.callFrames` 1024 | V5 |
+| `preset-via-loadFactoryPreset` | presets loaded by `loadFactoryPreset` before start | V9 |
+| `pitch-zero-kept` | TimePitch kept at 0 cents | V3 |
+| `window-not-keyed` | the window left out of the name | V4 |
+| `isolation-ignored` | the input not crossfaded with the isolated render | V6 |
+| `voice-before-isolation` | a request without the isolated file on disk | V3 |
+| `pending-silent` | a pending voice earns a tap that zeroes the clip | V1 |
+| `export-no-wait` | the export does not wait for its voices | V8 |
+| `tail-kept` | 48,000 frames past the window written | V5 |
+| `mono-left` | a mono output is the left channel | V7 |
+| `latency-kept` | the chain's latency not discarded | V10 |
+
+```sh
+python3 tools/proof/voice_proof.py --probe     # V1–V11
+python3 tools/proof/voice_proof.py --measure   # m_k per kind
+python3 tools/proof/voice_proof.py --mutants   # 11 mutants
+python3 tools/proof/voice_proof.py             # the probe, then I0, K1–K16, I2–I11 on an own instance
+```
+
+**The recorded run (2026-10-30, Release after `make gate`):** 38/38. V2 worst 0.0 alone and
+2.09e-7 behind the reducer's lead; V5 and V7 worst |Δ| 0.0, every chain's latency 0 frames; V9
+room 0.45 s, cathedral 4.07 s; V10 both envelope peaks at 0 ms; K1–K3 and I2 within 0.00 cents;
+K4 the sidebands +87.8 / +87.7 dB over the 1 kHz bin; K5 +9.8, K6 +9.8, K7 +3.3 dB (4 kHz +2.7
+reported); K8 −25.5 / −28.3, K9 −25.4 / −19.3 dB; K10 +60.6 dB; K11 −9.6 dB; K12 +0.02 / +0.04
+ms; K13–K16 0.430, 0.340, 1.600 and 3.650 s; I3 dry −29.60 LUFS and every kind within 0.10 LU;
+I9 the floor 13.2 dB lower. `--measure` (final table): every kind within 0.01 LU of the dry
+−29.63 LUFS. `--mutants` "10/10 mutants killed, 1 equivalent", exit 0: `latency-kept`
+survives and is scored equivalent, every chain's latency measuring 0 frames (V10 prints
+pitch +7's, at most 48 frames), so there is nothing to discard.

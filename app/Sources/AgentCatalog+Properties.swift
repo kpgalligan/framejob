@@ -210,9 +210,9 @@ extension AgentServer {
         + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
         + "rendered offline, the clip plays without it until the render lands and an export "
         + "waits for it; a clip not at ×1 plays without it)" + audioEQClause
-        + audioDynamicsClause + ". duck, "
-        + "compressor, limiter, eq (and each of its slots), hum, gate and de_esser are "
-        + "OBJECTS and they "
+        + audioDynamicsClause + audioVoiceClause + ". duck, "
+        + "compressor, limiter, eq (and each of its slots), hum, gate, de_esser and voice "
+        + "are OBJECTS and they "
         + "MERGE: a key you leave out keeps what is stored, and {duck: null} clears the "
         + "whole thing."
     // Format 32's keys (spec §11 AU-31..AU-34), their own typed local so the
@@ -252,6 +252,19 @@ extension AgentServer {
         + "loudness is measured: until then it plays without them and an export waits; a "
         + "clip too short or too quiet to measure plays without them; on a nest clip they "
         + "do nothing"
+    // Format 34's voice effect (spec §11 AU-140, AU-141), its own typed
+    // local for the reason `audioEQClause` is.
+    private static let audioVoiceClause: String =
+        ", voice (null or {kind, amount, pitch}: a voice effect rendered offline and played "
+        + "in place of the clip's sound, after isolation and before the channel pick; kind "
+        + "is one of voice: pitch, high, deep, robot; tone: bass, treble, bright, telephone, "
+        + "radio; character: lofi, distorted; space: echo, room, hall, plate, cathedral; "
+        + "amount 0–1, default 1, how much of the effect (0 plays the clip dry); pitch "
+        + "-12 to 12 semitones, read only by pitch, high and deep, absent meaning the "
+        + "kind's own, 0, +5 and -5; a new kind keeps a stored pitch unless pitch: null "
+        + "is sent with it; {voice: null} clears it. The clip plays without the effect "
+        + "until its render lands and an export waits for it; a clip not at ×1 plays "
+        + "without it; reverb and echo tails end with the clip)"
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.

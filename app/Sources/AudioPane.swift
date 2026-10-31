@@ -33,6 +33,8 @@ final class AudioPane: InspectorPaneView {
     /// Voice Isolation's Status read-out (AU-56), dropped by an offline
     /// audio settlement.
     let isolationMemo = IsolationCache.Memo()
+    /// Voice Effect's Status read-out (AU-146), dropped with it.
+    let voiceMemo = IsolationCache.Memo(compute: VoiceCache.status(of:in:))
 
     override init(inspector: InspectorViewController) {
         super.init(inspector: inspector)
@@ -48,6 +50,7 @@ final class AudioPane: InspectorPaneView {
 
     @objc private func offlineAudioSettled(_ note: Notification) {
         isolationMemo.invalidate()
+        voiceMemo.invalidate()
         inspector?.refresh(isLive: false)
     }
 

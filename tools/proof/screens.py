@@ -134,7 +134,7 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 SECTIONS = {
     "audio.channels": True, "audio.compressor": True, "audio.de_esser": False,
     "audio.duck": True, "audio.eq": False, "audio.fades": True, "audio.gate": False,
-    "audio.hum": True, "audio.isolation": True,
+    "audio.hum": True, "audio.isolation": True, "audio.voice": True,
     "audio.limiter": True, "audio.mix": True, "audio.noise": True, "audio.volume": False,
     "clip.timing": False,
     "doc.appearance": False, "doc.canvas": False, "doc.markers": False, "doc.rate": False,

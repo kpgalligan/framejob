@@ -220,7 +220,8 @@ final class ClipPane: InspectorPaneView {
             sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),
                 // The chain's head, in signal order (spec §11 AU-54, AU-38).
-                audioPane.isolationSection(), audioPane.channelsSection(),
+                audioPane.isolationSection(), audioPane.voiceSection(),
+                audioPane.channelsSection(),
                 audioPane.eqSection(), audioPane.humSection(),
                 audioPane.noiseSection(), audioPane.gateSection(), audioPane.deEsserSection(),
                 audioPane.compressorSection(), audioPane.mixSection(),

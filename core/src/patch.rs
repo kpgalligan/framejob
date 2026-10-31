@@ -77,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -155,6 +155,13 @@ impl Group {
                 // Format 33's gate and de-esser (spec §11 AU-46).
                 gate: Some(crate::model::Gate::default()),
                 de_esser: Some(crate::model::DeEsser::default()),
+                // Format 34's voice (spec §11 AU-140), `pitch` present so
+                // the walk knows it.
+                voice: Some(crate::model::Voice {
+                    kind: crate::model::VoiceKind::Pitch,
+                    amount: 1.0,
+                    pitch: Some(0.0),
+                }),
                 ..AudioProps::default()
             }),
             Group::Text => actions::to_json(&TextProps {

@@ -97,7 +97,10 @@ struct AudioIsolationSpan {
     let audio: IsolatedAudio
 }
 
-/// One composition audio track's isolation pass: its spans, sorted.
+/// One composition audio track's isolation pass: its spans, sorted. A ready
+/// voiced segment's render (spec §11 AU-143) is a span here too, at amount 1,
+/// in place of its isolation crossfade: the voice render already holds the
+/// isolation it was made from.
 struct AudioIsolationTrack {
     let spans: [AudioIsolationSpan]
 
@@ -106,15 +109,19 @@ struct AudioIsolationTrack {
     /// One span per segment of the family whose clip asks for isolation and
     /// whose render is loaded, placed through `placement(of:shift:)` so the
     /// track's leads compose: `[r(at), r(at + duration))` with `r` the
-    /// nearest frame, and the wet offset rounded once (AU-53).
+    /// nearest frame, and the wet offset rounded once (AU-53). A segment in
+    /// `voiced` takes its voice render at amount 1 instead (AU-143).
     init(
         segments: [PlanSegment], shift: CompositionBuilder.AudioShift,
-        dsp: AudioDSPParameters, renders: [IsolationSegmentKey: IsolatedAudio]
+        dsp: AudioDSPParameters, renders: [IsolationSegmentKey: IsolatedAudio],
+        voiced: [IsolationSegmentKey: IsolatedAudio] = [:]
     ) {
         var spans: [AudioIsolationSpan] = []
         for s in segments where s.duration > 0 {
-            let amount = dsp.isolation(for: s.clip)
-            guard amount > 0, let audio = renders[IsolationSegmentKey(s)],
+            let key = IsolationSegmentKey(s)
+            let voice = voiced[key]
+            let amount = voice == nil ? dsp.isolation(for: s.clip) : 1
+            guard amount > 0, let audio = voice ?? renders[key],
                 let p = CompositionBuilder.placement(of: s, shift: shift)
             else { continue }
             let start = IsolationCache.frame(ofTicks: p.at)

@@ -760,3 +760,105 @@ AU-130…AU-136 are AP13's (audio while scrubbing; survey B5), recorded before i
   mutants, each killed by its named row, plus `read-by-arrival`, which is equivalent (AVFoundation's
   mix reader delivers in presentation order) and is run but not scored. How the drag feels — no
   clicks, silence on hold — is the person's, PB-14 in `docs/manual-checks.md`.
+
+AU-140…AU-149 are AP14's (voice effects; survey B10, E8 of `designs/adr/effects-survey.md`,
+#123), recorded before its code.
+
+- **AU-140 — `audio.voice` is `{kind, amount, pitch}`, one per clip, absent or null off, format
+  34.** (32 went to AP3, 33 to AP4.) `kind` is one of sixteen, in E8's order and groups — voice: `pitch`,
+  `high`, `deep`, `robot`; tone: `bass`, `treble`, `bright`, `telephone`, `radio`; character:
+  `lofi`, `distorted`; space: `echo`, `room`, `hall`, `plate`, `cathedral` — with no default, as
+  `video.look`'s. `amount` is 0…1, default 1. `pitch` is −12…12 semitones and optional: absent
+  means the kind's own (0 for `pitch`, +5 for `high`, −5 for `deep`), and only those three read
+  it. The field is written only when set, `pitch` only when set, so every other project writes
+  the text it did and there is no migration step. `set_audio {voice: null}` clears it; a voice
+  patch merges key by key, so a `kind` alone keeps a stored `pitch` and `pitch: null` drops it
+  back to the kind's own; a patch with no `kind` over no voice is refused in serde's sentence.
+  `set_audio` refuses `amount` or `pitch` out of range in `in_range`'s sentence
+  (`audio.voice.amount must be between 0 and 1, not 1.5`), and an action end's values are
+  clamped (amount to 0…1, falling back to 1; pitch to −12…12, falling back to 0). Base-only
+  (AP8 animates), carried by Paste Attributes with the audio group, and nothing on a nest clip.
+- **AU-141 — Each kind is a fixed chain of Apple units, scaled by `amount`.** Amount `a` scales
+  every gain, wet mix, shift and band edge, an edge moving geometrically, `geo(x0, x1) =
+  x0·(x1/x0)^a`, from where it does nothing (20 Hz, 20 kHz) at a = 0. The units run TimePitch →
+  EQ → Distortion → Delay → Reverb:
+
+  | Kind | Chain | m_k (dB) |
+  |---|---|---|
+  | pitch / high / deep | TimePitch at `100·s·a` cents (rate 1, overlap 8), s the semitones; high adds an EQ high-pass at `geo(20,150)` and a high shelf at 4 kHz, +3a dB; deep adds a low shelf at 150 Hz, +4a, and a high shelf at 5 kHz, −3a | 2.01 / 1.67 / 1.12 |
+  | robot | Distortion with all 16 parameters set by address: ring mod 60 Hz on both oscillators, balance 50, ring mix 100; delay, decimation and polynomial mixes 0; linear term 1; soft-clip gain −6 dB; final mix 100a. Then Delay 8 ms, feedback 50, low-pass 15 kHz, wet 30a | 8.70 |
+  | bass | Low shelf at 200 Hz, +10a dB | −3.88 |
+  | treble | High shelf at 3 kHz, +10a dB | −1.67 |
+  | bright | Parametric at 3 kHz, 1 octave, +4a, and a high shelf at 8 kHz, +6a | −0.63 |
+  | telephone | High-pass ×2 at `geo(20,300)` and low-pass ×2 at `geo(20000,3400)` | 2.64 |
+  | radio | High-pass ×2 at `geo(20,400)` and low-pass ×2 at `geo(20000,4500)`, then Distortion `speechRadioTower`, wet 40a | −2.95 |
+  | lofi | High-pass at `geo(20,150)` and low-pass at `geo(20000,6000)`, then Distortion `multiDecimated2`, wet 100a | −3.08 |
+  | distorted | Distortion `multiDistortedCubed`, wet 100a | 8.89 |
+  | echo | Delay 0.25 s, feedback 40, low-pass 6 kHz, wet 50a | 0.34 |
+  | room / hall / plate / cathedral | Reverb `mediumRoom` 35a / `largeHall` 40a / `plate` 35a / `cathedral` 45a | 1.47 / 1.56 / 1.20 / 2.89 |
+
+  TimePitch is left out when its cents round to 0, and a unit is never put in at wet 0. A voice
+  is INERT — it renders nothing and plays dry — when `a = 0` or its chain is empty (the kind
+  `pitch` at 0 cents). Makeup gain is `10^(m_k·a/20)`, `m_k` a constant per kind measured at
+  `a = 1` on `samples/Rode-usb-mic.m4a` (`voice_proof.py --measure`: the dry recording's gated
+  BS.1770 loudness less the render's, with the kind's own pitch; the kind `pitch` at +7), so a
+  voice keeps the clip's loudness. Both are read as I3's export reads them — the fader at ×4, the
+  mono recording in both channels — because the recording is −44.7 LUFS and the −70 LUFS gate
+  makes integrated loudness non-linear in level there: read at its own level, robot, telephone
+  and distorted measured 7.90, 2.18 and 5.96 dB, and distorted then exported 3.0 LU low. The run
+  (2026-10-30): dry −29.63 LUFS, every kind within 0.01 LU of it once the table was in. Every number is Frame Job's own (the Concat rule).
+  `VoiceChain.version` names this table and AU-142's contract.
+- **AU-142 — The render contract is E8's, with the chain's latency discarded.** 48 kHz STEREO
+  connections (reverb given mono aborts the process) with an `AVAudioPlayerNode` playing an input
+  file; schedule → `start()` → `play()`; every `renderOffline` call asks for 4,096 frames (the
+  output is byte-identical only at a fixed call size); every preset set through
+  `auAudioUnit.currentPreset` before start (`loadFactoryPreset` before start is ignored, after it
+  lands about 43 ms late), and then only `wetDryMix` over it; every unit that takes no preset has
+  every parameter set and clamped to the range its parameter tree publishes. Output is float CAF
+  through `RampCAFWriter`. `L`, the sum over the chain's units of `round(auAudioUnit.latency ×
+  48 000)` read after `start()`, is discarded as `IsolationRenderer` discards its 4440: the engine
+  renders `L + (endFrame − firstFrame)` frames (the player gives silence once the input ends), the
+  first `L` are dropped, and exactly the window's length is written, so kept frame 0 is the
+  window's first frame and the tail is cut at the clip's end. The window renders cold, with no
+  preroll. The input file is always stereo (a mono source in both channels); the output has the
+  source's channel count, a mono output `(L+R)/2`. Makeup is applied in float before the write.
+- **AU-143 — The order (amends AU-54): isolation → voice → channels → high-pass/EQ → hum → noise
+  reduction → gate → de-esser → compressor → limiter → fader.** The voice render's input is the
+  dry window when the clip does not isolate; when it does (amount `i`), it is `dry + i·(iso −
+  dry)`, built from the isolated render, so the voice request exists only once that file is on
+  disk, and a change to the Isolation amount re-renders the voice. In the tap, a ready voiced
+  segment REPLACES the samples (a span at amount 1) instead of its isolation crossfade.
+- **AU-144 — The cache.** `cache/voiced/<media>-<16 hex>.caf`, FNV-1a 64 (as `IsolationCache.name`)
+  over the media file's path, size and modification second, `VoiceChain.version`, the reversal,
+  the window, the kind, amount and semitones (never a `pitch` a kind does not read), and the
+  isolation amount with the isolated file's name (or `none`). It renders as the `.voice` job on
+  `RampAudioRenders` — its owners, its landing under the ledger, pruning on settle, a failure once
+  per launch, `-RCDevRampRenderHold` — and every settle wants again, so a voice waiting for its
+  isolation is wanted when that isolation lands. Deviations from E8, both AP5's: no marker file
+  (the ledger's landing rename is the commit), and pruning on settle rather than sweeping on open.
+- **AU-145 — Which segments are voiced: AU-55's rule.** ×1 forward segments and reversed segments
+  whose copy is ready (`IsolationCache.isolatable`); a time-scaled, ramped or freeze segment
+  plays without the effect. A pending render plays without its effect — with isolation, if that
+  render is ready. A tap at a rate other than 48 kHz passes dry. Deviation from E8: the builder
+  does not substitute an asset track; the voiced render is read into memory and played by AP5's
+  pass.
+- **AU-146 — The section.** "Voice Effect", in the Sound tab after Voice Isolation: an Effect popup
+  — "None", then the sixteen in E8's order titled "Voice: Pitch" … "Space: Cathedral" (the groups
+  in the titles, because `OptionControls.swift` is Rasterize's and not forked); choosing a kind
+  writes `{kind, amount: current ?? 1, pitch: null}`, so every kind starts at its own pitch, and
+  None writes null. An Amount row 0–100 % (quick 25, 50, 100); a Pitch row −12…12 st at one
+  decimal (quick −12, −5, 0, 5, 12), enabled only for the kinds that read it, showing `pitch ??`
+  the kind's own; a Status read-out in Voice Isolation's words. Deviation from E8: no Clip ▸
+  Voice ▸ menu in this phase (filed).
+- **AU-147 — Export and agents.** An export wants and waits for its voice renders after its ramp
+  and isolation renders ("Preparing…"), and fails `voiceFailed` naming the clip when one cannot be
+  rendered. An agent uses `set_audio {voice}`: no new op, tool or FFI, and the render's status is
+  not in `get_project`.
+- **AU-148 — Limits.** Tails end with the clip. One effect per clip. Waveforms, Normalize's
+  reading and Remove Silences read the dry media. A split take's windows start cold. In a stereo
+  source a reverb or a delay mixes the channels, so AP3's channel pick chooses from the effected
+  pair. How each kind sounds is a person's (SE-32).
+- **AU-149 — The proof.** `voice_proof.py`: probe rows V1–V11 over `app/Sources`, `--measure` for
+  `m_k`, instance rows I0, K1–K16 (one per kind, against what E0 measured) and I2–I11, and eleven
+  mutants — one per AU-14x decision plus latency-kept for AU-142's discard — each killed by its
+  named row; manual check SE-32.

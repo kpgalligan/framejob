@@ -310,6 +310,10 @@ pub(crate) fn clamp_audio(mut props: AudioProps) -> AudioProps {
     props.hum = props.hum.map(crate::audio_eq::clamp_hum);
     props.gate = props.gate.map(crate::audio_dynamics::clamp_gate);
     props.de_esser = props.de_esser.map(crate::audio_dynamics::clamp_de_esser);
+    if let Some(voice) = props.voice.as_mut() {
+        voice.amount = bounded(voice.amount, 0.0, 1.0, 1.0);
+        voice.pitch = voice.pitch.map(|p| bounded(p, -12.0, 12.0, 0.0));
+    }
     props
 }
 

@@ -149,7 +149,8 @@ extension CompositionBuilder {
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
         assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset],
         ramps: [RampSegmentKey: AVAssetTrack] = [:],
-        isolated: [IsolationSegmentKey: IsolatedAudio] = [:]
+        isolated: [IsolationSegmentKey: IsolatedAudio] = [:],
+        voiced: [IsolationSegmentKey: IsolatedAudio] = [:]
     ) throws -> (inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack]) {
         var inputParameters: [AVAudioMixInputParameters] = []
         var meters: [LevelMeterTrack] = []
@@ -174,10 +175,11 @@ extension CompositionBuilder {
                         reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
                         shift: shift, ramps: ramps)
                 }
-                let isolation = isolated.isEmpty
+                let isolation = isolated.isEmpty && voiced.isEmpty
                     ? nil
                     : AudioIsolationTrack(
-                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated)
+                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated,
+                        voiced: voiced)
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(

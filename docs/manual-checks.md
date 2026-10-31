@@ -455,6 +455,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** are the gate's defaults (10 dB under the clip's loudness, 4:1, 20 dB range, 50 ms hold, 100 ms release) and the de-esser's (6 kHz, at the clip's loudness, 6 dB) right for this voice, and does either stage chatter, pump or lisp?
 - **Source:** road map "audio" AP4 (spec §11 AU-40..AU-49); `tools/proof/audio_ap4_probe.py` and `tools/proof/audio_ap4_proof.py` measure the curves, times, the floor and the band reduction against their analytic values, not how they sound.
 
+**SE-32 — Each voice effect sounds like its name on a real voice, and stays in sync**
+- **Do:** 1. Put your own voice (`samples/Rode-usb-mic.m4a`, or a camera clip of you talking, where you can see your lips) on the timeline and select it. 2. In the Sound sub-tab's Voice Effect section pick each effect in turn, wait for Status to read Ready, and play a few words through headphones: the four Voice ones, the five Tone ones, Lo-Fi and Distorted, then Echo, Room, Hall, Plate and Cathedral. 3. On Pitch, move Pitch to −12, −5, +5 and +12; on Robot, Distorted and Cathedral, set Amount to 25 % and 50 %. 4. On the camera clip with Pitch at +5, watch the lips against the voice. 5. Turn on Voice Isolation as well with Robot, and export one effect and play the export.
+- **Expect:** every effect sounds like its name; switching between them keeps about the same loudness; Robot is a clear metallic, buzzing voice that is still understandable; the pitch shifter changes the pitch without changing the speed, with no more than a light warble at ±12; Telephone and Radio sound band-limited, the radio slightly gritty; the reverbs grow from Room to Cathedral and their tails stop at the clip's end; lower amounts sound like less of the same effect; the lips and the voice stay together on a pitch effect; with isolation on the effect works on the clean voice; the export sounds like the preview.
+- **Answer:** does each effect sound right on your voice (which do not, and how), does Robot sound like a robot, are the pitch shifter's artefacts acceptable, and do lips and voice stay in sync?
+- **Source:** road map "audio" AP14 (spec §11 AU-141, AU-142, AU-146); `tools/proof/voice_proof.py` measures each effect against E0's numbers (pitch, band tilt, sidebands, echo times, reverb tails, loudness and sync), not how it sounds.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

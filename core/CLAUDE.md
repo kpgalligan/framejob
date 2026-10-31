@@ -42,7 +42,11 @@ governs a module now.
   AU-31, AU-33, AU-34, each written only when set, `channels` only when not
   `both`), and format 33's `Gate` and `DeEsser` (`audio.gate`,
   `audio.de_esser`, spec §11 AU-43, AU-45, after `channels`, each written only
-  when set); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
+  when set), and format 34's `Voice` (`audio.voice`, spec §11 AU-140, after
+  `de_esser`, written only when set: a `VoiceKind` with no default, an
+  `amount` defaulting to `VOICE_DEFAULT_AMOUNT`, an optional `pitch`; its
+  ranges in `props_check.rs`, its clamp in `actions_clamp.rs`, the chains
+  Swift's); the FIELD `Clip.audio` stays in `model.rs`. Re-exported through
   `model_props.rs`; a pure move out of it (road map "audio" AP0), so the audio
   group's new keys land here.
 - `audio_eq.rs` — the EQ's and the hum notch's bounds (format 32, spec §11

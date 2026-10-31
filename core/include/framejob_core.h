@@ -221,9 +221,12 @@ extern "C" {
  * only when not `both`; no migration step.
  *
  * Version 33 is the gate and de-esser (spec §11 AU-46): `audio.gate` and
- * `audio.de_esser`, each written only when set; no migration step. 34 and
- * above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 33
+ * `audio.de_esser`, each written only when set; no migration step.
+ *
+ * Version 34 is voice effects (spec §11 AU-140): `audio.voice`, after
+ * `de_esser`, written only when set; no migration step. 35 and above, 1014
+ * included, are newer. */
+#define RC_FORMAT_VERSION 34
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

@@ -3,8 +3,9 @@
 //! [`Duck`], [`Equalizer`] (with its slots [`HighPass`], [`LowShelf`],
 //! [`EqBand`], [`HighShelf`] and [`LowPass`]), [`Hum`] and [`AudioChannels`]
 //! inside it, and the [`Gate`] and [`DeEsser`], each over a hand-written
-//! [`Default`] that says what an absent key means. The EQ's, the hum's and
-//! the channel pick's bounds are `audio_eq.rs`'s (format 32, spec §11 AU-31,
+//! [`Default`] that says what an absent key means, and the [`Voice`]
+//! (format 34, AU-140), whose kind has none. The EQ's, the hum's and the
+//! channel pick's bounds are `audio_eq.rs`'s (format 32, spec §11 AU-31,
 //! AU-33, AU-34); the gate's and the de-esser's `audio_dynamics.rs`'s
 //! (format 33, AU-43, AU-45).
 //!
@@ -73,6 +74,10 @@ pub struct AudioProps {
     /// The split-band de-esser (format 33, spec §11 AU-45); absent is off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub de_esser: Option<DeEsser>,
+    /// The clip's voice effect (format 34, spec §11 AU-140), rendered
+    /// offline by Swift; absent is off, and is not written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<Voice>,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -101,6 +106,7 @@ impl Default for AudioProps {
             channels: AudioChannels::Both,
             gate: None,
             de_esser: None,
+            voice: None,
         }
     }
 }
@@ -486,4 +492,52 @@ impl Default for DeEsser {
             range_db: 6.0,
         }
     }
+}
+
+/// The amount a voice takes when a patch names only its kind: all of it
+/// (spec §11 AU-140), as a look's does.
+pub const VOICE_DEFAULT_AMOUNT: f64 = 1.0;
+
+fn default_voice_amount() -> f64 {
+    VOICE_DEFAULT_AMOUNT
+}
+
+/// The sixteen voice effects (spec §11 AU-140), in E8's order and groups —
+/// voice: pitch, high, deep, robot; tone: bass, treble, bright, telephone,
+/// radio; character: lofi, distorted; space: echo, room, hall, plate,
+/// cathedral. Append, never reorder: the spelling is persisted, and the
+/// order is the popup's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VoiceKind {
+    Pitch,
+    High,
+    Deep,
+    Robot,
+    Bass,
+    Treble,
+    Bright,
+    Telephone,
+    Radio,
+    Lofi,
+    Distorted,
+    Echo,
+    Room,
+    Hall,
+    Plate,
+    Cathedral,
+}
+
+/// A clip's voice effect: which, how much (0…1) and, for `pitch`, `high`
+/// and `deep`, the shift in semitones (−12…12; absent is the kind's own).
+/// `kind` has NO default, as `video.look`'s has none, so a voice patch
+/// naming only an amount over a clip with no voice is refused. The chains
+/// are Swift's (`VoiceChain.swift`).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Voice {
+    pub kind: VoiceKind,
+    #[serde(default = "default_voice_amount")]
+    pub amount: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pitch: Option<f64>,
 }

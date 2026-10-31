@@ -202,6 +202,9 @@ struct AudioPatch: Codable, Equatable {
     /// `.some(nil)` to clear.
     var gate: GateProps??
     var deEsser: DeEsserProps??
+    /// Format 34 (AU-140): a whole `VoiceProps` (its `pitch` always written,
+    /// null when nil), `.some(nil)` to clear.
+    var voice: VoiceProps??
 
     init(
         volume: Double? = nil, muted: Bool? = nil, fadeIn: Ticks? = nil, fadeOut: Ticks? = nil,
@@ -210,7 +213,7 @@ struct AudioPatch: Codable, Equatable {
         fadeInShape: FadeShape? = nil, fadeOutShape: FadeShape? = nil,
         limiter: LimiterProps?? = nil, isolation: Double? = nil, eq: EqProps?? = nil,
         hum: HumProps?? = nil, channels: AudioChannelChoice? = nil, gate: GateProps?? = nil,
-        deEsser: DeEsserProps?? = nil
+        deEsser: DeEsserProps?? = nil, voice: VoiceProps?? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -231,6 +234,7 @@ struct AudioPatch: Codable, Equatable {
         self.channels = channels
         self.gate = gate
         self.deEsser = deEsser
+        self.voice = voice
     }
 
     init(from decoder: Decoder) throws {
@@ -254,6 +258,7 @@ struct AudioPatch: Codable, Equatable {
         channels = c.lenient(.channels)
         gate = c.nullable(.gate)
         deEsser = c.nullable(.deEsser)
+        voice = c.nullable(.voice)
     }
 
     var dictionary: [String: Any] {
@@ -277,6 +282,7 @@ struct AudioPatch: Codable, Equatable {
         if let channels = channels { d["channels"] = channels.rawValue }
         d.putNullable("gate", gate) { $0.dictionary }
         d.putNullable("de_esser", deEsser) { $0.dictionary }
+        d.putNullable("voice", voice) { $0.dictionary }
         return d
     }
 

@@ -1,6 +1,6 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed. Two commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written.
 
 ## Where audio lives
 
@@ -8,21 +8,22 @@ There is only one kind of track. Any track can hold a clip with sound, whether i
 
 The waveform shows the level of the file itself, so moving the Volume slider doesn't redraw it. It's drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track that holds only sound clips is drawn as a shorter lane than a track with pictures.
 
-When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has ten sections, in this order:
+When the selection includes at least one clip that plays sound, the Clip tab of the inspector shows a **Sound** sub-tab. A clip counts as having sound when its file has an audio track and its audio is switched on, or when it is a nest that holds audio. The Sound sub-tab has twelve sections, in this order:
 
 1. **Volume**: level, gain read-out, loudness read-out, Mute and Normalize
 2. **Fades**: fade in and fade out
 3. **Ducking**: lowers every other clip while this one plays
 4. **Voice Isolation**
-5. **Channels**: which channels of a stereo file play
-6. **EQ**: a high-pass, two shelves, three bands and a low-pass, with presets for voice
-7. **Hum**: removes mains hum and its harmonics
-8. **Noise Reduction**
-9. **Gate**: turns the pauses between phrases down
-10. **De-esser**: tames harsh "s" sounds
-11. **Compressor**
-12. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
-13. **Limiter**: holds the clip's peaks under a ceiling
+5. **Voice Effect**: one of sixteen effects, from a pitch shift to a cathedral
+6. **Channels**: which channels of a stereo file play
+7. **EQ**: a high-pass, two shelves, three bands and a low-pass, with presets for voice
+8. **Hum**: removes mains hum and its harmonics
+9. **Noise Reduction**
+10. **Gate**: turns the pauses between phrases down
+11. **De-esser**: tames harsh "s" sounds
+12. **Compressor**
+13. **Mix**: pan, mix to mono, Detach Audio and Attach Audio
+14. **Limiter**: holds the clip's peaks under a ceiling
 
 Voice Isolation through Limiter appear in the order the sound passes through them. Volume, the fades and ducking are applied last, like a fader.
 
@@ -34,6 +35,7 @@ Every section header has a summary and a Reset button that appears when the sect
 | Fades | both lengths, for example "0.50 · 1.00 s", or "none" |
 | Ducking | the duck level, for example "20%", or "off" |
 | Voice Isolation | the amount, for example "80%", or "off" |
+| Voice Effect | the effect and its amount, for example "Space: Hall 100%", or "off" |
 | Channels | "Both", "Left Only", "Right Only" or "Swap Left and Right" |
 | EQ | how many parts are on, for example "2 on", "bypassed", or "off" |
 | Hum | the mains and the harmonics, for example "60 Hz · 4", or "off" |
@@ -179,6 +181,34 @@ Isolation comes first, before the channel choice, the EQ, noise reduction and th
 Isolation plays only on a clip at normal speed. A clip with a speed change, a speed ramp or a freeze frame plays without it, and the Status says so. A reversed clip is isolated once its reversed copy is ready.
 
 *Agents:* `set_audio` with `isolation` from 0 to 1 (0 is off). The render's status isn't in `get_project`; an export waits for it.
+
+## Voice Effect
+
+Voice Effect puts one of sixteen effects on the clip's sound, built from Apple's own audio units. The effects come in four groups:
+
+| Group | Effects |
+|---|---|
+| Voice | **Pitch** shifts the voice up or down without changing its speed; **High** and **Deep** shift it up 5 or down 5 semitones and brighten or warm it; **Robot** makes it metallic and buzzing. |
+| Tone | **Bass** and **Treble** boost the lows or the highs by up to 10 dB; **Bright** lifts the presence; **Telephone** and **Radio** squeeze it into a narrow band, the radio with some crackle. |
+| Character | **Lo-Fi** makes it gritty and dull; **Distorted** overdrives it. |
+| Space | **Echo** repeats it every quarter of a second; **Room**, **Hall**, **Plate** and **Cathedral** put it in a space, from a small room to a long cathedral tail. |
+
+| Control | What it does | Range | Default |
+|---|---|---|---|
+| Effect | The effect, or None. The popup names each one with its group, for example "Space: Hall". Picking one keeps the Amount and sets Pitch back to the effect's own. | None or one of 16 | None |
+| Amount | How much of the effect: 0 leaves the clip as it is, 100 % is the full effect. Every boost, mix and shift scales with it. Quick picks: 25, 50, 100 %. | 0–100 % | 100 % |
+| Pitch | The shift in semitones, for Pitch, High and Deep only (greyed out for the others). Quick picks: −12, −5, 0, 5, 12. | −12 to 12 st | 0 for Pitch, +5 for High, −5 for Deep |
+| Status | Read-only, in the same words as Voice Isolation's. With several clips selected it reads "—". | — | Off |
+
+Each effect keeps the clip at about the loudness it had, so switching between them doesn't jump in level.
+
+Like Voice Isolation, the effect is worked out once for each clip in the background, and until it is ready the clip plays without it. Changing the effect, Amount, Pitch, the Isolation amount, or trimming the clip works it out again. An export waits for every clip's effect to be ready ("Preparing…").
+
+The effect comes right after Voice Isolation: an isolated clip's effect is made from its isolated voice, so it waits for that first. Everything after it in the list (the channel choice, the EQ, noise reduction and the rest) works on the effected sound.
+
+The effect plays only on a clip at normal speed, as Voice Isolation does. A reverb or an echo stops at the end of the clip; it doesn't ring on into the next one.
+
+*Agents:* `set_audio` with `voice`: `{kind, amount, pitch}`, where `kind` is `pitch`, `high`, `deep`, `robot`, `bass`, `treble`, `bright`, `telephone`, `radio`, `lofi`, `distorted`, `echo`, `room`, `hall`, `plate` or `cathedral`; `amount` 0–1 (1 if left out); `pitch` −12 to 12, for `pitch`, `high` and `deep`. A new `kind` keeps a stored `pitch` unless `pitch: null` is sent with it, and `voice: null` turns the effect off. The render's status isn't in `get_project`; an export waits for it.
 
 ## Channels
 
@@ -544,8 +574,9 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
-- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, noise reduction, the limiter and ducking always apply to the whole clip.
-- On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, noise reduction and the limiter have no effect. Set them on the clips inside.
+- A voice effect also plays only at normal speed. A clip has one effect at a time. A reverb or echo tail ends with the clip, and a clip split from a take starts its effect fresh at the cut. The waveform, Normalize's reading and Remove Silences hear the clip without its effect. On a stereo file a reverb or an echo mixes the two channels, so the channel choice picks from the effected pair.
+- Only volume, Mute and the fades can be animated with an action. Pan, mono, Keep pitch, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, the voice effect, noise reduction, the limiter and ducking always apply to the whole clip.
+- On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter have no effect. Set them on the clips inside.
 - The gate and the de-esser act only once the clip's loudness has been measured; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip.
 - The gate has no lookahead, so a sound that starts loud after a long pause can lose its first millisecond while the gate opens. Neither stage has a listen or solo control for what it removes.
 - The EQ's settings switch at a cut between two clips without a glide; the curve has no handles to drag.
