@@ -316,7 +316,13 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   after. `model_track.rs` is the track vocabulary's home: AP10's `volume`, `pan` and
   `TRACK_VOLUME_MAX` landed there (39 → 68). No further seam in `model.rs` is named; the next
   is the media types (`Media`, `MediaOriginal`, `MediaKind`) out whole to a `model_media.rs`,
-  re-exported the same way.
+  re-exported the same way. Road map "creator-jobs" CJ0b paid it as toll T2, a pure move gated
+  alone (`cargo fmt --check`, `cargo test --release`, `make lint`): the `// ---- media` banner,
+  `Media`, `MediaOriginal` and `MediaKind` with their docs went whole to the new `model_media.rs`
+  under a module doc, re-exported by `model.rs` (`pub use crate::model_media::{Media, MediaKind,
+  MediaOriginal}`), so every `crate::model::Media*` path holds, and `lib.rs` gained `pub mod
+  model_media;`. Nothing widened. `wc -l core/src/model.rs`: 570 before, 512 after;
+  `model_media.rs` is 71. A media record's new keys land there. No further seam is named.
 - `format.rs`: at 598 before road map "audio" AP10, it paid toll T2 with T1: the per-version
   paragraphs of `RC_FORMAT_VERSION`'s doc (Version 2 … Version 34) went verbatim to the new
   `format_history.rs` as its `//!` module doc (no items), and the const kept its first two doc

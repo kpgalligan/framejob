@@ -108,6 +108,7 @@ pub mod model_grade;
 pub mod model_graphic;
 pub mod model_look;
 pub mod model_matte;
+pub mod model_media;
 pub mod model_media_color;
 pub mod model_motion;
 pub mod model_props;
