@@ -59,7 +59,7 @@ above unchanged. The export group's `mix` builds the composition as `Exporter` d
 `AVAssetReaderAudioMixOutput` over every audio track and the plan's mix, over
 `Exporter.timeRange` of the `audio_wav` settings, with no writer. A job's optional
 `mix_variant` picks the output: `app` (`ExportWriter.decodedAudioSettings`, the default),
-`float` (`ExportAudioGain.floatMixSettings`) or `output_varispeed` (`app` with the output's
+`float` (`ExportAudioMaster.floatMixSettings`) or `output_varispeed` (`app` with the output's
 `audioTimePitchAlgorithm` `.varispeed`). The file is channel 0 as float32 LE, and the line adds
 `variant`, `chunks: [[pts_ticks, frames]…]`, `range_ticks`, `composition_ticks` and
 `audio_track_ends`. A job's optional `tap_flag` makes `tap`'s tap `post` (PostEffects, the

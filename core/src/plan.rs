@@ -6,7 +6,8 @@
 
 use serde_json::{Map, Value};
 
-use crate::audio::Ducker;
+use crate::audio::{Ducker, Voice};
+use crate::audio_duck_speech::duck_ramps;
 use crate::evaluate::{json, Assignment};
 use crate::model::Project;
 use crate::time::{Ticks, TIMESCALE};
@@ -69,9 +70,19 @@ impl Project {
             .map(|track| {
                 let mut out = Map::new();
                 out.insert("id".to_string(), Value::from(track.id));
+                // The timeline track it plays under (spec §11 AU-107), for
+                // Swift's stems.
+                out.insert("track".to_string(), Value::from(track.track));
                 out.insert(
                     "segments".to_string(),
-                    Value::Array(track.segments.iter().map(|s| s.to_json(true)).collect()),
+                    Value::Array(
+                        track
+                            .segments
+                            .iter()
+                            .zip(&track.voices)
+                            .map(|(s, voice)| self.audio_segment(s.to_json(true), voice))
+                            .collect(),
+                    ),
                 );
                 // The envelope is computed from the voices, not the
                 // segments: fades, actions, mute and ducking all live in the
@@ -87,6 +98,20 @@ impl Project {
                     ),
                 );
                 Value::Object(out)
+            })
+            .collect();
+
+        // A speech duck's own multiplier (spec §11 AU-113), for the line the
+        // timeline draws on the ducking clip; none for an extent duck.
+        let ducks: Vec<Value> = duckers
+            .iter()
+            .filter_map(|ducker| {
+                let spans = ducker.spans.as_ref()?;
+                let mut entry = Map::new();
+                entry.insert("clip".to_string(), Value::from(ducker.clip));
+                let ramps = duck_ramps(ducker, spans).iter().map(json).collect();
+                entry.insert("ramps".to_string(), Value::Array(ramps));
+                Some(Value::Object(entry))
             })
             .collect();
 
@@ -118,6 +143,10 @@ impl Project {
         }
         out.insert("video_tracks".to_string(), Value::Array(video_tracks));
         out.insert("audio_tracks".to_string(), Value::Array(audio_tracks));
+        // Only with a speech duck, so every other plan is the text it was.
+        if !ducks.is_empty() {
+            out.insert("ducks".to_string(), Value::Array(ducks));
+        }
         out.insert(
             "instructions".to_string(),
             Value::Array(
@@ -158,6 +187,19 @@ impl Project {
             if !input.is_null() {
                 segment.insert("input".to_string(), input);
             }
+        }
+        segment
+    }
+
+    /// An audio segment as the plan publishes it: with `automation` — the
+    /// points `audio_automation.rs` evaluates for its voice — ONLY when its
+    /// clip has an action naming a tap key (spec §11 AU-85), after
+    /// `track_pans`, so every other plan is the text it was. `voice` is the
+    /// segment's own: `CompTrack.voices` is one per audio segment, in order.
+    fn audio_segment(&self, mut segment: Value, voice: &Voice<'_>) -> Value {
+        let points = self.automation(voice);
+        if let (false, Value::Object(fields)) = (points.is_empty(), &mut segment) {
+            fields.insert("automation".to_string(), json(&points));
         }
         segment
     }

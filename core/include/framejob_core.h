@@ -191,9 +191,53 @@ extern "C" {
  * ramps to along the action's curve and holds after; no key moves, so every
  * project without one writes the text it did, and there is no migration step.
  * An older build would play a ramp at the clip's base rate and lose nothing
- * visible on save, so it must refuse the file. 28 and above, 1014 included,
- * are newer. */
-#define RC_FORMAT_VERSION 27
+ * visible on save, so it must refuse the file.
+ *
+ * Version 28 is a linked pair (spec §11 AU-90): `clips[].linked`, the id of
+ * the clip a clip is linked to, after `label`, written only when set, which
+ * Detach Audio's picture and sound carry for each other. A link is mutual and
+ * inside one container, and a one-sided one is refused on open; no key moves,
+ * so every project without one writes the text it did, and there is no
+ * migration step. An older build would drop the link on save, so it must
+ * refuse the file.
+ *
+ * Version 29 is ducking by speech and fade shapes (spec §11 AU-110..AU-116):
+ * `media.speech`, `audio.duck`'s `mode`, `pre_roll` and `hold`,
+ * `audio.fade_in_shape` and `fade_out_shape`, and `transition_in.audio_shape`,
+ * each written only when not its default, so every other project writes the
+ * text it did, and there is no migration step.
+ *
+ * Version 30 is the clip limiter (spec §11 AU-21): `audio.limiter`,
+ * `{ceiling_db, release}` after `fade_out_shape`, written only when set, so
+ * every project without one writes the text it did; the reader's default is
+ * none, so there is no migration step.
+ *
+ * Version 31 is voice isolation (spec §11 AU-50): `audio.isolation`, after
+ * `limiter`, written only when not 0, so every other project writes the text
+ * it did, and there is no migration step.
+ *
+ * Version 32 is EQ, hum and channels (spec §11 AU-37): `audio.eq` and
+ * `audio.hum`, each written only when set, and `audio.channels`, written
+ * only when not `both`; no migration step.
+ *
+ * Version 33 is the gate and de-esser (spec §11 AU-46): `audio.gate` and
+ * `audio.de_esser`, each written only when set; no migration step.
+ *
+ * Version 34 is voice effects (spec §11 AU-140): `audio.voice`, after
+ * `de_esser`, written only when set; no migration step.
+ *
+ * Version 35 is a track's volume and pan (spec §11 AU-102): `tracks[].volume`
+ * and `tracks[].pan`, after `matte`, each written only when not its default;
+ * no migration step.
+ *
+ * Version 36 is a track's compressor and limiter (spec §11 AU-150):
+ * `tracks[].compressor` and `tracks[].limiter`, after `pan`, each written
+ * only when set; no migration step.
+ *
+ * Version 37 is the leveller (spec §11 AU-66): `audio.leveller`, after
+ * `voice`, written only when set; no migration step. 38 and above, 1014
+ * included, are newer. */
+#define RC_FORMAT_VERSION 37
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
@@ -327,7 +371,11 @@ int64_t rc_project_duration(const RcProject *p);
 /* The composition plan (spec 7.2): what Swift builds an AVMutableComposition,
  * AVMutableAudioMix and AVVideoComposition.Configuration from. Swift asks for this
  * after every edit and rebuilds ONLY when the JSON differs from the current
- * plan — the plan holds exactly the structural facts. */
+ * plan — the plan holds exactly the structural facts. A project with a
+ * speech duck (format 29, spec §11 AU-113) adds a top-level "ducks":
+ * [{"clip": id, "ramps": [ramp, ...]}], one per speech ducker, its own
+ * multiplier over its widened spans, for the timeline's line; the key is
+ * absent when there is none. */
 char *rc_project_composition_plan(const RcProject *p);
 
 /* The frame recipe at time `t` (spec 7.3): the back-to-front layer list with
@@ -434,7 +482,9 @@ char *rc_normalise_color(const char *text);
    row is the default the export sheet opens on.
 
    Three of the rows are audio only: `audio_m4a` (AAC) is what you send,
-   and `audio_wav` / `audio_aiff` are 16-bit LPCM at 48 kHz — what you hand
+   and `audio_wav` / `audio_aiff` are LPCM at 48 kHz, 16-bit or 24 (their
+   rows alone list `audio_bits`, [16, 24], spec 11 AU-29; all three list
+   `stems`, ["tracks", "names"], spec 11 AU-108) — what you hand
    to somebody else's tool, where a second lossy generation is the one
    thing you cannot take back. A row's `avf_preset` means only
    "AVFoundation can write this row": `null` is what routes an export to
@@ -490,20 +540,24 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * `range`, `optimize_for_network`, the two bitrates in bits per second
  * (`video_bitrate`, `audio_bitrate`) and the two loudness figures
  * (`loudness_lufs`, the integrated target an export is normalised to,
- * -70..0; `peak_dbtp`, the true-peak ceiling the gain is capped against,
- * -20..0) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
+ * -70..0; `peak_dbtp`, the true-peak ceiling of the export's master
+ * limiter, -20..0, spec 11 AU-27) and `dynamic_range` ("hlg", "pq" or "sdr", spec 11 HD-14: an
  * HLG project's 10-bit rows default to hlg, its other video rows write sdr
  * and refuse hlg and pq, and an SDR project refuses hlg and pq) and
  * `encoder_speed` ("faster", "balanced" or "smaller", spec 11 CX-12: taken
  * only by a row whose preset lists encoder speeds, balanced there when
- * absent, and an error naming the row on any other). Absent
+ * absent, and an error naming the row on any other) and `audio_bits` (16
+ * or 24, spec 11 AU-29: taken only by the WAV and AIFF rows, whose
+ * presets list the depths, 16 there when absent, and an error naming the
+ * row on any other) and `stems` ("tracks" or "names", spec 11 AU-108:
+ * taken only by the three audio rows, whose presets list the modes, and an
+ * error naming the row on any other; refused when no track is heard). Absent
  * and explicit null both mean "use the preset", an unknown key is ignored
  * so a newer UI still gets an export, and a value out of range or of the
- * wrong type is an error naming the key and the value. One pairing rule,
- * and it is the table's only one: a `peak_dbtp` with no `loudness_lufs` is
- * an error, because normalisation is gain-only and a ceiling with nothing
- * to cap would be accepted, echoed and silently inert. Neither loudness
- * key appears in the resolved settings unless it was asked for.
+ * wrong type is an error naming the key and the value. Either loudness key
+ * may come alone: the ceiling is the master limiter's, which every export
+ * with sound runs, −1 dBTP when not asked. Neither loudness key appears in
+ * the resolved settings unless it was asked for.
  *
  * Note what is NOT in that list: there is no `size` key. A size is two
  * numbers here. `rc_export_sizes`' row ids ("1080p", "document") are the
@@ -551,7 +605,11 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * `vp9_alpha_webm`, spec 11 CX-12, CX-16, CX-17) adds `writer` at the end
  * ("svt_av1" or "libvpx"), and the two AV1 rows then `encoder_speed` (the
  * speed asked, else "balanced"); no other row's settings carry either key,
- * and the two VP9 rows' carry no speed. */
+ * and the two VP9 rows' carry no speed. `audio_wav` and `audio_aiff` add
+ * `audio_bits` at the end (the depth asked, else 16); no other row's
+ * settings carry it. An audio row asked for `stems` ends with `stems`, the
+ * mode resolved to `[{name, tracks}]`: each file's name and the timeline
+ * track ids it holds, in order; without it the settings carry no key. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

@@ -6,7 +6,9 @@
 //! nothing is lost and every following clip keeps its relative timing. An
 //! **overwrite** takes room from what is there: the span the new clip needs
 //! is cleared on that track alone and nothing moves at all, so the cut's
-//! total length and every other track are untouched.
+//! total length and every other track are untouched — but for a cut clip's
+//! linked partner, which `split_clips` cuts at the same bound (spec §11
+//! AU-92).
 //!
 //! Both are compositions of ops that already exist — `split_clips`,
 //! `insert_time`, `add_clip` — and both are ONE op anyway, for two reasons.
@@ -36,7 +38,10 @@ impl Project {
     /// the insert lands between two clips rather than on top of one. Other
     /// tracks are not cut: `insert_time` shifts them whole, straddlers
     /// staying put, which is what keeps a music bed unbroken under an
-    /// insert into the picture.
+    /// insert into the picture. The one exception is a cut clip's linked
+    /// partner on an unlocked track, which `split_clips` cuts at the same
+    /// `at` and pairs with it (spec §11 AU-92), so the pair stays in step
+    /// through the inserted time.
     ///
     /// **A locked destination track refuses**, up front rather than by
     /// collision. `insert_time` will not shift a locked track, so the room
@@ -91,7 +96,11 @@ impl Project {
 
     /// The overwrite edit: `media` lands whole at `at` on `track`, and
     /// whatever that track was playing across the span it needs is removed
-    /// (spec §6). Nothing moves, and no other track is touched.
+    /// (spec §6). Nothing moves, and no other track is touched but for a
+    /// cut clip's linked partner on an unlocked track: `split_clips` cuts it
+    /// at the same bounds and pairs the pieces (spec §11 AU-92), and the
+    /// partner's middle piece stays, its link settled away with the
+    /// picture it was paired to.
     ///
     /// The span is cut at both bounds first, so everything that touched it
     /// afterwards lies entirely inside it and can be dropped whole; a clip

@@ -185,3 +185,94 @@ fn the_published_schema_carries_off() {
         .expect("required is a list");
     assert!(!required.contains(&json!("off")), "off is optional");
 }
+
+// ---- an EQ slot keyed off (spec §11 AU-88) ---------------------------------
+
+/// Clip 11 with a base high-pass and a band 2, and one linear action (21)
+/// over its first two seconds, whose end state is `end`.
+fn eq_project(end: Value) -> Handle {
+    Handle::from_value(&json!({
+        "version": 35,
+        "canvas": { "width": 1920, "height": 1080, "fps": [30, 1] },
+        "media": [{
+            "id": 1, "path": "/fixtures/1.mov", "kind": "video",
+            "duration": 60 * SEC, "width": 1920, "height": 1080, "fps": [30, 1],
+            "has_video": true, "has_audio": true
+        }],
+        "tracks": [{ "id": 2, "name": "Track 1" }],
+        "clips": [{
+            "id": 11, "track": 2, "start": 0, "duration": 10 * SEC,
+            "source": { "kind": "media", "media": 1, "in": 0 },
+            "audio": { "eq": {
+                "high_pass": { "frequency": 1000.0, "slope": 24 },
+                "band_2": { "frequency": 1000.0, "gain_db": 0.0, "q": 1.0 }
+            } },
+            "actions": [{ "id": 21, "start": 0, "duration": 2 * SEC,
+                          "curve": "linear", "end": end }]
+        }],
+        "next_id": 22
+    }))
+}
+
+#[test]
+fn off_keys_one_eq_slot_off_at_the_end() {
+    let after = eq_project(json!({})).apply(&op(json!({}), json!(["audio.eq.high_pass"])));
+    assert_eq!(
+        end(&after),
+        json!({ "audio": { "eq": { "high_pass": null } } })
+    );
+    let midway = after.clip_state(11, SEC).expect("clip 11 has a state");
+    assert!(
+        at(&midway, "/audio/eq/high_pass").is_object(),
+        "the high-pass is off before the end: {midway}"
+    );
+    let at_end = after.clip_state(11, 2 * SEC).expect("clip 11 has a state");
+    assert!(
+        at_end
+            .pointer("/audio/eq/high_pass")
+            .is_none_or(Value::is_null),
+        "the high-pass is still on at the end: {at_end}"
+    );
+    assert!(
+        at(&at_end, "/audio/eq/band_2").is_object(),
+        "keying one slot off took another: {at_end}"
+    );
+}
+
+#[test]
+fn off_keeps_the_other_slots_the_patch_names() {
+    let after = eq_project(json!({})).apply(&op(
+        json!({ "audio": { "eq": { "band_2": { "gain_db": 6.0 } } } }),
+        json!(["audio.eq.high_pass"]),
+    ));
+    assert_eq!(
+        end(&after),
+        json!({ "audio": { "eq": { "band_2": { "gain_db": 6.0 }, "high_pass": null } } })
+    );
+}
+
+#[test]
+fn off_refuses_an_unknown_slot_a_deeper_path_and_a_slot_the_patch_names() {
+    let project = eq_project(json!({}));
+    let bogus = project.errors(&op(json!({}), json!(["audio.eq.bogus"])));
+    assert_contains(
+        &bogus,
+        "\"bogus\" is not one of high_pass, low_shelf, band_1, band_2",
+    );
+    assert!(!bogus.contains("internal error:"), "{bogus}");
+    assert_contains(
+        &project.errors(&op(json!({}), json!(["audio.pan.x"]))),
+        "off path \"audio.pan.x\" must be \"group.key\"",
+    );
+    assert_contains(
+        &project.errors(&op(json!({}), json!(["audio.eq.band_2.gain_db"]))),
+        "must be \"group.key\"",
+    );
+    assert_contains(
+        &project.errors(&op(
+            json!({ "audio": { "eq": { "high_pass": { "slope": 12 } } } }),
+            json!(["audio.eq.high_pass"]),
+        )),
+        "\"audio.eq.high_pass\" is named in both the patch and off",
+    );
+}

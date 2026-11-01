@@ -36,7 +36,14 @@ extension Playback {
     /// the picture. The two differ by under one buffer, so on a fade the
     /// displayed level lags the applied gain by up to 85 ms, which is under
     /// this meter's own resolution and far under the eye's.
+    ///
+    /// **While the live loudness meter is measuring, the bars are the MIX**
+    /// (road map "audio" AP7, spec §11 AU-74): its sample peak and RMS per
+    /// channel over its last 100 ms, rebuilt from the taps' samples, rather
+    /// than the per-track sum above, which over-reads correlated tracks' peak
+    /// by up to 3.85 dB (spike S3).
     func meterReading() -> LevelMeterReading {
+        if let bars = loudness.bars { return bars }
         guard let meters = built?.meters, !meters.isEmpty else { return .silent }
         return LevelMeterTrack.mix(meters, at: currentTime)
     }
@@ -44,15 +51,23 @@ extension Playback {
     /// Armed by the rate KVO when the transport starts moving. A run-loop
     /// `Timer`, not a dispatch source, for the reason `Playback.swift`'s header gives
     /// for the debounce: it cancels deterministically, and app/CLAUDE.md's
-    /// five `DispatchQueue` seams are not to grow a sixth.
+    /// five `DispatchQueue` seams are not to grow a sixth. It runs in the
+    /// `.common` modes, so menu tracking and a live resize still drain the
+    /// taps' rings (spec §11 AU-72), and each tick feeds the live loudness
+    /// meter before the bars are read.
     func startMetering() {
         guard meterTimer == nil else { return }
-        meterTimer = Timer.scheduledTimer(
-            withTimeInterval: Playback.meterInterval, repeats: true
-        ) { [weak self] _ in
+        let timer = Timer(timeInterval: Playback.meterInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            // A build with track dynamics is approximate in the preview (AU-153).
+            self.loudness.consume(
+                self.built?.meters ?? [], rate: self.rate,
+                now: ProcessInfo.processInfo.systemUptime,
+                tracksApproximate: !(self.built?.trackDynamics.isEmpty ?? true))
             LevelMeter.shared.publish(self.meterReading(), from: ObjectIdentifier(self))
         }
+        RunLoop.main.add(timer, forMode: .common)
+        meterTimer = timer
     }
 
     /// Disarmed on every stop, with a final zero. Nothing is pulled through
@@ -64,6 +79,7 @@ extension Playback {
     func stopMetering() {
         meterTimer?.invalidate()
         meterTimer = nil
+        loudness.stop()
         built?.meters.forEach { $0.sink.clear() }
         LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
     }

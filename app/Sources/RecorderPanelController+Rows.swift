@@ -38,7 +38,7 @@ extension RecorderPanelController {
             toggle.target = self
             toggle.action = #selector(controlChanged(_:))
         }
-        for box in [includeFrameJobCheckbox, cameraBesideCheckbox] {
+        for box in [includeFrameJobCheckbox, cameraBesideCheckbox, enhanceMicrophoneCheckbox] {
             box.font = DS.sans(13)
             box.target = self
             box.action = #selector(controlChanged(_:))
@@ -64,6 +64,7 @@ extension RecorderPanelController {
         microphoneRow.orientation = .horizontal
         microphoneRow.alignment = .centerY
         microphoneRow.spacing = 8
+        enhanceMicrophoneCheckbox.toolTip = RecordingEnhance.boxTooltip
 
         sizeNote.font = DS.mono(11)
         sizeNote.textColor = DS.textFaint
@@ -76,6 +77,7 @@ extension RecorderPanelController {
             [fieldLabel("Format:"), formatPopup],
             [NSGridCell.emptyContentView, cameraPreview],
             [fieldLabel("Microphone:"), microphoneRow],
+            [NSGridCell.emptyContentView, enhanceMicrophoneCheckbox],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
             [fieldLabel("Rate:"), ratePopup],
@@ -291,6 +293,7 @@ extension RecorderPanelController {
         }
         choice.includeFrameJobWindows = includeFrameJobCheckbox.state == .on
         choice.microphone = microphonePopup.selectedItem?.representedObject as? String
+        choice.enhanceMicrophone = enhanceMicrophoneCheckbox.state == .on && choice.microphone != nil
         choice.systemAudio = systemAudioSwitch.state == .on
         choice.showClicks = showClicksSwitch.state == .on
         choice.rate = Self.rates.contains(ratePopup.selectedTag()) ? ratePopup.selectedTag() : 60
@@ -329,6 +332,7 @@ extension RecorderPanelController {
         defaults.set(
             includeFrameJobCheckbox.state == .on, forKey: Self.includeFrameJobWindowsKey)
         defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)
+        defaults.set(enhanceMicrophoneCheckbox.state == .on, forKey: Self.enhanceMicrophoneKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
     }
@@ -357,6 +361,8 @@ extension RecorderPanelController {
         includeFrameJobCheckbox.state =
             defaults.bool(forKey: Self.includeFrameJobWindowsKey) ? .on : .off
         cameraBesideCheckbox.state = defaults.bool(forKey: Self.cameraBesideKey) ? .on : .off
+        enhanceMicrophoneCheckbox.state =
+            defaults.bool(forKey: Self.enhanceMicrophoneKey) ? .on : .off
         let rate = defaults.integer(forKey: Self.rateKey)
         _ = ratePopup.selectItem(withTag: Self.rates.contains(rate) ? rate : RecordingChoice().rate)
         let size = defaults.string(forKey: Self.sizeKey) ?? ""

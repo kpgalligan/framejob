@@ -30,17 +30,20 @@ a check over a measured tone would be green against the build with the clamp
 deleted. Nothing there is a picture and nothing there is claimed to be one.
 
 **Section 9 is not a picture either**, and it is here for section 8's reason
-one step further on. The export gain is decided in one pure function over
-three doubles (`ExportLoudness.resolve`, `app/Sources/Loudness.swift`), and
+one step further on. The export gain is decided in one pure function
+(`ExportLoudness.resolve`, `app/Sources/ExportLoudness.swift`, a pure move
+out of `Loudness.swift` in road map "audio" AP0, solved since AP2 part 2
+through the master limiter's model over 10 ms steps, spec §11 AU-28), and
 the only way `phase5_proof.py` can reach it is to export a whole file and
 read the report back — which asks about ONE measured true peak, whichever
-that Mac's decode happened to give. The gain is quantised to a 0.01 dB grid,
-so whether a ceiling-capped export lands over its ceiling depends on where
-the measured peak falls in that grid: one fixture answers that by coin toss
-and a sweep of 200 peaks answers it. `Loudness.swift` has no AVFoundation, no
-AppKit and no project in it, so unlike the meter it needs neither the harness
-nor a stand-in — this script writes a `main.swift`, compiles the two together
-in under a second, and hands the probe its cases as JSON.
+that Mac's decode happened to give. A sweep of 200 peaks answers whether a
+reported peak ever lands over the ceiling; the rest pins the rounding (to
+nearest), the +40 dB cap, the non-finite peaks and the hot mixes. None of
+`Loudness.swift`, `ExportLoudness.swift`, `StepLoudness.swift` and
+`AudioLimiterModel.swift` has AVFoundation, AppKit or a project in it, so
+unlike the meter they need neither the harness nor a stand-in — this script
+writes a `main.swift`, compiles the five together, and hands the probe its
+cases as JSON.
 
 Every claim in sections 1–7 is a BYTE comparison of two PNGs the offscreen
 harness wrote (`tools/proof/harness/`, CLAUDE.md's "Seeing the chrome"), then
@@ -1147,27 +1150,35 @@ def report():
 
 # ---------------------------------------------------------------------------
 # Section 9 — the export GAIN's arithmetic, over a probe compiled out of
-# `app/Sources/Loudness.swift` alone.
+# `app/Sources/Loudness.swift`, `ExportLoudness.swift`, `StepLoudness.swift`
+# and `AudioLimiterModel.swift` alone (the gain went to `ExportLoudness.swift`
+# in road map "audio" AP0's toll T3, a pure move, and since AP2 part 2 it is
+# solved through the master limiter's model over 10 ms steps, spec §11 AU-28).
 #
 # It belongs beside section 8 and for the same reason one step further on:
 # the numbers `ExportLoudness.resolve` answers are decided in one pure
-# function over three doubles, and the only way `phase5_proof.py` can reach
-# it is by exporting a whole file and reading the report back — which
-# measures ONE measured true peak, whichever the decode happened to give.
-# The defect this section was written for lives in the 0.01 dB grid the gain
-# is quantised to, so it shows on some measured peaks and not on others: a
-# check that exports one fixture is a coin toss, and a sweep over 200 peaks
-# is not. `Loudness.swift` has no AVFoundation, no AppKit and no project in
-# it (its own header says why), so unlike the meter it needs neither the
-# harness nor a stand-in — it compiles with a `main.swift` this script
-# writes and nothing else, in under a second.
+# function, and the only way `phase5_proof.py` can reach it is by exporting a
+# whole file and reading the report back — which measures ONE measured true
+# peak, whichever the decode happened to give. A sweep over 200 peaks is not a
+# coin toss. None of the four files has AVFoundation, AppKit or a project in
+# it, so unlike the meter they need neither the harness nor a stand-in — they
+# compile with a `main.swift` this script writes and nothing else.
 
 LOUDNESS = os.path.join(CHROME, "loudness")
-LOUDNESS_SOURCE = os.path.join(ROOT, "app", "Sources", "Loudness.swift")
+SOURCES = os.path.join(ROOT, "app", "Sources")
+GAIN_SOURCES = [
+    os.path.join(SOURCES, name)
+    for name in ("Loudness.swift", "ExportLoudness.swift", "StepLoudness.swift",
+                 "AudioLimiterModel.swift")
+]
 
 # The probe. A case in, a resolved report out, JSON both ways — with the
 # non-finite levels spelled "inf" / "-inf", because JSON has no infinity and
-# a non-finite true peak is one of the cases under test.
+# a non-finite true peak is one of the cases under test. A case may carry
+# `steps` (a count), `energy` and `step_peak` (linear), and optionally
+# `spike_peak` every `spike_every` steps: that many 10 ms steps for the
+# master's model; without them the steps are empty and the gain is the
+# unlimited one.
 PROBE = """import Foundation
 
 // Written by tools/proof/phase5_chrome.py. `ExportLoudness.resolve` over the
@@ -1197,14 +1208,22 @@ for one in cases {
         integratedLUFS: one["integrated"] as? Double,
         truePeakDBTP: level(one["true_peak"]),
         samplePeakDBFS: level(one["sample_peak"]))
+    let count = one["steps"] as? Int ?? 0
+    let steps = [Double](repeating: one["energy"] as? Double ?? 0, count: count)
+    let every = one["spike_every"] as? Int ?? 0
+    let peaks = (0..<count).map { index -> Double in
+        every > 0 && index % every == 0
+            ? one["spike_peak"] as? Double ?? 0 : one["step_peak"] as? Double ?? 0
+    }
     let resolved = ExportLoudness.resolve(
-        measured: report, target: one["target"] as? Double,
+        measured: report, steps: steps, peaks: peaks, target: one["target"] as? Double,
         ceiling: one["ceiling"] as? Double)
     answers.append([
         "gain_db": resolved.gainDB,
         "true_peak_dbtp": json(resolved.truePeakDBTP),
-        "capped_by_peak": resolved.cappedByPeak,
-        "mix_clipped": resolved.mixClipped,
+        "limited_db": resolved.limitedDB,
+        "capped_by_gain": resolved.cappedByGain,
+        "integrated_lufs": resolved.integratedLUFS.map(json) ?? NSNull(),
         "summary": resolved.summary,
         "step_db": ExportLoudness.gainStepDB,
     ])
@@ -1214,20 +1233,21 @@ try JSONSerialization.data(withJSONObject: answers)
 """
 
 STEP = 0.01              # ExportLoudness.gainStepDB
+OFFSET = -0.691          # LoudnessMeter.offset
 
 
 def build_probe():
-    """`app/Sources/Loudness.swift` and the probe above, compiled together
-    through `swift_build.build` (which adds the bridging header and the
-    staticlib, though this file links nothing of the core's). Reused only
-    when every input is byte-identical, so a stale probe cannot lie."""
+    """The four sources and the probe above, compiled together through
+    `swift_build.build` (which adds the bridging header and the staticlib,
+    though none of them links anything of the core's). Reused only when every
+    input is byte-identical, so a stale probe cannot lie."""
     os.makedirs(LOUDNESS, exist_ok=True)
     main = os.path.join(LOUDNESS, "main.swift")
     with open(main, "w") as f:
         f.write(PROBE)
     binary = os.path.join(LOUDNESS, "probe")
     try:
-        swift_build.build(sources=[LOUDNESS_SOURCE, main], output=binary)
+        swift_build.build(sources=GAIN_SOURCES + [main], output=binary)
     except swift_build.SwiftBuildFailed as error:
         sys.stderr.write("\n".join(error.diagnostics) + "\n")
         sys.exit("the loudness probe did not build")
@@ -1248,10 +1268,14 @@ def resolve(binary, cases, name):
         return json.load(f)
 
 
-def case(integrated, true_peak, target, ceiling=None, sample_peak=None):
+def case(integrated, true_peak, target, ceiling=None, sample_peak=None, steps=None,
+         spikes=None):
     """One measured programme and what was asked of it. The sample peak
     defaults to the true peak, which is the relationship every real
-    measurement has (`LoudnessMeter.finish` takes the max of the two)."""
+    measurement has (`LoudnessMeter.finish` takes the max of the two).
+    `steps` is `(count, loudness LUFS, step true peak dBTP)` of constant
+    10 ms steps for the master's model, and `spikes` `(every, peak dBTP)` a
+    louder step's true peak every so many steps."""
     one = {
         "integrated": integrated,
         "true_peak": true_peak,
@@ -1260,122 +1284,120 @@ def case(integrated, true_peak, target, ceiling=None, sample_peak=None):
     }
     if ceiling is not None:
         one["ceiling"] = ceiling
+    if steps is not None:
+        count, lufs, peak = steps
+        one["steps"] = count
+        one["energy"] = 10 ** ((lufs - OFFSET) / 10)
+        one["step_peak"] = 10 ** (peak / 20)
+    if spikes is not None:
+        every, peak = spikes
+        one["spike_every"] = every
+        one["spike_peak"] = 10 ** (peak / 20)
     return one
 
 
 def gain_checks():
-    """Section 9 — the gain, swept."""
-    print("\n9. the export gain — `ExportLoudness.resolve`, over a probe of its own")
+    """Section 9 — the gain under the master, swept."""
+    print("\n9. the export gain — `ExportLoudness.resolve` under the master, over a probe")
     binary = build_probe()
 
-    # (a) The ceiling, swept across the 0.01 dB grid. A ceiling-limited gain
-    # is a CONSTRAINT and not a target: quantising it to the NEAREST step
-    # hands back up to half a step of the attenuation the ceiling asked for,
-    # and the export then reports — and writes — a true peak ABOVE the
-    # ceiling it names. 200 measured peaks 0.001 dB apart cover every phase
-    # of that grid twenty times over, so this cannot pass by luck the way one
-    # exported fixture can.
-    for ceiling, named in ((-1.0, "−1 dBTP"), (None, "the default 0 dBTP")):
+    # (a) The ceiling, swept across the 0.01 dB grid. The master limiter
+    # holds the ceiling (AU-27), so a gain that pushes the peak past it is
+    # reported at the ceiling with the excess as `limited_db`, never above:
+    # 200 measured peaks 0.001 dB apart, at −1 dBTP named and by default.
+    for ceiling, named in ((-1.0, "−1 dBTP"), (None, "the default −1 dBTP")):
         peaks = [-0.3 - 0.001 * i for i in range(200)]
         answers = resolve(
             binary, [case(-20.0, p, -14.0, ceiling) for p in peaks],
-            f"sweep{'' if ceiling is None else int(-ceiling * 10)}")
-        limit = 0.0 if ceiling is None else ceiling
-        over = [
-            (p, a["true_peak_dbtp"]) for p, a in zip(peaks, answers)
-            if a["true_peak_dbtp"] > limit + 1e-9
-        ]
-        # What a round-to-nearest quantisation would have done to the same
-        # sweep, computed here rather than assumed: it is the size of the
-        # hole this check covers.
-        would = sum(
-            1 for p in peaks
-            if round((limit - p) / STEP) * STEP > (limit - p) + 1e-12)
-        check(f"no gain capped at {named} lands OVER it — 200 measured true peaks "
-              f"0.001 dB apart, and the shifted peak is at or under the ceiling for "
-              f"every one of them",
+            f"sweep{'d' if ceiling is None else int(-ceiling * 10)}")
+        over = [(p, a["true_peak_dbtp"]) for p, a in zip(peaks, answers)
+                if a["true_peak_dbtp"] > -1.0 + 1e-9]
+        check(f"no reported true peak lands over {named} — 200 measured true peaks "
+              f"0.001 dB apart, each raised 6 dB toward −14 LUFS",
               not over,
-              f"{len(over)} of 200 over ({', '.join('%.4f→%.4f' % o for o in over[:3])}"
-              f"{', …' if len(over) > 3 else ''})" if over else
-              f"a round-to-NEAREST quantisation would put {would} of 200 over it")
-        short = [
-            (p, a["true_peak_dbtp"]) for p, a in zip(peaks, answers)
-            if a["true_peak_dbtp"] < limit - STEP - 1e-9
-        ]
-        check(f"…and none of them gives away more than the {STEP} dB grid to get there, "
-              f"so the cap is rounded DOWN and not simply lowered",
-              not short,
-              f"{len(short)} of 200 more than one step under" if short else
-              f"the worst sits {min(limit - a['true_peak_dbtp'] for a in answers):.4f} dB "
-              f"under the ceiling")
-        check(f"…and every one of them says so: capped_by_peak, since −14 LUFS over a "
-              f"−20 LUFS programme wants +6 dB and the ceiling has under a decibel",
-              all(a["capped_by_peak"] for a in answers))
+              f"{len(over)} of 200 over ({', '.join('%.4f→%.4f' % o for o in over[:3])})"
+              if over else "every one at the ceiling")
+        wrong = [(p, a["limited_db"]) for p, a in zip(peaks, answers)
+                 if abs(a["limited_db"] - (p + a["gain_db"] + 1.0)) > 1e-9]
+        check("…and each says how far the master took the peak down: limited_db is the "
+              "shifted peak's excess over the ceiling",
+              not wrong and all(a["limited_db"] > 5 for a in answers),
+              f"{len(wrong)} wrong" if wrong else
+              f"limited_db {answers[0]['limited_db']:.3f} … {answers[-1]['limited_db']:.3f}")
+        check("…and no summary says \"clipped\", while each names the limiting",
+              not any("clipped" in a["summary"] for a in answers)
+              and all("peaks limited by" in a["summary"] for a in answers),
+              f"e.g. “{answers[0]['summary']}”")
 
-    # (b) The other half of the same decision: a TARGET-limited gain still
-    # rounds to nearest. Flooring both would be a second bug wearing the
-    # first one's clothes — a quiet export, every time, by up to a hundredth
-    # of a decibel.
+    # (b) The gain rounds to NEAREST (AU-28): the limiter holds the ceiling,
+    # so no rounding leans toward it. Unlimited (no steps) and through the
+    # model (steps under the ceiling, so the model's unlimited bound answers).
     answers = resolve(
         binary,
-        [case(-20.004, -30.0, -14.0, -1.0), case(-20.006, -30.0, -14.0, -1.0)],
+        [case(-20.004, -30.0, -14.0, -1.0), case(-20.006, -30.0, -14.0, -1.0),
+         case(-20.004, -30.0, -14.0, -1.0, steps=(300, -20.004, -30.0)),
+         case(-20.006, -30.0, -14.0, -1.0, steps=(300, -20.006, -30.0)),
+         case(-20.0, -0.3, -14.0, -1.0, steps=(300, -20.0, -12.0), spikes=(50, -0.3))],
         "target")
-    check("a gain the TARGET decided still rounds to nearest — +5.996 dB asks for 6.00 "
-          "and +6.006 dB asks for 6.01, which is what says the rounding above was "
-          "chosen and not applied everywhere",
-          [round(a["gain_db"], 6) for a in answers] == [6.0, 6.01]
-          and not any(a["capped_by_peak"] for a in answers),
-          f"{[round(a['gain_db'], 6) for a in answers]}")
+    gains = [round(a["gain_db"], 6) for a in answers]
+    check("the gain rounds to NEAREST — +5.996 dB asks for 6.00 and +6.006 dB for 6.01, "
+          "unlimited and through the master's model alike",
+          gains[:4] == [6.0, 6.01, 6.0, 6.01] and not any(a["capped_by_gain"] for a in answers),
+          f"{gains[:4]}")
+    check("…and where the model limits (one step in 50 peaking at −0.3 dBTP, raised 6 dB "
+          "under −1), the gain is MORE than the unlimited 6 dB and the model lands on "
+          "the target",
+          gains[4] > 6.0 and answers[4]["limited_db"] > 0
+          and abs(answers[4]["integrated_lufs"] - (-14.0)) <= 0.05,
+          f"gain {gains[4]} dB, limited_db {answers[4]['limited_db']:.3f}, "
+          f"model {answers[4]['integrated_lufs']}")
 
-    # (c) A non-finite true peak. It reaches `resolve` from float source
-    # media carrying an infinity — −∞ cannot, because a programme with no
-    # integrated loudness has already returned — and "the peak cannot be
-    # measured" has to mean NO headroom. Infinite headroom is the inversion:
-    # the whole requested boost, ceiling ignored.
+    # (c) The +40 dB cap: a target no gain under it reaches.
     answers = resolve(
         binary,
-        [case(-40.0, "inf", -14.0, -1.0), case(-6.0, "inf", -23.0, -1.0),
+        [case(-65.0, -50.0, -14.0, -1.0, steps=(300, -65.0, -50.0)),
+         case(-65.0, -50.0, -14.0, -1.0)],
+        "cap")
+    check("a target past +40 dB is capped there, through the model and unlimited, and "
+          "capped_by_gain says so",
+          all(a["gain_db"] == 40 and a["capped_by_gain"] for a in answers),
+          f"{[(a['gain_db'], a['capped_by_gain']) for a in answers]}")
+
+    # (d) A non-finite true peak keeps the old handling (AU-28): no model, no
+    # gain, the peak passed through so the summary can say what it is.
+    answers = resolve(
+        binary,
+        [case(-40.0, "inf", -14.0, -1.0, steps=(300, -40.0, -30.0)),
          case(None, "-inf", -14.0, -1.0)],
         "nonfinite")
-    check("a non-finite true peak is NO headroom, not infinite headroom — a −40 LUFS "
-          "programme carrying an infinity is not boosted 26 dB toward −14",
-          answers[0]["gain_db"] == 0 and answers[0]["capped_by_peak"],
-          f"gain {answers[0]['gain_db']} dB, capped {answers[0]['capped_by_peak']}")
-    check("…while an ATTENUATION it asks for still happens — no headroom bounds the "
-          "gain above, never below",
-          round(answers[1]["gain_db"], 6) == -17.0,
-          f"gain {answers[1]['gain_db']} dB")
-    check("…and it does not read as SILENCE, which is what a bare isFinite guard makes "
-          "of it — the one programme that is anything but",
-          "Silent" not in answers[0]["summary"],
-          f"summary “{answers[0]['summary']}”")
-    check("while digital silence — no integrated loudness, a −∞ peak — still does",
-          answers[2]["summary"] == "Silent" and answers[2]["gain_db"] == 0,
-          f"summary “{answers[2]['summary']}”")
+    check("a +∞ measured true peak (target −14) answers gain 0, true peak +∞, "
+          "limited_db 0 and “Peak not measurable …” — not boosted 26 dB, not silent",
+          answers[0]["gain_db"] == 0 and answers[0]["true_peak_dbtp"] == "inf"
+          and answers[0]["limited_db"] == 0
+          and answers[0]["summary"] == "Peak not measurable (a non-finite sample in the mix)",
+          f"gain {answers[0]['gain_db']} dB, peak {answers[0]['true_peak_dbtp']}, "
+          f"limited {answers[0]['limited_db']}, summary “{answers[0]['summary']}”")
+    check("while digital silence — no integrated loudness, a −∞ peak — answers "
+          "“Silent” and limited_db 0",
+          answers[1]["summary"] == "Silent" and answers[1]["gain_db"] == 0
+          and answers[1]["limited_db"] == 0,
+          f"summary “{answers[1]['summary']}”, limited {answers[1]['limited_db']}")
 
-    # (d) The mix the writer would clip. Since #86 a NORMALISED export reads
-    # the same float mix the measurement read and quantises once after the
-    # gain, so a hot mix with a gain is not clipped and is not reported so.
-    # Only a hot mix written with NO gain goes through the 16-bit decode,
-    # which saturates; that one must say so. `phase5_proof.py` measures both
-    # end to end on written files.
+    # (e) A mix past full scale, normalised and not: nothing clips any more
+    # (AU-27), so neither summary says "clipped" and both peaks sit at the
+    # ceiling. `phase5_proof.py` measures both end to end on written files.
     answers = resolve(
-        binary,
-        [case(2.4, 6.02, -14.0, -1.0), case(-6.7, -0.02, -14.0, -1.0),
-         case(2.4, 6.02, None)],
-        "clipped")
-    check("a mix measured PAST full scale and normalised is NOT reported as clipped — "
-          "the gain is applied to the float mix before it is quantised",
-          not answers[0]["mix_clipped"] and "clipped" not in answers[0]["summary"],
-          f"summary “{answers[0]['summary']}”")
-    check("…and one that merely came close is not, so the sentence means something",
-          not answers[1]["mix_clipped"] and "clipped" not in answers[1]["summary"],
-          f"summary “{answers[1]['summary']}”")
-    check("…while the same hot mix written with NO gain is reported as clipped — the "
-          "16-bit decode saturates, so these figures are the mix's and the file's are "
-          "worse",
-          answers[2]["mix_clipped"] and "clipped" in answers[2]["summary"],
-          f"summary “{answers[2]['summary']}”")
+        binary, [case(2.4, 6.02, -14.0, -1.0), case(2.4, 6.02, None)], "hot")
+    check("a mix measured PAST full scale is not reported as clipped, normalised or "
+          "not: turned down 16.4 dB its peak reads −10.38, and un-normalised it reads the "
+          "ceiling",
+          all("clipped" not in a["summary"] for a in answers)
+          and abs(answers[0]["true_peak_dbtp"] - (6.02 - 16.4)) < 1e-9
+          and answers[1]["true_peak_dbtp"] == -1.0,
+          f"summaries “{answers[0]['summary']}” / “{answers[1]['summary']}”")
+    check("…and the un-normalised one is limited by its whole excess, 7.02 dB",
+          abs(answers[1]["limited_db"] - 7.02) < 1e-9 and answers[1]["gain_db"] == 0,
+          f"limited_db {answers[1]['limited_db']}")
 
 
 def main():

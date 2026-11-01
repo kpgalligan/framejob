@@ -1,0 +1,20 @@
+== HQ (true lag 4440, reported 4440)
+  mix 0 %: identical to dry? False; residual vs dry -78.1 dB; max|d| 2.2e-04
+  mix 50 % vs 0.5*dry + 0.5*wet100 (aligned): residual -84.1 dB
+  the unit's internal dry path at 50 %: lag of (m50 - 0.5*wet) vs dry = 0 (0 = compensated inside the unit)
+  mix -100 % vs dry - wet100 (the removed part): residual -63.6 dB; rms -62.2 (dry -47.7); speech-window rms -65.6, pause rms -63.0
+  mix -50 % vs 0.5*dry - 0.5*wet: residual 14.5 dB;  vs 0.5*dry + 0.5*(dry - wet): -72.4 dB
+  aligned wet vs dry over speech, per octave (|coherence|^2 / real normalised cross-spectrum): 125: 0.994/+0.997; 250: 0.995/+0.998; 500: 0.999/+1.000; 1000: 0.994/+0.997; 2000: 0.999/+1.000; 4000: 0.997/+0.999; 8000: 0.996/+0.998
+  host 50 % mix, aligned: 1/3-oct ripple 100 Hz-8 kHz 0.15 dB (range -0.1..+0.1); per-bin 95 % spread 250 Hz-4 kHz 0.3 dB; deepest bin -0.5 dB; residual vs the unit's own 50 % -84.1 dB
+  host 50 % mix, latency NOT removed: 1/3-oct ripple 100 Hz-8 kHz 1.88 dB (range -4.7..-2.8); per-bin 95 % spread 250 Hz-4 kHz 20.0 dB; deepest bin -35.9 dB; residual vs the unit's own 50 % -3.0 dB
+    expected notch spacing if unaligned: 10.8 Hz (first notch 5.4 Hz): a 92.5 ms echo
+== Voice (true lag 2704, reported 2705)
+  mix 0 %: identical to dry? False; residual vs dry -17.5 dB; max|d| 3.0e-02
+  mix 50 % vs 0.5*dry + 0.5*wet100 (aligned): residual -23.0 dB
+  the unit's internal dry path at 50 %: lag of (m50 - 0.5*wet) vs dry = 1 (0 = compensated inside the unit)
+  mix -100 % vs dry - wet100 (the removed part): residual -3.8 dB; rms -60.0 (dry -47.7); speech-window rms -56.8, pause rms -63.0
+  mix -50 % vs 0.5*dry - 0.5*wet: residual 13.9 dB;  vs 0.5*dry + 0.5*(dry - wet): -12.5 dB
+  aligned wet vs dry over speech, per octave (|coherence|^2 / real normalised cross-spectrum): 125: 0.979/+0.990; 250: 0.995/+0.997; 500: 0.999/+1.000; 1000: 0.994/+0.997; 2000: 0.999/+0.999; 4000: 0.996/+0.998; 8000: 0.980/+0.990
+  host 50 % mix, aligned: 1/3-oct ripple 100 Hz-8 kHz 0.20 dB (range -0.5..-0.3); per-bin 95 % spread 250 Hz-4 kHz 0.3 dB; deepest bin -0.9 dB; residual vs the unit's own 50 % -23.0 dB
+  host 50 % mix, latency NOT removed: 1/3-oct ripple 100 Hz-8 kHz 1.77 dB (range -4.9..-3.2); per-bin 95 % spread 250 Hz-4 kHz 20.4 dB; deepest bin -37.4 dB; residual vs the unit's own 50 % -3.6 dB
+    expected notch spacing if unaligned: 17.8 Hz (first notch 8.9 Hz): a 56.3 ms echo

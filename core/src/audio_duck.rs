@@ -8,32 +8,42 @@
 //! composition track's segments — so it is a module of its own, and
 //! `audio.rs` reads it as one multiplier per ducker at a breakpoint.
 //!
-//! Ducking is by clip EXTENT, not by voice activity: a ducking clip ducks
-//! for as long as it is on the timeline whether or not it is making a sound,
-//! which is what makes the result predictable from the picture of the
-//! timeline alone.
+//! Ducking is by clip EXTENT by default: a ducking clip ducks for as long
+//! as it is on the timeline whether or not it is making a sound, which is
+//! what makes the result predictable from the picture of the timeline alone.
+//! A duck in `speech` mode (format 29, spec §11 AU-110, AU-112) ducks over
+//! its media's saved speech spans instead; `audio_duck_speech.rs` turns
+//! those into project-time spans and this module's extent curve is applied
+//! to each of them.
 //!
 //! `Ducker` is re-exported by `audio.rs`, so `crate::audio::Ducker` — the
 //! path `evaluate.rs` names — still resolves.
 
+use std::iter::once;
+
 use crate::audio::{covers, Side};
-use crate::model::{Duck, Project};
+use crate::audio_duck_speech::speech_gain;
+use crate::model::{Duck, DuckMode, Project};
 use crate::nest::Instance;
 use crate::time::Ticks;
 
 /// A clip elsewhere in the project that pushes this track down while it
-/// plays. Ducking is by clip EXTENT, not by voice activity (spec §11), so
-/// this is all the ducker's audio needed to compute the gain.
+/// plays. For an extent duck this is all the ducker's audio needed to
+/// compute the gain; a speech duck carries its spans too.
 ///
 /// `clip` is carried so a track can drop the duckers that are its OWN
 /// segments; the span is project time, which for a nested ducker is the part
-/// of it the nest clip lets through.
-#[derive(Debug, Clone, Copy)]
+/// of it the nest clip lets through. `spans` is `None` for an extent duck and
+/// the merged, widened project-time speech spans for a speech duck — empty
+/// when the clip is not a media clip or its media has no `speech`, which
+/// ducks nowhere.
+#[derive(Debug, Clone)]
 pub struct Ducker {
     pub(crate) clip: u32,
     pub(crate) start: Ticks,
     pub(crate) end: Ticks,
     pub(crate) duck: Duck,
+    pub(crate) spans: Option<Vec<(Ticks, Ticks)>>,
 }
 
 /// The ducker's multiplier at `t`.
@@ -49,7 +59,16 @@ pub struct Ducker {
 /// release then starts from wherever it got to, so no combination of
 /// lengths produces a discontinuity in the middle of the curve.
 pub(crate) fn duck_gain(ducker: &Ducker, t: Ticks, side: Side) -> f64 {
-    let level = ducker.duck.level;
+    match &ducker.spans {
+        Some(spans) => speech_gain(ducker, spans, t, side),
+        None => extent_gain(&ducker.duck, ducker.start, ducker.end, t, side),
+    }
+}
+
+/// [`duck_gain`]'s extent curve for `duck` over `[start, end)`: the whole
+/// of an extent duck, and one span of a speech duck.
+pub(crate) fn extent_gain(duck: &Duck, start: Ticks, end: Ticks, t: Ticks, side: Side) -> f64 {
+    let level = duck.level;
     if !level.is_finite() {
         return 1.0;
     }
@@ -58,10 +77,10 @@ pub(crate) fn duck_gain(ducker: &Ducker, t: Ticks, side: Side) -> f64 {
     let level = level.clamp(0.0, 1.0);
     // Negative lengths are meaningless; treat them as instantaneous rather
     // than dividing by them.
-    let attack = ducker.duck.attack.max(0);
-    let release = ducker.duck.release.max(0);
-    let ducked_end = ducker.end.saturating_add(release);
-    if !covers(ducker.start, ducked_end, t, side) {
+    let attack = duck.attack.max(0);
+    let release = duck.release.max(0);
+    let ducked_end = end.saturating_add(release);
+    if !covers(start, ducked_end, t, side) {
         return 1.0;
     }
 
@@ -84,12 +103,12 @@ pub(crate) fn duck_gain(ducker: &Ducker, t: Ticks, side: Side) -> f64 {
         }
     };
 
-    if covers(ducker.start, ducker.end, t, side) {
-        reached(t.saturating_sub(ducker.start))
+    if covers(start, end, t, side) {
+        reached(t.saturating_sub(start))
     } else {
-        let held = reached(ducker.end.saturating_sub(ducker.start));
+        let held = reached(end.saturating_sub(start));
         let u = if release > 0 {
-            (t.saturating_sub(ducker.end) as f64 / release as f64).clamp(0.0, 1.0)
+            (t.saturating_sub(end) as f64 / release as f64).clamp(0.0, 1.0)
         } else {
             1.0
         };
@@ -114,19 +133,28 @@ impl Project {
     /// The duck is read from the base props, not through actions: the ramp
     /// lengths describe an envelope, and an envelope whose own attack time
     /// animates is not a version-1 feature.
+    ///
+    /// A speech duck's spans are measured from the clip's ORIGIN (its first
+    /// frame in project time) and kept to the part that plays, `start` to
+    /// `end` (`audio_duck_speech.rs`).
     pub(crate) fn duckers(&self, instances: &[Instance<'_>]) -> Vec<Ducker> {
         let mut out: Vec<Ducker> = Vec::new();
         for instance in instances {
-            for (clip, start, end) in instance.chain() {
+            // `chain`'s order, outermost first: each clip's origin beside it.
+            let origins = (instance.inside.iter().map(|e| e.origin)).chain(once(instance.origin));
+            for ((clip, start, end), origin) in instance.chain().zip(origins) {
                 if out.iter().any(|d| d.clip == clip.id) {
                     continue;
                 }
                 if let Some(duck) = clip.audio.and_then(|a| a.duck) {
+                    let spans = (duck.mode == DuckMode::Speech)
+                        .then(|| self.speech_spans(clip, origin, (start, end), &duck));
                     out.push(Ducker {
                         clip: clip.id,
                         start,
                         end,
                         duck,
+                        spans,
                     });
                 }
             }

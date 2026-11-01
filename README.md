@@ -32,7 +32,8 @@ Consolidate Media copies footage into the package.
 
 **Timeline.** One kind of track that holds any clip; a frame-accurate ruler,
 filmstrips and waveforms, zoom about the cursor, snapping, markers, an in/out
-range, track mute, solo and lock, clip names and colour labels.
+range, track mute, solo, lock, volume, pan, compressor and limiter, clip names
+and colour labels.
 → [The timeline and playback](docs/guide/timeline.md)
 
 **Editing.** Move, nudge, trim, slip, roll, split, lift, ripple delete, close
@@ -55,9 +56,25 @@ reverse, freeze frame, and speed ramps — **Clip ▸ Speed Ramp…** makes a Ra
 Up, Ramp Down, Speed Dip or Speed Burst in one step.
 → [Speed, reverse and freeze frames](docs/guide/speed.md)
 
-**Audio.** Per-clip volume, fades, ducking, noise reduction, compressor, pan and
-mono; Normalize; Synchronize Audio lines up a camera and a separate recorder by
-their sound, drift included.
+**Audio.** Per-clip volume, drawn as a line on each clip that you drag and
+⌥-click to add points, fades in four shapes, ducking for a clip's length
+or only while its speech plays, voice isolation (Apple's on-device voice model,
+which also reduces room echo), sixteen voice effects (pitch, robot, telephone,
+radio, echo, reverbs and more), channel selection, EQ with voice presets, hum
+removal, noise reduction, a gate for the pauses, a leveller that evens out a
+speaker who moves on and off the mic, phrase by phrase, and a de-esser, each
+set from the clip's own loudness, compressor, pan, mono and a true-peak limiter, each
+of them animated by actions as the volume is; each
+clip's loudness and true peak in the inspector; Enhance Voice, which sets a
+voice recording up for speech from its own measurements in one step; Match
+Audio, which gives clips another clip's loudness and speech tone; and
+Normalize to a loudness
+target (−16 LUFS at −1 dBTP by default, turning the
+limiter on when a clip's peaks need it) or to a peak, which matches clips; a
+live loudness meter for the mix as it plays; Synchronize Audio lines up a
+camera and a separate recorder by their sound, drift included. Detach Audio
+keeps the sound linked to its picture, so J- and L-cuts stay in sync through
+every edit, and Attach Audio puts it back.
 → [Audio](docs/guide/audio.md)
 
 **Clean-up tools.** Remove Silences cuts dead air by voice or by level; Remove
@@ -99,7 +116,9 @@ microphone-only voice-over.
 (10-bit, with HDR, from its own encoder built in, at three speeds; Opus sound
 in the WebM), VP9 in WebM for every browser (8-bit, or 10-bit with HDR, also
 built in, with Opus) and with alpha for transparent web video, ProRes 422 and 4444,
-M4A, WAV, AIFF, GIF and animated PNG; loudness targets, presets, an Export
+M4A, WAV and AIFF (16- or 24-bit, with stems: a file per track beside the
+mix), GIF and animated PNG; loudness targets
+reached through a true-peak master limiter on every export, presets, an Export
 Queue that runs while you edit, and single frames as stills.
 → [Exporting](docs/guide/export.md)
 

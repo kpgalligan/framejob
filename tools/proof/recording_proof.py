@@ -436,7 +436,8 @@ OPS = 55  # a floor too, for the same reason
 APP_STATE_TOOLS = {
     "open_project", "new_project", "save_project", "get_project", "import_media",
     "import_captions", "export_captions", "transcribe", "consolidate_media",
-    "detect_silence", "normalize_clip", "set_playhead", "set_range", "set_selection",
+    "detect_silence", "normalize_clip", "enhance_voice", "match_audio", "set_playhead",
+    "set_range", "set_selection",
     "set_scope", "undo", "redo", "render_frame", "export", "record_screen",
     "write_graphic", "get_graphic", "graphic_reference", "render_graphic",
     "import_graphic_font", "import_graphic_asset", "close_project",
@@ -458,6 +459,8 @@ RECORD_PROPERTIES = {
     "camera",
     # Camera-recording CR2a (spec §11 CAM-6): the camera's format.
     "camera_format",
+    # Road map "audio" AP6 part 3 (spec §11 AU-69): Enhance Voice after the landing.
+    "enhance",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of

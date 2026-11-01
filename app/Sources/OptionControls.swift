@@ -277,7 +277,7 @@ final class OptionDisplayControl: NSView, OptionControl {
     private let fixedWidth: CGFloat
     private let read: () -> String
     private let enabled: () -> Bool
-    private var text = ""
+    private(set) var text = ""
 
     init(width: CGFloat, read: @escaping () -> String, enabled: @escaping () -> Bool) {
         self.fixedWidth = width

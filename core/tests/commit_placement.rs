@@ -177,9 +177,12 @@ fn four_addition_callers_append_in_id_order() {
         .unwrap()
         .insert(0, new_track);
     clip_mut(&mut expected, 10)["enabled"]["audio"] = json!(false);
+    // The two halves name each other (spec §11 AU-90).
+    clip_mut(&mut expected, 10)["linked"] = json!(51);
     let mut audio = media_clip(&expected, 51, 50, 0, 1_000_000);
     audio["enabled"]["video"] = json!(false);
     audio["enabled"]["audio"] = json!(true);
+    audio["linked"] = json!(10);
     expected["clips"].as_array_mut().unwrap().push(audio);
     expected["next_id"] = json!(52);
     assert_eq!(a, expected, "whole detached document");
@@ -336,11 +339,13 @@ fn duplicate_and_detach_remint_actions_after_clip_and_track_ids() {
         .unwrap()
         .insert(0, new_track);
     clip_mut(&mut expected, 10)["enabled"]["audio"] = json!(false);
+    clip_mut(&mut expected, 10)["linked"] = json!(51);
     let mut audio = clip(&value, 10).clone();
     audio["id"] = json!(51);
     audio["track"] = json!(50);
     audio["enabled"]["video"] = json!(false);
     audio["actions"][0]["id"] = json!(52);
+    audio["linked"] = json!(10);
     expected["clips"].as_array_mut().unwrap().push(audio);
     expected["next_id"] = json!(53);
     assert_eq!(d, expected, "whole detach-with-action document");

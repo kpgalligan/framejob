@@ -143,6 +143,19 @@ impl Preset {
         self.writer.is_some_and(Writer::takes_speed)
     }
 
+    /// True for the uncompressed audio rows, `audio_wav` and `audio_aiff`,
+    /// the rows `audio_bits` applies to (spec §11 AU-29). ProRes's LPCM
+    /// track keeps 16 bits; it is not an `lpcm` row.
+    pub(crate) fn takes_audio_bits(&self) -> bool {
+        self.codec == "lpcm"
+    }
+
+    /// True for the three audio-only rows, `audio_m4a`, `audio_wav` and
+    /// `audio_aiff`, the rows `stems` applies to (spec §11 AU-108 (a)).
+    pub(crate) fn takes_stems(&self) -> bool {
+        !self.video
+    }
+
     pub(crate) fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("id".to_string(), Value::from(self.id));
@@ -180,6 +193,14 @@ impl Preset {
                 let speeds = EncoderSpeed::ALL.iter().map(|s| Value::from(s.as_str()));
                 out.insert("encoder_speeds".to_string(), speeds.collect());
             }
+        }
+        if self.takes_audio_bits() {
+            let bits = [16, 24].iter().map(|b| Value::from(*b));
+            out.insert("audio_bits".to_string(), bits.collect());
+        }
+        if self.takes_stems() {
+            let modes = ["tracks", "names"].iter().map(|m| Value::from(*m));
+            out.insert("stems".to_string(), modes.collect());
         }
         Value::Object(out)
     }

@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the sixty-two-way dispatch are the implementation of that
+//! enum and the sixty-four-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -36,6 +36,9 @@
 //! A bound is SOURCED from the constant that enforces it and never retyped
 //! here, which is what `core/tests/op_table.rs` checks by putting each end
 //! to the core and reading the refusal — including the numbers in it.
+//! A refused range that is not whole numbers (`set_track`'s `volume`
+//! 0–4 and `pan` −1–1) is stated in the tool's prose until [`Bound`]
+//! widens.
 //!
 //! ### The kinds
 //!
@@ -58,9 +61,10 @@
 //!   two. Named rather than "a list of numbers" because their LENGTH is
 //!   part of what serde refuses.
 //! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`],
-//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`], [`Kind::Blending`]
-//!   and [`Kind::RampShape`] — `TransitionKind`, `TransitionAlign`, `Curve`,
-//!   `ZoomFit`, `TrackMatte`, `CanvasOutput`, `CanvasBlending`, `RampShape`: closed
+//!   [`Kind::Fit`], [`Kind::Matte`], [`Kind::Output`], [`Kind::Blending`],
+//!   [`Kind::RampShape`] and [`Kind::FadeShape`] — `TransitionKind`,
+//!   `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`, `CanvasOutput`,
+//!   `CanvasBlending`, `RampShape`, `FadeShape`: closed
 //!   vocabularies, each carrying its members in [`Kind::values`] rather
 //!   than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
@@ -83,7 +87,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 62;
+pub const OP_COUNT: usize = 64;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -95,10 +99,11 @@ pub struct OpRow {
 
 /// One named value an op takes. `required` is the absence of a serde
 /// default on the enum's field. Optional means omission is accepted; it does
-/// not imply that `null` is accepted. The five defaulted plain booleans
+/// not imply that `null` is accepted. The eight defaulted plain booleans
 /// (`add_transition.ripple`, `paste_attributes.skip_missing`, both
-/// `with_clips` fields, and `set_canvas.rescale_clips`) default to false
-/// when absent and reject null.
+/// `with_clips` fields, `set_canvas.rescale_clips`, and the `alone` of
+/// `trim_start`, `trim_end` and `roll`) default to false when absent and
+/// reject null.
 /// Other optional fields are `Option<T>` and decode absence and null alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Argument {
@@ -152,6 +157,7 @@ pub enum Kind {
     Output,
     Blending,
     RampShape,
+    FadeShape,
 }
 
 impl Kind {
@@ -189,6 +195,7 @@ impl Kind {
             Output => &["sdr", "hlg"],
             Blending => &["encoded", "linear"],
             RampShape => &["ramp_up", "ramp_down", "speed_dip", "speed_burst"],
+            FadeShape => &["linear", "s_curve", "plus_3db", "minus_3db"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -254,11 +261,11 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("insert_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),
     op("overwrite_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),
     op("move_clip", &[req("clips", Ids), req("delta", Ticks), opt("track", Id)]),
-    op("trim_start", &[req("clip", Id), req("to", Ticks)]),
-    op("trim_end", &[req("clip", Id), req("to", Ticks)]),
+    op("trim_start", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
+    op("trim_end", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
     op("rate_stretch", &[req("clip", Id), req("to_end", Ticks)]),
     op("slip", &[req("clip", Id), req("delta", Ticks)]),
-    op("roll", &[req("clip", Id), req("to", Ticks)]),
+    op("roll", &[req("clip", Id), req("to", Ticks), opt("alone", Boolean)]),
     op("split", &[opt("clips", Ids), req("at", Ticks)]),
     op("delete", &[req("clips", Ids)]),
     op("ripple_delete", &[req("clips", Ids)]),
@@ -272,6 +279,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("set_reversed", &[req("clip", Id), req("reversed", Boolean)]),
     op("freeze_frame", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
     op("detach_audio", &[req("clip", Id)]),
+    op("attach_audio", &[req("clip", Id)]),
     op("duplicate", &[req("clips", Ids)]),
     op("paste", &[req("at", Ticks), opt("track", Id), req("payload", Object)]),
     op("paste_attributes",
@@ -291,7 +299,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("add_transition",
        &[req("clip", Id), opt("kind", Transition), req("duration", Ticks),
          opt("align", Alignment), opt("ripple", Boolean)]),
-    op("set_transition_style", &[req("clip", Id), opt("curve", Curve), opt("audio", Boolean)]),
+    op("set_transition_style",
+       &[req("clip", Id), opt("curve", Curve), opt("audio", Boolean),
+         opt("audio_shape", FadeShape)]),
 
     // ---- actions --------------------------------------------------------
     op("add_action", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
@@ -315,7 +325,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("move_track", &[req("track", Id), req("index", Index)]),
     op("set_track",
        &[req("track", Id), opt("name", Text), opt("hidden", Boolean), opt("muted", Boolean),
-         opt("locked", Boolean), opt("solo", Boolean), opt("matte", Matte)]),
+         opt("locked", Boolean), opt("solo", Boolean), opt("matte", Matte),
+         opt("volume", Number), opt("pan", Number), opt("compressor", Object),
+         opt("limiter", Object)]),
     op("remove_empty_tracks", &[]),
     op("add_marker",
        &[req("at", Ticks), opt("name", Text), opt("chapter", Boolean), opt("color", Text)]),
@@ -335,6 +347,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
        &[req("media", Id), req("path", Text), opt("bookmark", Text), opt("probe", Object)]),
     op("remove_media", &[req("media", Id), opt("with_clips", Boolean)]),
     op("set_media_color", &[req("media", Id), req("color", Object)]),
+    op("set_media_speech", &[req("media", Id), req("spans", Ranges)]),
 ];
 
 /// Every op name, in table order — a projection of [`OP_TABLE`], not a

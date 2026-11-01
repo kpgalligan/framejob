@@ -148,6 +148,17 @@ Built by `screens.py` on the first screen that names one, into
   action at clip 0.5–1.5 s whose end names `speed` ×2, a speed ramp. A playhead
   inside the span selects the action (CI-1), so the Speed section reads the
   action's end rate. Ready once `video`'s peaks are cached.
+- `eq` — `Eq.framejob` (road map "audio" AP3, spec §11 AU-32..AU-34): one
+  track, "Music", holding `tone` — `media/toneA.m4a` at 0 — with Rumble Cut
+  (`high_pass {80, 24}`), Presence (`band_3 {4000, +3, 1}`), the hum notch at
+  its defaults (60 Hz × 4, 30 dB) and the left channel picked, so the EQ
+  section draws a response with a high-pass, four notches and a presence bump.
+  Ready once `tone`'s peaks are cached.
+- `dynamics` — `Dynamics.framejob` (road map "audio" AP4, spec §11 AU-43,
+  AU-45, AU-48): one track, "Music", holding `tone` — `media/toneA.m4a` at 0 —
+  with the gate and the de-esser at their defaults (`{gate: {}, de_esser:
+  {}}`), so the Gate and De-esser sections show their rows and Status
+  read-outs. Ready once `tone`'s peaks are cached.
 
 ## Adding a screen
 

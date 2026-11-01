@@ -627,6 +627,9 @@ fn op_table() -> Vec<Value> {
         json!({"op": "set_reversed", "clip": 10, "reversed": true}),
         json!({"op": "freeze_frame", "clip": 10, "at": 3000000}),
         json!({"op": "detach_audio", "clip": 10}),
+        // `general()` holds no linked pair, so this is the refusal
+        // (`UNCHANGING`); `core/tests/link.rs` measures what it merges.
+        json!({"op": "attach_audio", "clip": 10}),
         json!({"op": "duplicate", "clips": [10]}),
         // The two backdrop ops each mint a track as well as a clip, which is
         // why they sit beside `detach_audio` rather than with `add_clip`:
@@ -691,6 +694,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "relink_media", "media": 1, "path": "/m/moved.mov"}),
         json!({"op": "remove_media", "media": 3, "with_clips": true}),
         json!({"op": "set_media_color", "media": 1, "color": {"log": "slog3"}}),
+        json!({"op": "set_media_speech", "media": 2, "spans": [[600000, 1200000]]}),
     ]
 }
 
@@ -703,7 +707,9 @@ fn op_table() -> Vec<Value> {
 /// `add_transition` to work at, which is a hard cut `roll` can move too —
 /// so it now changes something here as well, and its own edits stay proved
 /// against the fixture built for them in `core/tests/edge.rs`.
-const UNCHANGING: [&str; 1] = ["remove_empty_tracks"];
+/// `attach_audio` is the other: the fixture has no linked pair to merge,
+/// so its answer here is the refusal, and `core/tests/link.rs` proves it.
+const UNCHANGING: [&str; 2] = ["remove_empty_tracks", "attach_audio"];
 
 // ---- the op table --------------------------------------------------------
 

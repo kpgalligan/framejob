@@ -131,13 +131,15 @@ extension RecorderPanelController {
                         .compactMap { $0 })
                 Self.editor(of: document)?.viewStateDidChange()
                 landed(result, asNewProject: false, notes: placement.notes)
+                RecordingEnhance.follow(result, in: document)  // AU-68: after the commit
             } catch {
                 failedToLand(result, error)
             }
         case .newProject:
             do {
-                let (_, notes) = try ProjectDocument.untitled(around: result)
+                let (opened, notes) = try ProjectDocument.untitled(around: result)
                 landed(result, asNewProject: true, notes: notes)
+                RecordingEnhance.follow(result, in: opened)  // AU-68: after the commit
             } catch {
                 failedToLand(result, error)
             }

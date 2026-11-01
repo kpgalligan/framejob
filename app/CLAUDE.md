@@ -78,7 +78,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-two op tools.
+  `AgentCatalog.opTool` prints for all sixty-four op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -105,7 +105,8 @@ detail there.
   an `Optional<T>.none` widened to `Any?` is a non-nil `Any` wrapping a nil.
   The typed `setActionEnd` LIFTS every top-level null out of its patch into
   `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
-  at the end); `setActionEndRaw`'s nulls stay removals, which is what
+  at the end), and a null slot inside `audio.eq` into `audio.eq.<slot>`
+  (AU-88); `setActionEndRaw`'s nulls stay removals, which is what
   `clearOps` and every agent call send, and it writes `off` only when non-empty and `schema` only when non-nil
   (the agent door fills it for a graphic end from the module's current
   revision, spec §11 G-34).
@@ -136,7 +137,7 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. READ-ONLY means never written back as
   is: the stored properties are `var`, so a writer edits a COPY
   (`var s = current(); s.blur = v`) rather than rebuilding one through the
@@ -144,7 +145,19 @@ detail there.
   spell out; `MotionProps.with(_:)` is motion's per-slot copy (#357). `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`; `PlanSpeedRamp.source` is
-  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)). `ShapeProps.swift` (a pure
+  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)); `PlanDuck`
+  and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113). `AudioProps.swift`
+  (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
+  `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
+  `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
+  30's `LimiterProps` (`audio.limiter`, spec §11 AU-21) with its patch body,
+  and format 31's `AudioProps.isolation` (AU-50), and format 32's `eq`, `hum` and `channels`
+  (`AudioEQProps.swift`, AU-31, AU-33, AU-34), and format 33's `gate` and `deEsser`
+  (`AudioDynamicsProps.swift`, AU-43, AU-45), and format 34's `voice`
+  (`VoiceProps.swift`, AU-140), and format 37's `leveller`
+  (`AudioDynamicsProps.swift`, AU-66);
+  `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
+  `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
   `GradientStop`, `Gradient` and `ShapeProps`. `GradeProps.swift` holds `ColorAdjust` (a pure move out of `ProjectSnapshot.swift`, grading-2 G2-0) beside grading's other value types. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
@@ -303,13 +316,14 @@ detail there.
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch and the publish) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
+  `MediaImporter+Loudness.swift` · `LoudnessBlocks.swift` ·
   `MediaCacheLane.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `CodecLibraries.swift` (the SVT-AV1 and libvpx link and its `-RCCodecProbe`;
   export rows arrive with road map codec-export's C1) ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
-  `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
-  `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
+  `RewrapProgressWindowController.swift` — the import funnel and the per-media caches (`thumbs/`, `peaks/`,
+  `loudness/`, `sync/`, `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
   per-process opt-in to macOS's supplemental VP9 and AV1 decoders (`enable()`:
   `main.swift`, `generateCaches`, `CompositionBuilder.firstTrack`, the harness
   and the formats probe), the import's one-frame decode (`decodesFirstFrame`,
@@ -330,13 +344,13 @@ detail there.
   Frame Job window, and Cancel removes the partial copy (spec §11 #228-P). A
   tool call passes no watch.
   `MediaCacheLane.swift` (await-free) is `MediaImporter.CacheLane`, the cache
-  lane: every pass's peaks, sync and speech decodes run on it, at most two at
-  a time, first in first out, on a queue of its own and never on the Swift
-  cooperative pool, where synchronous reads would stop every `AVAssetReader`
-  in the process (spec §11 #367).
+  lane: every pass's peaks, loudness, sync and speech decodes run on it, at
+  most two at a time, first in first out, on a queue of its own and never on
+  the Swift cooperative pool, where synchronous reads would stop every
+  `AVAssetReader` in the process (spec §11 #367).
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
-  are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles`, `MediaCacheLedger`
-  and `MediaCacheLane`. A cache is CURRENT when its
+  are the `+` files, `MediaPeakBuckets`, `LoudnessBlocks`, `MediaCacheFiles`,
+  `MediaCacheLedger` and `MediaCacheLane`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
@@ -374,6 +388,16 @@ detail there.
   bytes, SY-34; a file under one frame publishes an empty `.bin`, SY-31; an
   MP3 read past its tag's encoder delay, SY-38) →
   speech.
+  `MediaImporter+Loudness.swift` (await-free, spec §11 AU-10) is the loudness
+  cache's marker (`LoudnessStamp`, `loudnessVersion` 1), URLs, load, clear,
+  head check (`loudnessPassNeeded`), reader (`writeLoudness`: the file's own
+  rate, a file of more than two channels read again as two) and one
+  publication (`finishLoudness`, a `loudness` post); `LoudnessBlocks.swift` is
+  the loaded cache (`MediaLoudness`) and the 10 ms accumulator fed beside a
+  `PeakBuckets` that validates, places and covers for it (`KWeighting` is
+  `Loudness.swift`'s).
+  `MediaImporter.loudness` runs after `peaks` and before `syncFeatures`; the
+  in-session retry runs while either published nothing.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
@@ -522,8 +546,13 @@ detail there.
   and `ReverseSource`, moved whole out of `ReverseRenderer.swift` (issue
   batch B96): where a reversed asset lives (its digest name and pruning) and
   what the composition is told. `ReverseResolution.rampAudio` is the
-  document's `cache/ramp-audio/` folder (speed ramps SR-12), so the export
-  queue's capture and pin carry the ramp renders with no change of its own.
+  document's `cache/ramp-audio/` folder (speed ramps SR-12), and `isolated`
+  its `cache/isolated/` (AU-52), so the export queue's capture and pin carry
+  the ramp and isolation renders with no change of its own. `cache` is the
+  document's `intendedCacheDirectory`, published by one line in
+  `ProjectDocument`, which the gate's and de-esser's levels read (AU-42).
+  `voiced` is computed, `isolated`'s sibling `cache/voiced/` (AU-144), so
+  it needs no line of its own.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
   its pivot (spec §11, D4-6), in the three units its readers hold it in:
   `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
@@ -543,6 +572,16 @@ detail there.
   the filmstrip's and the waveform's map-aware `sourceTime`
   (`TimelineView.swift` is frozen; it holds only `sourceMaps`, set in
   `refreshTimeline` from the same handle as the snapshot).
+- `DuckSpeech.swift` — Duck by Speech's Swift half (spec §11 AU-110, AU-111,
+  AU-113): `spans` (VAD probabilities → source-tick spans: p ≥
+  `defaultVoiceConfidence`, gaps under 0.2 s bridged, ends clamped to the
+  media's duration), `ops` (the `set_media_speech` each media without spans
+  needs, or a `Refusal` naming the clip or the file), `problem` (the same
+  answer without reading a cache, for the popup), and `DuckCurves` (one
+  handle's plan `ducks`, decoded lazily once, for the timeline). Every duck
+  edit of a Speech duck, in the Ducking section and over `set_audio`, puts
+  `ops` before the `set_audio`. No span→time or gain arithmetic: that is
+  the core's.
 
 **Frozen files.** `EditorViewController.swift`, `TimelineView.swift`,
 `PreviewCanvasView.swift`, `AgentServer.swift` are **frozen at current
@@ -750,21 +789,57 @@ the key map behind it.
   real heights per track KIND) · `TimelineBar.swift` · `TimelineClipDrawing.swift`
   (a clip is ONE object: body, name strip with the kind symbol, label dot,
   motion wedges for active edges only, filmstrip under a tint wash, waveform, grips on the
-  selected clip, hatched transition zone; a track paints in three passes —
-  bodies, transition zones, selection rings (`drawClips`, #66) — because a
-  zone lies inside the PREVIOUS clip's body) · `TimelineSessions.swift` (drag,
-  trim, slip, roll sessions) · `TimelineView+Rename` (the one inline editor
+  selected clip, hatched transition zone, the link glyph after a linked
+  clip's kind symbol; a track paints in three passes — bodies, transition
+  zones, selection rings (`drawClips`, #66), the last also drawing the dashed
+  accent echo ring on each selected clip's partner (spec §11 AU-97) — because
+  a zone lies inside the PREVIOUS clip's body) · `TimelineSessions.swift`
+  (drag, trim, slip, roll sessions; `TrimSession.alone` and
+  `RollSession.alone`, so a linked SOUND half's edge moves alone, spec §11
+  AU-93, and `ClipSnapshot.isLinkedSound`) · `TimelineView+Rename` (the one inline editor
   for clips, tracks and markers; it drops an unchanged and an empty commit,
   follows its target through relayout, and ends with its commit DROPPED when
   the target is gone or on Escape; a commit goes through `onGroupedEdit`
   (`performGroupedEdit`), so a rename is its own undo step even when the
   mouse-down that ended it edits too (#69)) · `+TrackMenu` (the right-click
   menu on a header or an
-  empty lane: the four toggles, checked, the Matte submenu (spec §11 MT-7),
-  and Remove Track through
+  empty lane: the header's five switches — the four toggles, checked, and
+  Mix…, the fifth, which opens the track's mix popover — the Matte
+  submenu (spec §11 MT-7), and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
-  a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
-  overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
+  a clip hit answers no menu) · `+TrackMix` (the track's mix
+  popover, spec §11 AU-105, AU-155: `showTrackMix(_:)`, one `NSPopover` per timeline —
+  a static table keyed by the view, since `TimelineView.swift` is frozen —
+  anchored on the header's fifth switch, lit by `TrackSnapshot.mixIsSet`,
+  editing through the timeline's live
+  trio and `onEdit`, refreshed on its document's `.projectDocumentDidChange`,
+  closed when its track is gone, told `inNest` when a nest is open; its
+  content is `TrackMixView.swift`:
+  `TrackMixViewController` (Volume in dB, Pan −100…100, Reset of all four
+  — only volume and pan inside a nest), `TrackMixEdits` and
+  `TrackMixLevel`, the dB rail, −60 Off … +12; and `TrackMixDynamics.swift`,
+  its Compressor and Limiter sections under Pan, each control writing the
+  whole object through `set_track` as one undo step, disabled in an open
+  nest) ·
+  `+Candidates` (Remove Silences' wash, drawn not
+  overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
+  line over its audio region from `TimelineView.duckCurves` — the frozen
+  file's one stored property for it, set in `refreshTimeline` beside
+  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+VolumeLine`
+  (the volume line on the timeline, spec §11 AU-81, AU-82, AU-84:
+  `volumeLineGeometry` — what the drawing and the hit both read —
+  `drawVolumeLine`, called after the duck line by `TimelineClipDrawing.swift`,
+  with the drag's readout, `volumeLineHit`, asked by `hit(at:)` before the
+  clip body, and `beginVolumeLine` / `continueVolumeLine` / `endVolumeLine`
+  over the frozen file's `volumeLines`, set by `refreshTimeline`, and
+  `volumeDrag`; its model is `VolumeLine.swift`, AU-80…AU-84: `VolumeScale`,
+  the dB scale, +30.103 dB at the top and −60 at the bottom; `VolumeLines`,
+  one handle's plan decoded lazily once, each clip's ramps cut to its audio
+  segment, and `gain(at:in:)`; `VolumeLineTarget` and `VolumeLine` — what a
+  drag edits, the ops a ⌥ point is made of, the drag's arithmetic, the
+  readout; `VolumeLineSession`; and `TimelineHit.resolvingVolumeLine(flags:
+  clicks:)`, which sends ⇧ and double-clicks on the line to the clip's arm) ·
+  `+NestScope` (the breadcrumb, painted LAST in the ruler's
   corner so it stays above the header column when scrolled) · `+Matte` (spec
   §11 MT-7: `TimelineMatteTag` — the header tag's words, dimmed with no
   target, on its own line when the row has room above the toggles, else
@@ -951,7 +1026,9 @@ the key map behind it.
   exception that sends a `filters` or `obscure` list of a different LENGTH, or
   `motion`, to the BASE props (a curve never: every count animates, spec §11
   GR-34), and `structural(audio:for:)` the one that sends pan, mono,
-  compressor, noise reduction, duck and keep-pitch there (CI-3);
+  compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
+  the gate and the de-esser (AU-46), the voice effect (AU-140), duck and
+  keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
   and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
@@ -1052,7 +1129,29 @@ the key map behind it.
   inside an action Rate writes the selected action's `end.speed`
   (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is
   `clip_state.speed`), while Keep pitch writes `set_speed` at `baseRate` and
-  Fit to is ⊘, SR-21; the note reads the peak a clip names) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  Fit to is ⊘, SR-21; the note reads the peak a clip names) ·
+  `AudioPane.swift` (the Ducking section's Duck by, Pre-roll and Hold and the
+  Fades section's In shape and Out shape, base-only, spec §11 AU-110…AU-114;
+  +`Loudness`: the Volume section's Loudness and At volume rows and the
+  Normalize row's Mode popup and Target field, spec §11 AU-15; +`Limiter`: the
+  Limiter section, spec §11 AU-26, registered after Mix in
+  `ClipPane.makeSections()` — Limit peaks, Ceiling, Release, animated
+  through actions (AU-88);
+  +`Isolation`: the Voice Isolation section, spec §11 AU-56, registered
+  before Noise Reduction — Isolate voice, Amount, Status, the Status read
+  through the pane's `IsolationCache.Memo`, dropped on
+  `.reversedMediaDidChange`, which the pane observes; +`Voice`: the Voice
+  Effect section, spec §11 AU-146, registered right after Voice Isolation,
+  its Status read through the pane's `voiceMemo`; +`HumChannels` and
+  +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
+  Voice Effect and before Noise Reduction, animated through actions (AU-88);
+  +`Dynamics`: the Gate, Leveller and De-esser sections, spec §11 AU-48,
+  AU-66 (the Leveller's Status read off `AudioDynamicsLevels.curves`),
+  registered after Noise Reduction and before Compressor, animated through
+  actions
+  (AU-88), their Status and Loudness rows read through
+  the pane's `loudnessMemo`) ·
+  `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
   shared module from `GraphicRegistry.entry(named:for:)`, main only, never a
@@ -1277,6 +1376,16 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
+- `ScrubGrains.swift` · `ScrubAudio.swift` · `EditorViewController+ScrubAudio.swift`
+  — audio while scrubbing (road map "audio" AP13, spec §11 AU-130…AU-136):
+  `ScrubGrains` the pure half (80 ms grains with 5 ms sin² edges,
+  `ScrubGrainScheduler`'s one-ahead rule, `read` over a build's mix as the
+  export's float read); `ScrubAudio` one window's player (its own
+  composition, rebuilt by its own queue item when the player's changes; one
+  reader per grain on its serial queue; a stale grain request dropped by
+  generation; `ScrubEngineSink`'s `AVAudioEngine` started on demand and
+  stopped 1 s after the drag, never `inputNode`). Wired by `timelineScrubbed`
+  and `TimelineView.onScrubEnded`.
 - `AudioRateCopy.swift` — a non-48 kHz audio source, or an MP3 whose
   LAME/Xing encoder delay Core Audio leaves in (read past it, SY-36), is read
   from a file-keyed 24-bit 48 kHz CAF copy in `NSTemporaryDirectory()/FrameJob/
@@ -1302,23 +1411,82 @@ the key map behind it.
   a deep slow-down is the owner's accepted limit (SR-15 as SR-16 widens
   it, `ramp_proof.py` L3), kept by SR1e (SR-16); written as a 32-bit float CAF through a
   `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
-- `RampAudioCache.swift` — `RampSegmentKey` (the clip, Keep pitch, glide and
-  map: equal exactly when the rendered file is), `RampAudioRequest` and the
-  file name from the media file's stat, the version and the reversal
-  (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix.
-- `RampAudioRenders.swift` — the process-wide serial render queue (SR-12):
+- `RampAudioCache.swift` — `OfflineAudioJob` (a ramp, an isolated
+  window, §11 AU-52, or a voiced one, AU-144), `RampSegmentKey` (the clip, Keep pitch, glide and
+  map: equal exactly when the rendered file is), `RampAudioRequest` (its
+  `job`) and the file name from the media file's stat, the version and the
+  reversal (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix,
+  in `ramp-audio`, `isolated` or `voiced`.
+- `RampAudioRenders.swift` — the process-wide serial render queue (SR-12)
+  of every offline audio job, a ramp's, an isolated window's (AU-52) or a
+  voiced window's (AU-144):
   owners (a document's recipe key, an export's key while it writes) WANT
   file names; a render nobody wants is cancelled, one wanted again while it
   runs is not, and a cancelled or refused render still wanted is queued
   again; the finished file is renamed into place inside `CacheLedger.publish`
   so it never lands mid-save; `wait` returns only on landing, failure or
-  cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only).
+  cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only); an
+  owner's `settled` closure runs on the main queue when a render it wants
+  lands OR fails, so a failure reaches the pane.
 - `ProjectDocument+RampAudio.swift` — the document's wants after each edit,
-  the prune, and `.reversedMediaDidChange` posted when a render lands, so
-  the frozen editor rebuilds with no change. `Exporter+RampAudio.swift` —
-  the export's wait for every ramp render it needs before the build (a
-  failure fails the export as `rampAudioFailed`; it never writes a
-  placeholder), its wants released by `Exporter.releaseRecipeKey`.
+  its plans' ramp segments, isolated windows and voiced windows in ONE
+  `want`, and `rampAudioDidSettle` on a landing or a failure: the prune of
+  the three folders, the wants made again (a voice waiting for its
+  isolation is wanted once that lands, AU-143) and
+  `.reversedMediaDidChange`, so the frozen editor rebuilds with no change
+  and the Voice Isolation and Voice Effect statuses read again.
+  `Exporter+RampAudio.swift` — the export's wait for every ramp render it
+  needs and every isolated window (`isolationFailed`), then a second wait
+  for every voiced window (`voiceFailed`, AU-147), before the build (a
+  ramp's failure fails the export as `rampAudioFailed`; it never writes a
+  placeholder), its wants released by `Exporter.releaseRecipeKey`, and
+  `waitForLevels`, the wait for a gated or de-essed clip's loudness still
+  being measured (`loudnessUnmeasured` after 300 s, AU-42).
+- `IsolationRenderer.swift` — a clip window's isolated voice rendered offline
+  (AU-51): Apple's `AUSoundIsolation` High Quality Voice at 100 %, one
+  manual-rendering engine per channel in lockstep over one
+  `RampSourceReader`, 4 s of preroll, the 4440-frame latency pinned and
+  discarded, zeros past the window, a 32-bit float CAF through
+  `RampCAFWriter`. Called by `RampAudioRenders`.
+- `IsolationCache.swift` — `cache/isolated/` (AU-52, AU-55):
+  `IsolationWindow`, the name (never the Amount), `IsolationSegmentKey`,
+  which segments are isolatable (×1, no ramp, no freeze), the requests, the
+  status the pane reads (`Memo`, held per document, clip, the two handles
+  and the published `ReverseResolution`, and through a gesture;
+  `Memo(compute:)` holds Voice Effect's status too), the wet
+  offset rounded ONCE (AU-53), and `CompositionBuilder.isolatedAudio` (the
+  READY renders a build reads into memory).
+- `AudioIsolation.swift` — the tap's isolation pass (AU-53, AU-54):
+  `IsolatedAudio` (a render in memory, read in 65,536-frame chunks) and
+  `IsolatedAudioStore` (path → weak object), `AudioIsolationSpan`,
+  `AudioIsolationTrack` (spans placed through `placement(of:shift:)`,
+  `dry + a·(wet − dry)` before the chain, reading only preloaded memory).
+  A ready voiced segment's render (AU-143) is a span at amount 1 in place
+  of its isolation crossfade (`voiced:`).
+- `VoiceProps.swift` — `audio.voice`'s Swift model (AU-140): `VoiceKind` in
+  E8's order, `VoiceGroup`, the popup titles ("Voice: Pitch" … "Space:
+  Cathedral"), each kind's own pitch; `dictionary` always carries `pitch`,
+  `NSNull` when unset, so a kind change drops a stored one.
+- `VoiceChain.swift` — the AU-141 table: `VoiceSettings` (semitones 0
+  unless the kind reads pitch), each kind's chain as `Stage` values
+  (TimePitch → EQ → Distortion → Delay → Reverb, scaled by the amount,
+  band edges by `geo`), inertness, the measured makeup per kind, the units
+  built (presets by `auAudioUnit.currentPreset`, every other parameter set
+  and clamped to its tree), and `version`, part of the cache key.
+- `VoiceRenderer.swift` — a clip window's voice effect rendered offline
+  (AU-142): `writeInput` (the window as a stereo CAF, crossfaded with the
+  isolated render when the clip isolates), then an `AVAudioPlayerNode` and
+  the chain at 48 kHz stereo in 4,096-frame offline calls, the chain's
+  latency discarded, cut at the window's end, mono as `(L+R)/2`, makeup in
+  float, through `RampCAFWriter`. Called by `RampAudioRenders`.
+- `VoiceCache.swift` — `cache/voiced/` (AU-144, AU-145): `VoiceJob`, the
+  name, the request (AU-55's segments, and an isolating clip's only once
+  its isolated file is on disk), the requests, the Voice Effect status, and
+  `CompositionBuilder.voicedAudio` (the READY renders a build reads into
+  memory).
+- `AudioPane+Voice.swift` — the Sound tab's Voice Effect section (AU-146),
+  after Voice Isolation: Effect popup (a kind writes `pitch: null`;
+  `voiceChoice`), Amount, Pitch for pitch/high/deep only, Status.
 - `RampVarispeedStream.swift` — the Keep pitch off tape glide as a stream
   (SR1c): the map read at 48 kHz from any start (negative for a
   pre-roll), dropping source behind a bound from the map's steepest
@@ -1492,8 +1660,9 @@ the key map behind it.
   step, and its validator arm) ·
   `EditorViewController+Seeing.swift` (View ▸ Show Ungraded, View ▸ Show
   Selection, View ▸ Show SDR Version and View ▸ Scopes, the tag stack,
-  `installSeeing`, their validator arm; spec §11 GR-4, GR-5, GR-10, GR-13,
-  HD-14) — the grade's seeing tools. Show SDR Version writes no UserDefaults
+  `installSeeing`, which puts the Loudness Meter's column between the canvas
+  and Scopes through `installLoudnessPanel`, AU-75, and their validator arm;
+  spec §11 GR-4, GR-5, GR-10, GR-13, HD-14) — the grade's seeing tools. Show SDR Version writes no UserDefaults
   (not a persisting item) and changes no pixel in an SDR project. Show
   Ungraded sets `RecipeOptions.ungraded` on the
   document's own key only, so an export or `render_frame`, which mint their
@@ -1701,14 +1870,118 @@ the key map behind it.
   `GraphicLibrary.maxSide`, since an error card is drawn through `bitmap(_:)`
   at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
   line, so it stays one integer literal.
-- `AudioTap.swift` · `AudioDSP.swift` — the `MTAudioProcessingTap` playback
-  and export share, and the four sample-level effects: noise reduction (a
-  512-sample delay the builder leads by, SY-25), the compressor, the mono fold (BEFORE the pan, or it is
-  algebraically self-cancelling) and pan (constant-power, unity at centre).
-  A track whose clips ask for none is bit-identical.
+- `AudioTap.swift` · `AudioTapSchedule.swift` · `AudioAutomation.swift` ·
+  `AudioDSP.swift` · `AudioEQStage.swift` · `AudioCompressorStage.swift` ·
+  `AudioNoiseReductionStage.swift` · `AudioLimiterStage.swift` — the
+  `MTAudioProcessingTap` playback and export share, and the ten sample-level
+  effects after voice isolation's crossfade, which runs first (AU-54,
+  `AudioIsolation.swift`; a ready voice effect's render in its place,
+  AU-143): the channel pick and the EQ and hum notch at the
+  head (AU-30, AU-34: RBJ biquads in Double over 17 fixed positions, scalar per
+  sample, designed at the cut; looked up `AudioTrackDSP.headLead` — SY-25's
+  6,400 ticks — further ahead on a noise-reduced track, the tap's runs split at
+  both lookups), noise reduction (a 512-sample delay the builder leads by,
+  SY-25), the gate, the leveller and the de-esser (AU-47, AU-66: read at the
+  compressor's lookup, and nil, touching no sample, until the clip's loudness —
+  and the leveller's curve — is measured, AU-42; the leveller stateless, its
+  run made per run at the lookup frame, nothing reset), the compressor, the
+  mono fold (BEFORE
+  the pan, or it is algebraically self-cancelling) and pan (constant-power,
+  unity at centre), then the clip limiter (AU-20: a lookahead true-peak
+  limiter last in the chain, told the clip's base volume because the fader is
+  after it, AU-22; its 158-sample delay led out by `AudioShift.limiterLead`,
+  1,975 ticks, with the tap looking spans up `lookupLead` ahead, AU-23; FIR
+  taps and the box sum as element-wise vDSP, never scalar loops, which miss
+  the tap's real-time deadline in the Debug app's `-Onone` build). A track
+  whose clips ask for none is bit-identical. `AudioTap.swift` is the tap
+  (`AudioTapContext`, `AudioTap.make`); `AudioTapSchedule.swift` is what a
+  track's tap is told when the composition is built (`AudioDSPSpan`,
+  `AudioTrackDSP`, `AudioDSPParameters`, `AudioDSPSource`), a pure move out of
+  it (road map "audio" AP0). `AudioAutomation.swift` (road map "audio" AP8b,
+  spec §11 AU-85…AU-88) reads the plan's per-segment `automation`:
+  `PlanAudioPoint`, `AudioProps.interpolated` (numbers linear, presence,
+  switches and the held slope, mains, harmonics and leveller response from the
+  left), `AudioDSPAutomation` (with the clip's leveller curves as a base fact;
+  a run's settings at its anchor on the absolute
+  32-frame grid, runs cut at grid boundaries and point frames, the track-wide
+  stages from any point), `AudioPanRamp` (the pan per sample, scalar) and
+  `AudioPatch.routedInsideAction` (the inspector's base/end split).
+  `AudioDSP.swift` keeps the parameters
+  (`AudioCompressorSettings`, `AudioLimiterSettings`, `AudioClipDSP` with its
+  `channels`, `eq`, `gate`, `leveller` and `deEsser`), the pan law and the
+  chain (`AudioDSPChain`, whose order is the channel strip's); each stage is a
+  file of its own, `AudioEQStage.swift` (AP3), `AudioCompressorStage.swift`,
+  `AudioNoiseReductionStage.swift` and `AudioLimiterStage.swift` (the first two
+  pure moves out of it, AP0), `AudioGateStage.swift` and
+  `AudioDeEsserStage.swift` (AP4, below), and `AudioLevellerCurve.swift` and
+  `AudioLevellerStage.swift` (AP6b, below).
+  `AudioTapSchedule.swift` also holds
+  `AudioDSPParameters(snapshot:levels:curves:)`,
+  `pendingLevels` and `measured(project:cache:)`, the resolution `Playback`
+  and `AudioDSPSource`'s fallback use; isolation and ramp callers keep the
+  levels-less init.
+- `AudioTrackDynamics.swift` — a timeline track's compressor and limiter
+  (format 36, spec §11 AU-150, AU-151, AU-153): `AudioTrackDynamicsSettings`,
+  `AudioTrackDynamicsStage` (the clip's compressor then limiter, latency 158
+  with a limiter), which the export runs on each track's sub-mix
+  (`ExportMixRead.swift`), and `AudioTrackEnvelope`, which a metering build's
+  tap gains by before the stage (×E at grid frame `g + L`) and divides by
+  after (÷E at `g`), so the preview's stage is post-fader approximately.
+  `AudioDSPParameters.trackDynamics` stays outside `isEmpty`, so a
+  non-metering build's taps are what they were.
+- `AudioBiquad.swift` · `AudioEQProps.swift` · `AudioEQCurveView.swift` ·
+  `AudioPane+EQ.swift` · `AudioPane+HumChannels.swift` — road map "audio" AP3
+  (spec §11 AU-30..AU-38): `AudioBiquad` the RBJ design (`AudioEQSettings`,
+  `AudioEQDesign.design` into 17 fixed positions, `magnitudeDB`, `responseDB`),
+  the one design the stage runs and the curve draws; `AudioEQProps` the read-only
+  mirror's `EqProps` (whose `dictionary` writes every slot, `NSNull` when off,
+  because a patch merges per key), `HumProps`, `AudioChannelChoice` and the
+  presets (`EqPreset`, each writing only its own slot); `AudioEQCurveView` the
+  drawn response at 48 kHz; `AudioPane+EQ` the EQ section and
+  `AudioPane+HumChannels` the Channels and Hum sections, after Voice Effect
+  and before Noise Reduction, all animated through actions (AU-88).
+- `AudioEnvelopeFollower.swift` · `AudioGateStage.swift` ·
+  `AudioDeEsserStage.swift` · `AudioDynamicsProps.swift` ·
+  `AudioDynamicsLevels.swift` · `AudioPane+Dynamics.swift` — road map "audio"
+  AP4 (spec §11 AU-40..AU-48): `AudioEnvelopeFollower` the linked peak
+  detector, peak follower and one-pole coefficients the compressor, the gate
+  and the de-esser share (`AudioEnvelope`, `AudioPeakFollower`; the
+  compressor's exact Float arithmetic, so its bytes did not move, AU-40);
+  `AudioGateStage` the downward expander/gate and `AudioGateSettings` (AU-40,
+  AU-43), open when fresh or reset; `AudioDeEsserStage` the split-band
+  de-esser — a 24 dB/oct Butterworth sidechain, an LR4 crossover and
+  `low + g·band`, which never boosts — and `AudioDeEsserSettings` (AU-44,
+  AU-45); `AudioDynamicsProps` the mirror's `GateProps` and `DeEsserProps`
+  (format 33) and `LevellerProps` (format 37); `AudioDynamicsLevels` each
+  gated, levelled or de-essed clip's measured loudness (its `ClipLoudness`
+  reading, AU-41) and each levelled clip's curves by response (`curves`,
+  AU-66 (e): pending on the loudness or the speech, unmeasurable where speech
+  detection is unavailable), their memos (never a pending answer; the curves'
+  with the `media.speech` read), the `loudness` and `speech` posts' drop and
+  `.reversedMediaDidChange`, and the export's `wait` on a pending level or
+  curve (AU-42); `AudioPane+Dynamics` the Gate, Leveller and De-esser sections
+  after Noise Reduction (AU-48, AU-66).
+- `AudioLevellerCurve.swift` · `AudioLevellerStage.swift` — road map "audio"
+  AP6b's leveller (spec §11 AU-66): `AudioLevellerCurve` the material's level
+  per 10 ms played step relative to L, made ahead of time from a
+  `ClipLoudness` reading and its speech mask (phrases split at 0.5 s breaks,
+  long phrases over a 3 s speech-only window smoothed forward then back over
+  half the response, short phrases and the edges a neighbour's value, breaks
+  held then glided over their last 0.25 s), keyed by segment start;
+  `AudioLevellerSettings` (the target, the caps and the curve for the
+  response) and `AudioLevellerRun`, the stateless gain after the gate and
+  before the de-esser: the gain at each step centre, interpolated per sample
+  on the tap's lookup frame.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
-  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` · `ExporterAudioGain.swift` ·
+  `ExporterWriter+Chapters.swift` · `ExporterWriter+Audio.swift` ·
+  `ExporterWriter+Pump.swift` (`ExportWriter`'s pump, whose `read:` is a
+  closure — the video output's, or `ExportMixRead.next` — and the master's
+  tail; a pure move out of `ExporterWriter.swift`, AP10c's toll T1) ·
+  `ExportMixRead.swift` (the export's float read, spec §11 AU-152: one mix
+  output, or the tracks' sub-mixes read in step, each through its track's
+  compressor and limiter, and summed before the master; the writer, the
+  stems, WebM and the measurement read through it) · `ExportAudioMaster.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
@@ -1724,6 +1997,16 @@ the key map behind it.
   `ExportAV1Picture.swift` (each picture's CICP, luma weights and HDR10 strings, CX-14) ·
   `ExportAV1Track.swift` · `ExportEncodePump.swift` (picks SVT-AV1 or libvpx by the settings'
   `writer`; straightens `vp9_alpha_webm`'s frames first, G-35) · `ExportSheetSpeed.swift` ·
+  `ExportSheetAudioBits.swift` (the sheet's Bit depth row after Quality, live on `audio_wav`
+  and `audio_aiff` only, spec §11 AU-29) ·
+  `ExportSheetStems.swift` (the export card's Stems row after Bit depth — None, One per
+  Track, One per Track Name — live on the three audio rows, spec §11 AU-108) ·
+  `ExportStems.swift` (the stems pipeline, spec §11 AU-108: `ExportStemsPipeline` wraps the
+  mix's `ExportWriter`, then writes each stem from a fresh build on the export's key read
+  through only its composition tracks (`BuiltComposition.selectingAudio`) into an
+  `ExportWriter` whose master neither gains nor limits (`ExportAudioMaster(limits: false)`);
+  the file names, `summary`, the source-collision refusal, nothing left by a failure or a
+  cancel) ·
   `ExportPacketSink.swift` (where the pump's AV1 packets go: the MP4 passthrough input or
   the WebM writer; `append` carries the `alpha` packet) · `ExportWebMWriter.swift` ·
   `ExportWebMWriter+Audio.swift` (the WebM audio pump, C5's toll T2) · `ExportWebMLayout.swift` ·
@@ -1739,13 +2022,16 @@ the key map behind it.
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
   or a deep VP9 track, §11 PR-12). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
-  32-bit float, then the write: un-normalised from a 16-bit decode (a mix
-  past full scale clips there, and `mixClipped` says so); normalised from the
-  same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). Where the sound ends is `ExportAudioEnd`'s
+  32-bit float (its 10 ms steps kept by `StepLoudnessMeter`, AU-28), then
+  the write from the same float decode, normalised or not, through
+  `ExportAudioMaster` (spec §11 AU-27..AU-29): each buffer placed by its
+  stamp, the gain, the master `AudioLimiterStage` at `peak_dbtp` (−1 dBTP by
+  default, always on), its 158 frames compensated (the head dropped,
+  `finish()`'s tail handed on before the padding), rounded once to 16 or 24
+  bits, never dithered. Where the sound ends is `ExportAudioEnd`'s
   (spec §11 #337): exactly round(range × 48 000) frames, the crossing buffer
-  cut, later buffers read and dropped, a short read padded with 16-bit
-  silence; the measurement feeds the same count. The alpha movie rows' frames (`prores_4444`,
+  cut, later buffers read and dropped, a short read padded with silence at
+  the master's depth; the measurement feeds the same count. The alpha movie rows' frames (`prores_4444`,
   `hevc_alpha`) are straightened in the video pump before `retimed`:
   un-premultiplied, each transparent pixel within 4 px of a visible one
   filled with the nearest one's colour, and labelled `StraightAlpha`, with
@@ -2228,9 +2514,84 @@ free.
   language, speakers and vocabulary from its marker, the shipped models,
   `disfluencies` and `refresh` true), its jobs and its `CloudEstimate` line,
   shared by the sheet and `transcribe_for_fillers`.
-- `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
-  measured PRE-FADER from the plan segment, REPLACING `volume` so a second
-  press is a no-op, always to BASE props.
+- `AudioNormalize.swift` (+`Loudness`) · `ClipLoudness.swift` ·
+  `StepLoudness.swift` · `AudioLimiterModel.swift` · `NormalizeChoice.swift`
+  — `StepLoudness` is BS.1770's gating over 10 ms steps (`integrated`,
+  `loudness`, moved out of `ClipLoudness`), read by `ClipLoudness`,
+  `AudioLimiterModel` and the export, and `StepLoudnessMeter` the export's
+  pass-1 steps and step peaks (spec §11 AU-28). Normalize Clip as a
+  value type: peaks (Peak mode) or the loudness cache (Loudness mode, spec §11
+  AU-24: −16 LUFS by default; a clip whose true peak fits −1 dBTP gets its
+  volume alone, any other gets `{volume, limiter}` with the volume solved
+  through `AudioLimiterModel`, the clip limiter at block rate over
+  `ClipLoudness.Reading.steps` and `stepPeaks`; ×32 the one cap,
+  `limited_by: max_gain`) in, ops out, measured PRE-FADER
+  from the plan segment, REPLACING `volume` so a second press is a no-op,
+  always to BASE props; `audioSegments(in:)` and `admit(_:in:segments:)` are
+  both modes' admission. `ClipLoudness` is a clip's reading over the window
+  that plays (the export's dual mono; the clip's own channel pick, mono fold
+  and pan on stereo, pan · fold · pick, AU-35, the EQ and hum not counted;
+  played-order 10 ms steps through `MediaPeaks.sourceTick` and
+  `ReverseMirror`, the gates once, AU-11, AU-12) and the Volume section's
+  `Memo` (per handle, per media file, and the held answer through a live
+  edit, AU-15). `NormalizeChoice` is the mode and target in UserDefaults
+  (Loudness and −16 by default, AU-25; `FrameJobNormalizeMode`,
+  `FrameJobNormalizeTargetLUFS`), which the button and Clip ▸ Normalize
+  follow, through `AudioMeasureDoor`; `normalize_clip` names its own mode and
+  never reads it.
+- `ProcessedLoudness.swift` — a clip measured through its own chain (spec §11
+  AU-64): `needsRender`, the measurement plan (the clip's segments, pre-fader
+  but for one constant ramp at the trial's base volume), the render under a
+  fresh key through `Exporter.withOfflineAudio`, the build and one float mix
+  read into a `StepLoudnessMeter`, and At volume's `Memo`.
+- `LoudnessMeasureRun.swift` — one press's renders, clip by clip: R0, the
+  solve through Loudness Normalize's plan, the limiter's verify renders
+  (±0.1 LU, at most three); cancel; `finish`, which releases the render wants.
+  It also holds `AudioMeasureRunning`, the protocol the Measuring Sound sheet,
+  `AudioMeasureDoor.measure` and `AgentServer.awaitMeasurement` take (this
+  run and `AudioMatchRun`), and `AudioMeasureOutcomeBox`; `static trial`
+  makes Match Audio's target trials too.
+- `AudioMeasureDoor.swift` — the one body the Volume section's Normalize and
+  Enhance Voice buttons and the Clip menu share: Peak at once, a run at once
+  when nothing renders, else the Measuring Sound sheet; the stale test; the
+  commit. And `pressMatch`, Clip ▸ Match Audio…'s press from its sheet's
+  hand-back (spec §11 AU-128), and `enhanceLanded`, a landing's follow (spec
+  §11 AU-68), through the same `measure` with refusals in place of beeps.
+- `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
+  "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
+  over `AudioMeasureRunning`.
+- `AudioEnhance.swift` (+`Reasons`, +`Leveller`) — Enhance Voice's value type
+  (spec §11 AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the
+  rules), `jobs`, `plan` over the run's outcome; `+Reasons` the loudness
+  reason and the reasons' numbers. `+Leveller` the speech's short-term
+  loudness range and the leveller's rule (AU-67).
+- `AudioDynamicsModel.swift` — the clip's compressor at the loudness cache's
+  10 ms steps, for Enhance Voice's makeup only (AU-62, AU-64 (h)).
+- `AudioPane+Enhance.swift` — the Volume section's Enhance Voice button; its
+  press is the door.
+- `AgentServer+EnhanceVoice.swift` — `enhance_voice`, the mirror of Clip ▸
+  Enhance Voice, off main; and the measurement's wait and stale test
+  `normalize_clip` shares.
+- `SpeechSpectrumMeter.swift` — a render's speech-only third-octave spectrum
+  (spec §11 AU-124): an 8192-point Hann STFT, hop 4096, fed beside
+  `ProcessedLoudness.render`'s step meter; 23 bands, nil under 12 speech
+  frames.
+- `AudioMatchFit.swift` — Match EQ's curve (weights, level removed,
+  smoothing) and its fit to the EQ's five tonal slots (shelves, up to three
+  bells, Levenberg–Marquardt, rounding), `applied` and `trialEQ`
+  (AU-125…AU-127). Pure.
+- `AudioMatch.swift` — Match Audio's value type: `read` (the reference's
+  refusals, the targets' skips), `plan` over the run's outcome (AU-120,
+  AU-122, AU-123, AU-127).
+- `AudioMatchRun.swift` — one Match Audio press's renders: the reference once
+  as it plays, each target's trial for its spectrum and fit, then an inner
+  `LoudnessMeasureRun` to the reference's loudness; `referenceProject`; an
+  `AudioMeasureRunning`.
+- `AudioMatchSheetController.swift` — the Match Audio sheet (Match to,
+  Loudness, EQ), its hand-back from `viewDidDisappear` and its dev accept
+  (AU-121, AU-128).
+- `AgentServer+MatchAudio.swift` — `match_audio`, the mirror of Clip ▸ Match
+  Audio…, off main.
 - `AudioSync.swift` (+`Correction`, +`Region`, +`Search`, +`Weak`) ·
   `AudioSyncMatch.swift` · `AudioSyncDrift.swift` · `AudioSyncPHAT.swift` ·
   `RealFFT.swift` ·
@@ -2274,16 +2635,40 @@ free.
   `EditorViewController+Audio` holds the Clip menu's sound
   commands (Normalize, moved whole out of the frozen file, and Synchronize
   Audio) with their validator arms.
-- `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` — the meter
-  reads the DSP tap that already exists and multiplies by the plan's
-  envelope; a second `PostEffects` tap cannot be built (one
-  `audioTapProcessor` per input, exclusive flags). Do not "fix" it back. The
-  MODEL publishes a raw peak and RMS and the VIEW owns the ballistics, with
-  ONE resting appearance so the harness settles. `Loudness` is BS.1770-4 with
-  no AVFoundation in it, refusing any rate but 48 kHz. A metered track counts
-  only while one of its OWN sounding spans holds the playhead
+- `LevelMeter.swift` · `LevelMeterView.swift` · `Loudness.swift` ·
+  `ExportLoudness.swift` — the meter reads the DSP tap that already exists
+  and multiplies by the plan's envelope; a second `PostEffects` tap cannot be
+  built (one `audioTapProcessor` per input, exclusive flags). Do not "fix" it
+  back. The MODEL publishes a raw peak and RMS and the VIEW owns the
+  ballistics, with ONE resting appearance so the harness settles.
+  `Loudness.swift` is BS.1770-4 (`LoudnessReport`, `LoudnessMeter`) with no
+  AVFoundation in it, at any rate in 8–192 kHz (`KWeighting`, moved here from
+  `LoudnessBlocks` in road map "audio" AP7: Tables 1–2 at 48 kHz,
+  libebur128's derivation elsewhere), with `momentaryLUFS` and
+  `shortTermLUFS` for the live meter; its K-weighting tables,
+  the Annex 2 FIR and the gates are internal, read by `LoudnessBlocks` and
+  `ClipLoudness` (road map "audio" AP1); `ExportLoudness.swift`
+  (a pure move out of it, road map "audio" AP0) is the export gain a target
+  asks for, solved through `AudioLimiterModel` at the master's ceiling
+  (AU-28), and the export's summary line, and `phase5_chrome.py`'s section 9
+  compiles it with `Loudness.swift`, `StepLoudness.swift` and
+  `AudioLimiterModel.swift` alone, so it stays free of AVFoundation. A metered track
+  counts only while one of its OWN sounding spans holds the playhead
   (`LevelMeterTrack.mix`; its format family's resolved segments, #65): a sink
   keeps its last buffer across silence.
+  Each sink also carries a `MixRing` (AP7, spec §11 AU-70): the tap copies
+  its post-chain block into it, lock-free (claims, a release fence, a
+  release publish; the drain detects an overwrite rather than waiting).
+  `LiveLoudness.swift` (+`Sum`) drains every ring on the meter's 30 Hz tick
+  (the timer is in `.common` modes) and sums the tracks by frame × envelope
+  into a `LoudnessMeter`, measured only at ×1, with `manual`, `jump` and
+  `overrun` resets; a track still on the old position after a seek drops
+  its stale buffers until it moves. While it is measuring,
+  `Playback.meterReading()` answers its bars (the mix's last 100 ms), else
+  `LevelMeterTrack.mix`. `LoudnessPanelView.swift` is View ▸ Loudness
+  Meter's 132 pt column and `EditorViewController+Loudness.swift` its
+  installation (between the canvas and Scopes), toggle, Reset and
+  validator; view state, no `UserDefaults` key.
 
 **Dialogs and windows.**
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses, and under
@@ -2522,9 +2907,11 @@ free.
   live with it, the warm-up is spent before the countdown, and the press
   reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
   CAM-11). The panel
-  remembers ten `FrameJobRecording…` keys (the Camera's, the Format's and
-  `FrameJobRecordingCameraBeside` among them; the type doc lists them), and a
-  probe or the harness that touches them handles all ten. The
+  remembers eleven `FrameJobRecording…` keys (the Camera's, the Format's,
+  `FrameJobRecordingCameraBeside` and the eleventh,
+  `FrameJobRecordingEnhanceMicrophone` — "Enhance the microphone when it
+  lands", spec §11 AU-69 — among them; the type doc lists them), and a probe
+  or the harness that touches them handles all eleven. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -2611,6 +2998,15 @@ free.
   start minus its offset, floored and head-trimmed through the voices'
   shared `headTrimmed`, then put in the bottom-right corner by one
   `set_video`, read back.
+- `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
+  AU-68): the recording's voice paths and clips, readiness and busy, the
+  pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
+  landing, ended before a step acts, `.enhance` through
+  `AudioMeasureDoor.enhanceLanded`). `record_screen {enhance}` polls the same
+  `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`.
+- `AgentServer+LandRecording.swift` — the dev tool `land_recording` (spec §11
+  AU-69 (e)): fixture files landed as a finished recording through the
+  panel's `recordingEnded` or `record_screen`'s landing.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`
@@ -2687,13 +3083,15 @@ free.
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
   +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0 —, +`Graphics`,
-  +`Declarations`)
+  +`Tracks` — the five track rows, spliced back where they stood by
+  `trackTools(trackDescription:)`, a pure move out of `AgentCatalog.swift`,
+  AP10c's toll T2 —, +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-two op tools is `opTool`'s** and carries no
+  **Every one of the sixty-four op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -2729,7 +3127,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and two
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and five
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -2948,7 +3346,9 @@ free.
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
   `select_inspector_tab` (V3), `assistant_send` and `assistant_answer`
-  (road map 12 A1), `play_preview` (#127, G-36) and `graphic_memory` (G-37); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  (road map 12 A1), `play_preview` (#127, G-36), `graphic_memory` (G-37)
+  and `loudness_meter` (road map "audio" AP7, AU-77); a dev tool is counted
+  apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+PlayPreview.swift` — `play_preview` (dev only, wholly under
   the flag; spec §11 G-36, §7.9c): plays a window's preview forward through
   the transport's own `setRate` and `seek(to:)` (an optional `seek_to` half
@@ -2969,6 +3369,12 @@ free.
   `GraphicPrefetch.memoryReport`; `pressure` simulates a memory-pressure
   level until the tool sets `normal`. `tools/proof/graphic_memory_proof.py`
   drives it.
+- `AgentServer+LoudnessMeter.swift` — `loudness_meter {reset?}` (dev only,
+  wholly under the flag, on main; spec §11 AU-77): a window's `LiveLoudness`
+  reading — `measuring`, `rate`, the four levels (null where none, `"-inf"`
+  for silence), `from_frame`/`to_frame`/`sample_rate`, `resets`,
+  `last_reset` — after an optional `manual` reset.
+  `tools/proof/audio_ap7_proof.py` drives it beside `play_preview`.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
   time and, while a trial asks, a SHA-256 of the destination's pixels;
@@ -3091,6 +3497,8 @@ free.
   its subviews, never a problem (the Assistant tab's transcript, spec §11
   AI-17). It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.
+- `OptionDisplayControl+Snapshot.swift` — (dev tools) a read-out's text as an
+  `option.display` part in `snapshot_ui`'s layout dump.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `intsArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
   `requiredEnumArg` — the one reader of a string-valued enum, with its
@@ -3277,14 +3685,17 @@ queue (`MediaImporter.CacheLane`, spec §11 #367), the export
 progress timer, the AV1 encode queue (`ExportEncodePump`'s
 `com.kgalligan.framejob.export.encode`, with its `DispatchSemaphore(3)` between the
 video pump and the encoder, spec §11 CX-12), the WebM writer's two pump queues
-(`com.kgalligan.framejob.export.webm.video` and `.audio`, CX-15), `Transcriber`'s serial queue, `CloudTranscriber`'s serial
+(`com.kgalligan.framejob.export.webm.video` and `.audio`, CX-15), the stems builds
+(`ExportStemsPipeline`'s `com.kgalligan.framejob.export.stems`, spec §11 AU-108),
+`Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`
 observation), `FFmpegRewrap`'s serial queue, the container rewrap's per-input writer
 queues (`ContainerRewrapWriter.swift`), the one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue`, `LookGallery.queue` — a fourth one-frame render joins
-this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
+this entry rather than growing the list), the scrub audio queue (`ScrubAudio`'s
+`com.kgalligan.framejob.scrub-audio`, spec §11 AU-130), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main

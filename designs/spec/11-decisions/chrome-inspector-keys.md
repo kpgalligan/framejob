@@ -59,7 +59,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `structural(video:for:)`'s motion and list-length rule); the core's door
   is unchanged and `set_action_end` still takes them from an agent. They
   are switches or effects an action cannot usefully ramp, and a write
-  that disappeared into an end patch was the redesign's P7.
+  that disappeared into an end patch was the redesign's P7. Narrowed by
+  AU-88: inside an action pan, mono, the compressor and noise reduction go
+  to the end with the rest of the tap's keys; duck and keep-pitch stay.
 - **CI-4 — Mint is the action ink, and nothing else uses it.**
   `DS.action` (dark `#5CD6B0`, light `#1E8F6E`) with `DS.actionInk`
   (`#101010`) on a solid band. The Clip tab's pinned action lane REPLACES
@@ -275,7 +277,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (`ReelOp.setActionEnd`) lifts every top-level null in its patch's groups
   into `off`, because a typed `.some(nil)` is the inspector's "switch it
   off"; the RAW builder, which `clearOps` and every agent call use,
-  forwards its nulls as removals and its caller chooses `off` itself.
+  forwards its nulls as removals and its caller chooses `off` itself. Extended by AU-88: `off` also accepts
+  `audio.eq.<slot>`, one EQ slot keyed off, which the typed builder lifts
+  from a null slot inside `audio.eq`.
 - **CI-15 — Every sub-row carries `mixed`, and the collapse is the one
   animation** (phase 5, P12 and Reduce Motion). A row nested under a switch
   (a shadow's Blur, a compressor's Ratio, a stroke's Width) shows the

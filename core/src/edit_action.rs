@@ -186,17 +186,37 @@ fn not_a_target(group: &str, key: &str) -> Result<(), String> {
     }
 }
 
-/// Reads `set_action_end`'s `off` list (spec §11 CI-14) into its
-/// `(group, key)` pairs, refusing in this order: a path that is not
-/// `group.key`, a group an end patch may not name, `video.motion` and
-/// `text.words`, a path `patch` also names, and then whatever the group's
-/// own read says of a `null` at that key — an unknown key, and a REQUIRED
-/// key (`video.opacity`), which no group can hold as `null`.
-fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a str)>, String> {
+/// The EQ's seven slots, the one group whose slot `off` may name (AU-88).
+#[rustfmt::skip]
+const EQ_SLOTS: [&str; 7] =
+    ["high_pass", "low_shelf", "band_1", "band_2", "band_3", "high_shelf", "low_pass"];
+
+/// One `off` path: `group.key`, or `audio.eq.<slot>` with its `slot`.
+struct OffPath<'a> {
+    group: &'a str,
+    key: &'a str,
+    slot: Option<&'a str>,
+}
+
+/// Reads `set_action_end`'s `off` list (spec §11 CI-14) into its paths,
+/// refusing in this order: a path that is not `group.key` or
+/// `audio.eq.<slot>` (AU-88; an unknown slot named against the seven), a
+/// group an end patch may not name, `video.motion` and `text.words`, a path
+/// `patch` also names, and whatever the group's read says of a `null` there
+/// — an unknown key, a REQUIRED key (`video.opacity`).
+fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<OffPath<'a>>, String> {
     let mut paths = Vec::with_capacity(off.len());
     for path in off {
-        let (group_name, key) = match path.split_once('.') {
-            Some((g, k)) if !g.is_empty() && !k.is_empty() && !k.contains('.') => (g, k),
+        let parts: Vec<&str> = path.split('.').collect();
+        let (group_name, key, slot) = match parts.as_slice() {
+            [g, k] if !g.is_empty() && !k.is_empty() => (*g, *k, None),
+            ["audio", "eq", slot] if EQ_SLOTS.contains(slot) => ("audio", "eq", Some(*slot)),
+            ["audio", "eq", slot] => {
+                return Err(format!(
+                    "off path \"{path}\" names no EQ slot: \"{slot}\" is not one of {}",
+                    EQ_SLOTS.join(", ")
+                ))
+            }
             _ => {
                 return Err(format!(
                     "off path \"{path}\" must be \"group.key\", a group of video, audio or \
@@ -212,9 +232,9 @@ fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a s
             .find(|group| group.name() == group_name)
             .ok_or_else(|| unknown_key(group_name, END_PATCH))?;
         not_a_target(group_name, key)?;
-        if patch
-            .get(group_name)
-            .and_then(|body| body.get(key))
+        let named = patch.get(group_name).and_then(|body| body.get(key));
+        if slot
+            .map_or(named, |slot| named.and_then(|eq| eq.get(slot)))
             .is_some()
         {
             return Err(format!(
@@ -222,7 +242,7 @@ fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a s
                  hold it and key it off"
             ));
         }
-        let probe = json!({ key: null });
+        let probe = slot.map_or(json!({ key: null }), |slot| json!({ key: { slot: null } }));
         let read = match group {
             Group::Video => merge_group(&VideoProps::default(), &probe, group).map(|_| ()),
             Group::Audio => merge_group(&AudioProps::default(), &probe, group).map(|_| ()),
@@ -230,27 +250,42 @@ fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a s
             Group::Shape => merge_group(&ShapeProps::default(), &probe, group).map(|_| ()),
         };
         read.map_err(|why| format!("cannot key \"{path}\" off: {why}"))?;
-        paths.push((group_name, key));
+        paths.push(OffPath {
+            group: group_name,
+            key,
+            slot,
+        });
     }
     Ok(paths)
 }
 
-/// Writes `null` at `group.key` of an end state — the property keyed OFF.
-/// `end` is an object after `actions::merge` with an object patch; its
-/// GROUP slot need not be (`end` is stored as the file had it), and a
-/// non-object slot is replaced by `{}` rather than indexed into.
-fn key_off(end: &mut Value, group: &str, key: &str) {
-    let Value::Object(groups) = end else {
-        return;
-    };
-    let slot = groups
-        .entry(group.to_string())
+/// The object at `key` of `map`, made `{}` when absent or not an object.
+fn object_at<'v>(map: &'v mut Map<String, Value>, key: &str) -> Option<&'v mut Map<String, Value>> {
+    let slot = map
+        .entry(key.to_string())
         .or_insert_with(|| Value::Object(Map::new()));
     if !slot.is_object() {
         *slot = Value::Object(Map::new());
     }
-    if let Value::Object(fields) = slot {
-        fields.insert(key.to_string(), Value::Null);
+    slot.as_object_mut()
+}
+
+/// Writes `null` at `group.key` of an end state, or at `audio.eq.<slot>`
+/// (AU-88) — the property keyed OFF. A group or `eq` slot that is not an
+/// object (`end` is stored as the file had it) is replaced by `{}`.
+fn key_off(end: &mut Value, path: &OffPath<'_>) {
+    let Value::Object(groups) = end else {
+        return;
+    };
+    let Some(fields) = object_at(groups, path.group) else {
+        return;
+    };
+    let (target, key) = match path.slot {
+        Some(slot) => (object_at(fields, path.key), slot),
+        None => (Some(fields), path.key),
+    };
+    if let Some(target) = target {
+        target.insert(key.to_string(), Value::Null);
     }
 }
 
@@ -385,6 +420,13 @@ impl Project {
                 slot.curve = curve;
             }
         }
+        // A linked clip's rate is refused (spec §11 AU-94).
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(&target, after))
+        {
+            return Ok(Outcome::Refused(why));
+        }
         // A rate action moves the out point when it moves (SR-2).
         if end_speed(&existing).is_some() {
             let what = format!("retiming action {action}");
@@ -483,8 +525,8 @@ impl Project {
         if let Some(read) = &graphic {
             write_graphic_end(&mut merged, read);
         }
-        for (group, key) in off {
-            key_off(&mut merged, group, key);
+        for path in &off {
+            key_off(&mut merged, path);
         }
 
         let mut next = self.clone();
@@ -499,6 +541,12 @@ impl Project {
                 stored.props.insert(key.clone(), start.clone());
             }
             check_count(&stored.props)?;
+        }
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(target, after))
+        {
+            return Ok(Outcome::Refused(why));
         }
         // The out point the new end rate reads to (SR-2): R1/R2 for a rate,
         // R3 for one taken away.
@@ -529,6 +577,12 @@ impl Project {
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
             slot.actions.retain(|a| a.id != action);
+        }
+        if let Some(why) = next
+            .clip(clip)
+            .and_then(|after| self.linked_rate_refusal(target, after))
+        {
+            return Ok(Outcome::Refused(why));
         }
         if names_speed {
             let what = format!("removing action {action}");

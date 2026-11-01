@@ -353,14 +353,23 @@ reason; a graphic that fails during the export stops it, leaving no file,
 and the reason names the graphic and the frame.
 
 `export` takes `preset` and `path`, plus `size`, `range` (`project` or
-`in_out`), `video_bitrate`, `audio_bitrate`, `loudness_lufs`, `peak_dbtp`,
-`burn_in_timecode`, `dynamic_range` and `encoder_speed`. The presets are `h264`, `hevc`,
+`in_out`), `video_bitrate`, `audio_bitrate`, `audio_bits`, `loudness_lufs`, `peak_dbtp`,
+`burn_in_timecode`, `dynamic_range`, `encoder_speed` and `stems`. The presets are `h264`, `hevc`,
 `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`, `prores_422`, `prores_4444`, `audio_m4a`,
 `audio_wav`, `audio_aiff`, `gif` and `apng`. There is no frame-rate
 argument: an export runs at the project's rate, or at 12.5 fps for `gif` and
 25 fps for `apng`. An existing file at the path is replaced, and the
-format's extension is added when the path has none. `peak_dbtp` without
-`loudness_lufs` is refused. `dynamic_range` `hlg` or `pq` is refused outside
+format's extension is added when the path has none. `peak_dbtp` (−20 to 0)
+is the ceiling of the limiter every export with sound goes through, −1 dBTP
+when absent, and may be given with or without `loudness_lufs`. `audio_bits`
+(16 or 24, 16 when absent) is `audio_wav`'s and `audio_aiff`'s alone and is
+refused on every other preset. `stems` (`tracks` or `names`) is the three
+audio presets' alone: it also writes one file per heard track, or per track
+name, beside the mix, each its tracks' sound before the master, replacing any
+file at its name; it is refused on every other preset and when no track can
+be heard, the job fails when a stem's file would be one of the project's
+media, and the done answer lists each as `stems [{name, tracks, path}]`
+([Stems](export.md#stems)). `dynamic_range` `hlg` or `pq` is refused outside
 `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `prores_422` and `prores_4444` (so on
 `vp9_alpha_webm`, always 8-bit), and in an SDR project.
 `encoder_speed` (`faster`, `balanced` or `smaller`) is `av1`'s and `av1_webm`'s
@@ -527,7 +536,7 @@ See [Motion and transitions](motion-and-transitions.md).
 | `add_track` | *op* — an empty track; the front by default. |
 | `remove_track` | *op* — refused while it holds clips unless `with_clips`. |
 | `move_track` | *op* — reorders the layer stack. |
-| `set_track` | *op* — name, Hide Video, Mute Audio, Lock Track, Solo and Matte (the **Track** menu). |
+| `set_track` | *op* — name, Hide Video, Mute Audio, Lock Track, Solo and Matte (the **Track** menu), and the mix panel's volume, pan, compressor and limiter (**Track ▸ Mix…**). `compressor` and `limiter` each take the clip's own object, which replaces the whole setting, or `null`; refused inside a `scope`. |
 | `remove_empty_tracks` | *op* — **Track ▸ Remove Empty Tracks**. |
 | `add_marker` | *op* — a marker at `at`, the playhead by default; `chapter` makes it a chapter of the export. |
 | `set_marker` | *op* — moves, renames or recolours a marker, or changes its chapter flag. |
@@ -541,7 +550,9 @@ See [Timeline](timeline.md), [Canvas and layers](canvas-and-layers.md) and [HDR 
 | Tool | What it does |
 |---|---|
 | `detect_silence` | Reports the quiet spans, changing nothing (the read half of **Clip ▸ Remove Silences…**). |
-| `normalize_clip` | Sets each clip's volume so its loudest moment lands at `peak_db` (**Clip ▸ Normalize**). |
+| `normalize_clip` | Sets each clip's volume so its loudest moment lands at `peak_db`, or with `mode: "loudness"` so its integrated loudness lands at `target_lufs` under −1 dBTP (**Clip ▸ Normalize**). A clip with processing is measured through it, so the call can take seconds. |
+| `enhance_voice` | Measures each clip's voice and pauses and writes ordinary settings for speech, with the volume to `target_lufs` measured through them (**Clip ▸ Enhance Voice**). |
+| `match_audio` | Gives `clips` the loudness of the `reference` clip as it plays and its speech's tone, as each clip's volume, limiter and EQ shelves and bands (**Clip ▸ Match Audio…**). The clips are rendered, so the call can take seconds. |
 | `sync_audio` | Lines clips up by their sound (**Clip ▸ Synchronize Audio**). |
 | `detect_fillers` | Reports filler words as ranges, changing nothing (the read half of **Clip ▸ Remove Filler Words…**). |
 | `transcribe_for_fillers` | Re-transcribes one media file with AssemblyAI, adding filler words — a paid upload. |
@@ -598,7 +609,7 @@ See [Export](export.md).
 
 | Tool | What it does |
 |---|---|
-| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format); with `source: "screen"` and `camera`, records that camera beside the screen on a Camera track in front, in the bottom-right corner. |
+| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format); with `source: "screen"` and `camera`, records that camera beside the screen on a Camera track in front, in the bottom-right corner. `enhance: true` then runs `enhance_voice` on the microphone's clips as its own undo step once their sound is analysed, answering `enhance` or `enhance_error`. |
 
 See [Screen recording](screen-recording.md).
 

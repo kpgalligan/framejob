@@ -488,6 +488,25 @@ extension AgentServer {
             document, peakOnly ? "PQ Peak" : "Camera Log",
             [.setMediaColorRaw(media: media, color: color)], ["media": Int(media)])
     }
+
+    /// `set_media_speech` — the spans Audio ▸ Ducking ▸ Duck by Speech saves
+    /// on the media from its voice cache (`DuckSpeech.ops`, spec §11 AU-110,
+    /// AU-111), one undo step "Speech Spans". `spans` goes to the core as
+    /// written, which holds them to its rules by name; the media id is the
+    /// core's to look up too. An absent `spans` names the call.
+    func setMediaSpeech(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let media = try idArg(a, "media")
+        guard let spans = a["spans"] else {
+            throw ToolError(
+                message: "Missing required argument: spans (an array of [start, end] source "
+                    + "tick pairs)")
+        }
+        return try editResult(
+            document, "Speech Spans",
+            [ReelOp(name: "set_media_speech", args: ["media": media, "spans": spans])],
+            ["media": Int(media)])
+    }
 }
 
 extension ProjectSnapshot {

@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::edit_adjustment::adjustment_transition;
 use crate::edit_clip::clip_end;
-use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
+use crate::model::{Clip, Project, Source, Transition, TransitionKind};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
@@ -480,53 +480,6 @@ impl Project {
         let end = clip_end(clip);
         let latest = self.snapped_down(end.saturating_add(tail));
         Some(frames_between(end, latest, self.canvas.fps).max(0))
-    }
-
-    /// Sets the transition's CURVE and whether it crossfades the sound
-    /// (spec §6, format version 7), leaving its kind alone.
-    ///
-    /// A second op rather than two more arguments on
-    /// [`Project::set_transition`], and the reason is the envelope: that op
-    /// reads an absent `kind` and an explicit `null` as the same thing — a
-    /// CLEAR — so it has no way to spell "leave the curve where it is".
-    /// Here neither argument is nullable, so an absent key is unambiguous
-    /// and means keep.
-    ///
-    /// It stores on the same terms `set_transition` does: any clip, with or
-    /// without an overlap, since a stored transition on a clip with no
-    /// overlap is simply undrawn until one exists. With NO stored
-    /// transition and at least one key given it mints
-    /// (`cross_dissolve`, spec §11 R5-2) and applies the style over it;
-    /// with NEITHER key given it is an identity whatever the clip holds
-    /// and never mints — asking for no change is not a way to make a
-    /// transition. `Err` for an unknown clip.
-    pub fn set_transition_style(
-        &self,
-        clip: u32,
-        curve: Option<Curve>,
-        audio: Option<bool>,
-    ) -> Result<Outcome, String> {
-        let target = self.require_clip(clip)?;
-        let stored = target.transition_in;
-        if curve.is_none() && audio.is_none() {
-            return Ok(Outcome::Identity);
-        }
-        if let Some(why) = adjustment_transition(target) {
-            return Ok(Outcome::Refused(why));
-        }
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            let mut transition =
-                stored.unwrap_or_else(|| Transition::minted(TransitionKind::default()));
-            if let Some(curve) = curve {
-                transition.curve = curve;
-            }
-            if let Some(audio) = audio {
-                transition.audio = audio;
-            }
-            slot.transition_in = Some(transition);
-        }
-        self.finish(next)
     }
 
     /// Moves the clip so its overlap with its predecessor is exactly

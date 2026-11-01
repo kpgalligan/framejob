@@ -29,13 +29,22 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     /// CX-12 (1), CX-16): "svt_av1" or "libvpx"; nil on every row AVFoundation
     /// encodes. A row with one has a soft-cap rate (CX-13).
     let writer: String?
+    /// The bit depths the row offers (`audio_bits`, spec §11 AU-29): [16, 24]
+    /// on `audio_wav` and `audio_aiff`, which offer the Bit depth popup; empty
+    /// elsewhere.
+    let audioBits: [Int]
+    /// The stem modes the row offers (`stems`, spec §11 AU-108): ["tracks",
+    /// "names"] on the three audio rows, which offer the Stems popup; empty
+    /// elsewhere.
+    let stems: [String]
 
     /// The core spells the size as one `size: [w, h] | null` and audio-only
     /// as `video: false` (`export.rs`), so the size and the audio flag are
     /// read from those rather than from `width` / `height` / `audio_only`,
     /// which it never emits.
     private enum CodingKeys: String, CodingKey {
-        case id, name, container, codec, size, video, hdr, encoderSpeeds, writer
+        case id, name, container, codec, size, video, hdr, encoderSpeeds, writer, audioBits
+        case stems
     }
 
     init(from decoder: Decoder) throws {
@@ -52,7 +61,16 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
         let speeds: [String] = c.lenient(.encoderSpeeds, [])
         encoderSpeeds = speeds.compactMap(EncoderSpeed.init(rawValue:))
         writer = c.lenient(.writer)
+        audioBits = c.lenient(.audioBits, [])
+        stems = c.lenient(.stems, [])
     }
+}
+
+/// One stem an audio export writes beside its mix (spec §11 AU-108): its file
+/// name's tail and the timeline track ids it holds, as the core resolved them.
+struct ExportStem: Decodable, Equatable {
+    let name: String
+    let tracks: [UInt32]
 }
 
 /// A preset plus overrides resolved against the project into the concrete
@@ -83,11 +101,10 @@ struct ExportSettings: Decodable, Equatable {
     /// two bitrates follow. The export sheet's Loudness popup and the
     /// `export` tool are the two callers that set it.
     let loudnessLufs: Double?
-    /// The true-peak ceiling the normalising gain is capped against, in dBTP
-    /// (`peak_dbtp`, −20…0). The core refuses one with no `loudnessLufs`
-    /// beside it, so this is nil whenever that is; nil WITH a target is a
-    /// script's "no ceiling but full scale", and `ExportLoudness.resolve`
-    /// supplies 0 dBTP for it.
+    /// The true-peak ceiling of the export's master limiter, in dBTP
+    /// (`peak_dbtp`, −20…0, spec §11 AU-27), with or without a target; nil
+    /// when not asked, and the master then holds −1 dBTP
+    /// (`masterCeilingDBTP`).
     let peakDbtp: Double?
     /// Whether this ENCODING carries an alpha channel — true for `prores_4444`,
     /// `hevc_alpha`, `vp9_alpha_webm` and `apng`, and for nothing else the table offers.
@@ -123,6 +140,17 @@ struct ExportSettings: Decodable, Equatable {
     /// settings carry neither key.
     let writer: String?
     let encoderSpeed: EncoderSpeed?
+    /// The sound's bit depth (`audio_bits`, spec §11 AU-29): 16 or 24 on
+    /// `audio_wav` and `audio_aiff`, whose settings always carry it; nil on
+    /// every other row, whose master writes 16.
+    let audioBits: Int?
+    /// The stems written beside the mix (`stems`, spec §11 AU-108), in order;
+    /// empty when not asked, whose settings carry no key.
+    let stems: [ExportStem]
+
+    /// The master limiter's ceiling (spec §11 AU-27): `peakDbtp`, else
+    /// `ExportLoudness.defaultCeiling`.
+    var masterCeilingDBTP: Double { peakDbtp ?? ExportLoudness.defaultCeiling }
 
     /// `color` as the picture it names; nil when the settings carry none.
     var dynamicRange: DynamicRange? { color.flatMap(DynamicRange.init(rawValue:)) }
@@ -156,7 +184,7 @@ struct ExportSettings: Decodable, Equatable {
         case preset, container, codec, width, height, fps, range
         case avPreset = "avfPreset"
         case fileType, optimizeForNetwork, videoBitrate, audioBitrate
-        case loudnessLufs, peakDbtp, alpha, color, writer, encoderSpeed
+        case loudnessLufs, peakDbtp, alpha, color, writer, encoderSpeed, audioBits, stems
     }
 
     private enum RangeKeys: String, CodingKey {
@@ -194,6 +222,8 @@ struct ExportSettings: Decodable, Equatable {
         writer = c.lenient(.writer)
         let speed: String? = c.lenient(.encoderSpeed)
         encoderSpeed = speed.flatMap(EncoderSpeed.init(rawValue:))
+        audioBits = c.lenient(.audioBits)
+        stems = c.lenient(.stems, [])
     }
 
     var renderSize: CGSize { CGSize(width: width, height: height) }

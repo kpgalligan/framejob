@@ -72,20 +72,25 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
 - **`insert_clip {track, media, at}`** — The INSERT edit: the clip `at` is strictly inside on
   `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the
   media lands at `at`. Only the destination track is cut — a straddler on another track rides the
-  shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses
-  when the clip could not be placed after the room was made, which is what a locked destination
-  track gives.
+  shift whole, which is what keeps a bed unbroken — but for a cut clip's linked partner on an
+  unlocked track, which is cut at the same `at` and its second half paired with the cut clip's
+  (§11 AU-92), so the pair stays in step through the inserted time. One op, so one undo step and
+  one tool. Refuses when the clip could not be placed after the room was made, which is what a
+  locked destination track gives.
 - **`overwrite_clip {track, media, at}`** — The OVERWRITE edit: `[at, at + media length)` is cleared
   on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands
-  there. Nothing shifts and no other track is touched; the named track is cleared whether or not it
-  is locked, exactly as `ripple_delete` removes the clips it was given.
+  there. Nothing shifts and no other track is touched, but for a cut clip's linked partner on an
+  unlocked track, which is cut at the same bounds and paired (§11 AU-92) — the partner's middle
+  piece stays, unlinked; the named track is cleared whether or not it is locked, exactly as
+  `ripple_delete` removes the clips it was given.
 - **`move_clip {clips, delta, track?}`** — Shifts by `delta` ticks (may be negative; clamps at 0)
   and optionally to another track (all selected clips keep their relative track offsets). **Overlap
   rule** on the destination track: a clip may overlap at most one neighbour on each side, and each
   overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a
   transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it
-  had none.
-- **`trim_start {clip, to}`** — New start `to`; source in advances by `(to − start) × speed`.
+  had none. A linked partner on an unlocked track moves with its clip by the same delta (the clamp at 0 taken over both, so a sound lead is kept) and keeps its own track: only the named clips change track (§11 AU-91).
+
+- **`trim_start {clip, to, alone?}`** — New start `to`; source in advances by `(to − start) × speed`.
   Clamps: `to ≥ start − in/speed` snapped UP to a whole frame (source bound — `in/speed` is a
   floored division and is not on the grid, so an un-snapped clamp could write a sub-frame start, §11
   D4-5), `to < end − one frame`. A text clip's `text.words` are rebased by `to − start` — unlike its
@@ -96,13 +101,15 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   moves back at the base rate moving out, and when the clip would then read past its file the edge
   is held at a fitting frame between `to` and the clip's current start, found by bisection on the
   frame grid — not necessarily the fitting frame nearest `to`, as the fit is not monotone (§11 SR-18
-  (c)).
-- **`trim_end {clip, to}`** — New end `to`; clamps to the source's remaining length (`media`
+  (c)). `alone` (false when absent): without it, a linked partner on an unlocked track whose start equals this clip's is trimmed to the same `to` after it, each by its own clamps, and a refusal from either is the answer; with it the clip moves alone — the J-cut (§11 AU-93).
+
+- **`trim_end {clip, to, alone?}`** — New end `to`; clamps to the source's remaining length (`media`
   sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and
   `> start`. A graphic's `length` is untouched: `null` keeps ending with the clip, a number stays
   (§11 G-9). On a ramped clip the remaining length is read through S∞ — its map run on past the end,
   an action past it still ramping, else the last rate held — and its speed actions are untouched
-  (§11 SR-18 (a)).
+  (§11 SR-18 (a)). `alone` as `trim_start`'s, for a partner whose end equals this clip's — with it, the L-cut (§11 AU-93).
+
 - **`rate_stretch {clip, to_end}`** — `speed = source_len / (to_end − start)`; duration follows.
   Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a
   message it can correct from (the UI never offers it). The audio ceiling is `set_speed`'s: the
@@ -112,7 +119,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   clamped into the clip — and an f that would take any of its rates past ×0.1–×1000 is the
   identity (§11 SR-19 (a), (b)). The app's doors append, in the same step, the re-time of the
   caption clips over a clip with sound (§11 SR-27, #341: the tool's answer adds `captions_retimed` /
-  `captions_removed`); the op itself moves no caption.
+  `captions_removed`); the op itself moves no caption. Refused on a linked clip (§11 AU-94).
+
 - **`slip {clip, delta}`** — Slides the source under a fixed clip: `in += delta × speed`, start and
   duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later
   material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤
@@ -120,8 +128,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   instead — it has a source time if not a window. Any other source is an **error**, as
   `rate_stretch` is. Actions are clip-relative and do not move. On a ramped clip the delta is
   converted at the base rate and the tail clamp is `in ≤ media.duration − S(duration)`; its speed
-  actions do not move (§11 SR-18 (d)).
-- **`roll {clip, to}`** — Moves a hard cut: this clip's start and its predecessor's end both become
+  actions do not move (§11 SR-18 (d)). A linked partner on an unlocked track slips with it, both by the smaller in magnitude of the two clamped amounts (§11 AU-94).
+
+- **`roll {clip, to, alone?}`** — Moves a hard cut: this clip's start and its predecessor's end both become
   `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The
   predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an
   overlap there instead it refuses (an overlap is a transition, and its length is
@@ -131,7 +140,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   them (§11 W-3), and its `graphic.in` advances by the move as `trim_start`'s does; the
   predecessor's `length` is untouched (§11 G-9). Ramped clips keep their speed actions in clip time:
   this clip's `in` moves as `trim_start`'s does and the cut is held where it still fits its file,
-  and the predecessor's source is read through S∞ as `trim_end`'s is (§11 SR-18).
+  and the predecessor's source is read through S∞ as `trim_end`'s is (§11 SR-18). `alone` (false when absent): without it, a linked partner on an unlocked track whose start equals this clip's and which has a hard-cut predecessor of its own is rolled to the same `to` after it (§11 AU-93).
+
 - **`split {clips?, at}`** — Two clips. Second: `start = at`, `in += (at − start) × speed`, base
   props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the
   second (start rebased); a straddling action becomes two — the first half's end patch is the
@@ -163,14 +173,19 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `at` is not strictly inside.
   **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the
   ⌘T-with-no-selection case.
-- **`delete {clips}`** — Removes; gaps stay.
+  A linked partner on an unlocked track is cut too, and the halves are paired: both cut, the
+  second halves are linked to each other and the first halves keep their link; the partner not cut
+  (the time is outside it, as in a J- or L-cut), it stays linked to the half sharing the longer
+  stretch of time with it, the first on a tie, and the other half is unlinked (§11 AU-92).
+- **`delete {clips}`** — Removes; gaps stay. A picture takes its linked sound (on an unlocked track) with it; a linked SOUND half — its picture off — named alone is removed alone, and its picture stays, silent, its link cleared (§11 AU-91).
 - **`ripple_delete {clips}` / `ripple_delete_range {from, to}`** — Removes; then for each removed
   span (union of the removed clips' spans, processed right-to-left) shifts every clip on
   **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that
   straddle a span are left in place. Range form: every unlocked clip is split at both bounds first,
   the middle pieces removed, then the shift. Every clip a shift moves moves by that ONE delta, so
   clips that abutted still abut — at a rate whose frame is not a whole number of ticks (7 fps) a
-  moved start may sit a tick off the grid (§11 #42).
+  moved start may sit a tick off the grid (§11 #42). Each named clip's linked partner on an unlocked track is removed too, either half named. Every shift (these, `ripple_delete_ranges`, `close_gap`, `insert_time` and `add_transition`'s ripple form) also moves each moved clip's partner on an unlocked track, whatever its own start, and refuses, nothing moved, when a partner would start before 0: "clip S would start before 0: it leads its linked clip P by N ticks" (§11 AU-91).
+
 - **`ripple_delete_ranges {ranges: [[from, to], …]}`** — Several ranges as ONE edit — the silence
   cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a
   reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping —
@@ -190,7 +205,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a
   locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the
   shift would break the overlap rule — a gap closes fully or not at all, because a partial close
-  leaves the user unable to tell whether the op ran. Markers do not move.
+  leaves the user unable to tell whether the op ran. Markers do not move. A partner the shift would take before 0 refuses (§11 AU-91).
+
 - **`set_speed {clip, rate?, duration?, keep_pitch?}`** — Two arms, exactly one given; both or
   neither is an **error** (§11 #190). `rate` sets the rate. `duration` FITS the clip: it is snapped,
   held to one frame, and turned into the rate `source_len / duration`; the clip's current duration
@@ -210,13 +226,15 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   duration is held through S∞; the audio ceiling reads the greatest rate the clip names (§11 SR-19
   (a)–(d)). The app's doors append, in the same step, the re-time of the caption clips over a clip
   with sound (§11 SR-27, #341: the tool's answer adds `captions_retimed` / `captions_removed`); the
-  op itself moves no caption.
+  op itself moves no caption. On a linked clip a change of rate is refused, "clip C is linked to clip P: Attach Audio before changing its speed or direction" (§11 AU-94); `keep_pitch` alone still applies.
+
 - **`set_reversed {clip, reversed}`** — Plays the media back to front, or forward again. The core
   does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a
   pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the
   clip PLAYS, so reversing keeps the in point and therefore shows different frames; the alternative
   would put two conventions into every trim and split. Media sources only, an **error** on any other
-  kind.
+  kind. Refused on a linked clip, as `set_speed` is (§11 AU-94).
+
 - **`freeze_frame {clip, at, duration=2 s}`** — `split` at `at`, `insert_time(at, duration)`, then a
   `still {media, at: source time}` clip filling the gap on the same track with the original's video
   props, LESS its `video.motion` (format version 8): a still is a new clip with new ends, so one
@@ -230,9 +248,12 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track
   below (a track is inserted at index 0 if needed). Refuses, naming why (§11 #88), on a clip that
   is not media, whose media has no audio, or whose audio is already detached. A ramped clip's
-  twin copies every action whole, with new ids, so it reads the same map (§11 SR-19 (e)).
+  twin copies every action whole, with new ids, so it reads the same map (§11 SR-19 (e)). The two clips name each other in `linked` (format 28, §11 AU-90) and are a linked pair from then on.
+- **`attach_audio {clip}`** — Merges a linked picture and its detached sound back into one clip; either half may be named (§11 AU-95). Refuses, each in its own sentence: a clip not linked to a detached sound ("clip C is not linked to a detached sound"); a pair that is not one half with its audio off and one with it on ("clips A and B are not a picture and its detached sound"); and a pair whose start, duration, source, speed or actions' spans and curves differ — a J- or L-cut — ("clip V's picture and clip S's sound do not cover the same time; trim them to match before Attach Audio"). Otherwise the picture's `enabled.audio` turns on and it takes the sound's `audio` group and, action by action at the same index, its `end.audio` (removed where the sound's action has none); its `linked` is cleared and the sound clip removed, its track staying. Clip ▸ Attach Audio (⇧⌥⌘D) sends one per pair.
+
 - **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
-  moves them).
+  moves them). A linked partner on an unlocked track is copied too, and the copies are linked to each other (§11 AU-96).
+
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
   "media": [...]}`, what ⌘C wrote to `com.kgalligan.framejob.clips` — with fresh ids for the clips,
   their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep
@@ -253,7 +274,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   duration, action spans, present base motion/text timings and a graphic's `in` and `length`
   normalized to this document's grid, since the payload may come from another
   frame rate (§11, D7-3, G-18·b). On a ramped clip a speed action is snapped but not clamped into
-  the clip, and the duration is held again against it (§11 SR-19 (f), (g)).
+  the clip, and the duration is held again against it (§11 SR-19 (f), (g)). A payload clip's `linked` is mapped to its partner's fresh id, at the top level and in each copied nest; one whose partner the payload lacks is cleared (§11 AU-96). Copy puts a selected picture half's linked sound in the payload, and copies a selected sound half alone.
+
 - **`paste_attributes {clips, payload, groups?, skip_missing?}`** — Copies the payload's EARLIEST
   clip's property groups onto each clip (at one start the front-most, then the lower id — never the
   array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes,
@@ -311,7 +333,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   and a matte taken without its target draws there as an ordinary track (O9). The nest's canvas is frozen at the project's current size, so a
   later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the
   project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one
-  nest clip, and when the nest clip would break the overlap rule against what was left behind.
+  nest clip, and when the nest clip would break the overlap rule against what was left behind. A linked partner on an unlocked track goes into the nest with its clip (§11 AU-91).
+
 - **`unnest {clip}`** — The inverse: the nest's clips return at `clip.start + their own start` with
   fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest
   clip's own — the nest's front-most NON-matte track (the front-most when all are, §11 MT-5) lands
@@ -324,9 +347,20 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   Each returning clip has its translated start, source-bounded duration, action spans and present
   base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy
   off-grid nest; a ramped clip's speed actions are snapped but not clamped into it, and its
-  duration held again against them (§11 SR-19 (g)). An **error** when `clip` is not a nest clip.
+  duration held again against them (§11 SR-19 (g)). An **error** when `clip` is not a nest clip. The returning clips' links are mapped to their fresh ids (§11 AU-96).
+
 - **`set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape`** — Merge the patch into the
-  base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a
+  base props. Refuses if nothing changes. `set_audio` refuses a patch that ITSELF sets
+  `duck.mode` to `speech` on a clip that is not a media clip or whose media has no `speech`
+  (`audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)`,
+  format version 29, §11 AU-111); any other edit of a clip already holding such a duck applies.
+  `set_audio` takes the gate and the de-esser as `gate` and `de_esser` (format version 33, §11
+  AU-43, AU-45, AU-46): objects that merge per key, `{}` storing the defaults and `null` clearing,
+  each field refused out of range by its dotted path (`audio.gate.hold must be between 0 and
+  300000 ticks, not 400000`); both thresholds are dB relative to the clip's measured loudness.
+  It takes the leveller as `leveller` the same way (format version 37, §11 AU-66:
+  `audio.leveller.<field>`, its target relative to the loudness too; the first build's
+  `threshold_db` is an unknown key). An unknown key, a value of the wrong JSON kind or a
   misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array
   indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad
   value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind"
@@ -353,6 +387,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded
   unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is
   normalised to `null` before the range checks run, so one clip has one spelling of "no motion".
+  `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
+  merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
+  **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.
   `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11
   W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is
   not the content's token count is an **error** in the rule's own words — `this text is timed word
@@ -434,10 +471,12 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or
   nothing left above one frame, is REFUSED, each in its own sentence. The same hard-cut `Err`s
   apply.
-- **`set_transition_style {clip, curve?, audio?}`** — Sets the transition's easing and whether it
-  crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on
+- **`set_transition_style {clip, curve?, audio?, audio_shape?}`** — Sets the transition's easing,
+  whether it crossfades the sound and the crossfade's shape (`audio_shape`, format version 29, §11
+  AU-115: `plus_3db` — R5-2's constant power, the default — `linear`, `s_curve`, `minus_3db`); an
+  absent key KEEPS. A separate op rather than two more arguments on
   `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing
   and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap —
   and a clip with no stored transition and at least one key given gets a minted `cross_dissolve`
-  with the style applied. NEITHER key given is an IDENTITY whatever the clip holds, and never mints
+  with the style applied. NO key given is an IDENTITY whatever the clip holds, and never mints
   — nothing was asked for, so there is nothing to explain. **Error** for an unknown clip.

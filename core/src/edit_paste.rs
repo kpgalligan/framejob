@@ -76,6 +76,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::edit_commit::Landing;
+use crate::edit_link::relink_copies;
 use crate::edit_track::{check_media_fields, normalize_original};
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
@@ -206,8 +207,11 @@ fn absorb_nests(
             tracks.insert(track.id, id);
             track.id = id;
         }
+        let mut fresh: HashMap<u32, u32> = HashMap::new();
         for clip in copy.clips.iter_mut() {
+            let old = clip.id;
             project.remint(clip);
+            fresh.insert(old, clip.id);
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
             remap_look_media(clip, media);
@@ -216,6 +220,8 @@ fn absorb_nests(
                 clip.speed = 1.0;
             }
         }
+        // A copied pair re-pairs through the fresh ids (spec §11 AU-96).
+        relink_copies(&mut copy.clips, &fresh);
         project.nests.push(copy);
     }
     for (offset, nest) in nests.iter().enumerate() {
@@ -445,9 +451,12 @@ impl Project {
         ordered.sort_by_key(|c| (std::cmp::Reverse(c.track), c.start, c.id));
 
         let mut landing = Landing::new(base);
+        let first = next.clips.len();
+        let mut fresh: HashMap<u32, u32> = HashMap::new();
         for source in ordered {
             let mut clip = source.clone();
             next.remint(&mut clip);
+            fresh.insert(source.id, clip.id);
             clip.source = remap_source(&source.source, &media, &nests);
             remap_look_media(&mut clip, &media);
             // The payload is trusted about WHAT a clip is and checked about
@@ -468,6 +477,10 @@ impl Project {
             // The target track, then the fallbacks already added, then a new
             // one.
             landing.land(&mut next, clip, source.track as i64);
+        }
+        // A payload pair re-pairs through the fresh ids (spec §11 AU-96).
+        if let Some(landed) = next.clips.get_mut(first..) {
+            relink_copies(landed, &fresh);
         }
 
         self.finish_placement(next, landing.touched())

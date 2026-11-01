@@ -10684,11 +10684,12 @@ full), and three are `recording_proof.py`'s.
   `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
   and `excludingWindows:`.
 - **1f, 5d, 7c** — `RecordingChoice()`'s `includeFrameJobWindows` is false;
-  the panel's row reads false and its title; `out["keys"]` lists ten (seven
+  the panel's row reads false and its title; `out["keys"]` lists eleven (seven
   until camera-recording CR1c added `FrameJobRecordingCamera`, eight until CR2a
   added `FrameJobRecordingCameraFormat`, nine until CR3c added
-  `FrameJobRecordingCameraBeside`), the harness pins
-  all ten by value (`"FrameJobRecordingIncludeFrameJobWindows":
+  `FrameJobRecordingCameraBeside`, ten until road map "audio" AP6 part 3 added
+  `FrameJobRecordingEnhanceMicrophone`), the harness pins
+  all eleven by value (`"FrameJobRecordingIncludeFrameJobWindows":
   false`, a literal) and `screens.py`'s `PINS` carries it for P2;
   `record_screen` declares `include_framejob_windows`. Every probe mode that
   pins the six keys pins the seventh false.
@@ -12876,7 +12877,9 @@ expected. After step 2, `ExporterWriter.swift` is 782 lines and
     ±full scale, BS.1770-4 (`phase5_proof.integrated`) within ±0.5 LU of the
     report, and no "clipped" in the summary.
   - **G5**: the hot un-normalised WAV says "clipped" and holds full-scale
-    samples.
+    samples. (Inverted by road map "audio" AP2 part 2, spec §11 AU-27: the
+    master limits it, so it holds no full-scale sample and says nothing of
+    clipping; see that section.)
   - **G1** (`--against`), per preset: the un-normalised decode is
     byte-identical to the reference's. Where G0 failed, it is an instrument
     failure instead.
@@ -25793,3 +25796,1517 @@ make app-debug
 python3 tools/proof/graphic_import_proof.py             # → 17/17
 python3 tools/proof/graphic_import_proof.py --mutant asset-replace
 ```
+
+## Road map "audio" AP1 — loudness you can see and target (`loudness_cache_probe.py`, `loudness_normalize_proof.py`; spec §11 AU-10..AU-17)
+
+Two instruments. **`loudness_cache_probe.py`** compiles
+`loudness_cache_probe.swift` with `app/Sources` through `swift_build.build`
+(a failed build is a scored failure) and builds the loudness cache with the
+product's own pass (`MediaImporter.loudness`), then reads it back through
+`ClipLoudness` against `LoudnessMeter` fed exactly each window. Its fixtures
+are made under `tools/proof/work/loudness-cache-probe/fixtures/` from
+`samples/Rode-usb-mic.m4a` with ffmpeg: a stereo file (L the recording, R the
+recording reversed at −6 dB, spike S4's), the recording and a 30 Hz + 1.6 kHz
+tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
+
+| Row | What it holds |
+|---|---|
+| C1 | the mono and stereo caches publish: width 3 / 8 (AP6's high band, AU-63), `⌈duration·100⌉` records, marker version 2 at 100 a second and ×4 |
+| C2 | the whole recording against the meter as dual mono: ≤ 0.1 LU, TP ≤ 0.01 dB |
+| C3 | S4's ten named windows forward, each ≤ 0.1 LU of the meter on that window |
+| C4 | the same windows reversed against the meter on the reversed samples, ≤ 0.1 LU |
+| C5 | the stereo file through identity, the mono fold and a hard pan, ≤ 0.1 LU of the meter on transformed samples (and the matrices themselves) |
+| C6 | the two 44.1 kHz fixtures against the meter on their 48 kHz copies, ≤ 0.1 LU |
+| C7 | 0.39 s played reads nil and 0.40 s reads a number; the −85 dBFS tone reads nil |
+| C8 | `plan` (AP2, AU-24): a peak that fits gets the volume alone; a peak past −1 dBTP gets the default limiter and the model's gain, −16 within 0.001 LU, its peak at the ceiling; ×32 with and without the limiter (`max_gain`); a turn-down; a clip's own limiter kept at −3 and one at 0 lowered to −1; the non-finite target's −16 |
+| C9 | a marker of version 0, or of 50 blocks a second, reads absent beside a valid `.bin` |
+| C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
+| C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
+| C12 | (AP6, AU-63) the high band: an 8 kHz tone's `h` within 0.05 dB of its mean square times the 6 kHz high-pass's \|H(8 kHz)\|²; a 1 kHz tone's `h` at least 60 dB under its `z` |
+
+`--mutants` runs eight (seven, and AP6's `M7-high-unfiltered`), each one replacement in a copied `app/Sources` (its
+anchor asserted once), and scores each killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `mono-not-doubled` | a mono record's z not doubled | C2 |
+| `reversed-forward-order` | a reversed segment's steps pooled in source order | C4 |
+| `no-relative-gate` | the −10 LU gate dropped | C3 |
+| `no-limiter` | the limiter never turned on (AP2) | C8 |
+| `limited-by-nil` | the volume-alone row's `limited_by` always nil (AP2) | C8 |
+| `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
+| `version-unchecked` | the marker's version not checked | C9 |
+| `M7-high-unfiltered` | (AP6) the high band read unfiltered | C12 |
+
+**`loudness_normalize_proof.py <dir>/agent.sock`** drives an instance over
+MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
+(`integrated`, `true_peak`). It writes its fixtures into `work/fixtures/`
+(stereo and mono steady tones, a quiet one, a peaky one, a copy of the owner's
+recording) and waits for each media's loudness marker after placing it. N10
+launches two more instances of the chosen app, one with `-FrameJobNormalizeMode
+peak` and one with `-FrameJobNormalizeMode loudness`, each with
+`-FrameJobNormalizeTargetLUFS -16` (the argument domain: nothing persists, and
+the mode the shared defaults domain holds is never read), and stops each.
+
+| Row | What it holds |
+|---|---|
+| N1 | the schema: `mode` the enum peak / loudness, its description naming loudness the default (AP2), `target_lufs` −50…−5, only `clips` required |
+| N2 | refused by name: `target_lufs` −51 and −4, `mode` "rms", `target_lufs` with peak (named, or implied by `peak_db` alone since AP2), `peak_db` with loudness; the volume untouched |
+| N3 | stereo and mono steady fixtures to −16, −14 and −23: the export within 0.5 LU of the target and of `result_lufs` |
+| N4 | the peaky fixture (AP2): the limiter on at −1 dBTP and 60 000 ticks, `limited_by` null, the export at −16 ±0.5 LUFS with its true peak ≤ −1 dBTP + 0.001 dB by `limiter_probe.true_peaks`' two meters, the clip carrying `audio.limiter` |
+| N5 | two clips of different levels in one call land within 0.5 LU of each other |
+| N6 | the owner's recording (AP2): measured about −41.7 LUFS, the limiter on, the export at −16 ±0.5 LUFS and at `result_lufs` ±0.5, its true peak ≤ −1 dBTP + 0.001 dB by both meters |
+| N7 | a reversed clip and a ×2 Keep pitch clip of a steady fixture land at −16 ±0.5 |
+| N8 | `measured_lufs` / `true_peak_dbtp` against the volume-1 export of the same window, ±0.5 LU / ±0.5 dB |
+| N9 | a second call "made no change" |
+| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance at −16 ±0.5 LUFS |
+| N11 | (AP2) no `mode` is Loudness at −16; `peak_db` alone is Peak |
+| N12 | (AP2) a clip's own limiter at −3 dBTP is kept, one at 0 is lowered to −1, each with its release, in the row and on the clip |
+| N13 | (AP2) one undo takes back the volume and the limiter together |
+
+The eighth mutant, `target_lufs`'s range check dropped in
+`AgentServer+Audio.swift`, runs on a mutated Debug build (restored after) and
+must fail N2's −51 and −4 rows.
+
+```sh
+python3 tools/proof/loudness_cache_probe.py            # C1–C12
+python3 tools/proof/loudness_cache_probe.py --mutants   # 8 mutants
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+```
+
+**The recorded run (2026-10-30):** `loudness_cache_probe.py` 11/11 rows (C3
+worst 0.076 LU, C4 0.087, C5 0.052, C6 0.004; the owner's recording −41.672
+LUFS and −18.526 dBTP against the meter's same); `--mutants` 7/7 killed, each
+by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
+after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
+at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
+rows. `phase5_proof.py` 92/92 on both.
+
+## Road map "audio" AP2, part 1 — the clip limiter, and Normalize to a loudness through it (`limiter_probe.py`, `limiter_proof.py`; `loudness_normalize_proof.py` N4, N6, N11–N13; `export_offset_proof.py` E44, E45; `core/tests/schema_v30.rs`; spec §11 AU-20..AU-26)
+
+Two new instruments. **`limiter_probe.py`** compiles `limiter_probe.swift`
+with `app/Sources` through `swift_build.build(optimize=True)` (a failed build
+is a scored failure; optimised, so the probe's long signals run in seconds)
+and runs the product's `AudioLimiterStage`, chain, `AudioTapContext`,
+schedule, `AudioLimiterModel` and Normalize plan on S1's crest signal
+(`crest_signal()`, gen_signals.py's recipe and seed) and on the owner's
+recording, decoded by ffmpeg into `tools/proof/work/limiter-probe/fixtures/`.
+L2's outputs are written as raw Float32 and measured by the script's OWN
+meters, which other proofs import as `limiter_probe.true_peaks(path)`: a 4×
+oversampler of 64 taps per phase (Kaiser β 10, S1's analysis meter) and
+BS.1770-4 Annex 2's four 12-tap phases, each over |x| too and over the whole
+convolution. `--measure <file>` prints a file's true peak by both.
+
+| Row | What it holds |
+|---|---|
+| L1 | an impulse under the ceiling comes out 158 samples late and unchanged; `latency` = lookahead + taps − 2; `AudioShift.limiterLead` 1,975 ticks, 8,375 with noise reduction, `.none` with neither |
+| L2 | every output at or under its ceiling + 0.001 dB by both meters: the crest signal and the recording +28 dB at −1, −3 and 0 dBTP; a stereo pair at −1 (one gain); L8's normalised recording; ×8 material at volume 4 told through `AudioDSPParameters(snapshot:)`, the fader applied after (AU-22) |
+| L3 | 512, 4096 and irregular blocks (1, 1023, 333, 691, 4096, 7, 2048, 17, 512) byte-identical, the settings changing every 12,000 samples between −1 dBTP, none and −6 at volume 2 |
+| L4 | after `reset()` a used stage gives a fresh stage's bytes |
+| L5 | nil settings: an exact 158-sample delay of a signal far over full scale |
+| L6 | after a burst at −6 dBTP the output equals the input, sample for sample, from within 2 s on (100 ms release) |
+| L7 | the product's `AudioTapContext` (a limiter at volume 16) under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same samples over the first 188,416 frames (S1's 4 s window), and not silence |
+| L8 | `AudioLimiterModel`'s figure against `LoudnessMeter` on the stage's output, the owner's recording at Normalize's own volume and limiter: ≤ 0.3 LU |
+| L9 | with no stored choice, `NormalizeChoice.mode` is Loudness |
+
+`--mutants` runs six, each one replacement in a copied `app/Sources`:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `annex2-only` | the Kaiser phases dropped from the detector | L2 |
+| M2 `kaiser-only` | Annex 2's phases dropped from the detector | L2 |
+| M5 `gain-not-told` | the stage told volume 1 | L2 |
+| M6 `model-off` | Normalize's limited volume is the unlimited gain | L8 |
+| M7 `reset-incomplete` | `reset()` leaves the envelope | L4 |
+| M8 `default-peak` | `NormalizeChoice` defaults to Peak | L9 |
+
+**`limiter_proof.py <dir>/agent.sock`** drives an instance over MCP and
+measures each export with `limiter_probe.true_peaks`. Its fixture is S1's
+crest signal halved, stereo (left forward, right reversed), as a 16-bit WAV
+in `work/fixtures/limiter-crest.wav`, beside a 1 kHz tone at 0.02, `limiter-quiet.wav`.
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s `limiter`: `{}` the defaults, a value round-trips, each bound and an unknown key refused by name with nothing changed, `null` clears it |
+| P2 | the crest fixture at volume 8 under −1 dBTP: ≤ −1 + 0.001 dB by both meters (and above +6 dBTP without the limiter; since AP2 part 2, P2–P4 export with `peak_dbtp=0` and the unlimited leg reads ≤ 0.001 and > −0.5 dBTP, the export's master holding it) |
+| P3 | the same under −3 dBTP |
+| P4 | a clip at volume 1 then one at volume 8 abutting it, both under −1 dBTP: ≤ −1 + 0.001 dB across the cut; and a quiet clip with no limiter at volume 8 then the crest clip at volume 8 under −1 dBTP, the same — the leg the tap's lookup lead decides (the first cannot: the fader's slew from 1 to 8 at the cut, #87, holds the crest clip's first 3.3 ms near ×1) |
+| P5 | a limiter set then cleared exports the same PCM bytes as one never set |
+| P6 | the saved file is at the header's `RC_FORMAT_VERSION` (30, AU-21), `"limiter"` only on the limited clip, none before it was set |
+
+`export_offset_proof.py` E44 (`clicks48` at F206 with a −1 dBTP limiter)
+and E45 (the same with noise reduction 0.5) hold every click on its frame
+through the limiter's 158-sample delay, as E22 does the reducer's; each
+prints its difference from E4. Two mutants run by hand on a Debug build
+(`HAND_MUTANTS` there): M25 drops the placement lead and must fail E44; M26
+drops the tap's lookup lead and must fail P4's second leg. `loudness_cache_probe.py`'s C8
+is rewritten for the new `plan`, and its two plan mutants re-anchored
+(`no-limiter`, `limited-by-nil`). `phase5_proof.py`, `peaks_proof.py` and
+`refusal_proof.py` name `mode="peak"` on every `normalize_clip` they mean as
+Peak, since Loudness is the default (AU-25).
+
+```sh
+python3 tools/proof/limiter_probe.py              # L1–L9
+python3 tools/proof/limiter_probe.py --mutants    # M1, M2, M5–M8
+python3 tools/proof/limiter_probe.py --measure <file>
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/limiter_proof.py <dir>/agent.sock
+python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E4,E22,E44,E45
+```
+
+**The recorded run (2026-10-30):** `limiter_probe.py` 9/9 rows (every L2 output
+at its ceiling to four decimals by both meters; L6 exact from 1.346 s; L7 188,416
+samples equal; L8 gap 0.090 LU, model −16.001 against the stage −15.911);
+`--mutants` 6/6 killed, each by its named row. `limiter_proof.py` 19/19 on Debug
+and on Release after `make gate` (PASS); `loudness_normalize_proof.py` 37/37 on
+both, the owner's recording exporting at −15.91 LUFS and −0.9998 / −0.9999 dBTP;
+`export_offset_proof.py --only E4,E22,E44,E45` 4/4 on both; `phase5_proof.py`
+92/92 on both; `peaks_proof.py` 21/21 and `refusal_proof.py` 145/145 on Debug;
+`loudness_cache_probe.py` 11/11 and `--mutants` 7/7. By hand on Debug: M25 failed
+E44 (+3.292 ms); M26 failed P4's second leg (+3.5363 dBTP) and passed its first.
+Again at integration, where the format became 30 (on the merged tree, Release, after
+`make gate` PASS): `limiter_proof.py` 19/19, P6 "the file is version 30, the header's 30";
+`loudness_normalize_proof.py` 37/37, N6 −15.91 LUFS and −0.9998 / −0.9999 dBTP;
+`export_offset_proof.py --only E4,E22,E44,E45` 4/4; `phase5_proof.py` 92/92;
+`limiter_probe.py` 9/9, L8 gap 0.090 LU.
+
+## Road map "audio" AP3 — EQ, hum removal and channel selection (`eq_probe.py` Q1–Q11, `eq_proof.py` E1–E8; ten mutants and one by hand; `core/tests/audio_eq.rs`, `schema_v32.rs`; spec §11 AU-30..AU-39)
+
+Two new instruments. **`eq_probe.py`** compiles `eq_probe.swift` with
+`app/Sources` through `swift_build.build(optimize=True)` (a failed build is a
+scored failure) and runs the product's `AudioEQDesign`, `AudioEQStage`,
+`AudioDSPChain`, `AudioTapContext`, schedule, `AudioEQCurveView.response` and
+`ClipLoudness.ChannelMatrix`. Its fixture, `work/eq-probe/fixtures/stereo.wav`,
+is the owner's recording's first 12 s on the left with a −40 dBFS 60 Hz hum
+under it and the right channel silent (24-bit, 48 kHz). Q1's responses are
+written as JSON and scored by the script's OWN numpy RBJ cookbook
+(`eq_probe.oracle(kind, params, fs)` and `magnitude_db`, which `eq_proof.py`
+imports): Butterworth section Qs (1/√2; 1/(2 cos π/8) and 1/(2 cos 3π/8)), RBJ
+shelves at S = 1, and the hum's Q = 10·k / A, A = 10^(−depth/40) (AU-33).
+
+| Row | What it holds |
+|---|---|
+| Q1 | every slot type (high-pass 12/24, low-pass 12/24, both shelves, the three bells) and each hum harmonic (60 × 8 at 30 dB, 50 × 8 at 48, 60 × 3 at 12): the designed positions are the oracle's and each one's \|H\| at 20 log-spaced frequencies (20 Hz–20 kHz, plus each k·f0 and k·f0 ± f0/20) within 0.001 dB of it, at 48 and 44.1 kHz; and `responseDB`'s whole hum cascade at 48 kHz, 60 × 4 at 30 dB and 50 × 8 at 48 dB, −depth ±0.1 dB at every k·f0 and within 0.3 dB of 0 midway between harmonics |
+| Q2 | HP and LP at 12 and 24 read −3.010 dB (±0.0005) at the corner, and the bilinear Butterworth of their order (`1/(1 + r^2n)`, prewarped) within 0.01 dB an octave beyond |
+| Q3 | 512, 4096 and irregular blocks byte-identical through `AudioDSPChain`, the clip changing every 12,000 samples between an EQ with hum, none, a second EQ swapped, the second left-picked and the first right-picked |
+| Q4 | after `reset()` a used two-channel stage gives a fresh stage's bytes on both channels |
+| Q5 | a flat shelf and bell, a bypassed EQ and no EQ design nothing (`AudioEQSettings` nil); a project whose clip carries a flat EQ and `both` is inert in `AudioDSPParameters`; the chain with inert settings and the stage with nil settings leave every byte |
+| Q6 | left, right and swapped sample-identical to their source channels; mono with left equals L in both; a one-channel chain with a right pick untouched |
+| Q7 | `AudioEQCurveView.response` against the stage's steady-state response (a 4 s sine, the last second's least-squares amplitude) at 16 of the 256 points, every slot and the hum on: within 0.01 dB |
+| Q8 | `ClipLoudness.reading` of the stereo fixture (its loudness cache built by `MediaImporter.loudness`): left reads both + 3.01 LU (±0.01), swapped reads both |
+| Q9 | the product's `AudioTapContext` (left pick, EQ, hum) under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same right-channel samples over the first 188,416 frames (limiter_probe L7's method), and sound there, which only the pick puts |
+| Q10 | µs per 1024 stereo frames with all 17 positions designed, best of 3 × 2000 runs, reported |
+| Q11 | `AudioTapContext` on a track of right-only, left-only and a noise-reduced clip, fed a left tone a block at a time: the right channel's onset at the cut ±1 ms (the head looked up `headLead` ahead), not 10.7 ms late |
+
+`--mutants` runs ten, each a replacement (two for M6) in a copied `app/Sources`;
+one by hand:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `butterworth-as-lr` | both 24 dB/oct sections at Q 1/√2 (Linkwitz-Riley) | Q1 or Q2 |
+| M2 `slope-ignored` | every pass one section | Q2 |
+| M3 `state-reset-each-run` | the stage zeroes its state at every run | Q3 |
+| M4 `reset-misses-a-channel` | `reset()` zeroes channel 0's state only | Q4 |
+| M5 `hum-constant-q` | the hum's Q not scaled by k (10 / A) | Q1 |
+| M6 `pick-after-fold` | the pick moved after the mono fold | Q6 |
+| M7 `head-lead-dropped` | the tap looks the head up at the tail's time | Q11 |
+| M8 `matrix-ignores-pick` | `ChannelMatrix` reads every clip as `both` | Q8 |
+| M9 `curve-at-44.1k` | the curve designed at 44.1 kHz | Q7 |
+| M10 `hum-q-not-depth-scaled` | the hum's Q = 10·k, not 10·k / A | Q1 |
+| M11 (by hand) | `patch.rs`'s audio template without `hum` | `core/tests/audio_eq.rs` |
+
+**`eq_proof.py <dir>/agent.sock`** drives an instance over MCP and measures
+each WAV export by least-squares amplitude per step against the dry export,
+compared with `eq_probe.oracle`. Its fixtures are 16-bit stereo WAVs under
+`work/fixtures/`: `eq-sweep.wav` (S1's 20 log-spaced tones, 1 s each, at
+0.25), `eq-hum60.wav` and `eq-hum50.wav` (each harmonic and k·f0 ± f0/20, 2 s
+each, so a 48 dB notch's ringing has decayed), `eq-pair.wav` (440 Hz with
+noise on the left, 1 kHz on the right), `eq-onset.wav` (1 s of a 1 kHz tone on
+the left only), `eq-voice-left.wav` (the owner's recording on the left only)
+and `eq-rode.wav`.
+
+| Row | What it holds |
+|---|---|
+| E1 | `set_audio`'s `eq`, `hum` and `channels` round-trip; each bound and an unknown key refused by name with nothing changed; `null` clears a slot and the groups, `both` is not written; `{eq: {high_pass: {}}}` stores `{80, 12}` |
+| E2 | the stepped sine through (a) HP24 + low shelf + three bells + high shelf + LP24 and (b) HP12 + LP12: each step ≥ −60 dB within ±0.1 dB of the analytic product |
+| E3 | hum 60 × 4 at 30 dB and 50 × 8 at 48 dB: −depth ±0.1 dB at each harmonic, and within ±0.1 dB of analytic at k·f0 ± f0/20 |
+| E4 | left, right and swapped exports sample-identical to the dry export's channels; mono with left both the left channel |
+| E5 | the voice-on-left file: `normalize_clip`'s `measured_lufs` with left = both + 3.01 (±0.05), and each normalised export at −16 ±0.5 LUFS by `phase5_proof.integrated` |
+| E6 | right-only then left-only abutting, noise reduction on a third clip: the tone's onset in the right channel at the cut ±1 ms |
+| E7 | the saved file at the header's version, the three keys on the set clip only and none before; set-then-cleared exports the same PCM bytes as never set |
+| E8 | reported: the owner's recording through Rumble Cut, De-mud and Presence — the pause floor (10th percentile of 50 ms RMS) and the octave bands 63 Hz–8 kHz, wet against dry |
+
+`clip_inspector2_probe.swift`'s T2 Sound list now names Channels, EQ, Hum and
+the Limiter (AP2 had left it at six). `screens.py` has the `eq` fixture and
+pins `audio.eq` open for 09b (and the AP1 Normalize keys, and three dev keys
+as not shown, which P2 had found unpinned).
+
+```sh
+cd core && cargo test --release --test audio_eq && cargo test --release --test schema_v32
+python3 tools/proof/eq_probe.py               # Q1–Q11
+python3 tools/proof/eq_probe.py --mutants     # M1–M10
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/eq_proof.py <dir>/agent.sock
+python3 tools/proof/screens.py --only 09b-clip-sound-eq
+```
+
+**The recorded run (2026-10-30, the lane):** `eq_probe.py` 11/11 (Q1 worst 0.000000 dB
+over 30 cases, the cascades −0.006…−0.034 dB at the harmonics and −0.096…−0.105 dB
+midway; Q7 worst 0.0000 dB; Q8 both −42.286, left −39.275 LUFS; Q9 188,416 samples
+equal; Q10 135.9 µs per 1024 stereo frames, 0.64 % of real time; Q11 the onset at
+sample 48,000) and `--mutants` 10/10, each killed by its named row; M11 by hand
+failed five of `audio_eq.rs`'s six tests. `eq_proof.py` 33/33 on Debug (E2 run on
+the Debug build: the stage keeps up at `-Onone`) and on Release after `make gate`
+(PASS, 448 s): E2 (a) within 0.0154 dB, (b) 0.0020 dB; E3 −0.005…−0.029 and
++0.003…−0.054 dB from −depth; E5 −43.09 and −40.08 LUFS measured (+3.010 LU), the
+exports at −15.87 and −15.96 LUFS; E6 the onset at sample 48,001 (+0.02 ms); E8 the
+three presets take the owner's pause floor from −64.30 to −66.65 dBFS (−2.34 dB),
+octave bands 63 Hz −2.68, 125 −1.11, 250 −2.34, 500 −1.50, 1 k −0.14, 2 k +0.86,
+4 k +2.51, 8 k +1.30 dB. On Release, `limiter_proof.py` 19/19,
+`loudness_normalize_proof.py` 37/37 (N6 −15.91 LUFS, −0.9998 / −0.9999 dBTP),
+`phase5_proof.py` 92/92 and `export_offset_proof.py --only E4,E22,E27,E44,E45`
+5/5; `limiter_probe.py` 9/9, `loudness_cache_probe.py` 11/11 and
+`clip_inspector2_proof.py` 33/33; `screens.py --only 09b-clip-sound-eq,09-clip-sound`
+7/7.
+
+## Road map "audio" AP4 — the gate and the de-esser (`audio_ap4_probe.py` D1–D11, `audio_ap4_proof.py` P1–P7; ten mutants and one by hand; `core/tests/audio_dynamics.rs`, `schema_v33.rs`; spec §11 AU-40..AU-49)
+
+Two new instruments. **`audio_ap4_probe.py`** compiles `audio_ap4_probe.swift`
+with `app/Sources` through `swift_build.build(optimize=True)` (a failed build is
+a scored failure) and runs the product's `AudioGateStage`, `AudioDeEsserStage`,
+`AudioEnvelope`, `AudioDSPChain`, `AudioDynamicsLevels`, `AudioDSPParameters`
+and `AudioTapContext`. The probe carries a verbatim copy of 3f7ed17's
+`AudioCompressorStage` (renamed `HeadAudioCompressorStage`), the bytes D1 holds
+the shared follower to. Its fixtures, under `work/audio-ap4-probe/fixtures/`,
+are the owner's recording's first 12 s as mono 48 kHz float (`voice.f32`) and
+24-bit WAV (`voice.wav`, and three copies, one per media id a levels row builds
+a loudness cache for).
+
+| Row | What it holds |
+|---|---|
+| D1 | the compressor on the shared follower gives `HeadAudioCompressorStage`'s bytes over the owner's recording and a crest signal, 512, 4096 and irregular blocks, a 5 ms and a 200 ms release and no compressor changing every 12,000 samples |
+| D2 | steady 12 kHz tones (samples on +A, 0, −A, 0) 1, 5, 15 and 30 dB under a −30 dBFS threshold at ratio 2, range 20: the reduction min(range, (thr − level)(ratio − 1)) ±0.05 dB; a tone 3 dB over it byte-identical |
+| D3 | a −20 dBFS burst, then a −100 dBFS bed: the gain's −10 dB crossing at t_f + hold + release·ln 2 ±0.2 ms for hold 0 and 100 ms (t_f the follower's analytic fall to the threshold, or with no hold to the target ramp's midpoint) |
+| D4 | 512, 4096 and irregular blocks byte-identical through `AudioDSPChain`, the gate and the de-esser changing (two settings each, either, both, neither) every 12,000 samples |
+| D5 | after `reset()` each stage gives a fresh stage's bytes; nil settings leave every byte |
+| D6 | the de-esser at 6 kHz: tones at 6, 7, 9 and 11 kHz reduced by −20·log10(1 − (1 − g)·\|band\|) ±0.1 dB (both magnitudes from `AudioEQDesign.magnitudeDB` of the designed sections); a sweep every 250 Hz from 2 to 12 kHz at range 24 none louder than its input by more than 0.05 dB; 1 kHz alone ±0.01 dB (the allpass); 1 kHz beside a loud 7 kHz ±0.1 dB; a quiet 7 kHz beside a loud 1 kHz ±0.1 dB (the sidechain is the band) |
+| D7 | a −40 dBFS tone through a gate (threshold −30, range 20) and a compressor that is +24 dB of makeup: out at −36 ±0.1 dBFS, which only gate-then-compressor gives |
+| D8 | `AudioDynamicsLevels.levels` over a scratch loudness cache: L equal to `ClipLoudness.answer`'s; `AudioDSPParameters.measured`'s thresholds L − 10 (gate) and L − 3 (de-esser) exactly; a 0.2 s clip unmeasurable and stage-less; an unwritten media pending, in `pendingLevels` and inert; a nest clip and its inner clip absent; no cache folder all pending; and the pending clip measured once its file is written, with no invalidation |
+| D9 | `wait`: landed (the file written 0.3 s in), `timedOut(clip: 2)` after 0.3 s, `cancelled` |
+| D10 | the owner's recording under the default gate and de-esser through `AudioTapContext` under a muted `AVPlayer` against an `AVAssetReaderAudioMixOutput`: the same samples over the first 188,416 frames, and the gate turning samples down |
+| D11 | µs per 1024 stereo frames through both stages, best of 3 × 2000 runs, reported; ≤ 1 % of real time |
+
+`--mutants` runs ten, each a replacement (two for M7) in a copied `app/Sources`;
+one by hand:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 `hold-ignored` | the hold counter never set | D3 |
+| M2 `reset-keeps-reduction` | the gate's `reset()` keeps its reduction | D5 or D10 |
+| M3 `threshold-not-relative` | the gate's threshold the relative value alone | D8 |
+| M4 `range-uncapped` | the target not capped at the range | D2 |
+| M5 `de-esser-wide-band` | the de-esser's gain on the whole signal | D6 |
+| M6 `de-esser-keyed-on-full-signal` | the sidechain's two high-pass sections dropped | D6 |
+| M7 `gate-after-compressor` | the gate moved after the compressor | D7 |
+| M8 `follower-floor-5ms` | `AudioEnvelope.fallFloorSeconds` 0.005 | D1 |
+| M9 `memo-holds-pending` | a pending level memoised | D8 |
+| M11 `split-as-subtraction` | the output `x − (1 − g)·band` | D6 |
+| M10 (by hand) | `check_audio` without `check_gate` | `core/tests/audio_dynamics.rs` |
+
+**`audio_ap4_proof.py <dir>/agent.sock`** drives an instance over MCP and
+measures each WAV export against the same project exported without the stage.
+L is `phase5_proof.integrated` over the dry export. Its fixtures are 16-bit
+stereo WAVs under `work/fixtures/`: `ap4-bursts.wav` (1 kHz bursts at −20 dBFS,
+0.5 s in each 2 s, over −60 dBFS RMS noise), `ap4-release.wav` (a 0.5 s
+−20 dBFS burst, then a −50 dBFS 300 Hz bed), `ap4-sibilance.wav` (300, 700,
+1200 and 2000 Hz tones with 80 ms of 6–9 kHz noise each second) and
+`ap4-rode.wav`.
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s `gate` and `de_esser` round-trip; each bound and an unknown inner key refused by name with nothing changed; `null` clears both; `{}` stores the defaults |
+| P2 | the saved file at the header's version, both keys on the set clip only and none before; set-then-cleared exports the same PCM bytes as never set |
+| P3 | ratio 20, range 20: the gaps' floor 20 ±0.5 dB under the dry export's, the bursts' middles ±0.05 dB |
+| P4 | hold 50 and 200 ms, release 100 ms: ln(1 − r/20) fitted over the release (r the reduction on the bed's samples, 2…18 dB) gives the −10 dB crossing, within ±3 ms of t_f + hold + release·ln 2 |
+| P5 | the de-esser at 4 kHz, the default threshold and range: the bursts' sidechain peaks ≥ 12 dB over L; their 6–9 kHz energy 4…6.5 dB lower; the tones' 300 Hz–2 kHz energy ±0.5 dB; between the bursts ±0.1 dB; no third-octave band 2–12.7 kHz louder than dry by more than 0.2 dB |
+| P6 | reported: the owner's recording under the default gate — the pause floor (p10 of 50 ms RMS) not raised and speech (p90) within ±1 dB |
+| P7 | `paste_attributes` carries both |
+
+`clip_inspector2_probe.swift`'s T2 Sound list names Gate and De-esser (thirteen
+sections). `screens.py` has the `dynamics` fixture (it waits for the media's
+loudness cache), pins `audio.gate` and `audio.de_esser` open for 09c, and its P2
+scan of declared section ids now reads an underscore, which found
+`media.camera_log` unpinned (pinned at its default, open).
+
+```sh
+cd core && cargo test --release --test audio_dynamics && cargo test --release --test schema_v33
+python3 tools/proof/audio_ap4_probe.py              # D1–D11
+python3 tools/proof/audio_ap4_probe.py --mutants    # M1–M9, M11
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap4_proof.py <dir>/agent.sock
+python3 tools/proof/screens.py --only 09-clip-sound,09c-clip-sound-dynamics
+```
+
+**The recorded run (2026-10-30, the lane):** `audio_ap4_probe.py` 11/11 — D1 six
+runs equal to HEAD's bytes; D2 1.000, 5.000, 15.000 and 19.995 dB (±0.05 of 1, 5,
+15 and 20) and the tone over the threshold byte-identical; D3 the crossing +0.025 ms (hold 0) and +0.006 ms
+(hold 100 ms) from the arithmetic; D6 2.492, 3.518, 4.953 and 5.600 dB at 6, 7, 9 and
+11 kHz, each equal to the analytic figure to three decimals, the sweep's loudest
+−0.000 dB (2250 Hz), 1 kHz alone −0.000 dB, beside 7 kHz −0.003 dB, the quiet 7 kHz
+0.000 dB; D7 −35.995 dBFS; D8 L −38.336 and −42.131 LUFS; D9 the timeout after
+0.316 s; D10 188,160 samples compared, none different, 54,785 turned down; D11
+71.0 µs per 1024 stereo frames, 0.33 % of real time (best of 3 × 2000 runs, three
+lanes sharing the machine). `--mutants` 10/10, each killed by its named row (M2 by
+D10; D5 alone did not fail it); M10 by hand failed two of `audio_dynamics.rs`'s five
+tests. `audio_ap4_proof.py` 30/30 on Debug and on Release after `make gate` (PASS,
+428 s): P3 L −22.03 LUFS, the gaps' floor −59.99 → −79.85 dBFS (19.854 dB), the
+bursts' middles −23.009 dBFS both; P4 the crossing −0.32 ms from the arithmetic at
+hold 50 and 200 ms, the fitted release 101.6 ms; P5 the sidechain peaks 13.5 dB over
+L (−19.10 LUFS), the 6–9 kHz energy 5.42 dB lower, the tones −0.011 dB, between the
+bursts −0.000 dB, the loudest third-octave +0.176 dB (2520 Hz); P6 L −41.64 LUFS,
+the owner's pause floor −64.30 → −76.70 dBFS (−12.39 dB), speech p90 −43.16 dBFS
+both. On Release, `phase5_proof.py` 92/92, `eq_proof.py` 33/33 (E7 "the file is
+version 33, the header's 33"), `limiter_proof.py` 19/19; `eq_probe.py` 11/11,
+`limiter_probe.py` 9/9, `clip_inspector2_proof.py` 33/33, `screens.py --only
+09-clip-sound,09c-clip-sound-dynamics` 7/7.
+
+## Road map "audio" AP9 — split edits that keep sync, and Attach Audio (`ap9_split_edits_proof.py` A0–A9; `core/tests/link.rs`, `link_edges.rs`, `schema_v28.rs`; sixteen core mutants; spec §11 AU-90…AU-97)
+
+Detach Audio's two clips are a LINKED PAIR (`clips[].linked`, format 28):
+every placement edit keeps them in step in time, trimming the sound half's
+edge alone makes a J- or L-cut, and `attach_audio` merges a pair back. The
+proof builds the cuts over MCP, exports them, and measures where the sound
+starts and stops against the picture.
+
+```sh
+make app-debug
+python3 tools/proof/proof_app.py launch                     # prints folder, socket, log, pid
+python3 tools/proof/ap9_split_edits_proof.py <dir>/agent.sock [--only A2,A3]
+```
+
+**The fixture** is made once under `tools/proof/work/ap9/fixture-v1.mov`: 10 s
+at 30 fps, 640×360, a gray ProRes picture with a white flash frame at frames
+45, 90, …, 270 and, at those instants, `export_offset_proof.py`'s
+raised-cosine click, over a continuous 440 Hz tone at 0.1 (48 kHz 16-bit
+PCM). Python writes the sound; ffmpeg the picture and the movie.
+
+**The measures** are `export_offset_proof.py`'s, imported and never copied:
+`read_ffmpeg` decodes each export's sound, `flash_times` reads the frames
+(mean luma over 32 is the picture, over 200 a flash) and `locate` finds the
+click near each flash. The tolerance is that file's E-row `TARGET_MS`
+(1 ms): an offset (tone onset − first picture frame, tone offset − the last
+picture frame's end) is held to it, and so is every click to its flash.
+
+| Row | What it claims |
+|---|---|
+| A0 | no `Frame Job: ` line in the instance's log |
+| A1 | `detach_audio` writes `linked` on both halves, mutually |
+| A2 | the J-cut (a carried one-second head trim, then the sound's `trim_start` alone 15 frames early): onset − first frame = −0.5 s |
+| A3 | the L-cut (the picture's `trim_end` with `alone: true` 15 frames early): offset − picture end = +0.5 s |
+| A4 | after `move_clip` on the picture, `ripple_delete` of a hidden, silent clip before the pair, `split` + `delete` of the first halves, and `nest`: each export keeps the +0.5 s tail, the −0.5 s head until the split removes the lead (0 after), and every click on its flash |
+| A5 | `set_speed` on a half refused in AU-94's sentence; `attach_audio` on the J-cut refused in AU-95's |
+| A6 | `attach_audio` on an in-step pair leaves one clip, and its `audio_wav` export equals a never-detached clip's within −90 dBFS |
+| A7 | `undo` restores the pair, linked |
+| A8 | two consecutive detached shots, the second's sound moved to a new track and J-cut 15 frames: the picture stays on its track, the sound has no `transition_in`, every click on its flash |
+| A9 | `delete` of a detached sound alone: the picture stays, unlinked, and its export is silent |
+
+Every project is closed with `discard: true`; no menu item is performed.
+
+**The sixteen core mutants** (more than ten because AU-91…AU-96 hold sixteen
+separate branches), each one replacement in `core/src/` (anchor asserted
+once), run with `cargo test --release --test link --test link_edges --test
+schema_v28 --test op_default_booleans` and the file restored after each:
+
+| Mutant | Edit | Killed by (among others) |
+|---|---|---|
+| `M1-closure-dropped-in-move` | `move_clips` acts on the named clips only | `moving_either_half_moves_both_in_time` |
+| `M2-anchor-from-closure` | the track delta anchored on the closure | `a_picture_moved_up_a_track_lands_on_the_track_asked_for` |
+| `M3-partners-take-track-delta` | every clip of the closure changes track | `a_sound_dragged_to_an_empty_track_goes_alone_and_then_leads_cleanly` |
+| `M4-earliest-from-caller-only` | the clamp at 0 over the named clips only | `a_j_cut_near_zero_keeps_its_lead_when_the_picture_is_dragged_left` |
+| `M5-lock-ignored-in-with-links` | a partner on a locked track added | `a_partner_on_a_locked_track_stays_and_stays_linked` |
+| `M6-partners-out-of-shifted` | `shifted` without partners | `a_shift_moves_a_partner_that_starts_before_the_boundary` |
+| `M7-floor-never-refuses` | the floor refusal never answered | `a_ripple_that_would_push_a_leading_sound_below_zero_refuses` |
+| `M8-delete-closure-is-with-links` | a sound named alone takes its picture | `deleting_a_sound_alone_keeps_its_picture_silent` |
+| `M9-pairing-skipped` | `pair_split_halves` not called | `a_split_through_both_halves_pairs_the_second_halves` |
+| `M10-uncut-partner-keeps-first` | the uncut partner always keeps the first half | `an_uncut_partner_keeps_the_half_it_shares_more_time_with` |
+| `M11-edge-always-carries` | the edge coincidence test removed | `a_trim_does_not_carry_across_a_j_cut` |
+| `M12-alone-ignored` | `alone` read as false | `trimming_the_sound_alone_makes_the_j_and_l_cuts` |
+| `M13-slip-own-clamp` | slip by the named clip's own clamp | `slip_moves_both_halves_by_the_smaller_clamp` |
+| `M14-rate-refusal-none` | `linked_rate_refusal` answers none | `speed_direction_and_ramps_are_refused_on_a_linked_clip` |
+| `M15-attach-in-step-removed` | Attach's in-step test removed | `attach_refuses_in_its_own_sentences` |
+| `M16-settle-no-op` | `settle_links` does nothing | `deleting_a_sound_alone_keeps_its_picture_silent` (validate refuses the one-sided link) |
+
+16 of 16 killed (2026-10-30; the runner and its logs are the implementer's
+scratch, each mutant a one-line replacement asserted to occur once).
+
+**The recorded run (2026-10-30, Release after `make gate`, which passed in 335 s
+with the four baseline warnings):** `RC_PROOF_APP=release
+ap9_split_edits_proof.py` 10/10, its log clean (A0): the J-cut's onset − first
+frame −0.4999 s, the L-cut's offset − picture end +0.5000 s, the worst click −
+flash 0.174 ms. 10/10 on Debug too.
+
+## Road map "audio" AP11 — ducking by speech, and fade and crossfade shapes (`audio_ap11_proof.py` D1–D4, F1–F4, X1, T1, R1, P1–P2; `core/tests/duck_speech.rs`, `fade_shapes.rs`, `schema_v29.rs` and ten core mutants; spec §11 AU-110..AU-116)
+
+A duck in `speech` mode lowers the rest of the mix only while its media's
+saved speech spans play (`media[].speech`, written by `set_media_speech` in
+the same undo step as the `set_audio` that turns the mode on), widened by
+`pre_roll` and `hold`; fades take four shapes, and a transition's crossfade
+the same four with R5-2's constant power as the default, bit for bit. The
+product catalog is **104** tools (`set_media_speech`, the sixty-fourth op):
+`op_argument_proof.py` asserts `PRODUCT_TOOLS = 104` and `OPS = 64`, and
+`op_catalog_proof.py` 64 ops.
+
+- **`core/tests/duck_speech.rs`** (in `make test`): the bed's plan ramps
+  against an oracle written from AU-112 — at every ramp end, every midpoint,
+  and every 1/100 s across them — for pre-roll, hold, attack and release,
+  touching and overlapping spans merged, a release meeting the next attack
+  (the minimum, never the product), reversed, ×2, ramped and nested
+  duckers, and a speech duck with no spans; an extent duck's ramps pinned as
+  before format 29, with no `ducks`; the plan's `ducks`; `set_audio`'s
+  refusal, a pasted spanless speech duck keeping a volume edit;
+  `set_media_speech`'s sentences and `validate`'s; a relink clipping and
+  clearing spans; `pre_roll`/`hold` on an extent duck surviving a save.
+- **`core/tests/fade_shapes.rs`**: each shape's fade-in and fade-out ramp
+  ends on its formula (1e-12) and midpoints within 0.01; each crossfade
+  shape; the default crossfade's ramp ends pinned as R5-2's law wrote them,
+  text for text; `set_transition_style`'s `audio_shape`.
+- **`core/tests/schema_v29.rs`**: format 29's open, newer and round-trip
+  rows, and a file at 28 writing what it did.
+- **`audio_ap11_proof.py <dir>/agent.sock`** (the docstring has each row and
+  bound) makes its fixtures on the first run into `tools/proof/media/` with
+  `say` and `ffmpeg` (`ap11_voice.wav`, `ap11_voice_cut.wav`, `ap11_bed.wav`,
+  `ap11_silent.wav`) and reads levels by quadrature at 440 Hz over
+  11-cycle windows of `audio_wav` exports. Release, 2026-10-30: **11/11** —
+  D2 −12.040 dB held (want −12.041 ± 0.2), D3 and D4's free parts +0.000 dB,
+  D4 −12.040 dB through the pause, F1–F4 within 0.117 dB, X1 within
+  0.100 dB, T1 the last span ending at the cut file's 600,000 ticks; R1, the
+  owner's `samples/Rode-usb-mic.m4a`: 10 spans over 30.3 s, 188 bytes
+  compact, 447 in the project file.
+- **`audio_ap11_proof.py --probe`** runs P1 and P2 alone, with no instance
+  (the whole run runs them first): the probe `audio_ap11_probe.swift`,
+  compiled AS `main.swift` over `app/Sources` through `swift_build.py`,
+  commits Ducking ▸ Level through the row's own field on a clip whose Speech
+  duck came by Paste Attributes and whose media has no spans. P1 (the media's
+  voice cache written) hears `set_media_speech` then `set_audio` and the two
+  apply, as `set_audio` over MCP does (AU-111); P2 (no cache) hears the
+  `set_audio` alone and the core refuses it in its own sentence. 2026-10-30,
+  the AP11 review's fix pass: **2/2**; over the pane before the fix P1
+  FAILS (the `set_audio` alone, refused).
+
+The ten mutants (pre-roll sign, hold dropped, min → product, the reversed
+reflection skipped, the S-curve and −3 dB formulas, +3 dB's outgoing side as
+`gain(1 − p)`, the `set_audio` refusal removed or read from the merged
+props, relink's clip of `speech` skipped) each fail a named core test; the
+record is AP11's in `archive/audio.md`.
+
+## Road map "audio" AP13 — audio while scrubbing (`scrub_audio_probe.py` G1–G7, C1–C3, E1–E5; nine mutants; spec §11 AU-130…AU-136)
+
+A ruler scrub plays 80 ms grains of the mix at the playhead (`ScrubGrains.swift`,
+`ScrubAudio.swift`). Nothing about it is reachable over MCP — a scrub makes no edit and
+`set_playhead` plays no grain (AU-135) — so the instrument is a probe:
+**`scrub_audio_probe.py`** compiles `scrub_audio_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `Blank.mp4` beside the binary.
+It drives `ScrubGrainScheduler` with its own clock, reads grains with `ScrubGrains.read`
+against the export's float read (`ExportWriter.audioReadOutput(…, gained: true)`) of a second
+build of the same plan, and runs `ScrubAudio` with a recording sink in place of the engine.
+Its fixtures are 48 kHz stereo float WAVs of seeded noise written by `AVAudioFile` under
+`tools/proof/work/scrub-audio-probe/<build>/scratch/`; its projects are made from ops on an
+untitled `ProjectDocument` with `AudioDSPSource` published for the key. No app, no ffmpeg.
+
+| Row | What it holds |
+|---|---|
+| G1 | a mid-timeline grain is 3,840 frames and starts at the playhead passed in |
+| G2 | the window: gain at frames 0 and n−1 < 1e-3, 1 across the middle, symmetric, step ≤ π/480; a windowed full-scale DC grain's first and last samples ≤ 1e-3 |
+| G3 | a 1 s forward drag at 60 Hz on a 30 fps grid: each `at` the previous `at` + 80 ms, each start the playhead at its request, no request with more than `lead` queued |
+| G4 | a 0.5 s hold on the last grain's frame: no grain; the last grain ends ≤ 0.12 s after the hold began |
+| G5 | `end()` leaves `isActive` false and `lastStart` nil; a press on the last grain's frame once the queue ran out gives a full grain; a leftward drag's grains start at the playhead, full forward length |
+| G6 | near the end the grain is duration − start; under 480 frames, at or past the end, none |
+| G7 | the same snapped frame twice in one scrub: one grain |
+| C1 | three tracks (volume 0.5, pan −0.6, a 0.5 s fade-in; a ducking clip; a muted track): the grain at 1.0, 3.0 and 5.3 s against the export's read at the same frames, max \|Δ\| ≤ 1e-5; a grain inside the duck's attack is reported, not scored |
+| C2 | a clip trimmed to end at 2.0 s, a gap, a clip at 3.0 s: the grain from 1.96 s is exactly 0 from 2.0 s and the export's read before it |
+| C3 | a compressor and noise reduction: the scheduler's own adjacent grains from a 1× drag, read in turn on one build, each (after the first) equal to a cold read on a fresh build, ≤ 1e-5; the RMS against the whole-timeline read reported |
+| E1 | `ScrubAudio` with a recording sink: the grains played are `read` × window at the scheduler's starts |
+| E2 | a sink whose first `play` blocks; three more grains asked, `end()`, release: one played |
+| E3 | two moves on one player composition make one build; a new composition object a second |
+| E4 | a move with composition B that asks for no grain: after `end()` and a new press, two builds and the grain is B's |
+| E5 | as E4, but the move with B asks for a grain the blocked queue then drops: the next scrub's grain is still B's |
+
+`--mutants` runs nine, each a replacement in a copied `app/Sources` (its anchor asserted
+once), and scores each killed when one of its named rows fails; `read-by-arrival` is
+equivalent (below), so it is run and reported but not scored, and the score is out of eight:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `flat-window` | `gain` answers 1 everywhere | G2 |
+| `no-hold-rule` | the new-frame test removed | G4 / G7 |
+| `no-lead-rule` | the 0.04 s lead test removed | G3 |
+| `no-end-clamp` | every grain 3,840 frames, none refused at the end | G6 |
+| `end-keeps-last-start` | `end()` keeps `lastStart` | G5 |
+| `leftward-backwards` | a leftward grain starts at playhead − length | G5 |
+| `read-by-arrival` | `read` places buffers in arrival order, not by presentation time | C1 (survives: equivalent, below) |
+| `no-stale-drop` | the generation test answers "not stale" | E2 |
+| `rebuild-on-grain` | the rebuild rides on the grain request and is dropped with it | E4 / E5 |
+
+```sh
+python3 tools/proof/scrub_audio_probe.py            # G1–G7, C1–C3, E1–E5
+python3 tools/proof/scrub_audio_probe.py --mutants  # 9 mutants, 8 scored
+```
+
+**`read-by-arrival` is equivalent.** An `AVAssetReaderAudioMixOutput` with a `timeRange` stamps
+its first buffer exactly at the range's start and fills a composition gap with silent buffers, so
+arrival order and presentation time agree sample for sample; it passed every row, and passed a
+trial row across a gap's far edge too. That trial row (the grain from 2.96 s over a gap ending at
+3.0 s) is not kept: against the export's read it gave max |Δ| 0.00019547 in 2 of 5 runs of one
+binary and 0.0 in 3.
+
+**The recorded run (2026-10-30):** 15/15 rows (C1, C2, C3 and E1–E5 max |Δ| 0.0; the window's
+edges 1.07e-5, its largest step 0.0065449; the last grain 0.1067 s after a hold began; C3's
+whole-timeline RMS 0.0194, reported; a grain inside a duck's attack 0.0988 from the export,
+reported); `--mutants` 8/9 killed, each by its named row, `read-by-arrival` surviving as
+equivalent. Once `read-by-arrival` was marked equivalent in the script, `--mutants` printed
+"8/8 mutants killed (1 equivalent, not scored)", exit 0, with `read-by-arrival` failing no row.
+
+## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P9, P2b, I0–I10, I1b; ten mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
+
+A clip's `audio.isolation` crossfades its dry sound with one cached offline `AUSoundIsolation`
+render of its window, before the tap's chain (`IsolationRenderer.swift`, `IsolationCache.swift`,
+`AudioIsolation.swift`). **`audio_ap5_proof.py`** has two halves, and its docstring has every
+row:
+
+- **The probe** (`audio_ap5_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.build`, `Blank.mp4` beside the binary; a failed build is a scored FAIL). Its
+  fixtures are 48 kHz stereo float WAVs of seeded noise and synthetic "renders" written by
+  `RampCAFWriter` under the name `IsolationCache` gives the clip's window, in
+  `tools/proof/work/audio_ap5/<build>/scratch/`; projects are ops on an untitled
+  `ProjectDocument` (each op tried on a scratch handle first, so a bad op is a printed FAIL and
+  never the document's modal alert), published under a fresh key with `AudioDSPSource` and a
+  `ReverseResolution` whose `isolated` is the scratch `cache/isolated/`. P5, P6 and P8 render
+  `samples/Rode-usb-mic.m4a` through the real renderer.
+
+  | Row | What it holds |
+  |---|---|
+  | P1 | isolation 1 with no render: no tap on any track, and the mix read byte-identical to isolation 0 |
+  | P2 | a synthetic stereo render at a clip placed at 3.5 s from source 2.5 s: the read equals it sample for sample over the clip, ≤ 1e-7 alone and ≤ 1e-4 with a noise-reduced clip on the same track (the 512-sample lead; the reducer at 0 is an FFT round trip) |
+  | P2b | `wetOffset` at 20,020 / source-in 40,040 ticks is 1,602 − first, the reverse −1,602 − first, and a built span there starts at 1,602 |
+  | P3 | Amount 0.5 and 0.25 against dry + a·(render − dry), ≤ 1e-6 (0.25 because a swapped crossfade is the same at 0.5) |
+  | P4 | no request for a time-scaled, a ramped, a freeze or a pending-reverse segment; a plain one gets one |
+  | P5 | the renderer over 6 s of the recording from 10 s: the cross-correlation peak against the dry at lag 0, and the file reads back whole |
+  | P6 | the window [10, 15 s) against the whole file's render over 10–11 s: residual ≤ −40 dB |
+  | P7 | `name` differs by window and by reversal; Amount 0.5 and 1 name one file |
+  | P8 | `Exporter.withRampAudio` runs its build only once the isolation file exists |
+  | P9 | a request whose source is a text file: the owner's `settled` runs exactly once, on the main queue, and `failure(for:)` and `IsolationCache.status(of:)` carry the message |
+
+- **The instance rows** I0–I10 and I1b, on `proof_app`'s app launched by the script with
+  `-RCDevRampRenderHold 2` and stopped by its own pid, every project the recording at volume ×4
+  (so a 16-bit `audio_wav` export's quantisation sits ≥ 60 dB under it), exports decoded by
+  ffmpeg: I1 and I1b alignment (|lag| ≤ 0.5 sample by cross-correlation with a parabolic peak;
+  I1b at 29.97 fps, off the 48 kHz grid), I2 the pause floor ≥ 9 dB lower and the speech bands
+  within ±0.5 dB (S2's 400 ms classifier), I3 Amount 0.5 against the mean of I2's two exports,
+  I4 an export straight after the edit waits, I5 a trim renders anew and prunes, I6 reversed,
+  I7 ×2 plays dry (Keep pitch off sample for sample; Keep pitch on by its pause floor, ±1 dB,
+  because AVFoundation's spectral time-pitch is not deterministic: two exports of one ×2 clip
+  measured max |Δ| 0.095), I8 Paste Attributes, I9 the refusal, I10 0 writes no key and plays
+  I2's dry. `--instance` runs the I rows alone.
+
+`--mutants` runs ten, each a replacement in a copied `app/Sources` (every anchor asserted once),
+scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `latency-kept` | the 4440 latency frames not discarded | P5 |
+| `no-preroll` | no media fed before the window | P6 |
+| `amount-swapped` | `wet + a·(dry − wet)` | P3 |
+| `no-track-lead` | spans placed with `shift: .none` | P2 |
+| `pending-silent` | a pending render earns a tap that zeroes the clip | P1 |
+| `scaled-isolated` | `isolatable` lets a time-scaled segment through | P4 |
+| `export-no-wait` | the export wants no isolation render | P8 |
+| `window-not-keyed` | the window left out of the name | P7 |
+| `split-rounding` | `r(source_in) − r(at)` instead of `r(source_in − at)` | P2b |
+| `failure-silent` | a failed render calls no owner | P9 |
+
+```sh
+python3 tools/proof/audio_ap5_proof.py --probe     # P1–P9, P2b
+python3 tools/proof/audio_ap5_proof.py --mutants   # 10 mutants
+python3 tools/proof/audio_ap5_proof.py             # the probe, then I0–I10, I1b on an own instance
+```
+
+**The recorded run (2026-10-30, Release after `make gate`):** 22/22. P2 worst |out − render|
+0.0 alone and 2.09e-7 with the reducer's lead; P3 0.0 at both amounts; P5 lag 0 (the render 0.34 s
+for 6 s); P6 −293.5 dB (the window's render and the whole file's are bit-identical over 10–11 s
+once 4 s of preroll is fed); I1 lag +0.001, I1b +0.002 samples; I2 38 pause and 9 speech windows,
+the floor 14.9 dB lower, speech +0.14 dB broadband and every octave 63 Hz–8 kHz within
+−0.02…+0.29 dB; I3 −63.7 dB; I4 the export finished 2.8 s after it was sent, floor 12.0 dB lower;
+I5 lag 0.000 with the old render pruned; I6 lag +0.007, floor 10.9 dB lower; I7 Keep pitch on's
+floor moved 0.00 dB and Keep pitch off sample for sample. `--mutants` 10/10 killed, each by its
+named row alone.
+
+## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T16, L1–L4; eleven mutants; spec §11 AU-70…AU-78)
+
+The live loudness meter (`LiveLoudness.swift`, `LiveLoudness+Sum.swift`) rebuilds the true mix on
+the main thread from each tap's `MixRing` (`LevelMeter.swift`) and measures it with the
+rate-generic `LoudnessMeter` (`Loudness.swift`). **`audio_ap7_proof.py --probe`** compiles
+`audio_ap7_probe.swift` as `main.swift` over `app/Sources` through `swift_build.build` (a failed
+build is a scored failure) and runs it: no app, no ffmpeg. Each signal is written into sinks'
+rings with `LevelMeterSink.capture` (the tap's own call) and `measure` as two or three tracks
+whose writes lead by 0, 2.7 and 13.4 ms (spike S3's per-track offsets), in chunks cycling
+1920/512/4096 frames, and `LiveLoudness.consume` runs at rate 1 after every cycle. A Tech 3341
+signal is split over three tracks at 0.5, 0.3 and 0.2 under unity envelopes.
+
+| Row | What it holds |
+|---|---|
+| T1 | Tech 3341 case 1 (20 s stereo 1 kHz at −23 dBFS): M, S and I −23.0 ±0.1 |
+| T2 | case 2 (−33 dBFS): M, S and I −33.0 ±0.1 |
+| T3–T5 | cases 3, 4 and 5 (the gates): I −23.0 ±0.1 |
+| T6 | case 9 (1.34 s at −20 / 1.66 s at −30, ×5): S −23.0 ±0.1 at every 100 ms read from 3 s |
+| T7 | case 12 (0.18 s at −20 / 0.22 s at −30, ×25): M −23.0 ±0.1 at every 100 ms read from 0.4 s |
+| T8 | true peak, cases 15–19: fs/4 at 0° and 45°, fs/6 at 60°, fs/8 at 67.5° (−6.02 dBFS), and fs/4 at 45° with every sample at 0 dBFS (+3.01 dBTP), each +0.2/−0.4 dB; each tone faded in over 20 ms (a sine switched on from silence rings the interpolator past its own peak); the rest of the 3 × 4 grid printed as `info` |
+| T9 | case 1 at 44.1 kHz (±0.1, and I within 0.02 LU of 48 kHz's) and fs/4 at 45° at 44.1 kHz |
+| T10 | the mix — a stereo tone under a 0.5 hold, mono noise under a 1 → 0.25 ramp, the tone again (correlated) under a 0 → 0.7 fade — against a fresh `LoudnessMeter` fed Σ env·x: \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.01 LU over exactly [0, 480000) |
+| T11 | a +0.5 s seek resets `jump`; a rebuild 0.3 s behind (new sinks) and a pause resumed 0.2 s behind neither reset nor double count (frames fed = to − from, I within 0.01 LU of the reference); a seek as the player delivers it — each track a buffer of the old position first, one track a second one after the other moved — resets exactly once, from the new frame |
+| T12 | a stalled track holds the sum at its last frame while the leader is under 0.5 s ahead, then is not waited on; a track past its last span is never waited on |
+| T13 | 3 s unread overruns the ring: resets `overrun`, the measurement goes on |
+| T14 | at ×2 nothing is measured (M, S nil; I, TP and `to_frame` held; `measuring` false); `stop()` holds M, S, I and TP, fires `onReading` once and empties the rings; a resume at ×1 from the reached frame continues with no reset |
+| T15 | the bars: two correlated 0.5 sines read peak 1.0; a sine and its inverse read 0.0 where the per-track sum reads 1.0 |
+| T16 | a 0.3 s and a 1 s gap between two clips on one track, and on one of two tracks: no reset, frames fed = to − from, I within 0.01 LU of the reference with silence in the gap |
+
+`--mutants` runs eleven, each a replacement in a copied `app/Sources` (its anchor asserted once),
+scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `mono-in-one-channel` | a mono track adds nothing to the right channel | T10 |
+| `envelope-dropped` | every gain 1 | T10 |
+| `summed-by-arrival` | each track's pending chunks laid end to end from the reached frame | T10 |
+| `jump-does-not-reset` | a jump is not reset | T11 |
+| `frames-before-reached-counted` | a chunk behind the reached frame rewinds the sum | T11 |
+| `stall-guard-removed` | a stalled track is always waited on | T12 |
+| `not-sounding-only-past-last-span` | a track's spans merged into one, so a gap counts as sounding | T16 |
+| `measured-at-any-rate` | the ×1 gate lets any forward rate through | T14 |
+| `short-term-over-4` | short-term over 4 sub-blocks | T6 |
+| `tables-at-every-rate` | Tables 1–2 used at every rate | T9 |
+| `bars-from-per-track-sum` | the bars are `LevelMeterTrack.mix` | T15 |
+
+**With a socket** (`python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock`, an instance
+`proof_app.py launch` started), L1–L4 drive the real player through `play_preview` and the dev
+tool `loudness_meter`. The project: a 10 s stereo tone (440/660 Hz, a 1 s fade-in) on track 1,
+mono pink noise on track 2 as two clips with a 0.4 s gap at 3.0–3.4 s (ffmpeg fixtures under
+`work/audio-ap7/`). L1 resets, plays 8 s at ×1 from 0, exports `audio_wav` and measures the
+export over `[from_frame, to_frame)` with `phase5_proof.py`'s BS.1770-4 (K-weighting from rest at
+`from_frame`, sub-blocks counted from there): \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.1 LU, \|ΔTP\| ≤ 0.2 dB,
+`resets` unchanged by the gap, `last_reset` `manual`, `measuring` false after the play. L2
+resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`. L3 resets and plays 2 s twice
+from 1 s: no reset, `from_frame` kept. L4: the tool listed with `reset` described, and the
+instance's log holds no `Frame Job: ` line. Needs ffmpeg.
+
+```sh
+python3 tools/proof/audio_ap7_proof.py --probe             # T1–T16
+python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 11 mutants
+python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock    # L1–L4
+```
+
+**What the player taught the instrument (Debug, 2026-10-30).** The first L2/L3 runs failed: a
+seek mid-play reset five times and a play after a paused seek once. The chunk log showed the
+player hands each track 4,096-frame buffers, and after a seek or a play from elsewhere first one
+or two buffers of the OLD position (sometimes the same buffer twice), not in step across tracks;
+the second track's stale buffer arrived after the first had moved. AU-72's admission now asks
+the reset rule only of a chunk that moves its track, and a track that has not moved after a jump
+drops its old stream until it does; T11's third case is that shape.
+
+**The recorded run (2026-10-30):** `--probe` 16/16 (case 1 −22.9933, cases 3–5 −23.0139,
+−23.0139, −22.9787, case 9 worst 0.0137 LU, case 12 worst 0.0396 LU, true peaks −6.0206,
+−5.9759, −6.3160, −6.0279 and +3.0550 dBTP, 44.1 kHz −22.9905; T10 |Δ| 0.0000); `--mutants`
+11/11 killed, each by its named row; L1–L4 4/4 on Release (I −13.6294 against the export's
+−13.6297, M, S and TP equal to four decimals). On the integration tree, with the host's default
+output AirPods Max over Bluetooth, `--probe` 16/16 and L1 and L4 passed (|ΔI| 0.0004), and L2 and
+L3 failed with extra `jump` resets — the same on the lane's own Release build — so a Bluetooth
+output is a host state these two rows fail on, not one they skip (`archive/audio.md`, AP7's
+record).
+## Road map "audio" AP14 — voice effects (`voice_proof.py` V1–V11, `--measure`, I0, K1–K16, I2–I11; eleven mutants; `core/tests/voice.rs`, `schema_v34.rs`; spec §11 AU-140…AU-149)
+
+A clip's `audio.voice` (`{kind, amount, pitch}`, sixteen kinds) is one cached offline render of
+its window through a fixed chain of Apple's units (`VoiceChain.swift`, `VoiceRenderer.swift`,
+`VoiceCache.swift`), played by AP5's tap pass in place of the clip's sound. **`voice_proof.py`**
+has three halves, and its docstring has every row:
+
+- **The probe** (`voice_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.build`, `Blank.mp4` beside the binary; a failed build is a scored FAIL). Its
+  fixtures are 48 kHz float WAVs written by `AVAudioFile` — seeded stereo noise, 220 Hz tone
+  bursts (100 ms on, 100 ms off), a 50 ms noise burst at −6 dBFS RMS at 0.5 s in 10 s — and
+  synthetic renders written by `RampCAFWriter` under the names `IsolationCache` and
+  `VoiceCache` give, in `tools/proof/work/voice/<build>/scratch/`; projects are ops on an
+  untitled `ProjectDocument` published under a fresh key with a `ReverseResolution` whose
+  `isolated` is the scratch `cache/isolated/` (so `voiced` is `cache/voiced/`).
+
+  | Row | What it holds |
+  |---|---|
+  | V1 | hall with no render: no tap, the mix read byte-identical to no voice; isolation 0.6 ready and the voice pending: one span, isolation's amount and render |
+  | V2 | a synthetic voiced render with isolation 0.5 and its render present: the read equals the voiced render at the placement, ≤ 1e-7 alone and ≤ 1e-4 behind the noise reducer's lead |
+  | V3 | no request for amount 0, pitch at 0 st, a time-scaled, ramped, freeze or pending-reverse segment, or an isolating clip whose isolated file is missing; once present, the request names it |
+  | V4 | the name changes with window, kind, amount, semitones, isolation and reversal, not with `pitch` on a kind that does not read it |
+  | V5 | `VoiceRenderer.render` against the probe's reference engine (fx_common's loop at 4,096-frame calls, the same latency discard, then makeup) for lofi, radio, robot, pitch +7 and hall: equal sample for sample, exactly the window's length |
+  | V6 | `writeInput` equals `dry + i·(iso − dry)` at i = 0.4 |
+  | V7 | hall on the mono recording: a mono file equal to the reference's `(L+R)/2` |
+  | V8 | `Exporter.withRampAudio` builds only once the voice file exists; an unreadable source fails it `voiceFailed` naming the clip |
+  | V9 | room's and cathedral's tails after the burst ≥ 3 s apart (presets in effect from sample 0) |
+  | V10 | sync on the tone bursts: the 1 ms RMS envelope of pitch +7 and robot against the dry's peaks at 0 ± 1 ms; each chain's latency printed |
+  | V11 | a kind change sends `pitch: null` (`VoiceProps.dictionary`, `AudioPane.voiceChoice`) |
+
+- **`--measure`** renders the owner's recording through each kind at amount 1 (pitch at +7) and
+  prints `m_k`, the dry recording's integrated loudness less the render's without makeup, both
+  read as an export at ×4 reads them (the fader at ×4, the mono sound in both channels): the
+  recording is −44.7 LUFS, and near the −70 LUFS gate integrated loudness is not linear in level.
+  `VoiceChain.makeupDb` is its output.
+
+- **The instance rows** I0, K1–K16 and I2–I11, on `proof_app`'s app launched by the script with
+  `-RCDevRampRenderHold 2` and stopped by its own pid, on ffmpeg's fixtures (48 kHz mono WAV:
+  tones at 220 Hz and 1 kHz, white noise, a click, the burst) and, for I3 and I9, the recording
+  at volume ×4; exports `audio_wav`, decoded by ffmpeg; I3's loudness is ffmpeg's `ebur128`.
+  K7 reads bright at its bell's 3 kHz octave: at 4 kHz the chain lifts about +2.6 dB, below the
+  sketch's +3, and that figure is reported beside it.
+
+`--mutants` runs eleven, each a replacement in a copied `app/Sources` (every anchor asserted
+once), scored killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `call-size-1024` | `VoiceRenderer.callFrames` 1024 | V5 |
+| `preset-via-loadFactoryPreset` | presets loaded by `loadFactoryPreset` before start | V9 |
+| `pitch-zero-kept` | TimePitch kept at 0 cents | V3 |
+| `window-not-keyed` | the window left out of the name | V4 |
+| `isolation-ignored` | the input not crossfaded with the isolated render | V6 |
+| `voice-before-isolation` | a request without the isolated file on disk | V3 |
+| `pending-silent` | a pending voice earns a tap that zeroes the clip | V1 |
+| `export-no-wait` | the export does not wait for its voices | V8 |
+| `tail-kept` | 48,000 frames past the window written | V5 |
+| `mono-left` | a mono output is the left channel | V7 |
+| `latency-kept` | the chain's latency not discarded | V10 |
+
+```sh
+python3 tools/proof/voice_proof.py --probe     # V1–V11
+python3 tools/proof/voice_proof.py --measure   # m_k per kind
+python3 tools/proof/voice_proof.py --mutants   # 11 mutants
+python3 tools/proof/voice_proof.py             # the probe, then I0, K1–K16, I2–I11 on an own instance
+```
+
+**The recorded run (2026-10-30, Release after `make gate`):** 38/38. V2 worst 0.0 alone and
+2.09e-7 behind the reducer's lead; V5 and V7 worst |Δ| 0.0, every chain's latency 0 frames; V9
+room 0.45 s, cathedral 4.07 s; V10 both envelope peaks at 0 ms; K1–K3 and I2 within 0.00 cents;
+K4 the sidebands +87.8 / +87.7 dB over the 1 kHz bin; K5 +9.8, K6 +9.8, K7 +3.3 dB (4 kHz +2.7
+reported); K8 −25.5 / −28.3, K9 −25.4 / −19.3 dB; K10 +60.6 dB; K11 −9.6 dB; K12 +0.02 / +0.04
+ms; K13–K16 0.430, 0.340, 1.600 and 3.650 s; I3 dry −29.60 LUFS and every kind within 0.10 LU;
+I9 the floor 13.2 dB lower. `--measure` (final table): every kind within 0.01 LU of the dry
+−29.63 LUFS. `--mutants` "10/10 mutants killed, 1 equivalent", exit 0: `latency-kept`
+survives and is scored equivalent, every chain's latency measuring 0 frames (V10 prints
+pitch +7's, at most 48 frames), so there is nothing to discard.
+
+## Road map "audio" AP10 part 1 — a track's volume and pan (`audio_ap10_proof.py` F1–F5, P1–P5, U1, V1, B1–B4; ten mutants; `core/tests/track_mix.rs`, `schema_v35.rs`; spec §11 AU-100…AU-106)
+
+A track's `volume` (linear 0…4) and `pan` (−1…1) are format 35's `tracks[]` keys: volume an
+envelope term after the mute at every stage (`audio_track.rs`'s `track_gain`, multiplied in
+`audio.rs`'s `stage_gain`), pan the plan audio segment's `track_pans`, a balance the tap applies
+after an enclosing nest's fold and before the clip limiter (`AudioTrackBalance`,
+`AudioDSPChain.process`). No new op, tool or FFI export: `set_track` takes both.
+
+- **`core/tests/track_mix.rs`** (in `make test`): `set_track` stores both, refuses each out of
+  range in `in_range`'s sentence and treats an unchanged value as an identity; the envelope at
+  track 0.5, clip 2 × track 0.25, inner × outer through a nest, a muted track at ×4 and a
+  hand-written ×9 clamped to ×4; `track_pans` innermost first, zeros dropped, cleared at a folded
+  nest clip, kept under a clip's own mono, clamped; a default project and its plan the text they
+  were; `nest` copying from every source track but the destination (unity and centre), the level
+  and pans of a nested single clip unchanged, the other source tracks' clips under both tracks;
+  `unnest` keeping neither.
+- **`core/tests/schema_v35.rs`**: format 35's open, newer and round-trip rows (after `matte`, in
+  `volume`, `pan` order, on the timeline's tracks and a nest's), and a file at 34 writing what it
+  did.
+- **`audio_ap10_proof.py <dir>/agent.sock`** (the docstring has each row and bound) makes
+  `ap10_tone.wav` (440 Hz at −12 dBFS, 48 kHz stereo, 6 s) and `ap10_tone_mono.wav` on the first
+  run into `tools/proof/media/` and reads each channel's level by quadrature at 440 Hz over
+  11-cycle windows across 1–3 s of an `audio_wav` export, in dB of the same fixture's unity
+  export. F1–F5 the fader (track, clip × track, inner × outer through a nest by `scope`, a muted
+  track at ×4, a nested clip's level and its nest track's absent keys), P1–P5 the pan (the law at
+  −1 and 0.5, inner × outer, a folded nest, a mono source, clip × track), U1 one undo step and
+  the parity log, V1 the live meter (`loudness_meter`, `play_preview` 5 s of the 6 s tone)
+  against the export's integrated loudness over the same frames, within 0.01 LU.
+- **`audio_ap10_proof.py --probe`** runs B1–B4 alone (the whole run runs them first): the probe
+  `audio_ap10_probe.swift`, compiled AS `main.swift` over `app/Sources` through `swift_build.py`
+  with `Blank.mp4` beside the binary. B1 the balance (unity, one pan the law's pair, two pans the
+  product, applied per channel and not at unity); B2 the chain's order (a 0.9 sine under a −6 dB
+  limiter and a track pan of −1 holds the ceiling in the left channel; after the limiter it would
+  be √2 over); B3 `isInert`, a schedule over a segment with `track_pans` active with no clip DSP,
+  and a project whose only processing is a track pan of −1 built by `CompositionBuilder.build`
+  and read in float (P1 offline: left +3.01 dB, right 0); B4 `TrackMixLevel`'s mapping, floor and
+  read-out.
+
+The ten mutants: M1 (the track gain not multiplied), M2 (only the innermost track's gain), M3
+(the folded-nest drop skipped), M4 (only the innermost pan kept), M5 (`track_pans` written when
+empty), M8 (`set_track`'s range check dropped), M9 (`nested_track` not copying a non-destination
+track's volume) and M10 (it copying the destination's too) each fail a named `track_mix.rs` test,
+run by hand; M6 (the builder still gating on `dsp.isEmpty`) and M7 (the balance after the
+limiter) are `--mutants`, each over its own copy of `app/Sources`, killed by B3 and B2.
+
+```sh
+python3 tools/proof/audio_ap10_proof.py --probe     # B1–B4
+python3 tools/proof/audio_ap10_proof.py --mutants   # M6, M7
+python3 tools/proof/audio_ap10_proof.py <dir>/agent.sock   # B1–B4, then F1–F5, P1–P5, U1, V1
+```
+
+**The recorded run (2026-10-31, Release after `make gate`):** 16/16. F1 and F2 −6.020 dB per
+channel, F3 −12.040, F4 silent (peak −∞ dBFS), F5 +0.000 per channel and no keys on the nest's
+track; P1 L +3.010 dB and R 0 at −1, (−5.333, +2.323) dB at 0.5; P2 (−3.010, −3.010); P3 and P4
++0.000; P5 (+4.645, −10.666); U1 one undo back to no keys, the log empty; V1 the meter −18.7034
+LUFS over [0, 233,472), the export the same, |dI| 0.0000 LU; B2 left peak 0.50045 under a
+0.50119 ceiling, right 0. `--mutants` 2/2 killed; the core's eight 8/8 killed by `track_mix.rs`.
+
+## Road map "audio" AP2, part 2 — every export through a float master (`export_master_proof.py` X1–X11, M1–M3; nine mutants; `export_offset_proof.py` E46; `phase5_proof.py` 5d and `phase5_chrome.py` §9 re-pinned; `core/tests/export_audio_bits.rs`; spec §11 AU-27..AU-29, closing #86)
+
+Every export with sound now reads the mix as float, places each buffer by its
+stamp, gains it, holds it under its `peak_dbtp` (−1 dBTP by default) with
+`AudioLimiterStage`, compensates the stage's 158 frames and rounds once to 16
+or 24 bits (`ExportAudioMaster.swift`, which replaced `ExporterAudioGain.swift`).
+The gain is solved through `AudioLimiterModel` over pass 1's 10 ms steps
+(`StepLoudnessMeter`, `StepLoudness.swift`). `audio_bits` (16 or 24) is taken by
+`audio_wav` and `audio_aiff` alone.
+
+**`export_master_proof.py <dir>/agent.sock [--only …]`** drives an instance over
+MCP; every ceiling is measured on the file by `limiter_probe.true_peaks` (the
+64-tap Kaiser β 10 oversampler AND Annex 2's phases), every loudness by
+`phase5_proof.integrated`. Fixtures: `limiter-crest.wav` (S1's crest signal
+halved, as `limiter_proof.py` writes it), phase 5's `half.wav` and `crest.wav`,
+`master-quiet.wav` (a 0.02 sine, 16-bit) and `master-faint-f32.wav` (a −90 dBFS
+440 Hz sine, float32), all 48 kHz stereo; the owner's
+`samples/Rode-usb-mic.m4a` for X10.
+
+| Row | What it holds |
+|---|---|
+| X1 | two limited crest clips (×8, clip limiter −1) through a 1 s cross-dissolve (`add_transition`, `ripple`), no `peak_dbtp`: ≤ −1 + 0.001 dBTP by both meters; with `peak_dbtp` 0 the same project reads over −1 (AU-22's case is real) |
+| X2 | a nest clip at volume 2 around a limited clip (×8, −1): the same two legs |
+| X3 | an action raising a limited clip (−1) from volume 1 to 4: the same two legs |
+| X4 | `peak_dbtp` −3 alone: accepted, `ceiling_dbtp` −3 echoed, no `target_lufs`, ≤ −3 + 0.001 by both meters |
+| X5 | `half.wav` at volume 4 un-normalised: no full-scale sample, ≤ −1 + 0.001 by both meters, 0.5–2.5 s within −50 dB of a fitted 440 Hz sine, `limited_db` 7.0 ± 0.2, no "clipped" |
+| X6 | `half.wav` un-normalised (under the ceiling) decodes identical to its own PCM, first and last 158 frames included |
+| X7 | `audio_bits` 24: ffprobe `pcm_s24le` (WAV) and `pcm_s24be` (AIFF), the two alike; a quiet tone normalised to −20 LUFS has non-zero low 8 bits in ≥ 90 % of samples; its 16-bit twin is it rounded within 1 LSB; `audio_bits` echoed 24, 24, 16 |
+| X8 | the −90 dBFS float tone at volume 32 un-normalised: sine-fit residual ≤ −120 dBFS at 24 bits, ≥ −105 at 16 |
+| X9 | phase 5's crest fixture to −14 LUFS: within ±0.5 LU, ≤ −1 + 0.001 by both meters |
+| X10 | the owner's recording raw, to −16 LUFS: within ±0.5 LU, ≤ −1 + 0.001 by both meters (skipped by name when the file is absent) |
+| X11 | `audio_bits` refused on `h264` ("h264 has no bit depth; …") and as 20 ("export audio_bits must be 16 or 24, not 20"); the loudness result has `limited_db` and `capped_by_gain` and no `capped_by_peak` |
+
+**`export_master_proof.py --probe`** (no app) builds `export_master_probe.swift`
+with `app/Sources` through `swift_build` (a probe that will not build is a scored
+failure) and drives `ExportAudioMaster` (24-bit, gain 1, origin 0, a signal far
+under the ceiling, each input sample a distinct multiple of 2⁻¹⁵):
+
+| Row | What it holds |
+|---|---|
+| M1 | buffers at frames 0..4095 then 4200..: output frames 4096..4199 are 0, frame 4200 holds buffer 2's first sample, one contiguous stream |
+| M2 | buffers at 0..4095 then 3996..: buffer 2's frame 100 lands at output 4096, nothing doubled, 8,092 frames |
+| M3 | a first buffer at frame 480: the first output stamp is 480 / 48 000 s and every sample k sits at 480 + k |
+
+**Changed rows.** `export_gain_proof.py` G5 is inverted (the hot
+un-normalised WAV holds no full-scale sample and says nothing of clipping); G1
+is unchanged and held byte-identical against a reference recorded on the base
+build (`79b3216`), every preset. `limiter_proof.py` P2–P4 export with
+`peak_dbtp=0`, so the master never hides a clip-limiter fault, and P2's
+unlimited leg now reads ≤ 0.001 and > −0.5 dBTP. `export_offset_proof.py`
+E46 (`clicks48` at F206 at volume 4, the master acting) holds every click on
+its frame under E4's pin; its hand mutant M27 keeps the master's head and must
+fail E4 and E46. `phase5_proof.py` 5d: the crest leg lands within ±0.5 LU of
+−14 by its own BS.1770 with its true peak ≤ −1 + 0.3 and `limited_db` > 0 (the
+five-ceiling sweep and its non-vacuity check are gone, nothing being capped
+any more); `hot-plain` holds no full-scale sample, says nothing of clipping and
+reads ≤ −1 + 0.3; `noceiling` reports −1; a ceiling alone is accepted and
+echoed; the catalog check reads `peak_dbtp`'s prose as the master's ceiling.
+`phase5_chrome.py` §9 compiles `Loudness.swift`, `ExportLoudness.swift`,
+`StepLoudness.swift` and `AudioLimiterModel.swift`: no reported peak over the
+ceiling across a 200-peak sweep (with `limited_db` the excess), the gain
+rounded to nearest unlimited and through the model, a limited model case
+landing on its target with a gain above the unlimited one, the +40 dB cap,
+a +∞ peak answering gain 0, +∞, `limited_db` 0 and "Peak not measurable …",
+−∞ answering "Silent", and no "clipped" anywhere. `webm_readers_probe.swift`
+lost its `gained` dimension (every read is the float mix; R3 is R2's read,
+kept so the row ids stay) and `webm_export_proof.py`'s `gain-skipped` mutant
+follows the WebM writer's new line (`audioMaster?.linearGain = gain`).
+`audio_ap5_probe.swift`, `scrub_audio_probe.swift`,
+`ramp_spike/ramp_spike_probe.swift` and `loudness_cache_probe.swift` name the
+moved symbols (`ExportAudioMaster.floatMixSettings`,
+`ExportWriter.audioReadOutput(_:)`, `StepLoudness.integrated`).
+
+**Mutants**, by hand on Debug (each one edit, the app rebuilt and its row run):
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| MA1 | the master's `stage.process` skipped | X1 (+1.42 dBTP) |
+| MA2 (M27) | the master's 158-frame head kept | E4, E46 (+3.292 ms) |
+| MA3 | `finish()` answers no tail | X6 (316 samples, the last 158 frames) |
+| MA4 | 24-bit written as the 16-bit rounding × 256 | X7 (0.0 % low bits), X8 (−101.4 dBFS) |
+| MA5 | the gain `target − integrated`, no model | X10 (−17.10 LUFS) |
+| MA6 | the default ceiling 0 dBTP | X1 (0.0000 / 0.0002 dBTP) |
+| MA7 | an un-normalised export reads the 16-bit decode and skips the master | X5 (192,480 full-scale samples), X8 |
+| MA8 | `takes_audio_bits` true on every row | `export_audio_bits.rs` (2 tests) |
+| MA9 | the master stamps by count without placing | M1, M2 |
+
+```sh
+python3 tools/proof/export_master_proof.py --probe          # M1–M3, no app
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/export_master_proof.py <dir>/agent.sock # X1–X11
+python3 tools/proof/phase5_proof.py <dir>/agent.sock
+python3 tools/proof/limiter_proof.py <dir>/agent.sock
+python3 tools/proof/export_gain_proof.py <dir>/agent.sock --against <reference>
+python3 tools/proof/export_offset_proof.py <dir>/agent.sock --only E4,E20,E22,E44,E45,E46
+```
+
+**Measured on Debug (2026-10-31):** `export_master_proof.py` 11/11 — X1, X2, X3
+−0.9998 / −0.9998 dBTP (Kaiser / Annex 2) and 0.0000 to 0.0002 with
+`peak_dbtp` 0; X4 −2.9993 / −2.9998; X5 0 full-scale samples, −1.0127 /
+−0.9999 dBTP, −93.9 dB from the fitted sine, `limited_db` 7.033; X6 identical,
+144,000 frames; X7 99.5 % low bits used, the twin within 1 LSB; X8 −149.1 dBFS
+at 24 bits, −101.4 at 16; X9 −14.0086 LUFS, −1.0085 / −1.0000 dBTP; X10
+−15.9125 LUFS, −0.9998 / −0.9999 dBTP. `--probe` 3/3. `phase5_proof.py` 90/90
+(the crest leg −14.0086 LUFS, gain 6.61 dB, `limited_db` 7.17; `hot-plain`
+−0.9999 dBTP). `phase5_chrome.py` 81/81. `limiter_proof.py` 19/19.
+`export_gain_proof.py --against` the base build's reference 36/36, G1
+byte-identical on all seven presets. `export_offset_proof.py --only
+E4,E20,E22,E44,E45,E46` 6/6 (E46 − E4 +0.000 ms). `loudness_normalize_proof.py`
+37/37. `webm_export_proof.py --probe` 10/10 and in full 29/29 (W11 −16.0
+LUFS). The nine mutants: all killed, each by its named row.
+
+**The recorded run (Release, after `make gate` PASS 385 s, 2026-10-31):**
+`export_master_proof.py` 11/11 with the same figures as Debug (X10 −15.9125 LUFS,
+−0.9998 / −0.9999 dBTP; X9 −14.0086 LUFS); `--probe` 3/3; `phase5_proof.py` 90/90;
+`limiter_proof.py` 19/19 (P2 −0.9995 / −0.9998 dBTP, its unlimited leg held at
+0.0005 / 0.0001 by the master); `export_offset_proof.py --only E4,E20,E44,E46` 4/4
+(E46 − E4 +0.000 ms); `screens.py --only 12-export-sheet` 6/6, the Bit depth row
+"16-bit", dimmed on H.264, after Quality in both appearances.
+
+## Road map "audio" AP8a — the volume line (`volume_line_proof.py` V1–V9; thirteen mutants; spec §11 AU-80…AU-84)
+
+Every clip with sound but a nest clip draws the plan's gain envelope for its audio segment as a
+line over its waveform (`VolumeLines`, `VolumeScale`, `TimelineView+VolumeLine.swift`); a drag
+edits the level in force there and ⌥-press adds a point, both through ordinary actions
+(`VolumeLine.target`, `VolumeLine.point`, `VolumeLineSession`). No core, FFI, op, tool, format or
+`UserDefaults` change, so there is no instance to drive: every row is in-process.
+
+- **`volume_line_proof.py --probe`**: the probe `volume_line_probe.swift`, compiled AS
+  `main.swift` over `app/Sources` through `swift_build.py`, with `Compositor.metal` built into a
+  `default.metallib` beside it (`editor_keys_undo_proof.build_shader`). Its fixture is built by
+  ops over a 10 s tone it writes (`tone.caf` in its scratch folder): track A at volume 0.5 with the
+  main clip (volume 0.5, a 0.5 s fade in, a linear volume action [1 s, 2 s) to 2.0, a pan-only
+  action [3 s, 4 s)), track B a clip at 6 s ducking by extent, track C muted with a second clip;
+  the same with the volume action ease in-out for V6's eased rows. V1 the drawn vertices against
+  the plan's ramps through a scale on a rect the probe computes (≤ 0.01 pt), one point at the
+  volume action's end, the muted clip's line on the floor; V2 the scale; V3 the targets at 0.5,
+  1.5, 2.5, 3.5 and 4.5 s; V4 the drag's arithmetic; V5 a point after the last action and the
+  gain unchanged at every frame; V6 a split and its eased form, and a press inside an action a
+  trim left past the clip's end beeping (nil); V7 one undo step each through an
+  offscreen `EditorViewController`; V8 the hit order, `resolvingVolumeLine` and a ⇧-press on a
+  line; V9 the paint with and without the line (`cacheDisplay`).
+- **`volume_line_proof.py --mutants`**: each over its own copy of `app/Sources`, killed when its
+  named row fails.
+
+| Mutant | What it breaks | Killed by |
+|---|---|---|
+| M1 | the scale's top +12 dB, not +30.103 | V2 |
+| M2 | the bottom writes 0.001, not 0 | V4 |
+| M3 | no 0.001 floor under a drag's start | V4 |
+| M4 | the inside-an-action target rule dropped | V3 |
+| M5 | the held rule taking any ended action, not one naming the volume | V3 |
+| M6 | a new point starting at the clip's start, not the last action's end | V5 |
+| M7 | a split dropping the action's curve | V6 |
+| M8 | the line hit before the edge grabs | V8 |
+| M9 | the line rect not raised below the action lane | V1 |
+| M10 | the split's one-frame-from-start check dropped | V6 |
+| M11 | `atBottom` without "below the press" | V4 |
+| M12 | `resolvingVolumeLine` ignoring ⇧ | V8 |
+| M13 | the split's past-the-clip's-end check dropped | V6 |
+
+```sh
+python3 tools/proof/volume_line_proof.py --probe     # V1–V9
+python3 tools/proof/volume_line_proof.py --mutants   # M1–M13
+```
+
+**The recorded run (2026-10-31, after `make gate` PASS):** `--probe` 9/9. V1 12 vertices from 6
+plan ramps (5 distinct gains), worst 0.000 pt, the rect's top at the lane's bottom, one point at
+the volume action's end, the muted clip's line on the floor; V2 the inverse within 1.4e-14 dB;
+V4 +6.0206 dB from 0.5 → 1.000000; V5 the gain's worst change over 300 frames 0.0; V6 the
+linear split's worst change 4.4e-16, the eased halves both `ease_in_out`; V7 "Set Volume" and
+"Add Volume Point", each undone to the original JSON; V9 3/3 differ on the line, 3/3 equal 4 pt
+off. `--mutants` 12/12 killed.
+
+**The fix pass (2026-10-31):** ⌥ inside a volume action a trim left past the clip's end built an
+`add_action` the core refuses (`action_past_end`), swallowed by the live edit with no beep; the
+split now answers nil there. `--probe` 9/9, V6 adding "trimmed to 1.5 s, the action ends 2.000000
+s past the clip's 1.500000 s: true; ⌥ at 1.25 s nil"; `--mutants` M1–M9 and M11–M13 killed (M13
+by V6), M10's anchor moved with the guard and, re-pointed, killed by V6 in its own run; `make
+gate` PASS 358 s.
+
+## Road map "audio" AP10 part 2a — stems (`audio_ap10b_proof.py` S1–S8, C1, B1–B2; seven mutants; `core/tests/export_stems.rs`; spec §11 AU-107…AU-109)
+
+The plan labels each audio track with its timeline track (`track`, AU-107), and the three audio
+rows take `stems` (`tracks` or `names`): the mix, then one file per stem beside it, each its
+tracks' sound before the master (`ExportStemsPipeline`, `ExportAudioMaster(limits: false)`,
+AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
+
+- **`core/tests/export_stems.rs`** (in `make test`): the label (two top-level tracks, a nest's
+  contents under the nest clip's track, overlapping clips on one track); both modes' grouping,
+  order and names (`Track N`, the ` (Track N)` suffix, `/` and `:` as `-`); a muted track, a
+  track silenced by a solo and a track of pictures alone without a stem; each refusal; `presets()`
+  listing `stems` on exactly the three audio rows; settings without `stems` carrying no key.
+  `export_audio_bits.rs`'s WAV and AIFF rows, written out whole, gained `stems`.
+- **`audio_ap10b_proof.py <dir>/agent.sock [--only …]`** (the docstring has each row and bound)
+  makes `ap10b_tone.wav` (440 Hz at −12.5 dBFS, 6 s), `ap10b_music.wav` (three sines and pink
+  noise near −20 dBFS RMS, 6 s, 24-bit) and `ap10b_long.m4a` (600 s of 440 Hz at −20 dBFS, AAC)
+  on the first run into `tools/proof/media/`, and decodes every export to PCM integers at its
+  own depth. S1 two tracks' stems by `tracks` at AU-108's names, Σ stems − mix ≤ 2 LSB at 24
+  bits on every sample; S2 `names` grouping "Music" and "music" and naming an unnamed track
+  "Track 3", Σ as S1; S3 a loudness target leaving every stem identical to S1's and the mix
+  not; S4 no stem for a muted or solo-silenced track; S5 `samples/Rode-usb-mic.m4a` beside the
+  music, each stem identical to the soloed export of its track (skipped by name without the
+  sample); S6 a tone at ×4 whose stem's true peak is over −1 dBTP by `limiter_probe.py`'s two
+  meters while the mix's is under −1 + 0.001; S7 the three refusals by name; S8 a stem path that
+  is the project's media failing the job with nothing written and the media byte-identical; C1
+  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with stems
+  1–2 on disk first, leaving no file.
+- **`audio_ap10b_proof.py --probe`** runs B1–B2 alone (the whole run runs them first): the
+  probe `audio_ap10b_probe.swift`, compiled AS `main.swift` over `app/Sources` through
+  `swift_build.py`. B1 `ExportAudioMaster(limits: false)` at 24 bits over two buffers past the
+  ceiling and past full scale: `round(clip(input))` frame for frame from stamp 0, no tail, where
+  the default master changes them; B2 `url(for:mix:)`, `summary`, `collision` (exact, case-only,
+  a symlink, none) and `SourceCollision`'s sentence.
+
+The queue row's success line is not read over MCP — `export_status`'s `done` carries no line and
+`snapshot_ui` cannot capture the Export Queue window — so its wording rests on `summary` (B2),
+which both success lines append, and on SE-36.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| M1 | every audio `CompTrack` labelled with the first timeline track | `export_stems.rs` (8 tests) |
+| M2 | a stem's master limits (`limits: true`) | S6 (the stem at −1.0127 / −1.0000 dBTP) |
+| M3 | `normalizeAudio` forwarded to each stem's writer | S3 (both stems differ from S1's) |
+| M4 | `silenced` not checked | `export_stems.rs` (3 tests) |
+| M5 | `names` grouping case-sensitive | `export_stems.rs` (`names_mode_groups_…`) |
+| M6 | no removal on a failure or a cancel | C1 (`Mix - One.wav`, `Mix - Two.wav` left) |
+| M7 | `collision` never answers | S8 (the media overwritten, `Mix.wav` written), B2 |
+
+M1, M4 and M5 by hand against `export_stems.rs`; M2, M3, M6 and M7 by hand on a mutated Debug
+build with `--only`.
+
+```sh
+python3 tools/proof/audio_ap10b_proof.py --probe                    # B1–B2, no app
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock           # B1–B2, S1–S8, C1
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock --only S6 # one row
+```
+
+**The recorded run (2026-10-31, Release after `make gate`):** 11/11. S1 and S2 Σ stems − mix
+worst 0 LSB at 24 bits; S3 both stems identical to S1's at a −1.46 dB loudness gain, the mix
+not; S4 A and C with B muted, C alone with C soloed; S5 both stems identical to their soloed
+exports over 1,454,400 frames; S6 the stem −0.4587 / −0.4460 dBTP (Kaiser / Annex 2), the mix
+−1.0127 / −1.0000; S7 the three sentences; S8 failed with nothing written and the media unchanged;
+C1 cancelled at progress 0.8973 with stems 1–2 on disk, nothing left; B1, B2. The mutants 7/7
+killed (the table). `export_master_proof.py` 11/11 on the same instance.
+
+## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A8, E1–E6, V1, U1; thirteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
+
+The plan carries each audio segment's `automation` (`core/src/audio_automation.rs`, AU-85): the
+clip's evaluated tap keys at the voice's ends, each tap-key action's ends and the 1/30 s grid
+inside an eased one. The tap reads a run's settings at its anchor on an absolute 32-frame grid,
+moves the pan per sample and isolation's Amount per frame (`AudioAutomation.swift`, AU-87); the
+inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>` (AU-88).
+
+- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A8,
+  then makes its fixtures into `tools/proof/media/` (five 6 s stereo 24-bit sines: `ap8b_440`,
+  `ap8b_1k`, `ap8b_4k`, `ap8b_200`, `ap8b_hot`) and drives the caller's instance: E1–E6 against
+  24-bit `audio_wav` exports, each a new project with one clip and one action over [1 s, 3 s),
+  levels by quadrature over 1,200-sample windows against the fixture's plain export; E5 on
+  `samples/Rode-usb-mic.m4a` trimmed to 4 s; V1 AP10's meter recipe on E2's project; U1 one
+  undo step and the log. Projects and exports go to `work/audio_ap8b/mcp/`, cleared per run.
+- **`audio_ap8b_proof.py --probe`**: the probe `audio_ap8b_probe.swift`, compiled AS
+  `main.swift` over `app/Sources` through `swift_build.py`, its projects made in-process
+  (`ReelProject.from(json:)`) with the core's own plans: A1 `AudioProps.interpolated` (numbers,
+  discretes and presence from the left, the slope, mains and harmonics held at f 0.5 and 0.99);
+  A2 an eased EQ gain and pan through `AudioTapContext` at 512-, 4096- and irregular buffers,
+  byte-identical; A3 the per-sample pan against `AudioPanLaw.gains(pan(t_n))`; A4
+  `usesLimiter` / `usesNoiseReduction` from a point, and a track's lead from an end alone; A5 the
+  Amount per frame from a base of 0 over a written wet render; A6 `routedInsideAction`; A7
+  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift.
+- **`audio_ap8b_proof.py --mutants`**: M4–M12 each over its own copy of `app/Sources`, killed
+  when its named row fails; M1–M3 and M13 in one copy of `core/` under
+  `work/audio_ap8b/core-mutants/` (`graphic/` beside it as a symlink, the target folder
+  `work/audio_ap8b-core-target/`, seeded from `core/target` by `cp -c` and kept), each file
+  restored after its `cargo test --release --test <file>`, killed when its named test fails.
+
+| Mutant | What it breaks | Killed by |
+|---|---|---|
+| M1 | the action-edge points dropped | `audio_automation.rs` `a_linear_pan_action_gives_exactly_four_points` |
+| M2 | `isolation` not written at 0 | `audio_automation.rs` `isolation_is_present_at_zero_and_ramps_from_it` |
+| M3 | the core's hold removed | `audio_automation.rs` `an_eq_slope_holds_until_the_actions_end` |
+| M4 | the grid anchored on the run's first frame | A2 |
+| M5 | discretes from the right point | A1 |
+| M6 | `usesLimiter` ignoring the points | A4 |
+| M7 | the pan constant per run | A3 |
+| M8 | the base Amount only | A5 |
+| M9 | the EQ kept with the base | A6 |
+| M10 | `wanting` ignoring action ends | A7 |
+| M11 | the held slope glided in Swift | A1 |
+| M12 | the lift ignoring a null EQ slot | A8 |
+| M13 | `key_off` ignoring the slot | `action_off.rs` `off_keys_one_eq_slot_off_at_the_end` |
+
+```sh
+python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A8
+python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M13
+python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A8, then E1–E6, V1, U1
+```
+
+**The recorded run (2026-10-31, after `make gate` PASS 394 s, against Release):** 16/16. A2 63
+points, the three renders byte-identical; A3 worst 0.0; A5 worst 1.47e-08 over 4 amounts; E1 120
+windows × 2 channels, worst 0.0000 dB; E2 worst 0.0057 dB; E3 worst 0.0272 dB; E4 0.00 LSB over
+[158, 3 s − 158) samples (the limiter's head cost and lookahead outside it: 157 samples differ at
+the start, 158 before 3 s), true peak −6.013 dBTP after; E5 worst 1.00 LSB over 192,000 frames;
+E6 −55.97 dB before the end, 0.0000 dB after; V1 |ΔI| 0.0000 LU; U1 one undo step, no `Frame Job: `
+line. `--mutants` 13/13 killed. `audio_ap5_proof.py --instance` against Release 12/12.
+
+## Road map "audio" AP6 part 1 — Enhance Voice, its volume solved on the processed sound (`audio_ap6_probe.py` E1–E3, E6–E11, `audio_ap6_proof.py` V1–V15; eleven mutants; `loudness_cache_probe.py` C1, C12, M7; spec §11 AU-60…AU-65)
+
+Two instruments, and the loudness probe's rows for the cache's high band (above).
+
+**`audio_ap6_probe.py`** compiles `audio_ap6_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `app/Resources/Models` copied
+beside the binary so the product's own Silero pass runs on the owner's recording. Nothing in it
+renders: the processed solve's figures are the proof's.
+
+| Row | What it holds |
+|---|---|
+| E1 | each AU-62 rule both sides of its threshold on synthetic readings: floor − L at −44 and −46 dB, isolatable or not, the gate from the pauses' median peak + 10 − L and its −40…−6 hold, the de-esser at 6 % and 4 % and a band at L − 11, the floor a median, Rumble Cut on the clip's own EQ |
+| E2 | the compressor: the threshold the speech's median peak held to −60…0; the makeup the probe's own copy of the block-rate model gives, > 0, the loudness through it within 0.5 LU of L |
+| E3 | on the owner's recording in a probe document: `choose` over its own committed result is the same patch and an identity |
+| E6 | the owner's measurements, choices and reasons printed; isolation, a gate and (since AP6b) the leveller key, no volume or limiter in the patch; the makeup gives back the loss; its job renders through the chosen patch carrying the limiter and the volume |
+| E7 | the skips by name, and an unmeasured floor leaving isolation, noise reduction and the gate out |
+| E8 | `speechMask`: [start, end), any order |
+| E9 | `measurementPlan` on a fixture plan: only the clip's segments (its emptied track dropped), no ramps, `track_pans` empty, no video tracks or ducks, one instruction from 0 over the plan, the span; with a volume of 2 one constant ramp at 2, at 1 none; the owner's clip's plan |
+| E10 | `needsRender`: each of the nine keys (the leveller since AP6b) true; pan, mono, channels, the limiter, the volume, fades, a bypassed or empty EQ and an inert voice false |
+| E11 | `plan(solved:)` keeps the clip's volume at 0.04 dB, writes the solve at 0.06 dB and with another limiter; a cache row is never kept |
+
+`--mutants` runs eleven, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | the noisy line at −40 dB | E1 |
+| M2 | the gate 6 dB over the pause peak | E1 |
+| M3 | isolation and noise reduction swapped | E1 |
+| M4 | the sibilance gap at −20 dB | E1 |
+| M5 | a mean for the median | E1 |
+| M6 | an active EQ not rendered | E10 |
+| M8 | the speech mask inverted | E8 |
+| M9 | the compressor's makeup 0 | E6 |
+| M10 | the gate from the floor, not the pause peak | E1 |
+| M11 | the ramps kept in the measurement plan | E9 |
+| M12 | `keepVolumeDB` 0 | E11 |
+
+**`audio_ap6_proof.py <dir>/agent.sock`** drives an instance over MCP and measures every export
+with `phase5_proof.py`'s BS.1770 and `limiter_probe.true_peaks` (ceiling + 0.001 dB); the pause
+floor is `eq_proof.report`'s 10th percentile of 50 ms RMS. Its fixtures are the owner's
+recording and `say` speech (V6 low-passed at 3.5 kHz, V7 high-shelved +15 dB above 5 kHz). V8
+launches a second instance with `-FrameJobNormalizeTargetLUFS -16`, V14 one with
+`-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
+runs only those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the nine keys (the leveller since AP6b), held by `get_project` |
+| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` null, `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
+| V3 | the pause floor at least 10 dB under a Normalize-only export's |
+| V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
+| V5 | one undo, "Enhance Voice", then the import's audio group |
+| V6, V7 | the de-esser off and on |
+| V8 | Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds the tool's set, the volume within 0.05 dB |
+| V9 | two clips each their own, one undo |
+| V10 | skips and refused arguments, changing nothing |
+| V11 | the parity log clean |
+| V12 | ×1.5 (not isolatable): noise reduction 0.5, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5 |
+| V13 | `normalize_clip` alone at volume 2: (a) isolation 0.8 and (b) an EQ, `processed_lufs` ≠ `measured_lufs`, the export at −16 ±0.5 and a second call "made no change"; (c) a plain clip, `processed_lufs` null, `renders` 0, the cache plan's −16 |
+| V14 | the hold instance, each leg on a fresh project whose `cache/isolated/` is empty: (a) the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), `cancel_sheet`, the clip unchanged after the hold; (b) the sheet seen, `set_audio {pan: 0.2}` during the hold, and once the sheet goes only the pan changed |
+| V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
+
+```sh
+python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E11
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M12
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `archive/audio.md`'s AP6 record.
+
+## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
+
+**`audio_ap12_probe.py`** compiles `audio_ap12_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure); it takes no fixture and renders
+nothing: the speech spectrum is fed synthetic buffers and the fit curves made by the EQ's own
+response.
+
+| Row | What it holds |
+|---|---|
+| P1 | `SpeechSpectrumMeter`: a 1 kHz sine at amplitude 0.5 in one channel reads 10·log10(A²/2) within 0.05 dB over 20 frames, its neighbours 60 dB down (the Hann window); each band's bins [c·2^(−1/6), c·2^(1/6)), contiguous; 20 s of seeded pink noise flat 100 Hz–10 kHz within ±1.5 dB |
+| P2 | speech gating: a pause's 4 kHz tone absent, 35 frames counted of a 3 s speech span; 11 frames nil, 12 not |
+| P3 | `AudioMatchFit.target`'s weights (both levels within 50 dB of their loudest) and the weighted mean of D removed, against the probe's own arithmetic; under 12 weighted bands nil |
+| P4 | the smoothing through `target`: [1, 2, 1]/4 inside, (2, 1)/3 at the ends |
+| P5 | a curve made by `responseDB` of a known five-slot EQ on the band centres recovered to rms ≤ 0.1 dB |
+| P6 | an off-grid curve (low shelf 250 Hz +4, bell 2.5 kHz +3 Q 1, high shelf 4 kHz −5) to rms ≤ 0.5 dB |
+| P7 | a ±20 dB curve held at ±12 dB; f to 1 Hz, gain to 0.1 dB, Q to 0.01; a flat or 0.04 dB curve sets no slot |
+| P8 | `applied` and `trialEQ` keep the passes and clear bypass; `AudioMatch.plan` writes eq and volume only, at the reference's loudness, and one part each with the other off; `AudioMatchRun.referenceProject` is the press's own project at the clip's own volume |
+| P9 | a lone 4 kHz −6 dB high shelf through `target` then `fit`: a +6 ±0.3 dB shelf at 4 ±0.5 kHz, no bell or low shelf above 0.5 dB, rms ≤ 0.1 dB |
+
+`--mutants` runs twelve, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | no smoothing | P4 |
+| M2 | every band weighted | P3 |
+| M3 | the level not removed | P3 |
+| M4 | no gain clamp in the fit | P7 |
+| M5 | the trial keeps the tonal slots | P8 |
+| M6 | the speech mask ignored | P2 |
+| M7 | the reference rendered at volume 1 | P8 |
+| M8 | the whole EQ replaced | P8 |
+| M9 | Q fixed at 1 | P5 |
+| M10 | no Levenberg–Marquardt step | P6 |
+| M11 | the residual's weighted mean kept | P9 |
+| M12 | the refined shelves never the start | P9 |
+
+**`audio_ap12_proof.py <dir>/agent.sock`** drives an instance over MCP and measures every
+export: loudness by `phase5_proof.py`'s BS.1770, each third-octave band by its own numpy (the
+meter's STFT and band edges) over the clip's own range (`set_range`, `range: "in_out"`,
+`peak_dbtp: 0`). Its fixtures are seeded pink noise, a copy of it exported through a tilt (low
+shelf 250 Hz +4, band 2.5 kHz +3 Q 1, high shelf 4 kHz −5) at −10 dB, `say` speech and a copy
+12 dB down, 2 s of silence, and the owner's recording with a tilted copy of itself (A3 is
+skipped by name without `samples/`). A7 launches a second instance with
+`-RCDevMatchAudioAccept YES` and stops it. `AP12_ONLY=pink,speech,owner,own,refuse,menu` runs
+only those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| A1 | pink noise as the reference for its tilted copy (`set_media_speech` spanning both): every band 100 Hz–10 kHz within ±1 dB of the reference's export and the loudness within ±0.5 LU; `set` eq and volume, held by `get_project` |
+| A2 | `say` speech 12 dB apart, `eq: false`: within ±0.5 LU, `set` the volume alone |
+| A3 | the owner's recording and its tilted, quieter copy (speech from the VAD cache): bands ±1 dB, ±0.5 LU |
+| A4 | with a second target: a second call "made no change"; one undo, "Match Audio", restores both |
+| A5 | a target's own high shelf replaced by a ≈ flat fit (every gain within ±1 dB), its 40 Hz high-pass kept, bands ±1 dB |
+| A6 | a missing `reference`, a silent reference, `loudness: false, eq: false` and an unknown key refused by name, changing nothing; a silent target skipped by name beside a matched one |
+| A7 | Clip ▸ Match Audio… with the dev accept holds the tool's set (the volume within 0.05 dB) |
+| A8 | the parity log clean |
+
+```sh
+python3 tools/proof/audio_ap12_probe.py             # P1–P9
+python3 tools/proof/audio_ap12_probe.py --mutants   # M1–M12
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap12_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `archive/audio.md`'s AP12 record.
+
+## Road map "audio" AP6 part 3 — Enhance the microphone when it lands (`audio_ap6c_probe.py` P1–P5, `audio_ap6c_proof.py` V1–V8; nine mutants; spec §11 AU-68, AU-69)
+
+Two instruments, and the panel's eleventh key in the recorder's own (`recording_probe.py` 5d and
+D3, `camera_recording_probe.swift` P3 and P20, the harness and `screens.py` pin it false).
+
+**`audio_ap6c_probe.py`** compiles `audio_ap6c_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), `app/Resources/Models` copied beside
+the binary. The panel is `RecorderPanelController.shared`, never shown, under grant doors that
+read and ask nothing, and the eleven `FrameJobRecording…` values are put back at the end.
+
+| Row | What it holds |
+|---|---|
+| P1 | the box: its title and key, its row directly under Microphone with no label, its tooltip naming the step; an absent key restores off; `persistChoices` writes it and `restoreChoices` reads it back; Microphone Off greys it with its value kept and the choice false; a microphone makes it live on a display, Microphone Only and Camera with the choice true; unticked the choice false; greyed while counting down and recording |
+| P2 | `voicePaths`: a voice-over's files; a screen recording's microphone files and a left-out segment's, never a movie or the camera; none without a microphone |
+| P3 | `decide`'s table: drop before enhance before give-up, 299 s waits and 300 s gives up, busy waits |
+| P4 | `recordingEnhance`: absent, false and null false; "yes" `boolArg`'s sentence; the microphone sentence, the place sentence, the microphone sentence first when both are wrong |
+| P5 | the follow's end: after `.drop` (`tick` driven) and after `.enhance` (the follow's own timer over a silent voice measured in a document with its editor window, refused under −70 LUFS at the inspector's foot), not pending, its timer invalid, one refusal |
+
+`--mutants` runs nine, each over its own copy of `app/Sources`, killed when its named row fails:
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | an absent key restores on | P1 |
+| M2 | `currentChoice` ignores a missing microphone | P1 |
+| M3 | the movie is a voice path | P2 |
+| M4 | `waitLimit` 3 s | P3 |
+| M5 | busy ignored | P3 |
+| M6 | give-up before drop | P3 |
+| M7 | `enhance: true` admitted without a microphone | P4 |
+| M8 | `enhance: true` admitted with `place: false` | P4 |
+| M9 | the follow keeps its timer after a step | P5 |
+
+**`audio_ap6c_proof.py <dir>/agent.sock`** drives an instance over MCP. The recorder needs the
+Microphone grant and a voice, so the dev tool `land_recording` hands fixture files to the
+product's own code after `onFinish`: door `tool` is `record_screen`'s landing, door `panel` the
+recorder panel's `recordingEnded`. Fixtures in `work/audio-ap6c-proof/<pid>/`: a fresh copy of
+`samples/Rode-usb-mic.m4a` per leg, a 5 s silent AAC and a 5 s `testsrc` movie with a 440 Hz track
+(ffmpeg). V4 launches a second instance with `-RCDevRampRenderHold 3
+-FrameJobNormalizeTargetLUFS -18` and stops it. `AP6C_ONLY=v1,v2,v3,v4,v5,v6,v7,v8` runs only
+those parts while iterating; a recorded run sets nothing.
+
+| Row | What it holds |
+|---|---|
+| V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the nine keys (the leveller since AP6b) with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
+| V2 | the tool door into a document: undo "Enhance Voice", then "Add Recording" |
+| V3 | `enhance` false on both doors: no `enhance` keys, `enhance_pending` false, no sheet, the audio the landing's after 5 s, undo's top "Add Recording" |
+| V4 | the held instance, the panel door: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", `enhance_pending` false, no sheet 2 s and 5 s after |
+| V5 | a movie and its microphone: only `mic_clip` enhanced, the movie clip's sound untouched |
+| V6 | `record_screen`'s refusals, exact, the project byte-identical: `enhance` "yes"; true on a screen with no microphone; `voice_over` with `place: false`; `seconds` 0 and `rate` 24 first; `source` camera |
+| V7 | a silent file: `enhance_error` "Nothing could be enhanced. …−70 LUFS…", undo's top "Add Recording"; the panel door with `follow_wait` 30: `enhance_pending` false, the clip untouched |
+| V8 | `record_screen` declares `enhance` (boolean, described); `land_recording`'s seven arguments; `follow_wait` with door `tool` refused by name; the parity log clean |
+
+```sh
+python3 tools/proof/audio_ap6c_probe.py             # P1–P5
+python3 tools/proof/audio_ap6c_probe.py --mutants   # M1–M9
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `archive/audio.md`'s AP6c record.
+
+## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; ten mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
+
+A timeline track takes a compressor and a limiter (`tracks[].compressor`, `tracks[].limiter`,
+format 36, `set_track`), run post-fader on its sub-mix. Every export reads its mix through
+`ExportMixRead`: one output when no track in the read has dynamics, else one per such track and
+one for the rest, read in step through each track's `AudioTrackDynamicsStage` and summed before
+the master. The preview runs the stage in each composition track's tap with the ×E/÷E pairing
+(`AudioTrackDynamics.swift`), approximate where a track splits; the meter says so
+(`tracks_approximate`).
+
+- **`core/tests/track_dynamics.rs`** (in `make test`): an object stored whole with the clip
+  type's defaults and never merged; `null` clears, absent keeps, the same value is an identity;
+  the refusals in their sentences (not an object, an unknown key, a mistyped member, each range
+  under `compressor.` or `limiter.`); the clip's own sentences unchanged; inside a scope either
+  key refused and the rest of `set_track` applying; `nest` giving the nest's tracks none.
+  **`schema_v36.rs`**: 1–35 and 1015 open stamped current, a 35 file writes what it did, both
+  keys round-trip after `pan`. `op_nullability.rs`'s inventory pinned at 82 (74 non-plain).
+- **`audio_ap10c_proof.py <dir>/agent.sock [--only …]`** (the docstring has each row and bound)
+  makes six 6 s 24-bit fixtures on the first run (`ap10c_hot_a/b.wav` at −1 dBFS,
+  `ap10c_mid_a/b.wav` at −6, `ap10c_sine10.wav`, `ap10c_music.wav`). T1 a crossfade of two hot
+  tones under a −6 dBTP track limiter: the `tracks` stem ≤ −5.99 dBTP by `limiter_probe.py`'s two
+  meters, the control > −5.5; T2 the compressor's arithmetic and post-fader (−14.5 and −16.005
+  dBFS ± 0.05); T3 a nest bus's stem under its ceiling; T4 Σ stems − mix ≤ 2 LSB with dynamics on
+  both tracks; T5 a −16 LUFS target through a track compressor (± 0.1, ≤ −1 dBTP); T6 `vp9_webm`
+  within 0.2 LU of the WAV, the undynamic one > 3 LU off; P1 the preview's measured overshoot
+  through the crossfade with `tracks_approximate` true, then false once cleared; U1 one undo
+  step, the read-back, the refusals by name, `nest`, no `Frame Job: ` line.
+- **`audio_ap10c_proof.py --probe`** runs B1–B5 alone: the probe `audio_ap10c_probe.swift`,
+  compiled AS `main.swift` over `app/Sources` through `swift_build.py`. B1 the stage byte-identical
+  at 512, 4,096 and irregular buffers, latency 158/0; B2 `ExportMixRead` single and
+  byte-identical with no dynamics, sub-mixed and within −140 dB with an identity compressor, and
+  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project); B3 a nest
+  bus equal to a fresh stage over its plain read plus the rest; B4 the tap's ×E/÷E — identity
+  within 1e-6 (0 under 2⁻²⁰), a released limiter under a 1 → 0.1 step a pure 158-frame delay at
+  48 and 44.1 kHz, and a 0.9 sine under E 0.5 passing a −6 dBTP limiter post-fader; B5 the leads
+  (1,975 ticks, summed with a clip limiter's), a non-metering build's `trackDynamics`,
+  `mixIsSet`, the footer and the meter's flag.
+- **`audio_ap10c_proof.py --mutants`** runs the seven probe mutants over copies of
+  `app/Sources` and prints the three run by hand.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| M1 | the export never sub-mixes | B2 |
+| M2 | every track read through the dynamic group's stage | B3 |
+| M3 | a group's latency not dropped | B3 |
+| M4 | the measurement reads the plain mix | B2 |
+| M5 | the WebM writer reads the plain mix | T6 (by hand, on a mutated Debug build) |
+| M6 | the tap without ×E/÷E | B4 |
+| M7 | no track-limiter lead (placement and lookup) | B5 |
+| M8 | the scope refusal removed | `track_dynamics.rs` (by hand) |
+| M9 | `nest` copies the dynamics | `track_dynamics.rs` (by hand) |
+| M10 | the ×E read `trackLead` ahead in ticks, not L frames | B4 (44.1 kHz) |
+
+```sh
+python3 tools/proof/audio_ap10c_proof.py --probe                    # B1–B5, no app
+python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock           # B1–B5, T1–T6, P1, U1
+python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row
+```
+
+The recorded runs are in `archive/audio.md`'s AP10c record.
+
+## Road map "audio" AP6 part 2 — the leveller (`audio_ap6b_probe.py` L1–L9, R1–R5, the step-2 ranges; `audio_ap6b_proof.py` P1–P8; fifteen mutants and M11 by hand; `core/tests/audio_dynamics.rs`, `audio_automation.rs`, `schema_v37.rs`; spec §11 AU-66, AU-67)
+
+**`audio_ap6b_probe.py`** compiles `audio_ap6b_probe.swift` with `app/Sources` through
+`swift_build.build` (a failed build is a scored failure), with `app/Resources/Models` beside the
+binary so the product's Silero pass runs. It makes the proof's two fixtures too
+(`make_fixtures`: six 10 s `say` segments 1.5 s apart over a −60 dBFS RMS Gaussian bed, mono
+48 kHz, 24-bit; `ap6b-offmic.wav` peaks −6 and −18 dBFS by turns, `ap6b-steady.wav` all −6).
+The curve is AU-66 (c)'s, made ahead of time (`AudioLevellerCurve`); the stage applies it with
+no state (`AudioLevellerRun`).
+
+| Row | What it holds |
+|---|---|
+| L1 | constant speech at L − 9, − 3, + 3 and − 20: r = x ±0.01 and the run's gain clamp(target − r, −down, +up) ±0.01 dB; a phrase with 0.3 s silent gaps has the same r (the window is speech only); a one-channel loudness record's curve equals its dual-mono stereo copy's |
+| L2 | two long phrases 12 dB apart across a 1.5 s break: B's first speech step's gain is B's settled gain ±0.01 dB; the break holds A ±0.001 dB until its last 0.25 s, then moves linearly to B inside [A, B]; a 0.5 s phrase between them takes A's value |
+| L3 | `smooth` of a step: the midpoint ±0.01 at the step, 90 % at τ·ln 5 ±1 step on both sides (zero-phase) |
+| L4 | through an `AudioTapContext` with the target automated: 512-, 4096- and irregular buffers byte-identical; a run from 2.5 s byte-identical to the same frames from the clip's start; no curve (pending) touches nothing; after the action each sample's gain is the curve's at its own frame ±0.01 dB |
+| L5 | noise at L − 22 under a 20 dB gate: the leveller at +12 dB after the gate lifts the gated pause by 12 ±1 dB; before the gate it would open it (≥ 6 dB over the input) |
+| L6 | `AudioDynamicsLevels.curves` over the steady fixture's own caches: pending on the loudness, then on the speech; unmeasurable ("speech detection is unavailable") and not in `pendingLevels` with `speechDetection: false`; `media.speech` ready either way, used over the VAD, a change of it recomputes; no long phrase unmeasurable; a nest clip absent; an end-only leveller in `levelling` and `wanting`; an end's other response its own curve; a pending curve in `pendingLevels` |
+| L7 | `interpolated` mixes the target and the limits; `response` the left point's |
+| L8 | a 1-hour clip's curve ≤ 100 ms (best of 3); a run ≤ 1 % of real time per 1024 stereo frames |
+| L9 | a reversed and a ×2 clip of the off-mic fixture levelled on their played steps: the quiet phrase a reversed clip plays first is boosted, the loud one cut |
+| R1 | `speechRange`: constant 0; two 10 s halves 12 dB apart 12.0 ±0.1; the mask honoured; nil under 300 speech steps |
+| R2 | `levellerRule` at 5.9 (off) and 6.1 LU (on at the defaults) and with no range (left out), each sentence word for word |
+| R3 | `needsRender` for a leveller alone; the memo key differs by its chain |
+| R4 | `choose` over one input twice is equal, the leveller on above 6 LU |
+| R5 | (not with `--quick`) the steady fixture's Enhance trial rendered three times through `ProcessedLoudness.render`, its isolated render wiped before the third: byte-identical step energies (AP6b step 3) |
+
+Then the step-2 figures (AU-67 (d)): the speech range Enhance measures on the owner's recording
+and both fixtures, each through a probe document's own loudness and speech caches, printed, and
+scored that the off-mic one is over 6 LU and the steady one at or under (otherwise the rule is
+a STOP for the owner).
+
+`--mutants` runs fifteen, each over its own copy of `app/Sources` (the step-2 figures and R5
+skipped), killed when its named row fails; M11 (`"leveller"` out of `TAP_KEYS`) is by hand,
+against `core/tests/audio_automation.rs`'s `a_leveller_named_by_an_end_is_in_the_points`. M16
+(the non-repeat's fix reverted) has no edit: step 3 found the render repeating on this tree
+(`archive/audio.md`'s AP6b record), and R5 and P5 hold it.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M1 | a break glides its whole length | L2 |
+| M2 | phrases not split at breaks | L2 |
+| M3 | the window counts pause steps | L1 |
+| M4 | the target absolute (the curve not relative to L) | L1 |
+| M5 | the boost uncapped | L1 |
+| M6 | the leveller before the gate | L5 |
+| M7 | causal one-way smoothing | L3 |
+| M8 | `response` interpolated | L7 |
+| M9 | a short phrase takes its own level | L2 |
+| M10 | the range ignores the speech mask | R1 |
+| M12 | `needsRender` omits the leveller | R3 |
+| M13 | `levelling` omits an end-only leveller | L6 |
+| M14 | the memo ignores `media.speech` | L6 |
+| M15 | the gain indexed run-relative | L4 |
+| M17 | speech detection unavailable answers pending | L6 |
+
+**`audio_ap6b_proof.py <dir>/agent.sock [P1 P2 P4 P7 P8]`** drives an instance over MCP and
+measures every export: loudness by `phase5_proof.py`'s BS.1770, true peak by
+`limiter_probe.true_peaks`, the speech's range by its own numpy over the fixture's known segments
+by AU-67's definition, and a gain as 10·log10 of Σout²/Σin² per 10 ms against the same clip's
+export with the leveller null. P8 launches a second instance with
+`-FrameJobInspectorSection.audio.leveller <false/>` (the argument domain, nothing persisted) and
+stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P5 and P6).
+
+| Row | What it holds |
+|---|---|
+| P1 | `set_audio`'s leveller: `{}` the four defaults, a field merges, null clears; each bound and `threshold_db` refused by name, changing nothing; `paste_attributes` carries it; one undo |
+| P2 | the off-mic fixture, the leveller alone, 24-bit WAV: (a) the speech's range over whole segments out ≤ in − 5 LU; (b) each segment's first 0.5 s mean gain within ±3 dB of its settled gain (the median over [3 s, end − 0.5 s); AU-67 (e): the window holds the glide's end on the bed before each sentence's first word, 0.06–0.29 s in, and the sentences open 0.2–3.1 dB louder than their middles, which the curve follows; v1's carry-over, ~12 dB, still fails); (c) each pause from 0.4 s in to 0.5 s before its end moves ≤ 0.1 dB; (d) over each whole pause the gain within the gains of the 0.5 s before and after it, ±0.5 dB; every figure printed |
+| P3 | `loudness_meter` after `play_preview` 12 s from 0 within 0.01 LU of the export over the same frames; then 8 s from 20 s (a seek), its signed ΔI less a CONTROL's within 0.01 LU — the levelled export itself placed as a clip with nothing on it in a project of its own, the same two plays after its own build, against its own export — because after a seek the player hands every tap a silent zero-duration buffer carrying the seek's time, which the live meter places at the seek's frame (filed), so a seek's ΔI depends on the material's level there; the control hears the same material through the same meter, so that part cancels and a leveller-made difference still fails |
+| P4 | `enhance_voice` on the off-mic fixture: the leveller on at its defaults and its reason; the export at −16 ±0.5 LUFS and ≤ −1 dBTP; the last verify within 0.1 LU of −16; presses 2 and 3 "made no change" |
+| P5 | the steady fixture: the leveller null and its reason; presses 2 and 3 "made no change"; three rounds of `set_audio {volume: 1}` then `normalize_clip {mode: loudness}` give `processed_lufs` equal within 0.0005 LU and equal to Enhance's |
+| P6 | the owner's recording: `speech_range_lu`, the decision and its reason printed; the decision matches the rule; a second call "made no change" |
+| P7 | the steady fixture levelled, an action over [21, 23) s taking the target 0 → −6: against the same export with no action, 0 ±0.05 dB over [12, 21) s and −6 ±0.05 dB over [23, 32) s |
+| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …" |
+
+```sh
+python3 tools/proof/audio_ap6b_probe.py             # L1–L9, R1–R5, the step-2 ranges
+python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `archive/audio.md`'s AP6b record.

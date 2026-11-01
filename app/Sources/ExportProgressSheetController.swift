@@ -160,7 +160,8 @@ final class ExportProgressSheetController: NSViewController {
             // What the graphics warned while the file was drawn: a count on
             // the line, the list in its tooltip (G-24 (c)).
             let warnings = exporter.graphicWarnings
-            statusLabel.stringValue = "Exported “\(url.lastPathComponent)”.\(measured)"
+            statusLabel.stringValue = "Exported “\(url.lastPathComponent)”"
+                + "\(ExportStemsPipeline.summary(settings)).\(measured)"
                 + Exporter.graphicWarningSuffix(warnings)
             statusLabel.toolTip = Exporter.graphicWarningDetails(warnings)
             statusLabel.textColor = DS.textStrong

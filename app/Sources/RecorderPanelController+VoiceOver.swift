@@ -62,6 +62,8 @@ extension RecorderPanelController {
         for control in screenControls {
             control.isEnabled = screenOnly
         }
+        // AU-69 (a): live only while idle with a microphone, on any source; greyed keeps its value.
+        enhanceMicrophoneCheckbox.isEnabled = idle && currentChoice().microphone != nil
         syncCameraControls()
     }
 

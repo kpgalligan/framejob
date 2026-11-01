@@ -76,6 +76,15 @@ extension AgentServer {
     /// (`EditorViewController.setTrackMatte`, on the current track) and the
     /// same submenu in the track context menu (`trackMenuSetMatte`, on the
     /// clicked track), undo "Track Matte".
+    /// `volume` and `pan` (spec §11 AU-102, AU-105) mirror the track mix
+    /// popover — the header's fifth switch (`TimelineView.showTrackMix`),
+    /// Track ▸ Mix… (`EditorViewController.showTrackMix`, on the
+    /// current track) and the context menu's Mix… — whose drags are "Track
+    /// Volume" and "Track Pan" and whose Reset is "Reset Track Mix".
+    /// `compressor` and `limiter` (spec §11 AU-150, AU-155) mirror the same
+    /// popover's Compressor and Limiter sections, "Track Compressor" and
+    /// "Track Limiter"; each is forwarded raw, an object or `null`, for the
+    /// core to read and refuse by name (`track_dynamics.rs`).
     func setTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
@@ -85,20 +94,27 @@ extension AgentServer {
         let locked = try boolArg(a, "locked")
         let solo = try boolArg(a, "solo")
         let matte = try enumArg(a, "matte", TrackMatte.self)
+        let volume = try doubleArg(a, "volume")
+        let pan = try doubleArg(a, "pan")
+        let compressor = a["compressor"]
+        let limiter = a["limiter"]
         guard
             name != nil || hidden != nil || muted != nil || locked != nil || solo != nil
-                || matte != nil
+                || matte != nil || volume != nil || pan != nil || compressor != nil
+                || limiter != nil
         else {
             throw ToolError(
                 message:
-                    "set_track needs at least one of name, hidden, muted, locked, solo, matte.")
+                    "set_track needs at least one of name, hidden, muted, locked, solo, matte, "
+                    + "volume, pan, compressor, limiter.")
         }
         return try editResult(
             document, "Track Properties",
             [
                 .setTrack(
                     track: track.id, name: name, hidden: hidden, muted: muted, locked: locked,
-                    solo: solo, matte: matte)
+                    solo: solo, matte: matte, volume: volume, pan: pan, compressor: compressor,
+                    limiter: limiter)
             ])
     }
 

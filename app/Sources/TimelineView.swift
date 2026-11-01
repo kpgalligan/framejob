@@ -32,6 +32,9 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// (d)), set by `refreshTimeline` beside `update(...)`; the filmstrip
     /// and the waveform read a ramped clip through them.
     var sourceMaps: SourceMaps = { _ in nil }
+    var duckCurves: DuckCurves?
+    /// The volume line's envelopes, off the same handle (spec §11 AU-81).
+    var volumeLines: VolumeLines?
 
     /// Remove Silences' candidate spans, washed over the lanes and the ruler
     /// while its sheet is up (`TimelineView+Candidates.swift` draws them).
@@ -96,6 +99,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var onSelectionChanged: ((Set<UInt32>) -> Void)?
     /// A scrub: the playhead is view state, so this never becomes an op.
     var onScrub: ((Ticks) -> Void)?
+    /// The scrub's mouse-up (its audio stops asking for grains, spec §11 AU-132).
+    var onScrubEnded: (() -> Void)?
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
@@ -150,6 +155,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var scrub: PlayheadSession?
     var markerDrag: MarkerDragSession?
     var fadeDrag: FadeHandleSession?
+    var volumeDrag: VolumeLineSession?
     var trackDrag: TrackDragSession?
     var actionDrag: ActionDragSession?
     /// The band under the pointer (`TimelineActionDrag.swift`); nil while a drag is live.
@@ -571,7 +577,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     ) {
         endRename()
         let suppressed = flags.contains(.command)
-        switch hit {
+        switch hit.resolvingVolumeLine(flags: flags, clicks: clicks) {
         case .none, .corner:
             break
 
@@ -662,6 +668,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
                 length: edge == .start ? props.fadeIn : props.fadeOut)
             onLiveBegin?()
 
+        case .volumeLine(let id, let time):
+            selectClip(id, flags: [])
+            beginVolumeLine(id, at: point, time: time, flags: flags)
+
         case .action(let clip, let action):
             selectClip(clip, flags: [])
             onActionSelected?(clip, action)
@@ -735,6 +745,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             session.update(time: time, fps: snapshot.canvas.fps)
             fadeDrag = session
             onLiveUpdate?([session.op])
+        } else if volumeDrag != nil {
+            continueVolumeLine(at: point)
         } else if var session = marquee {
             session.current = point
             marquee = session
@@ -754,6 +766,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     func endGesture(at point: CGPoint, flags: NSEvent.ModifierFlags) {
         if scrub != nil {
             scrub = nil
+            onScrubEnded?()
         } else if let session = clipDrag {
             clipDrag = nil
             onLiveEnd?(session.duplicating ? "Duplicate Clips" : "Move Clips")
@@ -776,6 +789,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         } else if fadeDrag != nil {
             fadeDrag = nil
             onLiveEnd?("Set Fade")
+        } else if volumeDrag != nil {
+            endVolumeLine()
         } else if marquee != nil {
             marquee = nil
         } else if let session = trackDrag {
@@ -880,6 +895,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         trim = TrimSession(
             clip: id, edge: edge,
             stretch: flags.contains(.option) && clip.source.hasSourceBound,
+            alone: clip.isLinkedSound,
             originalStart: clip.start, originalEnd: clip.end, frame: frame,
             time: edge == .start ? clip.start : clip.end)
         onLiveBegin?()
@@ -1270,6 +1286,7 @@ final class TimelineContentView: NSView {
                     return .clipEdge(clip.id, .end)
                 }
             }
+            if let hit = volumeLineHit(clip, rect: rect, at: point) { return hit }
             return .clip(clip.id)
         }
         return .lane(row: row, time: max(layout.time(atX: point.x), 0))
@@ -1602,8 +1619,8 @@ final class TimelineHeaderView: NSView {
         return hit === self ? nil : hit
     }
 
-    /// The four toggles (eye, speaker, lock, headphones), laid out from the
-    /// row's bottom-left. `local` is the
+    /// The five switches (eye, speaker, lock, headphones, sliders), laid out
+    /// from the row's bottom-left. `local` is the
     /// point relative to the ROW's top-left corner; the content view's hit
     /// test is the only caller, which is why the geometry lives here beside
     /// the drawing that has to agree with it.
@@ -1620,7 +1637,7 @@ final class TimelineHeaderView: NSView {
     }
 
     static func button(at local: CGPoint, height: CGFloat) -> TimelineHeaderButton? {
-        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked, .solo]
+        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked, .solo, .mix]
         for (index, button) in buttons.enumerated()
         where buttonRect(index, height: height).insetBy(dx: -1, dy: -1).contains(local) {
             return button
@@ -1659,6 +1676,7 @@ final class TimelineHeaderView: NSView {
                 (.muted, track.muted ? "speaker.slash" : "speaker.wave.2", "M", track.muted),
                 (.locked, track.locked ? "lock" : "lock.open", "L", track.locked),
                 (.solo, "headphones", "S", track.solo),
+                (.mix, "slider.horizontal.3", "V", track.mixIsSet),
             ]
             for (position, toggle) in toggles.enumerated() {
                 var box = Self.buttonRect(position, height: height)

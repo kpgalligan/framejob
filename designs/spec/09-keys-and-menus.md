@@ -18,6 +18,7 @@
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
+| ⇧⌥⌘D | Attach audio (§11 AU-95, AU-97) |
 | ⌥⌘K | Add action at playhead |
 | M | Add marker |
 | I / O / ⌥X | Set in / set out / clear range |
@@ -42,8 +43,11 @@
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | ⌃⌘U | View ▸ Show Ungraded — the preview (and the Preview Window) as if no clip were graded, with an "Ungraded" tag (grading GR3, §11 GR-4). A checkmark toggle; view state, not persisted; never an export or Save Frame… |
 | ⌃⌘W | View ▸ Scopes — the scopes panel beside the preview, two slots each picking Waveform, Parade, Vectorscope or Histogram (grading GR3, grading-2 G2-1, §11 GR-5, GR-10). A checkmark toggle; view state, not persisted, and the picks have no item or key |
+| ⌃⌘L | View ▸ Loudness Meter — the live loudness column left of Scopes: momentary, short-term and integrated LUFS and the true-peak maximum of the mix as the preview plays it at ×1, with a Reset (road map "audio" AP7, §11 AU-75, AU-76). A checkmark toggle; view state, not persisted |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
+| Drag a clip's volume line | Set the level in force there, in dB, one step "Set Volume" (road map "audio" AP8a, §11 AU-82); ⇧ and a double-click on the line act on the clip |
+| ⌥-click / ⌥-drag a clip's volume line | Add a volume point there as an action (or split the volume action under it), then drag it; one step "Add Volume Point" (§11 AU-83) |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
 | ⌥-drag a media clip's END edge | Rate stretch (on the start edge ⌥ trims like a bare drag) |
 | ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |
@@ -96,10 +100,26 @@ Properties (no key equivalent; the copied graphic's props onto the selected
 clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start to Playhead,
-Trim End to Playhead, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
+Trim End to Playhead, Freeze Frame, Detach Audio, Attach Audio (⇧⌥⌘D, road map "audio"
+AP9, §11 AU-95: each linked pair in the selection merged back), Normalize (following the Volume
+section's Normalize mode, Peak or Loudness, its title unchanged, §11 AU-15; road map 2's phase 5, beside
 Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
-a command reachable from a pane alone can be lost), Synchronize Audio (road
+a command reachable from a pane alone can be lost; in Loudness mode a clip
+with processing is measured through it under the Measuring Sound sheet, §11
+AU-64, AU-65), Enhance Voice (road map "audio" AP6, §11 AU-60…AU-65: right
+after Normalize, no key equivalent, enabled where Normalize is; each
+selected clip set up for speech from its own measurements in one undo step,
+its volume measured through the new settings under the Measuring Sound sheet
+— a bar, "Clip n of N…" and Cancel, which changes nothing — and refused at
+the inspector's foot if the project changed meanwhile; its mirror is
+`enhance_voice`), Match Audio… (road map "audio" AP12, §11 AU-121, AU-128:
+right after Enhance Voice, no key equivalent, enabled with two or more
+selected clips Normalize could measure; the Match Audio sheet picks the
+reference among them in timeline order and Loudness and EQ, both on each
+time, then the others are matched under the Measuring Sound sheet in one undo
+step, a refusal or a changed project said at the inspector's foot; its mirror
+is `match_audio`), Synchronize Audio (road
 map "audio-sync" AS-1 and AS-2, §11 SY-1..SY-10: the selected clips that play
 sound lined up by their sound, one anchor kept, each mover's clock drift
 corrected by a speed change in the same undo step; it shows no drift figure,
@@ -137,7 +157,8 @@ key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest, Open Nest ⌘↓, Close Nest ⌘↑ — road map 2's phase 9, in the
 grouping group because going inside a nest is the third thing you do with
 one), Track (New Track,
-Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo, Matte ▸ (Off · Alpha
+Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo, Mix… (the
+current track's mix popover, no key — §11 AU-105, AU-155), Matte ▸ (Off · Alpha
 · Inverted Alpha · Luma · Inverted Luma, on the current track, checked for
 its mode, undo "Track Matte", no key — §11 MT-7)), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
@@ -159,7 +180,9 @@ Show Selection (no shortcut), Show SDR Version (no shortcut) and Scopes ⌃⌘W
 H-3, §11 HD-7, HD-14 (g): four checkmark toggles about the preview, view state
 that nothing persists — none writes a default; Show Selection is disabled
 while off with no adjustment clip selected, Show SDR Version is always
-enabled and shows an HLG project's SDR version with an "SDR Version" tag)),
+enabled and shows an HLG project's SDR version with an "SDR Version" tag),
+then Loudness Meter ⌃⌘L (road map "audio" AP7, §11 AU-75: a checkmark toggle,
+always enabled, view state that writes no default)),
 Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet

@@ -108,7 +108,8 @@ final class AgentServer {
     private static let productOffMainTools: Set<String> = [
         "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
         "transcribe", "record_screen", "render_graphic", "open_project", "sync_audio",
-        "transcribe_for_fillers", "get_transcript", "export_graphic",
+        "transcribe_for_fillers", "get_transcript", "export_graphic", "enhance_voice",
+        "normalize_clip", "match_audio",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)
@@ -251,6 +252,7 @@ final class AgentServer {
         "set_reversed": { $0.setReversed },
         "freeze_frame": { $0.freezeFrame },
         "detach_audio": { $0.detachAudio },
+        "attach_audio": { $0.attachAudio },
         "duplicate": { $0.duplicateClips },
         "paste": { $0.pasteClips },
         "paste_attributes": { $0.pasteAttributes },
@@ -295,6 +297,8 @@ final class AgentServer {
         "transcribe_for_fillers": { $0.transcribeForFillers },
         // Sound (AgentServer+Audio.swift)
         "normalize_clip": { $0.normalizeClip },
+        "enhance_voice": { $0.enhanceVoice },
+        "match_audio": { $0.matchAudio },
         "sync_audio": { $0.syncAudio },
         // Captions (AgentServer+Captions.swift, AgentServer+Transcript.swift)
         "transcribe": { $0.transcribe },
@@ -320,6 +324,7 @@ final class AgentServer {
         "relink_media": { $0.relinkMedia },
         "remove_media": { $0.removeMedia },
         "set_media_color": { $0.setMediaColor },
+        "set_media_speech": { $0.setMediaSpeech },
         // Rendering and export (AgentServer+Render.swift, AgentServer+Export.swift)
         "render_frame": { $0.renderFrame },
         "export": { $0.exportProject },

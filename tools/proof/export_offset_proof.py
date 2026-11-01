@@ -11,7 +11,11 @@ recording (#299). #299 phase 1 (SY-39) plays keep pitch within ±0.1% of ×1
 as varispeed, so R3 is pinned, and adds E35 (the app's one remaining
 `time_domain` export, measured). Clean-up round 3 (#309, SY-42) added X16 and
 X17: the speech reader, the transcription extract, the reverse and the peaks
-of an MP3 read past the encoder delay Core Audio leaves in.
+of an MP3 read past the encoder delay Core Audio leaves in. Road map "audio"
+AP2 (spec §11 AU-23) added E44 and E45: the clip limiter's 158-sample delay led
+out, alone and beside noise reduction's. AP2 part 2 (spec §11 AU-27) added E46:
+the export's master limiter acting (the clicks at volume 4, +6 dBFS), its own
+158-sample delay compensated in the file, under E4's pin.
 
     python3 tools/proof/export_offset_proof.py [<dir>/agent.sock] [--only ID,ID,...]
     python3 tools/proof/export_offset_proof.py --mutants [--mutant NAME,NAME,...]
@@ -111,7 +115,7 @@ Rows:
       inside the reach), never pinned to a lag; their detail names SY-37's
       class (a defect when a window has r < 0.8, |lag| > 5.0 ms or a lag at
       the edge)
-  E1–E43  one project each (`E_ROWS`), exported and located; ok when the
+  E1–E46  one project each (`E_ROWS`), exported and located; ok when the
       export completed, ≥ 10 of 12 clicks were found (E23: all 10 of its
       in-range clicks) and SY-27's pin holds (E30, E33: the MP3s, read past
       their encoder delay, SY-36; E32 the late head, SY-35). E34 (×1.1 keep
@@ -164,7 +168,12 @@ lead) name X6, not X3, since X3 renders offline (SR-28). `before` — the
 unmutated tree — runs exactly once first and must pass every X row; a copy
 that does not build or answer is a failed control, never a kill. M19 is
 killed only when X17 fails on each of clicks44-mp3, clicks48-mp3 and
-clicks24-mp3 (`MUTANT_FIXTURES`). M7, M8 and M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand. `--mutant` runs
+clicks24-mp3 (`MUTANT_FIXTURES`). M7, M8 and M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand.
+M25 and M26 (AU-23) are run by hand on a Debug build, each over `app/Sources`
+(`HAND_MUTANTS`): M25 drops the limiter's placement lead and must fail E44; M26
+drops the tap's lookup lead and must fail limiter_proof.py's P4 (its second leg).
+M27 (AU-27) is run the same way: it keeps the export master's first 158 output
+frames (no head drop) and must fail E4 and E46 (+3.29 ms). `--mutant` runs
 `before` and only the named mutants. Exit 0 when every mutant was killed.
 """
 
@@ -214,6 +223,15 @@ X6_TARGET_MS = 0.5
 TARGET_SPREAD_MS = 0.5
 KEEP_TARGET_MS = 5.0
 NR_DELAY_MS = 512 / 48_000 * 1000
+LIMITER_DELAY_MS = 158 / 48_000 * 1000
+# The rows printed against E4: the delay each stage adds, which its lead takes back.
+DELAY_ROWS = {
+    "E22": f"the reducer's {NR_DELAY_MS:.3f} ms, led by SY-25",
+    "E44": f"the limiter's {LIMITER_DELAY_MS:.3f} ms, led by AU-23",
+    "E45": f"the reducer's and the limiter's {NR_DELAY_MS + LIMITER_DELAY_MS:.3f} ms, "
+           "led by SY-25 and AU-23",
+    "E46": f"the master limiter's {LIMITER_DELAY_MS:.3f} ms, compensated in the file by AU-27",
+}
 SOURCE_OFFSET = {"clicks44-late": 0.5, "clicks16-late5": 5.0}  # s: where its audio track starts
 FIXTURE_FILES = {
     "clicks16": "clicks16-v1.wav", "clicks48": "clicks48-v1.wav",
@@ -250,7 +268,7 @@ NO_READ_ROWS = {"L12"}  # checked inside the probe; no manifest read
 
 # row: (fixture, start ticks, edit, preset). An edit: None (×1),
 # ("speed", rate, keep_pitch), ("loudness", lufs), ("pan", value), ("nr", value),
-# ("range", start, end).
+# ("range", start, end), ("limiter", ceiling_db[, noise_reduction]), ("volume", v).
 E_ROWS = {
     "E1": ("clicks16", 0, None, "audio_wav"),
     "E2": ("clicks16", F206, None, "audio_wav"),
@@ -307,6 +325,13 @@ E_ROWS = {
     # codec-export C5 (spec §11 CX-17): E41 as vp9_alpha_webm — the picture with its alpha
     # stream as each block's BlockAdditional, and the same Opus sound, land as vp9_webm's do.
     "E43": ("cam-pcm48", 10 * SEC, None, "vp9_alpha_webm"),
+    # Road map "audio" AP2 (spec §11 AU-23): the clip limiter's 158-sample delay
+    # led out (1,975 ticks), alone and beside noise reduction's 6,400.
+    "E44": ("clicks48", F206, ("limiter", -1.0), "audio_wav"),
+    "E45": ("clicks48", F206, ("limiter", -1.0, 0.5), "audio_wav"),
+    # Road map "audio" AP2 part 2 (spec §11 AU-27): the clicks at volume 4 (+6 dBFS), so
+    # the export's master limiter acts on every click; its 158 frames compensated.
+    "E46": ("clicks48", F206, ("volume", 4), "audio_wav"),
 }
 E_IDS = list(E_ROWS)
 KEEP_ROWS = {"E9", "E11", "E12", "E29"}
@@ -329,8 +354,8 @@ MUTANTS = {
                              "static let varispeedSourceLead: Ticks = 575",
                              "static let varispeedSourceLead: Ticks = 0"),
     "M3-noise-lead-everywhere": (["X7"], "CompositionBuilder+AudioPlacement.swift",
-                                 "trackLead: usesNoiseReduction ? noiseReductionLead : 0,",
-                                 "trackLead: noiseReductionLead,"),
+                                 "trackLead: (usesNoiseReduction ? noiseReductionLead : 0)",
+                                 "trackLead: (noiseReductionLead)"),
     "M4-no-noise-lead": (["X4"], "CompositionBuilder+AudioPlacement.swift",
                          "Ticks(AudioNoiseReductionStage.window) * ReelTime.perSecond / 48_000",
                          "0"),
@@ -374,6 +399,19 @@ MUTANTS = {
     "M24-no-peaks-ranges": (["X17"], "MediaImporter+Peaks.swift",
                             "expectedRanges: peaksRanges(expectedRanges, less: lead),",
                             "expectedRanges: expectedRanges,"),
+}
+# Run by hand on a Debug build (spec §11 AU-23): name: (the row it must fail, file,
+# before, after). Not in `--mutants`: each needs the app rebuilt and driven.
+HAND_MUTANTS = {
+    "M25-no-limiter-lead": ("E44", "CompositionBuilder+AudioPlacement.swift",
+                            "+ (usesLimiter ? limiterLead : 0),", "+ 0,"),
+    "M26-no-lookup-lead": ("limiter_proof.py P4's second leg", "AudioTapSchedule.swift",
+                           "lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0",
+                           "lookupLead = 0 * 1"),
+    # Road map "audio" AP2 part 2 (spec §11 AU-27): the master's head kept, not dropped.
+    "M27-no-master-head-drop": ("E4, E46", "ExportAudioMaster.swift",
+                                "private var toDrop = AudioLimiterStage.latency",
+                                "private var toDrop = 0"),
 }
 # A mutant that must fail its row on EACH of these fixtures (row, fixtures).
 MUTANT_FIXTURES = {"M19-no-peaks-lead": ("X17", ["clicks44-mp3", "clicks48-mp3", "clicks24-mp3"])}
@@ -839,6 +877,13 @@ def run_e(mcp, row, fixture_override=None):
             session.op("set_audio", clips=[clip], patch={"pan": edit[1]})
         elif edit and edit[0] == "nr":
             session.op("set_audio", clips=[clip], patch={"noise_reduction": edit[1]})
+        elif edit and edit[0] == "limiter":
+            patch = {"limiter": {"ceiling_db": edit[1]}}
+            if len(edit) > 2:
+                patch["noise_reduction"] = edit[2]
+            session.op("set_audio", clips=[clip], patch=patch)
+        elif edit and edit[0] == "volume":
+            session.op("set_audio", clips=[clip], patch={"volume": edit[1]})
         elif edit and edit[0] == "range":
             session.op("set_range", start=edit[1], end=edit[2])
             export["range"] = "in_out"
@@ -904,18 +949,17 @@ def e_target(row, r):
                                     + f" (flash on its timeline frame {on_frame}, "
                                     f"|click − flash| ≤ {TARGET_MS} ms {av_ok})")
     met, sentence = pinned(r)
-    if row == "E22":
+    if row in DELAY_ROWS:
         base = _e_cache.get(("E4", None))
         if base and base["median_ms"] is not None:
             delta = r["median_ms"] - base["median_ms"]
-            sentence += (f"; E22 − E4 {delta:+.3f} ms (the reducer's {NR_DELAY_MS:.3f} ms, "
-                         "led by SY-25)")
+            sentence += (f"; {row} − E4 {delta:+.3f} ms ({DELAY_ROWS[row]})")
     return met, sentence
 
 
 def e_row(mcp, row):
     try:
-        if row == "E22":
+        if row in DELAY_ROWS:
             run_e(mcp, "E4")  # its base, measured once
         r = run_e(mcp, row)
     except Exception as error:  # an instrument failure is this row's scored FAIL

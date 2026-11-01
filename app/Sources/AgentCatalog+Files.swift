@@ -154,6 +154,21 @@ extension AgentServer {
                     "color": "{log, gamut?}, {lut} or {peak}, log or lut beside peak, or null to "
                         + "clear.",
                 ]),
+            opTool(
+                "set_media_speech",
+                "Saves where a media file's speech is — what a clip of it in duck mode speech "
+                    + "(set_audio's duck.mode) ducks the rest of the mix by. Audio ▸ Ducking ▸ "
+                    + "Duck by Speech writes it from the file's detected speech, and set_audio "
+                    + "with duck.mode speech does the same for you, so call this only to give "
+                    + "spans of your own. Refused on a media without audio, for a span that "
+                    + "starts before 0, ends at or before its start or past the file's "
+                    + "duration, for spans out of order or overlapping (touching is fine), and "
+                    + "past 100,000 spans. An empty list means the file has no speech.",
+                [
+                    "media": "Media id.",
+                    "spans": "[[start, end], …] in SOURCE ticks of the file played forward, "
+                        + "sorted, the end excluded.",
+                ]),
         ]
         // transcribe and export_captions are `AgentCatalog+Captions.swift`'s
         // as well, with their `// MARK: Captions` note and the one hoisted

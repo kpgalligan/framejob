@@ -104,7 +104,7 @@ The assistant has the same tools an agent has over MCP (see [MCP](mcp.md)), with
 - add, remove, reorder and set tracks; add and edit markers; change the canvas
 - import, relink and remove media, copy it into the project (it asks first), and set a media's camera log
 - place media, text, shapes, backgrounds, adjustment clips and graphics; insert, overwrite, paste and duplicate
-- move, trim, split, slip, roll, rate-stretch, ripple-delete, lift, insert time and close gaps; detach audio
+- move, trim, split, slip, roll, rate-stretch, ripple-delete, lift, insert time and close gaps; detach audio and attach it again, and make J- and L-cuts
 - nest clips, or take a nest apart
 - set speed, reverse, freeze frames and add speed ramps (see [Speed](speed.md))
 - change how a clip looks and sounds, including transitions, actions and zooms; rename a clip, hide or mute it, and paste attributes

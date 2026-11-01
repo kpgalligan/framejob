@@ -21,6 +21,13 @@ struct PlanSegment: Codable, Equatable {
     /// A RAMPED clip's one audio segment (spec §11 SR-6, SR-10): the map its
     /// rendered sound follows. Nil on every other segment.
     let ramp: PlanSpeedRamp?
+    /// An audio segment's track pans, innermost first (spec §11 AU-104):
+    /// the tap's balance after the clip's own pan. Empty when no track pans.
+    let trackPans: [Double]
+    /// An audio segment's automation (spec §11 AU-85): the tap keys of its
+    /// clip's evaluated audio at each point, sorted; empty when no action on
+    /// the clip names a tap key (`AudioAutomation.swift`).
+    let automation: [PlanAudioPoint]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -33,6 +40,8 @@ struct PlanSegment: Codable, Equatable {
         pitch = c.lenient(.pitch)
         input = c.lenient(.input)
         ramp = c.lenient(.ramp)
+        trackPans = c.lenient(.trackPans, [])
+        automation = c.lenient(.automation, [])
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the
@@ -105,12 +114,31 @@ struct PlanTrack: Codable, Equatable, Identifiable {
     /// Audio only: the envelope covering the whole extent, fades, volume
     /// actions and ducking already folded in.
     let ramps: [PlanRamp]?
+    /// Audio only: the timeline track it plays under (spec §11 AU-107), a
+    /// nest's contents under the nest clip's; nil on a video track.
+    let track: UInt32?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenient(.id, 0)
         segments = c.lenient(.segments, [])
         ramps = c.lenient(.ramps)
+        track = c.lenient(.track)
+    }
+}
+
+/// A speech ducker's own multiplier (format 29, spec §11 AU-113): the line
+/// the timeline draws on the ducking clip (`TimelineView+DuckCurve.swift`).
+/// Nothing builds a composition from it — the ramps that duck are already in
+/// every other track's `ramps`.
+struct PlanDuck: Codable, Equatable {
+    let clip: UInt32
+    let ramps: [PlanRamp]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        clip = c.lenient(.clip, 0)
+        ramps = c.lenient(.ramps, [])
     }
 }
 
@@ -151,6 +179,8 @@ struct CompositionPlan: Codable, Equatable {
     /// The project's dynamic range (spec §11 HD-2): every composition of an
     /// HLG project converts in BT.2020/HLG (`CompositionBuilder`).
     let output: CanvasOutput
+    /// One per speech ducker (spec §11 AU-113); empty when the plan has none.
+    let ducks: [PlanDuck]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -163,6 +193,7 @@ struct CompositionPlan: Codable, Equatable {
         instructions = c.lenient(.instructions, [])
         warnings = c.lenient(.warnings, [])
         output = c.lenient(.output, .sdr)
+        ducks = c.lenient(.ducks, [])
     }
 
     /// Whether any video segment's media converts at step 0 (spec §11

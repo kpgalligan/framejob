@@ -189,11 +189,34 @@ struct AudioPatch: Codable, Equatable {
     var pan: Double?
     var compressor: CompressorProps??
     var noiseReduction: Double?
+    var fadeInShape: FadeShape?
+    var fadeOutShape: FadeShape?
+    var limiter: LimiterProps??
+    var isolation: Double?
+    /// Format 32 (AU-31, AU-33, AU-34): a whole `EqProps` or `HumProps`
+    /// (every slot key written), `.some(nil)` to clear; the channel pick.
+    var eq: EqProps??
+    var hum: HumProps??
+    var channels: AudioChannelChoice?
+    /// Format 33 (AU-43, AU-45): a whole `GateProps` or `DeEsserProps`,
+    /// `.some(nil)` to clear.
+    var gate: GateProps??
+    var deEsser: DeEsserProps??
+    /// Format 34 (AU-140): a whole `VoiceProps` (its `pitch` always written,
+    /// null when nil), `.some(nil)` to clear.
+    var voice: VoiceProps??
+    /// Format 37 (AU-66): a whole `LevellerProps`, `.some(nil)` to clear.
+    var leveller: LevellerProps??
 
     init(
         volume: Double? = nil, muted: Bool? = nil, fadeIn: Ticks? = nil, fadeOut: Ticks? = nil,
         duck: DuckProps?? = nil, mono: Bool? = nil, keepPitch: Bool? = nil, pan: Double? = nil,
-        compressor: CompressorProps?? = nil, noiseReduction: Double? = nil
+        compressor: CompressorProps?? = nil, noiseReduction: Double? = nil,
+        fadeInShape: FadeShape? = nil, fadeOutShape: FadeShape? = nil,
+        limiter: LimiterProps?? = nil, isolation: Double? = nil, eq: EqProps?? = nil,
+        hum: HumProps?? = nil, channels: AudioChannelChoice? = nil, gate: GateProps?? = nil,
+        deEsser: DeEsserProps?? = nil, voice: VoiceProps?? = nil,
+        leveller: LevellerProps?? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -205,6 +228,17 @@ struct AudioPatch: Codable, Equatable {
         self.pan = pan
         self.compressor = compressor
         self.noiseReduction = noiseReduction
+        self.fadeInShape = fadeInShape
+        self.fadeOutShape = fadeOutShape
+        self.limiter = limiter
+        self.isolation = isolation
+        self.eq = eq
+        self.hum = hum
+        self.channels = channels
+        self.gate = gate
+        self.deEsser = deEsser
+        self.voice = voice
+        self.leveller = leveller
     }
 
     init(from decoder: Decoder) throws {
@@ -219,6 +253,17 @@ struct AudioPatch: Codable, Equatable {
         pan = c.lenient(.pan)
         compressor = c.nullable(.compressor)
         noiseReduction = c.lenient(.noiseReduction)
+        fadeInShape = c.lenient(.fadeInShape)
+        fadeOutShape = c.lenient(.fadeOutShape)
+        limiter = c.nullable(.limiter)
+        isolation = c.lenient(.isolation)
+        eq = c.nullable(.eq)
+        hum = c.nullable(.hum)
+        channels = c.lenient(.channels)
+        gate = c.nullable(.gate)
+        deEsser = c.nullable(.deEsser)
+        voice = c.nullable(.voice)
+        leveller = c.nullable(.leveller)
     }
 
     var dictionary: [String: Any] {
@@ -233,6 +278,17 @@ struct AudioPatch: Codable, Equatable {
         if let pan = pan { d["pan"] = pan }
         d.putNullable("compressor", compressor) { $0.dictionary }
         if let noiseReduction = noiseReduction { d["noise_reduction"] = noiseReduction }
+        if let fadeInShape = fadeInShape { d["fade_in_shape"] = fadeInShape.rawValue }
+        if let fadeOutShape = fadeOutShape { d["fade_out_shape"] = fadeOutShape.rawValue }
+        d.putNullable("limiter", limiter) { $0.dictionary }
+        if let isolation = isolation { d["isolation"] = isolation }
+        d.putNullable("eq", eq) { $0.dictionary }
+        d.putNullable("hum", hum) { $0.dictionary }
+        if let channels = channels { d["channels"] = channels.rawValue }
+        d.putNullable("gate", gate) { $0.dictionary }
+        d.putNullable("de_esser", deEsser) { $0.dictionary }
+        d.putNullable("voice", voice) { $0.dictionary }
+        d.putNullable("leveller", leveller) { $0.dictionary }
         return d
     }
 

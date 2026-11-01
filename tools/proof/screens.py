@@ -92,10 +92,12 @@ DEFAULT_APP = str(proof_app.bundle())
 DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 
-# The three `none` menu items a screen may perform: grading GR3's view toggles
-# (spec §11 GR-4, GR-5), grading-2 G2-1's rename (GR-10) and G2-4's Show
-# Selection (GR-13), which persist nothing, so no instance's defaults move.
-VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:")
+# The four `none` menu items a screen may perform: grading GR3's view toggles
+# (spec §11 GR-4, GR-5), grading-2 G2-1's rename (GR-10), G2-4's Show
+# Selection (GR-13) and road map "audio" AP7's Loudness Meter (AU-75), which
+# persist nothing, so no instance's defaults move.
+VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:",
+                  "toggleLoudnessMeter:")
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")
@@ -122,16 +124,26 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # pinned OPEN so 05g shows the curve plot (grading-2 G2-3); it opens Curves
 # between Wheels and Look on 05b, 05c and 05f too. `video.qualifier` is pinned
 # OPEN so 05h shows the ranges (grading-2 G2-4); it opens the Qualifier between
-# Adjustment and Light on 05c too.
+# Adjustment and Light on 05c too. `audio.eq` is pinned OPEN so 09b shows the
+# drawn response and the slots (road map "audio" AP3); it opens EQ between
+# Channels and Hum on 09 too. `audio.gate` and `audio.de_esser` are pinned OPEN
+# so 09c shows both sections' rows and Status read-outs (road map "audio" AP4);
+# on 09 and 09b they lie below the captured height. `audio.leveller` is pinned
+# CLOSED (its default, AU-66): on 09c its header sits closed between the Gate and
+# the De-esser. P2's scan of the declared
+# ids reads an underscore since then, which is how `media.camera_log` (pinned at
+# its default, open) was found unpinned.
 SECTIONS = {
-    "audio.compressor": True, "audio.duck": True, "audio.fades": True, "audio.mix": True,
-    "audio.noise": True, "audio.volume": False,
+    "audio.channels": True, "audio.compressor": True, "audio.de_esser": False,
+    "audio.duck": True, "audio.eq": False, "audio.fades": True, "audio.gate": False,
+    "audio.hum": True, "audio.isolation": True, "audio.leveller": True, "audio.voice": True,
+    "audio.limiter": True, "audio.mix": True, "audio.noise": True, "audio.volume": False,
     "clip.timing": False,
     "doc.appearance": False, "doc.canvas": False, "doc.markers": False, "doc.rate": False,
     "doc.summary": False,
     "graphic.properties": False, "graphic.size": True, "graphic.source": True,
     "graphic.timeline": True,
-    "media.files": False,
+    "media.camera_log": False, "media.files": False,
     "shape.arrows": True, "shape.fill": True, "shape.gradient": True, "shape.kind": False,
     "shape.stroke": True,
     "text.animation": True, "text.backdrop": True, "text.box": True, "text.content": False,
@@ -183,6 +195,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobRecordingCamera", ""),
     ("FrameJobRecordingCameraFormat", ""),
     ("FrameJobRecordingCameraBeside", False),
+    ("FrameJobRecordingEnhanceMicrophone", False),
     ("FrameJobCaptionEngine", "apple"),
     ("FrameJobAssemblyAIRegion", "us"),
     ("FrameJobCaptionStyle", "subtitles"),
@@ -195,6 +208,8 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobAssistantClearToolResults", False),
     ("FrameJobBackgroundRender", True),
     ("FrameJobBackgroundRenderDelay", 5),
+    ("FrameJobNormalizeMode", "loudness"),
+    ("FrameJobNormalizeTargetLUFS", -16.0),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"FrameJobInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
@@ -234,6 +249,15 @@ NOT_SHOWN = {
     "RCDevLookGalleryDump": "a dev launch default naming a folder the Look gallery writes "
                             "its thumbnails to (look_proof.py's G rows); no screen launches "
                             "with it",
+    "RCCodecProbe": "an argument-domain switch that prints the bundled encoders' versions "
+                    "for codecs_proof.py; no screen launches with it",
+    "RCDevExportFault": "a dev launch default that puts a fault in an export's pumps "
+                        "(spec §11 #378); no screen exports",
+    "RCDevGraphicImportAccept": "a dev launch default with which the Import Graphic sheet "
+                                "presses its own Import (spec §11 G-47); no screen launches "
+                                "with it",
+    "RCDevMatchAudioAccept": "a dev launch default with which the Match Audio sheet presses "
+                             "its own Match (spec §11 AU-128); no screen launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,
@@ -271,6 +295,10 @@ FIXTURES = {
                   "sound": ["video"]},
     "ramp": {"path": os.path.join(FIXTURE_DIR, "Ramp.framejob"),
              "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "eq": {"path": os.path.join(FIXTURE_DIR, "Eq.framejob"),
+           "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
+    "dynamics": {"path": os.path.join(FIXTURE_DIR, "Dynamics.framejob"),
+                 "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -429,6 +457,10 @@ def build_fixture(mcp, name):
             ids = _qualifier_ops(mcp, path)
         elif name == "ramp":
             ids = _ramp_ops(mcp, path)
+        elif name == "eq":
+            ids = _eq_ops(mcp, path)
+        elif name == "dynamics":
+            ids = _dynamics_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -631,6 +663,49 @@ def _ramp_ops(mcp, path):
         raise FixtureError(f"building ramp: add_action answered no new_actions: {added}")
     _call(mcp, "set_action_end", path, clip=ids["video"], action=actions[0],
           patch={"speed": 2})
+    return ids
+
+
+def _eq_ops(mcp, path):
+    """Road map "audio" AP3 (spec §11 AU-32..AU-34, AU-38): one track, "Music",
+    holding `toneA.m4a` at 0 with Rumble Cut and Presence (high_pass {80, 24},
+    band_3 {4000, +3, 1}), the hum notch at its defaults (60 Hz × 4, 30 dB) and
+    the left channel picked — the EQ section's curve, its slots and its summary
+    (09b)."""
+    _call(mcp, "set_track", path, track=1, name="Music")
+    tone = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneA.m4a"))
+    _call(mcp, "add_clip", path, media=_media_id(tone), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building eq: the project holds {len(clips)} clips, not 1")
+    ids = {"tone": clips[0]["id"]}
+    _call(mcp, "set_audio", path, clips=[ids["tone"]],
+          patch={"eq": {"high_pass": {"frequency": 80, "slope": 24},
+                        "band_3": {"frequency": 4000, "gain_db": 3, "q": 1}},
+                 "hum": {}, "channels": "left"})
+    return ids
+
+
+def _dynamics_ops(mcp, path):
+    """Road map "audio" AP4 (spec §11 AU-43, AU-45, AU-48): one track, "Music",
+    holding `toneA.m4a` at 0 with the gate and the de-esser at their defaults —
+    the Gate and De-esser sections' rows and Status read-outs (09c). Waits up
+    to 60 s for the media's loudness cache, so the read-outs show the measured
+    threshold rather than the wait."""
+    _call(mcp, "set_track", path, track=1, name="Music")
+    tone = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneA.m4a"))
+    _call(mcp, "add_clip", path, media=_media_id(tone), track=1, at=0)
+    marker = os.path.join(path, "cache", "loudness", f"{_media_id(tone)}.complete.json")
+    deadline = time.monotonic() + 60
+    while not os.path.exists(marker):
+        if time.monotonic() > deadline:
+            raise FixtureError("building dynamics: toneA.m4a's loudness cache was never written")
+        time.sleep(0.1)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building dynamics: the project holds {len(clips)} clips, not 1")
+    ids = {"tone": clips[0]["id"]}
+    _call(mcp, "set_audio", path, clips=[ids["tone"]], patch={"gate": {}, "de_esser": {}})
     return ids
 
 
@@ -975,7 +1050,7 @@ class Run:
             if not name.endswith(".swift"):
                 continue
             text = open(os.path.join(SOURCES, name), encoding="utf-8").read()
-            declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z.]+)", title:', text))
+            declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z._]+)", title:', text))
             literals |= set(re.findall(r'static let \w*Key = "((?:FrameJob|RC)[^"]*)"', text))
         pinned = {key for key, _ in PINS} | {APPEARANCE_KEY}
         problems = []

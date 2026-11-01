@@ -180,10 +180,10 @@ enum MediaImporter {
     /// awaits); the awaiting is here, inside the task, so this stays
     /// synchronous.
     ///
-    /// A waveform pass that published nothing is retried in the same task
-    /// after each of `peaksRetryDelays` while the pass is current
+    /// A waveform or loudness pass that published nothing is retried in the
+    /// same task after each of `peaksRetryDelays` while the pass is current
     /// (`retryPeaks`), so a lost waveform does not wait for the next open.
-    /// Its three audio decodes run on the cache lane (`onCacheLane`, spec §11 #367).
+    /// Its four audio decodes run on the cache lane (`onCacheLane`, spec §11 #367).
     static func generateCaches(
         for media: MediaSnapshot, url: URL, in cacheDir: URL, urls: [UInt32: URL] = [:]
     ) {
@@ -206,9 +206,11 @@ enum MediaImporter {
                     for: media, url: url, stamp: stamp, into: cacheDir, pass: pass, input: input)
                 let published = await peaks(
                     for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                let loudnessPublished = await loudness(
+                    for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 await syncFeatures(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
-                if !published, pass.isCurrent() {
+                if !(published && loudnessPublished), pass.isCurrent() {
                     await retryPeaks(for: media, url: url, into: cacheDir, pass: pass)
                 }
                 pass.done()
@@ -257,10 +259,10 @@ enum MediaImporter {
         return sleeper
     }
 
-    /// The in-session retry of a waveform pass that published nothing: after
-    /// each delay (a cancellation ends the wait), while the pass is current,
-    /// with a fresh stamp, until one attempt publishes or finds it current —
-    /// and then runs `syncFeatures` and `speech` once with that stamp (SY-11, SY-17).
+    /// The in-session retry of a waveform or loudness pass that published nothing: after each
+    /// delay (a cancellation ends the wait), while the pass is current, with a fresh stamp. An
+    /// attempt whose `peaks` lands runs `loudness`, `syncFeatures` and `speech` with that stamp
+    /// (SY-11, SY-17) and ends the retry when the loudness file landed too (spec §11 AU-10).
     private static func retryPeaks(
         for media: MediaSnapshot, url: URL, into cacheDir: URL, pass: CachePass
     ) async {
@@ -269,10 +271,12 @@ enum MediaImporter {
             guard pass.isCurrent() else { return }
             let stamp = CacheStamp.stamp(for: media, url: url)
             if await peaks(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass) {
+                let landed = await loudness(
+                    for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 // SY-11, SY-17: features and speech lost with the waveform land with it.
                 await syncFeatures(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
                 await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
-                return
+                if landed { return }
             }
         }
     }
@@ -312,19 +316,7 @@ enum MediaImporter {
     /// did. The every-16 post counts TILES, so a held tail posts as its
     /// seconds land and an ordinary strip posts as it did.
     ///
-    /// **What the generator answers between frames, measured** (the R0
-    /// spike's own recordings and `tools/proof/remaining_probe.py`'s 5f
-    /// fixtures): a second whose displayed frame is a SYNC sample lands
-    /// however far after it — 24 s after a keyframe — and a real
-    /// ScreenCaptureKit recording lands every second up to its track's end,
-    /// 1.6 s after its last, non-sync sample; but an `ffmpeg`-made file of
-    /// three frames 25 s apart FAILS (`-11821`, not `-11832`) at every second
-    /// inside a non-sync frame's range that is not the frame's own time, and
-    /// 0.7 ms after its last frame's time under the VideoToolbox encoder. So
-    /// the held request is the frame's exact time and not the track's end
-    /// less a frame: the end is stored in the movie timescale and rounds UP
-    /// (50.0333 s is 50.034 at 1000), which the composition's window absorbs
-    /// and the generator does not.
+    /// What the generator answers between frames, measured: see `thumbnailRequests`.
     ///
     /// Skipped outright when `thumbs/<id>/complete.json` holds `stamp` — the
     /// file's `CacheStamp` as `generateCaches` measured it: no decode, no
@@ -372,15 +364,7 @@ enum MediaImporter {
             return
         }
 
-        // `media.duration` is the RECORD's, and a file replaced in place
-        // keeps its record, so a file of another length at the old path
-        // sizes this strip — and `peaks`' bucket count — from the old
-        // duration. Recorded here rather than fixed: the marker rebuilds the
-        // strip for the changed file, at the old length — a longer file's
-        // tail is HELD below.
-        let seconds = max(
-            1,
-            min(maxThumbnails, Int((Double(media.duration) / Double(ReelTime.perSecond)).rounded(.up))))
+        let seconds = thumbnailSeconds(for: media)
         // Precise timing, so a sample cursor lands on the exact sample
         // (`AVAssetTrack.h`); the generator parses the table anyway.
         let asset = AVURLAsset(
@@ -392,14 +376,7 @@ enum MediaImporter {
             max(0, media.duration - max(1, media.fps.frameDuration)))
         let track = (try? await asset.loadTracks(withMediaType: .video))?.first
         if let track, let frame = await lastFrameTime(of: track) { lastTime = frame }
-        let last = CompositionBuilder.ticks(lastTime)
-        // The seconds at or past `last` are HELD: a suffix (the times are
-        // monotonic), asking for `lastTime` once, written under each of them.
-        let held = (0..<seconds).filter { Ticks($0) * ReelTime.perSecond >= last }
-        var times = (0..<(seconds - held.count)).map {
-            CompositionBuilder.time(Ticks($0) * ReelTime.perSecond)
-        }
-        if !held.isEmpty { times.append(lastTime) }
+        let (held, times) = thumbnailRequests(seconds: seconds, lastTime: lastTime)
 
         let reader = thumbnailReader(for: media, asset: asset, track: track, input: input)
         defer { reader.finish() }
@@ -410,16 +387,7 @@ enum MediaImporter {
             var tiles = 1
             switch result {
             case .success(requestedTime: let requested, image: let image, actualTime: _):
-                // Named by the seconds that ASKED for the requested time, not
-                // by a counter: results arrive in request order today, and a
-                // counter would silently shift the whole strip by one if that
-                // ever stopped being true or a frame failed. `time` and
-                // `ticks` are exact inverses at the tick timescale, so an
-                // unheld second divides exactly; the held request is the one
-                // time in the list off the grid, compared as a time.
-                let indices =
-                    requested == lastTime
-                    ? held : [Int(CompositionBuilder.ticks(requested) / ReelTime.perSecond)]
+                let indices = tileIndices(requested: requested, lastTime: lastTime, held: held)
                 for index in indices {
                     // A superseded pass writes no further frame.
                     guard pass?.isCurrent() ?? true else { break frames }
@@ -517,6 +485,32 @@ enum MediaImporter {
         return await onCacheLane {
             writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
                        stamp: stamp, into: cacheDir, pass: pass)
+        }
+    }
+
+    // MARK: - Loudness
+
+    /// Writes `cache/loudness/<id>.bin` (spec §11 AU-10, `MediaImporter+Loudness.swift`) after
+    /// `peaks`, with `peaks`' head and answer: true when there is nothing to make, the cache is
+    /// current, or it published; false otherwise, a superseded pass included.
+    @discardableResult
+    static func loudness(
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
+    ) async -> Bool {
+        guard loudnessPassNeeded(for: media, stamp: stamp, in: cacheDir, pass: pass) else {
+            return true
+        }
+        guard pass?.isCurrent() != false else { return false }
+        let asset = AVURLAsset(url: url)
+        guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first,
+            let trackRange = try? await track.load(.timeRange),
+            let segments = try? await track.load(.segments),
+            let expected = expectedPeaksRanges(trackRange: trackRange, segments: segments)
+        else { return false }
+        return await onCacheLane {
+            writeLoudness(for: media, asset: asset, track: track, expectedRanges: expected,
+                          stamp: stamp, into: cacheDir, pass: pass)
         }
     }
 

@@ -190,12 +190,93 @@ extension AgentServer {
         + "filled in nor clamped. chroma's key is the one exception, three numbers "
         + "with no alpha."
     private static let audioPatchDescription: String =
-        "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
-        + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
+        "Audio properties to merge. Keys: volume (0–"
+        + String(format: "%g", AudioNormalize.maxGain) + ", 1 = unity), muted, fade_in, "
+        + "fade_out (ticks), fade_in_shape and fade_out_shape (linear — the default — "
+        + "s_curve, plus_3db for a fast start, minus_3db for a slow one), duck (null or "
+        + "{level, attack, release, mode, pre_roll, hold}: mode extent — the default, for "
+        + "the clip's whole length — or speech, only while the clip's speech plays, "
+        + "widened by pre_roll before and hold after, in ticks, 0.5 s each by default; "
+        + "speech saves the media's speech spans from its detected speech in the same "
+        + "step, and is an error for a clip that is not a media clip with sound or whose "
+        + "speech has not been detected yet), mono, keep_pitch, "
         + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
-        + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1). "
-        + "duck and compressor are OBJECTS and they MERGE: a key you leave out keeps what "
-        + "is stored, and {duck: null} clears the whole thing."
+        + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1), "
+        + "limiter (null or {ceiling_db, release}: a true-peak limiter last in the clip's "
+        + "chain, ceiling_db in dBTP after the clip's base volume, -24 to 0, default -1, "
+        + "release in ticks, 600 to 600000, default 60000; {limiter: {}} turns it on at "
+        + "the defaults), "
+        + "isolation (0–1: voice isolation, Apple's on-device voice model, which also "
+        + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
+        + "rendered offline, the clip plays without it until the render lands and an export "
+        + "waits for it; a clip not at ×1 plays without it)" + audioEQClause
+        + audioDynamicsClause + audioVoiceClause + ". duck, "
+        + "compressor, limiter, eq (and each of its slots), hum, gate, leveller, de_esser and "
+        + "voice are OBJECTS and they "
+        + "MERGE: a key you leave out keeps what is stored, and {duck: null} clears the "
+        + "whole thing."
+    // Format 32's keys (spec §11 AU-31..AU-34), their own typed local so the
+    // chain above stays short enough to type-check quickly. The presets' values
+    // are the inspector's EQ buttons (AU-32).
+    private static let audioEQClause: String =
+        ", channels (both — the default — left, right or swapped: left and right play that "
+        + "channel of a stereo source from both sides, swapped exchanges them; first in the "
+        + "clip's chain after isolation, ignored on a mono source), eq (null or {high_pass, "
+        + "low_shelf, band_1, band_2, band_3, high_shelf, low_pass, bypass}, after the "
+        + "channel pick: "
+        + "each slot null (off) or an object; high_pass and low_pass {frequency, slope}, "
+        + "frequency 20–20000 Hz, slope 12 or 24 dB/octave, defaults {80, 12} and "
+        + "{12000, 12}; low_shelf and high_shelf {frequency, gain_db}, gain -24 to 24 dB, "
+        + "defaults {100, 0} and {8000, 0}; band_1..band_3 {frequency, gain_db, q}, q "
+        + "0.1–10, default {1000, 0, 1}; bypass true keeps the settings and silences them; "
+        + "{eq: {high_pass: {}}} turns one slot on at its defaults. The inspector's presets: "
+        + "Rumble Cut is high_pass {80, 24}, De-mud band_1 {300, -3, 1}, Presence band_3 "
+        + "{4000, 3, 1}), hum (null or {frequency, depth_db, harmonics}: notches at the "
+        + "mains frequency, 50 or 60, default 60, and its harmonics, 1–8, default 4, each "
+        + "depth_db deep, 6–60, default 30; after the EQ)"
+    // Format 33's keys (spec §11 AU-40..AU-45), their own typed local for the
+    // reason `audioEQClause` is.
+    private static let audioDynamicsClause: String =
+        ", gate (null or {threshold_db, ratio, range_db, attack, hold, release}: a "
+        + "downward expander after noise reduction that turns the pauses down; "
+        + "threshold_db is dB RELATIVE to the clip's measured loudness (the Loudness "
+        + "normalize_clip reports, before volume), -40 to 0, default -10; below it the "
+        + "level drops ratio - 1 dB per dB, ratio 1–20, default 4, never more than "
+        + "range_db, 1–80, default 20; attack 0–60000 ticks (default 600, 1 ms) opens it, "
+        + "hold 0–300000 (default 30000, 50 ms) keeps it open, release 600–1200000 "
+        + "(default 60000, 100 ms) closes it; {gate: {}} turns it on at the defaults), "
+        + "leveller (null or {target_db, max_up_db, max_down_db, response}: a gain curve after "
+        + "the gate for a speaker who moves on and off the mic, made AHEAD of time from the "
+        + "clip's measured loudness and its speech (media.speech, else speech detection): each "
+        + "phrase's level over a 3 s window of its speech, smoothed both ways over response "
+        + "ticks (300000–6000000, default 1200000, 2 s), is brought to target_db (dB RELATIVE "
+        + "to the clip's loudness, -20 to 10, default 0), never more than max_up_db up or "
+        + "max_down_db down (each 0–24, default 12); a phrase starts at its own level, a pause "
+        + "holds the gain and glides to the next phrase over its last 0.25 s, and a phrase "
+        + "under 1 s takes its neighbour's; the same in the preview and an export; it waits "
+        + "for the clip's speech as well as its loudness, and does nothing where speech "
+        + "detection is unavailable or no phrase has 1 s of speech; {leveller: {}} turns it on "
+        + "at the defaults), "
+        + "de_esser (null or {frequency, threshold_db, range_db}: after the leveller, turns "
+        + "the band above frequency down on sibilance and never boosts; frequency "
+        + "2000–12000 Hz, default 6000; threshold_db relative to the clip's loudness, -30 "
+        + "to 20, default 0; range_db 1–24, default 6). The three act only once the clip's "
+        + "loudness is measured: until then it plays without them and an export waits; a "
+        + "clip too short or too quiet to measure plays without them; on a nest clip they "
+        + "do nothing"
+    // Format 34's voice effect (spec §11 AU-140, AU-141), its own typed
+    // local for the reason `audioEQClause` is.
+    private static let audioVoiceClause: String =
+        ", voice (null or {kind, amount, pitch}: a voice effect rendered offline and played "
+        + "in place of the clip's sound, after isolation and before the channel pick; kind "
+        + "is one of voice: pitch, high, deep, robot; tone: bass, treble, bright, telephone, "
+        + "radio; character: lofi, distorted; space: echo, room, hall, plate, cathedral; "
+        + "amount 0–1, default 1, how much of the effect (0 plays the clip dry); pitch "
+        + "-12 to 12 semitones, read only by pitch, high and deep, absent meaning the "
+        + "kind's own, 0, +5 and -5; a new kind keeps a stored pitch unless pitch: null "
+        + "is sent with it; {voice: null} clears it. The clip plays without the effect "
+        + "until its render lands and an export waits for it; a clip not at ×1 plays "
+        + "without it; reverb and echo tails end with the clip)"
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.
@@ -291,7 +372,12 @@ extension AgentServer {
                 "set_audio",
                 "Changes the clips' BASE audio properties — volume, mute, fades, ducking, mono, "
                     + "pitch preservation, pan, compression and noise reduction. Merges like "
-                    + "set_video; duck or compressor set to null removes it.",
+                    + "set_video; duck or compressor set to null removes it. To animate one, "
+                    + "use an action's set_action_end: volume, mute, the fades and every key the "
+                    + "sound's effects read animate there (pan, mono, channels, eq, hum, "
+                    + "noise_reduction, gate, leveller, de_esser, compressor, limiter, "
+                    + "isolation); duck, "
+                    + "keep_pitch, the fade shapes and voice are this tool's alone.",
                 ["clips": clipsDescription, "patch": audioPatchDescription]),
             opTool(
                 "set_text",

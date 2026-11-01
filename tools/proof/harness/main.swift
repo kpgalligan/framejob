@@ -83,7 +83,12 @@
 //                      `top=<kind>` / `bottom=<kind>` (a slot's pick,
 //                      through the panel's own `pick`) and `topzoom=<1|2|4>`
 //                      / `bottomzoom=<1|2|4>` (a slot's vectorscope zoom,
-//                      through the panel's own `zoom`, grading-4 T4-1), or
+//                      through the panel's own `zoom`, grading-4 T4-1),
+//                      `loudness` (View ▸ Loudness Meter on, road map
+//                      "audio" AP7; stdout gets `seeing loudness X Y W H`,
+//                      the column's rect) and `loudnessfixed` (the column
+//                      shows a fixed reading: M −18.4, S −16.9, I −17.3,
+//                      TP −0.6, measuring), or
 //                      "-"/absent for none. The toggles go through the editor's own
 //                      commands; the panel's tap is then detached, so no live
 //                      frame can replace the fixed traces and the capture is
@@ -398,6 +403,7 @@ enum Harness {
             "FrameJobRecordingCamera": "",
             "FrameJobRecordingCameraFormat": "",
             "FrameJobRecordingCameraBeside": false,
+            "FrameJobRecordingEnhanceMicrophone": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5
@@ -445,6 +451,13 @@ enum Harness {
             // mode. These are the defaults.
             "FrameJobBackgroundRender": true,
             "FrameJobBackgroundRenderDelay": 5,
+            // Normalize's chosen mode and loudness target (`NormalizeChoice`'s
+            // two keys, spec §11 AU-15), literals for the same reason: written
+            // by ordinary use whenever a person changes the Volume section's
+            // Mode popup or Target field, and drawn by that section and the
+            // Loudness Meter's target line. These are the defaults.
+            "FrameJobNormalizeMode": "loudness",
+            "FrameJobNormalizeTargetLUFS": -16.0,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
             // narrower under the legacy kind, which moves its header's right
@@ -1057,7 +1070,9 @@ extension Harness {
     static func applySeeing(_ items: [String], to controller: EditorViewController) -> Int32? {
         var picks: [(Int, ScopeKind)] = []
         var zooms: [(Int, Int)] = []
-        for item in items where !["scopes", "ungraded", "ramp"].contains(item) {
+        for item in items where !["scopes", "ungraded", "ramp", "loudness", "loudnessfixed"]
+            .contains(item)
+        {
             let parts = item.split(separator: "=", maxSplits: 1).map(String.init)
             if parts.count == 2, let slot = ["topzoom", "bottomzoom"].firstIndex(of: parts[0]),
                 let zoom = Int(parts[1]), VectorscopeTrace.zooms.contains(zoom)
@@ -1075,6 +1090,22 @@ extension Harness {
         }
         if items.contains("scopes") { controller.toggleScopes(nil) }
         if items.contains("ungraded") { controller.toggleShowUngraded(nil) }
+        if items.contains("loudness") { controller.toggleLoudnessMeter(nil) }
+        if items.contains("loudnessfixed") {
+            var reading = LiveLoudnessReading.empty
+            reading.momentaryLUFS = -18.4
+            reading.shortTermLUFS = -16.9
+            reading.integratedLUFS = -17.3
+            reading.truePeakDBTP = -0.6
+            reading.measuring = true
+            controller.loudnessPanel?.show(reading)
+        }
+        if items.contains("loudness"), let column = controller.loudnessPanel {
+            controller.view.layoutSubtreeIfNeeded()
+            let r = column.convert(column.bounds, to: controller.view)
+            let top = controller.view.isFlipped ? r.minY : controller.view.bounds.height - r.maxY
+            print("seeing loudness \(r.minX) \(top) \(r.width) \(r.height)")
+        }
         guard let panel = controller.scopesPanel else { return nil }
         for (slot, kind) in picks { panel.pick(kind, slot: slot) }
         for (slot, zoom) in zooms { panel.zoom(zoom, slot: slot) }

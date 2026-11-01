@@ -102,11 +102,10 @@ final class Playback {
     /// Bumped per rebuild so a slow build that finishes after a newer one
     /// started is discarded instead of replacing a fresher item.
     private var generation = 0
-    /// The level meter's 30 Hz read. Nil whenever the transport is stopped —
-    /// the rate KVO arms and disarms it — so an idle editor pays nothing for
-    /// having a meter, exactly as it pays nothing for the periodic time
-    /// observer AVFoundation stops delivering.
+    /// The meter's 30 Hz read; nil while stopped (the rate KVO arms it).
     var meterTimer: Timer?
+    /// The live loudness meter over the true mix (`LiveLoudness.swift`).
+    let loudness = LiveLoudness()
 
     private var canvasSize = CGSize(width: 1920, height: 1080)
     /// View ▸ Preview Quality (road map 2's phase 8a). Persisted, so it is read
@@ -240,7 +239,7 @@ final class Playback {
     func update(project: ReelProject, urls: [UInt32: URL], isLive: Bool) {
         RecipeSource.shared.set(project, for: recipeKey)
         RecipeSource.shared.setMediaURLs(urls, for: recipeKey)  // LUT looks read these (GR-8)
-        let audioDSP = AudioDSPParameters(snapshot: project.snapshot)
+        let audioDSP = AudioDSPParameters.measured(project: project, cache: ReverseSource.shared.resolution(for: recipeKey).cache)
         AudioDSPSource.shared.publish(audioDSP, for: recipeKey)
         drawsGraphics = Self.drawsGraphics(project.snapshot)
         let planJSON = project.planJSON

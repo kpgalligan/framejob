@@ -217,9 +217,15 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
 - `edit_clip.rs`: grading L3 (on the `grading` branch) moved `detach_audio` and `set_enabled`,
   with the `// ---- enablement` banner, to `edit_detach.rs`, a pure move; nothing widened. `wc -l
-  core/src/edit_clip.rs`: 757 before, 661 after; `edit_detach.rs` is 108. Still over the cap,
-  known debt. The next seam: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
-  `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) out whole.
+  core/src/edit_clip.rs`: 757 before, 661 after; `edit_detach.rs` is 108. Road map "audio" AP9
+  paid the seam that record named: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
+  `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) moved whole to
+  `edit_fit.rs`, a pure move gated alone (634 → 587; `edit_fit.rs` 61), before AP9 wired the link
+  closure into `move_clips`, `split_clips`, `delete_clips` and `duplicate_clips` and the rate
+  refusal into `set_reversed`. The next seam: the described clips — `Described`, the Title
+  preset's constants, `add_text_clip`, `add_shape_clip` and `add_described_clip` — out whole to an
+  `edit_described.rs`, leaving `edit_clip.rs` the placement callers (move, split, delete,
+  duplicate) and `add_clip`.
 - `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
 - `recipe.rs`: grading-2's G2-0 moved the block from `// ---- what a caller asked for` through
   `impl RecipeOptions` (`RecipeOptions` and its reader `of`) to the new `recipe_options.rs`,
@@ -303,6 +309,20 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   export_vp9`, `cargo fmt --check`). `wc -l core/src/export_table.rs`: 582 before, 411 after;
   `export_preset.rs` is 187. What stays is the table and its two lookups; no further seam is
   named.
+- `model.rs`: at 597 before road map "audio" AP10, it paid toll T1 first, a pure move gated with
+  T2 (`make gate` PASS 400 s): `Track` (its doc and struct) went whole to the new
+  `model_track.rs`, re-exported by `model.rs` (`pub use crate::model_track::Track`), so every
+  `crate::model::Track` path holds; nothing widened. `wc -l core/src/model.rs`: 597 before, 570
+  after. `model_track.rs` is the track vocabulary's home: AP10's `volume`, `pan` and
+  `TRACK_VOLUME_MAX` landed there (39 → 68). No further seam in `model.rs` is named; the next
+  is the media types (`Media`, `MediaOriginal`, `MediaKind`) out whole to a `model_media.rs`,
+  re-exported the same way.
+- `format.rs`: at 598 before road map "audio" AP10, it paid toll T2 with T1: the per-version
+  paragraphs of `RC_FORMAT_VERSION`'s doc (Version 2 … Version 34) went verbatim to the new
+  `format_history.rs` as its `//!` module doc (no items), and the const kept its first two doc
+  lines and one line pointing there. `wc -l core/src/format.rs`: 598 before, 250 after;
+  `format_history.rs` 352, then 359 with AP10's version-35 paragraph. A bump adds its paragraph
+  to `format_history.rs`; `format.rs` takes only the number.
 
 ## Open items
 

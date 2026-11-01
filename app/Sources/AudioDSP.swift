@@ -1,9 +1,13 @@
 import Accelerate
 import Foundation
 
-/// The four sample-level audio effects the model carries and AVFoundation
-/// cannot express: pan, the mono fold, the compressor and broadband noise
-/// reduction (spec §4.2, §5.2's `AudioProps`).
+/// The sample-level audio effects the model carries and AVFoundation cannot
+/// express: the channel pick, the EQ and hum notch (`AudioEQStage.swift`),
+/// broadband noise reduction, the gate, the leveller and the de-esser
+/// (`AudioGateStage.swift`, `AudioLevellerStage.swift`,
+/// `AudioDeEsserStage.swift`), the compressor, the
+/// mono fold, pan and the limiter (spec §4.2, §5.2's `AudioProps`, §11 AU-3,
+/// AU-34, AU-47).
 ///
 /// **Why this file has no AVFoundation in it.** Volume, the fades and ducking
 /// are a gain CURVE, so `audio.rs` folds them into one envelope per
@@ -81,6 +85,31 @@ struct AudioCompressorSettings: Equatable {
     }
 }
 
+/// The clip limiter's settings in the units the stage works in (spec §11
+/// AU-22): its ceiling BEFORE the fader, since the fader is downstream of
+/// the tap.
+struct AudioLimiterSettings: Equatable {
+    /// Linear, pre-fader: `10^(ceilingDb/20) / volume` for the clip's base
+    /// volume; +∞ at volume 0, where nothing reaches the ceiling.
+    let ceiling: Float
+    /// Seconds for the gain to recover.
+    let releaseSeconds: Double
+
+    init(ceiling: Float, releaseSeconds: Double) {
+        self.ceiling = ceiling.isNaN ? .infinity : ceiling
+        self.releaseSeconds = releaseSeconds.isFinite ? Swift.max(releaseSeconds, 0) : 0.1
+    }
+
+    /// The settings a clip's limiter and base volume ask for. A hand-edited
+    /// value outside the model's ranges is held to them (`clamp_audio`'s).
+    init(ceilingDb: Double, volume: Double, releaseSeconds: Double) {
+        let db = ceilingDb.isFinite ? Swift.min(Swift.max(ceilingDb, -24), 0) : -1
+        let linear = pow(10, db / 20)
+        let ceiling = volume.isFinite && volume > 0 ? Float(linear / volume) : Float.infinity
+        self.init(ceiling: ceiling, releaseSeconds: releaseSeconds)
+    }
+}
+
 /// One clip's worth of sample-level audio settings — everything the model
 /// carries that the composition plan cannot.
 ///
@@ -112,10 +141,31 @@ struct AudioClipDSP: Equatable {
     /// envelope is a scalar per track and applies to every channel equally,
     /// so it commutes with the fold and may stay downstream of the tap.
     var enclosingMono: Bool
+    /// The clip's limiter, last in the chain (AU-20); nil when it has none.
+    var limiter: AudioLimiterSettings?
+    /// The channel pick, the chain's head (AU-34): `.both` touches nothing.
+    var channels: AudioChannelChoice
+    /// The EQ and hum notch after the pick (AU-30); nil when nothing would
+    /// be designed.
+    var eq: AudioEQSettings?
+    /// The gate and the de-esser after noise reduction (AU-47); nil when
+    /// off or while the clip's level is not measured (AU-42).
+    var gate: AudioGateSettings?
+    /// The leveller after the gate and before the de-esser (AU-66); nil when
+    /// off or while its curve is pending or unmeasurable.
+    var leveller: AudioLevellerSettings?
+    var deEsser: AudioDeEsserSettings?
+    /// The balance of the tracks the segment plays through (spec §11 AU-104),
+    /// after an enclosing nest's fold and before the limiter. Set per span
+    /// from the plan segment's `track_pans` (`AudioTrackDSP`), never per clip.
+    var trackBalance: AudioTrackBalance
 
     init(
         pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
-        mono: Bool = false, enclosingMono: Bool = false
+        mono: Bool = false, enclosingMono: Bool = false, limiter: AudioLimiterSettings? = nil,
+        channels: AudioChannelChoice = .both, eq: AudioEQSettings? = nil,
+        gate: AudioGateSettings? = nil, leveller: AudioLevellerSettings? = nil,
+        deEsser: AudioDeEsserSettings? = nil, trackBalance: AudioTrackBalance = .unity
     ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
@@ -124,6 +174,13 @@ struct AudioClipDSP: Equatable {
         // No clamping: a bool has no range.
         self.mono = mono
         self.enclosingMono = enclosingMono
+        self.limiter = limiter
+        self.channels = channels
+        self.eq = eq
+        self.gate = gate
+        self.leveller = leveller
+        self.deEsser = deEsser
+        self.trackBalance = trackBalance
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -138,6 +195,33 @@ struct AudioClipDSP: Equatable {
     /// wrong answer.
     var isInert: Bool {
         pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
+            && limiter == nil && channels == .both && eq == nil && gate == nil && leveller == nil
+            && deEsser == nil && trackBalance == .unity
+    }
+}
+
+// MARK: - The track balance
+
+/// The pans of the tracks a segment plays through as one balance (spec §11
+/// AU-104): the product of each pan's `AudioPanLaw` pair, so two tracks'
+/// pans compose by multiplying, as their volumes do in the envelope. Unity
+/// when there are none, and then the chain skips it.
+struct AudioTrackBalance: Equatable {
+    let left: Float
+    let right: Float
+
+    static let unity = AudioTrackBalance(pans: [])
+
+    init(pans: [Double]) {
+        var left: Float = 1
+        var right: Float = 1
+        for pan in pans {
+            let gains = AudioPanLaw.gains(pan)
+            left *= gains.left
+            right *= gains.right
+        }
+        self.left = left
+        self.right = right
     }
 }
 
@@ -192,533 +276,15 @@ enum AudioPanLaw {
     }
 }
 
-// MARK: - Compressor
-
-/// A feed-forward peak compressor with a hard knee, channel-linked.
-///
-/// **Linked, not per channel.** The detector is the largest absolute sample
-/// across the channels and one gain is applied to all of them. Compressing
-/// each channel on its own detector makes the stereo image wander whenever
-/// one side is louder, which is the classic way a compressor ruins a mix.
-///
-/// **One compressor per composition TRACK, not per clip.** A composition
-/// audio track is a sequence of clips (§7.2) and this sits on it like a
-/// channel-strip insert: the settings change at each cut, the envelope
-/// carries across it. Restarting the envelope per clip would make every cut
-/// audible as a jump in gain reduction.
-///
-/// The envelope is a one-pole smoother on the gain reduction in dB, which is
-/// the standard shape: `attack` is how fast the reduction closes on a level
-/// that just rose, `release` how fast it opens again.
-final class AudioCompressorStage {
-    /// Current gain reduction in dB, always ≥ 0. Persists across buffers.
-    private var reductionDB: Float = 0
-    /// The peak follower's state — see `processChunk`. Also persists.
-    private var detectorState: Float = 0
-    private let sampleRate: Double
-    /// The linked detector and the per-sample gain, sized once.
-    private let detector: UnsafeMutablePointer<Float>
-    private let scratch: UnsafeMutablePointer<Float>
-    private let gains: UnsafeMutablePointer<Float>
-    private let capacity: Int
-
-    init(sampleRate: Double, maxFrames: Int) {
-        self.sampleRate = sampleRate > 0 ? sampleRate : 48000
-        capacity = max(1, maxFrames)
-        detector = .allocate(capacity: capacity)
-        scratch = .allocate(capacity: capacity)
-        gains = .allocate(capacity: capacity)
-        detector.initialize(repeating: 0, count: capacity)
-        scratch.initialize(repeating: 0, count: capacity)
-        gains.initialize(repeating: 1, count: capacity)
-    }
-
-    @available(*, unavailable) required init?(coder: NSCoder) {
-        fatalError("AudioCompressorStage does not support NSCoder")
-    }
-
-    deinit {
-        detector.deallocate()
-        scratch.deallocate()
-        gains.deallocate()
-    }
-
-    /// Forgets the envelope and the follower. Called when playback restarts,
-    /// so a paused-then-resumed preview does not open with the reduction the
-    /// last buffer left.
-    func reset() {
-        reductionDB = 0
-        detectorState = 0
-    }
-
-    /// A one-pole coefficient for a time constant in seconds. Zero seconds
-    /// means "instantly", which is a legitimate setting (a brick-wall attack)
-    /// and must not divide by zero.
-    private func coefficient(_ seconds: Double) -> Float {
-        guard seconds > 0 else { return 1 }
-        return Float(1 - exp(-1 / (seconds * sampleRate)))
-    }
-
-    /// Compresses `frames` samples in place across `count` channels.
-    ///
-    /// `settings` of nil means this clip asks for no compression: the target
-    /// reduction is 0 but the envelope still RELEASES toward it, so a cut from
-    /// a compressed clip to an uncompressed one opens up over the last
-    /// clip's release time instead of stepping.
-    func process(
-        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
-        frames: Int, settings: AudioCompressorSettings?
-    ) {
-        guard frames > 0, count > 0 else { return }
-        // `maxFrames` is what `prepare` promised, not a guarantee: a buffer
-        // bigger than the scratch is split rather than dropped, because
-        // silently leaving audio unprocessed is the one outcome worth ruling
-        // out.
-        var offset = 0
-        while offset < frames {
-            let chunk = min(capacity, frames - offset)
-            processChunk(channels, count: count, offset: offset, frames: chunk, settings: settings)
-            offset += chunk
-        }
-    }
-
-    private func processChunk(
-        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
-        offset: Int, frames: Int, settings: AudioCompressorSettings?
-    ) {
-        // The linked detector: |x| of the first channel, then the running
-        // maximum against every other. Vectorised — this is two passes over
-        // the buffer rather than a branch per sample per channel.
-        var wrote = false
-        for channel in 0..<count {
-            guard let data = channels[channel] else { continue }
-            if !wrote {
-                vDSP_vabs(data + offset, 1, detector, 1, vDSP_Length(frames))
-                wrote = true
-            } else {
-                vDSP_vabs(data + offset, 1, scratch, 1, vDSP_Length(frames))
-                vDSP_vmax(detector, 1, scratch, 1, detector, 1, vDSP_Length(frames))
-            }
-        }
-        guard wrote else { return }
-
-        let thresholdDB = Float(settings?.thresholdDB ?? 0)
-        let ratio = Float(settings?.ratio ?? 1)
-        // How much of every dB above the threshold is given back. Ratio 1
-        // (or no compressor at all) makes this 0 and the stage a pure makeup
-        // gain, which is exactly what 1:1 means.
-        let slope = ratio > 1 ? 1 - 1 / ratio : 0
-        let makeupDB = Float(settings?.makeupDB ?? 0)
-        let thresholdLinear = AudioDSP.gain(fromDecibels: thresholdDB)
-        let attack = coefficient(settings?.attackSeconds ?? 0)
-        let release = coefficient(settings?.releaseSeconds ?? 0)
-        // The detector is a PEAK FOLLOWER — it jumps to each new peak and
-        // falls back at the release rate — rather than the raw |x|. A naive
-        // detector reads a waveform's own zero crossings as the level
-        // collapsing, so the gain is modulated at twice the signal's
-        // frequency: audible as distortion on anything low, and the reason a
-        // sine measured through a textbook 3:1 lands a few tenths of a dB
-        // shy of where the arithmetic says it should. The floor keeps a
-        // zero-release setting from turning the follower back into |x|.
-        let fall = Float(exp(-1 / (max(settings?.releaseSeconds ?? 0, 0.010) * sampleRate)))
-
-        for index in 0..<frames {
-            detectorState = max(detector[index], detectorState * fall)
-            let level = detectorState
-            // The log is skipped entirely below the threshold, which is where
-            // most samples of most material are.
-            var target: Float = 0
-            if slope > 0, level > thresholdLinear {
-                let levelDB = 20 * log10f(max(level, AudioDSP.silenceFloor))
-                target = (levelDB - thresholdDB) * slope
-            }
-            let coefficient = target > reductionDB ? attack : release
-            reductionDB += (target - reductionDB) * coefficient
-            gains[index] = AudioDSP.gain(fromDecibels: makeupDB - reductionDB)
-        }
-
-        for channel in 0..<count {
-            guard let data = channels[channel] else { continue }
-            vDSP_vmul(data + offset, 1, gains, 1, data + offset, 1, vDSP_Length(frames))
-        }
-    }
-}
-
-// MARK: - Noise reduction
-
-/// Broadband noise reduction, one instance per channel: a short-time spectral
-/// attenuator over a noise floor the signal itself is measured for.
-///
-/// **What it actually does**, spelled out so that neither this comment nor the
-/// pane's label can overstate it. The signal is cut into 512-sample frames
-/// every 128 samples and each is windowed and transformed. A per-bin estimate
-/// of the background noise floor is tracked continuously. Each bin is then
-/// multiplied by a Wiener gain — `SNR / (SNR + k)` — over a decision-directed
-/// estimate of that bin's signal-to-noise ratio, with `k` the over-subtraction
-/// factor the user's amount sets and a floor under the result so a suppressed
-/// bin fades rather than vanishes. The frames are windowed again and
-/// overlap-added back.
-///
-/// **It is not a gate, and the difference is the point.** Nothing here
-/// compares a level with a threshold and decides between "signal" and
-/// "silence": every bin of every frame keeps the fraction of itself that its
-/// own SNR says is signal, so a quiet passage keeps its content and a steady
-/// hiss is attenuated *underneath* speech rather than only between words. What
-/// it cannot do is remove a noise that is not stationary — a door slam, a
-/// cough — because nothing distinguishes those from the material.
-///
-/// **The noise estimate is continuous minimum tracking** (Doblinger's
-/// recursive-minimum variant of Martin's minimum statistics): the smoothed
-/// power in each bin is followed by a value that falls to it instantly and
-/// rises back only slowly, so it settles on the floor the bin returns to
-/// between sounds. That needs no noise print from the user and no silence at
-/// the head of the clip. Its known cost is that a bin which is never quiet —
-/// a long held note — is eventually read as noise; `minimumRise` is set for
-/// that case and the decision-directed SNR carries the rest.
-///
-/// **Latency.** An STFT cannot see a sample's neighbours before they arrive,
-/// so the output lags the input by one analysis window: 512 samples, 10.7 ms
-/// at 48 kHz. Measured, not assumed: a tap's process callback cannot read
-/// ahead — a second `MTAudioProcessingTapGetSourceAudio` inside one callback
-/// returns the SAME audio again rather than the next block, so priming a
-/// look-ahead is impossible. 10.7 ms is far inside every A/V sync tolerance
-/// and applies only to a track some clip of which asks for noise reduction;
-/// `AudioTap` keeps the stage running for the whole track once any clip on it
-/// does, so the delay never changes at a cut.
-final class AudioNoiseReductionStage {
-    /// Analysis window, a power of two for `vDSP`'s radix-2 FFT.
-    static let window = 512
-    /// Hop: 75 % overlap, which is what a √Hann pair needs to add back up to
-    /// a constant and is fine enough that a modified bin does not smear.
-    static let hop = 128
-
-    private let log2n: vDSP_Length
-    private let setup: FFTSetup
-    private let half: Int
-
-    /// √Hann, used for BOTH analysis and synthesis (Griffin–Lim): windowing
-    /// twice is what keeps a per-bin gain change from clicking at the frame
-    /// edges.
-    private let windowCurve: UnsafeMutablePointer<Float>
-    /// Everything below is allocated once and reused every frame.
-    private let history: UnsafeMutablePointer<Float>      // last `window` inputs
-    private let staging: UnsafeMutablePointer<Float>      // this hop's inputs
-    private let frame: UnsafeMutablePointer<Float>
-    private let real: UnsafeMutablePointer<Float>
-    private let imaginary: UnsafeMutablePointer<Float>
-    private let power: UnsafeMutablePointer<Float>        // half + 1
-    private let smoothed: UnsafeMutablePointer<Float>     // half + 1
-    private let minimum: UnsafeMutablePointer<Float>      // half + 1
-    private let binGain: UnsafeMutablePointer<Float>      // half + 1
-    /// Last frame's estimate of the CLEAN power per bin, which is what makes
-    /// the a priori SNR below a decision-directed one rather than a raw
-    /// per-frame ratio.
-    private let cleaned: UnsafeMutablePointer<Float>      // half + 1
-    private let overlap: UnsafeMutablePointer<Float>      // window
-    /// The finished samples waiting to be handed back, as a plain FIFO with a
-    /// read and a write index. It never holds more than two hops, and it is
-    /// compacted on a push rather than shifted on a pop — a `memmove` per
-    /// SAMPLE is what a naive queue costs here, and this runs on the audio
-    /// thread.
-    private let output: UnsafeMutablePointer<Float>       // window + hop
-    private var outputHead = 0
-    private var outputTail = 0
-    private var stagedCount = 0
-    /// False until the first frame has been analysed. The tracker starts at
-    /// that frame's own power rather than at zero: from zero it would take
-    /// its whole rise constant to charge up to the noise floor, and until it
-    /// did every bin would look like signal and nothing would be removed.
-    private var primed = false
-    /// The forward/inverse round trip's scale, times the overlap-add
-    /// normalisation. Both are constants of the window and the hop, so they
-    /// are folded into one multiply.
-    private let scale: Float
-
-    /// Smoothing of the per-bin power before the minimum tracker sees it.
-    private let powerSmoothing: Float = 0.7
-    /// How fast the tracked minimum may rise back — the one number that
-    /// decides whether a held note is mistaken for the room.
-    ///
-    /// The tracker FALLS instantly and rises at this rate, so an
-    /// overestimate corrects itself within a few frames of quiet while an
-    /// underestimate persists. That asymmetry says to be slow: 0.9999 per hop
-    /// is about 27 s at 48 kHz. Measured on a one-second 700 Hz tone buried
-    /// in white noise, 0.998 (1.4 s) took 12 dB off the tone and 0.9995 (5 s)
-    /// took 10 dB, because the tracker climbed to the tone and the filter
-    /// then read it as the floor; at 0.9999 the tone comes through within
-    /// half a dB and the noise-only stretches still lose 13.
-    private let minimumRise: Float = 0.9999
-    private let minimumBias: Float = 0.96
-    /// The tracked minimum reads low, because it is a minimum; the usual
-    /// compensation for the bias of that estimator.
-    private let noiseBias: Float = 1.5
-    /// How much of the a priori SNR is carried from the previous frame's
-    /// clean estimate. 0.98 is Ephraim and Malah's own figure, and it is what
-    /// stops the gain from chattering bin by bin — the chatter IS musical
-    /// noise.
-    private let decisionDirected: Float = 0.98
-
-    init?() {
-        var n = 1
-        var bits: vDSP_Length = 0
-        while n < Self.window {
-            n <<= 1
-            bits += 1
-        }
-        guard n == Self.window, let setup = vDSP_create_fftsetup(bits, FFTRadix(kFFTRadix2))
-        else { return nil }
-        self.setup = setup
-        log2n = bits
-        half = Self.window / 2
-
-        windowCurve = .allocate(capacity: Self.window)
-        history = .allocate(capacity: Self.window)
-        staging = .allocate(capacity: Self.hop)
-        frame = .allocate(capacity: Self.window)
-        real = .allocate(capacity: half)
-        imaginary = .allocate(capacity: half)
-        power = .allocate(capacity: half + 1)
-        smoothed = .allocate(capacity: half + 1)
-        minimum = .allocate(capacity: half + 1)
-        binGain = .allocate(capacity: half + 1)
-        cleaned = .allocate(capacity: half + 1)
-        overlap = .allocate(capacity: Self.window)
-        output = .allocate(capacity: Self.window + Self.hop)
-
-        history.initialize(repeating: 0, count: Self.window)
-        staging.initialize(repeating: 0, count: Self.hop)
-        frame.initialize(repeating: 0, count: Self.window)
-        real.initialize(repeating: 0, count: half)
-        imaginary.initialize(repeating: 0, count: half)
-        power.initialize(repeating: 0, count: half + 1)
-        smoothed.initialize(repeating: 0, count: half + 1)
-        minimum.initialize(repeating: 0, count: half + 1)
-        binGain.initialize(repeating: 1, count: half + 1)
-        cleaned.initialize(repeating: 0, count: half + 1)
-        overlap.initialize(repeating: 0, count: Self.window)
-        output.initialize(repeating: 0, count: Self.window + Self.hop)
-
-        // Periodic Hann, square-rooted: `hann` itself is what the analysis and
-        // synthesis windows multiply to, and 75 % overlap makes those sum to a
-        // constant. The constant is computed rather than quoted, so the round
-        // trip is unity whatever the window and hop become.
-        var overlapSum: Float = 0
-        for index in 0..<Self.window {
-            let hann = 0.5 - 0.5 * cos(2 * Float.pi * Float(index) / Float(Self.window))
-            windowCurve[index] = sqrt(max(hann, 0))
-        }
-        for step in stride(from: 0, to: Self.window, by: Self.hop) {
-            let sample = windowCurve[step]
-            overlapSum += sample * sample
-        }
-        // `vDSP_fft_zrip` returns a spectrum scaled by 2, and the inverse does
-        // not undo the transform's own length, so a round trip needs 1/(2·N).
-        scale = 1 / (2 * Float(Self.window) * max(overlapSum, .leastNormalMagnitude))
-        resetState()
-    }
-
-    @available(*, unavailable) required init?(coder: NSCoder) {
-        fatalError("AudioNoiseReductionStage does not support NSCoder")
-    }
-
-    deinit {
-        vDSP_destroy_fftsetup(setup)
-        windowCurve.deallocate()
-        history.deallocate()
-        staging.deallocate()
-        frame.deallocate()
-        real.deallocate()
-        imaginary.deallocate()
-        power.deallocate()
-        smoothed.deallocate()
-        minimum.deallocate()
-        binGain.deallocate()
-        cleaned.deallocate()
-        overlap.deallocate()
-        output.deallocate()
-    }
-
-    /// Empties the pipeline and re-primes the delay line.
-    ///
-    /// The queue starts holding ONE HOP of silence, not one window. Frame `k`
-    /// finishes the hop of output that begins at input `(k + 1)·hop − window`,
-    /// so the overlap-add itself already delays by `window − hop`; priming the
-    /// queue with one more hop makes the total exactly `window` and — checked
-    /// against every arrival pattern, not just the tidy one — leaves the queue
-    /// unable to run dry between hops.
-    func reset() { resetState() }
-
-    private func resetState() {
-        history.update(repeating: 0, count: Self.window)
-        staging.update(repeating: 0, count: Self.hop)
-        overlap.update(repeating: 0, count: Self.window)
-        output.update(repeating: 0, count: Self.window + Self.hop)
-        smoothed.update(repeating: 0, count: half + 1)
-        minimum.update(repeating: 0, count: half + 1)
-        cleaned.update(repeating: 0, count: half + 1)
-        primed = false
-        outputHead = 0
-        outputTail = Self.hop
-        stagedCount = 0
-    }
-
-    /// Filters `frames` samples in place.
-    ///
-    /// `amount` is the clip's `noise_reduction`, read fresh on every call
-    /// because the clip under the playhead changes at every cut. At 0 the
-    /// gain floor is 1, every bin's gain is 1, and the stage is an exact
-    /// (float-precision) delay rather than a filter — which is what keeps a
-    /// track that mixes reduced and unreduced clips from changing its latency
-    /// halfway through.
-    func process(_ data: UnsafeMutablePointer<Float>, frames: Int, amount: Double) {
-        guard frames > 0 else { return }
-        let clamped = Float(min(max(amount.isFinite ? amount : 0, 0), 1))
-        // Over-subtraction: 1 removes exactly the estimate, 4 removes four
-        // times it. The floor is what is left of a bin the subtraction would
-        // otherwise empty; at amount 0 it is 1, which makes every gain 1.
-        let overSubtraction = 1 + 3 * clamped
-        let floorGain = 1 - clamped
-
-        for index in 0..<frames {
-            // Samples are staged a hop at a time and the history is shifted
-            // once per hop, not once per sample: the window is a plain
-            // in-order buffer (which is what `vDSP_vmul` wants) and the price
-            // of that is 384 floats moved per 128 samples rather than 511 per
-            // one. A ring buffer would need no move at all and would cost an
-            // unwrap on every read of every frame instead — the wrong trade at
-            // 75 % overlap.
-            staging[stagedCount] = data[index]
-            stagedCount += 1
-            if stagedCount == Self.hop {
-                stagedCount = 0
-                memmove(
-                    history, history + Self.hop,
-                    (Self.window - Self.hop) * MemoryLayout<Float>.size)
-                (history + Self.window - Self.hop).update(from: staging, count: Self.hop)
-                processFrame(overSubtraction: overSubtraction, floorGain: floorGain)
-            }
-            data[index] = popOutput()
-        }
-    }
-
-    /// One analysis/synthesis frame over the newest `window` samples.
-    private func processFrame(overSubtraction: Float, floorGain: Float) {
-        vDSP_vmul(history, 1, windowCurve, 1, frame, 1, vDSP_Length(Self.window))
-
-        var split = DSPSplitComplex(realp: real, imagp: imaginary)
-        frame.withMemoryRebound(to: DSPComplex.self, capacity: half) { pointer in
-            vDSP_ctoz(pointer, 2, &split, 1, vDSP_Length(half))
-        }
-        vDSP_fft_zrip(setup, &split, 1, log2n, FFTDirection(kFFTDirection_Forward))
-
-        // `vDSP_fft_zrip` packs DC in real[0] and Nyquist in imaginary[0];
-        // both are real, so they get their own slots at either end of the
-        // power array rather than being treated as a complex pair.
-        power[0] = real[0] * real[0]
-        power[half] = imaginary[0] * imaginary[0]
-        for bin in 1..<half {
-            power[bin] = real[bin] * real[bin] + imaginary[bin] * imaginary[bin]
-        }
-
-        for bin in 0...half {
-            let current = power[bin]
-            let smooth =
-                primed ? powerSmoothing * smoothed[bin] + (1 - powerSmoothing) * current : current
-            if !primed {
-                minimum[bin] = smooth
-            } else if minimum[bin] < smooth {
-                // Rise slowly, and only as fast as the smoothed power itself
-                // is rising — Doblinger's recursion, which is what stops a
-                // long vowel from dragging the floor up with it.
-                minimum[bin] =
-                    minimumRise * minimum[bin]
-                    + ((1 - minimumRise) / (1 - minimumBias))
-                    * (smooth - minimumBias * smoothed[bin])
-            } else {
-                minimum[bin] = smooth
-            }
-            smoothed[bin] = smooth
-
-            // The gain is a Wiener filter over the a priori SNR, and the a
-            // priori SNR is the decision-directed estimate: mostly what last
-            // frame's clean output says this bin holds, corrected by what
-            // this frame's power says. Subtracting the noise estimate from
-            // the power directly (the textbook subtractor) makes the gain
-            // jump with the periodogram's own variance, which is heard as
-            // bins winking in and out; this does not.
-            let noise = max(max(minimum[bin], 0) * noiseBias, .leastNormalMagnitude)
-            let posterior = current / noise
-            let prior = max(
-                decisionDirected * cleaned[bin] / noise
-                    + (1 - decisionDirected) * max(posterior - 1, 0),
-                1e-6)
-            // `overSubtraction` in the denominator generalises the filter: 1
-            // is the plain Wiener gain, 4 removes four times as much for the
-            // same SNR. The floor is what a bin keeps when the filter would
-            // otherwise empty it — at amount 0 the floor is 1 and the whole
-            // rule collapses to a no-op.
-            let gain = max(floorGain, prior / (prior + overSubtraction))
-            binGain[bin] = gain
-            cleaned[bin] = gain * gain * current
-        }
-        primed = true
-
-        real[0] *= binGain[0]
-        imaginary[0] *= binGain[half]
-        for bin in 1..<half {
-            real[bin] *= binGain[bin]
-            imaginary[bin] *= binGain[bin]
-        }
-
-        vDSP_fft_zrip(setup, &split, 1, log2n, FFTDirection(kFFTDirection_Inverse))
-        frame.withMemoryRebound(to: DSPComplex.self, capacity: half) { pointer in
-            vDSP_ztoc(&split, 1, pointer, 2, vDSP_Length(half))
-        }
-        var factor = scale
-        vDSP_vsmul(frame, 1, &factor, frame, 1, vDSP_Length(Self.window))
-        vDSP_vmul(frame, 1, windowCurve, 1, frame, 1, vDSP_Length(Self.window))
-        vDSP_vadd(overlap, 1, frame, 1, overlap, 1, vDSP_Length(Self.window))
-
-        // The first `hop` samples of the accumulator have now been summed by
-        // every frame that covers them, so they are finished: they go to the
-        // output queue and the accumulator slides.
-        pushOutput(overlap, count: Self.hop)
-        memmove(overlap, overlap + Self.hop, (Self.window - Self.hop) * MemoryLayout<Float>.size)
-        (overlap + Self.window - Self.hop).update(repeating: 0, count: Self.hop)
-    }
-
-    /// Appends finished samples, compacting the queue first when the tail has
-    /// run out of room. The queue holds at most two hops, so the capacity of
-    /// `window + hop` can never actually be exceeded; the `take` clamp is
-    /// there so that a future window/hop pair which broke that invariant would
-    /// drop samples rather than write off the end.
-    private func pushOutput(_ source: UnsafeMutablePointer<Float>, count: Int) {
-        let capacity = Self.window + Self.hop
-        if outputTail + count > capacity {
-            let held = outputTail - outputHead
-            if held > 0 { memmove(output, output + outputHead, held * MemoryLayout<Float>.size) }
-            outputHead = 0
-            outputTail = held
-        }
-        let take = min(count, capacity - outputTail)
-        guard take > 0 else { return }
-        (output + outputTail).update(from: source, count: take)
-        outputTail += take
-    }
-
-    private func popOutput() -> Float {
-        guard outputHead < outputTail else { return 0 }
-        let value = output[outputHead]
-        outputHead += 1
-        return value
-    }
-}
-
 // MARK: - The chain
 
-/// One composition audio track's effect chain: noise reduction, then the
-/// compressor, then the Mix stage — the mono fold, then the pan, then the
-/// fold an enclosing NEST clip asked for.
+/// One composition audio track's effect chain: the channel pick, then the
+/// EQ and hum notch, then noise reduction, then the gate, then the leveller
+/// (AU-66), then the de-esser,
+/// then the compressor, then the Mix stage — the mono fold, then the pan,
+/// then the fold an enclosing NEST clip asked for, then the tracks' balance
+/// (AU-104) — then the limiter (spec §11 AU-3, AU-20, AU-34, AU-47). Voice isolation's crossfade runs before
+/// it, in the tap (AU-53, AU-54).
 ///
 /// **That order is the order a channel strip has**, and each step is there
 /// because of the one before it. Cleaning first means the compressor is not
@@ -749,24 +315,48 @@ final class AudioNoiseReductionStage {
 /// folds those into the plan's envelope and `AVMutableAudioMixInputParameters`
 /// applies them as volume ramps, which — measured — happen downstream of a
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
-/// full order the samples actually see is
-/// noise reduction → compressor → the clip's fold → pan → an enclosing nest's
-/// fold → volume/fades/ducking, which puts the compressor before the fader
-/// exactly as an insert should be.
+/// full order the samples actually see is isolation → channel pick → EQ and
+/// hum → noise reduction → gate → leveller → de-esser → compressor → the
+/// clip's fold →
+/// pan → an enclosing nest's fold → limiter → volume/fades/ducking, which puts
+/// the compressor before the fader exactly as an insert should be. The
+/// limiter is told the fader's base gain instead (`AudioLimiterSettings`,
+/// AU-22).
 final class AudioDSPChain {
     let channelCount: Int
     private let compressor: AudioCompressorStage
     /// One per channel, or nil when no clip on this track asks for noise
     /// reduction — in which case the track has no added latency at all.
     private let reducers: [AudioNoiseReductionStage]?
+    /// Nil when no clip on this track has a limiter — no added latency.
+    private let limiter: AudioLimiterStage?
+    /// The EQ and hum notch (AU-30): no latency, so always built; nil
+    /// settings touch no sample.
+    private let eq: AudioEQStage
+    /// The gate and the de-esser (AU-47): no latency, so always built; nil
+    /// settings reset them and touch no sample. The leveller between them
+    /// holds no state (AU-66): `process` is handed its run.
+    private let gate: AudioGateStage
+    private let deEsser: AudioDeEsserStage
 
-    /// `usesNoiseReduction` is decided for the WHOLE track when the
-    /// composition is built, not per buffer: the stage adds a fixed delay, and
-    /// switching it in and out at a cut would make the track jump backwards
-    /// and forwards by 10 ms.
-    init(channelCount: Int, sampleRate: Double, maxFrames: Int, usesNoiseReduction: Bool) {
+    /// `usesNoiseReduction` and `usesLimiter` are decided for the WHOLE track
+    /// when the composition is built, not per buffer: each stage adds a fixed
+    /// delay, and switching one in and out at a cut would make the track jump
+    /// backwards and forwards (SY-25, AU-23).
+    init(
+        channelCount: Int, sampleRate: Double, maxFrames: Int, usesNoiseReduction: Bool,
+        usesLimiter: Bool = false
+    ) {
         self.channelCount = max(0, channelCount)
         compressor = AudioCompressorStage(sampleRate: sampleRate, maxFrames: maxFrames)
+        eq = AudioEQStage(channelCount: self.channelCount, sampleRate: sampleRate)
+        gate = AudioGateStage(sampleRate: sampleRate, maxFrames: maxFrames)
+        deEsser = AudioDeEsserStage(
+            channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
+        limiter = usesLimiter && self.channelCount > 0
+            ? AudioLimiterStage(
+                channelCount: self.channelCount, sampleRate: sampleRate, maxFrames: maxFrames)
+            : nil
         if usesNoiseReduction, self.channelCount > 0 {
             // All channels or none: a track whose left channel was filtered
             // and whose right was not would be delayed on one side, which is
@@ -791,7 +381,11 @@ final class AudioDSPChain {
     /// tail.
     func reset() {
         compressor.reset()
+        eq.reset()
+        gate.reset()
+        deEsser.reset()
         reducers?.forEach { $0.reset() }
+        limiter?.reset()
     }
 
     /// Runs the chain in place over one buffer.
@@ -799,12 +393,27 @@ final class AudioDSPChain {
     /// `params` is the clip under this buffer's timestamp. It changes at every
     /// cut on the track; the stages carry their state across the change, which
     /// is what a track insert does.
+    ///
+    /// `head` is the clip the HEAD stages (the pick, the EQ and hum) read, nil
+    /// for `params`: on a noise-reduced track they see samples the reducer's
+    /// lead ahead of the stages after it, so `AudioTap` looks their clip up
+    /// there (AU-34). `leveller` is `params.leveller`'s run at this buffer's
+    /// lookup frame (AU-66), nil for none.
     func process(
         _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
-        params: AudioClipDSP
+        params: AudioClipDSP, head: AudioClipDSP? = nil,
+        panRamp: AudioPanRamp? = nil, leveller: AudioLevellerRun? = nil
     ) {
         let count = min(channels.count, channelCount)
         guard frames > 0, count > 0 else { return }
+        let head = head ?? params
+
+        // The head (AU-34): which channels play, then the EQ and hum. A
+        // one-channel track ignores the pick, as it ignores pan.
+        if head.channels != .both, count >= 2 {
+            pick(channels, count: count, frames: frames, choice: head.channels)
+        }
+        eq.process(channels, count: count, frames: frames, settings: head.eq)
 
         if let reducers = reducers {
             for channel in 0..<min(count, reducers.count) {
@@ -812,6 +421,12 @@ final class AudioDSPChain {
                 reducers[channel].process(data, frames: frames, amount: params.noiseReduction)
             }
         }
+
+        // The gate, the leveller, then the de-esser, on the clip the
+        // compressor reads (AU-47, AU-66).
+        gate.process(channels, count: count, frames: frames, settings: params.gate)
+        leveller?.apply(channels, count: count, frames: frames)
+        deEsser.process(channels, count: count, frames: frames, settings: params.deEsser)
 
         compressor.process(channels, count: count, frames: frames, settings: params.compressor)
 
@@ -822,12 +437,52 @@ final class AudioDSPChain {
         // construction rather than by argument.
         if params.mono, count >= 2 { fold(channels, count: count, frames: frames) }
 
-        pan(channels, count: count, frames: frames, position: params.pan)
+        // An automated pan moves per sample (AU-87, `AudioAutomation.swift`).
+        if let panRamp, count >= 2 {
+            panRamp.apply(channels, frames: frames)
+        } else { pan(channels, count: count, frames: frames, position: params.pan) }
 
         // The tail: the fold a nest clip ABOVE this one asked for, after
         // everything this clip does to its own channels, which is what makes
         // the sum of the folded contributors the fold of the sum.
         if params.enclosingMono, count >= 2 { fold(channels, count: count, frames: frames) }
+
+        // The tracks' balance (AU-104), after the folds and before the limiter,
+        // so a limited clip hard-panned by its track holds its ceiling. Not
+        // entered at unity, and a one-channel track has nothing to lean.
+        if params.trackBalance != .unity, count >= 2 {
+            balance(channels, frames: frames, by: params.trackBalance)
+        }
+
+        // Last, for the whole track once any clip on it asks (AU-23): a
+        // clip without a limiter passes through it as a delay.
+        limiter?.process(channels, count: count, frames: frames, settings: params.limiter)
+    }
+
+    /// The channel pick, in place (AU-34): `left` copies channel 0 into every
+    /// channel, `right` channel 1, `swapped` exchanges 0 and 1. Copies and a
+    /// scalar swap over raw pointers: nothing allocated.
+    private func pick(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int, choice: AudioChannelChoice
+    ) {
+        guard let left = channels[0], let right = channels[1] else { return }
+        switch choice {
+        case .both:
+            return
+        case .left, .right:
+            let source = choice == .left ? left : right
+            for channel in 0..<count {
+                guard let data = channels[channel], data != source else { continue }
+                data.update(from: source, count: frames)
+            }
+        case .swapped:
+            for i in 0..<frames {
+                let held = left[i]
+                left[i] = right[i]
+                right[i] = held
+            }
+        }
     }
 
     /// The pan, in place. Its own method only so the tail fold above it is
@@ -847,6 +502,17 @@ final class AudioDSPChain {
         guard gains.left != 1 || gains.right != 1 else { return }
         var left = gains.left
         var right = gains.right
+        if let data = channels[0] { vDSP_vsmul(data, 1, &left, data, 1, vDSP_Length(frames)) }
+        if let data = channels[1] { vDSP_vsmul(data, 1, &right, data, 1, vDSP_Length(frames)) }
+    }
+
+    /// The tracks' balance, in place on channels 0 and 1, as `pan` leans.
+    private func balance(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, frames: Int,
+        by balance: AudioTrackBalance
+    ) {
+        var left = balance.left
+        var right = balance.right
         if let data = channels[0] { vDSP_vsmul(data, 1, &left, data, 1, vDSP_Length(frames)) }
         if let data = channels[1] { vDSP_vsmul(data, 1, &right, data, 1, vDSP_Length(frames)) }
     }

@@ -149,7 +149,9 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let to = try timeArg(a, "to", document)
-        return try editResult(document, "Trim Start", [.trimStart(clip: clip.id, to: to)])
+        let alone = try boolArg(a, "alone") ?? false
+        return try editResult(
+            document, "Trim Start", [.trimStart(clip: clip.id, to: to, alone: alone)])
     }
 
     /// `trim_end` — dragging a clip's right edge, and E.
@@ -157,7 +159,8 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let to = try timeArg(a, "to", document)
-        return try editResult(document, "Trim End", [.trimEnd(clip: clip.id, to: to)])
+        let alone = try boolArg(a, "alone") ?? false
+        return try editResult(document, "Trim End", [.trimEnd(clip: clip.id, to: to, alone: alone)])
     }
 
     /// `rate_stretch` — ⌥-dragging a clip's END edge
@@ -191,7 +194,8 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let to = try timeArg(a, "to", document)
-        return try editResult(document, "Roll", [.roll(clip: clip.id, to: to)])
+        let alone = try boolArg(a, "alone") ?? false
+        return try editResult(document, "Roll", [.roll(clip: clip.id, to: to, alone: alone)])
     }
 
     /// `split` — ⌘T (`splitAtPlayheadCommand`). With no `clips` the core
@@ -350,6 +354,14 @@ extension AgentServer {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         return try editResult(document, "Detach Audio", [.detachAudio(clip: clip.id)])
+    }
+
+    /// `attach_audio` — Clip ▸ Attach Audio, ⇧⌥⌘D (`attachSelectionAudio`):
+    /// a linked picture and its detached sound merge back into one clip.
+    func attachAudio(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        return try editResult(document, "Attach Audio", [.attachAudio(clip: clip.id)])
     }
 
     /// `duplicate` — ⌘D (`duplicateSelection`): copies land after the

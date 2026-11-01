@@ -113,7 +113,7 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all ten on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all eleven on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
@@ -135,6 +135,8 @@ final class RecorderPanelController: NSWindowController {
     static let cameraFormatKey = "FrameJobRecordingCameraFormat"
     /// "Record the camera too" (spec §11 CAM-11 (2)); an absent key reads as off.
     static let cameraBesideKey = "FrameJobRecordingCameraBeside"
+    /// "Enhance the microphone when it lands" (spec §11 AU-69); an absent key reads as off.
+    static let enhanceMicrophoneKey = "FrameJobRecordingEnhanceMicrophone"
 
     // MARK: - Metrics and vocabulary
 
@@ -175,6 +177,8 @@ final class RecorderPanelController: NSWindowController {
     let cameraPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let formatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let enhanceMicrophoneCheckbox = NSButton(
+        checkboxWithTitle: "Enhance the microphone when it lands", target: nil, action: nil)
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
     let showClicksSwitch = NSSwitch()

@@ -305,8 +305,11 @@ MCP: `snapshot_ui` (a capture of the editor, a sheet, Settings, Welcome or the
 recorder panel, with a layout dump), `perform_menu_item`, `cancel_sheet`,
 `select_inspector_tab`, `play_preview` (plays a preview and answers the frames
 composed), `graphic_memory` (the graphic rasters' memory budget, and a
-simulated memory-pressure event) and `assistant_send` / `assistant_answer` (an
-assistant turn against a stand-in server). To look at the chrome without a
+simulated memory-pressure event), `loudness_meter` (the live loudness meter's
+reading, and its reset), `land_recording` (fixture files landed as a finished
+recording through the recorder panel's door or `record_screen`'s, for the
+recorder's Enhance the microphone when it lands) and `assistant_send` /
+`assistant_answer` (an assistant turn against a stand-in server). To look at the chrome without a
 running app or a Screen Recording grant, use the offscreen harness in
 `tools/proof/harness/`.
 

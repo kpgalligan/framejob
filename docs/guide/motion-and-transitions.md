@@ -44,7 +44,7 @@ A new action from **Add Action** is **Linear**. A zoom action is **Ease In Out**
 Some things are never animated. These rows write the clip itself, whatever is selected, and are marked ⊘ in the Clip tab:
 
 - The Motion presets section (below).
-- In the Sound sub-tab: Pan, Mix to mono, Ducking, Noise Reduction and the Compressor.
+- In the Sound sub-tab: Ducking, the fade shapes, the Voice Effect, and a nest clip's Mix to mono. Every other audio setting animates ([Audio](audio.md#animating-the-sound)).
 - In the Clip sub-tab's Speed section: Keep pitch and Fit to.
 - **Adding or removing** a filter or an obscure region. Changing a value inside an existing entry still animates.
 - A shape's own properties in the Shape sub-tab (its kind, stroke, fill, gradient and arrows). Its position, scale and opacity animate like any clip's.
@@ -328,7 +328,8 @@ The **Transition** section is on the Clip sub-tab when a single selected clip ov
 |---|---|---|
 | Kind | The style, or None | None and the thirteen styles |
 | Curve | How the transition's progress is eased | Linear, Ease In, Ease Out, Ease In Out |
-| Crossfade Audio | On: the outgoing sound fades out and the incoming fades in at constant power, eased by the Curve, so the level holds steady between two unrelated takes. A pair where only one clip has sound still fades that clip. Off: both clips play at their own level across the whole overlap, mixed together. Mute, solo, ducking and volume still apply on top | On or off |
+| Crossfade Audio | On: the outgoing sound fades out and the incoming fades in, eased by the Curve, in the Crossfade Shape. A pair where only one clip has sound still fades that clip. Off: both clips play at their own level across the whole overlap, mixed together. Mute, solo, ducking and volume still apply on top | On or off |
+| Crossfade Shape | The curve of the crossfade, enabled while Crossfade Audio is on. **+3 dB** (constant power, the default) holds the level steady between two unrelated takes. **Linear** is a straight-line pair, which dips 3 dB in the middle of unrelated takes but suits two parts of the same sound. **S-Curve** and **−3 dB** move more of the change to the middle or the end. The incoming clip follows the shape and the outgoing clip follows it in reverse | +3 dB, Linear, S-Curve, −3 dB |
 | Duration | The length of the overlap. Changing it **moves** the later clip to match | 0.02–10 s (quick picks 0.25, 0.5, 1, 2) |
 
 A transition Frame Job makes is eased (Ease In Out) and crossfades its sound. An overlap with no stored transition draws as a linear cross dissolve with no sound crossfade, and in that state the section shows **Linear** and **Crossfade Audio** off. Setting either of them then stores a transition with exactly the values shown.
@@ -337,7 +338,7 @@ The duration is refused on a track's first clip, and past half the shorter clip.
 
 Two overlapping clips with no picture (audio-only clips) get the same section. Only their sound changes: Crossfade Audio and Curve control the crossfade, and Kind has no visible effect.
 
-*Agents:* `set_transition_style` (`curve` and `audio`, each kept when absent); `set_transition_duration`.
+*Agents:* `set_transition_style` (`curve`, `audio` and `audio_shape` — `plus_3db`, `linear`, `s_curve`, `minus_3db` — each kept when absent); `set_transition_duration`.
 
 ### Remove a transition
 

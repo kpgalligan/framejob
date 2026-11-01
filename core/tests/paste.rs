@@ -1038,10 +1038,10 @@ fn a_payload_out_of_range_or_without_clips_is_an_error() {
         "video.opacity must be between 0 and 1, not 5",
     );
     let mut loud = looks();
-    loud["clips"][0]["audio"]["volume"] = json!(9);
+    loud["clips"][0]["audio"]["volume"] = json!(99);
     assert_contains(
         &project.errors(&paste_attributes(&[10], &loud)),
-        "audio.volume must be between 0 and 4, not 9",
+        "audio.volume must be between 0 and 32, not 99",
     );
     // A payload with nothing to read a look from, and one that is not a
     // payload at all.

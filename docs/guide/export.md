@@ -25,6 +25,8 @@ From top to bottom:
 | **Size** | The frame size, or **Custom…** with width and height fields on the row below. | The format's first row |
 | **Frame rate** | **Project rate**, or a fixed rate. | Project rate |
 | **Quality** | **Format default**, or a bit-rate tier. | Format default |
+| **Bit depth** | **16-bit** or **24-bit**, for WAV and AIFF. See [Bit depth](#bit-depth). | 16-bit |
+| **Stems** | **None**, **One per Track** or **One per Track Name**: also write each track's sound as its own file, for the audio formats. See [Stems](#stems). | None |
 | **Loudness** | **Off**, a loudness target, or **Custom…** with a LUFS field. | Off |
 | **Range** | **Whole project**, or **In/out range** when one is set. | Whole project |
 | **Burn in timecode** | Draws the project timecode into the picture. | Off |
@@ -32,7 +34,7 @@ From top to bottom:
 Under the controls, a readout line describes the file and a footnote names the codec, the container and the rates the file will use. Every number they show is the size, rate and duration the file will actually have.
 
 - **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`. For **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)** and **VP9 with Alpha (WebM)** a second line estimates how long the export will take: `Estimated time: about 25 s` (in 5-second steps under a minute, then minutes, then hours and minutes). It follows the format, Speed, size and range, and it is only an estimate: the figures behind it are the median of three measured exports per format at 1080p and 4K, of real 4K camera footage on an idle Apple M2 Max, so a slower or busy Mac, or a heavy timeline, takes longer. The other formats show no estimate.
-- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`, `VP9 · WEBM · alpha`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
+- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`, `VP9 · WEBM · alpha`), the video rate, the audio rate (`192 kbps audio`), `24-bit` for a 24-bit WAV or AIFF, the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
 
 A control the chosen format cannot use is greyed out rather than hidden. Its value is not sent.
 
@@ -51,7 +53,7 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | ProRes 422 (MOV) | `.mov` | An editing master for another application. 10-bit. |
 | ProRes 4444 (MOV) | `.mov` | A master that keeps the alpha channel. 12-bit. |
 | Audio only (M4A) | `.m4a` | AAC sound only. |
-| Audio only (WAV) | `.wav` | Uncompressed 16-bit, 48 kHz sound. |
+| Audio only (WAV) | `.wav` | Uncompressed 16-bit or 24-bit, 48 kHz sound. |
 | Audio only (AIFF) | `.aiff` | The same samples as WAV, in an AIFF file. |
 | Animated GIF | `.gif` | A short silent loop. Capped at 480 × 270 and 12.5 fps by default. |
 | Animated PNG | `.png` | A lossless silent loop with real transparency. Capped at 960 × 540 and 25 fps by default. |
@@ -118,6 +120,22 @@ The four tiers set a video rate from the frame's size, so a tier means the same 
 - Audio only (M4A) uses the tier's AAC rate alone.
 - Quality is greyed out for ProRes, WAV, AIFF, GIF and APNG, where the format fixes the rate.
 
+### Bit depth
+
+The **Bit depth** row sits under Quality. It is live only on **Audio only (WAV)** and **Audio only (AIFF)**; on every other format it is greyed out and keeps your last choice. **16-bit** is the default; **24-bit** keeps detail 16-bit cannot, which matters most for a quiet recording you are going to raise or process later. Both are rounded once from the mix, never dithered. ProRes's sound stays 16-bit. The choice is remembered with the rest of the sheet and stored in presets.
+
+### Stems
+
+The **Stems** row sits under Bit depth. It is live only on **Audio only (M4A)**, **Audio only (WAV)** and **Audio only (AIFF)**; on every other format it is greyed out and keeps your last choice. With a choice other than **None**, the export writes the mix and, beside it, one file per stem, in the same format, for mixing or mastering in another editor.
+
+- **One per Track** writes one stem for each track you can hear.
+- **One per Track Name** writes one stem for each track name: tracks whose names match, ignoring case and spaces at either end, share one file, named the way the first of them is spelled. A track with no name gets its own.
+- A muted track has no stem, and while any track is soloed only the soloed tracks have one. A track with no sound on it (only pictures, or nothing) has none. If no track can be heard, the export is refused: "stems: no track is heard, so there is no stem to write".
+- A stem is named after the mix and its track: exporting `Mix.wav` writes `Mix - Dialogue.wav` and `Mix - Music.wav`. A track with no name is called by its header's label, `Track 3`. A `/` or `:` in a track name is written as `-`, and a second stem whose name an earlier one already has, ignoring case, gets its track's label after it: `vo (Track 2)`. If an earlier stem already has that name too, a count follows the label, `vo (Track 2, 2)`, so no two stems share a file.
+- **An existing file at a stem's name is replaced without asking.** The save panel asks only about the mix. The one exception: if a stem's file would be one of the project's own media files, the export stops before writing any stem, with "The stem “Mix - Dialogue.wav” would replace media this project uses; export under another name."
+- Each stem holds its tracks' sound exactly as the mix plays it, with the clips' and tracks' volume, pan, fades, ducking and effects, and a track's own compressor and limiter, but **before the master**: no loudness target is applied to it and the master limiter does not touch it. So the stems added together are the mix, to within the last bit, wherever the master neither raised the level nor limited a peak. A stem can therefore peak higher than the mix; it is clipped only at full scale.
+- The stems are written one after another after the mix, and the progress bar counts them. The finish line reads "Exported “Mix.wav” and 3 stems.", and the footnote under the sheet says "3 stems". The loudness figures are the mix's. Cancelling, or a failure part-way, removes the mix and every stem already written.
+
 ### Loudness
 
 Loudness normalises the whole mix to an integrated loudness target, measured to ITU-R BS.1770-4.
@@ -133,8 +151,12 @@ Loudness normalises the whole mix to an integrated loudness target, measured to 
 How normalisation works:
 
 - The export measures the real mix first. The progress line reads "Measuring loudness…" during this pass.
-- It then applies **one gain** to everything. Levels inside the timeline keep their relationship to each other, and there is no limiter.
-- The gain is capped so the true peak stays under **−1 dBTP**. When the cap applies, the file comes out quieter than the target.
+- It then applies **one gain** to everything. Levels inside the timeline keep their relationship to each other.
+- The gain is worked out through the export's master limiter (below), so the file lands on the target even when its loudest peaks would pass the ceiling: those peaks are turned down instead of the whole mix. Only a target more than 40 dB above the mix falls short.
+
+**Every export with sound goes through a master limiter**, normalised or not. It keeps the file's true peak under **−1 dBTP**: a mix that would pass that, from loud clips, a crossfade between two loud clips, a nest turned up or an action that raises a clip's volume, is limited instead of clipped. Sound under the ceiling passes through untouched, sample for sample. The limiter looks 3.3 ms ahead, and the export takes that back, so the sound stays exactly in sync with the picture. The preview has no master limiter: what you hear while editing is the mix before it.
+
+A track's own compressor and limiter ([Audio](audio.md#track-compressor-and-limiter)) run before the master, on that track's sound alone, exactly as set: the export plays each such track on its own through them and mixes the tracks afterwards. The measurement for a loudness target hears them too, so the file still lands on the target. The master is only the loudness gain and this limiter; there is no master compressor or EQ. To compress the whole mix, nest everything onto one track and give that track a compressor.
 
 The sheet fixes the ceiling at −1 dBTP. An agent can choose another (see [For agents](#for-agents)). Loudness is greyed out for GIF and APNG.
 
@@ -196,7 +218,7 @@ The save panel suggests the project's name with the format's extension (`Board v
 | `Peak −1.0 dBTP · −14.0 LUFS` | The true peak and integrated loudness of the file. |
 | `Peak … · loudness not measurable` | The sound is too short or too quiet to have a loudness. |
 | `Silent` | The sound is digital silence. |
-| `… — measured on the mix, which clipped at +x dBFS before it was written` | The mix went over full scale and was written without normalisation, so the file is clipped and these are the mix's figures. Turn the clips down, or export with a loudness target, which brings a hot mix back under full scale before it is written. |
+| `… · peaks limited by 8.6 dB` | The master limiter turned the loudest peak down by that much to hold the ceiling. A large figure on music can be audible; turn the clips down, or ask for a lower target. |
 
 ## The Export Queue
 
@@ -280,6 +302,7 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 
 - **The same picture and sound as the preview.** The export uses the same composition and the same compositor. View-only settings never reach it: Preview Quality, Show Ungraded, Show SDR Version, Show Selection, safe areas and the scopes.
 - **Speed ramps and Keep pitch off.** An export waits for the rendered audio of every speed ramp, and of every clip at a constant speed other than ×1 with Keep pitch off, to finish before it writes, and shows "Preparing…" meanwhile. That sound is never exported silent (see [Speed](speed.md)). If it cannot be rendered, the export fails with "Clip *n*'s retimed audio could not be rendered: …".
+- **The gate, the leveller and the de-esser.** Their thresholds follow each clip's measured loudness, and the leveller works from the clip's speech too, so an export waits, showing "Preparing…", until every gated, levelled or de-essed clip in it has been measured. If a measurement has not landed after five minutes, the export fails with "Clip *n*'s loudness or speech has not been measured yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." (see [Audio](audio.md#gate)).
 - **Missing media.** A clip whose file is missing still exports, showing its slate and with no sound. An audio track none of whose clips can be read is written as silence instead of failing the export.
 - **Graphics.** An export draws the graphics as they were when it was asked for, even if a module is saved again mid-export. If a graphic in the range, or in a nest the range reaches, does not compile or has no module, the export does not start and names the graphic. If a graphic fails while the file is being written, the export stops at that frame, names the graphic, and leaves no file. See [Graphics](graphics.md).
 - **Captions** are ordinary text clips, so they are always burned into the picture. To write a separate subtitle file, use **File ▸ Export Captions…** (see [Captions](captions.md)).
@@ -296,7 +319,9 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 | `range` | Range | `project` (default) or `in_out`. Refused when there is no in/out range. |
 | `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1`, `av1_webm` and `vp9_webm`, `video_bitrate` is a soft cap the file usually stays under. On `vp9_alpha_webm` it is the same soft cap on the picture's stream alone, and the transparency's stream comes on top of it (about 6–15 % of the video at 1080p, up to about 39 % at 640 × 360, measured). `audio_bitrate` is the AAC or Opus rate. |
 | `loudness_lufs` | Loudness | −70 to 0. |
-| `peak_dbtp` | (fixed at −1 on the sheet) | −20 to 0. Refused without `loudness_lufs`. |
+| `peak_dbtp` | (fixed at −1 on the sheet) | −20 to 0: the master limiter's ceiling, −1 when absent. Legal with or without `loudness_lufs`. |
+| `audio_bits` | Bit depth | `16` (default) or `24`. `audio_wav` and `audio_aiff` only; refused on every other format. |
+| `stems` | Stems | `tracks` or `names`. `audio_m4a`, `audio_wav` and `audio_aiff` only; refused on every other format and when no track can be heard. See [Stems](#stems). |
 | `burn_in_timecode` | Burn in timecode | |
 | `dynamic_range` | Dynamic Range | `hlg`, `pq` or `sdr`. |
 | `encoder_speed` | Speed | `faster`, `balanced` (default) or `smaller`. `av1` and `av1_webm` only; refused on every other format, `vp9_webm` and `vp9_alpha_webm` included. |
@@ -307,7 +332,7 @@ Every refusal comes back from `export` itself, before anything is queued: a bad 
 
 - `export_status {export_id}` answers the job's row without waiting: `queued`, `running` (with `progress` from 0 to 1 and `phase`), `done`, `failed` or `cancelled`. Call it again after a pause until the job finishes.
   - Every answer has `path` and `elapsed` (seconds).
-  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp`, `capped_by_peak` and `target_lufs`.
+  - `done` adds `bytes`, the settings the file was written with, `burn_in_timecode`, `dynamic_range` in an HLG project, `encoder_speed` for AV1 and AV1 (WebM), `audio_bits` for WAV and AIFF, `stems` (`[{name, tracks, path}]`, each file beside the mix) when stems were asked, any `graphic_warnings` and, for every format with sound, `loudness`: `summary`, `integrated_lufs`, `true_peak_dbtp`, `sample_peak_dbfs`, `gain_db`, `ceiling_dbtp` (the master limiter's), `limited_db` (how far it turned the loudest peak down), `capped_by_gain` (the 40 dB limit decided the gain) and `target_lufs`.
   - `queued` adds `waiting`, the row's "Waiting for memory: …" sentence, while an AV1 or VP9 job waits for memory.
   - `queued` and `running` add `estimated_seconds` for `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`: the export sheet's estimate of the whole export, in whole seconds.
   - `failed` and `cancelled` add `reason`, the queue row's sentence.
@@ -320,14 +345,14 @@ The full reference is [MCP](mcp.md).
 ## Limits
 
 - An animated GIF or APNG holds at most **600 frames**: 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. A longer range is refused. Shorten the range or lower the frame rate.
-- Loudness normalisation is gain only, with no limiter. A target the ceiling will not allow lands quieter than asked.
-- An unnormalised mix that goes over full scale is clipped in the file.
+- A loudness target more than 40 dB above the mix lands quieter than asked, and the report's `capped_by_gain` says so.
+- The master limiter cannot be turned off; 0 dBTP is its loosest ceiling. The preview has no master limiter, so a mix that passes −1 dBTP sounds louder while editing than in the file.
 - ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) refuse a custom size of a different shape from the canvas.
 - VP9 with Alpha (WebM) is 8-bit SDR only: an HDR project writes its SDR version, and HDR is refused on it.
 - A VP9 with Alpha (WebM) file re-imported into Frame Job keeps its picture and loses its transparency: it shows opaque, with black where it was transparent. Export ProRes 4444 or HEVC with Alpha for a transparent clip to bring back in.
 - Whether Safari shows VP9 with Alpha (WebM)'s transparency has not been confirmed; use HEVC with Alpha for Safari.
 - A Mac with no encoder for a format reports "This Mac cannot export with the “*preset*” preset." and leaves no file.
-- WAV and AIFF are 16-bit only.
+- 24-bit is offered on WAV and AIFF only. ProRes, AAC and Opus sound is 16-bit, and nothing is dithered.
 - On an M1 or M2 Mac Frame Job cannot play or re-import its own AV1 file, MP4 or WebM; QuickTime cannot either. Those Macs have no AV1 decoder. A VP9 (WebM) file re-imports on any Apple silicon Mac.
 - AV1's and VP9's file size is not known in advance: the file usually comes in well under the rate, but very detailed footage can go up to about 1.25 times over it with AV1 and about 1.15 times with VP9.
 - Captions are burned in, never a switchable subtitle track.

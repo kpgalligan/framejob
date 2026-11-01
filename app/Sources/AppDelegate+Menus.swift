@@ -267,6 +267,11 @@ extension AppDelegate {
             item(
                 "Detach Audio", #selector(EditorViewController.detachAudio(_:)), "d",
                 [.command, .option]))
+        // Detach Audio's way back (spec §11 AU-95, AU-97): its key plus ⇧.
+        menu.addItem(
+            item(
+                "Attach Audio", #selector(EditorViewController.attachAudio(_:)), "d",
+                [.command, .option, .shift]))
         // Road map 2's phase 5c, next to Detach Audio because those two are
         // the Clip menu's only sound commands. It duplicates the Audio
         // section's button deliberately (contract D-C8): a command reachable
@@ -282,6 +287,12 @@ extension AppDelegate {
         // `normalize_clip` description names as this command's UI path. Three
         // spellings of one command is how the halves drift.
         menu.addItem(item("Normalize", #selector(EditorViewController.normalizeClips(_:))))
+        // Road map "audio" AP6 (spec §11 AU-65), right after Normalize: the
+        // UI path `enhance_voice` names. No key equivalent, for Normalize's
+        // reason.
+        menu.addItem(item("Enhance Voice", #selector(EditorViewController.enhanceVoice(_:))))
+        // AP12 (spec §11 AU-121): the UI path `match_audio` names; no key.
+        menu.addItem(item("Match Audio…", #selector(EditorViewController.matchAudio(_:))))
         // Road map "audio-sync" AS-1, beside Normalize: the UI path
         // `sync_audio` names. No key equivalent, for Normalize's reason.
         menu.addItem(
@@ -395,6 +406,9 @@ extension AppDelegate {
         menu.addItem(item("Lock Track", #selector(EditorViewController.toggleTrackLocked(_:))))
         // The checkmark is the validator's (EditorViewController+Identity.swift).
         menu.addItem(item("Solo", #selector(EditorViewController.toggleTrackSolo(_:))))
+        // The track's mix popover (spec §11 AU-105), no key.
+        menu.addItem(
+            item("Mix…", #selector(EditorViewController.showTrackMix(_:))))
         menu.addItem(submenuItem(trackMatteMenu()))
         return menu
     }
@@ -476,6 +490,12 @@ extension AppDelegate {
         menu.addItem(
             item(
                 "Scopes", #selector(EditorViewController.toggleScopes(_:)), "w",
+                [.command, .control]))
+        // Road map "audio" AP7 (spec §11 AU-75): the live loudness column,
+        // view state like Scopes.
+        menu.addItem(
+            item(
+                "Loudness Meter", #selector(EditorViewController.toggleLoudnessMeter(_:)), "l",
                 [.command, .control]))
         return menu
     }

@@ -85,7 +85,15 @@ extension EditorViewController {
         else { return nil }
         let snapshot = document.editedProject.snapshot
         let front = snapshot.tracks.count - 1
-        let selection = document.selection
+        // A selected PICTURE half brings its linked sound, so a pasted
+        // detached clip lands as a pair; a selected sound half is copied
+        // alone, and the core clears its link on paste (spec §11 AU-96).
+        var selection = document.selection
+        for id in document.selection {
+            if let clip = snapshot.clip(id), clip.enabled.video, let partner = clip.linked {
+                selection.insert(partner)
+            }
+        }
 
         var payloadClips: [[String: Any]] = []
         var wanted: Set<UInt32> = []

@@ -134,8 +134,11 @@ first selected clip. With nothing selected it is the front-most track. See
 | Trim Start to Playhead | W (key) | Trims the selected clips' starts to the playhead |
 | Trim End to Playhead | E (key) | Trims their ends to the playhead |
 | Freeze Frame | ⇧⌘F | Holds the frame under the playhead as a still clip |
-| Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip ([Audio](audio.md)) |
-| Normalize | | Sets the selected clips' loudness |
+| Detach Audio | ⌥⌘D | Moves a clip's sound onto its own clip, linked to it ([Audio](audio.md)) |
+| Attach Audio | ⇧⌥⌘D | Merges a detached sound back into its picture ([Audio](audio.md#attach-audio)) |
+| Normalize | | Sets the selected clips' volume to a loudness (the default, turning a clip's limiter on when its peaks need it) or a peak, by the mode chosen in the Volume section's Normalize row. A clip with processing is measured through it under the Measuring Sound sheet |
+| Enhance Voice | | Sets the selected clips up for speech from their own measurements: high-pass, isolation or noise reduction and a gate for noisy pauses, the leveller for an uneven voice, the de-esser, a compressor, the limiter and the volume to the Normalize row's target ([Audio](audio.md#enhance-voice)) |
+| Match Audio… | | Gives the selected clips the loudness and the speech's tone of one of them, chosen in a sheet: their volume and limiter, and their EQ's shelves and bands, measured under the Measuring Sound sheet ([Audio](audio.md#match-audio)) |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
@@ -188,7 +191,10 @@ first selected clip. With nothing selected it is the front-most track. See
 | Split | The timeline has any clip |
 | Trim Start / End to Playhead, Freeze Frame | A selected clip is under the playhead |
 | Detach Audio | Something is selected |
+| Attach Audio | A selected clip is linked to its detached sound or picture |
 | Normalize | A selected clip plays sound |
+| Enhance Voice | A selected clip plays sound |
+| Match Audio… | Two or more selected clips play sound |
 | Synchronize Audio | Two or more selected clips play sound |
 | Add Action | A selected clip is under the playhead |
 | Speed… | The selection includes a clip that plays a media file |
@@ -210,7 +216,7 @@ first selected clip. With nothing selected it is the front-most track. See
 Open Nest and Close Nest are also greyed while you are typing in a text
 field.
 
-*Agents:* `split`, `trim_start`, `trim_end`, `freeze_frame`, `detach_audio`,
+*Agents:* `split`, `trim_start`, `trim_end`, `freeze_frame`, `detach_audio`, `attach_audio`,
 `normalize_clip`, `sync_audio`, `add_action`, `set_speed`, `add_speed_ramp`,
 `close_gap`, `detect_silence`, `detect_fillers`, `add_transition` /
 `set_transition`, `set_video` (motion and look), `add_background`,
@@ -228,13 +234,14 @@ field.
 | Mute Audio | | Mutes the current track's sound |
 | Lock Track | | Locks the current track so its clips can't be edited |
 | Solo | | Plays only this track's sound. A checkmark shows when it is on |
+| Mix… | | Opens the current track's mix panel: volume, pan, compressor and limiter ([Audio](audio.md#track-volume-and-pan)) |
 | Matte ▸ Off · Alpha · Inverted Alpha · Luma · Inverted Luma | | Makes the current track a matte that cuts the track behind it. A checkmark shows the track's mode ([Canvas and layers](canvas-and-layers.md)) |
 
 These items act on the current track. To act on a particular track, use that
 track's context menu ([below](#context-menus)).
 
 *Agents:* `add_track`, `remove_track`, `remove_empty_tracks`, `set_track`
-(hidden, muted, locked, solo, matte), `move_track`.
+(hidden, muted, locked, solo, matte, volume, pan), `move_track`.
 
 ## Mark menu
 
@@ -273,14 +280,15 @@ bounds it clears the range).
 | Show Selection | | Shows which pixels the selected adjustment clip's qualifier picks. Needs a selected adjustment clip to turn on |
 | Show SDR Version | | Shows an HDR project's SDR version ([HDR and colour management](hdr-and-color.md)) |
 | Scopes | ⌃⌘W | Shows the scopes panel beside the preview ([Colour grading](color-grading.md)) |
+| Loudness Meter | ⌃⌘L | Shows the live loudness column beside the preview: momentary, short-term and integrated LUFS and the true peak of what plays ([Audio](audio.md#live-loudness)) |
 
 The canvas zoom steps are Fit, 50 %, 100 % and 200 %. View ▸ Zoom In, Zoom
 Out and Zoom to Fit always act on the canvas. Zoom In is greyed at 200 %,
 and Zoom Out and Zoom to Fit at Fit. To zoom the timeline, use the timeline
 bar's controls or the gestures [below](#timeline-gestures). Show Ungraded,
-Show SDR Version and Scopes are always enabled. Snapping, Safe Areas, Hide Inspector,
+Show SDR Version, Scopes and Loudness Meter are always enabled. Snapping, Safe Areas, Hide Inspector,
 Timeline Track Height and Preview Quality are remembered between launches.
-Show Ungraded, Show Selection, Show SDR Version and Scopes are not
+Show Ungraded, Show Selection, Show SDR Version, Scopes and Loudness Meter are not
 remembered, and they never change an export.
 
 ## Window menu
@@ -395,18 +403,20 @@ instead ([below](#preview-canvas-gestures)).
 | ⌥-drag | Clip's end edge | Rate stretch: changes the speed so the clip fills the new length. Works only on a clip that plays a media file. On the start edge, ⌥ trims as usual |
 | ⌥⇧-drag | Clip edge | Roll: moves the cut between this clip and the clip touching it. Does nothing where there is no touching clip |
 | Drag | Fade handle on a clip | Sets that clip's audio fade-in or fade-out |
+| Drag | Volume line on a clip | Changes the level in force there, in dB (see [Audio](audio.md#the-volume-line)) |
+| ⌥-click or ⌥-drag | Volume line on a clip | Adds a volume point there as an action, then sets its level |
 | Click | Action band | Selects the clip and that action. The Clip tab then edits the action's end values; ⎋ deselects the action |
 | Drag | Action band | Moves the action in time |
 | Drag | Edge of an action band | Changes the action's length |
 | Double-click | Clip | Renames it in place |
 | Double-click | Nest clip | Goes inside the nest. To rename a nest clip, use ⇧⌘R |
-| Click or drag | Ruler | Moves the playhead (scrubbing) |
+| Click or drag | Ruler | Moves the playhead (scrubbing), playing the sound under it |
 | Drag | Marker | Moves it |
 | Double-click | Marker | Renames it |
 | Drag | Track header | Moves the track up or down the stack |
 | Double-click | Track header | Renames the track |
 | ⌥-click | Track header | Selects every clip on that track |
-| Click | Header buttons (eye, speaker, lock, headphones) | Hide Video, Mute Audio, Lock Track, Solo |
+| Click | Header buttons (eye, speaker, lock, headphones, sliders) | Hide Video, Mute Audio, Lock Track, Solo, and the mix panel |
 | Click | Breadcrumb in the corner, while a nest is open | Comes back out by one level |
 | Hold ⌘ while dragging | Any drag that snaps | Turns snapping off for that drag, even when you press ⌘ partway through |
 | Pinch, or ⌥ / ⌘ with the scroll wheel | Anywhere on the timeline | Zooms around the pointer |
@@ -509,6 +519,7 @@ The menu is for the track you clicked:
 
 - **Hide Video**, **Mute Audio**, **Lock Track**, **Solo**, each with a
   checkmark showing that track's state
+- **Mix…**, the track's mix panel
 - **Matte ▸** Off · Alpha · Inverted Alpha · Luma · Inverted Luma, with a
   checkmark on the track's mode
 - **Remove Track**. You are asked first if the track holds clips. Greyed

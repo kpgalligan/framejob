@@ -59,7 +59,11 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`set_action_end {clip, action, patch, off?, schema?}`** — Merges into the end patch; a key set to `null`
   removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`,
   `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that
-  optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`,
+  optional property OFF at the end (§5.4, §11 CI-14), and `audio.eq.<slot>` — `high_pass`,
+  `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` or `low_pass` — writes it at that slot
+  of the end's `eq`, one EQ slot keyed off (§11 AU-88), the only three-part path (an unknown slot
+  is an **error** naming the seven, any other deeper path the `"group.key"` one); a malformed
+  path, `video.motion`,
   `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
   also names are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a
@@ -117,7 +121,7 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`add_track {index?, name?}`** — Inserts (index 0 = back).
 - **`remove_track {track, with_clips=false}`** — Refuses on a non-empty track unless `with_clips`.
 - **`move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?,
-  matte?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
+  matte?, volume?, pan?, compressor?, limiter?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
   rule — while any track in the set is soloed every other is treated as muted, mute wins, audio
   only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and
   never in the plan, so a solo toggle changes ramps and nothing else. `matte` (format version 14,
@@ -125,7 +129,20 @@ The rules every op shares are §6a; the clip ops are §6b.
   switches a matte off, an unknown name is invalid input naming the five, and re-choosing the
   current mode is an identity. It changes the recipe alone (§7.3's `matte` and `mattes`), never
   the plan: a matte track's clips decode and sound as on any track. `move_track` and
-  `remove_track` change which track is behind a matte, visibly (MT-2).
+  `remove_track` change which track is behind a matte, visibly (MT-2). `volume` (linear, 0–4)
+  and `pan` (−1–1) are the track's fader and balance (format version 35, §11 AU-102): a value
+  outside its range is invalid input in `in_range`'s sentence (`volume must be between 0 and 4,
+  not 5`). Volume is an envelope term after mute (AU-103); pan is the plan's `track_pans`
+  (§7.2, AU-104). `nest` copies both from every source track but the nest clip's destination,
+  whose copy is unity and centre; `unnest` keeps neither. `compressor` and `limiter` (format
+  version 36, §11 AU-150) are the track's dynamics, post-fader on its sub-mix (AU-151): an object
+  REPLACES the whole value, its missing keys the clip type's defaults; `null` clears it. Refused
+  as invalid input, each in its own sentence: a value neither an object nor `null` (`compressor
+  must be a json object or null, not 5`), an unknown key (`unknown key "compressor.knee" in
+  set_track`), a mistyped member (`bad value at "limiter.release" in set_track: …`), and a value
+  outside the clip's ranges under the track's key (`compressor.ratio must be between 1 and 20,
+  not 30`). Inside a `scope` either key is invalid input (`a track's compressor or limiter has no
+  meaning inside nest 5`), and `nest` gives the nest's tracks none.
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.
@@ -192,6 +209,19 @@ The rules every op shares are §6a; the clip ops are §6b.
   a `peak` that is not a whole number is an `Err` (`color.peak must be a whole number of
   cd/m², not a string`). A `scope` is an `Err` (`set_media_color has no meaning inside nest
   4`): a nest shares the document's media.
+- **`set_media_speech {media, spans}`** — A media's speech spans (format version 29, §11 AU-110,
+  AU-111): `spans` is `[[start, end], …]` in SOURCE ticks of the file played forward, stored as
+  `media.speech` exactly as given (never snapped: the voice cache's grid is 19,200 ticks), and read
+  by every clip of the media whose `audio.duck.mode` is `speech`. An empty list is stored too — a
+  file with no speech found. Spans equal to the stored ones are an IDENTITY. `Err` for an unknown
+  media (`no media with id 9`); refused, each in its own sentence: `media 2 has no audio, so it has
+  no speech to duck by`, `media 1 speech span 0 starts at -1, before 0`, `media 1 speech span 0 ends
+  at 600000, not after its start 600000`, `media 1 speech span 0 ends at 12600000, past the media's
+  duration 12000000`, `media 1 speech span 1 starts at 600000, before span 0 ends at 1800000: speech
+  spans are sorted and do not overlap`, `media 1 carries 100001 speech spans, more than 100000`.
+  The app's Duck by Speech writes it in the same undo step as the `set_audio` that turns the mode
+  on, only for a media without spans. A `scope` is an `Err` (`set_media_speech has no meaning inside
+  nest 4`).
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

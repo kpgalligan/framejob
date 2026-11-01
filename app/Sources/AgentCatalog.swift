@@ -70,8 +70,8 @@ extension AgentServer {
     /// `restore_graphic`, `list_graphics`, `insert_graphic`, `export_graphic`,
     /// `import_graphic`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all one hundred and two get `project`
-    /// and where all sixty-two get `scope`.
+    /// through here, so this is still where all one hundred and four get `project`
+    /// and where all sixty-four get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
     /// files build tools with it or with `opTool`, and `private` on an
@@ -84,7 +84,7 @@ extension AgentServer {
         schema["project"] = Self.projectProperty
         // Road map 2's phase 9: every §6 OP also takes the envelope's
         // `scope`, and it is injected HERE for the reason `project` is —
-        // one edit site instead of sixty-two, and the op somebody adds in
+        // one edit site instead of sixty-four, and the op somebody adds in
         // phase 10 cannot arrive with a tool that silently lacks it.
         //
         // Op-ness is the CORE's answer (`Self.opNames`, read through
@@ -128,7 +128,7 @@ extension AgentServer {
     /// injected keys are the same code and cannot come to differ: `project`
     /// on every tool, `scope` on every name the core calls an op.
     ///
-    /// **Every one of the sixty-two op tools is built here** since road
+    /// **Every one of the sixty-four op tools is built here** since road
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
     /// two graphics, the four raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
@@ -167,7 +167,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of one hundred and two
+    /// decode behind it happen once per process instead of one hundred and four
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be
@@ -442,65 +442,9 @@ extension AgentServer {
         // the same reason: never at the end of the catalog.
         catalog += graphicTools(
             ticks: ticks, trackDescription: trackDescription, clipDescription: clipDescription)
+        // The track rows (AgentCatalog+Tracks.swift), at the place they stood.
+        catalog += trackTools(trackDescription: trackDescription)
         catalog += [
-
-            // MARK: Tracks
-
-            opTool(
-                "add_track",
-                "Adds an empty track. INDEX 0 IS THE BACK of the layer stack — the bottom lane "
-                    + "of the timeline, drawn first — and tracks.count is the front, which is "
-                    + "what ⇧⌘N adds and where an overlay belongs.",
-                [
-                    "index": "Where in the stack (0 = back). Default: the front.",
-                    "name": "Track name, e.g. \"Titles\".",
-                ]),
-            opTool(
-                "remove_track",
-                "Removes a track. A track that still holds clips is refused unless with_clips "
-                    + "is true, which removes them with it.",
-                [
-                    "track": trackDescription,
-                    "with_clips": "Remove the track's clips too (default false).",
-                ]),
-            opTool(
-                "move_track",
-                "Reorders the layer stack: the track moves to `index`, 0 being the back. A "
-                    + "higher index draws in FRONT of the tracks below it.",
-                ["track": trackDescription, "index": "New position."]),
-            opTool(
-                "set_track",
-                "Renames a track, flips its four switches — the track header's toggles, "
-                    + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo — or sets its matte, "
-                    + "Track ▸ Matte. hidden drops its "
-                    + "picture from the composition, muted its sound; locked keeps every ripple, "
-                    + "insert and range edit off it; solo silences every OTHER track in its "
-                    + "container (the timeline, or a nest's own tracks) that is not also soloed "
-                    + "— mute wins on a track that is both, and pictures are untouched. matte "
-                    + "makes the track a matte for the track directly behind it in its "
-                    + "container: its clips are not drawn, and what they show cuts that track "
-                    + "by alpha, inverted alpha, luma or inverted luma — where the matte track "
-                    + "shows nothing, the track behind shows uncut; a back-most matte track, or "
-                    + "one in front of another matte track, cuts nothing. Its clips still "
-                    + "sound. \"none\" makes it an ordinary track again.",
-                [
-                    // The four switches name the MENU ITEM each one mirrors
-                    // and nothing else: what each DOES is the sentence above,
-                    // and a sentence written twice is what this candidate
-                    // exists to delete. The description an agent reads comes
-                    // with these in one tool object, so nothing is lost.
-                    "track": trackDescription,
-                    "name": "New track name.",
-                    "hidden": "Track ▸ Hide Video.",
-                    "muted": "Track ▸ Mute Audio.",
-                    "locked": "Track ▸ Lock Track.",
-                    "solo": "Track ▸ Solo.",
-                    "matte": "Track ▸ Matte; \"none\" is its Off.",
-                ]),
-            opTool(
-                "remove_empty_tracks",
-                "Removes every track that holds no clips — Track ▸ Remove Empty Tracks.",
-                [:]),
 
             // MARK: Markers
 

@@ -1,4 +1,4 @@
-//! Five optional plain booleans default to false; nullable controls do not.
+//! Eight optional plain booleans default to false; nullable controls do not.
 mod common;
 
 use common::{Handle, Outcome};
@@ -169,4 +169,73 @@ fn nullable_boolean_duration_and_enum_have_distinct_value_meaning() {
             .pointer("/clips/1/transition_in"),
         Some(&Value::Null)
     );
+}
+
+/// Clips 10 and 11 each detached: their sounds are 31 and 32, abutting on
+/// a new back track (30), each linked to its picture (spec §11 AU-90).
+fn linked() -> Handle {
+    project()
+        .apply(&json!({"op":"detach_audio","clip":10}))
+        .apply(&json!({"op":"detach_audio","clip":11}))
+}
+
+fn field(project: &Value, clip: u64, key: &str) -> Value {
+    common::by_id(project, "/clips", clip)[key].clone()
+}
+
+/// `alone`, the J- and L-cut switch (spec §11 AU-93): absent and false
+/// carry the edge to the linked partner, null is a decode error, and true
+/// moves the named clip alone.
+#[test]
+fn alone_keeps_a_linked_partner_out_of_a_trim_or_a_roll() {
+    let before = linked();
+    let original = before.value();
+    for (base, clip, partner, key) in [
+        (
+            json!({"op":"trim_start","clip":10,"to":100_000}),
+            10,
+            31,
+            "start",
+        ),
+        (
+            json!({"op":"trim_end","clip":11,"to":1_000_000}),
+            11,
+            32,
+            "duration",
+        ),
+        (json!({"op":"roll","clip":11,"to":500_000}), 11, 32, "start"),
+    ] {
+        let name = base["op"].as_str().unwrap().to_owned();
+        let omitted = answer(&before, &base);
+        let mut explicit = base.clone();
+        explicit["alone"] = json!(false);
+        assert_eq!(answer(&before, &explicit), omitted, "{name}: false");
+        explicit["alone"] = Value::Null;
+        let error = before.try_apply(&explicit).unwrap_err();
+        assert!(
+            error.starts_with(&format!("op \"{name}\" is not valid: ")),
+            "{error}"
+        );
+
+        let carried = before.apply(&base).value();
+        let mut single = base.clone();
+        single["alone"] = json!(true);
+        let alone = before.apply(&single).value();
+        assert_ne!(field(&carried, clip, key), field(&original, clip, key));
+        assert_eq!(
+            field(&alone, clip, key),
+            field(&carried, clip, key),
+            "{name}"
+        );
+        assert_eq!(
+            field(&carried, partner, key),
+            field(&carried, clip, key),
+            "{name}: the partner follows"
+        );
+        assert_eq!(
+            field(&alone, partner, key),
+            field(&original, partner, key),
+            "{name}: alone leaves the partner"
+        );
+    }
 }

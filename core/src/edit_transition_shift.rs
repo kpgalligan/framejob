@@ -10,7 +10,7 @@
 //! arguments, finds the cut and hands over here (spec §11, R5-3's
 //! amendment of 2026-09-16); nothing else calls it.
 
-use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
+use crate::edit_time::{locked_track, shift_clips, shifted, unlocked_tracks};
 use crate::edit_transition::transition_too_short;
 use crate::model::{Clip, Project, Transition, TransitionKind};
 use crate::outcome::Outcome;
@@ -44,12 +44,13 @@ impl Project {
     /// minted `cross_dissolve`, which is `close_gap`'s rule for the same
     /// shift.
     ///
-    /// Four refusals, each in its own sentence: an incoming clip on a
+    /// Five refusals, each in its own sentence: an incoming clip on a
     /// LOCKED track cannot move ([`locked_track`]); a request under one grid
     /// frame is too short ([`transition_too_short`]); a pair whose shorter
-    /// clip is under two frames has no half to give; and a shift every
-    /// length of which would break the overlap rule somewhere it moved
-    /// something.
+    /// clip is under two frames has no half to give; a shift every length
+    /// of which would break the overlap rule somewhere it moved something;
+    /// and a linked sound the shift would take below 0 (`shift_clips`,
+    /// spec §11 AU-91).
     pub(crate) fn add_transition_by_shift(
         &self,
         earlier: &Clip,
@@ -76,10 +77,10 @@ impl Project {
             )));
         }
         let cut = later.start;
+        // `shift_clips`'s own set, linked partners included (spec §11 AU-91).
         let mut touched: Vec<u32> = Vec::new();
-        for clip in &self.clips {
-            if clip.start >= cut && unlocked.contains(&clip.track) && !touched.contains(&clip.track)
-            {
+        for clip in shifted(self, cut).iter().filter_map(|id| self.clip(*id)) {
+            if !touched.contains(&clip.track) {
                 touched.push(clip.track);
             }
         }
@@ -104,11 +105,10 @@ impl Project {
         }
         if let Some(frames) = shift_frame_limit(self, cut, most, &touched) {
             let mut next = self.clone();
-            shift_clips(
-                &mut next,
-                cut,
-                frames_back(cut, frames, fps).saturating_sub(cut),
-            );
+            let delta = frames_back(cut, frames, fps).saturating_sub(cut);
+            if let Some(why) = shift_clips(&mut next, cut, delta) {
+                return Ok(Outcome::Refused(why));
+            }
             for track in &touched {
                 if let Err(why) = next.check_overlap_rule(&[], *track, &[]) {
                     return Ok(Outcome::Refused(why));

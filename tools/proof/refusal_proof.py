@@ -420,7 +420,7 @@ def several_ops(mcp):
 
     print("\n3a — two clips, two ops, and something changed")
     applied(s, "normalize_clip", "normalising both is one call that applied",
-            clips=[first, second])
+            mode="peak", clips=[first, second])
     volume = s.clip(first)["audio"]["volume"]
     check(volume > 1.0 and s.clip(second)["audio"]["volume"] == volume,
           f"…and both clips carry the same measured volume ({volume})")
@@ -428,18 +428,18 @@ def several_ops(mcp):
     print("\n3b — the same call again is a list of two identities, and says so")
     identity(s, "normalize_clip", "Normalize",
              "every op in the list changed nothing, so the CALL changed nothing",
-             clips=[first, second])
+             mode="peak", clips=[first, second])
 
     print("\n3c — a later op still runs after an earlier identity")
     s.op("undo")
     landed("one undo puts both volumes back, so the two ops were ONE undo step",
            [s.clip(first)["audio"]["volume"], s.clip(second)["audio"]["volume"]], [1.0, 1.0])
-    s.op("normalize_clip", clips=[first])
+    s.op("normalize_clip", mode="peak", clips=[first])
     landed("normalising the first clip alone applies", s.clip(first)["audio"]["volume"],
            volume)
     applied(s, "normalize_clip",
             "…and a call naming BOTH is not refused although its first op is now an "
-            "identity", clips=[first, second])
+            "identity", mode="peak", clips=[first, second])
     landed("…because the second op still ran", s.clip(second)["audio"]["volume"], volume)
 
 

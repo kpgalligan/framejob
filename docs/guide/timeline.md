@@ -73,7 +73,7 @@ top lane is the front-most**, and the bottom lane is the back.
 
 ### Track headers
 
-Each track has a header on the left with its name and four switches:
+Each track has a header on the left with its name and five switches:
 
 | Switch | Symbol (off / on) | What it does |
 |---|---|---|
@@ -81,6 +81,7 @@ Each track has a header on the left with its name and four switches:
 | Mute Audio | speaker / crossed-out speaker | Silences the track's sound. |
 | Lock Track | open padlock / closed padlock | Protects the track from edits: its clips can't be dragged or trimmed, a marquee skips them, and ripple, insert and range edits leave them alone. The lane is hatched. |
 | Solo | headphones (both) | Silences every other track that is not soloed too. Pictures stay. Mute still wins on a track that is both muted and soloed. |
+| Mix | sliders (both) | Opens the track's mix panel: volume, pan, compressor and limiter ([Audio](audio.md#track-volume-and-pan)). Lit while the volume or pan is not at its default, or a compressor or limiter is on. |
 
 A lit switch is also highlighted in the accent colour, so you can read a
 track's state from the symbol or the highlight. Under a solo, the waveforms
@@ -111,7 +112,8 @@ with it.") with **Remove** and **Cancel**. The last track can't be removed.
 The **Track** menu works on the *current track*: the first selected clip's
 track, or the front-most track when nothing is selected. Besides the commands
 above it has **Hide Video**, **Mute Audio**, **Lock Track** and **Solo**,
-which flip that track's switches. Only Solo shows a checkmark there. The
+which flip that track's switches, and **Mix…**, which opens the
+track's mix panel. Only Solo shows a checkmark there. The
 **Matte ▸** submenu is described in
 [Canvas and layers](canvas-and-layers.md).
 
@@ -119,8 +121,8 @@ which flip that track's switches. Only Solo shows a checkmark there. The
 
 Right-click (or ⌃-click) a header, or an empty part of a lane, to get that
 track's menu: **Hide Video**, **Mute Audio**, **Lock Track** and **Solo**,
-each checked when on, then **Matte ▸**, then **Remove Track** (disabled on
-the last track). Right-clicking a clip opens no menu.
+each checked when on, then **Mix…**, then **Matte ▸**, then
+**Remove Track** (disabled on the last track). Right-clicking a clip opens no menu.
 
 Every switch flip, rename and reorder is one undo step. The names **Edit ▸
 Undo** shows for this page's edits are:
@@ -129,6 +131,7 @@ Undo** shows for this page's edits are:
 |---|---|
 | Track switches | Hide Track, Mute Track, Lock Track, Solo Track |
 | A track's matte | Track Matte |
+| A track's volume and pan | Track Volume, Track Pan, Reset Track Mix |
 | Track names and order | Rename Track, Reorder Track |
 | Adding and removing tracks | New Track, Remove Track, Remove Empty Tracks |
 | Markers | Add Marker, Move Marker, Rename Marker, Chapter Marker, Remove Marker |
@@ -136,8 +139,8 @@ Undo** shows for this page's edits are:
 
 *Agents:* `add_track` (an `index`, 0 being the back; the front when left
 out), `remove_track` (`with_clips` to take its clips too), `move_track`,
-`set_track` (`name`, `hidden`, `muted`, `locked`, `solo`, `matte`),
-`remove_empty_tracks`.
+`set_track` (`name`, `hidden`, `muted`, `locked`, `solo`, `matte`, `volume`,
+`pan`), `remove_empty_tracks`.
 
 ### Row heights
 
@@ -176,6 +179,11 @@ where one ends and the next begins.
   solo, it draws faded.
 - **Fade handles**: small white squares at the top corners of the audio part.
   Drag one inward to fade (see [Audio](audio.md)).
+- **Volume line**: a thin white line over the waveform showing the level you
+  hear from the clip, with small squares where a volume action ends. Drag it
+  to change the level, or ⌥-click it to add a point (see
+  [Audio](audio.md#the-volume-line)). A silenced clip's line lies along the
+  bottom.
 - **Motion marks**: small wedges at the ends of the name strip for an active
   In or Out motion, and a wave glyph for a During motion (see
   [Motion and transitions](motion-and-transitions.md)).
@@ -183,6 +191,10 @@ where one ends and the next begins.
   transition's kind written in it when the word fits.
 - **Selected**: a 2 pt coral ring, with trim grips at both ends when the clip
   is wide enough to trim and its track is unlocked.
+- **Linked**: a picture and the sound Detach Audio split from it each show a
+  link symbol after the kind symbol. When one is selected, the other gets a
+  dashed accent ring, because edits to one move both (see
+  [Audio](audio.md#what-stays-in-sync)).
 - **Dimmed**: a clip on a hidden track, or one with both its picture and its
   sound switched off.
 - **No filmstrip**: text, shape, graphic, nest and adjustment clips have no
@@ -221,7 +233,9 @@ Labels drop the hours when the timeline is under an hour long. The playhead
 is the coral line with a triangle head on the ruler.
 
 - **Click the ruler** to move the playhead there, and **drag** along it to
-  scrub. Playback stops while you scrub. The scrub snaps like any other drag
+  scrub. Playback stops while you scrub, and you hear the sound under the
+  playhead instead (see [Hearing a scrub](audio.md#hearing-a-scrub)). The
+  scrub snaps like any other drag
   (see [Snapping](#snapping)).
 - The timeline scrolls itself to keep the playhead in view: when the playhead
   leaves the visible part, during playback or after a jump, the view moves

@@ -1,0 +1,22 @@
+== stems_aac.mov
+stream|index=0|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=1|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=2|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+== stems_lpcm24.mov
+stream|index=0|codec_name=pcm_s24le|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=1|codec_name=pcm_s24le|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=2|codec_name=pcm_s24le|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+== stems_aac.mp4
+stream|index=0|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=1|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=2|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+== mix_plus_stems_disabled.mov
+stream|index=0|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=1|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=2|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=3|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio
+== mix_plus_stems_altgroup.mov
+stream|index=0|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=1|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=1|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=2|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio
+stream|index=3|codec_name=aac|sample_rate=48000|channels=2|duration=10.000000|disposition:default=0|tag:language=eng|tag:handler_name=Core Media Audio

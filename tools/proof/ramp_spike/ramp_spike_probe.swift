@@ -24,7 +24,7 @@
 //            with an `AVAssetReaderAudioMixOutput` over every audio track and
 //            the plan's mix, per the job's optional `mix_variant`: `app`
 //            (`ExportWriter.decodedAudioSettings`, the default), `float`
-//            (`ExportAudioGain.floatMixSettings`) or `output_varispeed` (`app`
+//            (`ExportAudioMaster.floatMixSettings`) or `output_varispeed` (`app`
 //            with the output's `audioTimePitchAlgorithm` `.varispeed`). The
 //            file is channel 0, float32 LE, in order; the line adds `variant`,
 //            `chunks: [[pts_ticks, frames]…]`, `range_ticks`,
@@ -281,7 +281,7 @@ func mixRead(_ job: Job) {
         let output = AVAssetReaderAudioMixOutput(
             audioTracks: tracks,
             audioSettings: variant == "float"
-                ? ExportAudioGain.floatMixSettings : ExportWriter.decodedAudioSettings)
+                ? ExportAudioMaster.floatMixSettings : ExportWriter.decodedAudioSettings)
         output.audioMix = built.audioMix
         if variant == "output_varispeed" { output.audioTimePitchAlgorithm = .varispeed }
         output.alwaysCopiesSampleData = true

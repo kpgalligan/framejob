@@ -60,7 +60,7 @@ extension TimelineView {
         let frame = max(snapshot.canvas.fps.frameDuration, 1)
         dragSnapper = makeSnapper(excluding: [left.id, right.id], suppressed: flags.contains(.command))
         roll = RollSession(
-            clip: right.id,
+            clip: right.id, alone: clip.isLinkedSound,
             earliest: left.start + frame, latest: right.end - frame,
             time: right.start)
         onLiveBegin?()

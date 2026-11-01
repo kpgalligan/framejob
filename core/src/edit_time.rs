@@ -85,24 +85,55 @@ pub(crate) fn unlocked_tracks(project: &Project) -> Vec<u32> {
         .collect()
 }
 
-/// THE shift primitive: every clip on an unlocked track whose start is at
-/// or after `from` moves by `delta`, in place. Ripple, the range form and
-/// insert time differ only in what they compute for `from` and `delta`.
-///
-/// The comparison is on `start` alone, which is rule 3: a clip that
-/// straddles `from` began before it and stays.
-pub(crate) fn shift_clips(project: &mut Project, from: Ticks, delta: Ticks) {
-    if delta == 0 {
-        return;
-    }
+/// What a shift at `from` moves: every clip on an unlocked track starting
+/// at or after `from` (rule 3: a straddler stays), and each one's linked
+/// partner on an unlocked track, whatever its start (spec §11 AU-91).
+pub(crate) fn shifted(project: &Project, from: Ticks) -> Vec<u32> {
     let unlocked = unlocked_tracks(project);
+    let mut out: Vec<u32> = Vec::new();
+    for clip in project.clips.iter().filter(|c| c.start >= from) {
+        let partner = project.partner(clip.id).map(|p| (p.id, p.track));
+        for (id, track) in [Some((clip.id, clip.track)), partner].into_iter().flatten() {
+            if unlocked.contains(&clip.track) && unlocked.contains(&track) && !out.contains(&id) {
+                out.push(id);
+            }
+        }
+    }
+    out
+}
+
+/// THE shift primitive: exactly [`shifted`]'s clips move by `delta`, in
+/// place. Ripple, the range form and insert time differ only in what they
+/// compute for `from` and `delta`. `Some` refusal, nothing moved, when a
+/// partner leading its clip would start before 0; the caller answers it as
+/// [`Outcome::Refused`] (a ripple closes fully or not at all).
+pub(crate) fn shift_clips(project: &mut Project, from: Ticks, delta: Ticks) -> Option<String> {
+    if delta == 0 {
+        return None;
+    }
+    let moving = shifted(project, from);
+    for id in &moving {
+        let Some(clip) = project.clip(*id) else {
+            continue;
+        };
+        if clip.start.saturating_add(delta) < 0 {
+            if let Some(partner) = project.partner(*id) {
+                return Some(format!(
+                    "clip {id} would start before 0: it leads its linked clip {} by {} ticks",
+                    partner.id,
+                    partner.start.saturating_sub(clip.start)
+                ));
+            }
+        }
+    }
     for clip in project.clips.iter_mut() {
-        if clip.start >= from && unlocked.contains(&clip.track) {
+        if moving.contains(&clip.id) {
             // Saturating and floored: a caller's delta can never push a
             // clip to a negative start, which `validate` rejects.
             clip.start = clip.start.saturating_add(delta).max(0);
         }
     }
+    None
 }
 
 /// The bounds a range op works on: snapped, clamped to 0 and put in order,
@@ -169,6 +200,7 @@ impl Project {
     ///
     /// The named clips are removed whether or not their track is locked —
     /// the caller named them — while the lock decides only what may SHIFT.
+    /// Each one's linked partner on an unlocked track goes too (AU-91).
     ///
     /// Markers do not move. A ripple can remove several spans, and a marker
     /// inside one of them has no moment left to name and nowhere to go that
@@ -179,7 +211,7 @@ impl Project {
     ///
     /// `Err` on an unknown clip id; an identity for an empty selection.
     pub fn ripple_delete(&self, clips: &[u32]) -> Result<Outcome, String> {
-        let selection = self.selected_clips(clips)?;
+        let selection = self.selected_clips(&self.with_links(clips)?)?;
         if selection.is_empty() {
             return Ok(Outcome::Identity);
         }
@@ -198,7 +230,9 @@ impl Project {
         next.clips.retain(|c| !ids.contains(&c.id));
         for span in spans.iter().rev() {
             let length = span.end.saturating_sub(span.start);
-            shift_clips(&mut next, span.end, -length);
+            if let Some(why) = shift_clips(&mut next, span.end, -length) {
+                return Ok(Outcome::Refused(why));
+            }
         }
         // A shift can slide a clip onto a straddling neighbour on another
         // track; an overlap IS a transition, so give the newcomer the
@@ -290,7 +324,10 @@ impl Project {
             next = clear_range(&next, span.start, span.end)?;
             // Negated by subtraction rather than by `-length`, so an absurd
             // range cannot overflow on the negation.
-            shift_clips(&mut next, span.end, span.start.saturating_sub(span.end));
+            if let Some(why) = shift_clips(&mut next, span.end, span.start.saturating_sub(span.end))
+            {
+                return Ok(Outcome::Refused(why));
+            }
         }
         let unlocked = unlocked_tracks(&next);
         self.finish_placement(next, &unlocked)
@@ -383,17 +420,17 @@ impl Project {
         // and only those are checked: a rule violation elsewhere is not
         // this op's to report, and refusing over one would make a gap
         // uncloseable for a reason the user cannot see.
-        let unlocked = unlocked_tracks(self);
         let mut touched: Vec<u32> = Vec::new();
-        for clip in &self.clips {
-            if clip.start >= end && unlocked.contains(&clip.track) && !touched.contains(&clip.track)
-            {
+        for clip in shifted(self, end).iter().filter_map(|id| self.clip(*id)) {
+            if !touched.contains(&clip.track) {
                 touched.push(clip.track);
             }
         }
 
         let mut next = self.clone();
-        shift_clips(&mut next, end, start.saturating_sub(end));
+        if let Some(why) = shift_clips(&mut next, end, start.saturating_sub(end)) {
+            return Ok(Outcome::Refused(why));
+        }
         for id in &touched {
             if let Err(why) = next.check_overlap_rule(&[], *id, &[]) {
                 return Ok(Outcome::Refused(why));
@@ -425,7 +462,8 @@ impl Project {
         }
 
         let mut next = self.clone();
-        shift_clips(&mut next, at, length);
+        // A positive shift has no floor to refuse.
+        let _ = shift_clips(&mut next, at, length);
         for marker in next.markers.iter_mut() {
             if marker.time >= at {
                 marker.time = marker.time.saturating_add(length);

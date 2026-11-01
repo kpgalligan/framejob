@@ -1,4 +1,5 @@
 import AVFoundation
+import Accelerate
 import Foundation
 
 /// Where `AudioDSP`'s effects meet AVFoundation: the parameters, the schedule
@@ -34,8 +35,9 @@ import Foundation
 /// `kMTAudioProcessingTapCreationFlag_PreEffects`, so the compressor sees the
 /// clip at its recorded level rather than at the level the fader is passing —
 /// an insert before the fader, which is where a compressor belongs. What IS
-/// here is everything the plan cannot carry: pan, the mono fold, the
-/// compressor and noise reduction.
+/// here is everything the plan cannot carry: voice isolation's crossfade, the
+/// channel pick, the EQ and hum notch, noise reduction, the compressor, the
+/// mono fold, pan and the limiter.
 ///
 /// **The tap also meters, and it is the only thing that can.** A meter wants
 /// the mix level, which would be a PostEffects tap — but
@@ -52,273 +54,6 @@ import Foundation
 /// that metering never reaches an EXPORT, so every export keeps exactly the
 /// audio path it had.
 
-// MARK: - The schedule
-
-/// One clip's stretch of a composition audio track, in composition ticks.
-///
-/// Composition time equals timeline time on these tracks — `CompositionBuilder`
-/// fills them behind a cursor precisely so that stays true through speed
-/// changes — so the plan's own `start` and `duration` are what a buffer's
-/// timestamp is compared against.
-struct AudioDSPSpan: Equatable {
-    let start: Ticks
-    /// Exclusive.
-    let end: Ticks
-    let dsp: AudioClipDSP
-}
-
-/// What one composition audio track's tap needs to know, decided once when
-/// the composition is built.
-struct AudioTrackDSP: Equatable {
-    let spans: [AudioDSPSpan]
-    /// Whether any clip on this track asks for anything at all. False means no
-    /// tap is created, and the track's samples are exactly what the build
-    /// before this file existed produced.
-    let isActive: Bool
-    /// Whether the noise reducer runs for the WHOLE track. It is all or
-    /// nothing per track by design: the stage delays by 512 samples, and
-    /// switching it in at a cut would jump the track 10 ms backwards
-    /// mid-programme.
-    let usesNoiseReduction: Bool
-
-    init(segments: [PlanSegment], parameters: AudioDSPParameters) {
-        var spans: [AudioDSPSpan] = []
-        spans.reserveCapacity(segments.count)
-        for segment in segments where segment.duration > 0 {
-            let dsp = parameters.dsp(for: segment.clip)
-            guard !dsp.isInert else { continue }
-            spans.append(
-                AudioDSPSpan(
-                    start: segment.start, end: segment.start + segment.duration, dsp: dsp))
-        }
-        self.spans = spans
-        isActive = !spans.isEmpty
-        usesNoiseReduction = spans.contains { $0.dsp.noiseReduction > 0 }
-    }
-
-    private init() {
-        spans = []
-        isActive = false
-        usesNoiseReduction = false
-    }
-
-    /// A track that asks for no processing at all. What a METERING-only tap is
-    /// built with: it still has to fetch and hand on its source audio, and it
-    /// still has to measure it, but no chain is built for it and no sample is
-    /// touched.
-    static let inert = AudioTrackDSP()
-}
-
-// MARK: - Parameters, and where they come from
-
-/// Every clip's sample-level audio settings, keyed by clip id.
-///
-/// Only the clips that ask for something are in the dictionary: an empty one
-/// means the whole project needs no tap anywhere, which is the state every
-/// project made before this feature existed is in.
-struct AudioDSPParameters: Equatable {
-    private let clips: [UInt32: AudioClipDSP]
-
-    static let empty = AudioDSPParameters(clips: [:])
-
-    private init(clips: [UInt32: AudioClipDSP]) {
-        self.clips = clips
-    }
-
-    /// Reads the settings off a project snapshot, nests included — a nested
-    /// clip gets its own composition audio track exactly as a top-level one
-    /// does, and `Project.clips` and `Nest.clips` share one id space, so one
-    /// flat dictionary covers both.
-    ///
-    /// **A nest CLIP is not in the dictionary, and its own `mono` is carried
-    /// down instead.** The plan replaced a nest with the clips inside it
-    /// (`nest.rs`), so an audio segment always names the INNERMOST clip and
-    /// nothing could ever look a nest clip's entry up — a `mono` written on
-    /// one would be accepted by the core, kept by the checkbox, saved with
-    /// the project and silently fold nothing, which is what it did until this
-    /// walk existed. So every clip inside a folded nest is marked
-    /// `enclosingMono` and folds at the tail of its own chain, which sums to
-    /// exactly the fold of the nest's mix (`AudioClipDSP.enclosingMono`).
-    /// A nest inside a folded nest is walked too: an outer fold applies to
-    /// everything within, and folding twice is folding once.
-    ///
-    /// **The nest clip's other three do NOT travel, and two of them cannot.**
-    /// The compressor and the noise reducer are not linear, so running either
-    /// on each contributor is a different sound from running it on the mix —
-    /// bus compression is the whole reason a bus has a compressor — and the
-    /// reducer would also delay each inner track by its own 512 samples. Pan
-    /// is linear and could ride down the same walk, but two pans do not
-    /// compose into one number (`AudioClipDSP` carries one `pan`, and the
-    /// product of two constant-power pairs is no single position), and
-    /// turning it on would change how projects that already carry a nest pan
-    /// sound — the decision M3 recorded for `mono` itself, which phase 5
-    /// took deliberately and one at a time. So a nest clip's pan, compressor
-    /// and noise reduction reach nothing, exactly as they did in M3.
-    ///
-    /// **One limit the id space imposes:** two nest clips may show the SAME
-    /// nest, and the dictionary is keyed by clip id while the plan's segments
-    /// carry no instance path, so a fold asked for by one of them folds both.
-    /// Folding is the choice that makes the control do what it says on the
-    /// clip that asked; the alternative — fold only when every nest clip
-    /// showing the nest agrees — makes the checkbox do nothing at all.
-    ///
-    /// **Base properties only, never through actions.** A clip's numbers can
-    /// be animated (`actions.rs` lerps any of them), and none of the four is
-    /// read at the animated value: the plan carries no per-tick audio, the
-    /// tap would have to evaluate the action itself, and evaluation is Rust's
-    /// job. Ducking already works this way — `audio.rs`'s `duckers()` reads
-    /// base props and says so — so this is the established answer rather than
-    /// a new exception. An action that animates `pan` moves nothing.
-    init(snapshot: ProjectSnapshot) {
-        var clips: [UInt32: AudioClipDSP] = [:]
-        func collect(_ list: [ClipSnapshot]) {
-            for clip in list {
-                // A nest clip's own entry could never be looked up: its id
-                // names no audio segment. `fold` below is where its `mono`
-                // goes instead.
-                guard clip.source.nestID == nil, let audio = clip.audio else { continue }
-                let dsp = AudioClipDSP(
-                    pan: audio.pan,
-                    compressor: audio.compressor.map {
-                        AudioCompressorSettings(
-                            thresholdDB: $0.thresholdDb, ratio: $0.ratio,
-                            attackSeconds: AudioDSPParameters.seconds($0.attack),
-                            releaseSeconds: AudioDSPParameters.seconds($0.release),
-                            makeupDB: $0.makeupDb)
-                    },
-                    noiseReduction: audio.noiseReduction,
-                    mono: audio.mono)
-                guard !dsp.isInert else { continue }
-                clips[clip.id] = dsp
-            }
-        }
-        collect(snapshot.clips)
-        for nest in snapshot.nests { collect(nest.clips) }
-
-        // Marks everything `nestID` stands for, however deep. Bounded by the
-        // core's `MAX_NEST_DEPTH` (8, `format.rs`) rather than trusted to
-        // terminate: `validate` refuses a deeper — and so a circular — nest,
-        // but this walk reads a decoded snapshot and a walk that can be
-        // handed a cycle is a walk that must be bounded.
-        func fold(contentsOf nestID: UInt32, depth: Int) {
-            guard depth <= AudioDSPParameters.nestDepthCap, let nest = snapshot.nest(nestID)
-            else { return }
-            for clip in nest.clips {
-                if let inner = clip.source.nestID {
-                    fold(contentsOf: inner, depth: depth + 1)
-                    continue
-                }
-                // Every clip inside, not only the ones carrying audio props:
-                // which of them gets an audio segment is `evaluate.rs`'s rule
-                // (the media has sound, and `enabled.audio` holds all the way
-                // up), not one Swift may restate, and an entry the tap never
-                // looks up costs a dictionary slot and nothing else.
-                var dsp = clips[clip.id] ?? .inert
-                dsp.enclosingMono = true
-                clips[clip.id] = dsp
-            }
-        }
-        func foldMonoNests(_ list: [ClipSnapshot]) {
-            for clip in list where clip.audio?.mono == true {
-                guard let nestID = clip.source.nestID else { continue }
-                fold(contentsOf: nestID, depth: 1)
-            }
-        }
-        foldMonoNests(snapshot.clips)
-        for nest in snapshot.nests { foldMonoNests(nest.clips) }
-        self.clips = clips
-    }
-
-    /// `format.rs`'s `MAX_NEST_DEPTH`. Duplicated rather than bridged: the
-    /// FFI carries no constant for it, and a walk one level shallower than
-    /// the core allows would silently stop folding, so the number is written
-    /// where a reader comparing the two files can see it.
-    private static let nestDepthCap = 8
-
-    /// Ticks → seconds, the one place the compressor's two times cross that
-    /// boundary.
-    private static func seconds(_ ticks: Ticks) -> Double {
-        Double(max(ticks, 0)) / Double(ReelTime.perSecond)
-    }
-
-    func dsp(for clip: UInt32) -> AudioClipDSP { clips[clip] ?? .inert }
-
-    var isEmpty: Bool { clips.isEmpty }
-}
-
-/// The process-wide place `CompositionBuilder` finds a document's audio DSP
-/// parameters, keyed by the same `RecipeSource` slot the compositor reads
-/// recipes under.
-///
-/// **Why this is not simply read off the project.** The parameters are per
-/// clip, and `CompositionBuilder.build` is handed the composition PLAN, not
-/// the project: the plan is `plan.rs`'s structural description and carries
-/// no audio properties beyond the envelope and the time-pitch algorithm. Both
-/// callers do publish the project first — `Playback.update` and
-/// `Exporter.export` each call `RecipeSource.shared.set` before building — but
-/// `RecipeSource` exposes only `recipe(for:at:)`, and a frame recipe has no
-/// audio in it. So this mirror exists beside it, published from `Playback`.
-///
-/// **Why a key with no entry still gets the right answer.** An export mints a
-/// FRESH `RecipeSource` key (`Exporter.swift`: "NOT the document's", so a
-/// frame already queued cannot be composed from a project the user changed
-/// mid-write), and nothing publishes a document's parameters under that new
-/// key. What every such caller DOES publish under it is the project handle
-/// itself, so the lookup reads that handle back through
-/// `RecipeSource.project(for:)` and derives the parameters from its snapshot —
-/// the same pure `init(snapshot:)` `Playback` publishes through, applied to
-/// exactly the project being built.
-///
-/// It was once a scan for the published document whose plan JSON matched the
-/// one being built. That is a guess, and it guessed wrong the moment two
-/// documents were open with byte-identical composition plans: it could not
-/// tell them apart, so it returned nothing and every export ran with the DSP
-/// silently switched off. Measured, not theorised — two projects each holding
-/// one clip of the same file was enough. A key names one composition; ask it
-/// rather than the population.
-final class AudioDSPSource {
-    static let shared = AudioDSPSource()
-
-    private let lock = NSLock()
-    private var entries: [Int: AudioDSPParameters] = [:]
-
-    private init() {}
-
-    /// Publishes a document's parameters. Main thread, after every edit.
-    ///
-    /// `Playback` publishes here so the player never pays for a decode on a
-    /// scrub; the derivation in `parameters(for:)` is the same function, so
-    /// the two can never disagree about what a project asks for.
-    func publish(_ parameters: AudioDSPParameters, for key: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        entries[key] = parameters
-    }
-
-    /// Drops a document's slot, the way `RecipeSource.unregister` does.
-    func unpublish(_ key: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        entries.removeValue(forKey: key)
-    }
-
-    /// The parameters for the composition being built under `key`: the
-    /// published entry, or — for a key minted for one export or one rendered
-    /// frame — derived from the project that key was registered with.
-    ///
-    /// Never guesses. A key with no entry and no published project is a
-    /// composition nothing claims, and that gets `.empty`: an unprocessed
-    /// export, not a wrongly processed one.
-    func parameters(for key: Int) -> AudioDSPParameters {
-        lock.lock()
-        let published = entries[key]
-        lock.unlock()
-        if let published = published { return published }
-        guard let project = RecipeSource.shared.project(for: key) else { return .empty }
-        return AudioDSPParameters(snapshot: project.snapshot)
-    }
-}
-
 // MARK: - The tap
 
 /// One tap's state: what it was built with, and everything it carries between
@@ -330,13 +65,32 @@ final class AudioDSPSource {
 /// object's life is exactly the tap's.
 final class AudioTapContext {
     private let track: AudioTrackDSP
+    /// Voice isolation's crossfade (spec §11 AU-53, AU-54), run on the base
+    /// pointers BEFORE the chain; nil or empty when no clip has a render.
+    private let isolation: AudioIsolationTrack?
+    /// Whether `prepare` accepted a 48 kHz format: a tap at any other rate
+    /// passes dry, the renders being 48 kHz frames.
+    private var isolates = false
+    /// Where the last buffer ended, in 48 kHz composition frames, for a
+    /// buffer with no usable time.
+    private var positionFrame: Int64 = 0
+    /// The same at the tap's own rate: the automation's absolute grid
+    /// (AU-87) for a buffer with no usable time.
+    private var gridPosition: Int64 = 0
     /// Where this track's levels are published, on a metering (playback)
     /// build; nil on every export and on every rendered frame. Written on the
-    /// audio thread with two relaxed atomic stores and nothing else — see
-    /// `LevelMeter.swift` for why it is not the `NSLock` the rest of the app
-    /// publishes across threads with.
+    /// audio thread with two relaxed atomic stores and a copy into its
+    /// lock-free `MixRing` — see `LevelMeter.swift` for why it is not the
+    /// `NSLock` the rest of the app publishes across threads with.
     private let meter: LevelMeterSink?
     private var chain: AudioDSPChain?
+    /// The track's compressor and limiter on a metering build (spec §11
+    /// AU-153), made in `prepare`, and its two envelope buffers of
+    /// `stageFrames`: E read `latency` frames ahead, and E at the frame.
+    private var trackStage: AudioTrackDynamicsStage?
+    private var ahead: [Float] = []
+    private var behind: [Float] = []
+    private var stageFrames = 0
     /// The channel base pointers, refilled per buffer. A stored array so no
     /// allocation happens on the audio thread.
     private var channels: [UnsafeMutablePointer<Float>?] = []
@@ -355,8 +109,9 @@ final class AudioTapContext {
     /// at 48 kHz) and far shorter than any jump a scrub makes.
     private static let seekTolerance: Ticks = ReelTime.perSecond / 10
 
-    init(track: AudioTrackDSP, meter: LevelMeterSink?) {
+    init(track: AudioTrackDSP, isolation: AudioIsolationTrack?, meter: LevelMeterSink?) {
         self.track = track
+        self.isolation = isolation
         self.meter = meter
     }
 
@@ -390,7 +145,9 @@ final class AudioTapContext {
         let planar = formatFlags & kAudioFormatFlagIsNonInterleaved != 0
         guard float, planar, bitsPerChannel == 32, channelCount > 0 else {
             chain = nil
+            trackStage = nil
             channels = []
+            isolates = false
             meter?.clear()
             return
         }
@@ -401,16 +158,29 @@ final class AudioTapContext {
         chain = track.isActive
             ? AudioDSPChain(
                 channelCount: channelCount, sampleRate: sampleRate, maxFrames: maxFrames,
-                usesNoiseReduction: track.usesNoiseReduction)
+                usesNoiseReduction: track.usesNoiseReduction, usesLimiter: track.usesLimiter)
             : nil
+        stageFrames = max(1, maxFrames)
+        trackStage = track.dynamics == nil
+            ? nil
+            : AudioTrackDynamicsStage(
+                channelCount: channelCount, sampleRate: sampleRate, maxFrames: stageFrames)
+        ahead = trackStage == nil ? [] : [Float](repeating: 1, count: stageFrames)
+        behind = trackStage == nil ? [] : [Float](repeating: 1, count: stageFrames)
         channels = Array(repeating: nil, count: channelCount)
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
         position = 0
+        positionFrame = 0
+        gridPosition = 0
+        isolates = !(isolation?.isEmpty ?? true)
+            && sampleRate == Double(IsolationRenderer.sampleRate)
     }
 
     func unprepare() {
         chain = nil
+        trackStage = nil
         channels = []
+        isolates = false
         meter?.clear()
     }
 
@@ -428,22 +198,82 @@ final class AudioTapContext {
         let list = UnsafeMutableAudioBufferListPointer(bufferList)
         let count = min(list.count, channels.count)
         guard count > 0 else { return }
+        let frame = time.isNumeric
+            ? CMTimeConvertScale(
+                time, timescale: CMTimeScale(IsolationRenderer.sampleRate),
+                method: .roundHalfAwayFromZero
+            ).value
+            : positionFrame
+        positionFrame = frame + Int64(frames)
+        // The buffer's first frame at the tap's rate, the automation's grid.
+        let gridBase = time.isNumeric
+            ? CMTimeConvertScale(
+                time, timescale: CMTimeScale(sampleRate), method: .roundHalfAwayFromZero
+            ).value
+            : gridPosition
+        gridPosition = gridBase + Int64(frames)
 
-        if let chain = chain {
-            // A seek, a loop or a fresh stream: the compressor's envelope and
-            // the reducer's delay line belong to the position we just left.
-            if startOfStream || abs(start - position) > Self.seekTolerance {
-                chain.reset()
+        // Isolation first (AU-54): the crossfade of the dry input with the
+        // clip's render, on the whole buffer, before every stage of the chain.
+        if isolates, let isolation = isolation {
+            for index in 0..<count {
+                channels[index] = list[index].mData?.assumingMemoryBound(to: Float.self)
             }
+            channels.withUnsafeMutableBufferPointer { pointers in
+                isolation.apply(
+                    UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                    frames: frames, at: frame)
+            }
+        }
+
+        // A seek, a loop or a fresh stream: the compressor's envelope and
+        // the reducer's delay line belong to the position we just left, and
+        // so does the track stage's state.
+        let jumped = startOfStream || abs(start - position) > Self.seekTolerance
+        if jumped { trackStage?.reset() }
+        if let chain = chain {
+            if jumped { chain.reset() }
 
             // A buffer that straddles a cut is processed in runs, so a clip's
             // pan begins exactly at its own first sample rather than up to a
             // buffer early. The stages keep their state across the boundary —
-            // they are track inserts, not per-clip effects.
+            // they are track inserts, not per-clip effects. On a limited track
+            // the spans are looked up `lookupLead` ahead: its media was placed
+            // that much early, and the limiter's delay brings it back (AU-23).
+            // The head stages (pick, EQ, hum) run before the noise reducer, so
+            // on a noise-reduced track they look `headLead` further ahead, and
+            // a run ends at a cut of either lookup (AU-34). An automated
+            // span's run takes its settings at its anchor on the absolute
+            // grid and ends at a grid boundary or a point (AU-87), the
+            // head's included; pan then moves per sample.
             var offset = 0
             while offset < frames {
-                let run = self.run(from: start + ticks(frames: offset), remaining: frames - offset)
-                guard run.length > 0 else { break }
+                let at = start + track.lookupLead + ticks(frames: offset)
+                let run = self.run(from: at, remaining: frames - offset)
+                var length = run.length
+                var params = run.dsp
+                var head: AudioClipDSP?
+                var panRamp: AudioPanRamp?
+                let lookup = gridBase + Int64(offset) + leadFrames(track.lookupLead)
+                if let index = run.span, let automation = track.spans[index].automation {
+                    let control = automation.control(
+                        atFrame: lookup, spanStart: track.spans[index].start, rate: sampleRate)
+                    (params, panRamp) = (control.settings, control.pan)
+                    length = min(length, control.frames)
+                }
+                if track.headLead != 0 {
+                    let ahead = self.run(from: at + track.headLead, remaining: frames - offset)
+                    length = min(length, ahead.length)
+                    head = ahead.dsp
+                    if let index = ahead.span, let automation = track.spans[index].automation {
+                        let control = automation.control(
+                            atFrame: lookup + leadFrames(track.headLead),
+                            spanStart: track.spans[index].start, rate: sampleRate)
+                        head = control.settings
+                        length = min(length, control.frames)
+                    }
+                }
+                guard length > 0 else { break }
                 for index in 0..<count {
                     channels[index] = list[index].mData?
                         .assumingMemoryBound(to: Float.self).advanced(by: offset)
@@ -451,12 +281,16 @@ final class AudioTapContext {
                 channels.withUnsafeMutableBufferPointer { pointers in
                     chain.process(
                         UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
-                        frames: run.length, params: run.dsp)
+                        frames: length, params: params, head: head, panRamp: panRamp,
+                        leveller: params.leveller.map {
+                            AudioLevellerRun(settings: $0, firstFrame: lookup, rate: sampleRate)
+                        })
                 }
-                offset += run.length
+                offset += length
             }
         }
         position = start + ticks(frames: frames)
+        runTrackStage(list, count: count, frames: frames, gridBase: gridBase)
 
         // AFTER the chain, and over the whole buffer rather than per run: what
         // the meter is asked for is the level this track hands the mix, and
@@ -472,10 +306,79 @@ final class AudioTapContext {
                 UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
                 frames: frames)
         }
+        // The live loudness meter's copy (spec §11 AU-70), placed by the
+        // buffer's own time on this tap's sample grid. A buffer with no
+        // usable time (the player's silent pre-roll) is not placed at all.
+        guard time.isNumeric, time.timescale > 0 else { return }
+        let first = Int64(
+            (Double(time.value) * Double(sampleRate) / Double(time.timescale)).rounded())
+        channels.withUnsafeMutableBufferPointer { pointers in
+            meter.capture(
+                UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                frames: frames, start: first, sampleRate: Int(sampleRate))
+        }
     }
 
     private func ticks(frames: Int) -> Ticks {
         Ticks(frames) * ReelTime.perSecond / sampleRate
+    }
+
+    /// The track's compressor and limiter after the chain (spec §11 AU-153),
+    /// post-fader though the tap is not: frame `gridBase + i` is gained by the
+    /// envelope at grid frame `gridBase + i + L` — the timeline frame the
+    /// track's lead put there — the stage runs and delays it L frames, and
+    /// the result is divided by the envelope at `gridBase + i`, the frame it
+    /// now sits at (0 where E < 2⁻²⁰), so the fader downstream puts back
+    /// exactly what was taken off. L is the stage's latency in frames at the
+    /// tap's own rate, never the lead in ticks, so the ×E and the ÷E of one
+    /// sample are the same number at any rate.
+    private func runTrackStage(
+        _ list: UnsafeMutableAudioBufferListPointer, count: Int, frames: Int, gridBase: Int64
+    ) {
+        guard let stage = trackStage, let dynamics = track.dynamics else { return }
+        let latency = Int64(stage.latency(dynamics.settings))
+        var offset = 0
+        while offset < frames {
+            let length = min(stageFrames, frames - offset)
+            let first = gridBase + Int64(offset)
+            for index in 0..<count {
+                channels[index] = list[index].mData?
+                    .assumingMemoryBound(to: Float.self).advanced(by: offset)
+            }
+            ahead.withUnsafeMutableBufferPointer { gains in
+                guard let e = gains.baseAddress else { return }
+                dynamics.envelope.fill(
+                    e, frames: length, fromFrame: first + latency, rate: sampleRate)
+                for index in 0..<count {
+                    guard let data = channels[index] else { continue }
+                    vDSP_vmul(data, 1, e, 1, data, 1, vDSP_Length(length))
+                }
+            }
+            channels.withUnsafeMutableBufferPointer { pointers in
+                stage.process(
+                    UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                    frames: length, settings: dynamics.settings)
+            }
+            behind.withUnsafeMutableBufferPointer { gains in
+                guard let e = gains.baseAddress else { return }
+                dynamics.envelope.fill(e, frames: length, fromFrame: first, rate: sampleRate)
+                for index in 0..<count {
+                    guard let data = channels[index] else { continue }
+                    for i in 0..<length {
+                        data[i] = e[i] >= Self.envelopeFloor ? data[i] / e[i] : 0
+                    }
+                }
+            }
+            offset += length
+        }
+    }
+
+    /// Below this the envelope is silence, and ÷E would be a gain burst.
+    static let envelopeFloor: Float = 1.0 / 1_048_576
+
+    /// A lead in ticks as whole frames at the tap's rate, rounded (AU-87).
+    private func leadFrames(_ ticks: Ticks) -> Int64 {
+        (ticks * sampleRate + ReelTime.perSecond / 2) / ReelTime.perSecond
     }
 
     private func samples(_ ticks: Ticks) -> Int {
@@ -483,19 +386,22 @@ final class AudioTapContext {
         return value > Ticks(Int.max) ? Int.max : Int(value)
     }
 
-    /// The longest run from `at` over which one clip's settings hold, and
-    /// those settings. A gap between clips is a run of inert samples rather
-    /// than a stop, so the silence between two panned clips stays silence.
-    private func run(from at: Ticks, remaining: Int) -> (length: Int, dsp: AudioClipDSP) {
+    /// The longest run from `at` over which one clip's settings hold, those
+    /// settings, and the span's index. A gap between clips is a run of inert
+    /// samples rather than a stop, so the silence between two panned clips
+    /// stays silence.
+    private func run(from at: Ticks, remaining: Int)
+        -> (length: Int, dsp: AudioClipDSP, span: Int?)
+    {
         guard let index = span(covering: at) else {
             // Not inside any span: run to whichever comes first, the next
             // span's start or the end of the buffer.
             guard let next = track.spans.first(where: { $0.start > at })?.start
-            else { return (remaining, .inert) }
-            return (min(remaining, max(1, samples(next - at))), .inert)
+            else { return (remaining, .inert, nil) }
+            return (min(remaining, max(1, samples(next - at))), .inert, nil)
         }
         let span = track.spans[index]
-        return (min(remaining, max(1, samples(span.end - at))), span.dsp)
+        return (min(remaining, max(1, samples(span.end - at))), span.dsp, index)
     }
 
     /// Binary search rather than a carried cursor: a scrub jumps anywhere, and
@@ -529,13 +435,19 @@ enum AudioTap {
     /// from every audio track, including the ones no clip has asked anything
     /// of. That tap builds no chain and touches no sample — it fetches its
     /// source audio, hands it straight on, and measures it.
-    static func make(for track: AudioTrackDSP?, meter: LevelMeterSink?) -> MTAudioProcessingTap? {
+    ///
+    /// An `isolation` with spans earns one too (spec §11 AU-53); an empty one
+    /// — every render still pending — does not, so the clip plays dry
+    /// through exactly the path it had.
+    static func make(
+        for track: AudioTrackDSP?, isolation: AudioIsolationTrack?, meter: LevelMeterSink?
+    ) -> MTAudioProcessingTap? {
         let track = track ?? .inert
-        guard track.isActive || meter != nil else { return nil }
+        guard track.isActive || !(isolation?.isEmpty ?? true) || meter != nil else { return nil }
         // Retained here, released in `finalize` (or below, if no tap is made):
         // the tap owns the context and outlives every Swift reference to it.
         let context = Unmanaged.passRetained(
-            AudioTapContext(track: track, meter: meter)).toOpaque()
+            AudioTapContext(track: track, isolation: isolation, meter: meter)).toOpaque()
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: context,

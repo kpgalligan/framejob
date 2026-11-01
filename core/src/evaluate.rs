@@ -131,7 +131,9 @@ impl Pitch {
 /// A ramped clip's ONE audio segment carries `ramp`, the map its rendered
 /// sound follows (spec §11 SR-6, SR-10), and so does a constant media
 /// clip's time-scaled Keep pitch off audio segment (SR-28,
-/// [`Segment::with_constant_render`]); every other segment has none.
+/// [`Segment::with_constant_render`]); every other segment has none. An
+/// audio segment carries `track_pans`, the pans of the tracks its voice plays
+/// through ([`Segment::with_track_pans`], spec §11 AU-104), empty when none.
 #[derive(Debug, Clone)]
 pub(crate) struct Segment {
     clip: u32,
@@ -142,6 +144,7 @@ pub(crate) struct Segment {
     duration: Ticks,
     pitch: Pitch,
     ramp: Option<RampAudio>,
+    track_pans: Vec<f64>,
 }
 
 impl Segment {
@@ -166,6 +169,12 @@ impl Segment {
         self
     }
 
+    /// An AUDIO segment carrying its voice's track pans (AU-104).
+    fn with_track_pans(mut self, voice: &Voice<'_>) -> Segment {
+        self.track_pans = voice.track_pans();
+        self
+    }
+
     pub(crate) fn to_json(&self, audio: bool) -> Value {
         let mut out = Map::new();
         out.insert("clip".to_string(), Value::from(self.clip));
@@ -184,6 +193,11 @@ impl Segment {
             if let Some(ramp) = &self.ramp {
                 out.insert("ramp".to_string(), ramp.to_json());
             }
+            // Only when a track pans, so every other plan is the text it was.
+            if !self.track_pans.is_empty() {
+                let pans = self.track_pans.iter().map(|p| number(*p)).collect();
+                out.insert("track_pans".to_string(), Value::Array(pans));
+            }
         }
         Value::Object(out)
     }
@@ -194,6 +208,11 @@ impl Segment {
 #[derive(Debug, Clone)]
 pub(crate) struct CompTrack<'a> {
     pub(crate) id: u32,
+    /// On an AUDIO track, the id of the timeline track whose walk in
+    /// [`Project::assign`] placed it — a nest's contents carry the nest
+    /// clip's track — written as the plan's `track` (spec §11 AU-107). Zero
+    /// until `assign` labels it, and on every video track.
+    pub(crate) track: u32,
     pub(crate) segments: Vec<Segment>,
     /// One per segment, in the same order, on an AUDIO track; empty on a
     /// video track, which needs no envelope. A segment alone cannot say how
@@ -261,6 +280,7 @@ fn place<'a>(
             *next_id = next_id.saturating_add(1);
             tracks.push(CompTrack {
                 id,
+                track: 0,
                 segments: unit,
                 voices: voice.into_iter().collect(),
             });
@@ -348,6 +368,7 @@ impl Project {
             // composition is built, not per frame.
             pitch: Pitch::of(clip.audio.map(|a| a.keep_pitch).unwrap_or(true), clip.speed),
             ramp: None,
+            track_pans: Vec::new(),
         })
     }
 
@@ -375,6 +396,7 @@ impl Project {
                 duration,
                 pitch: Pitch::Off,
                 ramp: None,
+                track_pans: Vec::new(),
             };
         let video = self
             .ramp_spans(clip, map, source_in, found.duration)
@@ -440,13 +462,9 @@ impl Project {
                     // §11 SR-10, SR-19 (d)).
                     let peak = peak_rate(instance.clip);
                     if media.has_audio && instance.plays_audio() && peak <= AUDIO_SPEED_MAX {
-                        place(
-                            &mut audio,
-                            &mut next_audio,
-                            vec![sound],
-                            Some(Voice::of(&self.tracks, instance)),
-                            true,
-                        );
+                        let voice = Voice::of(&self.tracks, instance);
+                        let sound = sound.with_track_pans(&voice);
+                        place(&mut audio, &mut next_audio, vec![sound], Some(voice), true);
                     }
                     continue;
                 }
@@ -488,16 +506,15 @@ impl Project {
                     && !frozen
                     && clip.speed <= AUDIO_SPEED_MAX
                 {
-                    place(
-                        &mut audio,
-                        &mut next_audio,
-                        vec![segment.with_constant_render(&clip)],
-                        Some(Voice::of(&self.tracks, instance)),
-                        true,
-                    );
+                    let voice = Voice::of(&self.tracks, instance);
+                    let sound = segment.with_constant_render(&clip).with_track_pans(&voice);
+                    place(&mut audio, &mut next_audio, vec![sound], Some(voice), true);
                 }
             }
             assignment.video.extend(video);
+            for comp in &mut audio {
+                comp.track = track.id;
+            }
             assignment.audio.extend(audio);
         }
         assignment

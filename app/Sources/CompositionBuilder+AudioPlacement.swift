@@ -21,17 +21,29 @@ extension CompositionBuilder {
         static let noiseReductionLead: Ticks =
             Ticks(AudioNoiseReductionStage.window) * ReelTime.perSecond / 48_000
 
+        /// The limiter's latency, 158 samples at 48 kHz (spec §11 AU-23): the
+        /// stage's output lags its input by exactly that, so a track that
+        /// runs it places its media that much earlier, as SY-25's does.
+        static let limiterLead: Ticks =
+            Ticks(AudioLimiterStage.latency) * ReelTime.perSecond / 48_000
+
         /// The varispeed unit's lead, 46 samples at 48 kHz (SY-24): a
         /// time-scaled segment played `off` comes out that much late at every
         /// rate measured, so it reads its source that much earlier.
         static let varispeedSourceLead: Ticks = 575
 
         /// The shift for one composition track: the noise lead when its tap
-        /// runs noise reduction, and the varispeed lead when its segments
-        /// play `off` (a plan audio track holds one pitch name, SY-26).
-        static func of(segments: [PlanSegment], usesNoiseReduction: Bool) -> AudioShift {
+        /// runs noise reduction, plus the limiter's when it runs the limiter,
+        /// plus the limiter's again when its tap runs a TRACK limiter (a
+        /// metering build's, spec §11 AU-153), and the varispeed lead when its
+        /// segments play `off` (a plan audio track holds one pitch name, SY-26).
+        static func of(
+            segments: [PlanSegment], usesNoiseReduction: Bool, usesLimiter: Bool,
+            usesTrackLimiter: Bool = false
+        ) -> AudioShift {
             AudioShift(
-                trackLead: usesNoiseReduction ? noiseReductionLead : 0,
+                trackLead: (usesNoiseReduction ? noiseReductionLead : 0)
+                    + (usesLimiter ? limiterLead : 0) + (usesTrackLimiter ? limiterLead : 0),
                 scaledSourceLead: segments.compactMap(\.pitch).first == "off"
                     ? varispeedSourceLead : 0)
         }

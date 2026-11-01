@@ -70,6 +70,9 @@ extension AgentServer {
         colorDescription: (String) -> String, clipDescription: String
     ) -> [[String: Any]] {
         let clipsDescription = "Clip ids (get_project lists them)."
+        let aloneDescription = "true moves this clip's edge without its detach_audio "
+            + "partner's — the J- or L-cut (the timeline does this for a dragged sound). "
+            + "Default false."
         // The one property this file still builds whole: `detect_silence` and
         // `normalize_clip` have no op behind them, so they take the old form
         // and the sentence is shared with the migrated rows above them.
@@ -203,7 +206,9 @@ extension AgentServer {
                     + "`track` is split first, then every unlocked track opens by the media's "
                     + "length, then the media lands in the hole. Only the destination track is "
                     + "cut — a clip straddling `at` on another track rides the shift whole, "
-                    + "which is what keeps a music bed unbroken. One undo step.",
+                    + "which is what keeps a music bed unbroken — but for a cut clip's linked "
+                    + "partner on an unlocked track, which is cut at `at` too and paired with "
+                    + "it. One undo step.",
                 [
                     "track": trackDescription,
                     "media": "Media id — import_media returns one.",
@@ -215,7 +220,9 @@ extension AgentServer {
                     + "row. Takes the room instead of making it: the span the media needs is "
                     + "cleared on `track` ALONE — cut at both bounds, whatever is left inside "
                     + "removed — and nothing shifts, so the cut's length and every other track "
-                    + "are untouched. One undo step.",
+                    + "are untouched, but for a cut clip's linked partner on an unlocked track, "
+                    + "which is cut at the same bounds and paired; the partner's middle piece "
+                    + "stays, unlinked. One undo step.",
                 [
                     "track": trackDescription,
                     "media": "Media id — import_media returns one.",
@@ -229,7 +236,8 @@ extension AgentServer {
                     + "destination would break the overlap rule (at most one neighbour "
                     + "overlapped on each side, each overlap at most half the shorter clip); a "
                     + "clip that gains an overlap with the clip before it also gains a "
-                    + "cross_dissolve transition if it had none.",
+                    + "cross_dissolve transition if it had none. A detach_audio pair moves "
+                    + "together in time, but only the named clips change track.",
                 [
                     "clips": clipsDescription,
                     "delta": "How far to shift, \(ticks) Negative moves earlier.",
@@ -243,13 +251,15 @@ extension AgentServer {
                     + "shifts. Clamped by the source's own beginning and by the clip's end (a "
                     + "clip is at least one frame long). On a clip with a speed ramp the ramp "
                     + "stays where it is in the clip, so what plays after the new start can "
-                    + "change, and the start is held where the clip still fits its media.",
-                ["clip": clipDescription, "to": "New start, \(ticks)"]),
+                    + "change, and the start is held where the clip still fits its media. On a "
+                    + "detach_audio pair the other half's start follows when it was the same.",
+                ["clip": clipDescription, "to": "New start, \(ticks)", "alone": aloneDescription]),
             opTool(
                 "trim_end",
                 "Moves a clip's END to `to`. Clamped by how much source is left after the "
-                    + "in-point, on the frame grid, and by the clip's start.",
-                ["clip": clipDescription, "to": "New end, \(ticks)"]),
+                    + "in-point, on the frame grid, and by the clip's start. On a detach_audio "
+                    + "pair the other half's end follows when it was the same.",
+                ["clip": clipDescription, "to": "New end, \(ticks)", "alone": aloneDescription]),
             opTool(
                 "rate_stretch",
                 "Stretches a clip to end at `to_end` by changing its SPEED instead of trimming "
@@ -283,8 +293,13 @@ extension AgentServer {
                     + "The predecessor is the clip on the same track ending EXACTLY at this "
                     + "one's start; with a gap or an overlap there instead, it is refused (an "
                     + "overlap is a transition — use set_transition_duration). Clamped so each "
-                    + "clip keeps a frame and neither asks for source it does not have.",
-                ["clip": clipDescription, "to": "Where the cut moves to, \(ticks)"]),
+                    + "clip keeps a frame and neither asks for source it does not have. The "
+                    + "linked half of a detach_audio pair rolls its own cut too when it starts "
+                    + "at the same time.",
+                [
+                    "clip": clipDescription, "to": "Where the cut moves to, \(ticks)",
+                    "alone": aloneDescription,
+                ]),
             opTool(
                 "split",
                 "Cuts clips in two at `at` — Clip ▸ Split (⌘T). The second piece keeps playing the source from "
@@ -300,7 +315,8 @@ extension AgentServer {
             opTool(
                 "delete",
                 "Removes clips and LEAVES the gaps where they were — ⌫. Use ripple_delete to "
-                    + "close them.",
+                    + "close them. Deleting a detach_audio picture deletes its sound too; "
+                    + "deleting the sound alone keeps the picture, silent.",
                 ["clips": clipsDescription]),
             opTool(
                 "ripple_delete",
@@ -415,8 +431,19 @@ extension AgentServer {
                 "detach_audio",
                 "Splits a clip's audio onto its own clip on the track below (inserting one when "
                     + "there is none), muting the original's audio and hiding the new clip's "
-                    + "video — ⌥⌘D. The two can then be trimmed and moved apart. Refused, saying "
-                    + "why, for a non-media clip, media with no audio, or audio already detached.",
+                    + "video — ⌥⌘D. The two are LINKED (`linked` names the other): moves, "
+                    + "splits, ripples, nests and copies keep them in step in time; trim_start "
+                    + "or trim_end with alone: true on the sound makes a J- or L-cut; speed and "
+                    + "reverse are refused until attach_audio. Refused, saying why, for a "
+                    + "non-media clip, media with no audio, or audio already detached.",
+                ["clip": clipDescription]),
+            opTool(
+                "attach_audio",
+                "Merges a detach_audio pair back into one clip — Clip ▸ Attach Audio "
+                    + "(⇧⌥⌘D). Name either half. The picture's audio comes back on with the "
+                    + "sound's audio settings and the sound clip goes. Refused when the clip is "
+                    + "not linked, and when the two no longer cover the same time (a J- or "
+                    + "L-cut): trim them to match first.",
                 ["clip": clipDescription]),
             opTool(
                 "duplicate",

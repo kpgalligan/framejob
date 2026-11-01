@@ -143,15 +143,23 @@ extension CompositionBuilder {
     /// one meter per composition track, carrying its family's sounding spans
     /// so `LevelMeterTrack.mix` counts it only while one of them holds the
     /// playhead (#65). A family's members never sound at the same instant, so
-    /// the sum over the meters that sound is right.
+    /// the sum over the meters that sound is right. `owners` maps every
+    /// family's composition track id to its plan track's timeline `track`
+    /// (spec §11 AU-107), for the stems' read (`BuiltComposition.audioOwners`).
     static func addAudioTracks(
         to composition: AVMutableComposition, plan: CompositionPlan, urls: [UInt32: URL],
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
         assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset],
-        ramps: [RampSegmentKey: AVAssetTrack] = [:]
-    ) throws -> (inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack]) {
+        ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        isolated: [IsolationSegmentKey: IsolatedAudio] = [:],
+        voiced: [IsolationSegmentKey: IsolatedAudio] = [:]
+    ) throws -> (
+        inputParameters: [AVAudioMixInputParameters], meters: [LevelMeterTrack],
+        owners: [CMPersistentTrackID: UInt32]
+    ) {
         var inputParameters: [AVAudioMixInputParameters] = []
         var meters: [LevelMeterTrack] = []
+        var owners: [CMPersistentTrackID: UInt32] = [:]
         var nextID = firstExtraTrackID(plan)
         for planTrack in plan.audioTracks {
             let families = audioFamilies(
@@ -159,17 +167,42 @@ extension CompositionBuilder {
                 assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
-                let trackDSP = dsp.isEmpty
-                    ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp)
+                if let owner = planTrack.track { owners[track.trackID] = owner }
+                // A track pan alone asks for a tap too (spec §11 AU-104), and
+                // so does a segment's automation (AU-87).
+                let pans = family.segments.contains { !$0.trackPans.isEmpty }
+                let automated = family.segments.contains { !$0.automation.isEmpty }
+                let onset = family.sounding.map(\.lowerBound).min()
+                // The track's compressor and limiter, in a metering build's
+                // tap only (spec §11 AU-153); the export's sub-mixes run them.
+                let dynamics = metering
+                    ? planTrack.track.flatMap { dsp.trackDynamics[$0] }.map {
+                        AudioTrackDynamics(
+                            settings: $0,
+                            envelope: AudioTrackEnvelope(
+                                legs: volumeLegs(ramps: planTrack.ramps ?? [], onset: onset)))
+                    } : nil
+                let trackDSP = dsp.isEmpty && !pans && !automated && dynamics == nil
+                    ? nil
+                    : AudioTrackDSP(segments: family.segments, parameters: dsp, dynamics: dynamics)
+                // One shift for the media's place and the isolation spans'
+                // (AU-53), so the two cannot disagree about a lead.
+                let shift = AudioShift.of(
+                    segments: family.segments,
+                    usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false,
+                    usesLimiter: trackDSP?.usesLimiter ?? false,
+                    usesTrackLimiter: (trackDSP?.trackLead ?? 0) > 0)
                 if try !fillSilence(track, for: family) {
                     try fill(
                         track, segments: family.segments, mediaType: .audio, urls: urls,
                         reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
-                        shift: AudioShift.of(
-                            segments: family.segments,
-                            usesNoiseReduction: trackDSP?.usesNoiseReduction ?? false),
-                        ramps: ramps)
+                        shift: shift, ramps: ramps)
                 }
+                let isolation = isolated.isEmpty && voiced.isEmpty
+                    ? nil
+                    : AudioIsolationTrack(
+                        segments: family.segments, shift: shift, dsp: dsp, renders: isolated,
+                        voiced: voiced)
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(
@@ -180,11 +213,10 @@ extension CompositionBuilder {
                 inputParameters.append(
                     audioParameters(
                         for: track, segments: family.segments, ramps: planTrack.ramps,
-                        onset: family.sounding.map(\.lowerBound).min(),
-                        dsp: trackDSP, meter: sink))
+                        onset: onset, dsp: trackDSP, isolation: isolation, meter: sink))
             }
         }
-        return (inputParameters, meters)
+        return (inputParameters, meters, owners)
     }
 
     // MARK: - Audio
@@ -215,7 +247,8 @@ extension CompositionBuilder {
     /// this landed does now sound different, which is the feature.
     static func audioParameters(
         for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
-        onset: Ticks?, dsp: AudioTrackDSP?, meter: LevelMeterSink?
+        onset: Ticks?, dsp: AudioTrackDSP?, isolation: AudioIsolationTrack? = nil,
+        meter: LevelMeterSink?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
         if let pitch = segments.compactMap({ $0.pitch }).first {
@@ -231,7 +264,7 @@ extension CompositionBuilder {
                 fromStartVolume: Float(leg.from), toEndVolume: Float(leg.to),
                 timeRange: CMTimeRange(start: time(leg.start), duration: time(leg.duration)))
         }
-        if let tap = AudioTap.make(for: dsp, meter: meter) {
+        if let tap = AudioTap.make(for: dsp, isolation: isolation, meter: meter) {
             parameters.audioTapProcessor = tap
         }
         return parameters

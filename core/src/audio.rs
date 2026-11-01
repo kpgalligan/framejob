@@ -87,6 +87,14 @@
 //! keys its rebuild on, so a solo rebuilds the composition exactly as a
 //! mute or a volume change does — `Playback.swift` compares the whole
 //! plan.)
+//!
+//! ### A track's volume
+//!
+//! A track's fader (format 35, spec §11 AU-103) follows mute's path exactly:
+//! each stage carries its track's gain, decided in the walk as `track_muted`
+//! is, and `stage_gain` multiplies it after the mute, so a nested
+//! clip is scaled by its own track and by every enclosing nest clip's. Its
+//! pan is not a gain and rides the plan instead (`audio_track.rs`).
 
 use serde::Serialize;
 
@@ -94,6 +102,9 @@ use crate::audio_duck::duck_gain;
 /// Re-exported from its own module so `crate::audio::Ducker` — the path
 /// `evaluate.rs` names — resolves where it always did.
 pub use crate::audio_duck::Ducker;
+use crate::audio_duck_speech::speech_breaks;
+use crate::audio_shape::fade_breaks;
+use crate::audio_track::track_gain;
 use crate::model::{AudioProps, Clip, Nest, Project, Track};
 use crate::nest::Instance;
 use crate::time::{Ticks, TIMESCALE};
@@ -121,9 +132,12 @@ pub(crate) const ACTION_SAMPLE: Ticks = TIMESCALE / 30;
 /// slow enough that a coarser grid is inaudible.
 pub(crate) const MAX_ACTION_SAMPLES: i64 = 4096;
 
-/// Gain ceiling. `volume` is linear and may exceed 1, up to 4 (spec §5.2);
-/// clamping here keeps one bad patch from sending +80 dB to the mix.
-pub(crate) const MAX_GAIN: f64 = 4.0;
+/// Gain ceiling. `volume` is linear and may exceed 1, up to 32 — about
+/// +30 dB, enough to bring a quiet desktop microphone to −1 dBFS and most of
+/// the way to a delivery loudness (spec §5.2, §11 AU-1); clamping here keeps
+/// one bad patch from sending +80 dB to the mix. `AudioNormalize.maxGain` is
+/// the app's copy, held to this by `core/tests/audio_gain.rs`.
+pub(crate) const MAX_GAIN: f64 = 32.0;
 
 /// How close two ramps must be to count as one straight line. 1e-9 of
 /// linear gain is roughly 1e-8 dB — some seven orders of magnitude below
@@ -165,9 +179,9 @@ pub(crate) fn covers(start: Ticks, end: Ticks, t: Ticks, side: Side) -> bool {
 #[derive(Debug, Clone)]
 pub struct Voice<'a> {
     /// The span in PROJECT time, already clipped to every nest clip above.
-    start: Ticks,
-    end: Ticks,
-    stages: Vec<Stage<'a>>,
+    pub(crate) start: Ticks,
+    pub(crate) end: Ticks,
+    pub(crate) stages: Vec<Stage<'a>>,
 }
 
 /// One clip's contribution to a voice's gain.
@@ -193,6 +207,11 @@ pub(crate) struct Stage<'a> {
     /// `Project::clips`. Decided in the walk for `track_muted`'s reason —
     /// nothing downstream can look a nested clip's container up by id.
     pub(crate) container: Option<&'a Nest>,
+    /// The fader of the track this clip sits on, clamped (AU-103): decided
+    /// in the walk for `track_muted`'s reason.
+    pub(crate) track_gain: f64,
+    /// That track's pan, as stored; `Voice::track_pans` clamps it (AU-104).
+    pub(crate) track_pan: f64,
 }
 
 /// Whether `track` is silent for reasons of its own: muted, or not soloed
@@ -202,7 +221,7 @@ pub(crate) struct Stage<'a> {
 /// mute button lie. The test is on the set alone, never on what the tracks
 /// hold, so a soloed track with nothing audible on it still silences the
 /// rest.
-fn silenced(set: &[Track], track: &Track) -> bool {
+pub(crate) fn silenced(set: &[Track], track: &Track) -> bool {
     track.muted || (set.iter().any(|t| t.solo) && !track.solo)
 }
 
@@ -237,6 +256,8 @@ impl<'a> Voice<'a> {
             origin: instance.origin,
             track_muted: silenced(set_at(instance.inside.len()), instance.track),
             container: container_at(instance.inside.len()),
+            track_gain: track_gain(instance.track),
+            track_pan: instance.track.pan,
         });
         for (depth, enclosing) in instance.inside.iter().enumerate().rev() {
             stages.push(Stage {
@@ -244,6 +265,8 @@ impl<'a> Voice<'a> {
                 origin: enclosing.origin,
                 track_muted: silenced(set_at(depth), enclosing.track),
                 container: container_at(depth),
+                track_gain: track_gain(enclosing.track),
+                track_pan: enclosing.track.pan,
             });
         }
         Voice {
@@ -268,7 +291,7 @@ impl<'a> Voice<'a> {
 /// test extends the first ramp's line across the second's span and asks
 /// whether it lands on the second's end value, which bounds the error in
 /// GAIN units — the thing that matters — rather than in slope units.
-fn coalesce(ramps: Vec<Ramp>) -> Vec<Ramp> {
+pub(crate) fn coalesce(ramps: Vec<Ramp>) -> Vec<Ramp> {
     let mut out: Vec<Ramp> = Vec::with_capacity(ramps.len());
     for ramp in ramps {
         // A zero-length ramp carries no information and AVFoundation
@@ -391,10 +414,23 @@ impl Project {
                 // obvious corners are breakpoints.
                 let props = clip.audio.unwrap_or_default();
                 if props.fade_in > 0 {
-                    breaks.push(stage.origin.saturating_add(props.fade_in));
+                    let edge = stage.origin.saturating_add(props.fade_in);
+                    breaks.push(edge);
+                    // A shaped fade is a curve, sampled like an eased action
+                    // (spec §11 AU-114); its shape read where the fade runs.
+                    let shapes = [0, props.fade_in].map(|c| self.audio_props_at(clip, c));
+                    if shapes.iter().any(|p| !p.fade_in_shape.is_linear()) {
+                        breaks.extend(fade_breaks(stage.origin, edge));
+                    }
                 }
                 if props.fade_out > 0 {
-                    breaks.push(end.saturating_sub(props.fade_out));
+                    let edge = end.saturating_sub(props.fade_out);
+                    breaks.push(edge);
+                    let from = clip.duration.saturating_sub(props.fade_out);
+                    let shapes = [from, clip.duration].map(|c| self.audio_props_at(clip, c));
+                    if shapes.iter().any(|p| !p.fade_out_shape.is_linear()) {
+                        breaks.extend(fade_breaks(edge, end));
+                    }
                 }
 
                 // The crossfade is a curve too, and an eased one is not even
@@ -429,6 +465,10 @@ impl Project {
         }
 
         for ducker in duckers {
+            if let Some(spans) = &ducker.spans {
+                breaks.extend(speech_breaks(ducker, spans));
+                continue;
+            }
             breaks.push(ducker.start);
             breaks.push(ducker.start.saturating_add(ducker.duck.attack.max(0)));
             breaks.push(ducker.end);
@@ -475,7 +515,8 @@ impl Project {
     }
 
     /// One clip's own gain at project time `t`: its evaluated volume shaped
-    /// by its fades, or 0 if it is silenced.
+    /// by its fades, times its track's volume (AU-103), or 0 if it is
+    /// silenced.
     fn stage_gain(&self, stage: &Stage<'_>, t: Ticks, side: Side) -> f64 {
         let clip = stage.clip;
         if !clip.enabled.audio {
@@ -511,15 +552,18 @@ impl Project {
         // clip, or a pair that overlaps, multiplies — the honest reading of
         // "both are in effect here" and a dip rather than a discontinuity.
         if props.fade_in > 0 && clip_t < props.fade_in {
-            gain *= (clip_t.max(0) as f64 / props.fade_in as f64).clamp(0.0, 1.0);
+            let u = (clip_t.max(0) as f64 / props.fade_in as f64).clamp(0.0, 1.0);
+            gain *= props.fade_in_shape.gain(u);
         }
         let fade_out_start = clip.duration.saturating_sub(props.fade_out.max(0));
         if props.fade_out > 0 && clip_t > fade_out_start {
             let remaining = clip.duration.saturating_sub(clip_t).max(0) as f64;
-            gain *= (remaining / props.fade_out as f64).clamp(0.0, 1.0);
+            gain *= props
+                .fade_out_shape
+                .gain((remaining / props.fade_out as f64).clamp(0.0, 1.0));
         }
 
-        gain * self.crossfade_gain(stage, t, side)
+        gain * stage.track_gain * self.crossfade_gain(stage, t, side)
     }
 
     /// The clip's audio props at a clip time, through its actions.

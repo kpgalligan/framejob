@@ -7,7 +7,7 @@
 //! — `unnest`, edit, `nest` — which is the identity on clip content but
 //! throws the nest clip's own group-level properties away.
 //!
-//! **The fix is not to teach sixty-two ops about nests.** It is to give
+//! **The fix is not to teach sixty-four ops about nests.** It is to give
 //! the ENVELOPE a scope, and to hand the op a project in which the nest's
 //! own tracks and clips are the top level. Then `Project::clip` keeps its
 //! one meaning, `apply_op` keeps its flat dispatch, every refusal and every
@@ -168,8 +168,8 @@ pub(crate) fn read(value: Option<&Value>) -> Result<Option<u32>, String> {
     }
 }
 
-/// The ops with no meaning inside a nest, by name, or `None` for the fifty
-/// that work in there unchanged.
+/// The ops with no meaning inside a nest, by name, or `None` for the
+/// fifty-three that work in there unchanged.
 ///
 /// Exhaustive rather than a short list with a `_` arm, and that is the
 /// point of writing it out: an op added by a later phase does not compile
@@ -204,11 +204,23 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         Op::RelinkMedia { .. } => Some("relink_media"),
         Op::RemoveMedia { .. } => Some("remove_media"),
         Op::SetMediaColor { .. } => Some("set_media_color"),
+        Op::SetMediaSpeech { .. } => Some("set_media_speech"),
 
         // An adjustment clip grades what is behind it at the top level only
         // (spec §11 GR-6): `check_clips` refuses one inside a nest, so the
         // op is refused here before a view is built.
         Op::AddAdjustmentClip { .. } => Some("add_adjustment_clip"),
+
+        // A track's dynamics run on the TIMELINE's per-track sub-mixes (spec
+        // §11 AU-150): a nest's whole mix passes through the track holding
+        // its nest clip, which is the bus, and a nest's own tracks have no
+        // sub-mix of their own to compress. The rest of `set_track` means
+        // inside a nest what it means outside (below).
+        Op::SetTrack {
+            compressor,
+            limiter,
+            ..
+        } if compressor.is_some() || limiter.is_some() => Some("a track's compressor or limiter"),
 
         // ---- everything else ------------------------------------------
         // Placement, trimming, properties, actions, tracks and grouping all
@@ -243,6 +255,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::SetReversed { .. }
         | Op::FreezeFrame { .. }
         | Op::DetachAudio { .. }
+        | Op::AttachAudio { .. }
         | Op::Duplicate { .. }
         | Op::Paste { .. }
         | Op::PasteAttributes { .. }

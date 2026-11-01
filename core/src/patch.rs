@@ -27,7 +27,7 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Compressor, Filter, HueRange, LevelRange, Look, LookKind, Motion,
+    AudioProps, Chroma, Compressor, Filter, HueRange, LevelRange, Limiter, Look, LookKind, Motion,
     ObscureRegion, Qualifier, Reflection, Shadow, ShapeProps, Spotlight, TextProps, VideoProps,
     LOOK_DEFAULT_AMOUNT, QUALIFIER_BLUR_MAX,
 };
@@ -77,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `leveller`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -122,9 +122,48 @@ impl Group {
                 },
                 ..VideoProps::default()
             }),
+            // Format 29's and 31's keys are left out of `to_json` at their
+            // defaults (spec §11 AU-116, AU-50), so the template holds other
+            // values to show the key check every one of them.
             Group::Audio => actions::to_json(&AudioProps {
-                duck: Some(crate::model::Duck::default()),
+                duck: Some(crate::model::Duck {
+                    mode: crate::model::DuckMode::Speech,
+                    pre_roll: 0,
+                    hold: 0,
+                    ..crate::model::Duck::default()
+                }),
                 compressor: Some(Compressor::default()),
+                fade_in_shape: crate::model::FadeShape::SCurve,
+                fade_out_shape: crate::model::FadeShape::SCurve,
+                limiter: Some(Limiter::default()),
+                // Format 31's `isolation` is not written at 0 (AU-50).
+                isolation: 0.5,
+                // Format 32's keys (spec §11 AU-37): every EQ slot present
+                // and `bypass` true, the hum, and a pick that is not `both`.
+                eq: Some(crate::model::Equalizer {
+                    high_pass: Some(crate::model::HighPass::default()),
+                    low_shelf: Some(crate::model::LowShelf::default()),
+                    band_1: Some(crate::model::EqBand::default()),
+                    band_2: Some(crate::model::EqBand::default()),
+                    band_3: Some(crate::model::EqBand::default()),
+                    high_shelf: Some(crate::model::HighShelf::default()),
+                    low_pass: Some(crate::model::LowPass::default()),
+                    bypass: true,
+                }),
+                hum: Some(crate::model::Hum::default()),
+                channels: crate::model::AudioChannels::Swapped,
+                // Format 33's gate and de-esser (spec §11 AU-46).
+                gate: Some(crate::model::Gate::default()),
+                de_esser: Some(crate::model::DeEsser::default()),
+                // Format 34's voice (spec §11 AU-140), `pitch` present so
+                // the walk knows it.
+                voice: Some(crate::model::Voice {
+                    kind: crate::model::VoiceKind::Pitch,
+                    amount: 1.0,
+                    pitch: Some(0.0),
+                }),
+                // Format 37's leveller (spec §11 AU-66).
+                leveller: Some(crate::model::Leveller::default()),
                 ..AudioProps::default()
             }),
             Group::Text => actions::to_json(&TextProps {

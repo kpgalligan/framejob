@@ -147,8 +147,11 @@ let expected: [(String, ClipSubTab, [String])] = [
     ("av", .picture, ["video.transform", "video.crop", "video.corner", "video.chroma"]
         + picture),
     ("av", .color, ["video.light", "video.color", "video.wheels", "video.curves", "video.look"]),
-    ("av", .sound, ["audio.volume", "audio.fades", "audio.duck", "audio.noise",
-                    "audio.compressor", "audio.mix"]),
+    ("av", .sound, ["audio.volume", "audio.fades", "audio.duck", "audio.isolation",
+                    "audio.voice", "audio.channels", "audio.eq", "audio.hum", "audio.noise",
+                    "audio.gate", "audio.leveller", "audio.de_esser", "audio.compressor",
+                    "audio.mix",
+                    "audio.limiter"]),
     ("av", .clip, ["clip.timing", "video.speed", "video.motion"]),
 ]
 var t2Panes: [String: ClipPane] = [:]

@@ -7,6 +7,8 @@ import Foundation
 /// `ReelCore.swift` resolves the pair. `original` is the WebM or Matroska
 /// file a playable copy was made from (spec §11 #228-O), nil for any other
 /// media. `color` is its Camera Log (spec §11 GR-16), nil for none.
+/// `speech` is its saved speech spans, `[start, end]` in forward source
+/// ticks (format 29, spec §11 AU-110), nil until Duck by Speech writes them.
 struct MediaSnapshot: Codable, Equatable, Identifiable {
     let id: UInt32
     let path: String
@@ -21,12 +23,13 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
     let hasAlpha: Bool
     let original: MediaOriginal?
     let color: MediaColor?
+    let speech: [[Ticks]]?
 
     init(
         id: UInt32, path: String, bookmark: String? = nil, kind: MediaKind = .video,
         duration: Ticks = 0, width: Int = 0, height: Int = 0, fps: Fps = .thirty,
         hasVideo: Bool = true, hasAudio: Bool = false, hasAlpha: Bool = false,
-        original: MediaOriginal? = nil, color: MediaColor? = nil
+        original: MediaOriginal? = nil, color: MediaColor? = nil, speech: [[Ticks]]? = nil
     ) {
         self.id = id
         self.path = path
@@ -41,6 +44,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         self.hasAlpha = hasAlpha
         self.original = original
         self.color = color
+        self.speech = speech
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +62,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         hasAlpha = c.lenient(.hasAlpha, false)
         original = c.lenient(.original)
         color = c.lenient(.color)
+        speech = c.lenient(.speech)
     }
 
     /// The file's display name, for the Media tab, clip labels, the relink

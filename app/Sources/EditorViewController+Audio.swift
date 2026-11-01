@@ -9,12 +9,14 @@ import AppKit
 extension EditorViewController {
 
     /// Clip ▸ Normalize (road map 2 phase 5c) — the menu half of the Audio
-    /// section's Normalize button.
+    /// section's Normalize button. It follows the mode chosen there
+    /// (`NormalizeChoice`, spec §11 AU-15): Peak, or Loudness at its target;
+    /// the title stays "Normalize".
     ///
     /// **Not a line of the arithmetic is here**, which is the whole point of
     /// `AudioNormalize` being a value type: this reads no peaks and derives no
-    /// gain, it calls the same `read` + `plan` pair `AudioPane.normalize` and
-    /// the agent's `normalize_clip` call, so the three cannot mean different
+    /// gain, it calls the same `read` + `plan` pair (through `AudioMeasureDoor`)
+    /// `AudioPane.normalize` and the agent's `normalize_clip` call, so the three cannot mean different
     /// things. What reaches the document is one ordinary `set_audio` per clip
     /// — each clip gets its own measured gain — committed as ONE undo step.
     ///
@@ -40,15 +42,54 @@ extension EditorViewController {
     /// both without registering an undo step. The menu is not the place that
     /// explains WHY a clip was skipped; `normalize_clip` reports each reason by
     /// name under `skipped`.
+    ///
+    /// The press is `AudioMeasureDoor.press` (spec §11 AU-64, AU-65), the
+    /// button's body: Peak at once; Loudness at once when no clip has a stage
+    /// the loudness cache leaves out, else under the Measuring Sound sheet.
     @objc func normalizeClips(_ sender: Any?) {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot
         let ids = selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.map { $0.id }
-        guard !ids.isEmpty, let input = AudioNormalize.read(from: document, clips: ids) else {
+        AudioMeasureDoor.press(.normalize, document: document, clips: ids, window: view.window)
+    }
+
+    /// Clip ▸ Enhance Voice (road map "audio" AP6, spec §11 AU-60, AU-65) —
+    /// the menu half of the Volume section's Enhance Voice button, through
+    /// the same `AudioMeasureDoor.press`: the clips `AudioNormalize.canOffer`
+    /// passes, measured through their chosen settings under the Measuring
+    /// Sound sheet (AU-64), committed at the Normalize row's Target as ONE
+    /// undo step. Nothing to enhance and a second press beep, Normalize's two
+    /// answers; the tool reports each skip by name.
+    @objc func enhanceVoice(_ sender: Any?) {
+        guard let document = document else { return }
+        let snapshot = document.editedProject.snapshot
+        let ids = selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.map { $0.id }
+        AudioMeasureDoor.press(.enhanceVoice, document: document, clips: ids, window: view.window)
+    }
+
+    /// Clip ▸ Match Audio… (road map "audio" AP12, spec §11 AU-121, AU-128):
+    /// the Match Audio sheet over the selected clips `AudioNormalize.canOffer`
+    /// passes, then, from its hand-back, `AudioMeasureDoor.pressMatch` with
+    /// the chosen reference and the other clips — the same `AudioMatch` read
+    /// and plan and `AudioMatchRun` `match_audio` waits on. Under two clips,
+    /// no window or a sheet already up beep.
+    @objc func matchAudio(_ sender: Any?) {
+        guard let document = document else { return }
+        let snapshot = document.editedProject.snapshot
+        let candidates = AudioMatchSheetController.candidates(selectedClips, in: snapshot)
+        guard candidates.count >= 2, let window = view.window, window.attachedSheet == nil else {
             NSSound.beep()
             return
         }
-        document.applyEdit("Normalize", AudioNormalize.plan(input).ops)
+        let ids = candidates.map(\.clip)
+        presentAsSheet(
+            AudioMatchSheetController(candidates: candidates) { [weak self, weak document] choice in
+                guard let self, let document else { return }
+                AudioMeasureDoor.pressMatch(
+                    document: document, reference: choice.reference,
+                    clips: ids.filter { $0 != choice.reference }, loudness: choice.loudness,
+                    eq: choice.eq, window: self.view.window)
+            })
     }
 
     /// Clip ▸ Synchronize Audio — the menu half of `sync_audio`. The same
@@ -197,6 +238,15 @@ extension EditorViewController {
             // and a live menu item from disagreeing about one selection.
             guard let snapshot = document?.editedProject.snapshot else { return false }
             return selectedClips.contains { AudioNormalize.canOffer($0, in: snapshot) }
+        case #selector(enhanceVoice(_:)):
+            // Normalize's question, for Normalize's reasons (AU-60): the
+            // button asks it through `AudioPane.normalizable`.
+            guard let snapshot = document?.editedProject.snapshot else { return false }
+            return selectedClips.contains { AudioNormalize.canOffer($0, in: snapshot) }
+        case #selector(matchAudio(_:)):
+            // Two clips Normalize could measure (AU-121): one the reference.
+            guard let snapshot = document?.editedProject.snapshot else { return false }
+            return selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.count >= 2
         case #selector(synchronizeAudio(_:)):
             // Two clips that could play sound, asked of the snapshot for the
             // reason above; `read` and `plan` may still refuse, by name.

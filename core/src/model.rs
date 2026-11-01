@@ -59,6 +59,10 @@ pub use crate::model_canvas::CanvasBlending;
 /// its own for the reason `model_props.rs` is.
 pub use crate::model_media_color::{CameraGamut, LogCurve, MediaColor};
 
+/// A track (spec §5.2's `tracks[]`), a file of its own so this one stays
+/// clear of the cap.
+pub use crate::model_track::Track;
+
 /// Linear RGBA, each channel 0..1. Alpha is premultiplied by nothing — the
 /// renderer decides.
 pub type Color = [f64; 4];
@@ -182,6 +186,9 @@ pub struct Media {
     /// only when set, so a media with none writes the text it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<MediaColor>,
+    /// Speech spans, forward source ticks (format 29, spec §11 AU-110).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speech: Option<Vec<[Ticks; 2]>>,
 }
 
 /// The file a playable copy was made from (format version 11, spec §11
@@ -209,37 +216,6 @@ pub enum MediaKind {
 }
 
 // ---- tracks and markers --------------------------------------------------
-
-/// One kind of track only (spec §2): any clip may live on any track, and
-/// a later index in `Project::tracks` draws in front.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Track {
-    pub id: u32,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub hidden: bool,
-    #[serde(default)]
-    pub muted: bool,
-    /// Locked tracks are skipped by ripple, insert-time and hit-testing.
-    #[serde(default)]
-    pub locked: bool,
-    /// Solo (format version 3): while ANY track in this container — the
-    /// timeline, or one nest's own tracks — is soloed, every track that is
-    /// not is silent, and a track that is both muted and soloed stays
-    /// silent, because mute wins. Audio only: a solo hides nothing, and it
-    /// is applied as a gain envelope in `audio.rs`, never in the plan.
-    #[serde(default)]
-    pub solo: bool,
-    /// Matte (format version 14, spec §11 MT-1): `none` is an ordinary
-    /// track; any other mode makes the track's clips draw nothing on the
-    /// canvas and cut the track directly behind (MT-2, MT-3). Written only
-    /// when not `none` — this file's one `skip_serializing_if`, the model's
-    /// first (tone's nine keys in `model_props.rs` are the rest) — so an
-    /// ordinary track and every older file round-trip byte for byte.
-    #[serde(default, skip_serializing_if = "TrackMatte::is_none")]
-    pub matte: TrackMatte,
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Marker {
@@ -301,6 +277,12 @@ pub struct Clip {
     /// list would refuse a project written by a newer one.
     #[serde(default)]
     pub label: Option<String>,
+    /// The id of the clip this one is linked to (format version 28, spec
+    /// §11 AU-90): Detach Audio's picture and sound name each other, and
+    /// every placement edit keeps the two in step in time. Mutual and inside
+    /// one container, or absent; written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linked: Option<u32>,
 }
 
 /// What a clip shows. `media` is the only kind with a source bound —
@@ -484,13 +466,16 @@ pub enum Curve {
 /// so a project made before version 7 sounds and looks exactly as it did.
 /// It is deliberately NOT what a transition the CORE mints looks like —
 /// [`Transition::minted`] is that, and spec §11's R5-2 says why the two
-/// differ.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// differ. The `Default` impl is `audio_shape.rs`'s (AU-115).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Transition {
     pub kind: TransitionKind,
     pub curve: Curve,
     pub audio: bool,
+    /// The crossfade's shape (format 29), written only when not `plus_3db`.
+    #[serde(skip_serializing_if = "FadeShape::is_plus_3db")]
+    pub audio_shape: FadeShape,
 }
 
 impl Transition {
@@ -507,6 +492,7 @@ impl Transition {
             kind,
             curve: Curve::EaseInOut,
             audio: true,
+            audio_shape: FadeShape::Plus3Db,
         }
     }
 }

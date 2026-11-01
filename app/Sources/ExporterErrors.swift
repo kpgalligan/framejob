@@ -76,6 +76,17 @@ extension Exporter {
         /// export waits for every ramp segment it plays and never writes one
         /// silent, so it stops, naming the clip and the renderer's reason.
         case rampAudioFailed(clip: UInt32, message: String)
+        /// A clip's isolated voice (spec §11 AU-57) could not be rendered: the
+        /// export waits for it as for a ramp, and stops naming the clip.
+        case isolationFailed(clip: UInt32, message: String)
+        /// A gated or de-essed clip's loudness was still not measured when the
+        /// export's wait ran out (spec §11 AU-42): its thresholds are relative
+        /// to it, so the export stops naming the clip rather than writing it
+        /// ungated.
+        case loudnessUnmeasured(clip: UInt32)
+        /// A clip's voice effect (spec §11 AU-147) could not be rendered: the
+        /// export waits for it as for its isolation, and stops naming the clip.
+        case voiceFailed(clip: UInt32, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -109,6 +120,14 @@ extension Exporter {
                     + "\(message). No file was written."
             case .rampAudioFailed(let clip, let message):
                 return "Clip \(clip)'s retimed audio could not be rendered: \(message)."
+            case .isolationFailed(let clip, let message):
+                return "Clip \(clip)'s isolated voice could not be rendered: \(message)."
+            case .loudnessUnmeasured(let clip):
+                return "Clip \(clip)'s loudness or speech has not been measured yet, so its "
+                    + "gate, leveller and de-esser cannot be set. Wait for their Status rows to "
+                    + "show the clip's loudness, then export again."
+            case .voiceFailed(let clip, let message):
+                return "Clip \(clip)'s voice effect could not be rendered: \(message)."
             }
         }
     }

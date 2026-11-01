@@ -35,7 +35,7 @@ extension ExportWriter: ExportPipeline {}
 
 /// A pipeline the loudness normalisation's gain is handed to after the pick (`Exporter`'s
 /// one caller): the `AVAssetWriter` path and the WebM one (spec §11 CX-15 (2)), each
-/// applying it with `ExportAudioGain` before the end of the sound is cut.
+/// applying it in its `ExportAudioMaster` before the end of the sound is cut.
 protocol ExportAudioNormalizing: AnyObject {
     func normalizeAudio(byLinearGain gain: Float)
 }
@@ -107,7 +107,19 @@ extension Exporter {
                 built: built, settings: settings, chapters: chapters, to: url)
         }
         guard settings.isImageSequence else {
-            return try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
+            let mix = try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
+            guard !settings.stems.isEmpty, let plan = project.plan else { return mix }
+            // An audio row's stems (spec §11 AU-108): each a fresh build of the
+            // same plan on the export's key, beside the mix.
+            let planJSON = project.planJSON
+            let key = built.recipeKey
+            return try ExportStemsPipeline(
+                mix: mix, stems: settings.stems, settings: settings, mixURL: url,
+                sources: Array(urls.values),
+                rebuild: {
+                    try CompositionBuilder.build(
+                        plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
+                })
         }
         return try ImageSequenceWriter(
             project: project, urls: urls, settings: settings, options: options,

@@ -311,20 +311,44 @@ extension AgentServer {
                             + "in LUFS — the sheet's Loudness popup, whose rows are -14 "
                             + "(streaming), -16 (podcast) and -23 (EBU R 128 broadcast). The "
                             + "export measures itself first and then applies ONE gain to "
-                            + "everything, so relative levels inside the timeline are "
-                            + "untouched and no limiter is involved. Omit not to normalise: "
-                            + "the export still measures and still reports. Ignored where "
-                            + "there is no sound to measure (gif, apng).",
+                            + "everything, solved through the master limiter every export "
+                            + "runs at peak_dbtp, so the file lands on the target and its "
+                            + "loudest peaks are limited rather than the whole mix capped. "
+                            + "Omit not to normalise: the export still measures, still "
+                            + "limits at the ceiling and still reports. Ignored where there "
+                            + "is no sound to measure (gif, apng).",
                     ],
                     "peak_dbtp": [
                         "type": "number", "minimum": -20, "maximum": 0,
-                        "description": "The true-peak ceiling that gain is capped against, in "
-                            + "dBTP. The sheet fixes it at -1 and this is the knob for "
-                            + "anything else. Because normalisation is gain-only, a ceiling "
-                            + "with no loudness_lufs beside it would have nothing to cap and "
-                            + "is REFUSED rather than accepted and left inert. When the "
-                            + "ceiling bites, the file lands quieter than the target asked "
-                            + "for and the result's capped_by_peak says so.",
+                        "description": "The ceiling of the master limiter every export with "
+                            + "sound runs, in dBTP: the file's true peak stays at or under it. "
+                            + "Omit for -1 (the sheet's fixed value); 0 is the loosest, and "
+                            + "there is no off. Legal with or without loudness_lufs. How far "
+                            + "the limiter turned the hottest peak down is the result's "
+                            + "limited_db.",
+                    ],
+                    // The sheet's Bit depth popup (spec §11 AU-29).
+                    "audio_bits": [
+                        "type": "integer", "enum": [16, 24],
+                        "description": "audio_wav's and audio_aiff's bit depth — the sheet's "
+                            + "Bit depth popup: 16 (the default) or 24, rounded once from the "
+                            + "float mix, never dithered. Refused on every other preset "
+                            + "(ProRes keeps 16).",
+                    ],
+                    // The sheet's Stems popup (spec §11 AU-108).
+                    "stems": [
+                        "type": "string", "enum": ["tracks", "names"],
+                        "description": "Also write stems beside the mix, on audio_m4a, "
+                            + "audio_wav and audio_aiff — the sheet's Stems popup: tracks (one "
+                            + "file per heard timeline track) or names (heard tracks whose "
+                            + "names match, ignoring case, share one file). Each is named "
+                            + "'<file> - <track name>.<ext>' (an unnamed track 'Track N'), "
+                            + "replacing any file there, and holds its tracks' sound before "
+                            + "the master: no loudness gain and no limiter, so the stems sum "
+                            + "to the mix where the master changed nothing. Muted and "
+                            + "solo-silenced tracks have none. Refused on a movie preset, "
+                            + "when no track is heard, and when a stem's path is one of the "
+                            + "project's media. Omit for none.",
                     ],
                     "burn_in_timecode": burnInProperty,
                     // The sheet's Dynamic Range popup (spec §11 HD-5, HD-14).
@@ -366,12 +390,15 @@ extension AgentServer {
                     + "adds what the file holds: ok, bytes, the settings that were used "
                     + "(preset, container, codec, width, height, fps [num, den], start, "
                     + "duration), burn_in_timecode, dynamic_range in an HLG project (the "
-                    + "picture written), encoder_speed on av1 and av1_webm, loudness for "
-                    + "every format "
+                    + "picture written), encoder_speed on av1 and av1_webm, audio_bits on "
+                    + "audio_wav and audio_aiff, stems [{name, tracks, path}] when stems was "
+                    + "asked (each file beside the mix), loudness for every format "
                     + "that carries sound, normalised or not — summary, integrated_lufs, "
                     + "true_peak_dbtp, "
-                    + "sample_peak_dbfs, gain_db, ceiling_dbtp, capped_by_peak and target_lufs "
-                    + "when one was asked, read off the mix that was written — and "
+                    + "sample_peak_dbfs, gain_db, ceiling_dbtp (the master limiter's), "
+                    + "limited_db (how far it turned the hottest peak down), capped_by_gain "
+                    + "(the +40 dB cap decided the gain) and target_lufs "
+                    + "when one was asked, from the mix as written — and "
                     + "graphic_warnings [{name, frame, message}], each distinct warning a "
                     + "graphic gave while the file was drawn, absent when none. failed and "
                     + "cancelled add reason, the queue row's sentence. Only ids export "

@@ -63,10 +63,10 @@ extension AgentServer {
             ])
     }
 
-    /// `set_transition_style` — the Curve popup and the Crossfade Audio
-    /// checkbox in the Clip tab's Transition section
-    /// (`VideoPane+Transition.swift`, undo names "Transition Curve" and
-    /// "Transition Audio").
+    /// `set_transition_style` — the Curve popup, the Crossfade Audio
+    /// checkbox and the Crossfade Shape popup in the Clip tab's Transition
+    /// section (`VideoPane+Transition.swift`, undo names "Transition Curve",
+    /// "Transition Audio" and "Crossfade Shape").
     ///
     /// **A call with NEITHER key is an ARGUMENT that is missing, not a rule
     /// that said no**, which is why deepening D2·4 left this guard standing
@@ -82,15 +82,17 @@ extension AgentServer {
         let clip = try clipArg(a, "clip", document)
         let curve = try enumArg(a, "curve", Curve.self)
         let audio = try boolArg(a, "audio")
-        guard curve != nil || audio != nil else {
+        let shape = try enumArg(a, "audio_shape", FadeShape.self)
+        guard curve != nil || audio != nil || shape != nil else {
             throw ToolError(
-                message: "set_transition_style needs curve or audio — curve one of "
+                message: "set_transition_style needs curve, audio or audio_shape — curve one of "
                     + Curve.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + ", audio a boolean.")
+                    + ", audio a boolean, audio_shape one of "
+                    + FadeShape.allCases.map { $0.rawValue }.joined(separator: ", ") + ".")
         }
         return try editResult(
             document, "Transition Style",
-            [.setTransitionStyle(clip: clip.id, curve: curve, audio: audio)])
+            [.setTransitionStyle(clip: clip.id, curve: curve, audio: audio, audioShape: shape)])
     }
 
     /// `add_transition`'s `kind`: absent is nil, a name is the kind, and

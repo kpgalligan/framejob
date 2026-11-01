@@ -1,9 +1,10 @@
 import AppKit
 
 /// The track context menu: a right-click (or ⌃-click) on a track's header or
-/// on the empty part of its lane. It carries the header's four toggles —
-/// each with a checkmark, because a menu opened on ONE track can say that
-/// track's state where the Track menu, acting on `currentTrack`, cannot —
+/// on the empty part of its lane. It carries the header's five switches —
+/// the four toggles each with a checkmark, because a menu opened on ONE track
+/// can say that track's state where the Track menu, acting on `currentTrack`,
+/// cannot, and Mix… (spec §11 AU-105, AU-155), the popover the fifth opens —
 /// the Matte submenu (spec §11 MT-7), and Remove Track, which is the only way to delete an EMPTY track that is
 /// not the front-most one without selecting a clip on it first (and an empty
 /// track has none to select).
@@ -43,6 +44,7 @@ extension TimelineView {
         add("Mute Audio", #selector(trackMenuToggleMuted(_:)), on: track.muted)
         add("Lock Track", #selector(trackMenuToggleLocked(_:)), on: track.locked)
         add("Solo", #selector(trackMenuToggleSolo(_:)), on: track.solo)
+        add("Mix…", #selector(trackMenuShowMix(_:)), on: false)
         menu.addItem(matteMenuItem(for: track))
         menu.addItem(.separator())
         add("Remove Track", #selector(trackMenuRemove(_:)), on: false)
@@ -74,7 +76,8 @@ extension TimelineView {
         return item
     }
 
-    /// The four header toggles as edits — one `set_track` flipping one flag.
+    /// The four header toggles as edits — one `set_track` flipping one flag —
+    /// and the fifth switch, which opens the track's mix popover instead.
     func toggle(_ button: TimelineHeaderButton, on track: TrackSnapshot) {
         switch button {
         case .hidden:
@@ -85,6 +88,8 @@ extension TimelineView {
             onEdit?("Lock Track", [.setTrack(track: track.id, locked: !track.locked)])
         case .solo:
             onEdit?("Solo Track", [.setTrack(track: track.id, solo: !track.solo)])
+        case .mix:
+            showTrackMix(track)
         }
     }
 
@@ -106,6 +111,7 @@ extension TimelineView {
     @objc func trackMenuToggleMuted(_ sender: Any?) { toggleFromMenu(.muted, sender) }
     @objc func trackMenuToggleLocked(_ sender: Any?) { toggleFromMenu(.locked, sender) }
     @objc func trackMenuToggleSolo(_ sender: Any?) { toggleFromMenu(.solo, sender) }
+    @objc func trackMenuShowMix(_ sender: Any?) { toggleFromMenu(.mix, sender) }
 
     /// One `set_track {matte}` on the clicked track, undo "Track Matte";
     /// re-choosing its mode is the core's identity, which beeps.

@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all sixty-two.
+    /// not an argument of any op and is spelled once for all sixty-four.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an
@@ -140,14 +140,14 @@ extension ReelOp {
         return copy
     }
 
-    /// The eight DOCUMENT-level ops among those `core/src/scope.rs`'s
+    /// The nine DOCUMENT-level ops among those `core/src/scope.rs`'s
     /// `refused_inside` answers `"<op> has no meaning inside nest N"` to. The
-    /// ninth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
+    /// tenth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
     /// places, not because it is the document's, so it is sent scoped.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
     /// sense that the typed factories above mirror the op table: change one,
-    /// change both. It is eight names rather than a rule, so it can be
+    /// change both. It is nine names rather than a rule, so it can be
     /// checked by eye, and it is written here rather than at a call site
     /// because two copies of it is what would drift.
     ///
@@ -170,10 +170,10 @@ extension ReelOp {
     /// paths.
     static let documentLevelNames: Set<String> = [
         "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
-        "remove_media", "set_media_color",
+        "remove_media", "set_media_color", "set_media_speech",
     ]
 
-    /// True for one of the eight above — an edit about the document rather
+    /// True for one of the nine above — an edit about the document rather
     /// than about whatever container the timeline is looking at.
     var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
@@ -428,18 +428,23 @@ extension ReelOp {
     }
 
     /// Front trim: the source in-point advances with the start, so later
-    /// content stays where it is.
-    static func trimStart(clip: UInt32, to: Ticks) -> ReelOp {
+    /// content stays where it is. A linked partner whose start coincides
+    /// follows unless `alone` — the J-cut (spec §11 AU-93); `alone` is
+    /// written only when true.
+    static func trimStart(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "trim_start", args: a.values)
     }
 
-    static func trimEnd(clip: UInt32, to: Ticks) -> ReelOp {
+    /// End trim; `alone` as `trimStart`'s — the L-cut.
+    static func trimEnd(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "trim_end", args: a.values)
     }
 
@@ -467,11 +472,13 @@ extension ReelOp {
     /// ⌥⇧-drag on a clip edge: the hard cut between this clip and the one
     /// ending exactly at its start moves to `to`, and nothing else does.
     /// Refuses without a hard cut there — a gap, or an overlap, whose
-    /// length is `setTransitionDuration`'s.
-    static func roll(clip: UInt32, to: Ticks) -> ReelOp {
+    /// length is `setTransitionDuration`'s. A linked partner's cut rolls too
+    /// unless `alone` (spec §11 AU-93), written only when true.
+    static func roll(clip: UInt32, to: Ticks, alone: Bool = false) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("to", to)
+        a.put("alone", alone ? true : nil)
         return ReelOp(name: "roll", args: a.values)
     }
 
@@ -618,6 +625,15 @@ extension ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         return ReelOp(name: "detach_audio", args: a.values)
+    }
+
+    /// Merges a linked picture and its detached sound back into one clip;
+    /// either half may be named. Refuses a clip with no detached sound, and
+    /// a pair that no longer covers the same time (spec §11 AU-95).
+    static func attachAudio(clip: UInt32) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        return ReelOp(name: "attach_audio", args: a.values)
     }
 
     /// Copies placed after the originals' span on the same tracks.
@@ -857,14 +873,18 @@ extension ReelOp {
         return ReelOp(name: "add_transition", args: a.values)
     }
 
-    /// The transition's easing and whether it crossfades the two clips'
-    /// sound (§6 `set_transition_style`). A nil argument is omitted, which
-    /// the core reads as "keep"; both nil changes nothing.
-    static func setTransitionStyle(clip: UInt32, curve: Curve?, audio: Bool?) -> ReelOp {
+    /// The transition's easing, whether it crossfades the two clips' sound,
+    /// and the crossfade's shape (§6 `set_transition_style`, spec §11
+    /// AU-115). A nil argument is omitted, which the core reads as "keep";
+    /// all nil changes nothing.
+    static func setTransitionStyle(
+        clip: UInt32, curve: Curve?, audio: Bool?, audioShape: FadeShape? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("curve", curve?.rawValue)
         a.put("audio", audio)
+        a.put("audio_shape", audioShape?.rawValue)
         return ReelOp(name: "set_transition_style", args: a.values)
     }
 }
@@ -1102,7 +1122,8 @@ extension ReelOp {
     /// the inspector turned OFF (`VideoPatch.shadow`'s double optional) — is
     /// LIFTED out of the patch into `off`, so the end state holds the
     /// property off rather than losing the key (spec §11 CI-14). Removal
-    /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls.
+    /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls. A
+    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88).
     /// `graphic`'s one value is its `props` map, so the lift never touches
     /// it; `schema` is the module's current revision, which a graphic end
     /// needs (spec §11 G-34 (c), (l)).
@@ -1116,6 +1137,14 @@ extension ReelOp {
             for (key, value) in fields where value is NSNull {
                 off.append("\(group).\(key)")
                 fields[key] = nil
+            }
+            // An EQ slot turned off is a null one level down (AU-88).
+            if group == "audio", var eq = fields["eq"] as? [String: Any] {
+                for (slot, value) in eq where value is NSNull {
+                    off.append("audio.eq.\(slot)")
+                    eq[slot] = nil
+                }
+                fields["eq"] = eq
             }
             groups[group] = fields
         }
@@ -1159,10 +1188,14 @@ extension ReelOp {
     /// Omitted fields keep their value. `solo` is the fourth switch: while
     /// any track in a container is soloed, every track that is not is
     /// silent; mute wins over solo on the same track, and pictures are
-    /// untouched either way.
+    /// untouched either way. `volume` (linear, 0…4) and `pan` (−1…1) are the
+    /// track's fader and balance (spec §11 AU-102). `compressor` and `limiter`
+    /// (spec §11 AU-150) are each a `[String: Any]` object that replaces the
+    /// whole value, or `NSNull()` to clear it, forwarded as given.
     static func setTrack(
         track: UInt32, name: String? = nil, hidden: Bool? = nil, muted: Bool? = nil,
-        locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil
+        locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil,
+        volume: Double? = nil, pan: Double? = nil, compressor: Any? = nil, limiter: Any? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
@@ -1172,6 +1205,10 @@ extension ReelOp {
         a.put("locked", locked)
         a.put("solo", solo)
         a.put("matte", matte?.rawValue)
+        a.put("volume", volume)
+        a.put("pan", pan)
+        a.put("compressor", compressor)
+        a.put("limiter", limiter)
         return ReelOp(name: "set_track", args: a.values)
     }
 
@@ -1305,5 +1342,12 @@ extension ReelOp {
     /// take by name.
     static func setMediaColorRaw(media: UInt32, color: Any) -> ReelOp {
         ReelOp(name: "set_media_color", args: ["media": media, "color": color])
+    }
+
+    /// A media's speech spans (§6 `set_media_speech`, spec §11 AU-110):
+    /// `[[start, end], …]` in forward source ticks, the wire shape
+    /// `ripple_delete_ranges` uses. `DuckSpeech.ops` is the one writer.
+    static func setMediaSpeech(media: UInt32, spans: [[Ticks]]) -> ReelOp {
+        ReelOp(name: "set_media_speech", args: ["media": media, "spans": spans])
     }
 }

@@ -11,7 +11,7 @@ import os
 /// **A second `ExportPipeline`, and the exception to §7.8's one writer (CX-15 (2)).**
 /// `AVAssetWriter` writes no WebM, so this file is the WebM half of `ExportWriter` and
 /// nothing more: the same reader outputs (`ExportWriter.videoReadOutput` /
-/// `audioReadOutput`), each on a reader of its own (below), the same gain (`ExportAudioGain`), the same end of the sound
+/// `audioReadOutput`), each on a reader of its own (below), the same master (`ExportAudioMaster`, 16-bit), the same end of the sound
 /// (`ExportAudioEnd`, #337), the same chapters (`ExportChapter.partition`), the same size and
 /// rates (`encodedSize`, the pump). What is its own is the container: the core interleaves,
 /// clusters, cues and closes the file. **A composition with no audio track is a silent
@@ -19,9 +19,9 @@ import os
 /// has no audio track.
 ///
 /// **Two pumps.** The video pump is `ExportEncodePump` on `videoQueue` into an
-/// `ExportWebMPacketSink`. The audio pump reads, checks the time, applies the gain, cuts at
+/// `ExportWebMPacketSink`. The audio pump reads, runs the master, checks the time, cuts at
 /// the range (`end.fit`), encodes and adds, on `audioQueue`; once the read is dry it encodes
-/// the padding silence and the encoder's tail and cuts the surplus by DiscardPadding
+/// the master's tail, the padding silence and the encoder's tail and cuts the surplus by DiscardPadding
 /// (CX-15 (5)). The sound is placed at its stamps (`ExportAudioEnd.align`), so a dropped
 /// straddling buffer or a hole in the stamps keeps later sound where it was. Neither waits
 /// on the file: the core queues what the interleave holds.
@@ -51,15 +51,16 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
     private let videoOutput: AVAssetReaderOutput
     /// The audio mix's own reader, nil for a silent movie; its output is added in `start`.
     let audioReader: AVAssetReader?
-    private var audioOutput: AVAssetReaderOutput?
+    private var audioRead: ExportMixRead?
     let fault = ExportWebMDevFault.current()
     private let pump: ExportEncodePump
     private let opus: ExportOpusEncoder?
     let audioEnd: ExportAudioEnd
     private let layoutJSON: String
     private var webm: ReelWebM?
-    /// Written once on main between `init` and `start`, then read only on `audioQueue`.
-    private(set) var audioGain: ExportAudioGain?
+    /// The sound's master (spec §11 AU-27), nil for a silent movie: made in `init`, its gain
+    /// set once on main between `init` and `start`, then read only on `audioQueue`.
+    let audioMaster: ExportAudioMaster?
 
     private let videoQueue = DispatchQueue(
         label: "com.kgalligan.framejob.export.webm.video", qos: .userInitiated)
@@ -106,6 +107,10 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
         // The silent movie (CX-15 (2)): no sound, no reader, encoder or audio track.
         let hasAudio = !built.composition.tracks(withMediaType: .audio).isEmpty
         audioReader = hasAudio ? try Self.reader(built.composition, range: range) : nil
+        audioMaster = hasAudio
+            ? ExportAudioMaster(
+                bits: 16, ceilingDBTP: settings.masterCeilingDBTP, origin: range.start)
+            : nil
         opus = hasAudio
             ? try ExportOpusEncoder(
                 bitRate: settings.audioBitrate.map { max(1, $0) }
@@ -135,10 +140,10 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
     }
 
     /// `ExportWriter.normalizeAudio`'s rule: a non-finite, non-positive or unit gain is
-    /// ignored, so an export that was not normalised reads the 16-bit decode.
+    /// ignored, and the master keeps its gain of 1.
     func normalizeAudio(byLinearGain gain: Float) {
         guard gain.isFinite, gain > 0, gain != 1 else { return }
-        audioGain = ExportAudioGain(linearGain: gain)
+        audioMaster?.linearGain = gain
     }
 
     // MARK: - Running
@@ -148,13 +153,13 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
         self.completion = completion
         guard !isStopping else { return report(.failure(Exporter.ExportError.cancelled)) }
         if let audioReader {
-            let output = ExportWriter.audioReadOutput(built, gained: audioGain != nil)
-            guard audioReader.canAdd(output) else {
+            // The mix, or the tracks' sub-mixes through their dynamics (AU-152).
+            let read = ExportMixRead(built, origin: range.start)
+            guard read.add(to: audioReader) else {
                 return report(.failure(Exporter.ExportError.failed(
                     "The audio mix could not be read for export.")))
             }
-            audioReader.add(output)
-            audioOutput = output
+            audioRead = read
         }
         let webm: ReelWebM
         do {
@@ -191,11 +196,11 @@ final class ExportWebMWriter: ExportPipeline, ExportAudioNormalizing {
             defer { group.leave() }
             if isStopping { videoReader.cancelReading() }
         }
-        if let opus, let output = audioOutput, let audioReader {
+        if let opus, let read = audioRead, let audioReader {
             group.enter()
             audioQueue.async { [self] in
                 defer { group.leave() }
-                pumpAudio(output, into: webm, through: opus)
+                pumpAudio(read, into: webm, through: opus)
                 // Its own reader, after its own last read (G-17).
                 if isStopping { audioReader.cancelReading() }
             }

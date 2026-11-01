@@ -459,10 +459,20 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
     /// The track's matte (format version 14, `TrackMatte.swift`); `.none`
     /// for an ordinary track and for a file that names no mode.
     let matte: TrackMatte
+    /// The track's fader, linear 0…4, and its pan, −1…1 (format 35, spec
+    /// §11 AU-102); the core's envelope and plan apply both.
+    let volume: Double
+    let pan: Double
+    /// The track's compressor and limiter (format 36, spec §11 AU-150), nil
+    /// when off; post-fader on the track's sub-mix (AU-151).
+    let compressor: CompressorProps?
+    let limiter: LimiterProps?
 
     init(
         id: UInt32, name: String = "Track", hidden: Bool = false, muted: Bool = false,
-        locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none
+        locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none,
+        volume: Double = 1, pan: Double = 0, compressor: CompressorProps? = nil,
+        limiter: LimiterProps? = nil
     ) {
         self.id = id
         self.name = name
@@ -471,6 +481,10 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         self.locked = locked
         self.solo = solo
         self.matte = matte
+        self.volume = volume
+        self.pan = pan
+        self.compressor = compressor
+        self.limiter = limiter
     }
 
     init(from decoder: Decoder) throws {
@@ -482,6 +496,10 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         locked = c.lenient(.locked, false)
         solo = c.lenient(.solo, false)
         matte = c.lenient(.matte, TrackMatte.none)
+        volume = c.lenient(.volume, 1.0)
+        pan = c.lenient(.pan, 0.0)
+        compressor = c.lenient(.compressor)
+        limiter = c.lenient(.limiter)
     }
 }
 
@@ -875,115 +893,6 @@ struct VideoProps: Codable, Equatable {
     var offset: CGPoint { CGPoint(x: x, y: y) }
 }
 
-/// Ducking: "lower other audio to `level` while this clip plays" (§4.3).
-/// By clip extent, never by voice activity — the core folds it into every
-/// other track's envelope.
-struct DuckProps: Codable, Equatable {
-    var level: Double
-    var attack: Ticks
-    var release: Ticks
-
-    init(level: Double = 0.2, attack: Ticks = 300_000, release: Ticks = 600_000) {
-        self.level = level
-        self.attack = attack
-        self.release = release
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        level = c.lenient(.level, 0.2)
-        attack = c.lenient(.attack, 300_000)
-        release = c.lenient(.release, 600_000)
-    }
-}
-
-/// "Smooth volume levels" (§4.3): a downward compressor over the clip's own
-/// samples. Unlike ducking, which the core resolves into ramps on other
-/// clips' envelopes, this one depends on the samples — so the model carries
-/// the parameters and the DSP happens on this side.
-struct CompressorProps: Codable, Equatable {
-    /// dBFS above which gain reduction starts.
-    var thresholdDb: Double
-    /// N:1 — 1 is no compression, 20 is effectively a limiter.
-    var ratio: Double
-    var attack: Ticks
-    var release: Ticks
-    /// dB applied after compression, to win back what it took.
-    var makeupDb: Double
-
-    init(
-        thresholdDb: Double = -18, ratio: Double = 3, attack: Ticks = 6000,
-        release: Ticks = 120_000, makeupDb: Double = 0
-    ) {
-        self.thresholdDb = thresholdDb
-        self.ratio = ratio
-        self.attack = attack
-        self.release = release
-        self.makeupDb = makeupDb
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        thresholdDb = c.lenient(.thresholdDb, -18)
-        ratio = c.lenient(.ratio, 3)
-        attack = c.lenient(.attack, 6000)
-        release = c.lenient(.release, 120_000)
-        makeupDb = c.lenient(.makeupDb, 0)
-    }
-}
-
-/// The sample half of a clip. `volume` may exceed 1, up to 4 (§5.2).
-struct AudioProps: Codable, Equatable {
-    let volume: Double
-    let muted: Bool
-    let fadeIn: Ticks
-    let fadeOut: Ticks
-    let duck: DuckProps?
-    let mono: Bool
-    /// Preserve pitch through a speed change (`scaleTimeRange` + a
-    /// time-pitch algorithm; the plan carries it per segment).
-    let keepPitch: Bool
-    /// -1 hard left, 0 centred, +1 hard right (M3).
-    let pan: Double
-    let compressor: CompressorProps?
-    /// How much background noise to remove: 0 is off (M3).
-    let noiseReduction: Double
-
-    init(
-        volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
-        duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
-        pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0
-    ) {
-        self.volume = volume
-        self.muted = muted
-        self.fadeIn = fadeIn
-        self.fadeOut = fadeOut
-        self.duck = duck
-        self.mono = mono
-        self.keepPitch = keepPitch
-        self.pan = pan
-        self.compressor = compressor
-        self.noiseReduction = noiseReduction
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        volume = c.lenient(.volume, 1)
-        muted = c.lenient(.muted, false)
-        fadeIn = c.lenient(.fadeIn, 0)
-        fadeOut = c.lenient(.fadeOut, 0)
-        duck = c.lenient(.duck)
-        mono = c.lenient(.mono, false)
-        keepPitch = c.lenient(.keepPitch, true)
-        pan = c.lenient(.pan, 0)
-        compressor = c.lenient(.compressor)
-        noiseReduction = c.lenient(.noiseReduction, 0)
-    }
-
-    /// Volume in dB for the Audio tab's read-out; -inf shows as silence.
-    var decibels: Double { volume <= 0 ? -.infinity : 20 * log10(volume) }
-}
-
 // MARK: - Clips
 
 /// What a clip plays. Internally tagged by `kind`, and one of its keys is
@@ -1143,6 +1052,9 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
     /// Stored unvalidated on both sides, so draw it through
     /// `ClipLabel.color(named:)`, which absorbs a name this build lacks.
     let label: String?
+    /// The clip this one is linked to (format 28, spec §11 AU-90): Detach
+    /// Audio's picture and sound, which every placement edit keeps in step.
+    let linked: UInt32?
 
     init(
         id: UInt32, track: UInt32, start: Ticks = 0, duration: Ticks = 0,
@@ -1151,7 +1063,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         text: TextProps? = nil, shape: ShapeProps? = nil,
         graphic: GraphicSnapshot? = nil,
         actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil,
-        name: String? = nil, label: String? = nil
+        name: String? = nil, label: String? = nil, linked: UInt32? = nil
     ) {
         self.id = id
         self.track = track
@@ -1169,6 +1081,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         self.transitionIn = transitionIn
         self.name = name
         self.label = label
+        self.linked = linked
     }
 
     init(from decoder: Decoder) throws {
@@ -1189,6 +1102,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         transitionIn = c.lenient(.transitionIn)
         name = c.lenient(.name)
         label = c.lenient(.label)
+        linked = c.lenient(.linked)
     }
 
     /// Project time one tick past the clip's last frame.
@@ -1229,16 +1143,23 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
 /// `curve` and `audio` are format version 7's. Their defaults here are the
 /// FILE defaults — linear and silent — and not what the core MINTS (spec
 /// §11, R5-2), because this type decodes files: a version-6 project carries
-/// neither key and must read as what it always rendered.
+/// neither key and must read as what it always rendered. `audioShape` is
+/// format 29's (spec §11 AU-115), `plus_3db` — R5-2's constant power — when
+/// absent.
 struct TransitionSnapshot: Codable, Equatable {
     let kind: TransitionKind
     let curve: Curve
     let audio: Bool
+    let audioShape: FadeShape
 
-    init(kind: TransitionKind = .crossDissolve, curve: Curve = .linear, audio: Bool = false) {
+    init(
+        kind: TransitionKind = .crossDissolve, curve: Curve = .linear, audio: Bool = false,
+        audioShape: FadeShape = .plus3Db
+    ) {
         self.kind = kind
         self.curve = curve
         self.audio = audio
+        self.audioShape = audioShape
     }
 
     init(from decoder: Decoder) throws {
@@ -1246,6 +1167,7 @@ struct TransitionSnapshot: Codable, Equatable {
         kind = c.lenient(.kind, TransitionKind.crossDissolve)
         curve = c.lenient(.curve, Curve.linear)
         audio = c.lenient(.audio, false)
+        audioShape = c.lenient(.audioShape, FadeShape.plus3Db)
     }
 }
 

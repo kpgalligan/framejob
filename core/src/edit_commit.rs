@@ -46,6 +46,7 @@ impl Clip {
             transition_in: None,
             name: None,
             label: None,
+            linked: None,
         }
     }
 }
@@ -200,7 +201,12 @@ impl Project {
     /// It never answers [`Outcome::Refused`]: a rule that says no does so
     /// where it is asked, with its own sentence, before anything is built
     /// for this to judge.
-    pub(crate) fn finish(&self, next: Project) -> Result<Outcome, String> {
+    ///
+    /// Links settle FIRST (`edit_link.rs`, spec §11 AU-96): a link whose
+    /// partner the op removed, nested or replaced is cleared here, so no op
+    /// stores a one-sided link and the comparison sees the settled result.
+    pub(crate) fn finish(&self, mut next: Project) -> Result<Outcome, String> {
+        next.settle_links();
         if next == *self {
             return Ok(Outcome::Identity);
         }

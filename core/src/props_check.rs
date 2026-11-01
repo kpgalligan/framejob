@@ -31,6 +31,10 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
+use crate::audio_dynamics::{
+    check_compressor, check_de_esser, check_gate, check_leveller, check_limiter,
+};
+use crate::audio_eq::{check_eq, check_hum};
 use crate::grade_check::{check_curves, check_qualifier, check_wheels};
 use crate::model::{
     AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
@@ -61,6 +65,13 @@ pub(crate) const SPOT_ZOOM_MAX: f64 = 2.0;
 pub(crate) const COMPRESSOR_THRESHOLD_MIN_DB: f64 = -60.0;
 pub(crate) const COMPRESSOR_RATIO_MAX: f64 = 20.0;
 pub(crate) const COMPRESSOR_MAKEUP_MAX_DB: f64 = 24.0;
+
+/// The clip limiter's bounds (spec §11 AU-21). A ceiling from −24 dBTP,
+/// past which it is a level control rather than a limiter, up to full
+/// scale; a release of 1 ms to 1 s, in ticks.
+pub(crate) const LIMITER_CEILING_MIN_DB: f64 = -24.0;
+pub(crate) const LIMITER_RELEASE_MIN: Ticks = 600;
+pub(crate) const LIMITER_RELEASE_MAX: Ticks = 600_000;
 
 /// Where a word-caption page's active word may settle (format version 9,
 /// road map 8 §5a). 1 is "no pop"; past 1.5 the active word crowds its
@@ -132,7 +143,22 @@ fn ticks_in_envelope(key: &str, value: Ticks) -> Result<(), String> {
     }
 }
 
-fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
+pub(crate) fn ticks_in_range(
+    key: &str,
+    value: Ticks,
+    low: Ticks,
+    high: Ticks,
+) -> Result<(), String> {
+    if (low..=high).contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{key} must be between {low} and {high} ticks, not {value}"
+        ))
+    }
+}
+
+pub(crate) fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
     if value >= 0 {
         Ok(())
     } else {
@@ -337,30 +363,28 @@ pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
         in_range("audio.duck.level", duck.level, 0.0, 1.0)?;
         ticks_positive_or_zero("audio.duck.attack", duck.attack)?;
         ticks_positive_or_zero("audio.duck.release", duck.release)?;
+        ticks_positive_or_zero("audio.duck.pre_roll", duck.pre_roll)?;
+        ticks_positive_or_zero("audio.duck.hold", duck.hold)?;
     }
     in_range("audio.pan", props.pan, -1.0, 1.0)?;
     in_range("audio.noise_reduction", props.noise_reduction, 0.0, 1.0)?;
+    in_range("audio.isolation", props.isolation, 0.0, 1.0)?;
     if let Some(compressor) = &props.compressor {
-        in_range(
-            "audio.compressor.threshold_db",
-            compressor.threshold_db,
-            COMPRESSOR_THRESHOLD_MIN_DB,
-            0.0,
-        )?;
-        in_range(
-            "audio.compressor.ratio",
-            compressor.ratio,
-            1.0,
-            COMPRESSOR_RATIO_MAX,
-        )?;
-        ticks_positive_or_zero("audio.compressor.attack", compressor.attack)?;
-        ticks_positive_or_zero("audio.compressor.release", compressor.release)?;
-        in_range(
-            "audio.compressor.makeup_db",
-            compressor.makeup_db,
-            0.0,
-            COMPRESSOR_MAKEUP_MAX_DB,
-        )?;
+        check_compressor("audio.compressor", compressor)?;
+    }
+    if let Some(limiter) = &props.limiter {
+        check_limiter("audio.limiter", limiter)?;
+    }
+    props.eq.as_ref().map(check_eq).transpose()?;
+    props.hum.as_ref().map(check_hum).transpose()?;
+    props.gate.as_ref().map(check_gate).transpose()?;
+    props.de_esser.as_ref().map(check_de_esser).transpose()?;
+    props.leveller.as_ref().map(check_leveller).transpose()?;
+    if let Some(voice) = &props.voice {
+        in_range("audio.voice.amount", voice.amount, 0.0, 1.0)?;
+        if let Some(pitch) = voice.pitch {
+            in_range("audio.voice.pitch", pitch, -12.0, 12.0)?;
+        }
     }
     Ok(())
 }

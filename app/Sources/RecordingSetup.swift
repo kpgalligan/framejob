@@ -93,6 +93,8 @@ struct RecordingChoice: Equatable {
     var folder: URL = RecordingFiles.folder()
     var camera: String? = nil
     var cameraFormat: String? = nil
+    /// Enhance Voice on the voice's clips after the landing; only with a microphone (AU-68, AU-69).
+    var enhanceMicrophone: Bool = false
 }
 
 // MARK: - Where the files go

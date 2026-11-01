@@ -1,0 +1,57 @@
+== T1 tones, EQ (high-pass 80 Hz + peak +6 dB at 3 kHz): linear
+   input sum true peak +1.68 dBTP; REF (chain on the sum) true peak +2.11 dBTP
+   PER (chain per comp track, envelope first): true peak +2.11 dBTP | worst 50 ms level err 0.00 dB (>0.5 dB until +0.00 s) | worst momentary err 0.00 LU | error/signal -145.3 dB
+   PRE (chain before the envelope, as today):   true peak +2.11 dBTP | worst 50 ms level err 0.00 dB (>0.5 dB until +0.00 s) | worst momentary err 0.00 LU | error/signal -89.0 dB
+== T1 tones 440/660 Hz at -0.9 dBFS, 2 s crossfade, limiter -1 dBTP
+   input sum true peak +1.68 dBTP; REF (chain on the sum) true peak -1.10 dBTP
+   PER (chain per comp track, envelope first): true peak +1.68 dBTP | worst 50 ms level err 2.78 dB (>0.5 dB until +1.95 s) | worst momentary err 2.74 LU | error/signal -11.6 dB
+   PRE (chain before the envelope, as today):   true peak +1.49 dBTP | worst 50 ms level err 2.59 dB (>0.5 dB until +1.95 s) | worst momentary err 2.56 LU | error/signal -12.4 dB
+== T1 tones, compressor default (-18 dB, 3:1, 10/200 ms)
+   input sum true peak +1.68 dBTP; REF (chain on the sum) true peak -11.42 dBTP
+   PER (chain per comp track, envelope first): true peak -7.97 dBTP | worst 50 ms level err 3.43 dB (>0.5 dB until +2.00 s) | worst momentary err 3.40 LU | error/signal -7.6 dB
+   PRE (chain before the envelope, as today):   true peak -9.71 dBTP | worst 50 ms level err 1.72 dB (>0.5 dB until +2.00 s) | worst momentary err 1.70 LU | error/signal -15.9 dB
+== T1 tones, compressor heavy (-30 dB, 6:1, 5/100 ms)
+   input sum true peak +1.68 dBTP; REF (chain on the sum) true peak -24.68 dBTP
+   PER (chain per comp track, envelope first): true peak -20.21 dBTP | worst 50 ms level err 4.44 dB (>0.5 dB until +2.00 s) | worst momentary err 4.41 LU | error/signal -4.3 dB
+   PRE (chain before the envelope, as today):   true peak -22.55 dBTP | worst 50 ms level err 2.14 dB (>0.5 dB until +1.95 s) | worst momentary err 2.11 LU | error/signal -14.2 dB
+== T2 speech x2, EQ (linear)
+   input sum true peak +7.60 dBTP; REF (chain on the sum) true peak +12.18 dBTP
+   PER (chain per comp track, envelope first): true peak +12.18 dBTP | worst 50 ms level err 0.00 dB (>0.5 dB until +0.00 s) | worst momentary err 0.00 LU | error/signal -145.9 dB
+   PRE (chain before the envelope, as today):   true peak +12.17 dBTP | worst 50 ms level err 0.02 dB (>0.5 dB until +0.00 s) | worst momentary err 0.01 LU | error/signal -55.3 dB
+== T2 speech x2 (Rode, +29 dB), 1 s crossfade, limiter -1 dBTP
+   input sum true peak +7.60 dBTP; REF (chain on the sum) true peak -1.10 dBTP
+   PER (chain per comp track, envelope first): true peak -0.25 dBTP | worst 50 ms level err 0.28 dB (>0.5 dB until +0.00 s) | worst momentary err 0.12 LU | error/signal -22.1 dB
+   PRE (chain before the envelope, as today):   true peak -2.60 dBTP | worst 50 ms level err 4.43 dB (>0.5 dB until +0.85 s) | worst momentary err 3.13 LU | error/signal -13.3 dB
+== T2 speech x2, compressor default
+   input sum true peak +7.60 dBTP; REF (chain on the sum) true peak -3.35 dBTP
+   PER (chain per comp track, envelope first): true peak -2.87 dBTP | worst 50 ms level err 9.07 dB (>0.5 dB until +1.00 s) | worst momentary err 4.93 LU | error/signal -7.5 dB
+   PRE (chain before the envelope, as today):   true peak -4.60 dBTP | worst 50 ms level err 7.56 dB (>0.5 dB until +1.00 s) | worst momentary err 5.64 LU | error/signal -6.8 dB
+== T2 speech x2, compressor heavy
+   input sum true peak +7.60 dBTP; REF (chain on the sum) true peak -15.50 dBTP
+   PER (chain per comp track, envelope first): true peak -12.23 dBTP | worst 50 ms level err 8.54 dB (>0.5 dB until +1.00 s) | worst momentary err 3.52 LU | error/signal -4.5 dB
+   PRE (chain before the envelope, as today):   true peak -13.53 dBTP | worst 50 ms level err 6.87 dB (>0.5 dB until +0.90 s) | worst momentary err 2.67 LU | error/signal -3.9 dB
+== T3 speech, hard cut at 3 s across two comp tracks, limiter (region 3-5 s)
+   input sum true peak +1.74 dBTP; REF (chain on the sum) true peak -1.10 dBTP
+   PER (chain per comp track, envelope first): true peak -1.10 dBTP | worst 50 ms level err 0.01 dB (>0.5 dB until +0.00 s) | worst momentary err 0.00 LU | error/signal -80.8 dB
+   PRE (chain before the envelope, as today):   true peak -1.10 dBTP | worst 50 ms level err 0.01 dB (>0.5 dB until +0.00 s) | worst momentary err 0.00 LU | error/signal -80.8 dB
+== T3 speech, hard cut, compressor default (region 3-5 s)
+   input sum true peak +1.74 dBTP; REF (chain on the sum) true peak -3.72 dBTP
+   PER (chain per comp track, envelope first): true peak -3.72 dBTP | worst 50 ms level err 10.20 dB (>0.5 dB until +0.10 s) | worst momentary err 0.87 LU | error/signal -16.1 dB
+   PRE (chain before the envelope, as today):   true peak -3.72 dBTP | worst 50 ms level err 10.20 dB (>0.5 dB until +0.10 s) | worst momentary err 0.87 LU | error/signal -16.1 dB
+== T3 speech, hard cut, compressor heavy (region 3-5 s)
+   input sum true peak +1.74 dBTP; REF (chain on the sum) true peak -16.00 dBTP
+   PER (chain per comp track, envelope first): true peak -16.00 dBTP | worst 50 ms level err 6.37 dB (>0.5 dB until +0.10 s) | worst momentary err 1.72 LU | error/signal -11.4 dB
+   PRE (chain before the envelope, as today):   true peak -16.00 dBTP | worst 50 ms level err 6.37 dB (>0.5 dB until +0.10 s) | worst momentary err 1.72 LU | error/signal -11.4 dB
+   (T4 bed RMS -21.4 dBFS)
+== T4 nest bus: voice (+29 dB) and bed together 30 s, limiter -1 dBTP
+   input sum true peak +10.39 dBTP; REF (chain on the sum) true peak -1.10 dBTP
+   PER (chain per comp track, envelope first): true peak +1.35 dBTP | worst 50 ms level err 1.18 dB (>0.5 dB until +19.30 s) | worst momentary err 0.80 LU | error/signal -25.6 dB
+   PRE (chain before the envelope, as today):   true peak +1.35 dBTP | worst 50 ms level err 1.18 dB (>0.5 dB until +19.30 s) | worst momentary err 0.80 LU | error/signal -25.6 dB
+== T4 nest bus, compressor default
+   input sum true peak +10.39 dBTP; REF (chain on the sum) true peak -0.91 dBTP
+   PER (chain per comp track, envelope first): true peak +1.79 dBTP | worst 50 ms level err 9.87 dB (>0.5 dB until +28.00 s) | worst momentary err 4.76 LU | error/signal -10.7 dB
+   PRE (chain before the envelope, as today):   true peak +1.79 dBTP | worst 50 ms level err 9.87 dB (>0.5 dB until +28.00 s) | worst momentary err 4.76 LU | error/signal -10.7 dB
+== T4 nest bus, compressor heavy
+   input sum true peak +10.39 dBTP; REF (chain on the sum) true peak -12.26 dBTP
+   PER (chain per comp track, envelope first): true peak -7.02 dBTP | worst 50 ms level err 11.69 dB (>0.5 dB until +28.00 s) | worst momentary err 4.95 LU | error/signal -4.9 dB
+   PRE (chain before the envelope, as today):   true peak -7.02 dBTP | worst 50 ms level err 11.69 dB (>0.5 dB until +28.00 s) | worst momentary err 4.95 LU | error/signal -4.9 dB

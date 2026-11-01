@@ -1,8 +1,11 @@
 import AppKit
 
 /// The Clip tab's AUDIO sections (spec §4.3): volume with its dB read-out,
-/// Normalize and mute, the two fades, ducking, noise reduction, the
-/// compressor, pan, mix-to-mono and Detach Audio.
+/// Normalize and mute, the two fades, ducking, voice isolation
+/// (`AudioPane+Isolation.swift`), the channel pick, the EQ and the hum notch
+/// (`AudioPane+HumChannels.swift`, `AudioPane+EQ.swift`), noise reduction,
+/// the compressor, pan, mix-to-mono, Detach Audio and Attach Audio, and the
+/// limiter (`AudioPane+Limiter.swift`).
 ///
 /// **This pane is never shown**: since the six tabs became three it is a
 /// factory `ClipPane` holds and calls, last in the Clip tab, whenever at least
@@ -15,14 +18,60 @@ import AppKit
 /// measured gain (`normalize()` says why it cannot go through
 /// `InspectorBinding.ops(audio:)`).
 ///
-/// The last three sections are in SIGNAL ORDER rather than in order of
-/// familiarity: noise reduction, then the compressor, then the pan in Mix, is
-/// the order `AudioDSPChain` actually runs them in, and the order matters to
+/// The sections after Ducking are in SIGNAL ORDER rather than in order of
+/// familiarity: Voice Isolation, Channels, EQ, Hum, noise reduction, the
+/// compressor, the pan in Mix, then the Limiter, is the order the tap and
+/// `AudioDSPChain` actually run them in, and the order matters to
 /// what the numbers mean (the compressor's threshold is read against a signal
 /// the reducer has already cleaned). Volume, the fades and ducking come first
 /// in the pane and LAST in the signal, being the fader the core folds into the
 /// plan's envelope. `ClipPane` keeps them in that order.
 final class AudioPane: InspectorPaneView {
+    /// The Volume section's loudness readout (spec §11 AU-15), dropped by a
+    /// `loudness` cache post.
+    let loudnessMemo = ClipLoudness.Memo()
+    /// Voice Isolation's Status read-out (AU-56), dropped by an offline
+    /// audio settlement.
+    let isolationMemo = IsolationCache.Memo()
+    /// Voice Effect's Status read-out (AU-146), dropped with it.
+    let voiceMemo = IsolationCache.Memo(compute: VoiceCache.status(of:in:))
+
+    override init(inspector: InspectorViewController) {
+        super.init(inspector: inspector)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(loudnessCacheChanged(_:)), name: .mediaCacheDidChange,
+            object: nil)
+        // An isolation render landed or failed (AU-56): Voice Isolation's
+        // status reads again.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(offlineAudioSettled(_:)), name: .reversedMediaDidChange,
+            object: nil)
+    }
+
+    @objc private func offlineAudioSettled(_ note: Notification) {
+        isolationMemo.invalidate()
+        voiceMemo.invalidate()
+        inspector?.refresh(isLive: false)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("AudioPane does not support NSCoder")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    /// A loudness file landed or was withdrawn: the memo's files and answers
+    /// go, and the readout reads again.
+    @objc private func loudnessCacheChanged(_ note: Notification) {
+        guard note.userInfo?[MediaImporter.cacheKindKey] as? String == MediaImporter.loudnessKind
+        else { return }
+        loudnessMemo.invalidate()
+        inspector?.refresh(isLive: false)
+    }
+
     // MARK: Volume
 
     func volumeSection() -> InspectorSection {
@@ -37,24 +86,8 @@ final class AudioPane: InspectorPaneView {
             title: "Normalize",
             action: { [weak self] in self?.normalize() },
             enabled: { !AudioPane.normalizable(binding).isEmpty }, onEdit: {})
-        // Two of the three sentences are the limits, and they are here because
-        // this is where somebody meets them: the tool's description says the
-        // same three things (road map 2 phase 5c, D-C3). The level is spelled
-        // with the typographic minus the sheets use, and read off the constant
-        // so that changing the target changes the sentence. The nest clause is
-        // a fourth limit and is here for the same reason turned around: a nest
-        // alone leaves the button disabled, but a nest picked BESIDE an
-        // ordinary clip leaves it enabled and the nest quietly not asked
-        // about, which is the one thing about the press the others do not say.
-        let level = String(format: "%.0f dBFS", AudioNormalize.defaultPeakDB)
-            .replacingOccurrences(of: "-", with: "−")
-        let tip: String =
-            "Set each selected clip's volume so its loudest moment reaches " + level
-            + ". It REPLACES the volume rather than adding to it, so pressing it twice "
-            + "changes nothing; it writes the clip's base level even while the playhead "
-            + "is inside an action; and it leaves Mute alone. A nest is skipped: its "
-            + "level lives in the clips inside it, not in the nest."
-        normalize.toolTip = tip
+        // The tooltip follows the chosen mode (`normalizeTip`, AU-15).
+        let modeRow = normalizeRow(updating: normalize)
         return InspectorSection(
             id: "audio.volume", title: "Volume",
             summary: {
@@ -66,8 +99,11 @@ final class AudioPane: InspectorPaneView {
             reset: { binding.apply("Volume", audio: AudioPatch(volume: 1, muted: false)) },
             defaultExpanded: false,
             rows: [
+                // The field reaches the model's ceiling and the slider stops at
+                // 400 %, where a linear rail is still useful (spec §11 AU-1).
                 inspectorValueRow(
-                    "Volume", binding, name: "Volume", unit: "%", decimals: 0, min: 0, max: 400,
+                    "Volume", binding, name: "Volume", unit: "%", decimals: 0, min: 0,
+                    max: AudioNormalize.maxGain * 100, sliderMax: 400,
                     quick: [0, 50, 100, 150, 200, 400],
                     read: { binding.audioProps.volume * 100 },
                     ops: { binding.ops(audio: AudioPatch(volume: $0 / 100)) },
@@ -82,16 +118,20 @@ final class AudioPane: InspectorPaneView {
                         }
                     ], binding: binding,
                     follows: binding.ops(audio: AudioPatch(volume: binding.audioProps.volume))),
+            ] + loudnessRows() + [
                 inspectorCheckRow(
                     "Mute", binding, name: "Mute",
                     read: { binding.audioProps.muted },
                     ops: { binding.ops(audio: AudioPatch(muted: $0)) },
                     mixed: { binding.mixedAudio { $0.muted } }),
+                modeRow,
                 inspectorButtonRow([normalize, InspectorClipTag(binding: binding)]),
+                inspectorButtonRow([enhanceButton()]),
             ])
     }
 
-    /// Normalize Clip's UI half: measure, then commit as ONE undo step.
+    /// Normalize Clip's UI half: measure, then commit as ONE undo step, in
+    /// the mode the Normalize row chose (`NormalizeChoice`, spec §11 AU-15).
     ///
     /// All of the arithmetic is `AudioNormalize`'s, which is the point — the
     /// agent's `normalize_clip` calls the same two functions, so the button and
@@ -133,14 +173,10 @@ final class AudioPane: InspectorPaneView {
     }
 
     private func normalize() {
-        guard let document = binding.document,
-              let input = AudioNormalize.read(
-                from: document, clips: AudioPane.normalizable(binding).map { $0.id })
-        else {
-            NSSound.beep()
-            return
-        }
-        binding.apply("Normalize", AudioNormalize.plan(input).ops)
+        guard let document = binding.document else { return NSSound.beep() }
+        AudioMeasureDoor.press(
+            .normalize, document: document,
+            clips: AudioPane.normalizable(binding).map { $0.id }, window: window)
     }
 
     // MARK: Fades
@@ -154,9 +190,12 @@ final class AudioPane: InspectorPaneView {
     /// Fades are also the corner handles on the clip (§4.4), so the numbers
     /// here and the drag there write the same two fields. The rows store the
     /// length typed, off the frame grid (`rampTicks`); the handle's drag
-    /// snaps it to whole frames (§11 #355).
+    /// snaps it to whole frames (§11 #355). The two shape popups (format 29,
+    /// spec §11 AU-114) are base-only, as the duck is (CI-3, AU-88).
     func fadeSection() -> InspectorSection {
         let binding = self.binding
+        let shapes = FadeShape.allCases
+        func shape(_ index: Int) -> FadeShape { shapes[min(max(index, 0), shapes.count - 1)] }
         return InspectorSection(
             id: "audio.fades", title: "Fades",
             summary: {
@@ -181,24 +220,62 @@ final class AudioPane: InspectorPaneView {
                     read: { ReelTime.seconds(binding.audioProps.fadeOut) },
                     ops: { binding.ops(audio: AudioPatch(fadeOut: Self.rampTicks(seconds: $0))) },
                     mixed: { binding.mixedAudio { $0.fadeOut } }),
+                inspectorPopupRow(
+                    "In shape", binding, name: "Fade In Shape", items: shapes.map { $0.title },
+                    read: { shapes.firstIndex(of: binding.audioProps.fadeInShape) ?? 0 },
+                    ops: { binding.ops(audio: AudioPatch(fadeInShape: shape($0))) },
+                    mixed: { binding.mixedAudio { $0.fadeInShape } }),
+                inspectorPopupRow(
+                    "Out shape", binding, name: "Fade Out Shape", items: shapes.map { $0.title },
+                    read: { shapes.firstIndex(of: binding.audioProps.fadeOutShape) ?? 0 },
+                    ops: { binding.ops(audio: AudioPatch(fadeOutShape: shape($0))) },
+                    mixed: { binding.mixedAudio { $0.fadeOutShape } }),
             ])
     }
 
     // MARK: Ducking
 
-    /// "Lower other audio to N % while this clip plays" — by clip EXTENT, not
-    /// voice activity (§11), which is why there is nothing to analyse and the
-    /// core can fold it into the other clips' envelopes.
+    /// "Lower other audio to N % while this clip plays" — by the clip's
+    /// length, or (Duck by Speech, format 29, spec §11 AU-110..AU-113) only
+    /// while its speech plays, widened by Pre-roll and Hold. The core folds
+    /// either into the other clips' envelopes.
     ///
     /// Every control writes a whole `DuckProps`: the patch replaces the
-    /// object, so each edit re-sends the other two values as they stand.
-    /// Attack and release are stored as typed, off the frame grid
-    /// (§11 #355).
+    /// object, so each edit re-sends the other values as they stand.
+    /// Attack, release, pre-roll and hold are stored as typed, off the frame
+    /// grid (§11 #355).
+    ///
+    /// **Choosing Speech is ONE edit with the spans** (AU-111): the
+    /// `set_media_speech` each media without spans needs, from its voice
+    /// cache (`DuckSpeech.ops`), then the `set_audio`. Every other duck edit
+    /// re-sends `mode`, so on a Speech duck it carries the same spans first,
+    /// as `AgentServer.setAudio` does: a Level edit on a pasted spanless
+    /// Speech duck saves its media's spans and applies. A media whose cache
+    /// cannot be read adds none, and the core refuses the edit in its own
+    /// sentence rather than the row doing nothing. Speech cannot be chosen
+    /// — the popup is disabled while the duck follows the clip's length —
+    /// for a selection with a clip that is not a media clip with sound, or
+    /// whose speech has not been detected yet (`DuckSpeech.problem`).
     func duckSection() -> InspectorSection {
         let binding = self.binding
         func current() -> DuckProps { binding.audioProps.duck ?? DuckProps() }
-        func ops(_ next: DuckProps) -> [ReelOp] { binding.ops(audio: AudioPatch(duck: .some(next))) }
+        func ops(_ next: DuckProps) -> [ReelOp] {
+            let set = binding.ops(audio: AudioPatch(duck: .some(next)))
+            guard next.mode == .speech else { return set }
+            let spans = (try? DuckSpeech.ops(
+                for: binding.audioClips, in: binding.snapshot,
+                cacheDirectory: binding.document?.cacheDirectory)) ?? []
+            return spans + set
+        }
         func on() -> Bool { binding.audioProps.duck != nil }
+        func speech() -> Bool { on() && current().mode == .speech }
+        func offerable() -> Bool {
+            speech()
+                || DuckSpeech.problem(
+                    for: binding.audioClips, in: binding.snapshot,
+                    cacheDirectory: binding.document?.cacheDirectory) == nil
+        }
+        let modes = DuckMode.allCases
         return InspectorSection(
             id: "audio.duck", title: "Ducking",
             summary: { on() ? String(format: "%.0f%%", current().level * 100) : "off" },
@@ -213,6 +290,16 @@ final class AudioPane: InspectorPaneView {
                             audio: AudioPatch(duck: value ? .some(DuckProps()) : .some(nil)))
                     },
                     mixed: { binding.mixedAudio { $0.duck != nil } }),
+                inspectorPopupRow(
+                    "Duck by", binding, name: "Ducking", items: ["Clip Length", "Speech"],
+                    read: { modes.firstIndex(of: current().mode) ?? 0 },
+                    ops: { index in
+                        var d = current()
+                        d.mode = modes[min(max(index, 0), modes.count - 1)]
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.mode } },
+                    enabled: { on() && offerable() }),
                 inspectorValueRow(
                     "Level", binding, name: "Duck Level", unit: "%", decimals: 0, min: 0, max: 100,
                     quick: [0, 10, 20, 30, 50],
@@ -246,6 +333,28 @@ final class AudioPane: InspectorPaneView {
                     },
                     mixed: { binding.mixedAudio { $0.duck?.release } },
                     enabled: on),
+                inspectorValueRow(
+                    "Pre-roll", binding, name: "Duck Pre-roll", unit: " s", decimals: 2, min: 0,
+                    max: 5, quick: [0, 0.25, 0.5, 1],
+                    read: { ReelTime.seconds(current().preRoll) },
+                    ops: { value in
+                        var d = current()
+                        d.preRoll = Self.rampTicks(seconds: value)
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.preRoll } },
+                    enabled: speech),
+                inspectorValueRow(
+                    "Hold", binding, name: "Duck Hold", unit: " s", decimals: 2, min: 0,
+                    max: 5, quick: [0, 0.25, 0.5, 1],
+                    read: { ReelTime.seconds(current().hold) },
+                    ops: { value in
+                        var d = current()
+                        d.hold = Self.rampTicks(seconds: value)
+                        return ops(d)
+                    },
+                    mixed: { binding.mixedAudio { $0.duck?.hold } },
+                    enabled: speech),
             ])
     }
 
@@ -405,6 +514,9 @@ final class AudioPane: InspectorPaneView {
         let detach = commandButton(
             "Detach Audio", #selector(EditorViewController.detachAudio(_:)),
             toolTip: "Move the audio to its own clip on the track below (⌥⌘D)")
+        let attach = commandButton(
+            "Attach Audio", #selector(EditorViewController.attachAudio(_:)),
+            toolTip: "Merge a detached sound back into its picture (⇧⌥⌘D)")
         return InspectorSection(
             id: "audio.mix", title: "Mix",
             summary: {
@@ -436,7 +548,7 @@ final class AudioPane: InspectorPaneView {
                     read: { binding.audioProps.mono },
                     ops: { binding.ops(audio: AudioPatch(mono: $0)) },
                     mixed: { binding.mixedAudio { $0.mono } }),
-                inspectorButtonRow([detach]),
+                inspectorButtonRow([detach, attach]),
             ])
     }
 }

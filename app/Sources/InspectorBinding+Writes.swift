@@ -129,18 +129,19 @@ extension InspectorBinding {
             structural: { self.structural(video: $0, for: $1) })
     }
 
-    /// Spec §11 CI-3: pan, mono, compressor, noise reduction, duck and
-    /// keep-pitch are the clip's, whatever is selected.
+    /// Spec §11 AU-88 (amending CI-3, AU-21, AU-37, AU-46, AU-50): with an
+    /// action selected, pan, mono, the compressor, noise reduction, the
+    /// limiter, isolation, the EQ, the hum notch, the channel pick, the gate,
+    /// the leveller (AU-66) and the de-esser go to the action's END with
+    /// volume and the fades, a
+    /// switch turned off there keyed off (`ReelOp.setActionEnd`); the duck,
+    /// keep-pitch, the fade shapes (AU-114), the voice effect (AU-140) and a
+    /// NEST clip's mono stay the clip's (`AudioPatch.routedInsideAction`).
     private func structural(audio patch: AudioPatch, for clip: ClipSnapshot)
         -> (base: AudioPatch?, animatable: AudioPatch?)
     {
-        let base = AudioPatch(
-            duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
-            compressor: patch.compressor, noiseReduction: patch.noiseReduction)
-        var animatable = patch
-        (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
-        (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
-        return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
+        let routed = patch.routedInsideAction(nestClip: clip.source.nestID != nil)
+        return (routed.base, routed.end)
     }
 
     func ops(audio patch: AudioPatch) -> [ReelOp] {

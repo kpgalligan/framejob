@@ -37,6 +37,7 @@ extension EditorViewController {
         // method on this controller.
         timeline.onSelectionChanged = { [weak self] ids in self?.timelineSelected(ids) }
         timeline.onScrub = { [weak self] time in self?.timelineScrubbed(time) }
+        timeline.onScrubEnded = { [weak self] in self?.scrubAudioEnded() }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
         timeline.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
@@ -70,6 +71,10 @@ extension EditorViewController {
         // The source maps come from the same handle as the snapshot (spec
         // §11 SR-20 (d)), set first so the redraw `update` asks for reads them.
         timeline.sourceMaps = document.editedProject.sourceMap
+        // A speech duck's line, off the same handle (spec §11 AU-113).
+        timeline.duckCurves = DuckCurves(document.editedProject)
+        // The volume line's envelopes, off the same handle (spec §11 AU-81).
+        timeline.volumeLines = VolumeLines(document.editedProject)
         timeline.update(
             snapshot: document.editedProject.snapshot,
             selection: document.selection,
@@ -129,6 +134,7 @@ extension EditorViewController {
     private func timelineScrubbed(_ time: Ticks) {
         playback.pause()
         setPlayhead(time)
+        scrubAudioMoved()
     }
 
     /// Applies ops to the current handle PURELY so a gesture can learn the
@@ -198,12 +204,15 @@ extension EditorViewController {
 
     /// W / E. Every selected clip is offered to the core; the ones the
     /// playhead is not inside are refused, and a wholly refused batch beeps.
+    /// A linked sound half trims alone, as its edge's drag does (spec §11
+    /// AU-93).
     func trimToPlayhead(_ edge: TimelineEdge) {
         guard let document = document else { return }
         let now = document.playhead
         let ops = clipsUnderPlayhead.map { clip in
             edge == .start
-                ? ReelOp.trimStart(clip: clip.id, to: now) : ReelOp.trimEnd(clip: clip.id, to: now)
+                ? ReelOp.trimStart(clip: clip.id, to: now, alone: clip.isLinkedSound)
+                : ReelOp.trimEnd(clip: clip.id, to: now, alone: clip.isLinkedSound)
         }
         guard !ops.isEmpty else {
             NSSound.beep()
@@ -280,6 +289,29 @@ extension EditorViewController {
         document.applyEdit("Detach Audio", selectedClips.map { .detachAudio(clip: $0.id) })
     }
 
+    /// ⇧⌥⌘D — Clip ▸ Attach Audio and the Mix section's button: each linked
+    /// pair the selection touches merges back into one clip (spec §11 AU-95).
+    @objc func attachAudio(_ sender: Any?) { attachSelectionAudio() }
+
+    /// One `attach_audio` per PAIR, so a selection holding both halves of a
+    /// pair asks once. The core refuses a pair out of step in its own
+    /// sentence; a selection with no linked clip beeps.
+    func attachSelectionAudio() {
+        guard let document = document else { return }
+        var seen: Set<UInt32> = []
+        var ops: [ReelOp] = []
+        for clip in selectedClips {
+            guard let partner = clip.linked, !seen.contains(clip.id) else { continue }
+            seen.formUnion([clip.id, partner])
+            ops.append(.attachAudio(clip: clip.id))
+        }
+        guard !ops.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        document.applyEdit("Attach Audio", ops)
+    }
+
     // Clip ▸ Speed… is a sheet, not a menu: `SpeedSheetController`, put up by
     // `EditorViewController+Export.swift`.
 
@@ -340,7 +372,8 @@ extension EditorViewController {
     /// Track ▸ Hide Video / Mute Audio / Lock Track / Solo — the same four
     /// toggles the header column draws. Solo is audio only and mute wins over
     /// it (spec §7.2); the core's envelopes apply the rule, so this is one
-    /// flag like the other three.
+    /// flag like the other three. The fifth switch, `.mix`, opens the current
+    /// track's Volume and Pan popover (spec §11 AU-105).
     func toggleTrack(_ button: TimelineHeaderButton) {
         guard let document = document, let track = currentTrack else {
             NSSound.beep()
@@ -355,6 +388,8 @@ extension EditorViewController {
             document.applyEdit("Lock Track", .setTrack(track: track.id, locked: !track.locked))
         case .solo:
             document.applyEdit("Solo Track", .setTrack(track: track.id, solo: !track.solo))
+        case .mix:
+            timeline?.showTrackMix(track)
         }
     }
 
@@ -401,6 +436,8 @@ extension EditorViewController {
         switch action {
         case #selector(duplicateClips(_:)), #selector(detachAudio(_:)):
             return hasSelection
+        case #selector(attachAudio(_:)):
+            return selectedClips.contains { $0.linked != nil }
         case #selector(deleteClips(_:)):
             // ⌫ lifts the in/out range with nothing selected, so the item
             // has to be live for that too.

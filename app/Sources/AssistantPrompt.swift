@@ -39,13 +39,13 @@ enum AssistantPrompt {
             + "below, insert and overwrite edits, paste, duplicate",
          ["add_clip", "add_text_clip", "add_shape_clip", "add_adjustment_clip", "add_background",
           "add_blurred_background", "insert_clip", "overwrite_clip", "paste", "duplicate"]),
-        ("cut and time clips: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
-            + "detach audio, delete, ripple delete, delete or lift a range, insert time, close "
-            + "a gap",
+        ("cut and time: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
+            + "detach or attach audio, (ripple) delete, delete or lift a range, insert time, "
+            + "close a gap",
          ["move_clip", "trim_start", "trim_end", "rate_stretch", "slip", "roll", "split",
           "delete", "ripple_delete", "ripple_delete_range", "ripple_delete_ranges", "lift_range",
           "insert_time", "close_gap", "set_speed", "set_reversed", "freeze_frame",
-          "detach_audio"]),
+          "detach_audio", "attach_audio"]),
         ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",
@@ -59,12 +59,13 @@ enum AssistantPrompt {
           "remove_action"]),
         ("media files: import, relink, remove, copy into the project, camera log",
          ["import_media", "add_media", "relink_media", "remove_media", "set_media_color",
-          "consolidate_media"]),
+          "set_media_speech", "consolidate_media"]),
         ("captions: import, transcribe speech, read a clip's timed words, export a caption file",
          ["import_captions", "transcribe", "get_transcript", "export_captions"]),
         ("audio: find silences and filler words, even out loudness, line up recordings by "
             + "their sound",
-         ["detect_silence", "detect_fillers", "normalize_clip", "sync_audio"]),
+         ["detect_silence", "detect_fillers", "normalize_clip", "enhance_voice", "match_audio",
+          "sync_audio"]),
         ("graphics: write, rename, delete, restore, export or import a module; place, change or "
             + "insert a graphic clip; its reference, fonts and assets",
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",

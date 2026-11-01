@@ -200,6 +200,10 @@ impl Project {
             out
         };
         let after = build(rate);
+        // A linked clip's rate is refused (spec §11 AU-94).
+        if let Some(why) = self.linked_rate_refusal(&target, &after) {
+            return Ok(Outcome::Refused(why));
+        }
         if let Some(over) = self.overrun(&after) {
             let floor_k = if shape.rises() {
                 (base * 1000.0).floor() as i64 + 1

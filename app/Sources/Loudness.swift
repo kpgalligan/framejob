@@ -15,10 +15,15 @@ import Foundation
 /// constant below is quoted from Recommendation ITU-R BS.1770-4 (10/2015)
 /// with its table, and the coefficients are for a **48 kHz** sample rate —
 /// the only rate the standard publishes them at, and the rate
-/// `ExportWriter.decodedAudioSettings` pins the export mix to. That is why
-/// `LoudnessMeter.init` REFUSES any other rate rather than filtering with
-/// the wrong numbers: `AudioTapContext.prepare` is the precedent for
-/// checking a format instead of assuming it.
+/// `ExportWriter.decodedAudioSettings` pins the export mix to. At any other
+/// rate in `LoudnessMeter.rateRange` the K-weighting is `KWeighting`'s,
+/// derived from the same analog prototype (road map "audio" AP7, spec §11
+/// AU-71), because the live meter measures at whatever rate the player's
+/// taps run; the export still measures at 48 kHz, where the tables are used
+/// verbatim and the arithmetic is the one this header measures. A rate
+/// outside the range, like a channel count outside 1…2, is refused rather
+/// than filtered: `AudioTapContext.prepare` is the precedent for checking a
+/// format instead of assuming it.
 ///
 /// The measurement chain is:
 ///
@@ -118,169 +123,6 @@ struct LoudnessReport: Equatable {
         integratedLUFS: nil, truePeakDBTP: -.infinity, samplePeakDBFS: -.infinity)
 }
 
-// MARK: - What an export did about it
-
-/// A measurement, the target it was measured against, and the gain that
-/// follows — the value both consumers of an export read (the progress
-/// sheet's final line and the `export` tool's result).
-///
-/// **Gain only, no limiter.** That is what makes every number here
-/// arithmetic instead of a second measurement: a scalar gain shifts
-/// integrated loudness and true peak by exactly itself, so "measured plus
-/// the gain" IS what the file holds. Add a limiter, a soft clip or a
-/// fader-shaped ramp and the reported figure becomes a guess.
-///
-/// **With one exception:** a mix past full scale written with NO gain is
-/// clipped by the write pass's 16-bit decode, so the file holds a signal the
-/// measurement never saw. `mixClipped` is that case, it is the only one, and
-/// `summary` names it rather than letting the figures pass as the file's. A
-/// gained export reads the same float mix the measurement read and is
-/// quantised once, after the gain (spec §11 #86), so it is not clipped.
-struct ExportLoudness: Equatable {
-    /// What the mix measured, before any gain.
-    let measured: LoudnessReport
-    /// The integrated target that was asked for, or nil when the export was
-    /// not normalised at all and this is a readout.
-    let target: Double?
-    /// The true-peak ceiling the gain was capped against.
-    let ceiling: Double
-    /// The gain that was applied, in dB. Quantised (see `gainStepDB`), and
-    /// exactly 0 when nothing was applied.
-    let gainDB: Double
-    /// True when the ceiling, not the target, decided the gain — the case
-    /// worth reporting, because the file will then be quieter than asked.
-    let cappedByPeak: Bool
-
-    /// The ceiling assumed when a caller asks for a target and names none.
-    /// 0 dBTP is not a loudness opinion, it is "do not push the programme
-    /// past full scale", which is true of every file: the export sheet always
-    /// sends `peakCeilingDBTP`, and only a script can reach this default.
-    static let fullScaleCeiling: Double = 0
-
-    /// The grid the applied gain is rounded to, in dB.
-    ///
-    /// Not cosmetic. AVFoundation's mix is not bit-deterministic near a duck
-    /// ramp edge (CLAUDE.md records 38 samples of one 16-bit LSB), which
-    /// moves the measured loudness by something like 10⁻⁵ LU — irrelevant to
-    /// a ±0.5 LU target, but enough that a raw `Double` gain would differ in
-    /// its last bits between two runs and round the ENTIRE file's 16-bit
-    /// samples differently. At 0.01 dB the two runs pick the same gain, so
-    /// two normalised exports of one project compare, and "−14.0 LUFS"
-    /// reproduces.
-    static let gainStepDB: Double = 0.01
-
-    /// The linear multiplier `ExportWriter` applies to the decoded samples.
-    var linearGain: Double { pow(10, gainDB / 20) }
-
-    /// True when the writer has nothing to do — which is what keeps an
-    /// un-normalised export on exactly the code path it had before this
-    /// phase existed.
-    var isUnity: Bool { gainDB == 0 }
-
-    /// What the file holds: the measurement shifted by the gain — unless
-    /// `mixClipped`, which is the one case where it does not.
-    var integratedLUFS: Double? { measured.integratedLUFS.map { $0 + gainDB } }
-    var truePeakDBTP: Double { measured.truePeakDBTP + gainDB }
-
-    /// True when the mix passed full scale and is written with NO gain — the
-    /// one case where the two lines above describe the MIX and not the file.
-    ///
-    /// The measurement reads 32-bit float on purpose (`ExporterLoudness` says
-    /// why), and so does the write pass whenever a gain applies (spec §11
-    /// #86), so a gained export is the measured signal turned down. An
-    /// export with no gain is written from the 16-bit decode, which
-    /// SATURATES: for a mix past full scale the file holds it hard-clipped,
-    /// and no arithmetic here can carry the measurement into that, because a
-    /// clip is not a gain. The decode is kept for those exports because
-    /// changing it would change every such file's bytes, so `summary` names
-    /// the overshoot and says whose numbers these are.
-    ///
-    /// A gain of exactly 0 dB is `isUnity`, and the writer then applies none.
-    var mixClipped: Bool { measured.samplePeakDBFS > 0 && isUnity }
-
-    /// The gain a `target` and a `ceiling` ask for over `measured`.
-    ///
-    /// `target` nil is "do not normalise": the measurement is still carried,
-    /// because the road map wants every export's final line to report what
-    /// the file actually holds, normalised or not.
-    static func resolve(
-        measured: LoudnessReport, target: Double?, ceiling: Double?
-    ) -> ExportLoudness {
-        let ceiling = ceiling ?? fullScaleCeiling
-        guard let target = target, let integrated = measured.integratedLUFS else {
-            return ExportLoudness(
-                measured: measured, target: target, ceiling: ceiling, gainDB: 0,
-                cappedByPeak: false)
-        }
-        let wanted = target - integrated
-        // The cap is computed on TRUE peak rather than sample peak, and that
-        // is what makes the write safe as well as honest: true peak is never
-        // below sample peak, so a gain that keeps the true peak under the
-        // ceiling keeps every 16-bit sample inside full scale, and the clip
-        // in the writer's quantiser (`ExportAudioGain`) never has to fire.
-        //
-        // A peak that is not a finite number is NO headroom, which is the
-        // safe answer and not the obvious one. −∞ cannot reach this line at
-        // all — a nil `integratedLUFS` has already returned above, and a
-        // programme with any block above Γa has a non-zero sample peak — so
-        // the only value that gets here is a +∞ carried in from float source
-        // media holding a non-finite sample, and "the peak cannot be
-        // measured" has to mean "do not push it up". Infinite headroom would
-        // mean the opposite: apply the whole requested boost and ignore the
-        // ceiling.
-        let headroom = measured.truePeakDBTP.isFinite ? ceiling - measured.truePeakDBTP : 0
-        // The two are quantised DIFFERENTLY, because they mean different
-        // things. `wanted` is a target and rounds to nearest: half a
-        // hundredth of a decibel either way of a ±0.5 LU claim is nothing.
-        // `headroom` is a CONSTRAINT — rounding it to nearest hands back up
-        // to 0.005 dB of the attenuation the ceiling asked for, and a
-        // ceiling-capped export then reports, and holds, a true peak ABOVE
-        // the ceiling it names about half the time (which is what the sheet's
-        // "capped so its true peak stays under −1 dBTP" would then be
-        // promising falsely). It rounds DOWN, toward more attenuation, so the
-        // shifted true peak can only land at or under the ceiling.
-        let quantised = Swift.min(
-            (wanted / gainStepDB).rounded() * gainStepDB,
-            (headroom / gainStepDB).rounded(.down) * gainStepDB)
-        return ExportLoudness(
-            measured: measured, target: target, ceiling: ceiling,
-            gainDB: quantised.isFinite ? quantised : 0, cappedByPeak: headroom < wanted)
-    }
-
-    /// The one line every export reports: `"Peak −1.0 dBTP · −14.0 LUFS"`.
-    var summary: String {
-        guard truePeakDBTP.isFinite else {
-            // −∞ is digital silence. Anything else non-finite is a mix
-            // carrying a non-finite sample, and calling THAT silent is the
-            // loudest lie this line could tell.
-            return truePeakDBTP == -.infinity
-                ? "Silent" : "Peak not measurable (a non-finite sample in the mix)"
-        }
-        let peak = "Peak \(Self.decibels(truePeakDBTP)) dBTP"
-        let measurement: String
-        if let integrated = integratedLUFS {
-            measurement = "\(peak) · \(Self.decibels(integrated)) LUFS"
-        } else {
-            // A programme shorter than one 400 ms gating block, or one whose
-            // every block fell under Γa. It has a peak and no loudness, and
-            // saying which is better than printing −∞.
-            measurement = "\(peak) · loudness not measurable"
-        }
-        guard mixClipped else { return measurement }
-        // The figures are the mix's and the file's are worse, so the line
-        // says which it is showing — in both consumers at once, since the
-        // progress sheet's last line and the `export` tool's result are the
-        // same string. `mixClipped` says why they differ at all.
-        return "\(measurement) — measured on the mix, which clipped at +"
-            + "\(Self.decibels(measured.samplePeakDBFS)) dBFS before it was written"
-    }
-
-    /// One decimal, with the typographic minus the rest of the chrome uses.
-    private static func decibels(_ value: Double) -> String {
-        String(format: "%.1f", value).replacingOccurrences(of: "-", with: "−")
-    }
-}
-
 // MARK: - The meter
 
 /// BS.1770-4 over a stream of interleaved 32-bit float frames.
@@ -295,8 +137,15 @@ struct ExportLoudness: Equatable {
 final class LoudnessMeter {
 
     /// The rate the coefficient tables are published at, and the rate the
-    /// export mix is decoded at. Not a default: `init` refuses anything else.
+    /// export mix is decoded at; `KWeighting` uses the tables only here.
     static let requiredSampleRate: Double = 48000
+
+    /// The rates `init` accepts (spec §11 AU-71): the live meter's taps run
+    /// at the output's rate, not the tables'.
+    static let rateRange: ClosedRange<Double> = 8000...192000
+
+    /// Short-term loudness's window in 100 ms sub-blocks: 3 s (EBU R 128).
+    static let shortTermSubBlocks = 30
 
     /// Every measurement window BS.1770-4 § 2 names, in seconds.
     ///
@@ -311,14 +160,14 @@ final class LoudnessMeter {
     /// BS.1770-4 equation (2)'s offset. Note 1 of that clause says what it
     /// is for: it cancels the K-weighting's gain at 997 Hz, which this
     /// implementation measures as +0.6977 dB.
-    private static let offset: Double = -0.691
+    static let offset: Double = -0.691
 
     /// Γa, the absolute gate, in LUFS. A block at or below it is not
     /// programme.
-    private static let absoluteGate: Double = -70
+    static let absoluteGate: Double = -70
 
     /// Γr's offset below the gated mean, in LU.
-    private static let relativeGate: Double = -10
+    static let relativeGate: Double = -10
 
     // ---- K-weighting -----------------------------------------------------
 
@@ -333,14 +182,14 @@ final class LoudnessMeter {
     /// direct form I loses enough per step to drift audibly over a
     /// forty-minute programme. This is not the audio render thread, so the
     /// precision is free.
-    private struct Biquad {
+    struct Biquad {
         let b0: Double, b1: Double, b2: Double, a1: Double, a2: Double
     }
 
     /// Table 1: "Filter coefficients for stage 1 of the pre-filter to model a
     /// spherical head" — a high shelf, +4 dB above about 2 kHz. Quoted from
     /// Recommendation ITU-R BS.1770-4 (10/2015), for 48 kHz.
-    private static let stage1 = Biquad(
+    static let stage1 = Biquad(
         b0: 1.535_124_859_586_97,
         b1: -2.691_696_189_406_38,
         b2: 1.198_392_810_852_85,
@@ -349,7 +198,7 @@ final class LoudnessMeter {
 
     /// Table 2: "Filter coefficients for the second stage weighting curve" —
     /// the RLB high-pass. Same source, same rate.
-    private static let stage2 = Biquad(
+    static let stage2 = Biquad(
         b0: 1.0,
         b1: -2.0,
         b2: 1.0,
@@ -359,8 +208,8 @@ final class LoudnessMeter {
     // ---- true peak -------------------------------------------------------
 
     /// Taps per phase of the interpolating FIR.
-    private static let peakTaps = 12
-    private static let peakPhases = 4
+    static let peakTaps = 12
+    static let peakPhases = 4
 
     /// Annex 2, § 3: "One set of filter coefficients (for the order 48,
     /// 4-phase, FIR interpolating) that would satisfy the requirements would
@@ -378,7 +227,7 @@ final class LoudnessMeter {
     /// omitted on the standard's own instruction: "This step is not necessary
     /// if the calculations are performed in floating point." So is the
     /// matching amplification, which is what it was for.
-    private static let peakFilter: [[Double]] = [
+    static let peakFilter: [[Double]] = [
         [
             0.001_708_984_375_0, 0.010_986_328_125_0, -0.019_653_320_312_5,
             0.033_203_125_000_0, -0.059_448_242_187_5, 0.137_329_101_562_5,
@@ -442,6 +291,10 @@ final class LoudnessMeter {
     /// The last four sub-block sums, oldest overwritten.
     private var ring: [Double]
     private var ringWrites = 0
+    /// The last `shortTermSubBlocks` sub-block sums, for `shortTermLUFS`.
+    private var shortRing: [Double]
+    /// The two K-weighting sections at this meter's rate (`KWeighting`).
+    private let stages: (Biquad, Biquad)
     /// One `Σᵢ Gᵢ·zᵢ` per completed 400 ms block. 100 ms apart, so ten a
     /// second — 36 000 doubles for an hour of programme, which is why the
     /// two-sweep gating can keep them all.
@@ -450,22 +303,24 @@ final class LoudnessMeter {
     private var truePeakLinear: Double = 0
     private var samplePeakLinear: Double = 0
 
-    /// nil for a rate the coefficients are not published at, or a channel
-    /// count this build cannot weight.
+    /// nil for a rate outside `rateRange`, or a channel count this build
+    /// cannot weight.
     ///
     /// **Both refusals are assertions, not conveniences.** The K-weighting
-    /// table is 48 kHz only, and filtering at another rate would answer a
-    /// number that looks right and is not. And BS.1770-4's Table 3 weights
+    /// is the standard's tables at 48 kHz and `KWeighting`'s derivation at
+    /// another rate in the range; outside it there is no weighting this
+    /// meter vouches for. And BS.1770-4's Table 3 weights
     /// the surround channels 1.41 and excludes the LFE, which needs a
     /// channel LAYOUT this meter is not handed; mono and stereo are the two
     /// cases whose weights are all 1.0 and therefore need no layout, and the
     /// export mix is stereo by `ExportWriter.decodedAudioSettings`. A
     /// surround measurement is a feature, not a widening of this guard.
     init?(sampleRate: Double, channelCount: Int) {
-        guard sampleRate == Self.requiredSampleRate, (1...2).contains(channelCount) else {
+        guard Self.rateRange.contains(sampleRate), (1...2).contains(channelCount) else {
             return nil
         }
         self.channelCount = channelCount
+        stages = KWeighting.coefficients(sampleRate: sampleRate)
         hopFrames = Int((sampleRate * Self.hopSeconds).rounded())
         blockFrames = hopFrames * Self.subBlocksPerBlock
         guard hopFrames > Self.peakTaps else { return nil }
@@ -487,6 +342,7 @@ final class LoudnessMeter {
         filterState = .allocate(capacity: channelCount * 8)
         filterState.initialize(repeating: 0, count: channelCount * 8)
         ring = Array(repeating: 0, count: Self.subBlocksPerBlock)
+        shortRing = Array(repeating: 0, count: Self.shortTermSubBlocks)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
@@ -589,7 +445,7 @@ final class LoudnessMeter {
     /// The two-stage K-weighting, in place, with this channel's state.
     private func weight(_ samples: UnsafeMutablePointer<Double>, frames: Int, channel: Int) {
         let base = filterState + channel * 8
-        for (index, section) in [Self.stage1, Self.stage2].enumerated() {
+        for (index, section) in [stages.0, stages.1].enumerated() {
             let state = base + index * 4
             var x1 = state[0], x2 = state[1], y1 = state[2], y2 = state[3]
             for n in 0..<frames {
@@ -611,6 +467,7 @@ final class LoudnessMeter {
 
     private func closeSubBlock() {
         ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum
+        shortRing[ringWrites % Self.shortTermSubBlocks] = subBlockSum
         ringWrites += 1
         subBlockSum = 0
         subBlockFilled = 0
@@ -645,14 +502,32 @@ final class LoudnessMeter {
             samplePeakDBFS: Self.decibels(samplePeakLinear))
     }
 
+    /// The momentary loudness (EBU R 128): the last completed 400 ms block,
+    /// nil before one; −∞ for a silent block.
+    var momentaryLUFS: Double? {
+        blocks.last.map(Self.loudness)
+    }
+
+    /// The short-term loudness (EBU R 128): the last `shortTermSubBlocks`
+    /// sub-blocks (3 s), ungated; nil before that many have closed.
+    var shortTermLUFS: Double? {
+        guard ringWrites >= Self.shortTermSubBlocks else { return nil }
+        return Self.loudness(
+            shortRing.reduce(0, +) / Double(hopFrames * Self.shortTermSubBlocks))
+    }
+
+    private func integrated() -> Double? {
+        Self.gatedLoudness(blocks)
+    }
+
     /// BS.1770-4 equations (5)–(7): the absolute gate, then the relative one,
-    /// applied ONCE.
+    /// applied ONCE, over `blocks`' mean squares.
     ///
     /// The mean is over the LINEAR mean squares, never over the block
     /// loudnesses. Both gates are expressed in dB, which invites averaging
     /// dB; the gates only SELECT blocks, and the answer is the loudness of
     /// the survivors' linear mean.
-    private func integrated() -> Double? {
+    static func gatedLoudness(_ blocks: [Double]) -> Double? {
         let gated = blocks.filter { $0 > 0 && Self.loudness($0) > Self.absoluteGate }
         guard !gated.isEmpty else { return nil }
         let threshold = Self.loudness(gated.reduce(0, +) / Double(gated.count))
@@ -670,5 +545,38 @@ final class LoudnessMeter {
 
     private static func decibels(_ linear: Double) -> Double {
         linear > 0 ? 20 * log10(linear) : -.infinity
+    }
+}
+
+/// BS.1770-4's K-weighting at a rate. Tables 1 and 2 at exactly 48 kHz, the
+/// standard's own numbers (`LoudnessMeter.stage1`/`stage2`); at any other
+/// rate the two sections derived from their analog prototype through the
+/// bilinear transform, libebur128's derivation, which ffmpeg 9 uses too
+/// (AP0's spike S4: within 0.005 LU of the 48 kHz path at 44.1 kHz).
+enum KWeighting {
+    static func coefficients(sampleRate: Double) -> (LoudnessMeter.Biquad, LoudnessMeter.Biquad) {
+        if sampleRate == LoudnessMeter.requiredSampleRate {
+            return (LoudnessMeter.stage1, LoudnessMeter.stage2)
+        }
+        // The high shelf, +4 dB above about 1.7 kHz.
+        var f0 = 1681.974450955533
+        let gain = 3.999843853973347
+        var q = 0.7071752369554196
+        var k = tan(Double.pi * f0 / sampleRate)
+        let vh = pow(10.0, gain / 20.0)
+        let vb = pow(vh, 0.4996667741545416)
+        let a0 = 1.0 + k / q + k * k
+        let shelf = LoudnessMeter.Biquad(
+            b0: (vh + vb * k / q + k * k) / a0, b1: 2.0 * (k * k - vh) / a0,
+            b2: (vh - vb * k / q + k * k) / a0,
+            a1: 2.0 * (k * k - 1.0) / a0, a2: (1.0 - k / q + k * k) / a0)
+        // The RLB high-pass at about 38 Hz.
+        f0 = 38.13547087602444
+        q = 0.5003270373238773
+        k = tan(Double.pi * f0 / sampleRate)
+        let d = 1.0 + k / q + k * k
+        let highPass = LoudnessMeter.Biquad(
+            b0: 1, b1: -2, b2: 1, a1: 2.0 * (k * k - 1.0) / d, a2: (1.0 - k / q + k * k) / d)
+        return (shelf, highPass)
     }
 }

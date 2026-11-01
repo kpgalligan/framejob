@@ -15,7 +15,9 @@ extension AgentServer {
     // MARK: - Actions
 
     /// `add_action` — ⌥⌘K (`EditorViewController+Inspector`'s
-    /// `addActionAtPlayheadCommand`) and the Clip tab's action lane's `+`.
+    /// `addActionAtPlayheadCommand`) and the Clip tab's action lane's `+`; and
+    /// ⌥-press on the timeline's volume line, which adds a point as an action
+    /// (`VolumeLine.point`, spec §11 AU-83).
     /// `at` is CLIP time, not project time: it is measured from the clip's own
     /// start (spec §5.4).
     func addAction(_ a: [String: Any]) throws -> String {
@@ -176,7 +178,9 @@ extension AgentServer {
     /// `set_action` — the Clip tab's action lane: the selected action's
     /// Start, Length and Curve in its detail row, and dragging a band's body
     /// (move) or its outer 5 pt (resize) in that lane or on the timeline's
-    /// action lane (spec §11 CI-11). An action running past its clip's end
+    /// action lane (spec §11 CI-11); and ⌥-press on the volume line inside a
+    /// volume action, which shortens it and re-curves the new half
+    /// (`VolumeLine.point`, spec §11 AU-83). An action running past its clip's end
     /// can be re-curved there (the detail row's Curve popup), moved earlier
     /// or shortened, never taken further out (spec §11 SR-22, #338).
     func setAction(_ a: [String: Any]) throws -> String {
@@ -205,6 +209,14 @@ extension AgentServer {
     /// × and its menu's "Remove from action N" (`InspectorBinding.clearOps`,
     /// spec §11 CI-9). A patch naming `speed` is the Clip tab's Speed section's
     /// Rate with the action selected (`VideoPane.rateOps`, spec §11 SR-21 (a)).
+    /// A patch naming only `audio.volume` is also a drag on the timeline's
+    /// volume line where an action's end is in force, and its ⌥-press's new
+    /// point (`VolumeLineSession`, spec §11 AU-82, AU-83). A patch naming
+    /// `audio` is also the Sound tab's Mix, Channels, EQ, Hum, Noise
+    /// Reduction, Gate, De-esser, Compressor, Limiter and Voice Isolation
+    /// sections with an action selected, a switch turned off there an `off`
+    /// path, an EQ slot `audio.eq.<slot>` (`AudioPatch.routedInsideAction`,
+    /// spec §11 AU-88).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and

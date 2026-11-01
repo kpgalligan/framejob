@@ -28,7 +28,8 @@ extension AgentServer {
     /// The finished job's answer carries the sound the file actually holds —
     /// its integrated loudness and true peak, measured on the way through —
     /// for every format that has any, whether `loudness_lufs` was asked for
-    /// or not.
+    /// or not, and, with `stems` (the sheet's Stems popup, spec §11 AU-108),
+    /// each stem file beside the mix.
     func exportProject(_ a: [String: Any]) throws -> String {
         // The clock `export_status`'s `elapsed` runs on, read before any check.
         let started = ProcessInfo.processInfo.systemUptime
@@ -88,11 +89,9 @@ extension AgentServer {
             // through `doubleArg`, not `intArg`: −14.5 LUFS is a real request
             // and every one of these figures is a negative fraction. Neither
             // is validated here. `export_overrides.rs` owns the bounds
-            // (−70…0 and −20…0) and the one PAIRING rule among the overrides
-            // — a `peak_dbtp` with no `loudness_lufs` is refused, because
-            // normalisation is gain-only and a ceiling with nothing to cap
-            // would be a key accepted, echoed and silently inert — and it
-            // names the offending value the way the bitrate refusals do.
+            // (−70…0 and −20…0) and names the offending value the way the
+            // bitrate refusals do; either may come alone, the ceiling being
+            // the master limiter's (spec §11 AU-27).
             // Restating a bound here would be a second spelling of it to
             // drift from the first.
             // The sheet sends both together and fixes the ceiling at
@@ -121,6 +120,17 @@ extension AgentServer {
             // same terms: the core reads the three words and refuses a row without one.
             if let speed = a["encoder_speed"] {
                 overrides["encoder_speed"] = speed
+            }
+            // The sheet's Bit depth popup (spec §11 AU-29), forwarded unread on the
+            // same terms: the core reads 16 or 24 and refuses a row without a depth.
+            if let bits = a["audio_bits"] {
+                overrides["audio_bits"] = bits
+            }
+            // The sheet's Stems popup (spec §11 AU-108), forwarded unread on the same
+            // terms: the core reads "tracks" or "names", refuses a movie row, and refuses
+            // a project with no track heard.
+            if let stems = a["stems"] {
+                overrides["stems"] = stems
             }
             let settings: ExportSettings
             do {

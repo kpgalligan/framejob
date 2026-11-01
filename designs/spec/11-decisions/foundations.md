@@ -48,6 +48,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   no image extraction.
 - **Ducking is by clip extent**, not voice activity,
   so no audio analysis is needed for it.
+  **Amended by AU-110** (road map "audio" AP11): extent stays the default, and a duck may
+  instead follow the ducking clip's speech, from spans saved on its media.
 - **Speed and pitch** come from `scaleTimeRange` and the time-pitch
   algorithm. Reverse is not native; M3 pre-renders reversed segments.
 - **Text and shapes are described, not rasterized, in the model.** The

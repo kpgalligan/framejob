@@ -1,0 +1,15 @@
+== PreEffects taps in an AVPlayer (muted)
+  rate +1.0 (player reports +1.0) over 1.50 s wall: T1 19 calls, 1.45 s of comp time stamped, 1.62 s of frames; T2 18 calls, 1.37 s of comp time stamped, 1.54 s of frames
+  rate +2.0 (player reports +2.0) over 1.50 s wall: T1 40 calls, 3.05 s of comp time stamped, 3.41 s of frames; T2 38 calls, 2.98 s of comp time stamped, 3.24 s of frames
+  rate +4.0 (player reports +4.0) over 1.50 s wall: T1 76 calls, 6.21 s of comp time stamped, 6.49 s of frames; T2 74 calls, 6.06 s of comp time stamped, 6.31 s of frames
+  rate +8.0 (player reports +8.0) over 1.50 s wall: T1 148 calls, 12.27 s of comp time stamped, 12.63 s of frames; T2 143 calls, 11.95 s of comp time stamped, 12.20 s of frames
+  rate +0.5 (player reports +0.5) over 1.50 s wall: T1 12 calls, 12.27 s of comp time stamped, 1.02 s of frames; T2 14 calls, 11.95 s of comp time stamped, 1.19 s of frames
+  rate -1.0 (player reports -1.0) over 1.50 s wall: T1 21 calls, 9.17 s of comp time stamped, 1.79 s of frames; T2 21 calls, 9.17 s of comp time stamped, 1.79 s of frames
+== PostEffects taps in an AVPlayer (muted)
+  rate +1.0 (player reports +1.0) over 1.50 s wall: T1 19 calls, 1.56 s of comp time stamped, 1.62 s of frames; T2 18 calls, 1.38 s of comp time stamped, 1.54 s of frames
+  rate +2.0 (player reports +2.0) over 1.50 s wall: T1 21 calls, 3.25 s of comp time stamped, 1.79 s of frames; T2 21 calls, 3.09 s of comp time stamped, 1.79 s of frames
+  rate +4.0 (player reports +4.0) over 1.50 s wall: T1 21 calls, 6.48 s of comp time stamped, 1.79 s of frames; T2 21 calls, 6.15 s of comp time stamped, 1.79 s of frames
+  rate +8.0 (player reports +8.0) over 1.50 s wall: T1 21 calls, 12.94 s of comp time stamped, 1.79 s of frames; T2 22 calls, 12.29 s of comp time stamped, 1.88 s of frames
+  rate +0.5 (player reports +0.5) over 1.50 s wall: T1 20 calls, 0.85 s of comp time stamped, 1.71 s of frames; T2 21 calls, 12.21 s of comp time stamped, 1.79 s of frames
+  rate -1.0 (player reports -1.0) over 1.50 s wall: T1 21 calls, 9.21 s of comp time stamped, 1.79 s of frames; T2 21 calls, 9.26 s of comp time stamped, 1.79 s of frames
+  T1 PostEffects tap in the player, 6.1-7.0 s: gain against source -0.0881 (volume ramp 0.5)

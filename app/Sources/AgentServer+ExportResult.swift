@@ -47,6 +47,20 @@ extension AgentServer {
         if let speed = settings.encoderSpeed {
             result["encoder_speed"] = speed.rawValue
         }
+        // The depth a WAV or AIFF was written at (spec §11 AU-29); absent elsewhere.
+        if let bits = settings.audioBits {
+            result["audio_bits"] = bits
+        }
+        // Each stem written beside the mix, in order (spec §11 AU-108); absent without.
+        if !settings.stems.isEmpty {
+            let mix = URL(fileURLWithPath: path)
+            result["stems"] = settings.stems.map {
+                [
+                    "name": $0.name, "tracks": $0.tracks,
+                    "path": ExportStemsPipeline.url(for: $0, mix: mix).path,
+                ] as [String: Any]
+            }
+        }
         if let measured = loudnessResult(loudness) {
             result["loudness"] = measured
         }
@@ -87,10 +101,14 @@ extension AgentServer {
             // two consumers of one measurement cannot describe it differently.
             "summary": report.summary,
             "true_peak_dbtp": jsonLevel(report.truePeakDBTP),
-            "sample_peak_dbfs": jsonLevel(report.measured.samplePeakDBFS + report.gainDB),
+            // The shifted sample peak, never above the true peak the master
+            // held (spec §11 AU-28).
+            "sample_peak_dbfs": jsonLevel(
+                min(report.measured.samplePeakDBFS + report.gainDB, report.truePeakDBTP)),
             "gain_db": report.gainDB,
             "ceiling_dbtp": jsonLevel(report.ceiling),
-            "capped_by_peak": report.cappedByPeak,
+            "limited_db": report.limitedDB,
+            "capped_by_gain": report.cappedByGain,
         ]
         // Absent rather than null, and for a reason worth the line: a
         // programme shorter than one 400 ms gating block, or one whose every

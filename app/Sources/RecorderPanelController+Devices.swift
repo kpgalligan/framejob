@@ -132,6 +132,8 @@ extension RecorderPanelController {
             Self.hotPlugSelection(
                 listed: microphones.map(\.uniqueID),
                 stored: defaults.string(forKey: Self.microphoneKey), current: currentMicrophone))
+        // AU-69 (a): the Enhance box follows a microphone that came or went.
+        enhanceMicrophoneCheckbox.isEnabled = currentChoice().microphone != nil
         refreshSizeNote()
     }
 }

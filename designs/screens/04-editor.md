@@ -23,7 +23,8 @@ properties." because nothing is selected.
 
 The timeline shows four tracks, each a named row with the eye, speaker, lock and
 headphone icons: Music, holding a green audio clip "toneA.m4a" with a pale level
-line across it, its waveform band; Shapes, a teal clip "Ellipse"; Graphics, a taller teal clip "Graphic";
+line across it, its waveform band, and over that its volume line, a thin white
+line across the clip at its level; Shapes, a teal clip "Ellipse"; Graphics, a taller teal clip "Graphic";
 and Titles, an orange clip "Frame Job". Each clip's name sits in a darker strip
 along its top with a small icon for its kind. The red playhead is at about the
 2.5-second mark, a thin line through every track.

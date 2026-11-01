@@ -44,8 +44,9 @@ extension AgentServer {
             document, "Video Properties", [.setVideoRaw(clips: clips, patch: patch)])
     }
 
-    /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
-    /// handles (`FadeHandleSession`).
+    /// `set_audio` — the Audio tab (`AudioPane`), the timeline's fade
+    /// handles (`FadeHandleSession`) and a drag on its volume line where the
+    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
     /// after D1·3, `archive/roadmap-7.md` §2.4). Its group holds no
@@ -54,12 +55,32 @@ extension AgentServer {
     /// defaults, and a misspelt key inside one is
     /// `unknown key "duck.levl" in an audio patch` instead of a dropped key
     /// and a duck the caller did not write.
+    ///
+    /// **One key IS read: `duck.mode`.** A patch setting it to `speech` is
+    /// Audio ▸ Ducking ▸ Duck by Speech, which saves each media's speech
+    /// spans from its voice cache in the same undo step (spec §11 AU-111):
+    /// `DuckSpeech.ops` is prepended, and its refusal — a clip that is not a
+    /// media clip with sound, a speech cache not written yet — is this
+    /// tool's error. Nothing else in the patch is read.
     func setAudio(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let patch = try rawPatchArg(a, "patch")
+        var ops: [ReelOp] = []
+        let mode = ((patch as? [String: Any])?["duck"] as? [String: Any])?["mode"] as? String
+        if mode == DuckMode.speech.rawValue {
+            let named = Set(clips)
+            let shown = try idScope(document).clips.filter { named.contains($0.id) }
+            do {
+                ops = try DuckSpeech.ops(
+                    for: shown, in: document.project.snapshot,
+                    cacheDirectory: document.cacheDirectory)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+        }
         return try editResult(
-            document, "Audio Properties", [.setAudioRaw(clips: clips, patch: patch)])
+            document, "Audio Properties", ops + [.setAudioRaw(clips: clips, patch: patch)])
     }
 
     /// `set_text` — the Text tab (`TextPane`) and the canvas's inline text

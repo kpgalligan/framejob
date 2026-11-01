@@ -54,6 +54,10 @@ impl Track {
             locked: false,
             solo: false,
             matte: TrackMatte::None,
+            volume: 1.0,
+            pan: 0.0,
+            compressor: None,
+            limiter: None,
         }
     }
 }
@@ -363,12 +367,16 @@ impl Project {
                     format!("media {}: {why}", media.id)
                 }
             })?;
+            // A media's speech spans (spec §11 AU-110), `set_media_speech`'s
+            // rules, every sentence already naming the media.
+            self.check_media_speech(media)?;
         }
         self.check_clips(&self.clips, &self.tracks, "")?;
         for nest in &self.nests {
             self.check_clips(&nest.clips, &nest.tracks, &format!(" in nest {}", nest.id))?;
         }
         self.check_nesting()?;
+        self.check_links()?;
 
         if self.next_id <= max_id {
             return Err(format!(
