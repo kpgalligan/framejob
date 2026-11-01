@@ -40,6 +40,7 @@ use framejob_core::ffi_container::{
     rc_container_sample, rc_container_sample_count,
 };
 use framejob_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
+use framejob_core::ffi_cursor::{rc_cursor_free, rc_cursor_open};
 use framejob_core::ffi_edit::rc_project_apply;
 use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
@@ -2395,6 +2396,14 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     cover("rc_cube_copy_rgb");
     unsafe { rc_cube_free(ptr::null_mut()) };
     cover("rc_cube_free");
+
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_cursor_open(ptr::null(), 0, &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("bytes is NULL"));
+    assert!(unsafe { rc_cursor_open(ptr::null(), 0, ptr::null_mut()) }.is_null());
+    cover("rc_cursor_open");
+    unsafe { rc_cursor_free(ptr::null_mut()) };
+    cover("rc_cursor_free");
 
     // rc_hdr10_peak — every NULL is an absent input, so nothing is read: `{}`.
     let read = unsafe { rc_hdr10_peak(ptr::null(), 24, ptr::null(), 4, ptr::null(), 100, 4) };

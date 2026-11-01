@@ -28,7 +28,9 @@ detail there.
   `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index, #216-R), `ReelCube`,
   `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`, `rc_hdr10_av1_peak`, HD-18;
   `stillPeak`, `rc_hdr10_still_peak`, HD-20), `ReelAV1` and `ReelWebM` (`rc_webm_*`, the
-  `av1_webm` writer, spec §11 CX-15) — and `ReelCore+Graphics.swift` the graphics engine's
+  `av1_webm` writer, spec §11 CX-15) — `ReelCore+Cursor.swift` holds `ReelCursor`
+  (`rc_cursor_open`, `rc_cursor_free`: a cursor file's open, which is its check, spec
+  §11 CU-9, CU-15; road map creator-jobs CU1a) — and `ReelCore+Graphics.swift` the graphics engine's
   wrappers (below), with `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`,
   `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`)
   and `GraphicLibrary.imageCache(limit:)` (`rc_graphic_image_cache`, G-39) — both pure moves
@@ -3054,6 +3056,21 @@ free.
   start minus its offset, floored and head-trimmed through the voices'
   shared `headTrimmed`, then put in the bottom-right corner by one
   `set_video`, read back.
+- `CursorValues.swift` · `CursorCaptureBuffer.swift` · `CursorFileWriter.swift` — the
+  cursor file's Swift side (road map creator-jobs CU1a, spec §11 CU-10, CU-14…CU-17),
+  naming no `rc_*`. `CursorValues` the typed header (`CursorSegmentStart` with its
+  opening `geometry`, `CursorGeometry`, `CursorPixelSize`), the v1 body
+  `CursorFileBody`, `CursorAnchor.choose(e2:e1:)` (E2 when given, else E1) and
+  `CursorFileProblem`. `CursorCaptureBuffer` is PURE: fed host-timed samples per
+  segment, it answers the body at `closeSegment(movieSize:anchor:)` by CU-17's rules
+  (reset at each open; the latest move, image change and geometry before the anchor
+  kept at t 0, events before it dropped; columns sorted; hidden spans clipped,
+  dropped when empty, merged; images interned; changes deduped; `none` drops images),
+  so a body it writes is one the core accepts. `CursorFileWriter` writes
+  `<stem>.fjcursor.partial` beside the movie, reads it back through `ReelCursor`, and
+  `rename(2)`s it into place; a failure leaves neither path and answers the core's
+  sentence as that segment's `cursorProblem`, never the recording's failure (CU-14).
+  The recorder's wiring is CU1b's.
 - `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
   AU-68): the recording's voice paths and clips, readiness and busy, the
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per

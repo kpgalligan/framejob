@@ -27406,3 +27406,37 @@ python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    #
 python3 tools/proof/cursor_spike/cursor_spike.py --only s4                     # then s3, s2, s1, one group per call
 python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         # the person tier, merged in (JOB-29)
 ```
+
+## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
+
+**`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with
+`swift_build.py`'s line (it links `libframejob_core.a`, so `make rust` first) and runs it once.
+It feeds synthetic segments through the app's own `CursorCaptureBuffer` and `CursorAnchor`,
+writes each body through `CursorFileWriter` (so every file is read back through `ReelCursor`,
+the core's `rc_cursor_open`, before its rename) beside a movie path under
+`tools/proof/work/cursor-capture-probe/<tree|mutant-NAME>/files/`, and decodes each file with
+`JSONSerialization`. No app, no grant, no media. The format itself is pinned by the core's
+`core/tests/cursor_file.rs`.
+
+| Row | What it holds |
+|---|---|
+| B0 | the probe builds |
+| C1 | two segments with a pause between them, the second fed no geometry after open: each file holds only its own samples, times from its own anchor, and one geometry entry at least (the second's its own opening one); the pause's samples dropped |
+| C2 | three distinct geometries and one repeat fed after open: exactly three entries past the opening one, which is the start's |
+| C3 | `CursorAnchor.choose` answers E2 when given and E1 when not, and the header names the one chosen with its host time |
+| C4 | a corrupted body (version 2, truncated, a typed key's label) leaves neither `.fjcursor` (a stale one was put there first) nor `.partial`, and the problem contains the sentence `ReelCursor(data:)` throws for the same bytes |
+| C5 | eight synthetic fixtures accepted by the core, each one's decoded counts and values the ones the probe states: negative scroll deltas, a hidden span wholly before the anchor and one across it, two overlapping and two touching hidden spans, a `.none` segment fed images, the latest move, image change and geometry before the anchor kept at t 0, images interned and changes deduped, events sorted |
+| C6 | content 1001 × 701 with a 1002 × 702 movie: `movie_size` [1002, 702] |
+
+Mutants (each must fail its row; each edits a copy of `app/Sources`): `buffer-not-reset` C1,
+`geometry-once` C2, `e1-over-e2` C3, `readback-skipped` C4, `movie-size-from-content` C6. The
+exit follows `cache_pass_probe.py`'s rule R: 0 when every row passed, 1 when one failed; a
+mutant 1 when caught, 0 when it survived, 2 when the control could not be performed.
+
+```sh
+make rust
+python3 tools/proof/cursor_capture_probe.py [--only C1,C4]
+python3 tools/proof/cursor_capture_probe.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU1a record.

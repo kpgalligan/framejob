@@ -848,6 +848,30 @@ bool rc_cube_copy_rgb(const RcCube *cube, float *out, size_t count);
 /* Releases a LUT. NULL-tolerant. */
 void rc_cube_free(RcCube *cube);
 
+/* ---------------------------------------------------------------- cursor */
+
+/* A cursor file (spec §11 CU-9, CU-10): a screen recording's pointer,
+ * clicks, scrolls and keys, written by the recorder beside each segment
+ * movie and read back through `rc_cursor_open` before it is renamed into
+ * place (CU-15). Format v1 is specified by the module doc of
+ * core/src/cursor_file.rs: one JSON object, its format and version read
+ * before the strict parse, every refusal a lowercase sentence of its own
+ * ("the cursor file is version 2; this Frame Job reads cursor files up to
+ * version 1", "this is not a Frame Job cursor file: its \"format\" is not
+ * \"framejob-cursor\"", "moves.t[3] is 5, before moves.t[2] (9); a
+ * column's times never go back", …). An RcCursor is immutable and may be
+ * read from any thread. */
+#define RC_CURSOR_FILE_VERSION 1
+
+typedef struct RcCursor RcCursor;
+
+/* Parses and checks `len` bytes at `bytes`. NULL with the sentence through
+ * `err_out` (or "bytes is NULL"). Freed with `rc_cursor_free`. */
+RcCursor *rc_cursor_open(const uint8_t *bytes, size_t len, char **err_out);
+
+/* Releases a cursor file. NULL-tolerant. */
+void rc_cursor_free(RcCursor *cursor);
+
 /* ----------------------------------------------------------------- hdr10 */
 
 /* A PQ file's HDR10 peak (spec §11 HD-12), read by the core from the bytes

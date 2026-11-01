@@ -167,6 +167,18 @@ governs a module now.
   `with_clips`; paste carries it by path. `Project::check_lut_reference` is
   the one check of a LUT named by media id, keyed by its field
   (`video.look.media`, `color.lut`).
+- `cursor_file.rs` — the cursor file, format v1 (road map "creator-jobs" CU1a, spec
+  §11 CU-10): its module doc IS the format's specification (the header, the columns
+  in integer µs and points × 100, the caps, every refusal's sentence, the parse
+  order); `RC_CURSOR_FILE_VERSION` (the header's `#define` held to it by
+  `core/tests/cursor_file.rs`), the caps, the types and `CursorFile::parse`, which
+  reads the object, `format`, `version` and CU-7's `typed` keys loosely BEFORE the
+  strict `deny_unknown_fields` read through `serde_path_to_error`, so a newer file is
+  refused by its version and a project by its format. `cursor_file_check.rs` — its
+  check (`check`, `check_typed`) and the base64 decoder, a module of its own because
+  the two together pass the 400-line cap for a new file. `ffi_cursor.rs` —
+  `rc_cursor_open` (parse and check; an open is the recorder's read-back, CU-15) and
+  `rc_cursor_free`. No file I/O, no pixel work: a PNG is checked by its signature.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and

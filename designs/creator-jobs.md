@@ -2933,6 +2933,111 @@ files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_ind
   (C6); a `typed` entry with a label accepted (core test).
 - **Depends on:** CU0b (CU-S4's body; CU-S3's `dirty`), CJ0d (T15). **Lane** B.
 
+#### CU1a's record (2026-11-01)
+
+**Landed.** Lane B, base `90465898` (I's HEAD with CU0b; the lane worktree was made at
+`822973cd` and fast-forwarded to it before any edit). One decisions commit (`b4dfc3c0`: CU-10,
+CU-14…CU-17 and their index rows), then one commit with the code, the probe and the documents
+(`0b7b1c4f`), then fix 1 (`ca9276a7`); landed on `worktree-creator-jobs` as one commit. Nothing a
+person or an agent sees changed: no tool, catalog, menu, recorder file or format version moved,
+so the parity check is untouched. The recorder's wiring is CU1b's.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/cursor_file.rs` | 367 | the module doc (format v1's specification: the keys, the columns, the caps, every sentence, the parse order), `RC_CURSOR_FILE_VERSION`, the caps, the types, `CursorFile::parse` |
+| `core/src/cursor_file_check.rs` | 333 | `check`, `check_typed` (CU-7's `typed` rule, run in the loose read) and `decode_base64` |
+| `core/src/ffi_cursor.rs` | 51 | `rc_cursor_open`, `rc_cursor_free` over `read_bytes`, `fallible_op`, `boxed`, `free_boxed` |
+| `app/Sources/ReelCore+Cursor.swift` | 27 | `ReelCursor` (`init(data:)` through `withNonNullBytes` and `takeErrorMessage`, `deinit`) |
+| `app/Sources/CursorValues.swift` | 193 | the typed header, `CursorFileBody`, `CursorAnchor`, `CursorFileProblem`; no `rc_*` |
+| `app/Sources/CursorCaptureBuffer.swift` | 230 | the pure buffer, CU-17's rules |
+| `app/Sources/CursorFileWriter.swift` | 52 | `.partial`, the read-back through `ReelCursor`, `rename(2)`; a failure removes both paths |
+| `core/tests/cursor_file.rs` | 641 | 12 tests through the two exports |
+| `tools/proof/cursor_capture_probe.swift` · `.py` | 370 · 177 | B0, C1–C6 and five mutants |
+
+**Measured.**
+
+- `cargo test --release --test cursor_file`: 12 passed. Pinned: a minimal and a full file
+  accepted (negative scroll deltas, touching hidden spans, three images, both anchors and
+  `none`), the full file's values read back through `CursorFile::parse` (the PNG bytes against
+  an RFC 4648 encoder written in the test); every refusal sentence; each of the eleven caps at
+  its count accepted and one past refused, and one PNG at 1,048,576 bytes accepted and one byte
+  more refused; a v2 body with a key v1 does not know refused by its version naming 2 and 1; a
+  project-shaped `{"format_version": 38, "tracks": []}` refused by the format sentence; touching
+  hidden spans accepted, overlapping ones refused; the header's `RC_CURSOR_FILE_VERSION` equal
+  to the const; NULL bytes "bytes is NULL".
+- `cargo test --release --test model_tests null_safety`: 1 passed, with `rc_cursor_open` and
+  `rc_cursor_free` in the sweep.
+- `cargo fmt` and `make lint`: clean (one `type_complexity` in the test fixed with a `type
+  Edit`).
+- Core mutants, each run once and reverted byte-identical: `typed` accepting a `label` in
+  `check_typed` — `a_typed_key_is_its_time_only` failed (11 passed, 1 failed); the version
+  check moved after the strict read — `format_and_version_are_read_before_the_strict_parse`
+  failed (11 passed, 1 failed).
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings.
+- `python3 tools/proof/cursor_capture_probe.py`: "scores: 7/7" (B0 and C1–C6), exit 0, built
+  in 30.6 s; the recorded run after the gate reused the build and printed "scores: 7/7".
+  C4's three sentences: "the cursor file is version 2; this Frame Job reads cursor files up to
+  version 1", "the cursor file is not JSON: EOF while parsing a string at line 1 column 377",
+  "keys.typed holds a typed key's time only; \"label\" is refused (spec §11 CU-7)".
+- The five Swift mutants, each exit 1 ("caught"): `buffer-not-reset` (C1: segment 2's moves
+  `[0, 500000, 600000]`, 2 images), `geometry-once` (C2: 2 entries, not 4), `e1-over-e2` (C3),
+  `readback-skipped` (C4: the writer kept all three and `.fjcursor` was left), and
+  `movie-size-from-content` (C6: `[1001, 701]`).
+- `spec_index_proof.py`: 222/222.
+- The gate: `make gate` once, after the code and the documents and before this record was
+  written (load average 7.85 at its start): "gate: PASS 388s" — names 1 s, typecheck 6 s, fmt
+  3 s, lint 6 s, test 227 s, app 144 s. `name_residue.py` was re-run over the record.
+
+**Deviations from the road map, as the spec recorded them.** `closeSegment` takes `anchor:`
+beside `movieSize:`, since E2 has been answered or dropped by the close; `CursorSegmentStart`
+carries the opening `geometry`, written at t 0, so every file has the one entry v1 requires.
+The road map's sixth mutant (a `typed` label accepted) is the core's first mutant.
+
+**Implementation choices the spec left open.**
+
+- The strict read deserializes the loose `Value` (not the bytes), so a serde sentence carries
+  its path and no "at line N column M": "the cursor file at \"source\": unknown variant
+  `screen`, expected one of `display`, `window`, `picked`"; the root reads "the cursor file at
+  its top level: missing field `moves`". Every column, the `keys` object and every header key
+  but `display_id` and an image's `kind` are required.
+- An image's base64 is decoded after the strict read and before the check, through a private
+  `png_base64` field the read fills and the parse empties: "images[i].png is not base64: …"
+  (a length not a multiple of 4, a byte outside the alphabet, `=` before the end, more than two
+  `=`).
+- The sizes' range (`content_size`, `movie_size` 1…16384) has its own sentence ("content_size
+  [0, 10] is outside 1…16384"), as does `anchor_host_us` below 0, and a version below 1 ("the
+  cursor file is version 0; versions start at 1"). A hot spot lies inside `[0, w] × [0, h]`.
+- The buffer writes only what CU-17 lists; it adds no guard of its own (a non-PNG image, a
+  click button past 31): what the core refuses there is that segment's `cursorProblem`
+  (CU-14). It converts a value that is not finite to 0 rather than trap, and encodes a float
+  that is not finite as a string the read-back refuses by name.
+
+**Review and fix pass.** The first review found one should-fix: `decode_base64`'s "it ends in
+more than two \"=\"" refusal was pinned by no test, though Approach step 2 and this record said
+every sentence was. Fix 1 (`ca9276a7`) added `images[0].png = "iVBOR==="` to the refusal table
+(`cursor_file` 12 passed; "gate: PASS 395s"); the probe, its Swift mutants and the core mutants
+were not re-run, since no Swift, probe or mutant-anchor file changed. The second review passed,
+carrying three nits: `cursor_file.rs`'s parse paragraph sent the check's sentences to
+`cursor_file_check.rs`'s module doc, which points back (re-worded at integration to "under **The
+check** below"); CU-10's loose read left out CU-7's `typed` keys, which the code reads before the
+strict parse (added at integration); and every image's base64 is decoded before `check` applies
+the 1,024-image cap (left: the sentence is the same either way and the bytes are already read).
+
+**Integration.** Cherry-picked (`b4dfc3c0…ca9276a7`) onto `worktree-creator-jobs` at CU0b's
+`90465898`, with no conflict. The decisions file had reached 519 lines, so by the series' rule
+(spec §11 `creator-jobs.md`'s head) CU-10 and CU-14…CU-17 moved to a new
+`11-decisions/creator-jobs-2.md`: `creator-jobs.md` is back to 471 lines, the index's five rows
+link the new file, the new file has its row (59 lines), and the spec README's `11-decisions/`
+total is 17276 in 36 files (`spec_index_proof.py` 225/225). The `CLAUDE.md` edits owed (the
+`cursor_file.rs`, `cursor_file_check.rs` and `ffi_cursor.rs` entry in `core/CLAUDE.md`;
+`ReelCore+Cursor.swift` in `app/CLAUDE.md`'s core's-edge bullet and the three `Cursor*.swift` files
+under **Recording.**) applied as written. `make gate` on the integrated tree: "gate: PASS 361s"
+(names 1 s, typecheck 7 s with the four baseline warnings, fmt 3 s, lint 10 s, test 207 s, app
+133 s). Then, with `RC_PROOF_APP=release`, `cursor_capture_probe.py` built afresh from the
+integrated `app/Sources` (30.0 s) and printed "scores: 7/7", C4's three sentences as above.
+
+**Owed.** Nothing: no manual check, no owner step and nothing to file.
+
 ### CO0 — scope, the record, the tolls' schedule and the spikes
 
 Bet 6 opens here. The cutout phases run in lane C on CJ2a's analysis lane; the layout phases (CO6
