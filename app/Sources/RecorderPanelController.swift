@@ -10,7 +10,8 @@ import ScreenCaptureKit
 /// `RecordingChoice`; Record hands it to `ScreenRecorder.shared`; the result
 /// goes through `RecordingLanding` into a document or opens a new one. This
 /// file is the window, its rows and its phases; `+Rows.swift` is what fills
-/// the popups and turns them into a `RecordingChoice` and back;
+/// the popups, and `+Choices.swift` turns them into a `RecordingChoice` and
+/// back;
 /// `+Recording.swift` is everything from Record pressed to the recording
 /// running, `+Grants.swift` the three grants a press checks first and the
 /// one place System Settings is opened for them, `+Landing.swift`

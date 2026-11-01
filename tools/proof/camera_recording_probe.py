@@ -492,7 +492,7 @@ MUTANTS = {
          "        for control in screenAndRate { control.isEnabled = false }\n",
          "        _ = screenAndRate\n")]),
     "camera-row-persisted": (["P3"], [
-        ("RecorderPanelController+Rows.swift",
+        ("RecorderPanelController+Choices.swift",
          "        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected, !cameraSelected {\n",
          "        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected {\n")]),
     "camera-panel-hides": (["P6"], [
@@ -541,7 +541,7 @@ MUTANTS = {
          "        formatPopup.isEnabled = phase == .idle && cameraWanted\n",
          "        formatPopup.isEnabled = true\n")]),
     "format-unpersisted": (["P11"], [
-        ("RecorderPanelController+Rows.swift",
+        ("RecorderPanelController+Choices.swift",
          '            defaults.set(selectedCameraFormat ?? "", forKey: Self.cameraFormatKey)\n', "")]),
     "format-rebuild-skipped-on-match": (["P12"], [
         ("RecorderPanelController+Camera.swift", "        defer { rebuildCameraFormats() }\n", ""),
@@ -702,7 +702,7 @@ MUTANTS = {
     # CR3c (spec §11 CAM-11): the panel's box, each run with `--only panel` but
     # `beside-unprepared` (`panel,screen`) and `timeout-ceiling-by-files` (`tool`).
     "beside-choice-dropped": (["P20"], [
-        ("RecorderPanelController+Rows.swift",
+        ("RecorderPanelController+Choices.swift",
          "        if cameraWanted {\n            choice.camera = selectedCameraID\n",
          "        if cameraSelected {\n            choice.camera = selectedCameraID\n")]),
     "beside-popups-dead": (["P20"], [
@@ -717,7 +717,7 @@ MUTANTS = {
          "        cameraBesideCheckbox.isEnabled = phase == .idle && screenSourceSelected\n",
          "        cameraBesideCheckbox.isEnabled = phase == .idle\n")]),
     "beside-unpersisted": (["P20"], [
-        ("RecorderPanelController+Rows.swift",
+        ("RecorderPanelController+Choices.swift",
          "        defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)\n",
          "")]),
     "beside-camera-grant-skipped": (["P21"], [

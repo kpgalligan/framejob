@@ -1161,10 +1161,10 @@ among them), against a tree scoring `--only exclusion` 28/28; each exits 1:
                     (ScreenRecorder+Content.swift) — 26/28: X1's two
                     include rows.
   choice-drops-include  `currentChoice()`'s read of the checkbox deleted
-                    (RecorderPanelController+Rows.swift) — 27/28: X2's
+                    (RecorderPanelController+Choices.swift) — 27/28: X2's
                     choice-after-on row.
   persist-drops-include  `persistChoices`'s write of the key deleted
-                    (RecorderPanelController+Rows.swift) — 26/28: X2's
+                    (RecorderPanelController+Choices.swift) — 26/28: X2's
                     key-after-on and restored rows.
   lock-drops-include  the checkbox dropped from `syncControlsEnabled()`'s
                     controls (RecorderPanelController+VoiceOver.swift since
@@ -10558,12 +10558,12 @@ MUTANTS = {
         "        if false {\n",
         "RecordingExclusion.make ignores the box — Frame Job is always excluded (the code before)"),
     "choice-drops-include": (
-        "RecorderPanelController+Rows.swift",
+        "RecorderPanelController+Choices.swift",
         "        choice.includeFrameJobWindows = includeFrameJobCheckbox.state == .on\n",
         "",
         "currentChoice() never reads the checkbox — the panel's recording excludes Frame Job whatever it says"),
     "persist-drops-include": (
-        "RecorderPanelController+Rows.swift",
+        "RecorderPanelController+Choices.swift",
         "        defaults.set(\n"
         "            includeFrameJobCheckbox.state == .on, forKey: Self.includeFrameJobWindowsKey)\n",
         "",

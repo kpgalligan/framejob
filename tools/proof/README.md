@@ -7563,7 +7563,7 @@ active False`. **Keep your hands off the keyboard while the last screen of each
 look runs.**
 
 **Unpinnable inputs.** The recorder's Source row names the host's display and
-its size note is that display's size (`RecorderPanelController+Rows.swift`);
+its size note is that display's size (`RecorderPanelController+Choices.swift`);
 the Export sheet's presets come from the person's `ExportPresets.json`; the
 Generate Captions sheet's language list is the installed speech models; the
 window lands on whichever screen AppKit picks, at its scale and colour profile.

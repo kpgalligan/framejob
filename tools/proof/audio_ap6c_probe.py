@@ -42,11 +42,11 @@ WORK = ROOT / "tools/proof/work/audio-ap6c-probe"
 ROWS = ["P1", "P2", "P3", "P4", "P5"]
 
 MUTANTS = [
-    ("M1 absent-key-on", "P1", "RecorderPanelController+Rows.swift",
+    ("M1 absent-key-on", "P1", "RecorderPanelController+Choices.swift",
      "            defaults.bool(forKey: Self.enhanceMicrophoneKey) ? .on : .off",
      "            (defaults.object(forKey: Self.enhanceMicrophoneKey) == nil\n"
      "                || defaults.bool(forKey: Self.enhanceMicrophoneKey)) ? .on : .off"),
-    ("M2 no-mic-ignored", "P1", "RecorderPanelController+Rows.swift",
+    ("M2 no-mic-ignored", "P1", "RecorderPanelController+Choices.swift",
      "choice.enhanceMicrophone = enhanceMicrophoneCheckbox.state == .on && choice.microphone != nil",
      "choice.enhanceMicrophone = enhanceMicrophoneCheckbox.state == .on"),
     ("M3 movie-is-voice", "P2", "RecordingEnhance.swift",
