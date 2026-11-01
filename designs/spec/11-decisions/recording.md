@@ -18,11 +18,24 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   not scheduled, and CU's phases record what they build. 'A recording is
   ordinary media' (the next bullet) stands until CU-2. **Amended by
   CJ-4**: the recorder panel may ask for Input Monitoring, opt-in.
+  **Amended by CU-1**: the cursor's path and images, every click and scroll,
+  and — opt-in, under Input Monitoring — the shortcuts pressed and the times
+  of other key presses are recorded as DATA in a cursor file beside each
+  movie. With Cursor set to Separate (the default from CU3c)
+  ScreenCaptureKit draws neither the pointer nor the click ring, and the
+  editor draws the cursor as part of the screen clip's layer. Nothing is
+  reconstructed for a recording that has no cursor file.
 - **A recording is ordinary media.** The recorder writes a file and the app
   imports it through exactly the path File ▸ Open and Add Media… use
   (`adoptImported`, the two-try placement). The model learns nothing: no
   source kind, no flag, no schema bump. Every op, cache and export treats a
   recording clip as the media clip it is.
+  **Amended by CU-2**: a screen recording's movie may carry a cursor file,
+  which import attaches as `media.cursor` (one format bump, CU3a1, written
+  only when set). It is still imported through `adoptImported` and the
+  two-try placement, there is still no source kind and no flag on a clip,
+  and every op, cache and export but the frame recipe treats it as the media
+  clip it is.
 - **The file lives in `~/Movies/Frame Job Recordings/`**, named by date and
   time, never in the package and never in the temporary directory: an
   untitled document has no package (§5.6), and a recording is ORIGINAL
@@ -49,6 +62,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   usage key and the hardened-runtime entitlement
   `com.apple.security.device.audio-input` for the microphone; Screen
   Recording needs neither.
+  **Extended by CU-3**: Input Monitoring is the fourth grant, read and asked
+  only when the person chose to record shortcuts (CJ-4).
 - **A press of Record asks for Screen Recording once, and every later
   press opens System Settings at the pane** (2026-09-28). The first press
   without the grant calls `CGRequestScreenCaptureAccess`, and the panel
@@ -260,6 +275,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a` is now
   `~/Movies/Frame Job Recordings/Voice-over <date> at <time>.m4a`;
   `include_reelcut_windows` is now `include_framejob_windows`.
+  **Amended by CU-1**: `record_screen`'s screen-only arguments gain `cursor`
+  (CU3c), `keys` (CU6) and `auto_zoom`, `shortcut_overlays` and
+  `speed_up_typing` (CU10), each refused by name with `source: "voice_over"`
+  after `include_framejob_windows`, as its phase adds it. "No microphone
+  glyph in the menu bar" stands; CU-61 adds the keyboard mark.
 - **Include Frame Job windows** (2026-09-30). The panel's checkbox under
   Source, off by default, kept in `FrameJobRecordingIncludeFrameJobWindows`;
   `record_screen`'s `include_framejob_windows` mirrors it, default false.

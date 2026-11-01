@@ -129,6 +129,10 @@ close (2026-10-27); the entries moved here unchanged.
      and no more than the bound after it. A segment's question is dropped at its close (a pause,
      the finishing), so a frame of a later segment never answers it. No frame in that window, or
      none by the close, leaves E2 unset.
+     **Amended by CU-13**: the watch is on the stream with a camera or with cursor data (every
+     display, window or picked recording from CU1b), and besides E2 it records each complete frame's
+     geometry when it changes; CAM-9 (6)'s remove-and-re-add around a resume applies whenever it is
+     on.
   4. **The offset** is the camera's first buffer's PTS (host clock) minus E2, else minus E1, in
      ticks; POSITIVE means the camera began after the screen. Without both host stamps it is the
      first buffer's arrival minus the screen's start (`screenStart(of:)`); without those, 0. A

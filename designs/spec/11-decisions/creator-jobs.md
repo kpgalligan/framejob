@@ -214,3 +214,62 @@ The bets' scope-level decisions, recorded at CJ0a (their phases hold the rest):
   and the Angle Viewer shows every angle and switches while playing. There is no multicam source
   kind and no nest in point: every shot can be rolled, trimmed, graded and deleted like any clip,
   and spec §2's one kind of track holds.
+
+Bet 2's scope-level decisions, recorded at CU0a (2026-11-01) before any CU code (its phases hold
+the rest):
+
+- **CU-1 — The cursor, clicks and scrolls are data; shortcuts are opt-in; the editor draws the
+  cursor** (the orchestrator's reading of the owner's "Add all: 1-6" and "The recorder can ask for
+  input monitoring", 2026-11-01; CJ0a's question 7 confirms the `recording.md` amendments). Zooms,
+  overlays and speed-ups are generated as ordinary edits. No cursor is reconstructed for a recording
+  without a cursor file or for an imported screen video; no vision pass looks for a pointer.
+- **CU-2 — The cursor file.** One per segment movie, `<movie stem>.fjcursor`, beside the movie in
+  `~/Movies/Frame Job Recordings/`. The core owns the format (`cursor_file.rs`'s module doc is its
+  specification): Swift writes it and the core reads it back before it is renamed into place.
+  Versioned (the core reads every version up to its own and refuses a newer one by name). The header
+  carries the stream's content size (points × pixels per point) and `movie_size` (the written
+  movie's track size, read back at the segment's close; the encoder rounds an odd dimension up).
+  Attached at import as `media.cursor = {path, bookmark?, in_picture}`.
+- **CU-3 — Input Monitoring, the recorder's fourth grant.** Read and asked by the pair CU-S1's A11
+  picks (`grant_api`): `CGPreflightListenEventAccess()` and `CGRequestListenEventAccess()`, or
+  `IOHIDCheckAccess` and `IOHIDRequestAccess` with `kIOHIDRequestTypeListenEvent`; asked from the
+  panel only, when Record shortcuts is on and Record is pressed; asked once
+  (`FrameJobInputMonitoringAsked`, counted only in a launchd-owned launch, `launchClause` on every
+  sentence), after which each press opens `Privacy_ListenEvent`. `record_screen` refuses `keys`
+  without it: "Input Monitoring is not granted to Frame Job. Turn it on in System Settings ▸ Privacy
+  & Security ▸ Input Monitoring." plus "then relaunch Frame Job." only when CU-S1 says
+  `relaunch=needed`, plus `launchClause`. Accessibility is never asked; Frame Job never posts an
+  event; no Info.plist key or entitlement unless CU-S1 measures one is needed.
+- **CU-4 — The cursor is part of its clip's layer, not a clip of its own.** The layer stage
+  composites the sprite and its ripples over the source texel inside `layerSample`
+  (`Compositor.metal:800`), before `gradeSample`, so crop, placement, grade, filters, spotlight,
+  obscure regions, mattes, transitions, every transform, zoom action, nest and ramp meet it as they
+  met a burned pointer. The sprite binds at `texture(5)` (CJ-8 (b)); no frame copy, no new pipeline.
+  The core computes the cursor's source time and state; the compositor draws and never opens a file
+  or computes a path (CU-37).
+- **CU-5 — Planners live in the core, and their results are ordinary ops.** Auto zoom, shortcut
+  overlays and typing stretches are pure functions of the cursor file and the project, answering
+  lists of existing ops (and CU9a's one new op) applied as one named undo step. Nothing is tagged
+  "generated"; re-planning finds zooms by content (`action_class.rs`, CJ-8 (i)). A reversed clip is
+  refused by name by every planner and by `get_cursor_events` in clip time ("clip C plays reversed;
+  <command> plans only clips that play forward"), since mapping it would put a mirror in the core
+  (D4-6).
+- **CU-6 — The spikes' rules are CJ0's**, each verdict recorded before the phase that depends on it.
+- **CU-7 — Keys are private by construction.** A key-down while ⌘ or ⌃ is held is a shortcut, stored
+  with its spelled keys; every other key-down and every auto-repeat is a mark with a time and no
+  identity; no character, key code or label of a typed key is ever stored, so none can reach a tool
+  answer, the project or the Assistant. Nothing is recorded, not even timing, while any process
+  holds secure input (`IsSecureEventInputEnabled()`); a password field that does not turn secure
+  input on (a Terminal `sudo` prompt without Secure Keyboard Entry) is recorded as time-only marks.
+  No "all keys" mode (it would put typed text, passwords included, into the project). The status
+  item shows a mark while shortcuts record (CU-61).
+- **CU-8 — No recorder's code is carried over.** Cap is AGPL-3.0 (the Concat rule applies);
+  OpenScreen (MIT) and the rest are not carried either; algorithms are written from their stated
+  rules.
+- **CU-9 — The FFI surface is three exports, and their wrapper is a ReelCore file of its own.**
+  `rc_cursor_open(bytes, len, err_out)` (parse and validate; a check is an open and a free),
+  `rc_cursor_free`, and `rc_cursor_query(tracks, n, project, request_json, err_out)`: every read — a
+  frame's state, an image (base64 PNG inside the JSON), events, the path, each planner — is one JSON
+  request and answer. The Swift side is `ReelCursor` in `ReelCore+Cursor.swift` (init, `deinit`,
+  `query`, about 30 lines), its typed answers in `CursorValues.swift` (no `rc_*`) (CJ-8 (l)); no
+  room is paid.

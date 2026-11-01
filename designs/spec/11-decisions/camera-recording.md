@@ -162,6 +162,9 @@ series (CAM-3 on), before its code.
      `window`, `system_audio`, `show_clicks`, `size`, `include_framejob_windows` and `rate`
      are refused together, in that order: "With source camera, <a, b> cannot be given — a
      camera recording records the camera alone, at the camera's own format."
+     **Amended by CU-1**: `cursor` (CU3c), `keys` (CU6) and `auto_zoom`, `shortcut_overlays` and
+     `speed_up_typing` (CU10) are screen-only too, refused with source `camera` in this sentence at
+     the place their phase records.
   4. **The microphone.** `microphone: true` records the DEFAULT microphone, as with the screen
      source. Choosing a microphone is the panel's (CR1c).
   5. **The span** counts from segment 0's first buffer (the recorder's `heldFirstStartedAt`,
