@@ -7499,6 +7499,124 @@ decisions.
   *no*.
 - **SW9b:** apply at stop — *yes*.
 
+### The owner's answers (2026-11-01)
+
+The owner walked through every question above on 2026-11-01, in nine batches. Each phase builds on these answers and records its own lines with its decisions. "Minor (taken as recommended)" marks an item that was listed to the owner as accepted unless they objected; they did not object. One answer departs from the recommendation: SW0 also generates the three-hour fixture now, rather than waiting for S-LONG1.
+
+#### Batch 1: the key gate and shared phases
+- CJ1:
+  - Remove Filler Words stays usable with a cached filler transcript and no key: YES.
+  - A disabled keyed menu item gets a title suffix naming its key, beside the tooltip: YES.
+  - Minor (taken as recommended): View ▸ Assistant stays enabled; the parity check's sixth part.
+- CJ5b: the new document opens with the range as its first state: YES.
+- CJ6: raise MAX_CLIPS to CJ-S1's N if it passes: YES.
+- CJ2b, minor (taken as recommended): Split at Shot Changes is the analysis lane's first door.
+
+#### Batch 2: the Transcript tab
+- TX1:
+  - Same speech on two tracks: show both and name the pair.
+  - Fill only when asked: YES.
+  - Minor (taken as recommended): read each media whole.
+- TX2a:
+  - The host is the fifth inspector tab.
+  - A timeline click while the transcript shows: stay and scroll.
+  - Minor (taken as recommended): the title is "Transcript" if T1 passes, else "Words"; ⌃⌘T YES; ⌘F later, unless it comes free.
+
+#### Batch 3: cutting and reviewing by transcript
+- TX3: ⌫ ripples in the transcript and lifts on the timeline: YES. A word selection sets the in/out range: YES.
+- TX6: a long pause is over 1.0 s, keeping 0.2 s: YES.
+  - Minor (taken as recommended): strikes are shown as a timeline wash.
+- TX7:
+  - Retakes are on by default if TX-S4 passes on the owner's read; otherwise off, with restarts and repeats on.
+  - TX-S4's paid AssemblyAI read of S-RT1 (about $0.01, cap $0.05): YES.
+  - Minor (taken as recommended): the hand-off button to the Assistant.
+- TX4, minor (taken as recommended): a restore longer than one track's cut fills what each track has and leaves a gap.
+- TX5, minor (taken as recommended): Restore is Return on a greyed selection, with no key equivalent on the menu item; up to 40 words inline.
+- TX8, minor (taken as recommended): the figures recorded beside CJ-5's criteria, agreed before TX1's code.
+
+#### Batch 4: the cursor recorder
+- CU0b: a STOP verdict is put to the owner (stop and ask), not taken automatically.
+- CU1b: the cursor file sits beside the movie as `<stem>.fjcursor`: YES.
+- CU3c: the default is Separate, unless CU-S2's Separate rows failed.
+- CU4: a recording lands with its cursor as captured, plus ripples when Show Clicks was on.
+- CU6:
+  - The indicator is a keyboard mark plus a menu row.
+  - Minor (taken as recommended): ⌥ with arrows, delete, return, tab or escape counts as a shortcut.
+
+#### Batch 5: Auto Zoom, overlays, Speed Up Typing
+- CU7: Replace's default is off.
+- CU8: overlays sit at the bottom, in the dark theme.
+- CU9b: the sound in a sped stretch is sped with Keep pitch on.
+- CU10: the landing checkboxes default to zoom on, shortcuts on when recorded, speed-up off.
+- CU11, minor (taken as recommended): the shutter Auto Zoom sets is 50 %.
+
+#### Batch 6: cutout and layouts
+- CO0: if CO-S2 passes neither the mask track nor the mask pack, file the video cutout, build CO10's stills and go on with CO6–CO9.
+- CO4: Best is not the default on a short clip; Standard always, Best per clip.
+- CO6:
+  - A switch takes 0.5 s, eased in and out.
+  - Minor (taken as recommended): the nest is offered, not automatic.
+- CO9: on silence, fade.
+- Minor (taken as recommended):
+  - CO1: a cut-out clip's analysis starts at once, with CJ-S3 (b)'s pause if chosen.
+  - CO2b: a pending cutout is drawn uncut in the preview, with a status saying so.
+  - CO3: Remove Background has no key equivalent.
+  - CO5: Behind Subject is a clip flag.
+  - CO8: the panel's default layout is Corner.
+  - CO10: pictures are in this road map, last.
+
+#### Batch 7: Make Vertical Version
+- VR2b:
+  - The default zoom is fill.
+  - Two people who don't fit: follow one.
+  - Minor (taken as recommended): headroom 38 %.
+- VR3:
+  - Offer 4:5 as well as 9:16 and 1:1: YES (VR-32).
+  - Minor (taken as recommended): the copy is made as one undo step.
+- VR9: once linked versions land, the sheet's default is Add to This Project.
+- Minor (taken as recommended):
+  - VR1: Show Subjects is in the product.
+  - VR4: Re-lay Captions for This Canvas exists on its own (VR-45); captions are re-paged from the pages; old template copies in a vertical copy are updated.
+  - VR5: 16:9 auto zooms are replaced; a screen and its camera are re-laid in VR5b instead of following the cursor.
+  - VR5b: Side by Side becomes Stacked on a tall canvas.
+  - VR6: faces are matched to mics automatically, with the sheet confirming.
+  - VR7a: YES (CJ0a question 8).
+  - VR8: the popup goes in the toolbar and View ▸ Framing ▸; only X, Y and Scale are set per framing; a clip added after the framing keeps its own until framed.
+
+#### Batch 8: Find Clips and Make Short
+- FC3: run the sound pass at import: NO. It runs when Find Clips needs it.
+- FC5: Rasterize applies the same `agent/` diff through one issue on kpgalligan/rasterize: YES (FC5 files it).
+- FC6:
+  - A keyed `rank_clips` for outside agents: NO.
+  - Minor (taken as recommended): rank with the Assistant's model; titles and reasons in the transcript's language; a classifier refusal ends the run.
+- FC8a: the default Export row is H.264 MP4 at the canvas size, −14 LUFS. Removing pauses in a short is not the default.
+- Minor (taken as recommended):
+  - FC4: bounds 20–60 s and a pool of 3 × count.
+  - FC7a: a window, not a sheet.
+  - FC7b: show both the ceiling and the band.
+  - FC9: the default shape is 9:16.
+
+#### Batch 9: Switch by Speaker and multi-track audio
+- SW0: build F-4K once: YES. **The three-hour file: BUILD BOTH NOW.** That means a generated three-hour fixture, not waiting for S-LONG1. This departs from the recommendation.
+- SW2b:
+  - The program track: YES.
+  - `wide_after` is offered and off.
+  - Cutting to the wide on laughter is not built here; it is a candidate to file.
+- SW3a: the default track is track 1; no asking at import.
+- SW4a: track 1 is measured at import; the other tracks when played.
+- SW9a:
+  - Angles are derived: YES.
+  - A panel beside the preview: YES.
+  - A multicam clip instead: NO.
+- SW9b: switches made while playing apply at Stop: YES.
+- Minor (taken as recommended):
+  - SW1: no ⌥1–⌥9 (bare 1–9 come in SW9b); a re-pick does not keep a shot's own video settings.
+  - SW2a: the defaults as SW-S4 tunes them.
+  - SW6: Frame Job's equal fold when AVFoundation's fold is unequal.
+  - SW7a: groups: YES.
+  - SW7b: OBS's mix track is included when detaching.
+  - SW8: proceed at SW-S3's middle band, with SW-82's hedge.
+
 ## Not in this road map
 
 Nothing below is excluded: the spec names no non-goal since CJ-1. Each item is simply not built by
