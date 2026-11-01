@@ -27,8 +27,8 @@ code. The series continues in `creator-jobs-2.md` past about 500 lines.
   by the owner (CJ0a's question 5, 2026-11-01); nothing on that list is built.
 - **CJ-2 — Road map "creator-jobs" builds the survey's six bets, led by people who record themselves
   talking.** TX, CU and CO first (talking heads and screen tutorials), then VR and FC (shorts), then
-  SW (podcasts), in the lanes and order of "Phases". The survey's next tier and "Not worth chasing"
-  are not built here and are neither in nor out. Survey decisions 3, 5 and 8 are CJ0a's questions
+  SW (podcasts), in the lanes and order of the road map's "Phases". The survey's next tier and "Not
+  worth chasing" are not built here and are neither in nor out. Survey decisions 3, 5 and 8 are CJ0a's questions
   7, 8 and 4, each answered yes (owner, 2026-11-01); 10 is not a build question. A trial finding that reorders phases is
   recorded as an amendment of this entry.
 - **CJ-3 — The key rule: a feature that needs a language model or a cloud model works only when the
@@ -82,15 +82,15 @@ code. The series continues in `creator-jobs-2.md` past about 500 lines.
   `XXna`, `XXnb`…, sharing its block; a lettered phase split again takes a digit (`CU3a1`, `CU3a2`),
   its letter alone naming both halves. Phase XXn's decisions are XX-n0…XX-n9; XX0's are XX-1…XX-9; a
   bet with no zero phase records its scope-level decisions here under its own prefix (VR-1…VR-7,
-  TX-70; SW-3 is in SW0's block). Spikes are XX-S1, XX-S2…; each rule is fixed in this file before
-  its run, and each run's `results.json` stores as `rule_sha256` the SHA-256 of that spike's entry
+  TX-70; SW-3 is in SW0's block). Spikes are XX-S1, XX-S2…; each rule is fixed in the road map
+  (`designs/creator-jobs.md`) before its run, and each run's `results.json` stores as `rule_sha256` the SHA-256 of that spike's entry
   in "Every spike, with its rule" (the entry's first line, `- **<ID> —`, and every following line
   that begins with two spaces, each with its newline; no blank line and no group heading), so
-  records added elsewhere in this file leave it unchanged. A spike runs at the head of the first phase that
+  records added elsewhere in the road map leave it unchanged. A spike runs at the head of the first phase that
   uses it, in that phase's lane. Manual checks are `JOB-n` in blocks of ten: CJ 1–9, TX 10–19, CU
   20–29, VR 30–39, FC 40–49, SW 50–59, CO 60–69; a bet that needs more takes the next free block
-  from 70. Handoffs are `~/.claude/litecode/framejob/cj-<phase id lowercased>`. This file holds each
-  phase's record.
+  from 70. Handoffs are `~/.claude/litecode/framejob/cj-<phase id lowercased>`. The road map
+  (`designs/creator-jobs.md`) holds each phase's record.
 - **CJ-8 — Shared reservations, so lanes do not collide.**
   - (a) The fifth inspector tab is TX's Transcript. Another tab, or a panel beside the inspector,
     needs a decision of its own (`InspectorViewController.swift` is frozen; five titles at the 280

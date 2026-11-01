@@ -148,9 +148,9 @@ can change.
 - **"Create a full design, then we'll compact and begin"** is this file. After compaction the
   orchestrator starts at CJ0a, which asks CJ0a's eight questions first.
 - **Survey decisions not answered in words:** 3 is read from "Add all" (above) and confirmed by
-  CJ0a's question 7; 5 (a vertical copy or linked versions) is CJ0a's question 8, recommended yes;
-  8 (the multi-stream 4K and multi-hour measurement) is CJ0a's question 4, run as SW-S2 in SW0 on a
-  yes; 10 (positioning) is not a build question. Decision 3's AI-10 and W-10 amendments belong to
+  CJ0a's question 7; 5 (a vertical copy or linked versions) is CJ0a's question 8, answered yes
+  (2026-11-01); 8 (the multi-stream 4K and multi-hour measurement) is CJ0a's question 4, answered
+  yes (2026-11-01), run as SW-S2 in SW0; 10 (positioning) is not a build question. Decision 3's AI-10 and W-10 amendments belong to
   the next tier; no bet needs them.
 
 ## The orchestrator's defaults (each one the owner can change)
@@ -756,8 +756,8 @@ per lane). Every spike's rule is fixed here, at the end of this section.
   by the owner (CJ0a's question 5, 2026-11-01); nothing on that list is built.
 - **CJ-2 — Road map "creator-jobs" builds the survey's six bets, led by people who record themselves
   talking.** TX, CU and CO first (talking heads and screen tutorials), then VR and FC (shorts), then
-  SW (podcasts), in the lanes and order of "Phases". The survey's next tier and "Not worth chasing"
-  are not built here and are neither in nor out. Survey decisions 3, 5 and 8 are CJ0a's questions
+  SW (podcasts), in the lanes and order of the road map's "Phases". The survey's next tier and "Not
+  worth chasing" are not built here and are neither in nor out. Survey decisions 3, 5 and 8 are CJ0a's questions
   7, 8 and 4, each answered yes (owner, 2026-11-01); 10 is not a build question. A trial finding that reorders phases is
   recorded as an amendment of this entry.
 - **CJ-3 — The key rule: a feature that needs a language model or a cloud model works only when the
@@ -811,15 +811,15 @@ per lane). Every spike's rule is fixed here, at the end of this section.
   `XXna`, `XXnb`…, sharing its block; a lettered phase split again takes a digit (`CU3a1`, `CU3a2`),
   its letter alone naming both halves. Phase XXn's decisions are XX-n0…XX-n9; XX0's are XX-1…XX-9; a
   bet with no zero phase records its scope-level decisions here under its own prefix (VR-1…VR-7,
-  TX-70; SW-3 is in SW0's block). Spikes are XX-S1, XX-S2…; each rule is fixed in this file before
-  its run, and each run's `results.json` stores as `rule_sha256` the SHA-256 of that spike's entry
+  TX-70; SW-3 is in SW0's block). Spikes are XX-S1, XX-S2…; each rule is fixed in the road map
+  (`designs/creator-jobs.md`) before its run, and each run's `results.json` stores as `rule_sha256` the SHA-256 of that spike's entry
   in "Every spike, with its rule" (the entry's first line, `- **<ID> —`, and every following line
   that begins with two spaces, each with its newline; no blank line and no group heading), so
-  records added elsewhere in this file leave it unchanged. A spike runs at the head of the first phase that
+  records added elsewhere in the road map leave it unchanged. A spike runs at the head of the first phase that
   uses it, in that phase's lane. Manual checks are `JOB-n` in blocks of ten: CJ 1–9, TX 10–19, CU
   20–29, VR 30–39, FC 40–49, SW 50–59, CO 60–69; a bet that needs more takes the next free block
-  from 70. Handoffs are `~/.claude/litecode/framejob/cj-<phase id lowercased>`. This file holds each
-  phase's record.
+  from 70. Handoffs are `~/.claude/litecode/framejob/cj-<phase id lowercased>`. The road map
+  (`designs/creator-jobs.md`) holds each phase's record.
 - **CJ-8 — Shared reservations, so lanes do not collide.**
   - (a) The fifth inspector tab is TX's Transcript. Another tab, or a panel beside the inspector,
     needs a decision of its own (`InspectorViewController.swift` is frozen; five titles at the 280
@@ -970,7 +970,8 @@ CAM-9; and so on).
   the format-bump count, lane B's order, VR7a's gate, CJ0a's questions and "Questions asked at
   phase time"); the draft entries CJ-1, CJ-2, CJ-6, CJ-7, CJ-8 (l), VR-3 and TX-70 carry the same
   changes as the §11 file, so the two read alike. CJ-7's `rule_sha256` is now over the entry's first
-  line and every following line that begins with two spaces.
+  line and every following line that begins with two spaces, and CJ-7 and CJ-2 name the road map,
+  not "this file", as where spike rules, phase records and "Phases" live (the review's finding).
 - **The decisions:** `designs/spec/11-decisions/creator-jobs.md` (216 lines) holds CJ-1…CJ-9,
   VR-1…VR-7, TX-70 and SW-3, each with its row in `11-decisions/README.md` (18 rows) and the file's
   row after `audio.md`'s.
