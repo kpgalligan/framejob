@@ -36,8 +36,9 @@ import AppKit
 ///
 /// One member did NOT come. `ReelOp.coreNames()` reads `rc_op_names()`, and
 /// the root `CLAUDE.md`'s rule that the ReelCore files are the only files
-/// calling `rc_*` is not negotiable, so it stays there in an `extension ReelOp` of its
-/// own — the one place the op table is read BACK rather than written down.
+/// calling `rc_*` is not negotiable, so it stays there in an
+/// `extension ReelOp` of its own — the one place the op table is read BACK
+/// rather than written down.
 ///
 /// The cut is the size payment `ReelCore.swift` owed at 2242 lines against
 /// app/CLAUDE.md's ~600 cap, taken before phase 9 adds to it, and it is a pure

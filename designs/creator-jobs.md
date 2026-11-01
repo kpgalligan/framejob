@@ -1320,8 +1320,8 @@ each `pass`, "gate: PASS 361s", the four baseline warnings as above.
 #### CJ0d's record (2026-11-01)
 
 **Landed.** Lane C, eight toll commits and one documents commit on the lane's branch
-(`worktree-wf_14ad530d-40f-15`), base `ba535d61`; the integrator lands the range as one commit.
-Nothing a person sees changed. Every range was re-read at the base (identical to `d0661e5d`'s
+(`worktree-wf_14ad530d-40f-15`), base `ba535d61`, each picked onto `worktree-creator-jobs` as
+its own commit (below). Nothing a person sees changed. Every range was re-read at the base (identical to `d0661e5d`'s
 but for the road map's off-by-one ends: T11 is 784–894, T12 896–1172, T13 443–504, each with
 the blank line after it).
 
@@ -1376,9 +1376,34 @@ the blank line after it).
   §7.4 (row 5, the snapshot row, `FrameRecipe+Mattes.swift`, `writeTiles`; 80 → 81 lines) and
   its index's Lines cell; the stale `MediaImporter.swift:19` ("lives in `ReelCore.swift`" →
   `MediaDescriptor.swift`), `framejob_core.h:5` and `ReelOps.swift`'s two "only file" doc lines.
-- **Owed:** `app/CLAUDE.md`'s map entries (the integrator applies them). The road map's
-  acceptance line asks for `make gate` after each toll; the lane rules ask for it once, with
-  `make typecheck` per toll, which is what ran.
+- **Deviations:** the road map's acceptance line asks for `make gate` after each toll; the lane
+  rules ask for it once, with `make typecheck` per toll, which is what ran. T15c's doc is two
+  lines (the spec's one line wraps at that indent). The lane's gate ran before this record was
+  written; `name_residue.py` was re-run over it, exit 0.
+
+**On `worktree-creator-jobs`.** Cherry-picked after CJ0b's record without conflict: `2789fc16`
+(T12), `0af270ae` (T11), `c749fa37` (T13), `f9be4aed` (T14), `4c228361` (T15), `bececc56`
+(T15c), `853e17b2` (T16), `d142b505` (T17) and `ef7ad78e` (documents), each toll still its own
+commit. `app-file-history.md`, spec §7.4 (81 lines) and its index cell merged beside CJ0c's
+entries. `AgentServer.swift` is 808 lines there before and after T15c (CJ0c's T8 added one);
+the history entry says so.
+
+**Review.** Verdict pass, one nit: `ReelOps.swift:39`, re-worded by T15, ran to 86 columns.
+Fixed at integration: lines 38–40 reflowed (`ReelOps.swift` 1353 → 1354, comment only).
+
+**Map entries, at integration.** `app/CLAUDE.md`: the ReelCore entry names which types are
+`ReelCore+MediaFiles.swift`'s and `ReelCore+Graphics.swift`'s, `ReelAgentSocket.answer(_:)`, and
+`ReelAV1` as `+MediaFiles`'; the snapshot family lists `VideoProps.swift`, `ClipSnapshot.swift`
+and `TrackSnapshot.swift`, with `TransitionSnapshot.audioShape` now `ClipSnapshot.swift`'s;
+`FrameRecipe.swift`'s entry names `FrameRecipe+Mattes.swift`; `MediaImporter`'s `+Thumbnails`
+names `writeTiles`; a `ReverseRenderer+Settings.swift` entry replaces `+Read`'s next-seam
+clause. Root `CLAUDE.md` already named the ReelCore files (CJ0a). `make gate` on
+`worktree-creator-jobs` after the picks, the fix and these edits: names, typecheck (the four
+baseline warnings), fmt, lint, test and app (D25, D26 ok) each `pass` (`build/gate/times.tsv`:
+0.6 s, 6.6 s, 3.0 s, 1.6 s, 167.3 s, 139.9 s), "gate: PASS 320s".
+
+**Owed.** Nothing: no proof rows, mutants beyond T16's re-aimed one (run above), or manual
+checks, and nothing to file.
 
 #### Every spike, with its rule
 

@@ -23,11 +23,16 @@ detail there.
   once per handle and clip, SR-20), timecode, snapping (export presets/sizes/settings are
   `ExportValues.swift`'s, a pure move, HDR H-1), `ReelSpeed.limits` (the
   core's speed range and audio ceiling, typed as `SpeedLimits` in
-  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25), `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`, `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`) and
-  `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
-  #216-R) and `ReelWebM` (`rc_webm_*`, the `av1_webm` writer, spec §11 CX-15) and `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`,
-  `rc_hdr10_av1_peak`, HD-18; `stillPeak`, `rc_hdr10_still_peak`, HD-20), and `GraphicLibrary.imageCache(limit:)`
-  (`rc_graphic_image_cache`, G-39); `ReelCoreError`, `Fps.ffiPair` and `ReelTime`'s
+  `CoreValues.swift` — no Swift file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and `ReelAgentSocket` (below);
+  `ReelCore+MediaFiles.swift` holds the media files the core reads or writes —
+  `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index, #216-R), `ReelCube`,
+  `ReelHDR10` (`rc_hdr10_peak`, spec §11 HD-6; `av1Peak`, `rc_hdr10_av1_peak`, HD-18;
+  `stillPeak`, `rc_hdr10_still_peak`, HD-20), `ReelAV1` and `ReelWebM` (`rc_webm_*`, the
+  `av1_webm` writer, spec §11 CX-15) — and `ReelCore+Graphics.swift` the graphics engine's
+  wrappers (below), with `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`,
+  `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`)
+  and `GraphicLibrary.imageCache(limit:)` (`rc_graphic_image_cache`, G-39) — both pure moves
+  out of `ReelCore.swift` (road map creator-jobs CJ0d, T15); `ReelCoreError`, `Fps.ffiPair` and `ReelTime`'s
   seconds conversions are `CoreValues.swift`'s (G6 phase 5's toll T2 and speed ramps SR4-0,
   pure moves); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
   `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
@@ -51,10 +56,13 @@ detail there.
   only its own key to every selected clip. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
   14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
-  core's sentence, `release` is the quit's unlink-if-still-ours with no join.
+  core's sentence, `release` is the quit's unlink-if-still-ours with no join;
+  `answer(_:)` hands the tool callback's answer back through
+  `rc_agent_string_create` (CJ0d's T15c), a plain static because the trampoline
+  runs on the core's server thread, so `AgentServer.swift` names no `rc_*`.
   The `dictionary` extensions on the property types are
   `OpDictionaries.swift`'s (below).
-  The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
+  The graphics engine's wrappers are `ReelCore+Graphics.swift`'s: `GraphicLibrary` (`addFont`,
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
@@ -70,8 +78,8 @@ detail there.
   halves, clean-up round 3's toll; `array`, `overrides`, C1's tolls; `ExportSize.list`,
   `ExportSettings.decoded`, `ReelAV1.Config.decoded`, `withNonNullBytes`, codec-export C5's
   toll), and C1's
-  fix-pass moves: `ReelAV1.Config` / `.Color` (an extension of `ReelCore.swift`'s
-  `ReelAV1`, whose `rc_av1_*` calls stay there), `GraphicDiagnostic.list(json:)`,
+  fix-pass moves: `ReelAV1.Config` / `.Color` (an extension of
+  `ReelCore+MediaFiles.swift`'s `ReelAV1`, whose `rc_av1_*` calls stay there), `GraphicDiagnostic.list(json:)`,
   `GraphicFailure.checkSides`, `SpeedLimits.decoded` and the free `withBytes`.
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
   `revealURL(for:)` (the original, else the copy), `isTrashed` and
@@ -138,7 +146,8 @@ detail there.
   `ReelEdit?` too for the `try?` probes. In the fold **a refusal does not
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
-- `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
+- `ProjectSnapshot.swift` · `VideoProps.swift` · `ClipSnapshot.swift` ·
+  `TrackSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
   `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. READ-ONLY means never written back as
   is: the stored properties are `var`, so a writer edits a COPY
@@ -158,8 +167,11 @@ detail there.
   (`AudioDynamicsProps.swift`, AU-43, AU-45), and format 34's `voice`
   (`VoiceProps.swift`, AU-140), and format 37's `leveller`
   (`AudioDynamicsProps.swift`, AU-66);
-  `ProjectSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
-  `MediaSnapshot.speech` the media's saved spans. `ShapeProps.swift` (a pure
+  `ClipSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
+  `MediaSnapshot.speech` the media's saved spans. `VideoProps.swift` (`VideoProps`),
+  `ClipSnapshot.swift` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`,
+  `TransitionSnapshot`) and `TrackSnapshot.swift` (`TrackSnapshot`) are pure moves out of
+  `ProjectSnapshot.swift` (road map creator-jobs CJ0d, T11–T13). `ShapeProps.swift` (a pure
   move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
   `GradientStop`, `Gradient` and `ShapeProps`. `GradeProps.swift` holds `ColorAdjust` (a pure move out of `ProjectSnapshot.swift`, grading-2 G2-0) beside grading's other value types. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
@@ -316,7 +328,9 @@ detail there.
   `detectedPQ`, a PQ file's HDR10 peak through `ReelHDR10`, HD-6, and
   `detectedStillPQ`, a PQ still's through `ReelHDR10.stillPeak`, HD-20;
   +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
-  await-free halves of `thumbnails`, the image branch and the publish) ·
+  await-free halves of `thumbnails`, the image branch, the publish and `writeTiles`, one landed
+  frame's tiles, `nil` once the pass is superseded so the frames loop's labelled break stays in
+  `thumbnails`, CJ0d's T16) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `MediaImporter+Loudness.swift` · `LoudnessBlocks.swift` ·
   `MediaCacheLane.swift` ·
@@ -539,8 +553,12 @@ detail there.
   `rendererVersion` 5).
 - `ReverseRenderer+Read.swift` — reading one slice (`Frame`, `Slice`, `read`,
   `copyBuffer`, `copyRows`), moved whole out of `ReverseRenderer.swift`
-  (clean-up round 3's toll; its next seam, `// MARK: - Settings`, is named in
-  app-file-history.md).
+  (clean-up round 3's toll).
+- `ReverseRenderer+Settings.swift` — the reverse's writer settings
+  (`dimensions`, `videoSettings`, `sliceDuration`, which reads the type's
+  `bufferBudget`), moved whole out of `ReverseRenderer.swift` (road map
+  creator-jobs CJ0d, T17); `precision_proof.py`'s `reverse-main` and
+  `reverse-709-labels` and `log_proof.py`'s variant edits anchor here.
 - `ReverseRenderer+Audio.swift` — the reverse's audio: its LPCM settings,
   slice bytes, reversed blocks and sample buffers, moved whole out of
   `ReverseRenderer.swift` (issue batch B98).
@@ -1628,9 +1646,10 @@ the key map behind it.
   (`passActivity`, `endPassActivity`; the owner's choice, G-38).
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
-  `RecipeMatteGroup`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with `mattes`), out of
-  `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
+  `RecipeClipRect`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with
+  `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
+  `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
+  `RecipeMatteGroup`, a pure move out of it (road map creator-jobs CJ0d, T14).
 - `WaveformAnalyzer.swift` (the four scopes' GPU passes over
   `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
   `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers; each pass

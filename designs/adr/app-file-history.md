@@ -790,7 +790,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   rc_agent_string_create($0) }`) became `ReelAgentSocket.answer(result)`, a plain static on
   `ReelAgentSocket` whose body is exactly that call (the trampoline runs on the core's server
   thread, so `answer` holds no actor isolation). The frozen `AgentServer.swift` changed that line
-  only, 807 lines before and after; `git grep -n 'rc_[a-z_]*('` over `app/Sources` now matches
+  only, 807 lines before and after at `ba535d61` (808 on `worktree-creator-jobs`, after CJ0c's
+  T8); `git grep -n 'rc_[a-z_]*('` over `app/Sources` now matches
   only the ReelCore files and two doc comments. `wc -l app/Sources/ReelCore.swift`: 439 before,
   445 after. The next seam: none named; a new `rc_*` wrapper goes in the `ReelCore+<Area>.swift`
   of its area.
