@@ -1096,6 +1096,59 @@ area."
 - **Acceptance:** `make gate` PASS after each toll; each move diffed line-identical; `cargo fmt`
   leaves the moved text as it was. **Proof rows, mutants, manual checks, questions:** none.
 
+#### CJ0b's record (2026-11-01)
+
+**Landed.** Four pure moves in `core/src`, one commit each on lane A's branch, base `ba535d61`;
+no FFI, header, op, format or Swift change, and `RC_FORMAT_VERSION` is unchanged. Every count
+below is a `wc -l` run.
+
+| Toll | Commit | Old file, before → after | New file | Widened |
+|---|---|---|---|---|
+| T1 | `72275320` | `op_table.rs` 374 → 238 | `op_rows.rs` 148 | `req`, `opt`, `within`, `op` → `pub(crate)` |
+| T2 | `6001a1fc` | `model.rs` 570 → 512 | `model_media.rs` 71 | nothing |
+| T3 | `ca57875c` | `recipe.rs` 547 → 508 | `recipe_hash.rs` 45 | nothing |
+| T4 | `4849d874` | `edit_clip.rs` 616 → 444 | `edit_described.rs` 181 | `DEFAULT_CLIP_DURATION` → `pub(crate)` |
+
+- **T1:** `OP_TABLE` (its doc and `#[rustfmt::skip]`), `OP_NAMES` and `names()` to `op_rows.rs`,
+  with the two `use` lines only the rows name; `op_table.rs` re-exports both (`pub use
+  crate::op_rows::{OP_NAMES, OP_TABLE}`). `edit_canvas.rs:30`'s doc names `op_rows.rs`'s table.
+- **T2:** the `// ---- media` banner, `Media`, `MediaOriginal`, `MediaKind` to `model_media.rs`;
+  `model.rs` re-exports the three after `Track`'s re-export.
+- **T3:** `FNV_OFFSET`, `FNV_PRIME`, `fnv1a`, `content_hash`, `sorted` to `recipe_hash.rs`;
+  `recipe.rs` re-exports `content_hash` `pub(crate)`. The doc lines in `recipe_text.rs` (the
+  "What is NOT here" paragraph) and `core/tests/evaluate_tests.rs` (the FNV oracle's doc) name
+  `recipe_hash.rs`.
+- **T4:** `TITLE_FONT`, `TITLE_CONTENT`, `Described`, and `add_text_clip`, `add_shape_clip`,
+  `add_described_clip` (in a new `impl Project`) to `edit_described.rs`, whose module doc carries
+  `edit_clip.rs`'s paragraph on the two ops that take a patch; `edit_clip.rs`'s module doc names
+  the new home in one line, and its imports lost the nine items only the moved code named.
+  `edit_adjustment.rs` and `edit_graphic.rs` `use crate::edit_described::Described`. Doc lines
+  naming the new home: `edit_graphic.rs:8`, `props_check.rs:13` and `:29`, `recipe_text.rs`'s
+  `TITLE_FONT` reason. The `Source::Media` patterns in `add_clip` and `set_reversed` stay in
+  `edit_clip.rs`.
+- **Line identity.** For each moved range, `git show ba535d61:core/src/<old>.rs | sed -n
+  '<a>,<b>p'` against `sed -n '<x>,<y>p' core/src/<new>.rs`, after `cargo fmt`; each `diff` printed
+  nothing (exit 0): T1 `op_table.rs` 238–374 = `op_rows.rs` 12–148 (137 lines); T2 `model.rs`
+  156–216 = `model_media.rs` 11–71 (61); T3 `recipe.rs` 80–118 = `recipe_hash.rs` 7–45 (39); T4
+  `edit_clip.rs` 39–42 = `edit_described.rs` 4–7 (4), 64–72 = 20–28 (9), 76–84 = 30–38 (9),
+  227–366 = 41–180 (140). `git diff ba535d61 -- core/src/{op_table,model,recipe,edit_clip}.rs`
+  adds only the four builders' `pub(crate)`, the three re-exports (two with their `///` doc),
+  `edit_clip.rs`'s pruned `model` import, its one `//!` line and `DEFAULT_CLIP_DURATION`'s
+  `pub(crate)`; every other line is a deletion.
+- **Per-toll gate** (each toll, before its commit, from `core/`): `cargo fmt` (no moved line
+  changed), `cargo fmt --check` exit 0, `cargo test --release` exit 0 (171 result lines, 1806
+  passed, 0 failed, at each of the four), `make lint` exit 0 with no warning line, and
+  `python3 tools/proof/spec_index_proof.py` (222/222 checks passed) after each 07.10 row.
+- **`make gate`** once after T4, at `4849d874`: PASS 356 s. `build/gate/times.tsv`: names pass
+  0.7 s, typecheck skip (inputs byte-identical to its last pass; no Swift changed), fmt pass 3.1 s,
+  lint pass 1.0 s, test pass 173.9 s (198 result lines, 1976 passed, 0 failed), app pass 176.5 s
+  (D25 and D26 ok).
+- **Documents:** spec §7.10 gained the four rows after their parents' and rewrote the
+  `op_table.rs`, `edit_graphic.rs`, `edit_adjustment.rs` and `recipe.rs` rows (128 → 132 lines,
+  `spec/README.md`'s cell set from `wc -l`); `core-file-history.md`'s "Named next cuts" gained an
+  `op_table.rs` bullet and extended `model.rs`'s, `recipe.rs`'s and `edit_clip.rs`'s. The
+  `core/CLAUDE.md` map entries are owed to the integrator (lanes edit no `CLAUDE.md`).
+
 #### CJ0c — the app's tolls T5–T8: menus, builder, document, dispatch
 
 - **What a person gets:** nothing.
