@@ -7,8 +7,8 @@ import AppKit
 /// and the panel's step for the grant and the note once its pane is open
 /// (CR1c, CAM-5; the pane's URL is `RecordingGrant.swift`'s, beside the
 /// others, the one file a System Settings URL is spelled in). Values a probe
-/// can call, in a file of their own because `RecordingSetup.swift` stands
-/// near the 400-line cap. Nothing here
+/// can call, in a file of their own because `RecordingSetup.swift` stood
+/// near the 400-line cap at CR1a. Nothing here
 /// prompts: `AVCaptureDevice.requestAccess(for: .video)` is the recorder
 /// panel's alone (`RecorderPanelController+Grants.swift`), and `cameraStatus`
 /// is read before any `AVCaptureDeviceInput` exists, because that

@@ -2899,7 +2899,9 @@ free.
   set false, and it is retained by one stored property on the editor, NOT
   `addWindowController`, which would silence the save prompt on close. It
   forwards bare keys to `handleEditorKey`, the one key map.
-- `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
+- `RecorderPanelController.swift` (+`Rows`, +`Choices` — `currentChoice`, `persistChoices`,
+  `restoreChoices` and `refreshSizeNote`, a pure move out of `+Rows`, CU0a's U3 —,
+  +`Recording`, +`Grants`,
   +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`, +`Showing` — `show()`, the
   sync timer, `setNote` and the refit, a pure move out of the base file,
   camera-recording CR1-0, +`Camera` — Source ▸ Camera, the Camera popup
@@ -2946,11 +2948,13 @@ free.
   meter live, Record reading Stop, a Pause/Resume button beside it.
 
 **Recording.**
-- `RecordingSetup.swift` (+`Camera`) · `RecordingResult.swift` — the half a probe can
-  call: choices, file naming, `RecordingConfiguration.make` (PURE), the grant
-  reads, the step a press takes, the three pane URLs, the result types;
-  nothing here prompts or opens.
-- `ScreenRecorder.swift` (+`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
+- `RecordingSetup.swift` (+`Camera`) · `RecordingGrant.swift` · `RecordingResult.swift` — the
+  half a probe can call: choices, file naming, `RecordingConfiguration.make` (PURE), the result
+  types; `RecordingGrant.swift` the grant reads, the step a press takes and the pane URLs (a
+  pure move out of `RecordingSetup.swift`, road map creator-jobs CU0a's U1; the one file a
+  System Settings URL is spelled in); nothing here prompts or opens.
+- `ScreenRecorder.swift` (+`Started` — `captureStarted` and `failStart`, a pure move, CU0a's
+  U2 —, +`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
   +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`, +`CameraBeside`,
   +`CameraBesideFinishing`) · `ScreenFrameWatch.swift` · `CameraDevices.swift` · `CameraCapture.swift`
@@ -3107,7 +3111,7 @@ free.
   `paintChecker` internal, the browser preview's checker too) and
   `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
   vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
-  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0 —, +`Graphics`,
+  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0, its argument descriptions in +`RecordingArguments` (`recordScreenArguments()`, CU0a U4) —, +`Graphics`,
   +`Tracks` — the five track rows, spliced back where they stood by
   `trackTools(trackDescription:)`, a pure move out of `AgentCatalog.swift`,
   AP10c's toll T2 —, +`Declarations`)

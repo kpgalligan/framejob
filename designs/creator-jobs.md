@@ -2139,6 +2139,27 @@ says; U2 ends at 398 and U3 at 394, not 399 and 395 (those lines are the type's 
   U3's corrected ends are above. `RecorderPanelController.swift`'s header doc, outside the
   spec's file list, was edited because U3 made its sentence false.
 
+**On `worktree-creator-jobs`.** Cherry-picked after CJ0d's record without conflict: `d797cb05`
+(decisions), `82543c0d` (U1), `4feb9abf` (U2), `659d2c67` (U3), `e0875375` (U4), `acff5d4b`
+(U5) and `878cda2b` (documents), each toll still its own commit.
+
+**Review.** Verdict pass, one nit: `RecordingSetup+Camera.swift:10` still said the file stands
+apart because `RecordingSetup.swift` "stands near the 400-line cap", false at 248 lines. Fixed
+at integration: "stood near the 400-line cap at CR1a" (comment only, 84 lines unchanged).
+
+**Map entries, at integration.** `app/CLAUDE.md`: the `RecordingSetup.swift` entry names
+`RecordingGrant.swift` (the grant reads, the press's step, the pane URLs; the one file a System
+Settings URL is spelled in); `ScreenRecorder.swift`'s list gains +`Started`;
+`RecorderPanelController.swift`'s gains +`Choices`; the `AgentCatalog` +`Recording` clause names
++`RecordingArguments` (`recordScreenArguments()`). `core/CLAUDE.md`: the `actions_clamp.rs` entry
+names `bounded` `pub(crate)` and the grading clamps' new home, a new `actions_clamp_grade.rs`
+entry follows it, and `grade_check.rs`'s entry names that file for `clamp_wheels`,
+`clamp_curves` and `clamp_qualifier`. `make gate` on `worktree-creator-jobs` after the picks,
+the fix and these edits: names, typecheck (the four baseline warnings), fmt, lint, test and app
+(D25, D26 ok) each `pass` (`build/gate/times.tsv`: 0.7 s, 7.0 s, 3.4 s, 7.7 s, 185.3 s,
+135.0 s), "gate: PASS 340s". The Release products the lane's copied build database had removed
+from this tree's `build/` (`Sparkle.framework` and five dSYMs) were rebuilt by its app step.
+
 **Owed.** Nothing: no proof rows, mutants or manual checks, and nothing to file.
 
 ### CJ2a — the analysis lane, its store and reader, and `shots`

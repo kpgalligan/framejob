@@ -534,12 +534,13 @@ governs a module now.
   the field (issue #89).
 - `grade_check.rs` — tier 2's range checks (spec §11 GR-11), called from `check_video`: each
   wheel's x, y and master −1…1, and x² + y² ≤ 1 (to `WHEEL_RIM_TOLERANCE`, 1e-9, so a rim point
-  is never refused) refused in its own sentence; `actions_clamp.rs`'s `clamp_wheels` closes an
-  action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising, each in
-  its own sentence, a hue curve's x 0 ≤ x < 360 and its value in its domain (GR-32);
-  `clamp_curves` closes an action's end per domain. `check_qualifier` (GR-13): each
-  bound in its own sentence, low ≤ high, then `blur` 0…1 last (GR-35); `clamp_qualifier`
-  closes an action's end (a non-finite blur to 0, then 0…1);
+  is never refused) refused in its own sentence; `actions_clamp_grade.rs`'s `clamp_wheels`
+  closes an action's end. `check_curves` (GR-12): 2–16 points, x and y 0…1, x strictly rising,
+  each in its own sentence, a hue curve's x 0 ≤ x < 360 and its value in its domain (GR-32);
+  `actions_clamp_grade.rs`'s `clamp_curves` closes an action's end per domain.
+  `check_qualifier` (GR-13): each bound in its own sentence, low ≤ high, then `blur` 0…1 last
+  (GR-35); `actions_clamp_grade.rs`'s `clamp_qualifier` closes an action's end (a non-finite
+  blur to 0, then 0…1);
   `edit_adjustment.rs`'s `check_qualifier_clip` refuses one on any other clip.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
@@ -745,8 +746,16 @@ governs a module now.
   `audio` or `text` end patch's keys and kinds but deliberately not its
   VALUES, and never looks at the clip for them; this bounds every value
   such a patch can carry and forces `normal` on a nest clip), with
-  `bounded` / `finite_or`; the first two a pure move out of `actions.rs`
-  (issue batch B87, toll A), `clamp_text` added by #353.
+  `bounded` (`pub(crate)`, which `actions_clamp_grade.rs` calls) and
+  `finite_or`; the first two a pure move out of `actions.rs` (issue batch
+  B87, toll A), `clamp_text` added by #353. `clamp_video`'s grading clamps
+  are `actions_clamp_grade.rs`'s.
+- `actions_clamp_grade.rs` — the grading clamps `clamp_video` runs on an
+  action's evaluated video props, a pure move out of `actions_clamp.rs`
+  (road map "creator-jobs" CU0a's U5): `clamp_wheels` (GR-11),
+  `clamp_curves` (GR-12, GR-32; also `actions_curves.rs`') and
+  `clamp_qualifier` (GR-13, GR-35), each `pub(crate)`, with their private
+  helpers `clamp_points`, `clamp_hue` and `clamp_level`.
 - `actions_curves.rs` — `curves_json` (all six curves, an absent one
   as its domain's identity, for `video_json`'s callers),
   `align_identity_curves` (spec §11 GR-12, GR-32: an identity curve
