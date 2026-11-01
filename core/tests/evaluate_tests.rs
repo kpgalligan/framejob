@@ -1218,7 +1218,7 @@ fn hash_of(handle: &Handle, id: i64, t: i64) -> String {
     text(&layer_of(&handle.recipe(t), id), "/source/hash").to_string()
 }
 
-/// FNV-1a, 64-bit, hex — the algorithm `recipe.rs` documents, written out
+/// FNV-1a, 64-bit, hex — the algorithm `recipe_hash.rs` documents, written out
 /// again here because an oracle that imported the implementation would only
 /// prove the implementation equals itself. The claim it serves is that the
 /// hash is taken over a description this test can spell out in full.

@@ -40,9 +40,10 @@
 //!
 //! # What is NOT here
 //!
-//! [`crate::recipe::content_hash`] and the FNV under it stay in
-//! `recipe.rs` and are `pub(crate)` for this file to call: a SHAPE layer
-//! hashes its description through the same function, so the hash is the
+//! [`crate::recipe::content_hash`] and the FNV under it live in
+//! `recipe_hash.rs`, re-exported `pub(crate)` by `recipe.rs` for this file
+//! to call: a SHAPE layer hashes its description through the same
+//! function, so the hash is the
 //! recipe's texture-cache primitive and not a text concern. The layer
 //! object around `source` stays there too, and so does the arm that
 //! decides a clip HAS a text description at all — this file is handed one,

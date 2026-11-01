@@ -234,7 +234,14 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   move gated with G2-0's other three, its body identical after `cargo fmt`. Nothing widened. `wc
   -l core/src/recipe.rs`: 548 before, 484 after; `recipe_options.rs` is 76. The next seam: the
   content hash (`FNV_OFFSET`, `FNV_PRIME`, `fnv1a`, `content_hash`, `sorted`) out to
-  `recipe_hash.rs`.
+  `recipe_hash.rs`. Road map "creator-jobs" CJ0b paid it as toll T3, a pure move gated alone
+  (`cargo fmt --check`, `cargo test --release`, `make lint`): the two constants, `fnv1a`,
+  `content_hash` and `sorted` with their docs went whole to the new `recipe_hash.rs` under a
+  module doc, re-exported by `recipe.rs` (`pub(crate) use crate::recipe_hash::content_hash`), so
+  `recipe_graphic.rs`'s and `recipe_text.rs`'s `crate::recipe::content_hash` holds, and `lib.rs`
+  gained `mod recipe_hash;`. Nothing widened; `fnv1a`, `sorted` and the constants stay private to
+  the new module. `wc -l core/src/recipe.rs`: 547 before, 508 after; `recipe_hash.rs` is 45. No
+  further seam is named.
 - `actions.rs`: 532 at grading-2's G2-2, near the cap, so G2-3's curve helpers went to a new
   module rather than into it: `actions_curves.rs` (85) holds `curves_json` (all four channels,
   an absent one as the identity, inserted by `video_json`) and `align_identity_curves` (called
