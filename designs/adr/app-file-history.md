@@ -539,6 +539,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `QualifierPickView` subclass. `ProjectSnapshot.swift`'s named seam is unchanged.
   Road map "audio" AP10 gave it wiring only (`TrackSnapshot.volume` and `.pan`: the fields, their
   init parameters and their lenient decode): 1436 → 1445. The named seam is unchanged.
+  Road map creator-jobs CJ0d paid this seam three times, bottom-up (T12, T11, T13), each a pure
+  move gated alone. T12: `// MARK: - Clips` through `TransitionSnapshot`'s closing brace (`ClipSource` with its
+  nested `private enum CodingKeys`, `ClipSnapshot`, `TransitionSnapshot`) went whole to
+  `ClipSnapshot.swift` with `import AppKit`, and the blank line after the block went too,
+  diffed empty against `git show HEAD:app/Sources/ProjectSnapshot.swift` lines 896–1172; nothing
+  widened (`CodingKeys` moved nested with its type). `wc -l app/Sources/ProjectSnapshot.swift`:
+  1454 before, 1176 after; `ClipSnapshot.swift` is 283. No proof anchor moved.
 - `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
   `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
   extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,
