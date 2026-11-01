@@ -1067,6 +1067,20 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/ReverseRenderer.swift`: 737 before, 557 after; `ReverseRenderer+Read.swift` is
   183. The next seam: `// MARK: - Settings` (`dimensions`, `videoSettings`, `sliceDuration`) out
   to `ReverseRenderer+Settings.swift`.
+  Road map creator-jobs CJ0d's T17 paid it: lines 480–572 at `ba535d61` (`// MARK: - Settings`
+  through `sliceDuration`'s closing brace) moved byte for byte into `extension ReverseRenderer`
+  in `ReverseRenderer+Settings.swift` with `import AVFoundation` and `import VideoToolbox`, at
+  their 4-space indent, and the blank lines either side (479, 573) went too; a pure move gated
+  alone, diffed empty against HEAD once the three `private static func` lines were normalised.
+  `dimensions`, `videoSettings` and `sliceDuration` and the type's `bufferBudget` (which
+  `sliceDuration` reads) lost `private`; nothing else changed. `precision_proof.py`'s
+  `reverse-main` and `reverse-709-labels` anchors and `log_proof.py`'s `REVERSE_VARIANTS` edits
+  on `MAIN10_LINE`, `RATE_LINE` and `PRORES_LINE` moved to `REVERSE_SETTINGS`, the new file,
+  where each occurs once (and none in `ReverseRenderer.swift`); `reverse-odd-hevc`, the `X420_*`
+  edits, `PRORES_EDIT`, `odd-range-ignored` and `export_offset_proof.py`'s M22/M23 stay on
+  `ReverseRenderer.swift`, each once there. `wc -l app/Sources/ReverseRenderer.swift`: 574
+  before, 479 after; `ReverseRenderer+Settings.swift` is 98. The next seam: none named; the file
+  holds the renderer's job, its write and its backwards walk.
 - `LayerRenderers.swift`: clean-up round 3's batch B phase 3 paid its toll before #322's
   gain-map still (spec §11 HD-22). `image(url:media:)` with its doc (lines 177–196 at `189af58`),
   `renderImage` and `renderHDRImage` (466–502) and `deepBitmap` and `hdrBitmap` (528–558) moved

@@ -710,6 +710,7 @@ MUTANTS = {
 # variants scale `bits` AFTER its clamps: the log fixtures sit at the 2 Mbps
 # floor, where scaling the 0.12 factor would leave rate2 a no-op.
 REVERSER = "app/Sources/ReverseRenderer.swift"
+REVERSE_SETTINGS = "app/Sources/ReverseRenderer+Settings.swift"
 X420_LINE = "            case .hevcMain10: return kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange\n"
 X420_BYTES = "            case .hevcMain10: return 3\n"
 MAIN10_LINE = ("            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as "
@@ -724,14 +725,14 @@ PRORES_EDIT = (REVERSER, INIT_LINE, "            self = .proRes422\n")
 REVERSE_VARIANTS = {
     "base": [],
     "x422": X422_EDITS,
-    "main422": X422_EDITS + [(REVERSER, MAIN10_LINE,
+    "main422": X422_EDITS + [(REVERSE_SETTINGS, MAIN10_LINE,
                               MAIN10_LINE.replace("Main10_AutoLevel", "Main42210_AutoLevel"))],
-    **{f"rate{k}": [(REVERSER, RATE_LINE,
+    **{f"rate{k}": [(REVERSE_SETTINGS, RATE_LINE,
                      f"            AVVideoAverageBitRateKey: min(bits * {k}, 240_000_000),\n")]
        for k in (2, 4, 8)},
-    "quality": [(REVERSER, RATE_LINE, "            AVVideoQualityKey: 1.0,\n")],
+    "quality": [(REVERSE_SETTINGS, RATE_LINE, "            AVVideoQualityKey: 1.0,\n")],
     "prores422": [PRORES_EDIT],
-    "prores422hq": [PRORES_EDIT, (REVERSER, PRORES_LINE,
+    "prores422hq": [PRORES_EDIT, (REVERSE_SETTINGS, PRORES_LINE,
                                   PRORES_LINE.replace("proRes422,", "proRes422HQ,"))],
 }
 # The log fixtures each variant reverses, and the cost fixtures: 2 s of grain

@@ -454,6 +454,7 @@ REVERSE_DISTINCT = 800
 REVERSE_PROBE = ROOT / "tools/proof/reverse_probe.swift"
 REVERSE_DIR = BASE / "reverse-probe"
 REVERSER = "app/Sources/ReverseRenderer.swift"
+REVERSE_SETTINGS = "app/Sources/ReverseRenderer+Settings.swift"
 REVERSE_READ = "app/Sources/ReverseRenderer+Read.swift"
 REVERSE_CACHE = "app/Sources/ReverseCache.swift"
 DEEP = "app/Sources/DeepStillFrame.swift"
@@ -528,11 +529,11 @@ MUTANTS = {
          "                    kCVPixelBufferPixelFormatTypeKey as String: "
          "Int(kCVPixelFormatType_32BGRA),\n")]},
     "reverse-main": {"mode": "rows", "rows": ["V0"], "anchors": [
-        (REVERSER, "            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as "
+        (REVERSE_SETTINGS, "            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main10_AutoLevel as "
          "String,\n",
          "            AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel as String,\n")]},
     "reverse-709-labels": {"mode": "rows", "rows": ["V2", "V3"], "anchors": [
-        (REVERSER, "            AVVideoCompressionPropertiesKey: compression,\n",
+        (REVERSE_SETTINGS, "            AVVideoCompressionPropertiesKey: compression,\n",
          "            AVVideoColorPropertiesKey: [\n"
          "                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,\n"
          "                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,\n"
