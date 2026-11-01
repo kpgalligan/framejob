@@ -225,7 +225,16 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   refusal into `set_reversed`. The next seam: the described clips — `Described`, the Title
   preset's constants, `add_text_clip`, `add_shape_clip` and `add_described_clip` — out whole to an
   `edit_described.rs`, leaving `edit_clip.rs` the placement callers (move, split, delete,
-  duplicate) and `add_clip`.
+  duplicate) and `add_clip`. Road map "creator-jobs" CJ0b paid it as toll T4, a pure move gated
+  alone (`cargo fmt --check`, `cargo test --release`, `make lint`): `TITLE_FONT`,
+  `TITLE_CONTENT`, `Described` and `add_text_clip`, `add_shape_clip` and `add_described_clip`
+  with their docs went whole to the new `edit_described.rs`, the methods in a new `impl Project`
+  block, under a module doc that carries `edit_clip.rs`'s paragraph on the two ops that take a
+  patch; `edit_adjustment.rs` and `edit_graphic.rs` now `use crate::edit_described::Described`,
+  and `lib.rs` gained `mod edit_described;`. Its widening: `DEFAULT_CLIP_DURATION` became
+  `pub(crate)`, because it stays in `edit_clip.rs` (`whole_media_length` reads it) and the
+  described tail imports it. `wc -l core/src/edit_clip.rs`: 616 before, 444 after;
+  `edit_described.rs` is 181. No further seam is named.
 - `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
 - `recipe.rs`: grading-2's G2-0 moved the block from `// ---- what a caller asked for` through
   `impl RecipeOptions` (`RecipeOptions` and its reader `of`) to the new `recipe_options.rs`,

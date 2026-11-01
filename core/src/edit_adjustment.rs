@@ -60,7 +60,7 @@
 //! adjustment target keeps its own when the payload clip is not an
 //! adjustment clip (`edit_paste_attributes.rs`'s `copy_group`).
 
-use crate::edit_clip::Described;
+use crate::edit_described::Described;
 use crate::model::{BlendMode, Clip, FilterKind, Project, Source, VideoProps};
 use crate::nest::Instance;
 use crate::outcome::Outcome;

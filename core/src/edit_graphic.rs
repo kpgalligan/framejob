@@ -5,7 +5,7 @@
 //! What a graphic IS — its fields, the name rule, the side bound, the
 //! schema and props checks and the colour normalisation — is
 //! `model_graphic.rs`'s, and this module only composes them into ops. The
-//! placement tail is `edit_clip.rs`'s `add_described_clip`, the one every
+//! placement tail is `edit_described.rs`'s `add_described_clip`, the one every
 //! sourceless clip is placed through, so a graphic clip obeys the overlap
 //! rule and the default five seconds exactly as a text or shape clip does.
 //!
@@ -31,7 +31,7 @@ use serde_json::{Map, Value};
 
 use crate::actions_graphic::names_prop;
 use crate::edit_action_graphic::schema_default;
-use crate::edit_clip::Described;
+use crate::edit_described::Described;
 use crate::export::describe;
 use crate::model::{GraphicProps, Project, Source};
 use crate::model_graphic::{

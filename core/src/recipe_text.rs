@@ -350,7 +350,7 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
 // ---- the burn-in timecode layer -----------------------------------------
 
 /// The face a timecode burn-in is drawn in. A concrete face, not a family,
-/// for `edit_clip.rs`'s `TITLE_FONT` reason: the renderer asks for exactly
+/// for `edit_described.rs`'s `TITLE_FONT` reason: the renderer asks for exactly
 /// this name. IBM Plex Mono is the app's own face for machine-produced
 /// numbers (`Theme.mono`), and monospacing is not decoration here — a
 /// proportional timecode's digits change width as they count, so the field

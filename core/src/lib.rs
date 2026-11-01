@@ -49,6 +49,7 @@ pub mod edit_canvas;
 pub mod edit_clip;
 mod edit_clip_timing;
 mod edit_commit;
+mod edit_described;
 mod edit_detach;
 pub mod edit_edge;
 mod edit_fit;

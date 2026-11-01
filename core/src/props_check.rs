@@ -10,7 +10,7 @@
 //! VOCABULARY, not about an edit. It reads a finished `VideoProps` and says
 //! whether the numbers are legal, and it neither knows nor cares whether a
 //! patch (`edit_props.rs`), a paste (`edit_paste.rs`), a new title or shape
-//! (`edit_clip.rs`) or a canvas colour (`edit_track.rs`) produced them.
+//! (`edit_described.rs`) or a canvas colour (`edit_track.rs`) produced them.
 //! Every op that writes a group runs that group's check after writing and
 //! before storing, so these four functions are the ONE statement of what a
 //! legal group is — and `actions_clamp.rs`'s `clamp_video` bounds an
@@ -26,7 +26,7 @@
 //! module accepts is a value a control can show.
 //!
 //! Every reader names this module directly — `edit_props.rs` for the four
-//! checks, `edit_clip.rs` for the two a new title or shape runs,
+//! checks, `edit_described.rs` for the two a new title or shape runs,
 //! `edit_track.rs` for `color_ok`, `actions.rs` for the bounds — and nothing
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
