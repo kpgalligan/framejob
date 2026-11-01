@@ -1317,6 +1317,69 @@ each `pass`, "gate: PASS 361s", the four baseline warnings as above.
   instead passes `cache_pass_probe.py` whole with its re-aimed mutant killed (S1b). **Proof rows,
   mutants, manual checks, questions:** none beyond T16's.
 
+#### CJ0d's record (2026-11-01)
+
+**Landed.** Lane C, eight toll commits and one documents commit on the lane's branch
+(`worktree-wf_14ad530d-40f-15`), base `ba535d61`; the integrator lands the range as one commit.
+Nothing a person sees changed. Every range was re-read at the base (identical to `d0661e5d`'s
+but for the road map's off-by-one ends: T11 is 784–894, T12 896–1172, T13 443–504, each with
+the blank line after it).
+
+| Toll | Lane commit | What | `wc -l` before → after | New file |
+|---|---|---|---|---|
+| T12 | `9dcb74f9` | `// MARK: - Clips` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`, `TransitionSnapshot`) | `ProjectSnapshot.swift` 1454 → 1176 | `ClipSnapshot.swift` 283 |
+| T11 | `26509ab8` | `VideoProps` with its doc | 1176 → 1064 | `VideoProps.swift` 116 |
+| T13 | `c6b45ce2` | `// MARK: - Tracks`, `TrackSnapshot` | 1064 → 1001 | `TrackSnapshot.swift` 67 |
+| T14 | `e4e97765` | `RecipeLayerMatte`, `RecipeLayerDissolve`, `RecipeMatteGroup` | `FrameRecipe.swift` 417 → 358 | `FrameRecipe+Mattes.swift` 64 |
+| T15 | `0aca690b` | `// MARK: - Containers` … `ReelWebM`; `// MARK: - Graphics` … `ReelGraphicPackage` | `ReelCore.swift` 766 → 439 | `ReelCore+MediaFiles.swift` 207, `ReelCore+Graphics.swift` 131 |
+| T15c | `08c3d8d5` | `ReelAgentSocket.answer(_:)`; `AgentServer.swift:806` calls it | `ReelCore.swift` 439 → 445; `AgentServer.swift` 807 → 807 | — |
+| T16 | `650d5548` | `writeTiles` in `MediaImporter+Thumbnails.swift`, the arm calls it | `MediaImporter.swift` 589 → 585; `+Thumbnails` 120 → 140 | — |
+| T17 | `bf2ef660` | `// MARK: - Settings` (`dimensions`, `videoSettings`, `sliceDuration`) in `extension ReverseRenderer` | `ReverseRenderer.swift` 574 → 479 | `ReverseRenderer+Settings.swift` 98 |
+
+- **Pure moves (T11–T15, T17):** each moved range diffed empty against `git show
+  HEAD:app/Sources/<Old>.swift` before its commit (T17 after normalising its three `private static
+  func` lines), and each old file's `git diff --numstat` showed only the named edits: T11–T14
+  added 0 lines; T15 added 13 (the header's 11 for its 8, and `takeErrorMessage` and `takeString`
+  losing `private`); T17 added 1 (`bufferBudget` losing `private`). Widened, and nothing else:
+  `takeErrorMessage`, `takeString`, `ReverseRenderer.bufferBudget`, `dimensions(of:track:limit:)`,
+  `videoSettings(_:fps:intermediate:)`, `sliceDuration(dimensions:fps:)`. `ReelCore.swift` is 445,
+  not the road map's ≈442: T15's header (first sentence and type list naming the ReelCore files,
+  "the typed patches" dropped) is 3 lines longer than the old one.
+- **The refactors (T15c, T16), not line-identical:** T15c's `answer` is exactly `text.withCString
+  { rc_agent_string_create($0) }`, a plain static; after it `git grep -n 'rc_[a-z_]*(' --
+  app/Sources` matches only the ReelCore files, `ReelOpSchema.swift:28` and `ReelOps.swift:37`
+  (doc comments). T16's `writeTiles` is the arm's loop moved with its guard and comment, `nil`
+  once superseded; the labelled break stays in `thumbnails`; it is await-free.
+- **Typecheck:** `make typecheck` before each of the eight commits: exit 0, 0 errors, the 4
+  baseline warnings each time.
+- **Anchors re-aimed:** `graphics_ffi_probe.py`'s `frame-off-by-one` → `ReelCore+Graphics.swift`;
+  `cache_pass_probe.py`'s `frame-check-ignored` → `writeTiles`' `guard pass?.isCurrent() ?? true
+  else { return nil }` in `MediaImporter+Thumbnails.swift`; `precision_proof.py`'s `reverse-main`
+  and `reverse-709-labels`, and `log_proof.py`'s `REVERSE_VARIANTS` edits on `MAIN10_LINE`,
+  `RATE_LINE` and `PRORES_LINE` → `REVERSE_SETTINGS`. Each counted 1 in its new file and 0 in the
+  old by `grep -cF`. The anchors left on `ReverseRenderer.swift` (`reverse-odd-hevc`, `X420_*`,
+  `PRORES_EDIT`, `odd-range-ignored`, `export_offset_proof.py`'s M22 and M23) each count 1 there.
+- **Probe runs:** `graphics_ffi_probe.py --mutant frame-off-by-one` exit 0 ("MUTANT PASS … P5 FAILED
+  in the copy (failed: P5, P9)"); `cache_pass_probe.py --only B0,S1a,S1b` 3/3 at T16;
+  `cache_pass_probe.py` whole exit 0, 13/13; `--mutant frame-check-ignored` exit 1 ("caught — S1b
+  failed", "changed: 2.jpg, 3.jpg, 4.jpg"). `spec_index_proof.py` 222/222 after §7.4's new row.
+  Not run, by the spec: `log_proof.py --variant` and `precision_proof.py --mutant reverse-*` (their
+  anchor text is unchanged, only the file; the runs are long).
+- **The gate:** `make gate` once, after the last toll: PASS, 437 s (names 0.6 s, typecheck 7.0 s,
+  fmt 3.2 s, lint 14.3 s, test 251.2 s, app 160.3 s, from `build/gate/times.tsv`), D25 and D26 ok.
+- **Release drive (T15c):** `proof_app.py launch --app release`, then `get_project` over its
+  socket answered a `ToolError` ("No project is open. Call open_project or new_project first."):
+  the answer crossed the FFI through `ReelAgentSocket.answer`. `grep "Frame Job: "` over its log
+  printed nothing; the instance was stopped by its pid.
+- **Documents:** `app-file-history.md`'s entries for `ProjectSnapshot.swift`, `ReelCore.swift`,
+  `MediaImporter.swift` and `ReverseRenderer.swift`, and a new `FrameRecipe.swift` entry; spec
+  §7.4 (row 5, the snapshot row, `FrameRecipe+Mattes.swift`, `writeTiles`; 80 → 81 lines) and
+  its index's Lines cell; the stale `MediaImporter.swift:19` ("lives in `ReelCore.swift`" →
+  `MediaDescriptor.swift`), `framejob_core.h:5` and `ReelOps.swift`'s two "only file" doc lines.
+- **Owed:** `app/CLAUDE.md`'s map entries (the integrator applies them). The road map's
+  acceptance line asks for `make gate` after each toll; the lane rules ask for it once, with
+  `make typecheck` per toll, which is what ran.
+
 #### Every spike, with its rule
 
 Each rule is fixed here before its run (CJ-7). Instruments go in `tools/proof/creator_spike/` (CJ,
