@@ -1098,6 +1098,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (the frame watch, the camera take, `launchScreen`) took it from 357, after CR3-0 had moved
   `stop(completion:)` out. The next seam: `captureStarted(_:error:at:)` and `failStart(_:)` out
   whole to `ScreenRecorder+Started.swift`, a pure move gated alone.
+  Road map creator-jobs CU0a's U2 paid it: lines 341–398 at `822973cd` (`captureStarted`
+  through `failStart`'s closing brace, with `failStart`'s doc) moved byte for byte into
+  `extension ScreenRecorder` in `ScreenRecorder+Started.swift` with `import AppKit` and `import
+  ScreenCaptureKit`, and the blank line before them (340) went too; a pure move gated alone.
+  Nothing widened: neither method reads a `private` member, and `refuse` stays in the class,
+  `private`. The header doc's file list names `+Started.swift`. No anchor named the range;
+  `recording_probe.py`'s 10f now reads `+Started.swift` among the tool side's `ScreenRecorder*`
+  files and finds none of its three tokens there. `wc -l app/Sources/ScreenRecorder.swift`: 399
+  before, 341 after; `ScreenRecorder+Started.swift` is 68. No next seam is named.
 - `CameraCapture.swift`: at 399 since camera-recording CR2b (the shared session queue, the
   preview layer, `stop(completion:)`), after CR2-0 had moved the warm-up's rule to
   `CameraCapture+WarmUp.swift` (399 → 364). The next seam: `// MARK: - Stopping`
@@ -1107,6 +1116,42 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   (`RecordingGrant`) to `RecordingGrant.swift`. The System Settings pane URLs are
   `RecordingGrant`'s, so `recording_probe.py`'s 10f, which holds them to `RecordingSetup.swift`,
   is re-aimed in the same move.
+  Road map creator-jobs CU0a's U1 paid it, at 398 lines by then: lines 249–398 at `822973cd`
+  (`// MARK: - The grants` through `RecordingGrant`'s closing brace) moved byte for byte to
+  `RecordingGrant.swift` with `import AVFoundation` and `import AppKit`, and the blank line
+  before them (248) went too; a pure move gated alone, nothing widened. The header doc's "and
+  the two grants it stands on" became a pointer to `RecordingGrant.swift`, and
+  `RecordingSetup+Camera.swift`'s doc names it as the one file a System Settings URL is spelled
+  in; its `extension RecordingGrant` is unchanged. `recording_probe.py`'s 10f check
+  (`holders == ["RecordingGrant.swift"]`) and the anchors of `ask-every-press`,
+  `open-first-press`, `shell-opens`, `mic-denied-asks` and `panes-swapped` moved to the new file,
+  where each occurs once and none in `RecordingSetup.swift`; `excludes` stays there, once.
+  `wc -l app/Sources/RecordingSetup.swift`: 398 before, 248 after; `RecordingGrant.swift` is
+  159. No next seam is named.
+- `RecorderPanelController+Rows.swift`: at 395. Road map creator-jobs CU0a's U3 cut it: lines
+  271–394 at `822973cd` (`// MARK: - The choice, persisted and restored` through
+  `refreshSizeNote`'s closing brace: `currentChoice`, `persistChoices`, `restoreChoices`,
+  `refreshSizeNote`) moved byte for byte into `extension RecorderPanelController` in
+  `RecorderPanelController+Choices.swift` with the source's three imports, and the blank line
+  before them (270) went too; a pure move gated alone, nothing widened. The header docs of
+  `+Rows.swift` and `RecorderPanelController.swift` name `+Choices.swift` for the choice. The
+  anchors of `camera_recording_probe.py`'s `camera-row-persisted`, `format-unpersisted`,
+  `beside-choice-dropped` and `beside-unpersisted`, `audio_ap6c_probe.py`'s M1 and M2 and
+  `recording_probe.py`'s `choice-drops-include` and `persist-drops-include` moved to the new
+  file, where each occurs once and none in `+Rows.swift`; `sync-while-recording`, 5h's read and
+  `hot_plug_source_row` (`rebuildMicrophones`) stay on `+Rows.swift`. `wc -l
+  app/Sources/RecorderPanelController+Rows.swift`: 395 before, 270 after;
+  `RecorderPanelController+Choices.swift` is 135. No next seam is named.
+- `AgentCatalog+Recording.swift`: at 390. Road map creator-jobs CU0a's U4 cut it:
+  `record_screen`'s properties literal, its entries at lines 261–386 at `822973cd` (`"seconds"`
+  through `"path"`), moved into `AgentCatalog+RecordingArguments.swift` as `extension AgentServer
+  { func recordScreenArguments() -> [String: Any] }`, each line dedented by 8 spaces, and the
+  enclosing `[` (260) and `], required: ["seconds"]),` (387) became one call,
+  `recordScreenArguments(), required: ["seconds"]),`; a pure move gated alone, nothing widened.
+  The header doc names the new file. No anchor named the range; the Debug app's
+  `agent-catalog.json` parsed equal before and after. `wc -l
+  app/Sources/AgentCatalog+Recording.swift`: 390 before, 264 after;
+  `AgentCatalog+RecordingArguments.swift` is 141. No next seam is named.
 - `ExportWebMWriter.swift`: at 400, the new-module cap, since codec-export C4, so C5 paid toll
   T2 before taking the alpha row's shape guard, a pure move gated alone (`make typecheck`, its
   four baseline warnings): `// MARK: - The audio pump` (`pumpAudio` and its doc) went whole to

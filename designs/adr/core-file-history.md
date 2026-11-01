@@ -355,6 +355,23 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   Its widenings: the four builders `req`, `opt`, `within` and `op` became `pub(crate)`, because
   the rows call them; `names()` stays private. `wc -l core/src/op_table.rs`: 374 before, 238
   after; `op_rows.rs` is 148. An op's row is added in `op_rows.rs`. No further seam is named.
+- `actions_clamp.rs`: at 405 before road map "creator-jobs" bet 2, it paid CU0a's toll U5, a
+  pure move gated alone (`cargo fmt --check`, `cargo test --release --test wheels --test curves
+  --test hue_curves --test curve_blend --test qualifier --test qualifier_blur --test
+  evaluate_bounds`, `make lint`): lines 169–272 at `822973cd` (`clamp_wheels` through
+  `clamp_level`, with their docs: `clamp_wheels`, `clamp_curves`, `clamp_points`,
+  `clamp_qualifier`, `clamp_hue`, `clamp_level`) went whole to the new `actions_clamp_grade.rs`
+  under a module doc, with the `model` items only they name, and the blank line after them (273)
+  went too; `actions_clamp.rs` imports `clamp_curves`, `clamp_qualifier` and `clamp_wheels` back
+  (`clamp_video` calls them), `actions_curves.rs` imports `clamp_curves` from the new module, and
+  `lib.rs` gained `mod actions_clamp_grade;`. Its widenings: `bounded` became `pub(crate)`,
+  because it stays and `clamp_wheels` calls it, and `clamp_wheels` and `clamp_qualifier` became
+  `pub(crate)`, because `clamp_video` stays; `clamp_curves` already was, and `clamp_points`,
+  `clamp_hue` and `clamp_level` stay private. `finite_or` stays private: the moved clamps never
+  call it, though the road map's U5 row said they did. The moved lines differ from the base only
+  in the two widened `fn` lines. `actions_qualifier.rs`', `grade_check.rs`' and `model_grade.rs`'
+  module docs name the new file. `wc -l core/src/actions_clamp.rs`: 405 before, 298 after;
+  `actions_clamp_grade.rs` is 114. No next seam is named.
 
 ## Open items
 

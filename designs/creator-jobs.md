@@ -2071,6 +2071,76 @@ every tool.
 - **Acceptance:** `make gate` after each toll. **Proof rows, mutants, manual checks:** none.
 - **Depends on:** CJ0a. **Lane** B. **Questions:** none (the non-goals and the grant are answered).
 
+#### CU0a's record (2026-11-01)
+
+**Landed.** Lane B, one decisions commit, five toll commits and one documents commit on the
+lane's branch (`worktree-wf_d062fc7a-bc3-11`), base `822973cd`. Nothing a person or an agent
+sees changed. Every range was re-read at the base: U1 (249–398) and U5 (169–272) as the road map
+says; U2 ends at 398 and U3 at 394, not 399 and 395 (those lines are the type's closing brace);
+`RecordingSetup.swift` was 398 lines, not the 396 `app-file-history.md` named.
+
+| Step | Lane commit | What | `wc -l` before → after | New file |
+|---|---|---|---|---|
+| Decisions | `d0f0f66f` | CU-1…CU-9 in `creator-jobs.md`; the amendments to `recording.md` (three bullets and the voice-over), CAM-4 (3) and CAM-9 (3); the index's rows and Lines cells | — | — |
+| U1 | `628af05f` | `// MARK: - The grants` (`RecordingGrant`) | `RecordingSetup.swift` 398 → 248 | `RecordingGrant.swift` 159 |
+| U2 | `af9a8502` | `captureStarted`, `failStart` in `extension ScreenRecorder` | `ScreenRecorder.swift` 399 → 341 | `ScreenRecorder+Started.swift` 68 |
+| U3 | `7ed6da44` | `// MARK: - The choice, persisted and restored` (`currentChoice`, `persistChoices`, `restoreChoices`, `refreshSizeNote`) | `RecorderPanelController+Rows.swift` 395 → 270 | `RecorderPanelController+Choices.swift` 135 |
+| U4 | `abf55650` | `record_screen`'s properties literal as `recordScreenArguments()` | `AgentCatalog+Recording.swift` 390 → 264 | `AgentCatalog+RecordingArguments.swift` 141 |
+| U5 | `f1726d50` | `clamp_wheels` … `clamp_level` | `actions_clamp.rs` 405 → 298 | `actions_clamp_grade.rs` 114 |
+
+- **Pure moves:** each moved range diffed against `git show 822973cd:<old file>`: U1, U2 and
+  U3 identical; U4 identical once the old side lost 8 leading spaces; U5 different only in the
+  two widened `fn` lines. Each old file's kept lines diffed identical too, but for its header
+  doc and U5's `bounded` line. Widened, and nothing else: `bounded` (`pub(crate)`),
+  `clamp_wheels` and `clamp_qualifier` (`pub(crate)`, because `clamp_video` stays). U2 widened
+  nothing; `refuse` stays `private` in the class.
+- **Docs the moves made false:** `RecordingSetup.swift`'s header (the grants →
+  `RecordingGrant.swift`), `RecordingSetup+Camera.swift`'s pane-URL sentence,
+  `ScreenRecorder.swift`'s file list (`+Started.swift`), `+Rows.swift`'s header and
+  `RecorderPanelController.swift`'s ("`+Choices.swift` turns them into a `RecordingChoice` and
+  back"), `AgentCatalog+Recording.swift`'s header, `actions_clamp.rs`'s module doc, and
+  `actions_qualifier.rs`', `grade_check.rs`' and `model_grade.rs`' module docs.
+- **Anchors re-aimed:** `recording_probe.py`'s 10f (`holders == ["RecordingGrant.swift"]`) and
+  `ask-every-press`, `open-first-press`, `shell-opens`, `mic-denied-asks` and `panes-swapped` →
+  `RecordingGrant.swift`; `choice-drops-include` and `persist-drops-include` →
+  `+Choices.swift`, with their docstring lines; `camera_recording_probe.py`'s
+  `camera-row-persisted`, `format-unpersisted`, `beside-choice-dropped` and
+  `beside-unpersisted` and `audio_ap6c_probe.py`'s M1 and M2 → `+Choices.swift`;
+  `tools/proof/README.md`'s size-note line → `+Choices.swift`. A scratch script over the three
+  probes' `MUTANTS`, after U1 and after U3: 15 anchors, each once in its named file, each
+  re-aimed one 0 times in the file it left, and `excludes` and `sync-while-recording` 0 times
+  in the new files; 15/15 both times.
+- **Typecheck:** `make typecheck` before each of U1–U4: exit 0, 0 errors, the 4 baseline
+  warnings each time.
+- **Probe runs:** `recording_probe.py --only grants,exclusion` 94/94 at U1 and at U3, `--only
+  grants` 67/67 at U2 (10f with `+Started.swift` on the tool side); `--mutant panes-swapped
+  --only grants` exit 1 (61/67); `--mutant persist-drops-include --only exclusion` exit 1
+  (26/28); `audio_ap6c_probe.py` 5/5; `camera_recording_probe.py --only panel` 28/28, none
+  skipped.
+- **U4's catalog:** `make app-debug` before and after U4; `agent-catalog.json` parsed equal
+  (exit 0). The bytes differ (`cmp` at char 29), a dictionary's key order.
+- **U5:** `cargo fmt --check` exit 0; `cargo test --release --test wheels --test curves --test
+  hue_curves --test curve_blend --test qualifier --test qualifier_blur --test evaluate_bounds`
+  60 passed, 0 failed; `make lint` exit 0.
+- **Spec index:** `spec_index_proof.py` 222/222 after the decisions commit and after the
+  documents.
+- **The gate:** `make gate` once, after U5 and the documents, before this record was
+  written: PASS 495 s (names 3.0 s, typecheck 7.7 s, fmt 3.1 s, lint 1.0 s, test 306.5 s,
+  app 169.8 s, from `build/gate/times.tsv`), D25 and D26 ok. `name_residue.py` was re-run
+  over the record, exit 0.
+- **Documents:** `app-file-history.md`'s `RecordingSetup.swift` and `ScreenRecorder.swift`
+  entries and new `RecorderPanelController+Rows.swift` and `AgentCatalog+Recording.swift`
+  entries; `core-file-history.md`'s new `actions_clamp.rs` entry; spec §7.4's rows 73 and 75
+  (81 lines, unchanged), §7.10's `actions_clamp_grade.rs` row and rows 26 and 65 (132 → 133)
+  and its index's Lines cell.
+- **Deviations:** the road map's acceptance line asks for `make gate` after each toll; the lane
+  rules ask for it once, with each toll's narrow checks, as in CJ0b–CJ0d. The road map's U5 row
+  says the moved clamps call `finite_or`; they do not, so `finite_or` stays private. U2's and
+  U3's corrected ends are above. `RecorderPanelController.swift`'s header doc, outside the
+  spec's file list, was edited because U3 made its sentence false.
+
+**Owed.** Nothing: no proof rows, mutants or manual checks, and nothing to file.
+
 ### CJ2a — the analysis lane, its store and reader, and `shots`
 
 - **What a person gets:** nothing visible yet. An agent gets `get_media_analysis` with the `shots`
