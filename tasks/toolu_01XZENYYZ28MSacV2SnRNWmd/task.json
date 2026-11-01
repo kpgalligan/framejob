@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01XZENYYZ28MSacV2SnRNWmd",
+  "agent_id": "ae994ec5467d1b54c",
+  "subagent_type": "lc-reviewer",
+  "task_description": "CJ0a review",
+  "token_usage": {
+    "input_tokens": 46,
+    "cache_creation_tokens": 120867,
+    "cache_read_tokens": 1833764,
+    "output_tokens": 12377,
+    "api_call_count": 23
+  },
+  "started_at": "2026-11-01T10:22:04.940795-05:00",
+  "completed_at": "2026-11-01T10:24:20.381902-05:00"
+}
