@@ -323,6 +323,16 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   lines and one line pointing there. `wc -l core/src/format.rs`: 598 before, 250 after;
   `format_history.rs` 352, then 359 with AP10's version-35 paragraph. A bump adds its paragraph
   to `format_history.rs`; `format.rs` takes only the number.
+- `op_table.rs`: at 374 of its 400 before road map "creator-jobs", whose bets each add op rows,
+  it paid CJ0b's toll T1, a pure move gated alone (`cargo fmt --check`, `cargo test --release`,
+  `make lint`): `OP_TABLE` (its doc and `#[rustfmt::skip]`), `OP_NAMES` (its doc) and `names()`
+  went whole to the new `op_rows.rs` under a module doc, with the two `use` lines only the rows
+  name (`CANVAS_MIN`/`CANVAS_MAX`, `GRAPHIC_MIN_SIDE`/`GRAPHIC_MAX_SIDE`), re-exported by
+  `op_table.rs` (`pub use crate::op_rows::{OP_NAMES, OP_TABLE}`), so every `op_table::` path,
+  `edit.rs`'s `OP_NAMES` and `framejob_core::OP_NAMES` hold, and `lib.rs` gained `mod op_rows;`.
+  Its widenings: the four builders `req`, `opt`, `within` and `op` became `pub(crate)`, because
+  the rows call them; `names()` stays private. `wc -l core/src/op_table.rs`: 374 before, 238
+  after; `op_rows.rs` is 148. An op's row is added in `op_rows.rs`. No further seam is named.
 
 ## Open items
 

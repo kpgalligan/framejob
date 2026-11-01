@@ -119,6 +119,7 @@ pub mod model_track;
 pub mod model_words;
 pub mod motion;
 pub mod nest;
+mod op_rows;
 pub mod op_schema;
 pub mod op_table;
 pub mod outcome;

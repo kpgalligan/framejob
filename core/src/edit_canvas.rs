@@ -27,7 +27,7 @@ use crate::time::{self, Fps, Ticks};
 /// document and large enough that the compositor has pixels to work with;
 /// the ceiling is past 8K, where a single frame is already 130 MB.
 ///
-/// `pub(crate)` because `op_table.rs` publishes this range as `width`'s and
+/// `pub(crate)` because `op_rows.rs`'s table publishes this range as `width`'s and
 /// `height`'s bound: the published bound is SOURCED from the constant the
 /// refusal below is written against, never retyped beside it.
 pub(crate) const CANVAS_MIN: u32 = 16;
