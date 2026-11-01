@@ -1175,6 +1175,8 @@ tsc silent. `make gate`: names, typecheck, fmt, lint, test and app each `pass`, 
 the four baseline warnings, the `timeRange` one in `CompositionBuilder+HeldFrame.swift`; BUILD
 SUCCEEDED through the Write Agent Catalog step's parity check over the merged handlers).
 
+#### CJ0d — the app's tolls T11–T17: snapshots, recipe, core edge, importer, reverse
+
 - **What a person gets:** nothing.
 - **T11–T13** `ProjectSnapshot.swift` (1,454, over), its named shape "a property group's snapshot
   types out, whole": `VideoProps` with its doc (784–895) → `VideoProps.swift`; `// MARK: - Clips`
