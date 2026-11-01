@@ -553,6 +553,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   AppKit`, the blank line after it too, diffed empty against HEAD; nothing widened. 1064 before,
   1001 after; `TrackSnapshot.swift` is 67. No proof anchor moved. The next seam: `// MARK: -
   Canvas` out whole to `CanvasSnapshot.swift` (road map creator-jobs VR7a).
+- `FrameRecipe.swift`: at 417, over its new-file 400, after the mattes and HDR road maps. Road map
+  creator-jobs CJ0d's T14 moved `RecipeLayerMatte` with its doc, `RecipeLayerDissolve` and
+  `RecipeMatteGroup` (213–270) whole to `FrameRecipe+Mattes.swift` with `import AppKit`, the
+  blank line after them too; `RecipeLayer`'s doc stays with it. A pure move gated alone, diffed
+  empty against `git show HEAD:app/Sources/FrameRecipe.swift`; nothing widened, and no proof
+  anchor names the moved lines. `wc -l app/Sources/FrameRecipe.swift`: 417 before, 358 after;
+  `FrameRecipe+Mattes.swift` is 64. The next seam: `RecipeSourceRef` (its doc through its
+  closing brace) out whole to `FrameRecipe+Source.swift`.
 - `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
   `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
   extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,
