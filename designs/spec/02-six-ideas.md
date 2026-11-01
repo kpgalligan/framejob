@@ -21,6 +21,8 @@ Six ideas do most of the work. Frame Job is built on all six.
 6. **A small keyboard vocabulary.** ⌘T split, W/E trim to playhead,
    ⌘⌫ ripple delete, ⇧⌘F freeze frame, M marker, Space/JKL transport.
 
-Left out: everything that only makes sense for a recording
-it made itself (mouse/keyboard/touch callouts, pointer effects), templates,
-publishing to YouTube/Vimeo, the stock-media library.
+Left out at day one: everything that only makes sense for a recording
+Frame Job made itself (callouts, pointer effects), templates, publishing
+to YouTube or Vimeo, and a stock-media library. None of these is
+excluded any longer (§11 CJ-1); graphics brought templates (G-44), and
+road map 'creator-jobs' takes up pointer effects (CU).

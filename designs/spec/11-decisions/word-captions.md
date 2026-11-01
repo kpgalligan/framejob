@@ -114,6 +114,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended 2026-10-22, by TR-5:** the assistant may also choose words to
   CUT by their meaning (a false start) when the person asks, reading them
   through `get_transcript`; no pipeline does.
+  **Amended by TX-70** (2026-11-01): "the Transcript tab's review pass
+  strikes repeated phrases for the person to remove, by comparing
+  spelled words, never by a language model; captions are untouched".
 - **W-10 (the core's sentence) — `set_text` can patch `case`, `words` and
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled

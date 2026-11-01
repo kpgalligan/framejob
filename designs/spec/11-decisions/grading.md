@@ -38,6 +38,7 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   not one of his own ("LUT worked"); T2, T5 and T6 were not run by him, and GRD-1…GRD-6 were not
   reported (they stay standing rows in `docs/manual-checks.md`, with GRD-7…GRD-10 added for T2,
   T5, T6 and other people's feedback).
+  **Noted by CJ-1** (2026-11-01): §1 no longer lists grading as a non-goal.
 - **GR-2 — Tone: nine keys under `video.color`, applied at step 4c behind a uniform flag;
   exposure and white balance in LOCAL linear light.**
   - The keys follow `hue` in this one order everywhere (the JSON, the uniforms, the inspector):

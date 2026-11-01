@@ -15,6 +15,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   clause: "a clip may draw itself from a JavaScript module in its package
   (road map 10); nothing else is scriptable". The user asked for this
   reversal, as road map 3 reversed screen recording.
+  **Amended by CJ-1** (2026-11-01): §1's clause 'nothing else is
+  scriptable' is lifted with the plugin non-goal. A graphic stays a source
+  and nothing else becomes scriptable until a road map decides it in
+  writing.
 - **G-2 — The engine is a separate Rust crate; the core crate keeps its two
   rules** (road map 10 §4, 2026-09-25). QuickJS and resvg live in
   `graphic/`, a crate at the repo root. `framejob-core` depends on it by

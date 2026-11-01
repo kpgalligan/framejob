@@ -38,6 +38,8 @@ series (CAM-3 on), before its code.
   accepted:** a second capture stack (`AVCaptureSession` for a camera) beside ScreenCaptureKit,
   a Camera grant and its entitlement, and a camera's own clock to line up with the screen's and
   the microphone's; CR0 measures each before any of it is built.
+  **Amended by CJ-1** (2026-11-01): 'callouts stay OUT' no longer holds; callouts are allowed, not
+  scheduled.
 
 - **CAM-2 — The camera spike's rule (CR0), fixed before its run.** `tools/proof/camera_spike/`
   measures camera capture alone and beside a running screen recording; `results.json` stores

@@ -51,6 +51,9 @@ in §6).
   the assistant may choose words to cut by their meaning (a false start), reading them through
   `get_transcript`, a clip's words in timeline times that never makes a network call. It
   proposes, then makes ordinary undoable cuts; no pipeline picks words to cut by meaning.
+  **Amended by TX-70** (2026-11-01): "a pipeline may strike words for review by comparing their
+  spelling, order and timing with the phrases beside them; that is not picking words by meaning, and
+  nothing is cut until the person removes the strikes".
 - **AI-7 — What the assistant may not call, and what it must ask about first.** Withheld: the
   dev tools, always (V-1: they are not in Distribution, and the assistant sees one catalog in
   both builds); `record_screen`, always, because recording is a person at the Record button;

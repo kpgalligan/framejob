@@ -62,6 +62,11 @@ TR-11.
     pipeline does it (W-9, AI-6); the assistant may, when the person asks (TR-5).
   - Risk accepted: a filler the vocabulary does not spell, or one the engine did not report, is
     not offered; a false start is never offered without a conversation.
+
+  **Amended by TX-70** (2026-11-01): "a false start that repeats words — a restart, or a line said
+  again — is found by TX-70's comparison of spelled words and offered struck for review; one that
+  repeats no words is found only by reading what was meant, so no pipeline does it (W-9, AI-6); the
+  assistant may, when the person asks (TR-5)".
 - **TR-4 — Remove Filler Words… is shaped like Remove Silences: a sheet, a candidate wash on the
   timeline, one `ripple_delete_ranges` undo step, and its own read-half MCP tool,
   `detect_fillers`.** The owner's decision 2, its first sub-point.

@@ -99,14 +99,22 @@ nothing of Concat is opened, at design time or build time.
 - **GR-27 — An Offset wheel is not wanted: #266 closed.** Choice 4a. Its master is Color's
   Brightness, Temperature and Tint already shift every level, and a fourth disc squeezes the row
   past the master field at the 280 pt pane.
+  **Amended by CJ-1** (2026-11-01): no longer excluded by §1; not built. This was the owner's
+  verdict, so a road map that would build it asks the owner first.
 - **GR-28 — A qualifier on picture clips is not wanted: #269 closed.** Choice 7a. A clip holds
   one grade, so a qualifier there would limit its only grade; Insert ▸ Adjustment Clip is the
   secondary.
+  **Amended by CJ-1** (2026-11-01): no longer excluded by §1; not built. This was the owner's
+  verdict, so a road map that would build it asks the owner first.
 - **GR-29 — 1,024-level scopes are not wanted: #273 closed.** Choice 10a. About 2.5 levels per
   drawn pixel, the 16-bit-float compositor never quantizes a grade, and `render_frame`'s PNG is
   already 16-bit for a deep source (PR-4).
+  **Amended by CJ-1** (2026-11-01): no longer excluded by §1; not built. This was the owner's
+  verdict, so a road map that would build it asks the owner first.
 - **GR-30 — A histogram behind the curve plot is not wanted: #270's first item closed.** Choice
   8a. The tap sees the frame after the curve, so it moves as the curve is dragged.
+  **Amended by CJ-1** (2026-11-01): no longer excluded by §1; not built. This was the owner's
+  verdict, so a road map that would build it asks the owner first.
 - **GR-31 — The vectorscope zoom: ×1, ×2 and ×4 per slot, counted at the zoom, off-plot pixels
   not counted, the targets as rim ticks, three corner cells and `render_frame
   {vectorscope_zoom}`.** Recorded in T4-1 before its code; it settles GR-24's T4-1 item to the

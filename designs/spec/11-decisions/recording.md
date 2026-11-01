@@ -13,6 +13,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   — a camera alone or beside a screen recording, each its own file and
   track, through this recorder's panel (`camera-recording.md`); callouts
   stay OUT.
+  **Amended by CJ-1** (2026-11-01): callouts, and reconstructing
+  afterwards what the recorder saw, are no longer out; they are allowed,
+  not scheduled, and CU's phases record what they build. 'A recording is
+  ordinary media' (the next bullet) stands until CU-2. **Amended by
+  CJ-4**: the recorder panel may ask for Input Monitoring, opt-in.
 - **A recording is ordinary media.** The recorder writes a file and the app
   imports it through exactly the path File ▸ Open and Add Media… use
   (`adoptImported`, the two-try placement). The model learns nothing: no

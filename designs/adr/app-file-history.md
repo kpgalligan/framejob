@@ -53,7 +53,9 @@ lenient-decoding rule.
 - **Any addition to `ReelCore.swift` pays for itself first with a pure move of a type that names
   no `rc_*` symbol.** The precedents are `RecipeSource.swift`, `TextPatch.swift` and
   `MediaDescriptor.swift`. The file is far over the cap (orig "ReelCore.swift toll", "graphics
-  wrappers").
+  wrappers"). **Superseded by spec §11 CJ-8 (l)** (2026-11-01): `ReelCore.swift` and its
+  `ReelCore+<Area>.swift` files may call `rc_*`, and a new wrapper goes in the file of its area
+  instead of paying for room here.
 
 ### Motion (E2)
 
@@ -740,7 +742,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   app/Sources/ReelCore.swift`: 768 before, 752 after; `ReelGraphicPackage.read` then took it to
   763, within its 768. The next seam: the file header's three conventions carried from
   Rasterize (lines 17–25), which the root `CLAUDE.md`'s "FFI contract" already states in part,
-  cut to its contracts — a doc-only cut; nothing `rc_*`-free is left to move.
+  cut to its contracts — a doc-only cut; nothing `rc_*`-free is left to move. The next seam (CJ-8
+  (l), 2026-11-01): CJ0d's T15 split — the media-file wrappers and the graphics wrappers out whole
+  to `ReelCore+MediaFiles.swift` and `ReelCore+Graphics.swift`.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

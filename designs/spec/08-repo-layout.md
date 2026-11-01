@@ -53,7 +53,7 @@ and both `CLAUDE.md` files under `core/` and `app/`.
 
 Rules carried over verbatim: pure ops, which here answer three arms rather
 than Rasterize's `Option` (§5.5); the three-file lockstep (`ffi_*.rs` →
-header → `ReelCore.swift`)
+header → a ReelCore file, §11 CJ-8 (l))
 — with JSON ops the header changes rarely, but the op table in `edit.rs`
 and the builders in `ReelCore.swift` still move together; every export
 `catch_unwind` + NULL-tolerant + `err_out`; no panics on any input; the

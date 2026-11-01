@@ -14,7 +14,9 @@ detail there.
 ## File map
 
 **The core's edge.**
-- `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
+- `ReelCore.swift` — with its `ReelCore+<Area>.swift` files, the only files
+  that call `rc_*` (spec §11 CJ-8 (l)); a new wrapper goes in the file of its
+  area. `ReelCore.swift` holds `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them; so is `sourceMap(_:)`, `rc_project_source_map` decoded and checked

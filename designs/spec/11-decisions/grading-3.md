@@ -471,6 +471,8 @@ opened, at design time or build time.
   out-of-709 colours are lost, which is right for a Rec. 709 output. Wide gamut comes only as
   Rec. 2020 inside GR-19's HDR timeline. This settles, for SDR projects, the wide gamut PR-5
   deferred, without editing PR-5's list.
+  **Amended by CJ-1** (2026-11-01): no longer excluded by §1; not built. This was the owner's
+  verdict, so a road map that would build it asks the owner first.
 - **GR-21 — A converting media's thumbnails are drawn through step 0** (#282; amends GR-15
   and GR-16). Owner, 2026-10-12: HLG and PQ included, SDR wide gamut not.
   - The cache pass renders a video media whose Camera Log converts, or whose video track's

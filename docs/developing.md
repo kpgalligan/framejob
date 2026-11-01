@@ -130,7 +130,8 @@ the compositor or the builder, never in a second rendering path.
 **The FFI contract.** `core/include/framejob_core.h` is a hand-maintained C
 header and the single contract between the two worlds. It is three files in
 lockstep: a Rust `#[no_mangle]` export, its entry in the header, and its
-wrapper in `app/Sources/ReelCore.swift`, the only Swift file that calls `rc_*`.
+wrapper in `app/Sources/ReelCore.swift` and its `ReelCore+<Area>.swift` files, the only files
+that call `rc_*` (spec §11 CJ-8 (l)); a new wrapper goes in the file of its area.
 
 - A project handle is **immutable**. Every edit is pure and returns a new
   handle, so undo is a stack of handles and publishing a handle to the

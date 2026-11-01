@@ -9,6 +9,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   compositor draws. There is no package format, no user shader, no
   expression language — which is why neither road map 5 phase adds a Metal
   pipeline.
+  **Noted by CJ-1** (2026-11-01): the plugin non-goal is lifted; effects
+  stay closed vocabularies until a road map amends this entry.
 - **R5-2 — A transition's sound is a constant-power crossfade, on by
   default for NEW transitions and absent from old files.** The overlap a
   person adds a transition at is two different moments — a Remove Silences

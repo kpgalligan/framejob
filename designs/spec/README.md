@@ -8,7 +8,7 @@ through [`11-decisions/README.md`](11-decisions/README.md).
 **Never read the whole spec.** Read this index, then only the file for the section you need.
 For a decision, look its ID up in `11-decisions/README.md`, or grep this directory
 (`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
-lettered files that keep its number (§4.3 is `04.3a`, `04.3b` and `04.3c`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b` and `06c`, §7.5 is `07.5a` and `07.5b`, §7.9 is `07.9a`, `07.9b`, `07.9c` and `07.9d`);
+lettered files that keep its number (§4.3 is `04.3a`, `04.3b`, `04.3c` and `04.3d`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b` and `06c`, §7.5 is `07.5a` and `07.5b`, §7.9 is `07.9a`, `07.9b`, `07.9c`, `07.9d` and `07.9e`);
 a citation of the bare number names them together, and this index gets their rows in the same
 change. Until #342 (2026-10-24) §4.3b was the Media, Document and Assistant tabs, now §4.3c; an older citation of §4.3b (in `archive/` or git history) means §4.3c.
 
@@ -17,15 +17,16 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 
 | File | Lines | Read it for |
 |---|---|---|
-| [`01-what-this-is.md`](01-what-this-is.md) | 47 | The product in one page, its opening flow, and its non-goals. |
-| [`02-six-ideas.md`](02-six-ideas.md) | 26 | The six ideas the model is built on, and why it stays simple. |
+| [`01-what-this-is.md`](01-what-this-is.md) | 34 | The product in one page, its opening flow, and the scope it no longer limits (§11 CJ-1). |
+| [`02-six-ideas.md`](02-six-ideas.md) | 28 | The six ideas the model is built on, and why it stays simple. |
 | [`03-window-layout.md`](03-window-layout.md) | 71 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 171 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 141 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
-| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 520 | The Clip tab's sections: every video, audio, text and shape section. |
+| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 277 | The Clip tab's sections: every video section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 228 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
+| [`04.3d-inspector-clip-sections-audio-text-shape.md`](04.3d-inspector-clip-sections-audio-text-shape.md) | 246 | The Clip tab's audio, text and shape sections (continues §4.3b). |
 | [`04.4-timeline.md`](04.4-timeline.md) | 275 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
@@ -41,7 +42,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 239 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
-| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 196 | The `rc_*` exports and their contracts. |
+| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 197 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 306 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 80 | The spec's Swift file map (app/CLAUDE.md is the live one). |
@@ -50,15 +51,16 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 57 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 243 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 761 | Export: writers, formats, stems, loudness, the queue, the wait for ramp audio, isolated voice and voice effects. |
-| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 550 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding. |
+| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 97 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, lenient decoding (`set_media_color`, `set_media_speech` and `set_audio`'s `duck.mode` are in §7.9e). |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 160 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 393 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`, `loudness_meter`, `land_recording`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 57 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, `enhance` (Enhance Voice after the landing), and its answer. |
+| [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 457 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 128 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 228 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 16638 in 34 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 16911 in 35 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

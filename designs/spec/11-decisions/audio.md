@@ -58,6 +58,9 @@ parallel lanes never claim one ID; AP0's are AU-2…AU-9.
   speed-ramp audio. Out, under §1's plugin system: hosting third-party Audio Unit plug-ins (the
   survey's C5). Tier C of the survey is not in the road map; it is neither in nor out until the
   owner asks.
+  **Amended by CJ-1** (2026-11-01): §1's clause keeping third-party Audio Unit hosting out is
+  lifted. The decision stands as current design: none is hosted, and a road map that would host one
+  amends this entry first.
 - **AU-3 — Live stages are Frame Job's own DSP in the tap, in one fixed order; Apple's units
   only where Frame Job cannot write its own (owner, 2026-10-30, choices 4 and 5).** EQ and the
   high-pass, the hum notch, the gate/expander, the de-esser and the limiter are written beside

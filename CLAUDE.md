@@ -181,7 +181,9 @@ no `rc_*` export wraps them (spec §11 CX-4).
 - `core/include/framejob_core.h` is a **hand-maintained** C header, the single
   contract between the worlds. **The FFI is three files in lockstep**: a Rust
   `#[no_mangle]` export, its entry in the header, and its wrapper in
-  `app/Sources/ReelCore.swift` — **the only file that calls `rc_*`**.
+  `app/Sources/ReelCore.swift` and its `ReelCore+<Area>.swift` files, **the
+  only files that call `rc_*`** (spec §11 CJ-8 (l)); a new wrapper goes in
+  the file of its area.
 - A handle is an immutable project. **Every edit is pure and answers one of
   three arms** (`core/src/outcome.rs`, spec §5.5): applied with the new
   project, an identity, or refused in the rule's own sentence. Only the first
@@ -220,7 +222,7 @@ else is what bloats files:
    `schema_vN.rs`; a new `core/tests/*.rs`. A field lands in the same phase as
    the thing that renders it.
 2. **FFI**, only when a new `rc_*` export is needed: Rust → header →
-   `ReelCore.swift`.
+   the ReelCore file of its area.
 3. **Swift:** the typed builder in `ReelOps.swift`; a small value or model
    file; an `EditorViewController+<Feature>.swift` with its validator arm; an
    inspector section REGISTERED in `ClipPane.makeSections()`; a menu item in
