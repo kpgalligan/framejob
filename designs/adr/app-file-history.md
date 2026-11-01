@@ -548,7 +548,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   1454 before, 1176 after; `ClipSnapshot.swift` is 283. No proof anchor moved. T11: `VideoProps`
   with its doc (784–894) went whole to `VideoProps.swift` with `import AppKit`, the blank line
   after it too, diffed empty against HEAD; nothing widened. 1176 before, 1064 after;
-  `VideoProps.swift` is 116. No proof anchor moved.
+  `VideoProps.swift` is 116. No proof anchor moved. T13: `// MARK: - Tracks` through
+  `TrackSnapshot`'s closing brace (443–504) went whole to `TrackSnapshot.swift` with `import
+  AppKit`, the blank line after it too, diffed empty against HEAD; nothing widened. 1064 before,
+  1001 after; `TrackSnapshot.swift` is 67. No proof anchor moved. The next seam: `// MARK: -
+  Canvas` out whole to `CanvasSnapshot.swift` (road map creator-jobs VR7a).
 - `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
   `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
   extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,
