@@ -621,6 +621,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "ripple_delete_ranges",
                "ranges": [[1200000, 1800000], [2400000, 3000000]]}),
         json!({"op": "lift_range", "from": 1200000, "to": 2400000}),
+        json!({"op": "keep_range", "from": 3000000, "to": 6000000}),
         json!({"op": "insert_time", "at": 0, "length": 600000}),
         json!({"op": "close_gap", "track": 6, "at": 3600000}),
         json!({"op": "set_speed", "clip": 10, "rate": 2.0}),

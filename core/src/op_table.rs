@@ -89,7 +89,7 @@ pub use crate::op_rows::{OP_NAMES, OP_TABLE};
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 64;
+pub const OP_COUNT: usize = 65;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.

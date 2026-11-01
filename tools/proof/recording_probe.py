@@ -8756,6 +8756,10 @@ FILE_GROUP_ORDER = [
     "render_frame", "export",
     "export_status", "cancel_export",
 ]
+# The core's ops with no tool, by design (spec §11 CJ-50; the list is
+# AgentServer.opsWithoutTools): `keep_range` is applied only to a derived
+# document, so the catalog is the ops less these plus the app-state tools.
+OPS_WITHOUT_TOOLS = {"keep_range"}
 RECORD_SCREEN_ARGUMENTS = [
     "camera", "camera_format", "display", "enhance", "include_framejob_windows", "microphone", "path",
     "place", "project", "rate", "seconds", "show_clicks", "size", "source", "system_audio", "window",
@@ -8783,8 +8787,9 @@ def section_catalog(binary, sources):
     check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
     check("7a: they are the 55 ops plus the forty app-state tools, record_screen among them",
-          set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
-          f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
+          set(names) == (set(ops) - OPS_WITHOUT_TOOLS) | set(APP_STATE_TOOLS),
+          f"missing {sorted(((set(ops) - OPS_WITHOUT_TOOLS) | set(APP_STATE_TOOLS)) - set(names))}, "
+          f"extra {sorted(set(names) - (set(ops) - OPS_WITHOUT_TOOLS) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
           f"{sorted(set(APP_STATE_TOOLS) & set(ops))}")
     last = len(FILE_GROUP_ORDER) + 1
@@ -8796,7 +8801,8 @@ def section_catalog(binary, sources):
           "of the fifteen appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-last]),
           f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-last]))}")
     by = {t.get("name"): t for t in tools}
-    without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
+    without = [n for n in sorted(set(ops) - OPS_WITHOUT_TOOLS)
+               if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
     with_scope = [n for n in APP_STATE_TOOLS if (by.get(n) or {}).get("hasScope")]
     check("7c: none of the forty app-state tools declares it", not with_scope, f"with: {with_scope}")

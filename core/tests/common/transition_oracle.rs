@@ -295,27 +295,22 @@ fn inexact_seven_fps_grid_matches_the_enumerated_path() {
 
 fn valid_shift(project: &Value, shift: i64) -> bool {
     let cut = 40 * FRAME;
-    let clips = project["clips"].as_array().unwrap();
-    for a in clips {
-        for b in clips {
-            if a["id"] == b["id"] || a["track"] != b["track"] {
-                continue;
-            }
-            let track = a["track"].as_u64().unwrap();
-            if track == 4 {
-                continue;
-            } // locked track is outside the shift set
-            let a_start = int(a, "/start") - if int(a, "/start") >= cut { shift } else { 0 };
-            let b_start = int(b, "/start") - if int(b, "/start") >= cut { shift } else { 0 };
-            let a_len = int(a, "/duration");
-            let b_len = int(b, "/duration");
-            let overlap = (a_start + a_len).min(b_start + b_len) - a_start.max(b_start);
-            if overlap > a_len.min(b_len) / 2 {
-                return false;
-            }
-        }
-    }
-    true
+    let mut shifted = project.clone();
+    let clips: Vec<Value> = project["clips"]
+        .as_array()
+        .unwrap()
+        .iter()
+        // The locked track is outside the shift set, and outside the check.
+        .filter(|clip| clip["track"].as_u64().unwrap() != 4)
+        .map(|clip| {
+            let mut moved = clip.clone();
+            let start = int(clip, "/start");
+            moved["start"] = json!(start - if start >= cut { shift } else { 0 });
+            moved
+        })
+        .collect();
+    shifted["clips"] = Value::Array(clips);
+    super::overlap_oracle::overlap_rule_holds(&shifted)
 }
 
 #[test]

@@ -147,7 +147,10 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
 PRODUCT_TOOLS = 106
-OPS = 64
+OPS = 65
+# The core's ops with no tool, by design: AgentServer.opsWithoutTools
+# (`keep_range`, spec §11 CJ-50, applied only to a derived document).
+OPS_WITHOUT_TOOLS = {"keep_range"}
 PARITY = "Frame Job: "
 
 passed = 0
@@ -542,16 +545,19 @@ def main():
         check("…and they sit together, in dev_tools.py's order, immediately before "
               "import_media, where devTools() splices them",
               block == DEV_TOOLS + ["import_media"], f"{block}")
-    check(f"the core declares {OPS} ops and every one of them is a tool",
-          len(ops) == OPS and ops <= set(tools),
-          f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
+    check(f"the core declares {OPS} ops and every one of them but "
+          f"{sorted(OPS_WITHOUT_TOOLS)} is a tool",
+          len(ops) == OPS and ops - OPS_WITHOUT_TOOLS <= set(tools)
+          and not OPS_WITHOUT_TOOLS & set(tools),
+          f"{len(ops)} ops, missing tools: {sorted(ops - OPS_WITHOUT_TOOLS - set(tools))}, "
+          f"tools that should not be: {sorted(OPS_WITHOUT_TOOLS & set(tools))}")
     complaints = parity_lines(log)
     check("the startup parity check logged nothing — all five parts, in the binary on the "
           f"socket ({log})", complaints == [],
           "no such log" if complaints is None else json.dumps(complaints)[:300])
 
     print("\n2 — every difference from the core's table is one the declarations list names")
-    group = sorted(ops)
+    group = sorted(ops - OPS_WITHOUT_TOOLS)
     # The arguments a `filledByTheApp` row takes out of a tool (road map 10
     # G3b: the two graphic ops' `schema`, which the app reads from the
     # module): the core publishes them and the tool deliberately does not.
@@ -962,7 +968,8 @@ def main():
         if fragment.get("type") == "object" and "properties" not in fragment)
     check(f"the core publishes {len(doors)} arguments as an opaque object a tool takes — a "
           "caller's own patch, which deepening D1 made the core the one validator of",
-          len(doors) == 14, json.dumps(doors))
+          # 14 until format 36's `set_track` `compressor` and `limiter` (AU-150).
+          len(doors) == 16, json.dumps(doors))
     # The two graphic doors reach the core only through a module the
     # untitled project's graphics/ holds (road map 10 G3b: the app reads the
     # schema from it and refuses a module it cannot find). `value_for` names
@@ -1025,8 +1032,9 @@ def main():
     print("\n5 — the twenty tools the core calls no op, which the gate covers the same way")
     others = sorted(set(tools) - ops)
     dev = [name for name in DEV_TOOLS if name in tools]
-    want = PRODUCT_TOOLS - OPS + len(dev)
-    check(f"there are {want} of them ({PRODUCT_TOOLS - OPS} product and {len(dev)} dev)",
+    op_tools = OPS - len(OPS_WITHOUT_TOOLS)
+    want = PRODUCT_TOOLS - op_tools + len(dev)
+    check(f"there are {want} of them ({PRODUCT_TOOLS - op_tools} product and {len(dev)} dev)",
           len(others) == want, json.dumps(others))
     for name in others:
         # A hand-written schema is the only spelling these have, so the list

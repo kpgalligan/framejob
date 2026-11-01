@@ -91,7 +91,7 @@
 //! same times its `clips[]` are written in — not project time. A nest has
 //! no speed, so `t − nest_clip.start` is the whole mapping.
 //!
-//! **Ten ops are an `Err` with a scope**, naming themselves and the nest:
+//! **Eleven ops are an `Err` with a scope**, naming themselves and the nest:
 //! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
 //! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
 //! the parent had when it was made, deliberately, and the rest of a canvas
@@ -100,9 +100,11 @@
 //! `set_media_speech` (a nest
 //! references the parent's `media[]` in the parent's one id space, so a
 //! media edit inside a scope is an edit OUTSIDE it wearing a scope, which is
-//! the one thing a scope exists to prevent), and `add_adjustment_clip` (an adjustment clip
-//! grades what is behind it at the top level only, spec §11 GR-6).
-//! Everything else — all fifty-three — works
+//! the one thing a scope exists to prevent), `add_adjustment_clip` (an adjustment clip
+//! grades what is behind it at the top level only, spec §11 GR-6), and
+//! `keep_range` (it keeps a range of the DOCUMENT's timeline, and is
+//! applied only to a derived document, spec §11 CJ-50).
+//! Everything else — all fifty-four — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -131,6 +133,7 @@
 //! | `ripple_delete_range` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. Every shift (this, `ripple_delete`, `ripple_delete_ranges`, `close_gap`, `insert_time`, `add_transition`'s ripple form) moves each moved clip's linked partner on an unlocked track too, and refuses, nothing moved, when that would take a partner below 0: "clip S would start before 0: it leads its linked clip P by N ticks" (AU-91). |
 //! | `ripple_delete_ranges` | Several `[from, to]` pairs as one edit — the silence cut. Each pair is snapped, clamped and ordered as `ripple_delete_range`'s one is, the pairs are then MERGED (touching as well as overlapping) and the survivors cut and closed right to left, so the op is merge-then-cut and not N `ripple_delete_range`s. Markers do not move. An empty list, and one that merges to nothing, change nothing. Refuses as `ripple_delete_range` does when a shift would take a linked partner below 0. |
 //! | `lift_range` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. |
+//! | `keep_range` | The project as `[from, to)` of its top-level timeline, moved to start at 0 (spec §11 CJ-50, `edit_keep_range.rs`): both bounds snapped and clamped to 0, `to` not after `from` an `Err`; every clip on every track, locked or not, cut at both bounds by `split`'s rules; at an edge inside a transition the piece beyond the edge is dropped and the incoming piece starting at `from` hard-starts (no `transition_in`), the incoming piece kept when both bounds lie in one overlap; clips not wholly inside removed, the rest and the markers inside moved by −`from`, markers outside removed; nests no kept clip reaches and media no kept clip plays, names in a look or converts through removed; tracks and canvas unchanged. Refused: a nest clip across an edge, nothing left to play, and a transition inside the range whose clip an edge cut too short for it. Document-level, with no tool: it is applied to a derived document only (CJ5b). |
 //! | `insert_time` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `close_gap` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. A linked partner of a moved clip moves too, and a partner the shift would take below 0 refuses (AU-91). |
 //! | `set_speed` | Two arms, exactly one given: a `rate`, or a `duration` to fit, which is snapped, held to a frame and turned into `content length / duration` (the current duration keeps the current rate). Both or neither is an `Err`. Either rate is clamped to `SPEED_MIN`–`SPEED_MAX`; then `duration = content length / rate`, snapped NEAREST and held to what the file still holds AT THAT RATE, so the segment plays at exactly `rate` (spec §11, D4-3); actions keep their clip-relative fraction. Above `AUDIO_SPEED_MAX` (×12, both pitch modes) the plan leaves the clip's audio out (spec §11, #190). On a ramped clip one factor f (the clamped rate ÷ `speed`, or D ÷ d), clamped so no rate the clip names passes a limit, scales the base, every end rate and every speed action's span, unclamped into the clip, and the duration is held through S∞ (spec §11 SR-19 (a)–(c)). A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. Refused on a linked clip when its rate would change (AU-94). |
@@ -386,6 +389,10 @@ pub enum Op {
         ranges: Vec<[Ticks; 2]>,
     },
     LiftRange {
+        from: Ticks,
+        to: Ticks,
+    },
+    KeepRange {
         from: Ticks,
         to: Ticks,
     },
@@ -862,6 +869,7 @@ impl Project {
             Op::RippleDeleteRange { from, to } => self.ripple_delete_range(*from, *to),
             Op::RippleDeleteRanges { ranges } => self.ripple_delete_ranges(ranges),
             Op::LiftRange { from, to } => self.lift_range(*from, *to),
+            Op::KeepRange { from, to } => self.keep_range(*from, *to),
             Op::InsertTime { at, length } => self.insert_time(*at, *length),
             Op::CloseGap { track, at } => self.close_gap(*track, *at),
             Op::SetSpeed {

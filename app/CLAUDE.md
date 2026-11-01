@@ -124,7 +124,8 @@ detail there.
   explicit null are opposite intentions there, and only the tool can tell
   them apart.
   `scope` is a member folded into `json`; `documentLevelNames` MIRRORS
-  `scope.rs`'s `refused_inside` (eight names) so one edit can mix a
+  `scope.rs`'s `refused_inside` (ten names: its eleven arms but
+  `add_adjustment_clip`, sent scoped) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
 - `ReelOpSchema.swift` — what an op TAKES, mirroring what

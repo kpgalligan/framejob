@@ -169,7 +169,7 @@ pub(crate) fn read(value: Option<&Value>) -> Result<Option<u32>, String> {
 }
 
 /// The ops with no meaning inside a nest, by name, or `None` for the
-/// fifty-three that work in there unchanged.
+/// fifty-four that work in there unchanged.
 ///
 /// Exhaustive rather than a short list with a `_` arm, and that is the
 /// point of writing it out: an op added by a later phase does not compile
@@ -210,6 +210,10 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         // (spec §11 GR-6): `check_clips` refuses one inside a nest, so the
         // op is refused here before a view is built.
         Op::AddAdjustmentClip { .. } => Some("add_adjustment_clip"),
+
+        // A range kept as a whole project is the DOCUMENT's timeline, edited
+        // only on a derived document (spec §11 CJ-50); a nest has none.
+        Op::KeepRange { .. } => Some("keep_range"),
 
         // A track's dynamics run on the TIMELINE's per-track sub-mixes (spec
         // §11 AU-150): a nest's whole mix passes through the track holding

@@ -64,6 +64,9 @@ import swift_build  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "op-catalog-probe")
+# The core's ops with no tool, by design: AgentServer.opsWithoutTools
+# (`keep_range`, spec §11 CJ-50, applied only to a derived document).
+OPS_WITHOUT_TOOLS = {"keep_range"}
 
 passed = 0
 failed = 0
@@ -273,10 +276,13 @@ def main():
     tools = mcp.schemas()
 
     print("\n1 — the catalog is the core's op list plus the app's own tools")
-    check(f"the core declares {len(ops)} ops and every one of them is a tool",
-          len(ops) == 64 and ops <= set(tools),
-          f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
-    group = sorted(ops)
+    check(f"the core declares {len(ops)} ops and every one of them but "
+          f"{sorted(OPS_WITHOUT_TOOLS)} is a tool",
+          len(ops) == 65 and ops - OPS_WITHOUT_TOOLS <= set(tools)
+          and not OPS_WITHOUT_TOOLS & set(tools),
+          f"{len(ops)} ops, missing tools: {sorted(ops - OPS_WITHOUT_TOOLS - set(tools))}, "
+          f"tools that should not be: {sorted(OPS_WITHOUT_TOOLS & set(tools))}")
+    group = sorted(ops - OPS_WITHOUT_TOOLS)
     envelope = {
         name: [key for key in ("project", "scope")
                if key not in tools[name]["inputSchema"]["properties"]]
@@ -288,7 +294,7 @@ def main():
     stray = sorted(
         name for name, tool in tools.items()
         if name not in ops and "scope" in tool["inputSchema"].get("properties", {}))
-    check(f"no tool the core calls no op has a scope — {len(tools) - len(ops)} app-state "
+    check(f"no tool the core calls no op has a scope — {len(tools) - len(group)} app-state "
           "tools, and the injection is still op-only", not stray, json.dumps(stray))
 
     print("\n2 — every op tool is the core's table plus what is declared")

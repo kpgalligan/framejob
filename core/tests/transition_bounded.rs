@@ -7,6 +7,8 @@ use std::time::{Duration, Instant};
 
 mod common;
 use common::{by_id, int, Handle, Outcome};
+#[path = "common/overlap_oracle.rs"]
+mod overlap_oracle;
 #[path = "common/transition_oracle.rs"]
 mod transition_oracle;
 

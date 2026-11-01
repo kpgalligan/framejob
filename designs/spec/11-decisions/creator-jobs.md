@@ -273,3 +273,53 @@ the rest):
   request and answer. The Swift side is `ReelCursor` in `ReelCore+Cursor.swift` (init, `deinit`,
   `query`, about 30 lines), its typed answers in `CursorValues.swift` (no `rc_*`) (CJ-8 (l)); no
   room is paid.
+
+The phases' decisions, recorded at each phase before its code:
+
+- **CJ-50 — `keep_range {from, to}` answers the project holding only `[from, to)` of its top-level
+  timeline, moved to start at 0, every track passing THE overlap rule, and only what the kept clips
+  play left in `media[]` and `nests[]` (CJ5a, `core/src/edit_keep_range.rs`).** No tool, UI, FFI or
+  format change; CJ5b's `new_project_from_range` is its door.
+  - (a) **Bounds (N2).** `from` and `to` are each snapped to the frame grid and clamped to 0, as
+    every op's ticks are. `to` not after `from` is invalid input, an `Err`: "keep_range's to must be
+    after its from (from F, to T ticks, on the frame grid)". `ordered_range` is not followed: an
+    empty keep is not an identity.
+  - (b) **A nest clip a bound lies strictly inside is refused**, the first in `clips[]` order, at
+    `from` and then at `to`: "Clip N is a nest across the range's edge; a nest clip has no in point,
+    so a cut there would replay it from its start. Move the edge, or open the nest and unnest it."
+    A nest clip exactly at an edge, wholly inside or wholly outside is kept or removed as any clip.
+  - (c) **The cut.** Every top-level clip on ANY track, locked or not (the derived document keeps
+    its locks; the source document is never edited), that `from` lies strictly inside is cut there
+    by `split`'s own cutter (`split_clip`) and its halves paired (`pair_split_halves`); then the same
+    at `to`. A ramp (SR-18 (e)), a timed caption page (W-3) and a linked pair (AU-92) follow
+    `split`'s rules exactly.
+  - (d) **THE overlap rule at the edges (N1)**, judged on the overlaps of the source's tracks. At
+    `from`, an overlap `[os, oe)` with `os ≤ from < oe` drops the outgoing clip's piece that starts
+    at `from`, and the incoming clip's piece starting at `from` loses its `transition_in` (a hard
+    start). At `to`, an overlap with `os < to ≤ oe` drops the incoming clip's piece that ends at
+    `to`, so the outgoing clip ends there — except when that piece starts at `from` (both bounds in
+    one overlap, `os ≤ from < to ≤ oe`): it is the incoming piece the `from` rule kept, and it
+    stays, hard-cut. The edges stay where asked. A dropped piece's linked partner stays unless its
+    own track's rule drops it; `finish`'s `settle_links` clears the dangling link.
+  - (e) **Keep and move.** Every top-level clip not wholly inside `[from, to)`, and every dropped
+    piece, is removed; the rest move by −`from`. Markers with `from ≤ time < to` are kept and moved;
+    the others are removed. Every track is kept, empty or not, with its settings and lock; the
+    canvas is unchanged; `next_id` only advances.
+  - (f) **What a range leaves unused goes.** `nests[]` keeps only the nests the kept top-level clips
+    reach, through nest clips inside kept nests too, so a nest no clip showed in the source goes as
+    well. `media[]` keeps, in order, a media that a clip of the kept timeline or of a kept nest uses
+    as its source, or names in a look (the base look and every action end, `look_media_ids`), or
+    that is a kept media's `color.lut`; every other media goes.
+  - (g) **Refusals after the cut.** No top-level clip left: "Nothing plays between F and T ticks."
+    Then each track of the result passes `check_overlap_rule`; where it fails, the first overlap on
+    that track longer than the half-shorter limit is refused as "Keeping F to T ticks would leave
+    clips A and B overlapping by D ticks, more than half of the shorter piece (L ticks); move an edge
+    further from their transition.", A and B the ids of the SOURCE clips the pieces were cut from
+    (an uncut clip is its own source); with none found, the rule's own sentence. The edge rule (d)
+    repairs only an overlap an edge lies in; a piece left shorter than twice a transition wholly
+    inside the range is refused, never repaired: clips never push each other.
+  - (h) **Document-level, with no tool.** It exits through `finish` (an identity when nothing
+    changed). It is `refused_inside`'s eleventh arm ("keep_range has no meaning inside nest N": it
+    is the document's timeline), `ReelOp.documentLevelNames`' tenth name, and the first entry of
+    `AgentServer.opsWithoutTools`, because it discards everything outside a range: only File ▸ New
+    Project from Range… and `new_project_from_range` (CJ5b) apply it, to a derived document.

@@ -162,8 +162,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   halves, which is what a clone does and what version 5 did, makes the first half leave at the cut
   and the second arrive again there. A `during` slot survives on both, since it is anchored to
   neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`,
-  `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame`
-  — so the rule is stated once (`edit_split.rs`, §7.10). On a ramped clip the halves meet at the
+  `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip`, `freeze_frame`
+  and `keep_range` — so the rule is stated once (`edit_split.rs`, §7.10). On a ramped clip the halves meet at the
   source the clip read by the cut: the second half's `in` is `in + round(S(at − start))` and its
   `speed` the rate at the cut; a straddled speed action's first half ends at the rate that reads
   exactly that (solved, so for `ease_out` and `ease_in_out` the rate steps at the cut), and its
@@ -198,6 +198,16 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
 - **`lift_range {from, to}`** — `ripple_delete_range` without the close: every unlocked clip is
   split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps
   the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples.
+- **`keep_range {from, to}`** — The project as `[from, to)` of its top-level timeline, moved to
+  start at 0 (§11 CJ-50). Both bounds are snapped and clamped to 0; `to` not after `from` is an error.
+  Every clip on every track, locked or not, is cut at both bounds by `split`'s rules; at an edge
+  inside a transition the piece beyond it is dropped and the incoming piece starting at `from` loses
+  its transition (kept, hard-cut, when both bounds lie in one overlap). Clips not wholly inside go,
+  the rest and the markers inside move by −`from`, the other markers go; nests no kept clip reaches
+  and media no kept clip plays, names in a look or converts through go; tracks and canvas stay.
+  Refuses a nest clip across an edge, a range where nothing plays and a transition inside the range
+  whose clip an edge cut too short. Document-level and with no tool: only a derived document takes
+  it (File ▸ New Project from Range…, CJ5b).
 - **`insert_time {at, length}`** — Shifts every unlocked clip whose start ≥ `at` right by `length`.
   Straddling clips are left in place. Every marker at or after `at` moves right by `length` too.
 - **`close_gap {track, at}`** — Closes the empty span on `track` that contains `at`, bounded by the

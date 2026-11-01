@@ -3112,6 +3112,96 @@ derived document; FC1 and FC2's numbers are retired. CJ5a and CJ5b share CJ-50�
 - **Manual checks:** none. **Depends on:** CJ0b (T1, T4). **Lane** A (during CP1).
 - **Questions:** none expected.
 
+#### CJ5a's record (2026-11-01)
+
+**Landed.** `keep_range {from, to}` (spec §11 CJ-50 (a)–(h), recorded and committed before the
+code) on lane A's branch, base `822973cd`. No FFI, header, tool or format change;
+`RC_FORMAT_VERSION` is unchanged. Every count below is a `wc -l` or a run's own output.
+
+- **Core:** `core/src/edit_keep_range.rs` (new, 248 lines): bounds snapped and clamped, `to ≤ from`
+  an `Err`; the nest refusal before any cut; both bounds cut on every track through `split_clip` and
+  `pair_split_halves`, with a piece → source-id map; THE overlap rule at the edges judged on the
+  source's `overlaps_on_track`, with K14's same-overlap exception; keep and move; markers;
+  `prune_unused` (nests reached transitively from kept clips; media by source, `look_media_ids` and
+  a kept media's `color.lut`, to a fixpoint); "Nothing plays" and the short-transition sentence
+  (source ids); exit through `finish`. `op_rows.rs`'s row after `lift_range`'s, `OP_COUNT` 64 → 65,
+  `Op::KeepRange` and its dispatch, `edit.rs`'s table row and scope paragraph ("Eleven ops",
+  "fifty-four"), `scope.rs`'s eleventh arm and "fifty-four", `edit_split.rs`'s splitter list.
+- **Tests:** `core/tests/common/overlap_oracle.rs` (new, 36 lines), `overlap_rule_holds` lifted out
+  of `transition_oracle.rs`'s `valid_shift`, which now builds the shifted copy (the locked track 4
+  left out, as its check skipped it) and calls it; `transition_bounded` 12 passed, 0 failed before
+  the lift and after. `core/tests/keep_range.rs` (new, 440 lines; tests are outside the ledger's
+  cap): K1–K14 as fifteen tests (K7's two cases apart), each applied answer held to the oracle. The
+  enumerations: `scope.rs` (refused, every_op, `OP_NAMES.len()` 65, the "eleven" names, the
+  no-scope row with a marker at 5 s first), `edit_tests.rs`'s `op_table()`, `op_ticks_timeline.rs`'s
+  `keep_range.from`/`.to` vectors and `op_ticks.rs`'s 46 / 33 / 51.
+- **Swift:** `ReelOps.swift` `keepRange(from:to:)` and `documentLevelNames`' tenth name (doc nine →
+  ten, `add_adjustment_clip` the eleventh); `AgentServer.swift`'s `opsWithoutTools` its first entry
+  with its reason, "None today" → "One today", nothing else.
+- **Proofs:** `OPS_WITHOUT_TOOLS = {"keep_range"}` in `op_catalog_proof.py` (65 ops, the op-tool
+  group over `ops − OPS_WITHOUT_TOOLS`, and no tool named for it), `op_argument_proof.py` (`OPS` 65,
+  section 1 and 2 the same, section 5's count over `OPS − 1` op tools) and `recording_probe.py`'s
+  section 7 (7a's set and 7c's list).
+- **Documents:** spec §6b's bullet (482 → 492) and splitter list, §6a's "Eleven ops" (107 → 109),
+  §7.10's `edit_keep_range.rs` row and `edit_split.rs`'s list (132 → 133), the spec README's cells
+  and the `11-decisions/` total (16911 → 16962), the decisions index's CJ-50 row and the file row
+  (216 → 266).
+- **Checks in the loop:** `cargo test --release --test keep_range` 15 passed; `--test scope --test
+  edit_tests --test op_ticks --test op_table --test op_names --test op_schemas --test keep_range
+  --test transition_bounded` all ok (38, 53, 6, 8, 5, 10, 15, 12 passed); `cargo clippy
+  --all-targets -- -D warnings` exit 0, no warning; `make typecheck` exit 0, no error, the four
+  baseline warnings; `spec_index_proof.py` 222/222; `recording_probe.py --only catalog` 31/31;
+  `make app-debug` BUILD SUCCEEDED (the Debug parity trap did not fire).
+- **Mutants** (nine, the spec's M1–M9, once against `--test keep_range` on the final code): all
+  killed — M1 (K2, K14), M2 (K3), M3 (K11), M4 (K8), M5 (K10), M6 (K4), M7 (K9), M8 (K12), M9
+  (K14).
+- **`make gate`** once, at `9e4b8f5f` with this record written: PASS 463 s — names 1 s, typecheck
+  10 s (the four baseline warnings), fmt 4 s, lint 10 s, test 273 s (199 result lines, 1991 passed,
+  0 failed), app 164 s (D25 and D26 ok).
+- **Against Release** (one instance from `proof_app.py launch --app release`, stopped by its pid):
+  `op_catalog_proof.py` 23/23; `op_argument_proof.py` 179/180 on its first run — section 4's count of
+  opaque-object arguments still said 14, where the core has published 16 since format 36's
+  `set_track` `compressor` and `limiter` (AU-150), whose two doors the same run passed — then
+  180/180 with the count at 16 (the only edit between the runs); `grep "Frame Job: "` on its log
+  printed nothing; `recording_probe.py --only catalog` 31/31 after the gate.
+
+**Deviations.** The road map's five mutants are the spec's nine. The draft's "removed by
+`remove_media`'s rule" for media is CJ-50 (f)'s rule (source, looks, a kept media's `color.lut`),
+and nests a range leaves unused go too, as the draft left to the design pass. `scope.rs`'s
+count is "fifty-four" (`OP_COUNT` 65 less eleven arms), per CJ-8 (g)'s reading that the old
+"fifty-three" was stale. `op_catalog_proof.py` and `op_argument_proof.py` also check that no tool
+is named for an `OPS_WITHOUT_TOOLS` op, inside the spec's section-1 check. `op_argument_proof.py`'s
+opaque-object count 14 → 16 is outside the spec's list: a stale pin in a file this phase edits, found
+by its Release run.
+
+**Found, not fixed (out of scope; owed as an issue, its draft in the implementer's notes).**
+`split`, `lift_range` and `ripple_delete_range` each leave a piece shorter than twice a
+neighbouring transition and answer Applied: on A [0, 4 s), B [3 s, 8 s) with a 1 s dissolve, each
+at 2.2 s applied with the half-shorter oracle false (a scratch test, removed after the run).
+`keep_range` refuses that case (CJ-50 (g)).
+
+**Review.** Verdict pass, one nit: `core/tests/keep_range.rs` is 440 lines, over the 400-line
+cap for a new file if the cap is read past the size ledger (`app/Sources`, `core/src`,
+`graphic/src`), which it is not; left as it is. The reviewer walked rule (d) through `from` and
+`to` at, inside and at the end of an overlap, a three-clip chain and both bounds in one overlap,
+and found the code dropping the piece CJ-50 says each time.
+
+**Integration.** Cherry-picked onto `worktree-creator-jobs` after CU0a. Three conflicts, all
+indexes, each kept both sides: `11-decisions/creator-jobs.md` holds CU-1…CU-9 and then "The
+phases' decisions" with CJ-50; its index row follows CU-9's; the file row's summary names
+CU-1…CU-9 and then CJ-50, its Lines cell 275 → 325, and the spec README's `11-decisions/` total
+17006 → 17057; §7.10's cell 133 → 134 (CU0a had already taken it to 133). Map entries at
+integration: `core/CLAUDE.md`'s `edit_keep_range.rs` entry after `edit_time.rs`'s, and
+`app/CLAUDE.md`'s `documentLevelNames` sentence "(eight names)" → "(ten names: its eleven arms
+but `add_adjustment_clip`, sent scoped)". `make gate` after the picks and these edits: names,
+typecheck, fmt, lint, test (199 result lines, 1991 passed, 0 failed) and app (D25, D26 ok) each
+pass, "gate: PASS 346s". Then, on the integrated tree: `recording_probe.py --only catalog` 31/31;
+against its Release app `op_catalog_proof.py` 23/23 and `op_argument_proof.py` 180/180, and
+`grep "Frame Job: "` on the log printed nothing.
+
+**Owed.** No manual check. The splitters' short-piece finding above, filed as an issue at
+integration (`ai-drafted`, `low-priority`).
+
 ### CU3a — the cursor in the model, then drawn as part of the layer
 
 CU3a is two pipelines (CJ-7's re-split): CU3a1 puts the cursor in the model and the recipe,

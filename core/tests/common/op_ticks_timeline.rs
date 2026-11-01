@@ -86,6 +86,26 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             ],
         ),
         applied(
+            "keep_range.from",
+            "from",
+            one.clone(),
+            json!({"op":"keep_range","from":off(21,f),"to":25*f}),
+            vec![
+                ("/clips/0/start", json!(0)),
+                ("/clips/0/duration", json!(3 * f)),
+            ],
+        ),
+        applied(
+            "keep_range.to",
+            "to",
+            one.clone(),
+            json!({"op":"keep_range","from":22*f,"to":off(24,f)}),
+            vec![
+                ("/clips/0/start", json!(0)),
+                ("/clips/0/duration", json!(3 * f)),
+            ],
+        ),
+        applied(
             "insert_time.at beside edge",
             "at",
             two.clone(),

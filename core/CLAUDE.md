@@ -589,6 +589,14 @@ governs a module now.
   refusal's sentence, written once here for its three callers
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
   rippled form), each passing the clause after the comma.
+- `edit_keep_range.rs` — `keep_range` (road map "creator-jobs" CJ5a, spec
+  §11 CJ-50): the project as `[from, to)` of its top-level timeline moved to
+  0 — both bounds cut on every track, locks ignored, through `split_clip`
+  and `pair_split_halves`; THE overlap rule at the edges (an edge inside an
+  overlap drops the piece beyond it and hard-starts the incoming); a nest
+  across an edge, an empty range and a transition cut too short refused;
+  markers inside kept, nests and media no kept clip reaches pruned.
+  Document-level and tool-less (`opsWithoutTools`).
 - `edit_edge.rs` · `edit_insert.rs` — the cutting moves that keep something
   fixed on purpose: `slip` and `roll` (a `still` slips the frame it holds;
   any other non-media source is an `Err`; roll's predecessor must end

@@ -141,14 +141,14 @@ extension ReelOp {
         return copy
     }
 
-    /// The nine DOCUMENT-level ops among those `core/src/scope.rs`'s
+    /// The ten DOCUMENT-level ops among those `core/src/scope.rs`'s
     /// `refused_inside` answers `"<op> has no meaning inside nest N"` to. The
-    /// tenth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
+    /// eleventh, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
     /// places, not because it is the document's, so it is sent scoped.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
     /// sense that the typed factories above mirror the op table: change one,
-    /// change both. It is nine names rather than a rule, so it can be
+    /// change both. It is ten names rather than a rule, so it can be
     /// checked by eye, and it is written here rather than at a call site
     /// because two copies of it is what would drift.
     ///
@@ -171,10 +171,10 @@ extension ReelOp {
     /// paths.
     static let documentLevelNames: Set<String> = [
         "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
-        "remove_media", "set_media_color", "set_media_speech",
+        "remove_media", "set_media_color", "set_media_speech", "keep_range",
     ]
 
-    /// True for one of the nine above — an edit about the document rather
+    /// True for one of the ten above — an edit about the document rather
     /// than about whatever container the timeline is looking at.
     var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
@@ -546,6 +546,16 @@ extension ReelOp {
         a.put("from", from)
         a.put("to", to)
         return ReelOp(name: "lift_range", args: a.values)
+    }
+
+    /// The project as `[from, to)` of its top-level timeline, moved to
+    /// start at 0 (spec §11 CJ-50): applied only to a derived document, so
+    /// it has no tool of its own (`AgentServer.opsWithoutTools`).
+    static func keepRange(from: Ticks, to: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("from", from)
+        a.put("to", to)
+        return ReelOp(name: "keep_range", args: a.values)
     }
 
     /// Shifts every unlocked clip starting at or after `at` right by

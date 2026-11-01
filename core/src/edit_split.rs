@@ -14,12 +14,12 @@
 //!
 //! Every splitter in the crate routes here — `split_clips`,
 //! `split_under_playhead`, `clear_range` (so `ripple_delete_range(s)` and
-//! `lift_range`), `insert_clip`, `overwrite_clip` and `freeze_frame` — so a
-//! rule stated once is a rule they all obey. It is a free function taking
-//! `&mut Project` rather than a `Project` method for the reason it always
-//! was: it is called mid-edit on a clone the caller is still assembling,
-//! after `finish` would be too late and before it has anything to hand
-//! back.
+//! `lift_range`), `insert_clip`, `overwrite_clip`, `freeze_frame` and
+//! `keep_range` — so a rule stated once is a rule they all obey. It is a
+//! free function taking `&mut Project` rather than a `Project` method for
+//! the reason it always was: it is called mid-edit on a clone the caller is
+//! still assembling, after `finish` would be too late and before it has
+//! anything to hand back.
 
 use serde_json::Value;
 

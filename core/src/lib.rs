@@ -56,6 +56,7 @@ pub mod edit_edge;
 mod edit_fit;
 pub mod edit_graphic;
 pub mod edit_insert;
+mod edit_keep_range;
 mod edit_link;
 pub mod edit_nest;
 pub mod edit_paste;

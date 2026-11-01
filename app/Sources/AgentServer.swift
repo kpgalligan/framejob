@@ -335,12 +335,16 @@ final class AgentServer {
     // The dev tools' handlers join here (AgentServer+DevTools.swift).
     private static let handlers = withDevHandlers(withCreatorHandlers(productHandlers))
 
-    /// Ops the core declares that deliberately have NO tool. None today,
+    /// Ops the core declares that deliberately have NO tool. One today,
     /// and the bar for an entry is high: the agent-parity rule
     /// (app/CLAUDE.md) says every user-visible edit gets a mirror, so the
     /// answer to "this op has no tool" is almost always to write the tool.
     /// An entry here carries a comment saying why it is the exception.
     private static let opsWithoutTools: Set<String> = [
+        // It discards everything outside a range; only File ▸ New Project
+        // from Range… and `new_project_from_range` (CJ5b) apply it, to a
+        // derived document (spec §11 CJ-50).
+        "keep_range",
     ]
 
     /// The enforcement behind the table's contract, in five parts:

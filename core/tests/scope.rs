@@ -23,7 +23,7 @@
 //! reason.
 //!
 //! Around the oracle sit the cases the oracle cannot see, and they are the
-//! phase's real content: the ten refusals, the invariants a view is BLIND
+//! phase's real content: the eleven refusals, the invariants a view is BLIND
 //! to (the document-wide caps and the nesting depth, which is why a scoped
 //! op has a wider `Err` arm than any other), and the two write-back rules
 //! that only a shared object can test — a `paste` that appends media, and
@@ -581,7 +581,7 @@ fn a_misspelt_argument_is_still_refused_beside_a_scope() {
 
 // ---- the refusal list ----------------------------------------------------
 
-/// The ten ops with no meaning inside a nest, with an argument list each
+/// The eleven ops with no meaning inside a nest, with an argument list each
 /// that would otherwise be valid — so what the message reports is the
 /// refusal and not a bad argument.
 fn refused() -> Vec<(&'static str, Value)> {
@@ -615,11 +615,15 @@ fn refused() -> Vec<(&'static str, Value)> {
             "add_adjustment_clip",
             json!({"op": "add_adjustment_clip", "track": 2, "at": 20 * SEC}),
         ),
+        (
+            "keep_range",
+            json!({"op": "keep_range", "from": 0, "to": 4 * SEC}),
+        ),
     ]
 }
 
 #[test]
-fn the_ten_ops_with_no_meaning_inside_a_nest_are_errors_naming_themselves() {
+fn the_eleven_ops_with_no_meaning_inside_a_nest_are_errors_naming_themselves() {
     let base = one_nest();
     for (name, op) in refused() {
         let mut scoped = op.clone();
@@ -638,7 +642,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use framejob_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 64, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 65, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -762,6 +766,7 @@ fn every_op() -> Vec<(&'static str, Value)> {
             "lift_range",
             json!({"op":"lift_range","from":SEC/2,"to":SEC}),
         ),
+        ("keep_range", json!({"op":"keep_range","from":0,"to":4*SEC})),
         (
             "insert_time",
             json!({"op":"insert_time","at":SEC,"length":SEC}),
@@ -904,12 +909,12 @@ fn every_op() -> Vec<(&'static str, Value)> {
 }
 
 #[test]
-fn every_op_in_the_table_works_inside_a_nest_except_the_ten() {
+fn every_op_in_the_table_works_inside_a_nest_except_the_eleven() {
     // The empirical half of `scope.rs`'s exhaustive `refused_inside` match.
     // The match makes the compiler classify every op; this makes the
-    // CLASSIFICATION true — that the fifty-three actually apply against a
+    // CLASSIFICATION true — that the fifty-four actually apply against a
     // real nest and come back through `validate` on the merged parent, and
-    // that exactly ten do not.
+    // that exactly eleven do not.
     use framejob_core::OP_NAMES;
     let base = every_kind();
     let table = every_op();
@@ -942,7 +947,7 @@ fn every_op_in_the_table_works_inside_a_nest_except_the_ten() {
 }
 
 #[test]
-fn the_same_ten_ops_still_work_without_a_scope() {
+fn the_same_eleven_ops_still_work_without_a_scope() {
     // The refusal is about the scope and not about the op: each of these is
     // an ordinary edit on the timeline, which is what says the list bounds
     // a container rather than disabling a feature.
@@ -958,6 +963,10 @@ fn the_same_ten_ops_still_work_without_a_scope() {
     // its own documented rule — `with_clips` is the way through it.
     base.apply(&json!({"op": "remove_media", "media": 1, "with_clips": true}));
     base.apply(&json!({"op": "add_adjustment_clip", "track": 2, "at": 20 * SEC}));
+    // On `one_nest()` alone every range is an identity or a refusal; the
+    // marker outside the range is what the keep removes.
+    base.apply(&json!({"op": "add_marker", "at": 5 * SEC}))
+        .apply(&json!({"op": "keep_range", "from": 0, "to": 4 * SEC}));
 }
 
 // ---- what the view cannot see: the caps ----------------------------------

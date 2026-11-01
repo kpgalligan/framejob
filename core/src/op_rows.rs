@@ -46,6 +46,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("ripple_delete_range", &[req("from", Ticks), req("to", Ticks)]),
     op("ripple_delete_ranges", &[req("ranges", Ranges)]),
     op("lift_range", &[req("from", Ticks), req("to", Ticks)]),
+    op("keep_range", &[req("from", Ticks), req("to", Ticks)]),
     op("insert_time", &[req("at", Ticks), req("length", Ticks)]),
     op("close_gap", &[req("track", Id), req("at", Ticks)]),
     op("set_speed",
