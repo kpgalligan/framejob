@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_015ZaHiZ1dEhSKatVCDFyYGb",
+  "agent_id": "a78dd718e02b358ac",
+  "subagent_type": "lc-triage",
+  "task_description": "CJ0a triage",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 33196,
+    "cache_read_tokens": 61298,
+    "output_tokens": 677,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-01T09:51:13.783325-05:00",
+  "completed_at": "2026-11-01T09:51:21.917383-05:00"
+}

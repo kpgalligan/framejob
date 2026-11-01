@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a2af95b0bf9312c6c",
+  "agent_id": "a2af95b0bf9312c6c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "designs/creator-jobs.md"
+  ],
+  "token_usage": {
+    "input_tokens": 308,
+    "cache_creation_tokens": 521918,
+    "cache_read_tokens": 58121672,
+    "output_tokens": 151636,
+    "api_call_count": 152
+  },
+  "started_at": "2026-11-01T07:21:28.866259-05:00",
+  "completed_at": "2026-11-01T07:45:38.380282-05:00"
+}
