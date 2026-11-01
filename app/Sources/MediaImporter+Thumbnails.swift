@@ -2,7 +2,8 @@ import AVFoundation
 
 /// The await-free halves of the thumbnail pass — `writeImageThumbnail` (a still's one tile, its
 /// marker and its post; an HLG or PQ still's tile drawn by `MediaImporter.thumbnails` through
-/// `stillReader`, spec §11 HD-21) and `publishThumbnails` (a movie's marker and last post, after
+/// `stillReader`, spec §11 HD-21), `writeTiles` (one landed frame's tiles, inside the frames
+/// loop) and `publishThumbnails` (a movie's marker and last post, after
 /// `thumbnails(for:url:stamp:into:pass:input:)` has drawn its frames). An `extension
 /// MediaImporter` in a file of its own for the same reason `MediaImporter+Speech.swift` is:
 /// `async`/`await` is confined to `MediaImporter.swift`, and these pieces of the pass do not need
@@ -116,5 +117,24 @@ extension MediaImporter {
     static func tileIndices(requested: CMTime, lastTime: CMTime, held: [Int]) -> [Int] {
         requested == lastTime
             ? held : [Int(CompositionBuilder.ticks(requested) / ReelTime.perSecond)]
+    }
+
+    /// One landed frame written under each of its `tileIndices`, each index `writeJPEG`
+    /// succeeded on inserted into `written`. `nil` once the pass is superseded, and the caller's
+    /// loop breaks (its labelled break cannot cross into this function); else the tiles the frame
+    /// stands for, which the caller counts towards its next post.
+    static func writeTiles(
+        _ image: CGImage, requested: CMTime, lastTime: CMTime, held: [Int], directory: URL,
+        pass: CachePass?, into written: inout Set<Int>
+    ) -> Int? {
+        let indices = tileIndices(requested: requested, lastTime: lastTime, held: held)
+        for index in indices {
+            // A superseded pass writes no further frame.
+            guard pass?.isCurrent() ?? true else { return nil }
+            if writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg")) {
+                written.insert(index)
+            }
+        }
+        return indices.count
     }
 }

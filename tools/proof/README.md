@@ -9574,7 +9574,7 @@ hold ended: true; completion 0.02 s after return"; S1a "30.32 s"; S1b
 | `--mutant` | Edit | Result |
 |---|---|---|
 | `unbounded-wait` | `awaitPass(previous, bounded: false)` | S1a FAIL ("never"), caught, exit 1 |
-| `frame-check-ignored` | the loop's `guard pass?.isCurrent() … { break frames }` → `_ = pass?.isCurrent()` | S1b FAIL ("changed: 2.jpg, 3.jpg, 4.jpg"), caught, exit 1 |
+| `frame-check-ignored` | `writeTiles`' `guard pass?.isCurrent() … { return nil }` in `MediaImporter+Thumbnails.swift` → `_ = pass?.isCurrent()` | S1b FAIL ("changed: 2.jpg, 3.jpg, 4.jpg"), caught, exit 1 |
 | `peaks-entry-ignored` | `peaks`' entry check → `_ = pass?.isCurrent()` | S1b FAIL ("changed: bin, peaks marker"), caught, exit 1 |
 | `publish-ignores-saves` | `while let expiry = saveExpiryLocked(directory), false {` | G1 FAIL (".bin or marker during the save: true … never after saveEnded"), G2 FAIL ("marker while the save ran: true … marker after: the stamp"), caught, exit 1 |
 | `save-unannounced` | no `saveBegan` / `saveEnded` in the override | G3 FAIL ("save returned 0.00 s … after the hold ended: false"), caught, exit 1 |

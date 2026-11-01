@@ -65,7 +65,7 @@ MUTANTS = {
         ("MediaImporter.swift", "await awaitPass(previous, bounded: bounded)",
          "await awaitPass(previous, bounded: false)")]),
     "frame-check-ignored": (["S1b"], [
-        ("MediaImporter.swift", "guard pass?.isCurrent() ?? true else { break frames }",
+        ("MediaImporter+Thumbnails.swift", "guard pass?.isCurrent() ?? true else { return nil }",
          "_ = pass?.isCurrent()")]),
     "peaks-entry-ignored": (["S1b"], [
         ("MediaImporter.swift", "guard pass?.isCurrent() ?? true else { return false }",

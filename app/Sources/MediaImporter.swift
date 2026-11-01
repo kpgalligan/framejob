@@ -16,7 +16,7 @@ import UniformTypeIdentifiers
 /// `generateCaches(for:url:in:)`), which keep every `await` on this side of
 /// the seam.
 ///
-/// The other half of the media story lives in `ReelCore.swift`:
+/// The other half of the media story lives in `MediaDescriptor.swift`:
 /// `MediaDescriptor` (what `probe` returns) and `mediaURL(for:)` /
 /// `bookmarkString(for:)` (how a descriptor's path is resolved back to a
 /// file).
@@ -387,15 +387,11 @@ enum MediaImporter {
             var tiles = 1
             switch result {
             case .success(requestedTime: let requested, image: let image, actualTime: _):
-                let indices = tileIndices(requested: requested, lastTime: lastTime, held: held)
-                for index in indices {
-                    // A superseded pass writes no further frame.
-                    guard pass?.isCurrent() ?? true else { break frames }
-                    if writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg")) {
-                        written.insert(index)
-                    }
-                }
-                tiles = indices.count
+                guard let count = writeTiles(
+                    image, requested: requested, lastTime: lastTime, held: held,
+                    directory: directory, pass: pass, into: &written)
+                else { break frames }
+                tiles = count
             case .failure:
                 // A frame that will not decode leaves a hole in the strip;
                 // the timeline draws the clip's tint there and carries on.

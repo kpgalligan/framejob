@@ -980,6 +980,21 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   internal). `wc -l app/Sources/MediaImporter.swift`: 599 before, 573 after;
   `MediaImporter+Thumbnails.swift` is 57. The next seam: the frames loop's per-result write
   (the `switch result` body) out to `+Thumbnails`.
+  Road map creator-jobs CJ0d's T16 paid that seam re-scoped, a small refactor gated alone and
+  NOT line-identical: the `switch result` body could not move whole, since its `guard
+  pass?.isCurrent() ?? true else { break frames }` is a labelled break to the `frames:` loop and
+  it writes the loop's locals. So only the `.success` arm's tile loop went to `+Thumbnails` as
+  `writeTiles(_:requested:lastTime:held:directory:pass:into:) -> Int?` (await-free: `nil` once
+  the pass is superseded, else the tiles written, each written index inserted into `written`
+  through `inout`; the guard's comment moved with it), and the arm became `guard let count =
+  writeTiles(…) else { break frames }; tiles = count`, so the break stays in the loop. The doc
+  line naming `ReelCore.swift` as the media story's other half (stale since #190) now names
+  `MediaDescriptor.swift`. `cache_pass_probe.py`'s `frame-check-ignored` mutant was re-aimed at
+  the helper's `guard pass?.isCurrent() ?? true else { return nil }` in
+  `MediaImporter+Thumbnails.swift` (counted 1 there, 0 here), and `--only B0,S1a,S1b` passed
+  3/3. `wc -l app/Sources/MediaImporter.swift`: 589 before, 585 after;
+  `MediaImporter+Thumbnails.swift` 120 → 140. The next seam: SW-43's four audio passes out to
+  `MediaImporter+AudioPasses.swift` (road map creator-jobs SW4a).
 - `ExportSheetController.swift`: the HDR road map's H-0 paid a toll before H-3's export range:
   `// MARK: - Commit` through `panelMessage`'s closing brace (lines 514–623 at `0f8c9f5`, and
   the blank line before) moved verbatim into `extension ExportSheetController` in
