@@ -785,6 +785,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `ReelCore+MediaFiles.swift` is 207,
   `ReelCore+Graphics.swift` 131. A new wrapper goes in the file of its area (CJ-8 (l)); the
   next seam is CJ0d's T15c, the one `rc_*` call left outside the ReelCore files.
+  CJ0d's T15c paid it, a small refactor gated alone and not line-identical:
+  `agentToolTrampoline`'s answer (`AgentServer.swift:806`, `result.withCString {
+  rc_agent_string_create($0) }`) became `ReelAgentSocket.answer(result)`, a plain static on
+  `ReelAgentSocket` whose body is exactly that call (the trampoline runs on the core's server
+  thread, so `answer` holds no actor isolation). The frozen `AgentServer.swift` changed that line
+  only, 807 lines before and after; `git grep -n 'rc_[a-z_]*('` over `app/Sources` now matches
+  only the ReelCore files and two doc comments. `wc -l app/Sources/ReelCore.swift`: 439 before,
+  445 after. The next seam: none named; a new `rc_*` wrapper goes in the `ReelCore+<Area>.swift`
+  of its area.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

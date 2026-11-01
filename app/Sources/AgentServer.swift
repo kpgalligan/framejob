@@ -804,5 +804,5 @@ func agentToolTrampoline(
     // The header's contract is that this is called from the server thread,
     // which is what lets the lane take its lock here.
     let result = AgentLane.shared.serve(tool: name, argumentsJSON: arguments)
-    return result.withCString { rc_agent_string_create($0) }
+    return ReelAgentSocket.answer(result)
 }

@@ -436,4 +436,10 @@ enum ReelAgentSocket {
     static func release() {
         rc_agent_socket_release()
     }
+
+    /// `text` handed back to the core as the tool handler's answer, `rc_agent_string_create`;
+    /// the core frees it.
+    static func answer(_ text: String) -> UnsafeMutablePointer<CChar>? {
+        text.withCString { rc_agent_string_create($0) }
+    }
 }
