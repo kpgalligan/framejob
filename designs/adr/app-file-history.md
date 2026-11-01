@@ -767,6 +767,24 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   cut to its contracts — a doc-only cut; nothing `rc_*`-free is left to move. The next seam (CJ-8
   (l), 2026-11-01): CJ0d's T15 split — the media-file wrappers and the graphics wrappers out whole
   to `ReelCore+MediaFiles.swift` and `ReelCore+Graphics.swift`.
+  Road map creator-jobs CJ0d's T15 paid that seam, one pure move gated alone: `// MARK: -
+  Containers` through `ReelWebM`'s closing brace (411–612: `ReelContainer`, `ReelCube`,
+  `ReelHDR10`, `ReelAV1`, `ReelWebM`) went whole to `ReelCore+MediaFiles.swift`, and `// MARK: -
+  Graphics` through `ReelGraphicPackage`'s closing brace (614–739: the private
+  `takeDiagnostics`, `GraphicLibrary` with its `fileprivate handle`, `GraphicModule`,
+  `ReelGraphicPackage`) to `ReelCore+Graphics.swift`, each with `import AppKit` and the blank
+  line after it; both diffed empty against `git show HEAD:app/Sources/ReelCore.swift`.
+  `takeErrorMessage` and `takeString` lost `private`; nothing else widened (`takeDiagnostics`
+  and `GraphicLibrary.handle` moved with every reader). The header's first sentence and type list
+  now name the ReelCore files and which types each holds, and dropped "the typed patches"
+  (`TypedPatches.swift`'s since B73); `core/include/framejob_core.h`'s lockstep comment and
+  `ReelOps.swift`'s two "only file" doc lines name the ReelCore files too (comments only).
+  `graphics_ffi_probe.py`'s `frame-off-by-one` mutant was re-aimed at `ReelCore+Graphics.swift`
+  (anchor text unchanged; counted 1 there, 0 in `ReelCore.swift`) and still kills P5. `wc -l
+  app/Sources/ReelCore.swift`: 766 before, 439 after (330 lines moved, the header 3 longer);
+  `ReelCore+MediaFiles.swift` is 207,
+  `ReelCore+Graphics.swift` 131. A new wrapper goes in the file of its area (CJ-8 (l)); the
+  next seam is CJ0d's T15c, the one `rc_*` call left outside the ReelCore files.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,

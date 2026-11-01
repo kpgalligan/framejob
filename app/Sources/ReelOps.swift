@@ -19,8 +19,8 @@ import AppKit
 /// beside ordinary arguments) the typed one delegates to the raw one, so a
 /// row still has one body.
 ///
-/// The seam is the FFI. `ReelCore.swift` is the only file in the app that
-/// names an `rc_*` symbol and nothing here names one: an op is a VALUE — a
+/// The seam is the FFI. The ReelCore files are the only files in the app that
+/// name an `rc_*` symbol and nothing here names one: an op is a VALUE — a
 /// name, its arguments, and the JSON those two make — that no handle has to
 /// exist for. The whole contact surface between the two files is
 /// `ReelProject.applying(_:)` reading `op.json`.
@@ -35,8 +35,8 @@ import AppKit
 /// each file gets exactly one of them.
 ///
 /// One member did NOT come. `ReelOp.coreNames()` reads `rc_op_names()`, and
-/// the root `CLAUDE.md`'s rule that `ReelCore.swift` is the only file calling
-/// `rc_*` is not negotiable, so it stays there in an `extension ReelOp` of its
+/// the root `CLAUDE.md`'s rule that the ReelCore files are the only files
+/// calling `rc_*` is not negotiable, so it stays there in an `extension ReelOp` of its
 /// own — the one place the op table is read BACK rather than written down.
 ///
 /// The cut is the size payment `ReelCore.swift` owed at 2242 lines against

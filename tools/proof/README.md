@@ -6123,7 +6123,7 @@ The nine `rc_graphic_*` exports have no caller a script can reach before
 G3, so the probe is compiled from `app/Sources` over `harness/build.sh`'s
 swiftc line (a probe that will not build is a scored FAILURE) and drives
 the app's own wrappers — `GraphicLibrary`, `GraphicModule`, `GraphicRaster`
-in `ReelCore.swift`. It runs under `graphics_spike/bounded.py`'s `run`
+in `ReelCore+Graphics.swift`. It runs under `graphics_spike/bounded.py`'s `run`
 (600 s bound, its own process group). The Swift side loads every `.ttf` in
 `app/Resources/Fonts`, compiles `graphic/tests/graphics/lower-third.js`,
 and prints one JSON object (kept as `work/graphics-ffi-probe/answer.json`)

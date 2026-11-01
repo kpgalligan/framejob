@@ -2,7 +2,8 @@
  * framejob_core.h — the ONE contract between the Swift app and the Rust core.
  *
  * Hand-maintained: changing any `rc_*` signature means editing the Rust
- * `ffi_*.rs` file, this header, and `app/Sources/ReelCore.swift` in lockstep.
+ * `ffi_*.rs` file, this header, and `app/Sources/ReelCore.swift` (or the
+ * `ReelCore+<Area>.swift` of its area) in lockstep.
  *
  * Conventions, uniform across the surface:
  *

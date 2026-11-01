@@ -180,7 +180,7 @@ def replace_once(path, before, after):
 
 
 MUTANTS = {
-    "frame-off-by-one": ("ReelCore.swift",
+    "frame-off-by-one": ("ReelCore+Graphics.swift",
                          "            handle, Int64(frame), propsJSON, ctxJSON,",
                          "            handle, Int64(frame + 1), propsJSON, ctxJSON,"),
 }

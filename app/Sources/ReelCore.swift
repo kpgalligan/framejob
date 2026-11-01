@@ -1,13 +1,16 @@
 import AppKit
 
-/// The ONLY file in the app that names an `rc_*` symbol. Everything the Rust
-/// core can do reaches the rest of Frame Job as typed Swift here: `ReelProject`
-/// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`, `ReelColor`,
-/// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
-/// `GraphicModule`, `ReelAgentSocket`, and the op ARGUMENTS an edit is built
-/// out of — the typed patches. The `dictionary` extensions on the §5.2
-/// property types are in `OpDictionaries.swift`, for the same reason: they
-/// name no `rc_*` symbol.
+/// With its `ReelCore+<Area>.swift` files, the ONLY files in the app that name
+/// an `rc_*` symbol (spec §11 CJ-8 (l)); a new wrapper goes in the file of its
+/// area. Everything the Rust core can do reaches the rest of Frame Job as typed
+/// Swift in them. This file holds `ReelProject` (a handle plus its lazily
+/// decoded `ProjectSnapshot`), `ReelSnap`, `ReelTime`, `ReelColor`, `ReelExport`,
+/// `ReelSpeed`, the op table read back and `ReelAgentSocket`;
+/// `ReelCore+MediaFiles.swift` holds `ReelContainer`, `ReelCube`, `ReelHDR10`,
+/// `ReelAV1` and `ReelWebM`, and `ReelCore+Graphics.swift` the graphics
+/// engine's `GraphicLibrary`, `GraphicModule` and `ReelGraphicPackage`. The
+/// `dictionary` extensions on the §5.2 property types are in
+/// `OpDictionaries.swift`, because they name no `rc_*` symbol.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/framejob_core.h` is the contract itself.
 ///
@@ -25,7 +28,7 @@ import AppKit
 ///    `applying(_:)`. Getting that wrong is a phantom undo step.
 
 /// Consumes a Rust-allocated error string and returns its contents.
-private func takeErrorMessage(_ err: UnsafeMutablePointer<CChar>?, fallback: String) -> String {
+func takeErrorMessage(_ err: UnsafeMutablePointer<CChar>?, fallback: String) -> String {
     guard let err = err else { return fallback }
     defer { rc_string_free(err) }
     return String(cString: err)
@@ -34,7 +37,7 @@ private func takeErrorMessage(_ err: UnsafeMutablePointer<CChar>?, fallback: Str
 /// Consumes any Rust-allocated string and returns its contents. Every
 /// `char *` this library hands back MUST come through here — the core
 /// allocated it, only `rc_string_free` may release it.
-private func takeString(_ s: UnsafeMutablePointer<CChar>?) -> String? {
+func takeString(_ s: UnsafeMutablePointer<CChar>?) -> String? {
     guard let s = s else { return nil }
     defer { rc_string_free(s) }
     return String(cString: s)
@@ -406,336 +409,6 @@ extension ReelOp {
 enum ReelSpeed {
     /// Read once from the core (`SpeedLimits.decoded` says why it traps).
     static let limits = SpeedLimits.decoded(takeString(rc_speed_limits()))
-}
-
-// MARK: - Containers
-
-/// A WebM or Matroska file's index (`RcContainer`, spec §11 #216-R): its
-/// first video and audio track and where each frame's bytes lie, which
-/// `ContainerRewrap` copies into a movie. `retime` comes before any sample
-/// is read; after it, `count` and `sample` may be called from two threads at
-/// once (the writer's two pumps), since neither changes the index.
-final class ReelContainer {
-    static let video = UInt32(RC_CONTAINER_VIDEO)
-    static let audio = UInt32(RC_CONTAINER_AUDIO)
-    private let handle: OpaquePointer
-
-    /// Opens and indexes the file; throws the core's lowercase reason.
-    init(path: String) throws {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        guard let made = rc_container_open(path, &err) else {
-            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
-        }
-        handle = made
-    }
-
-    deinit { rc_container_free(handle) }
-
-    /// The header's describe JSON.
-    var describeJSON: String { takeString(rc_container_describe(handle)) ?? "{}" }
-
-    /// Snaps the video to `fps`'s grid when it lies on it; true when it did.
-    func retime(_ fps: Fps) -> Bool {
-        rc_container_retime(handle, Int64(fps.num), Int64(fps.den))
-    }
-
-    /// The copied samples of `track`.
-    func count(_ track: UInt32) -> Int {
-        Int(clamping: rc_container_sample_count(handle, track))
-    }
-
-    /// Sample `index` of `track`, in decode order; nil past the count.
-    func sample(_ track: UInt32, at index: Int) -> RcContainerSample? {
-        guard index >= 0 else { return nil }
-        var out = RcContainerSample()
-        return rc_container_sample(handle, track, UInt64(index), &out) ? out : nil
-    }
-}
-
-// MARK: - LUTs
-
-/// A `.cube` 3D LUT read by the core (`RcCube`, spec §11 GR-8), so the import
-/// probe and the compositor read one file the same way.
-enum ReelCube {
-    /// The largest file the core reads; `MediaImporter.readLUT` reads one
-    /// byte more, so a larger file is refused in the core's own sentence.
-    static let maxBytes = Int(RC_CUBE_MAX_BYTES)
-
-    /// The file's lattice; throws the core's lowercase sentence.
-    static func parse(_ data: Data) throws -> CubeLattice {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let made = withNonNullBytes(data) { rc_cube_parse($0, $1, &err) }
-        guard let cube = made else {
-            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
-        }
-        defer { rc_cube_free(cube) }
-        let size = Int(rc_cube_size(cube))
-        var rgb = [Float](repeating: 0, count: size * size * size * 3)
-        let copied = rgb.withUnsafeMutableBufferPointer { out in
-            out.baseAddress.map { rc_cube_copy_rgb(cube, $0, out.count) } ?? false
-        }
-        guard size >= 2, copied else {
-            throw ReelCoreError(message: "its table could not be read")
-        }
-        return CubeLattice(size: size, rgb: rgb)
-    }
-}
-
-// MARK: - HDR10
-
-/// A PQ file's HDR10 peak read by the core (`rc_hdr10_peak`, spec §11 HD-12):
-/// the format description's two extensions when either is present, else the
-/// first sample's prefix SEI, its NAL units prefixed by `nalLength` bytes.
-enum ReelHDR10 {
-    /// What the core read; an empty `PQColor` when it read nothing (the core
-    /// answers NULL only on a caught panic, read as nothing too).
-    static func peak(mastering: Data?, contentLight: Data?, sample: Data?, nalLength: Int)
-        -> PQColor
-    {
-        let length = UInt32(clamping: max(0, nalLength))
-        let text: String? = withBytes(mastering) { m, mCount in
-            withBytes(contentLight) { l, lCount in
-                withBytes(sample) { s, sCount in
-                    takeString(rc_hdr10_peak(m, mCount, l, lCount, s, sCount, length))
-                }
-            }
-        }
-        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
-    }
-
-    /// An AV1 track's peak (spec §11 HD-18 (c)), for a description carrying
-    /// neither extension: the metadata OBUs of its `av1C` record (`config`),
-    /// then of its first sample with data; an empty `PQColor` when nothing
-    /// reads.
-    static func av1Peak(config: Data?, sample: Data?) -> PQColor {
-        let text: String? = withBytes(config) { c, cCount in
-            withBytes(sample) { s, sCount in
-                takeString(rc_hdr10_av1_peak(c, cCount, s, sCount))
-            }
-        }
-        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
-    }
-
-    /// A PQ still's peak (`rc_hdr10_still_peak`, spec §11 HD-20 (b)) from its
-    /// whole file: a PNG's `cLLI`/`mDCV`, a HEIF or AVIF primary item's
-    /// `clli`/`mdcv`; an empty `PQColor` when nothing reads.
-    static func stillPeak(file: Data?) -> PQColor {
-        let text: String? = withBytes(file) { f, fCount in
-            takeString(rc_hdr10_still_peak(f, fCount))
-        }
-        return text.flatMap { ReelJSON.decode(PQColor.self, from: $0) } ?? PQColor()
-    }
-}
-
-/// AV1 in MP4's container bytes, decided in the core (spec §11 CX-12 (4)): the
-/// `av1C` record from SVT-AV1's sequence header, each packet's temporal
-/// delimiters stripped, and the written file's `ftyp` branded `av01`.
-enum ReelAV1 {
-    /// The record for the first sequence header OBU in `sequenceHeader`; throws
-    /// the core's sentence when there is none or it ends early.
-    static func config(sequenceHeader: Data) throws -> Config {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let raw = withByteBuffer(sequenceHeader) { rc_av1_config($0, $1, &err) }
-        guard let text = takeString(raw) else {
-            throw ReelCoreError(
-                message: takeErrorMessage(err, fallback: "the av1C record could not be built"))
-        }
-        return try Config.decoded(text)
-    }
-
-    /// `data` without its temporal delimiter OBUs; false, `data` untouched, when
-    /// it is not a run of whole OBUs (or is empty).
-    static func stripTemporalDelimiters(_ data: inout Data) -> Bool {
-        let kept = withMutableByteBuffer(&data) { rc_av1_strip_temporal_delimiters($0, $1) }
-        guard kept > 0 else { return false }
-        data.removeSubrange(data.startIndex.advanced(by: kept)...)
-        return true
-    }
-
-    /// `rc_av1_ftyp_brand` over a file's first bytes, in place: 1 rewritten, 0
-    /// already carried, -1 no `ftyp` box or no `mp41` brand.
-    static func brandAV01(_ head: inout Data) -> Int32 {
-        withMutableByteBuffer(&head) { rc_av1_ftyp_brand($0, $1) }
-    }
-}
-
-/// The core's WebM writer (`RcWebm`, spec §11 CX-15), `ExportWebMWriter`'s file. `add`,
-/// `endTrack` and `finish` may come from several threads; each throws the core's sentence.
-final class ReelWebM {
-    static let video = UInt32(RC_WEBM_VIDEO)
-    static let audio = UInt32(RC_WEBM_AUDIO)
-    private let handle: OpaquePointer
-
-    /// Creates the file at `path` and writes its header from `layoutJSON`.
-    init(path: String, layoutJSON: String) throws {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        guard let made = rc_webm_open(path, layoutJSON, &err) else {
-            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be made"))
-        }
-        handle = made
-    }
-
-    deinit { rc_webm_free(handle) }
-
-    func add(track: UInt32, ptsNs: Int64, key: Bool, discardPaddingNs: Int64, data: Data) throws {
-        try check { err in
-            withByteBuffer(data) {
-                rc_webm_add_packet(handle, track, ptsNs, key, discardPaddingNs, $0, $1, err)
-            }
-        }
-    }
-
-    /// One video packet with its alpha frame (spec §11 CX-17 (5)), on a layout whose video has
-    /// `alpha_mode`.
-    func addVideo(ptsNs: Int64, key: Bool, data: Data, alpha: Data) throws {
-        try check { err in
-            withByteBuffer(data) { picture, pictureCount in
-                withByteBuffer(alpha) { plane, planeCount in
-                    rc_webm_add_video_with_alpha(
-                        handle, ptsNs, key, picture, pictureCount, plane, planeCount, err)
-                }
-            }
-        }
-    }
-
-    func endTrack(_ track: UInt32) throws { try check { rc_webm_end_track(handle, track, $0) } }
-
-    func finish() throws { try check { rc_webm_finish(handle, $0) } }
-
-    private func check(
-        _ call: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Bool
-    ) throws {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        guard !call(&err) else { return }
-        throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be written"))
-    }
-}
-
-// MARK: - Graphics
-
-/// Decodes and frees a `diag_out`. An unreadable one is one error saying so.
-private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDiagnostic] {
-    takeString(raw).map(GraphicDiagnostic.list(json:)) ?? []
-}
-
-/// The engine's fonts and assets (`RcGraphicLibrary`), frozen by its first compile or rasterize;
-/// it and a module compiled against it may be freed in either order.
-final class GraphicLibrary {
-    /// The header's `RC_GRAPHIC_MAX_SIDE`; a larger side is refused before allocating.
-    static let maxSide = Int(RC_GRAPHIC_MAX_SIDE)
-    fileprivate let handle: OpaquePointer
-
-    init() { handle = rc_graphic_library_new() }
-    deinit { rc_graphic_library_free(handle) }
-
-    func addFont(_ bytes: Data) throws {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let ok = withByteBuffer(bytes) { rc_graphic_library_add_font(handle, $0, $1, &err) }
-        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No font added.")) }
-    }
-
-    func addAsset(name: String, bytes: Data) throws {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let ok = withByteBuffer(bytes) { rc_graphic_library_add_asset(handle, name, $0, $1, &err) }
-        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
-    }
-
-    /// Sets the per-process image cache's limit (spec §11 G-39); answers the bytes it holds.
-    @discardableResult static func imageCache(limit: Int) -> Int {
-        rc_graphic_image_cache(max(0, limit))
-    }
-
-    /// The engine's family names, sorted. FREEZES the library.
-    func families() -> [String] {
-        guard let json = takeString(rc_graphic_library_families(handle)) else { return [] }
-        return ReelJSON.decode([String].self, from: json) ?? []
-    }
-
-    /// What every parse and measure has used (spec §11 G-46 (b)). FREEZES the library.
-    func usage() -> GraphicUsage {
-        GraphicUsage.decoded(takeString(rc_graphic_library_usage(handle)))
-    }
-
-    /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
-    func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
-        try GraphicFailure.checkSides(width, height, max: Self.maxSide)
-        let stride = width * 4
-        var bgra = [UInt8](repeating: 0, count: max(height * stride, 1))
-        var diag: UnsafeMutablePointer<CChar>? = nil
-        let ok = bgra.withUnsafeMutableBufferPointer { out in
-            rc_graphic_rasterize(
-                handle, svg, UInt32(width), UInt32(height), out.baseAddress, stride, &diag)
-        }
-        let diagnostics = takeDiagnostics(diag)
-        guard ok else { throw GraphicFailure(diagnostics: diagnostics) }
-        return GraphicRaster(
-            width: width, height: height, stride: stride, bgra: bgra, warnings: diagnostics)
-    }
-}
-
-/// One compiled graphic module (`RcGraphic`). Holds its library strongly.
-final class GraphicModule {
-    let library: GraphicLibrary
-    private let handle: OpaquePointer
-
-    private init(library: GraphicLibrary, handle: OpaquePointer) {
-        self.library = library
-        self.handle = handle
-    }
-
-    deinit { rc_graphic_free(handle) }
-
-    static func compile(
-        library: GraphicLibrary, name: String, source: String, budgetMs: Int
-    ) throws -> GraphicModule {
-        var diag: UnsafeMutablePointer<CChar>? = nil
-        let made = rc_graphic_compile(
-            library.handle, name, source, UInt32(clamping: budgetMs), &diag)
-        let diagnostics = takeDiagnostics(diag)
-        guard let handle = made else { throw GraphicFailure(diagnostics: diagnostics) }
-        return GraphicModule(library: library, handle: handle)
-    }
-
-    /// `{"meta":…,"schema":…,"revision":…,"warnings":[…]}`, the schema in the module's order.
-    func describeJSON() -> String {
-        takeString(rc_graphic_describe(handle)) ?? "{}"
-    }
-
-    func svg(
-        frame: Int, propsJSON: String, ctxJSON: String, budgetMs: Int
-    ) throws -> (svg: String, warnings: [GraphicDiagnostic]) {
-        var diag: UnsafeMutablePointer<CChar>? = nil
-        let out = rc_graphic_svg(
-            handle, Int64(frame), propsJSON, ctxJSON, UInt32(clamping: budgetMs), &diag)
-        let diagnostics = takeDiagnostics(diag)
-        guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
-        return (svg, diagnostics)
-    }
-}
-
-/// The core's `.fjgraphic` writer (spec §11 G-46 (c)) and reader (G-47 (c)).
-enum ReelGraphicPackage {
-    /// Writes the package at `path` from `packageJSON` and `data` (the files' bytes in order);
-    /// answers its `manifest.json`, or throws the core's sentence.
-    static func write(path: String, packageJSON: String, data: Data) throws -> String {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let raw = withByteBuffer(data) { rc_graphic_package_write(path, packageJSON, $0, $1, &err) }
-        guard let manifest = takeString(raw) else {
-            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be written"))
-        }
-        return manifest
-    }
-
-    /// Checks the package held in `data` (spec §11 G-47 (c)); answers its manifest with each
-    /// file's `offset` in `data`, or throws the core's sentence.
-    static func read(_ data: Data) throws -> String {
-        var err: UnsafeMutablePointer<CChar>? = nil
-        let raw = withByteBuffer(data) { rc_graphic_package_read($0, $1, &err) }
-        guard let answer = takeString(raw) else {
-            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
-        }
-        return answer
-    }
 }
 
 // MARK: - The agent socket
