@@ -112,7 +112,7 @@ final class AgentServer {
         "normalize_clip", "match_audio",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
-    static let offMainTools = productOffMainTools.union(devOffMainTools)
+    static let offMainTools = productOffMainTools.union(creatorOffMainTools).union(devOffMainTools)
 
     // MARK: - Lifecycle
 
@@ -208,8 +208,9 @@ final class AgentServer {
     /// `import_graphic`). The count is
     /// not decoration: `prepareCatalog()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
-    /// deliberately have no tool, so a new tool that is not an op belongs in
-    /// that sentence as well as in this table.
+    /// deliberately have no tool, so a new product tool that is not an op belongs in
+    /// that sentence as well as in this table; a tool of road map "creator-jobs" belongs in
+    /// `AgentServer+CreatorJobs.swift`'s `creatorHandlers` instead (spec §11 CJ-8 (d)).
     private static let productHandlers: [String: ToolHandler] = [
         // Projects (AgentServer+Project.swift)
         "open_project": { $0.openProject },
@@ -332,7 +333,7 @@ final class AgentServer {
         "cancel_export": { $0.cancelExport },
     ]
     // The dev tools' handlers join here (AgentServer+DevTools.swift).
-    private static let handlers = withDevHandlers(productHandlers)
+    private static let handlers = withDevHandlers(withCreatorHandlers(productHandlers))
 
     /// Ops the core declares that deliberately have NO tool. None today,
     /// and the bar for an entry is high: the agent-parity rule
