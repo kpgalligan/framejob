@@ -1126,7 +1126,54 @@ area."
 - **Acceptance:** `make gate` PASS after each toll, at exactly the four baseline warnings; each move
   diffed line-identical. **Proof rows, mutants, manual checks, questions:** none.
 
-#### CJ0d — the app's tolls T11–T17: snapshots, recipe, core edge, importer, reverse
+#### CJ0c's record (2026-11-01)
+
+**Landed.** Five commits on lane B's own branch, base `ba535d61` (`app/Sources` and `tools/`
+unchanged there from `d0661e5d`, so the ranges above held when re-read): one per toll, each a pure
+move typechecked alone, then this record's documents commit. Nothing a person or an agent can see
+changed.
+
+- **T5:** `viewMenu`, `trackHeightMenu` and `previewQualityMenu` (442–526) to
+  `AppDelegate+ViewMenu.swift`; `viewMenu` internal. `wc -l`: `AppDelegate+Menus.swift` 554 → 471,
+  `AppDelegate+ViewMenu.swift` 100. No `inventory.json` site moved (`inventory.py --check` 5/5).
+- **T6:** `// MARK: - The held last frame` through `missingClips` (428–518) to
+  `CompositionBuilder+HeldFrame.swift`; `heldTail` and `missingClips` internal. `wc -l`:
+  `CompositionBuilder.swift` 546 → 454, `CompositionBuilder+HeldFrame.swift` 108. The `timeRange`
+  warning reports at `CompositionBuilder+HeldFrame.swift:47`, and `TYPECHECK_BASELINE`'s row names
+  that file (`gate.py --selftest` 35/35).
+- **T7:** `// MARK: - Reverse (spec §11)` through `reverseRenderDidFinish` (827–979) to
+  `ProjectDocument+Reverse.swift`; `private` dropped on the three stored properties (:364, :368,
+  :369). `wc -l`: `ProjectDocument.swift` 1336 → 1182, `ProjectDocument+Reverse.swift` 169.
+  `inventory.json`'s site became `ProjectDocument+Reverse.swift:122` (`host.presentAsSheet(`), and
+  its five `gate` anchors and the `retryReversedMedia` anchor moved with it; the `via` anchors stay
+  on `ProjectDocument.swift` (`inventory.py --check` 5/5).
+- **T8:** `AgentServer+CreatorJobs.swift` (43 lines: `withCreatorHandlers`, an empty
+  `creatorHandlers`, an empty `creatorOffMainTools`); `AgentServer.swift` 807 → 808 by its :115 and
+  :335 lines and its tool-table doc sentence.
+- **The moves' diffs:** each moved range diffed against `ba535d61`'s lines: T5 differs only on
+  `viewMenu`'s line, T6 only on `heldTail`'s and `missingClips`' lines, T7 not at all. The base
+  files' own diffs are removals, the three `private` drops, `+Menus`' head doc and
+  `AgentServer.swift`'s three edits.
+- **Documents:** `app-file-history.md`'s three "Named next cuts" entries and its frozen-files
+  bullet; spec §7.4's rows for `ProjectDocument.swift`, `CompositionBuilder.swift`, the
+  `AppDelegate` row and the `AgentServer` row (80 lines still, `spec_index_proof.py` 222/222).
+
+**Deviations.**
+- `heldTail` and `missingClips` lost `private`, which T6 above does not name: Swift's `private`
+  reaches only its own file, and their callers (`fill`, `build`) stay in `CompositionBuilder.swift`.
+- `AppDelegate+Menus.swift`'s head doc was amended so it stays true: the menus it builds and the
+  toll paragraph name `AppDelegate+ViewMenu.swift` and `viewMenu()`. Its count was already one high
+  (it said ten menus here and Insert the eleventh, where `buildMainMenu()` hangs ten in all); it
+  now says eight here, Insert the ninth and View the tenth.
+- `AgentServer.swift`'s doc sentence grew from two lines to three.
+- The acceptance line above asks for `make gate` after each toll; per this phase's spec each toll
+  was held to `make typecheck` (and `inventory.py --check` or `gate.py --selftest` where it
+  touched them) alone, and `make gate` ran once at the end.
+
+**Verification.** `make typecheck` after each toll: 0 errors, exactly the four baseline warnings,
+tsc silent. `make gate`: names, typecheck, fmt, lint, test and app each `pass`, "gate: PASS 483s" (exactly
+the four baseline warnings, the `timeRange` one in `CompositionBuilder+HeldFrame.swift`; BUILD
+SUCCEEDED through the Write Agent Catalog step's parity check over the merged handlers).
 
 - **What a person gets:** nothing.
 - **T11–T13** `ProjectSnapshot.swift` (1,454, over), its named shape "a property group's snapshot

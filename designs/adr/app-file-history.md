@@ -753,8 +753,17 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   the kept-re-encode map), and the base file took only `assist`'s `planned` and its kept
   re-encode check. The next seam: the process plumbing (`run`, `ToolResult`, `OutputBox`) with
   the tool search.
-- `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
-  machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
+- `ProjectDocument.swift`: road map "creator-jobs" CJ0c's T7 cut the reverse machinery, in the
+  shape of `+DisplayStem`, `+Import`, `+Graphics`: `// MARK: - Reverse (spec §11)` through
+  `reverseRenderDidFinish` (lines 827–979 at `ba535d61`) moved whole to
+  `ProjectDocument+Reverse.swift` (`import AppKit`), a pure move gated alone. Its three stored
+  properties (`refusedReverseMedia`, `renderingReverseMedia`, `isPresentingReverseSheet`) stayed,
+  since an extension cannot hold one, and lost `private`; `reverseState()` moved with its two
+  callers and kept it. `inventory.json`'s `presentAsSheet` site, its five gate anchors and its
+  `retryReversedMedia` anchor re-pinned to the new file. `wc -l app/Sources/ProjectDocument.swift`:
+  1336 before, 1182 after; `ProjectDocument+Reverse.swift` is 169. The next seam:
+  `generateCaches()` with its doc to `ProjectDocument+Caches.swift` (SW4a, the road map's cap
+  table).
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift`,
   `InspectorBinding+Writes.swift` and `InspectorRows.swift` (issue batch B87 phase 3: `// MARK: -
   Row builders` through `changedRGBA`, a pure move gated alone before `inspectorRow(discrete:)`
@@ -897,6 +906,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `CompositionBuilder+Orientation.swift` is 77. The next seam: the held last frame (`// MARK: - The held last frame`: `heldTail`,
   `timeRange(of:)`, `oneFrame(of:)`, `convertsSources`, `keyed`) to
   `CompositionBuilder+HeldFrame.swift`, taking the `timeRange` warning and its baseline row.
+  Road map "creator-jobs" CJ0c's T6 paid it: `// MARK: - The held last frame` through
+  `missingClips` (lines 428–518 at `ba535d61`) moved whole to `CompositionBuilder+HeldFrame.swift`
+  (`import AVFoundation`), a pure move gated alone; `heldTail` and `missingClips` lost `private`
+  because their callers, `fill` and `build`, stayed (`oneFrame` kept it), and the `timeRange`
+  warning's `TYPECHECK_BASELINE` row now names `+HeldFrame`. `wc -l
+  app/Sources/CompositionBuilder.swift`: 546 before, 454 after;
+  `CompositionBuilder+HeldFrame.swift` is 108. The next seam: `// MARK: - The media-less
+  timeline` (`addPlaceholderIfNeeded`) to `CompositionBuilder+Placeholder.swift`.
 - `MediaImporter.swift`: audio-sync-2's AS-3 paid a toll before the `syncFeatures` pass landed:
   `ProbeBox` (with its doc) and `hasAlphaChannel` (with its doc), the two members of the file that
   do not await, went verbatim to `MediaImporter+Probe.swift` (which gained `import CoreMedia`),
@@ -942,7 +959,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `backgroundMenu`, `transitionMenu`, `motionMenu`, `labelMenu` and `tagged` lost `private`
   (`motionSlotMenu` and `labelDot` kept it). `wc -l app/Sources/AppDelegate+Menus.swift`: 579
   before, 494 after; `AppDelegate+ClipMenus.swift` is 104. The next seam: the View menu's
-  submenus (`trackHeightMenu`, `previewQualityMenu`).
+  submenus (`trackHeightMenu`, `previewQualityMenu`). Road map "creator-jobs" CJ0c's T5 paid it
+  with the menu itself: `viewMenu`, `trackHeightMenu` and `previewQualityMenu` (lines 442–526 at
+  `ba535d61`) moved whole to `AppDelegate+ViewMenu.swift` (`import AppKit`), a pure move gated
+  alone; `viewMenu` lost `private` because `buildMainMenu()` calls it (the two submenus kept
+  it), and the head doc's menu count and toll paragraph were amended to stay true. No
+  `inventory.json` site moved. `wc -l app/Sources/AppDelegate+Menus.swift`: 554 before, 471
+  after; `AppDelegate+ViewMenu.swift` is 100. The next seam: `clipMenu()` into
+  `AppDelegate+ClipMenus.swift` beside its submenus.
 - `ReverseRenderer.swift`: precision-2's P2-0 paid its toll before P2-2's 10-bit reverse. It
   moved `// MARK: - Progress` (`ReverseProgressSheetController`) out whole, with `import AppKit`,
   to `ReverseProgressSheetController.swift`, a pure move gated alone; nothing widened, and
@@ -1019,7 +1043,12 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,
   `PreviewCanvasView.swift`, `EditorViewController.swift` and `AgentServer.swift` are frozen and
-  take wiring only.
+  take wiring only. Road map "creator-jobs" CJ0c's T8 gave `AgentServer.swift` its creator-jobs
+  seam as wiring (spec §11 CJ-8 (d)): `AgentServer+CreatorJobs.swift` (43 lines) holds
+  `creatorHandlers` and `creatorOffMainTools`, and the frozen file merges them by its two lines
+  (`withDevHandlers(withCreatorHandlers(productHandlers))` and the `offMainTools` union), its
+  tool-table doc sentence naming the seam; `wc -l app/Sources/AgentServer.swift`: 807 before,
+  808 after.
 
 ## Open items
 
