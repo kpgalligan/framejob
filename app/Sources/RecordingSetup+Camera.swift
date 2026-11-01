@@ -5,7 +5,7 @@ import AppKit
 /// CR1a, spec §11 CAM-3): its file stem (and a camera's file beside a screen
 /// movie, CAM-9) and its grant's read and refusal;
 /// and the panel's step for the grant and the note once its pane is open
-/// (CR1c, CAM-5; the pane's URL is `RecordingSetup.swift`'s, beside the
+/// (CR1c, CAM-5; the pane's URL is `RecordingGrant.swift`'s, beside the
 /// others, the one file a System Settings URL is spelled in). Values a probe
 /// can call, in a file of their own because `RecordingSetup.swift` stands
 /// near the 400-line cap. Nothing here

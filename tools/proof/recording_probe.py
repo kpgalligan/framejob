@@ -550,7 +550,7 @@ nothing and never write the flag; 11 a flag already true still asks. 10f,
 structural over the comment-stripped source: `CGRequestScreenCaptureAccess(`,
 `requestAccess(` and `NSWorkspace` in no `AgentServer+Recording*` or
 `ScreenRecorder*` file; `x-apple.systempreferences` only in
-`RecordingSetup.swift`; `CGRequestScreenCaptureAccess(` only in
+`RecordingGrant.swift`; `CGRequestScreenCaptureAccess(` only in
 `+Grants.swift`.
 
 Section 11 (`unreadable`, issue batch B17, #97) runs in its own process
@@ -867,11 +867,11 @@ route-to-show 874 — every one below the count.
 184/184 when 10e gained its level row: each scored exactly one more (the
 level row passes under each), so each figure below is +1 of 184 today:
 
-  ask-every-press   `screenStep` ignores `asked` → `.ask` (RecordingSetup.swift)
+  ask-every-press   `screenStep` ignores `asked` → `.ask` (RecordingGrant.swift)
                     — 178/183: 10a's asked-and-launchd row, 10e 2's three
                     rows, 10e 3's tried pane.
   open-first-press  `screenStep` always `.openPane` for an ungranted press
-                    (RecordingSetup.swift) — 170/183: 10a's three ask rows,
+                    (RecordingGrant.swift) — 170/183: 10a's three ask rows,
                     10e 1's four, 10e 2's two, 10e 10's three, 10e 11.
   asked-forgotten   the `rememberScreenAsked()` call deleted
                     (RecorderPanelController+Grants.swift) — 179/183: 10e 1's
@@ -879,11 +879,11 @@ level row passes under each), so each figure below is +1 of 184 today:
   shell-remembers   the `if owned` guard on `rememberScreenAsked()` dropped
                     (RecorderPanelController+Grants.swift) — 182/183: 10e 10's
                     flag row.
-  shell-opens       `screenStep`'s launchd arm deleted (RecordingSetup.swift) —
+  shell-opens       `screenStep`'s launchd arm deleted (RecordingGrant.swift) —
                     181/183: 10a's shell-and-asked row, 10e 11.
-  mic-denied-asks   `.denied` → `.ask` in `microphoneStep` (RecordingSetup.swift)
+  mic-denied-asks   `.denied` → `.ask` in `microphoneStep` (RecordingGrant.swift)
                     — 179/183: 10b's denied row, 10e 4's three rows.
-  panes-swapped     the two pane anchors swapped (RecordingSetup.swift) —
+  panes-swapped     the two pane anchors swapped (RecordingGrant.swift) —
                     177/183: 10c's two URLs, 10e 2, 3, 4 and 5's opened URL.
   opened-claimed    the opener's answer ignored in the screen arm
                     (RecorderPanelController+Grants.swift) — 182/183: 10e 3's
@@ -9258,8 +9258,8 @@ def section_grants(binary, sources):
         check(f"10f: `{token}` in no AgentServer+Recording*/ScreenRecorder* file", holders == [],
               f"{holders}")
     holders = [name for name in names if "x-apple.systempreferences" in codes[name]]
-    check("10f: `x-apple.systempreferences` only in RecordingSetup.swift",
-          holders == ["RecordingSetup.swift"], f"{holders}")
+    check("10f: `x-apple.systempreferences` only in RecordingGrant.swift",
+          holders == ["RecordingGrant.swift"], f"{holders}")
     holders = [name for name in names if "CGRequestScreenCaptureAccess(" in codes[name]]
     check("10f: `CGRequestScreenCaptureAccess(` only in RecorderPanelController+Grants.swift",
           holders == ["RecorderPanelController+Grants.swift"], f"{holders}")
@@ -10391,12 +10391,12 @@ MUTANTS = {
         "pause() leaves the microphone's writer running through the pause"),
     # The grants a press checks (spec §11 recording; section 10's rows).
     "ask-every-press": (
-        "RecordingSetup.swift",
+        "RecordingGrant.swift",
         "        if asked { return .openPane }\n",
         "        if asked { return .ask }\n",
         "screenStep ignores the asked flag — every press puts up a prompt that never comes again"),
     "open-first-press": (
-        "RecordingSetup.swift",
+        "RecordingGrant.swift",
         "        if !launchedByLaunchd { return .ask }\n"
         "        if asked { return .openPane }\n"
         "        return .ask\n",
@@ -10413,18 +10413,18 @@ MUTANTS = {
         "            doors.rememberScreenAsked()\n",
         "a shell-launched press writes the flag — a later Finder launch would never be asked"),
     "shell-opens": (
-        "RecordingSetup.swift",
+        "RecordingGrant.swift",
         "        if !launchedByLaunchd { return .ask }\n",
         "",
         "screenStep's launchd arm deleted — a shell-launched press that finds the flag opens the pane"),
     "mic-denied-asks": (
-        "RecordingSetup.swift",
+        "RecordingGrant.swift",
         "        case .denied, .restricted: return .openPane\n",
         "        case .denied: return .ask\n"
         "        case .restricted: return .openPane\n",
         "a denied microphone asks again — a prompt the system will never show"),
     "panes-swapped": (
-        "RecordingSetup.swift",
+        "RecordingGrant.swift",
         "        string: \"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture\")\n"
         "\n"
         "    /// System Settings ▸ Privacy & Security ▸ Microphone.\n"
