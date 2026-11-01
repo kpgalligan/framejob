@@ -171,7 +171,10 @@ VERSION              the base version, MAJOR.MINOR; `make project` feeds it to x
 project (JSON, spec §5.2), every edit, the composition plan, the per-frame
 recipe, the index of a WebM/Matroska file being imported and the WebM file an
 `av1_webm`, `vp9_webm` or `vp9_alpha_webm` export writes (its container only; the packets come from Swift). Swift owns windows, gestures, undo, AVFoundation playback and export,
-the Metal compositor, media import and its caches, and agent dispatch. No
+the Metal compositor, media import and its caches and on-device analysis of
+the media (Vision and Sound Analysis on the analysis lane, cached per media
+in `cache/analysis/`; the core reads only what a tool or op hands it), and
+agent dispatch. No
 pixel or sample work in Rust; no ffmpeg dependency in the product. The AV1 and
 VP9 encoders (SVT-AV1, libvpx; `designs/adr/codec-export.md`) are
 platform-side like AVFoundation: Swift calls them through the bridging header,
@@ -253,7 +256,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and six product tools (and the dev tools, road
+  stranger by name, for all one hundred and seven product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -323,7 +326,7 @@ path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
-`detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `normalize_clip`, `enhance_voice`, `match_audio`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
+`detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `get_media_analysis`, `normalize_clip`, `enhance_voice`, `match_audio`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `export_status`, `cancel_export`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
@@ -340,6 +343,12 @@ true peak, the frames measured and its resets) and resets it (road map
 finished recording through the recorder panel's door or `record_screen`'s,
 so a proof can watch Enhance the microphone when it lands without a
 microphone grant (spec §11 AU-69); and
+`analysis_job`, which wants a media's analysis under a document's stand-in
+owner and returns at once, or waits for every such job and answers their
+runs (spec §11 CJ-27); and `-RCDevAnalysisHold <s>`, which holds each
+analysis job before its first frame, polling cancellation, so a proof can
+act during it; and `-RCDevAnalysisCanned YES`, with which a canned analysis
+marker is honoured (spec §11 CJ-26); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

@@ -66,7 +66,7 @@ A package is a folder that the Finder shows as one file:
 | Inside | What it is |
 |---|---|
 | `project.json` | The edit itself: canvas, media list, tracks, clips, markers. The only thing a package needs in order to open. |
-| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips and speed-ramp audio. A package with a missing or damaged `cache/` still opens and just redraws. |
+| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips, speed-ramp audio and the shot changes found for an agent (`cache/analysis/`). A package with a missing or damaged `cache/` still opens and just redraws. |
 | `media/` | Only after **Consolidate Media…**: copies of the footage (see [Consolidate Media](#consolidate-media)). |
 | `graphics/` | Only once you add a graphic: graphic modules, their fonts, images and kept versions. See [Graphics](graphics.md). |
 

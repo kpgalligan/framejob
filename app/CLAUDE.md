@@ -328,7 +328,8 @@ detail there.
   Apple Log and Apple Log 2 labels read at probe, spec §11 GR-16, and
   `detectedPQ`, a PQ file's HDR10 peak through `ReelHDR10`, HD-6, and
   `detectedStillPQ`, a PQ still's through `ReelHDR10.stillPeak`, HD-20;
-  +`ThumbnailSource`: the converted strip, below; +`Thumbnails`: the
+  +`ThumbnailSource`: the converted strip, below, and `oneClip`, which
+  the analysis reader's converted arm builds too; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch, the publish and `writeTiles`, one landed
   frame's tiles, `nil` once the pass is superseded so the frames loop's labelled break stays in
   `thumbnails`, CJ0d's T16) ·
@@ -453,6 +454,31 @@ detail there.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
   folder under it: `0700` at each level it makes, an existing folder left
   alone (#108).
+- `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
+  `AnalysisFrames.swift` · `AnalysisShots.swift` ·
+  `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
+  `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` —
+  on-device analysis of the media (road map creator-jobs CJ2a, spec §11
+  CJ-20…CJ-27): a cache made on demand in `cache/analysis/<kind>/`, never at
+  import, never project state, never read by the plan or the recipe.
+  `AnalysisLane` is the process-wide analysis lane, the analysis twin of
+  `MediaCacheLane.swift`'s rule: owners want requests (`want` replaces, an
+  unwanted job is cancelled, an owner whose `alive()` is false is dropped at
+  the next 50 ms poll, `settled` runs on main), a `.utility` picture queue
+  of `pictureWidth` (1, CJ-S3) and a serial sound queue, never the
+  cooperative pool and never `MediaCacheLane`; a job takes no `CachePass`
+  and writes only through `AnalysisStore.publish` — a lock per (cache, kind,
+  media) inside `CacheLedger.publish(in:for: nil)`, re-reading and merging
+  what is on disk — so an import pass and a job never cancel or wait on each
+  other, and nothing in a publish waits on main. A stamp is compared field
+  by field (`AnalysisStamp.matches`). `AnalysisFrames` reads direct (turned
+  upright) or converted through `MediaImporter.oneClip` and step 0 when a
+  `ThumbnailInput` exists, its pre-roll two DECODED frames.
+  `get_media_analysis` (`AgentServer+Analysis.swift`, off main) waits
+  holding the agent lane's lock, at most `AnalysisLane.callWaitLimit` (60
+  s). `-RCDevAnalysisHold <s>` and `-RCDevAnalysisCanned YES` are dev only,
+  and `analysis_job` (`AgentServer+AnalysisJob.swift`) is the dev tool
+  proofs act through.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.

@@ -308,7 +308,7 @@ extension MediaImporter {
 
     /// The one-clip project around `media` at `url`, published under `key`
     /// and built; nil for any refusal, identity, throw or empty plan.
-    private static func oneClip(
+    static func oneClip(
         _ media: MediaSnapshot, url: URL, input: ThumbnailInput, key: Int
     ) -> BuiltComposition? {
         guard

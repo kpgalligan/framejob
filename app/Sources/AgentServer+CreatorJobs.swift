@@ -33,11 +33,21 @@ extension AgentServer {
         return merged
     }
 
-    /// Road map "creator-jobs"'s tool handlers, by tool name. Empty until the
-    /// road map's first tool lands.
-    private static let creatorHandlers: [String: ToolHandler] = [:]
+    /// Road map "creator-jobs"'s tool handlers, by tool name.
+    private static let creatorHandlers: [String: ToolHandler] = [
+        // AgentServer+Analysis.swift (CJ2a, spec §11 CJ-25)
+        "get_media_analysis": { $0.getMediaAnalysis },
+    ]
 
     /// The road map's tools that run off the main thread, unioned into
     /// `AgentServer.offMainTools`.
-    static let creatorOffMainTools: Set<String> = []
+    static let creatorOffMainTools: Set<String> = ["get_media_analysis"]
+
+    /// The road map's catalog rows, in catalog order: `get_media_analysis`
+    /// (CJ2a, `AgentCatalog+Analysis.swift`). `catalogJSON()` splices them in
+    /// immediately before the dev tools' rows, so the dev block still runs
+    /// straight into `import_media` and the file groups stay last.
+    func creatorTools() -> [[String: Any]] {
+        analysisTools()
+    }
 }

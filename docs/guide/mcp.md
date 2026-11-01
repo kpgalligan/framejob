@@ -567,6 +567,7 @@ See [Audio](audio.md) and [Remove Silences and Remove Filler Words](cleanup-tool
 | `import_captions` | An `.srt` file as text clips (**File ▸ Import Captions…**). |
 | `export_captions` | One text track as `.srt` or `.vtt` (**File ▸ Export Captions…**). |
 | `get_transcript` | One clip's spoken words with timeline times; never uploads anything. |
+| `get_media_analysis` | The hard cuts (`kind: "shots"`) in one media file, or in the part of it one clip plays, with clip and timeline times for a clip; found on this Mac, kept in the project's cache, no key and nothing uploaded. A cut inside a gradual dissolve or a single flash frame is not reported; a dissolve between flat-coloured pictures (slides, title cards) can show as one cut. |
 
 See [Captions](captions.md) and [Remove Silences and Remove Filler Words](cleanup-tools.md).
 

@@ -515,6 +515,7 @@ extension AgentServer {
         // `ticks` is the one local they share with the groups above.
         // The dev tools' rows (AgentServer+DevTools.swift) go HERE, before the file
         // tools, never at the end; Distribution's are none.
+        catalog += creatorTools()
         catalog += devTools()
         catalog += fileTools(ticks: ticks)
         let data = try JSONSerialization.data(withJSONObject: catalog)

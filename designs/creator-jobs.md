@@ -2278,6 +2278,220 @@ from this tree's `build/` (`Sparkle.framework` and five dSYMs) were rebuilt by i
   canned markers honoured without the flag (A8); the hold not polling cancellation (A6 times out).
 - **Manual checks:** none. **Depends on:** CJ0c (T8). **Lane** C. **Questions:** none expected.
 
+#### CJ2a's record (2026-11-01)
+
+**Landed.** Lane C, on the lane's branch (`worktree-wf_d062fc7a-bc3-15`), base `822973cd`:
+`bf767308` (`oneClip` internal, the fixtures, the spikes, CJ-20…CJ-27 recorded — before any
+`Analysis*.swift` existed), `ecba69a3` (the app code, the probe and the proof), `c15d981c`
+(CJ-S3 (b) in CJ-21, the pinned counts, the guide, the spec and the proof README), then this
+record's commit. No core, FFI or format change (CJ-20). An agent gets `get_media_analysis`
+(`kind: "shots"`); a person sees nothing yet.
+
+- **New files** (`wc -l`): `AnalysisStamp.swift` 183, `AnalysisStore.swift` 221,
+  `AnalysisLane.swift` 297, `AnalysisFrames.swift` 385, `AnalysisShots.swift` 218,
+  `ProjectDocument+Analysis.swift` 73, `AgentServer+Analysis.swift` 268,
+  `AgentCatalog+Analysis.swift` 66, `AgentServer+AnalysisJob.swift` 175 (`FRAMEJOB_DEV_TOOLS`
+  only). Wiring: `MediaImporter+ThumbnailSource.swift` (`oneClip` loses `private`, 349 lines,
+  unchanged count), `AgentServer+CreatorJobs.swift` 43 → 53 (the handler row,
+  `creatorOffMainTools`, `creatorTools()`), `AgentCatalog.swift` 523 → 524 (`catalog +=
+  creatorTools()` before `devTools()`), `AgentServer+DevTools.swift` 117 → 120,
+  `AssistantPrompt.swift` (`get_media_analysis` in the media topic's tools, no words). Not
+  touched: `AgentServer.swift`, `AgentLane.swift`, `ProjectDocument.swift`,
+  `BackgroundRender.swift` (CJ-S3 (b) did not fire).
+- **Instruments:** `tools/proof/analysis_fixtures.py`, `creator_spike/rule.py`,
+  `creator_spike/shots_spike.{py,swift}`, `creator_spike/lane_spike.{py,swift}`,
+  `analysis_probe.swift`, `analysis_proof.py` (P1–P9, A1–A12, Z1, ten mutants); `dev_tools.py`
+  gains `analysis_job`; `PRODUCT_TOOLS = 107`; `get_media_analysis` in `APP_STATE_TOOLS` of
+  `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
+- **Documents:** spec §5.6 (272 → 286), §7.4 (81 → 82), §7.9c (393 → 410), §7.9e (457 →
+  482) and their index cells; the §11 file (216 → 356) and eight index rows;
+  `docs/guide/mcp.md`, `projects-and-media.md`, `docs/developing.md`; `tools/proof/README.md`.
+
+**The spikes.** Preflight: `pmset -g batt` "Now drawing from 'AC Power'"; `uptime` at the
+start "load averages: 3.49 6.27 8.82", at CJ-S4's last run "41.55 63.44 44.31", at CJ-S3 (a)'s
+"11.63 35.50 39.90" (three lanes). OS build 25F80, Apple M2 Max, 12 cores. Both `rule_sha256`
+values recomputed by `rule.py` match CJ0a's table (CJ-S3 `209c6f01…ce830`, CJ-S4
+`eea6c190…46f9d1`); each `results.json` is in `tools/proof/work/creator_spike/<ID>/`.
+
+- **CJ-S4:** S-TH1 missing, so the no-cut input is ten minutes of the moving still (cover
+  SHA-256 `4a0b50f9…038983`) and S-TH1 is owed. The 40-clip project was exported by the Debug
+  app (`flattened.mp4`, 1,809 frames, 39 cuts from `get_project`). Recall 39/39 for the colour
+  histogram at every T from 0.04 to 0.64 (31 values) and for the luma histogram from 0.20 to
+  0.62, false cuts on the still 0 from T = 0.08 (colour) and 0.20 (luma); the tie went to the
+  wider band, its median T = 0.34; every m of 4, 6, 8, 12 kept the fixture's four cuts, so m =
+  12. PASS at 100 %, no SAD arm. At T and m: the fixture's cuts 60, 120, 180, 240 exactly; the
+  photographs' dissolve peaked at d1 0.16; the flash's two sides tie at 2; the VFR twin's cuts
+  the same frames. Found: `dissolve_patterns.mov` (test patterns dissolving) peaked at 1.04 and
+  answered one false cut at frame 68 — CJ-24's measured limit.
+- **CJ-S3 (a), (c):** synthetic files, S-TH4 owed; medians of three in CJ-21. Width 1 (two
+  converted jobs 1.05× one). Converted for converting media. `callWaitLimit` = 60 s (26.9 s
+  for ten minutes of 4K HLG converted at 256, × 2, up to 10 s).
+- **CJ-S3 (b):** on Debug, idle 600 / 580 / 598, busy 593 / 588 / 599, drop 0.84 %: no pause,
+  no `anyPlaying`. Each busy run's ten-minute job took 279–319 s in the Debug build (its
+  signature loop unoptimised); in Release the fixture's 380 frames took 0.36 s (A1's `run`).
+
+**Commands and results.**
+- `make typecheck` after `oneClip` and after each Swift round: exit 0, the four baseline
+  warnings, tsc silent.
+- `python3 tools/proof/swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS
+  tools/proof/analysis_probe.swift`: exit 0.
+- `analysis_proof.py --only P1,…,P8`: first 6/8 (P6 and P7 held the tick arithmetic wrong in the
+  probe — 4 s is 2,400,000 ticks — and P6 compared the reversed window against a 0 the media's
+  extra 200 ticks move); after the fix 8/8.
+- Debug, `make app-debug` then `--only A1,A2,A3`: 4/4. The other rows: first A8 (with the flag),
+  A10 and A11 failed — the canned marker's coverage was one index short of the media's grid
+  (7,600,200 ticks make 381 indices); the converted reader's range ran past the composition
+  (-11841); `relink_media` to the file's own path is an identity; and, once those were fixed,
+  A10 showed the lane skipping a landed request wanted again after the store had lost it (fixed:
+  a request wanted ANEW runs again). Then the whole proof on Debug: 21/21.
+- `python3 tools/proof/assistant_prompt_proof.py --probe`: 14/14, F4 "14 topics, 100 tools + 4
+  core against 104". `python3 tools/proof/spec_index_proof.py`: 222/222.
+  `python3 tools/proof/name_residue.py`: exit 0.
+- `make gate`: names, typecheck, test and app `pass` (fmt and lint skipped, no Rust input
+  changed), "gate: PASS 352s".
+- `RC_PROOF_APP=release python3 tools/proof/analysis_proof.py`: 21/21 (P1–P8, A1–A12, Z1 on
+  all three launches).
+- `RC_PROOF_APP=release python3 tools/proof/op_argument_proof.py <sock>` on a Release instance:
+  first 181/182 — "the core publishes 16 arguments as an opaque object", pinned at 14 since
+  before road map "audio" AP10c added `set_track`'s `compressor` and `limiter` (both doors'
+  own rows passed); re-pinned to 16 in `op_argument_proof.py`, then 182/182 (107 product tools,
+  the dev block with `analysis_job` straight into `import_media`). Parity grep empty.
+- Mutants (`analysis_proof.py --mutant <name>`, once each on the final instrument; probe
+  mutants on a copy of `app/Sources`, app mutants as Debug tree copies): **nine of ten
+  caught** — `stamp-no-os-build` P1, `preroll-by-index` P7 ("119...139 DIFFER at [119, 120]"),
+  `stamp-no-reader` A10, `partial-taken-covered` A3, `margin-unread` A9 (the first-half answer
+  gained the flash, 150, the other order 151), `width-wrong` A7 (the runs overlapped),
+  `flash-rule-removed` A1 (150 answered), `canned-without-flag` A8 (cuts [7] without the flag),
+  `hold-no-cancel-poll` A6 (cancelled 3.02 s after t0). **`write-outside-publish` SURVIVED A5**:
+  a save of the package takes about 13 ms (measured with a 1 GiB file in its `cache/`: 0.013 s
+  and 0.014 s), so a held job never publishes while a save is in flight and A5 cannot see a
+  write made outside the ledger; no row of this phase can make that overlap without a dev hold
+  on the save (filed below).
+- Review fix pass 1: probe row **P9** added — `CacheLedger.saveBegan` on a scratch folder, an
+  `AnalysisStore.publish` started on another thread, no marker or payload until `saveEnded`,
+  then both — and the `write-outside-publish` mutant re-pointed at it.
+  `analysis_proof.py --only P1,…,P9`: 9/9. `--mutant write-outside-publish`: CAUGHT, P9 failed
+  ("publish returned true (want false), marker true, payload true"). **Ten of ten caught.**
+
+**Deviations.**
+- **The call holds the agent lane's lock while it waits**, as `get_transcript` does; the road
+  map's draft said nothing of it and the adversary's objection 2 ruled out releasing it.
+- **A5–A7 and A11 act through `analysis_job` (CJ-27)**, because the MCP server answers one
+  request at a time; A7's "two documents' calls" are two dev owners' jobs.
+- **The VFR neighbour rule:** d1 and d2 are to the previous KEPT frames, the flash test reads the
+  next kept frame within m + 1, and the pre-roll is two decoded frames with restarts (CJ-23,
+  CJ-24), replacing the draft's "the frame before" and "two frames".
+- **The shots fixture's dissolve is between two FlexAudio photographs**, not two of the four
+  test sources: a dissolve between flat-coloured patterns peaks above every T with full recall
+  (1.04), so A1's "none inside the dissolve" can hold only for a dissolve whose distances stay
+  under T, which CJ-24's draft presupposed. The pattern dissolve is measured as a finding
+  (`dissolve_patterns.mov`) and stated as a limit in CJ-24, the tool's description and the
+  guide.
+- **The signature is in whole-pixel counts, its L1 divided once:** the spike's first run on
+  normalised floats left the flash's two sides 2 and 1.9999999999999998, so the return frame
+  became a cut; integers make them tie, as the tie-break needs.
+- **CJ-S4's tie-break** (two signatures at recall 100 %): the one with more T at the top recall,
+  then the median T of its band. **CJ-S3 rule (a)** is applied at shots' size on each file
+  through the reader rule (c) gives it, every file required.
+- **A11 relinks to a copy** keeping the bytes and the modification second (the same source
+  identity): a relink to the file's own path is an identity and starts no import pass.
+- **The lane's "not run again":** a request an owner wants ANEW after it ended runs again (its
+  caller found the store missing it); one an owner keeps wanting (the dev owner's earlier
+  requests) keeps its run. Found by A10.
+- **`isOpenForAnalysis` is `nonisolated`** (the document is main-actor isolated; an owner's
+  `alive()` runs on the lane's threads).
+- **The VFR twin's grid** is the importer's rationalised rate, 29842/1000, not 30: P7 compares
+  within that grid (gaps at indices 118 and 269, the cut at 4 s at 119).
+- **TX1** (lane A) may add the same `creatorTools()` seam and catalog splice; the integrator
+  reconciles them (one splice, both groups).
+
+**Files outside the spec's list.** `tools/proof/creator_spike/rule.py` (the CJ-7 hash and the
+results file both spikes share); `op_argument_proof.py`'s opaque-door pin (above; the file is
+in the list for `PRODUCT_TOOLS`).
+
+**CLAUDE.md edits owed** (the integrator applies them):
+- `app/CLAUDE.md`, "The document.", after the `MediaCacheLane.swift` paragraph's bullet: a new
+  bullet — "- `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
+  `AnalysisFrames.swift` · `AnalysisShots.swift` · `ProjectDocument+Analysis.swift` ·
+  `AgentServer+Analysis.swift` · `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift`
+  — on-device analysis of the media (road map creator-jobs CJ2a, spec §11 CJ-20…CJ-27): a cache
+  made on demand in `cache/analysis/<kind>/`, never at import, never project state, never read
+  by the plan or the recipe. `AnalysisLane` is the process-wide analysis lane, the analysis
+  twin of `MediaCacheLane.swift`'s rule: owners want requests (`want` replaces, an unwanted job
+  is cancelled, an owner whose `alive()` is false is dropped at the next 50 ms poll, `settled`
+  runs on main), a `.utility` picture queue of `pictureWidth` (1, CJ-S3) and a serial sound
+  queue, never the cooperative pool and never `MediaCacheLane`; a job takes no `CachePass` and
+  writes only through `AnalysisStore.publish` — a lock per (cache, kind, media) inside
+  `CacheLedger.publish(in:for: nil)`, re-reading and merging what is on disk — so an import pass
+  and a job never cancel or wait on each other, and nothing in a publish waits on main. A
+  stamp is compared field by field (`AnalysisStamp.matches`). `AnalysisFrames` reads direct
+  (turned upright) or converted through `MediaImporter.oneClip` and step 0 when a
+  `ThumbnailInput` exists, its pre-roll two DECODED frames. `get_media_analysis`
+  (`AgentServer+Analysis.swift`, off main) waits holding the agent lane's lock, at most
+  `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and `-RCDevAnalysisCanned YES`
+  are dev only, and `analysis_job` (`AgentServer+AnalysisJob.swift`) is the dev tool proofs
+  act through."; and in the `MediaImporter.swift` bullet, "+`ThumbnailSource`: the converted
+  strip, below;" becomes "+`ThumbnailSource`: the converted strip, below, and `oneClip`, which
+  the analysis reader's converted arm builds too;".
+- Root `CLAUDE.md`: "for all one hundred and six product tools" → "for all one hundred and
+  seven product tools"; in "Verifying a build"'s app-state list, "`detect_fillers`,
+  `transcribe_for_fillers`, `get_transcript`," → "`detect_fillers`, `transcribe_for_fillers`,
+  `get_transcript`, `get_media_analysis`,"; in its dev-tools list, after the `land_recording`
+  sentence's "(spec §11 AU-69); and", insert "`analysis_job`, which wants a media's analysis
+  under a document's stand-in owner and returns at once, or waits for every such job and
+  answers their runs (spec §11 CJ-27); and `-RCDevAnalysisHold <s>`, which holds each analysis
+  job before its first frame, polling cancellation, so a proof can act during it; and
+  `-RCDevAnalysisCanned YES`, with which a canned analysis marker is honoured (spec §11
+  CJ-26); and"; and in "Architecture", "the Metal compositor, media import and its caches, and
+  agent dispatch." → "the Metal compositor, media import and its caches and on-device analysis
+  of the media (Vision and Sound Analysis on the analysis lane, cached per media in
+  `cache/analysis/`; the core reads only what a tool or op hands it), and agent dispatch."
+
+**To file** (drafts, `ai-drafted`, `low-priority`):
+- "Shots: a flash whose two sides differ in its bin, and a dissolve between flat pictures,
+  can be answered as cuts" — CJ-24's measured limits: the flash rule rests on the return
+  frame's d1 not exceeding the flash frame's (exact only when the flash shares no bin with the
+  shot), and a dissolve between flat-coloured pictures moves whole regions across a 4 × 4 × 4
+  bin in one frame (1.04 measured, `dissolve_patterns.mov`). A candidate fix is a second test
+  that a cut differs from the frame two before as well (d2(i) ≥ T), which rejects the return
+  frame; a dissolve needs a spatial signal. Needs a new decision amending CJ-24 and a re-run of
+  CJ-S4.
+- "A dev hold on a package save, so a proof can publish a cache file during one" — CJ2a's
+  `write-outside-publish` mutant survived `analysis_proof.py` A5 because a save takes about
+  13 ms, even with a 1 GiB file in `cache/` (the analysis store is now proved by the probe row
+  P9 instead); every other writer that goes through `CacheLedger.publish` (markers, waveforms,
+  ramp audio) is unproved over MCP against a write during a save for the same reason. A dev-only `-RCDevSaveHold <s>` in
+  `ProjectDocument+CacheSaves.swift` between `saveBegan` and `super.save` would let A5 publish
+  inside a held save; it needs its own decision.
+
+**Review.** First review: one should-fix, `write-outside-publish` surviving A5, fixed in
+`0928e42d` by the probe row P9 above; two nits. Second review: verdict pass, every Files and
+Approach item done, the SKIPPED Release re-runs after the fix justified (no app source or A-row
+instrument changed). Three nits left as they are: a run evicted from `AnalysisLane`'s 256-run
+order while still queued or running keeps its `runs` entry outside the limit
+(`AnalysisLane.swift:235`); `analysis_job`'s `wait` treats an evicted run as not ended, so a dev
+owner past 256 wants waits its whole deadline (`AgentServer+AnalysisJob.swift:106`); P9's
+captured `failure` var would draw a Swift 6 strict-concurrency warning.
+
+**Integration.** Cherry-picked (`bf767308…0928e42d`) onto `worktree-creator-jobs` after CU0a and
+CJ5a, as one commit. Conflicts, each kept both sides: `11-decisions/creator-jobs.md` holds
+CU-1…CU-9, "The phases' decisions" with CJ-50, then CJ2a's line and CJ-20…CJ-27; the file row's
+summary names CJ-20…CJ-27 beside CJ-50, its Lines cell 465, the spec README's `11-decisions/`
+total 17205, its §7.9e row CJ2a's text (§7.10 kept at CU0a's and CJ5a's 134);
+`op_argument_proof.py` keeps CJ5a's `OPS = 65` and `OPS_WITHOUT_TOOLS` with `PRODUCT_TOOLS =
+107`, and CJ5a's re-pin of the opaque-door count to 16, the same fix this phase made. TX1 has not
+landed, so `creatorTools()` has one group. The CLAUDE.md edits owed above applied as written.
+`make gate` on the integrated tree: names, typecheck (the four baseline warnings), test (199
+result lines, 1991 passed, 0 failed) and app (D25, D26 ok) pass, fmt and lint skipped, "gate:
+PASS 290s". Against its Release app: `analysis_proof.py` 22/22 (P1–P9, A1–A12, Z1 on all three
+launches); on one instance from `proof_app.py launch --app release`, `op_argument_proof.py`
+182/182 and `op_catalog_proof.py` 23/23, and `grep "Frame Job: "` on its log printed nothing;
+`recording_probe.py --only catalog` 31/31. The two To-file drafts above were filed as issues at
+integration (`ai-drafted`, `low-priority`).
+
+**Owed.** S-TH1 (CJ-S4's no-cut input, a re-run when it exists) and S-TH4 (CJ-S3 (a), (c) on
+the owner's 4K HLG). No manual checks.
+
 ### TX1 — the timeline's words
 
 Bet 1 opens here. Every TX phase is in lane A, after CJ1. No TX phase changes the persisted format.

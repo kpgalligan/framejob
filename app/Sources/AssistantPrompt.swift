@@ -59,7 +59,7 @@ enum AssistantPrompt {
           "remove_action"]),
         ("media files: import, relink, remove, copy into the project, camera log",
          ["import_media", "add_media", "relink_media", "remove_media", "set_media_color",
-          "set_media_speech", "consolidate_media"]),
+          "set_media_speech", "consolidate_media", "get_media_analysis"]),
         ("captions: import, transcribe speech, read a clip's timed words, export a caption file",
          ["import_captions", "transcribe", "get_transcript", "export_captions"]),
         ("audio: find silences and filler words, even out loudness, line up recordings by "

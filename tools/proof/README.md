@@ -27310,3 +27310,73 @@ python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `archive/audio.md`'s AP6b record.
+
+## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P9, A1–A12, Z1; ten mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27)
+
+**`analysis_fixtures.py`** makes every fixture with ffmpeg into `tools/proof/media/analysis/`
+(gitignored), reused while present (`--force` remakes them, `--flattened <socket>` also makes
+the 40-clip export over MCP): `shots.mov` (hard cuts at 60, 120, 180 and 240, the one at 60
+chroma only, a white flash at 150, a dissolve between two photographs over 300…329),
+`shots_vfr.mov` (frames 119 and 270 removed, timestamps kept), `dissolve_patterns.mov` (a
+dissolve between test patterns), `moving_still.mov` (ten minutes of a FlexAudio cover drifting
+over black; its SHA-256 in `fixtures.json`), `hlg_4k.mov`, `h264_1080.mov`, the four
+`variant_*.mov` and `flattened.mp4` with its cut list in `flattened.json`.
+
+**`creator_spike/`** holds road map "creator-jobs"'s CJ spikes, each writing
+`tools/proof/work/creator_spike/<ID>/results.json` with its `rule_sha256` (recomputed by
+`rule.py` from the road map, CJ-7, and compared with CJ0a's table), the OS build and the
+device: `shots_spike.py` (+ `.swift`, built alone) is CJ-S4, both candidate signatures and the
+SAD fallback scored over every frame and the rule applied; `lane_spike.py` (+ `.swift`, built
+from `app/Sources`, with `Blank.mp4` and a `default.metallib` beside it) is CJ-S3 (a) and (c)
+— the direct and converted readers at 256 and 1280, one job and two, three runs each, the
+median kept — and, with `--playback --socket <sock>` against a running app, (b): `play_preview`'s
+frames composed over 20 s of a 1080p30 timeline idle and while another document's ten-minute
+job runs (wanted through `analysis_job`).
+
+**`analysis_proof.py`** builds `analysis_probe.swift` from `app/Sources` with
+`FRAMEJOB_DEV_TOOLS` for P1–P9 (no app), then drives the app (`proof_app.binary()`) on a
+scratch `CFFIXED_USER_HOME` in three launches: plain (A1–A4, A8 without the flag, A9, A10,
+A12), `-RCDevAnalysisCanned YES` (A8 with it) and `-RCDevAnalysisHold 3` (A5–A7, A11, acting
+during a held job through the dev tool `analysis_job`). Z1 is each launch's parity grep.
+
+| Row | What it holds |
+|---|---|
+| P1 | each stamp field alone (source size, modified second, duration, version, parameters, OS build, device, reader) makes a lookup miss |
+| P2 | coverage merges adjacent ranges; the hit rule counts the read margin (13) each side |
+| P3 | the cut rule: a flash, a tie to the earlier, a dissolve under T, m, no frame within m + 1 after, the media's end |
+| P4 | `frames.bin` round trip against hand-spelt little-endian bytes |
+| P5 | a canned marker answers only with the flag and a matching source |
+| P6 | a trimmed, a ×2 and a reversed clip's window and clip times |
+| P7 | the VFR twin: the 21 records after each gap equal from a whole-file job and from one starting just after the gap; the cut at 4 s found by both |
+| P8 | two disjoint publishes from one on-disk state, in either order and at once, both kept |
+| P9 | a publish started during a save (`CacheLedger.saveBegan`) writes no marker or payload until `saveEnded`, then both |
+| A1 | exactly the fixture's cuts (60, 120, 180, 240): none at the flash or in the dissolve; a job ran |
+| A2 | a second call `cached: true`, no `run`, marker and payload bytes unchanged |
+| A3 | a window inside the coverage is a hit; one past it runs only the missing range, the coverage the union |
+| A4 | the media's modification second moved: a miss whose stamp names it |
+| A5 | a save during a held job: the job lands after it, the next save is not refused, the files are there |
+| A6 | the calling document closed during a held job: cancelled within 1.5 s, nothing written |
+| A7 | two documents' held jobs run one at a time (width 1) |
+| A8 | a canned marker replaced without the flag, answered with it |
+| A9 | a whole-file call and two half-window calls split at the flash, in either order: the same cuts, equal payloads |
+| A10 | `set_media_color` S-Log3: a miss whose stamp names the converted reader; cleared, another miss, raw |
+| A11 | `relink_media` to the same bytes during a held job: the job lands after it |
+| A12 | a trimmed, a ×2 and a reversed clip: every cut in its window once, at its `clip_time` and `timeline` |
+
+Mutants (each must fail its row): `stamp-no-os-build` P1, `stamp-no-reader` A10,
+`write-outside-publish` P9, `partial-taken-covered` A3, `margin-unread` A9, `width-wrong` A7,
+`flash-rule-removed` A1, `canned-without-flag` A8, `hold-no-cancel-poll` A6,
+`preroll-by-index` P7. A probe row's mutant edits a copy of `app/Sources`; an app row's builds
+a tree copy (`tree_copy.py`).
+
+```sh
+python3 tools/proof/analysis_fixtures.py
+python3 tools/proof/creator_spike/shots_spike.py [--socket <sock>]
+python3 tools/proof/creator_spike/lane_spike.py
+python3 tools/proof/creator_spike/lane_spike.py --playback --socket <dir>/agent.sock
+python3 tools/proof/analysis_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9
+make app-debug && python3 tools/proof/analysis_proof.py
+python3 tools/proof/analysis_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CJ2a record.

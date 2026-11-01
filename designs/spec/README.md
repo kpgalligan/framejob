@@ -35,7 +35,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 184 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
-| [`05.6-persistence.md`](05.6-persistence.md) | 272 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts. |
+| [`05.6-persistence.md`](05.6-persistence.md) | 286 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts, the analysis cache. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 109 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, a linked pair moving as one in time (format 28, AU-90…AU-96), how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eleven ops that are an error with a scope, the checks on the merged parent). |
 | [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 492 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
@@ -45,7 +45,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 197 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 306 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 81 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 82 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 326 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 57 | What playback does after every edit: rebuild or refresh. |
@@ -53,14 +53,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.8-export.md`](07.8-export.md) | 761 | Export: writers, formats, stems, loudness, the queue, the wait for ramp audio, isolated voice and voice effects. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 97 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, lenient decoding (`set_media_color`, `set_media_speech` and `set_audio`'s `duck.mode` are in §7.9e). |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 160 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
-| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 393 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`, `loudness_meter`, `land_recording`), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
+| [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 410 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`, `loudness_meter`, `land_recording`, `analysis_job` and the analysis launch defaults), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 57 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, `enhance` (Enhance Voice after the landing), and its answer. |
-| [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 457 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
+| [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 482 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, the media analysis (`get_media_analysis`), detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 134 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 228 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 17057 in 35 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 17205 in 35 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
