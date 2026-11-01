@@ -27380,3 +27380,29 @@ python3 tools/proof/analysis_proof.py --mutant <name>
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CJ2a record.
+
+## Road map "creator-jobs" CU0b — the cursor spike (`cursor_spike/`)
+
+The spikes behind the cursor recorder:
+- **CU-S1:** capture APIs, grants, the event clock and the cursor's image.
+- **CU-S2:** global points to movie pixels, and the time anchor.
+- **CU-S3:** whether dirty rects locate typing.
+- **CU-S4:** the cursor file's size and speed, on a reader prototype in the scratch crate `cursor_spike/reader/`.
+
+Each is judged by its own entry under the road map's "Every spike, with its rule". R0 refuses a rule whose CJ-7 hash is not CJ0a's (`RULE CHANGED <id>`, exit 1). `tools/proof/cursor_spike/README.md` has the tiers (auto, posted, person), the exit codes and the instruments. **The answers are in `designs/creator-jobs.md`'s "CU0b's record"**, and the owner's rows are `docs/manual-checks.md` JOB-29.
+
+Where things run:
+- The probe builds through `swift_build.build` with nothing from `app/Sources`.
+- A1–A3's listener is the scratch bundle `work/cursor_spike/bundle/Cursor Spike.app` (`com.kgalligan.FrameJob.cursorspike`), opened with `open -n -a`, never a terminal-run process.
+- `tccutil` runs only under `--person`, and only on that id.
+- Every child runs under `graphics_spike/bounded.py`.
+
+What the runs do to the host:
+- They warp the pointer and show full-screen windows.
+- While the console is locked (`CGSessionScreenIsLocked`), every screen row is skipped by name.
+
+```sh
+python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    # 16 rows; ten mutants, each exit 1
+python3 tools/proof/cursor_spike/cursor_spike.py --only s4                     # then s3, s2, s1, one group per call
+python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         # the person tier, merged in (JOB-29)
+```

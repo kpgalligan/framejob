@@ -255,6 +255,12 @@ the rest):
   <command> plans only clips that play forward"), since mapping it would put a mirror in the core
   (D4-6).
 - **CU-6 — The spikes' rules are CJ0's**, each verdict recorded before the phase that depends on it.
+  **Settled at CU0b** (2026-11-01; `designs/creator-jobs.md`'s "CU0b's record", every rule's
+  `rule_sha256` equal to CJ0a's): CU-S4 `body=json smoothing=whole-file` (CU-10's body is
+  columnar JSON, version 1, and smoothing is prepared over the whole file). Every CU-S1, CU-S2 and
+  CU-S3 field is `owed`. The console was locked and the terminal could not post, so those rows were
+  skipped by name, and the owner runs them with the person tier (`docs/manual-checks.md` JOB-29)
+  before CU1b and CU6. None is a STOP.
 - **CU-7 — Keys are private by construction.** A key-down while ⌘ or ⌃ is held is a shortcut, stored
   with its spelled keys; every other key-down and every auto-repeat is a mark with a time and no
   identity; no character, key code or label of a typed key is ever stored, so none can reach a tool

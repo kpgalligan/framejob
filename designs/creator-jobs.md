@@ -2622,6 +2622,146 @@ TX-70 was recorded at CJ0a; this bet writes no key sentence of its own.
 - **Acceptance:** each VERDICT line and `rule_sha256` recorded; `make gate` (nothing in
   `app/Sources` changes).
 
+#### CU0b's record (2026-11-01)
+
+**Landed.** Lane B, base `b2eccc35`. The instruments `tools/proof/cursor_spike/` (the runner
+`cursor_spike.py`, the pure `deciders.py`, the probe `cursor_spike_probe.swift` with
+`cursor_spike_capture.swift`, the scratch crate `reader/`, and its README), JOB-29, and this
+record. Nothing in `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/` changed. No new decision
+ID: the CU0 block is full, and the phase sets no rule beyond the verdicts.
+
+**The host.** macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset` first: "Now drawing from
+'AC Power'"), two displays (the built-in panel, main, at 2×; a BenQ GW2790QT at 1×). Two other
+lanes were running: the one-minute load average was 6.69 at the first CU-S4 run and 28.8 at the
+second. The terminal held Screen Recording and nothing else:
+`CGPreflightPostEventAccess`, `CGPreflightListenEventAccess` and `AXIsProcessTrusted` all false.
+**The console was locked** (`CGSSessionScreenIsLocked`) for every run. The first CU-S2 and CU-S3
+runs, made before the runner checked for that, recorded the lock screen: its animated Aerial
+wallpaper, with no window and no menu bar (two frames read back with `ffmpeg`), every complete
+frame's dirty rect the whole 3456 × 2234 display (CU-S3: 946 complete frames, no idle one).
+Covering the display with the instrument and turning off its distractors changed nothing, since
+the lock screen covered both. Those runs are void. The runner now reads the lock state in its
+`host` mode and skips, by name, every row that needs the screen or an active window.
+
+**Rule hashes (R0).** Each run recomputed CJ-7's hash of its entry, and each matched CJ0a's
+record: CU-S1 `9508e82d119466262ed5fa48b7b3a6502b12022fa65b63ac0a35badfee23886c`, CU-S2
+`15d61ec5374d3465b7f8a2f7c652ed6d78b099d0c2c5642946d8c87b3919c851`, CU-S3
+`9ffadf0b9897880826cdddc0820ddc93bb0a2337bdf27e73b51c6fa41372ea5c`, CU-S4
+`0fe71118ada7d67c52790943eb6cd5cf0c8b160377df3a72df207d54db47e208`. Each `results.json`
+(`tools/proof/work/cursor_spike/cu-sN/`) stores its value.
+
+**The verdicts.**
+
+- **CU-S4** — `VERDICT body=json smoothing=whole-file json_mb=10.42 parse_ms=13.9 state_us=0.42
+  prepare_ms=2.7`. The worst case (432,000 moves, 7,200 click records for 3,600 clicks, 20,000 key
+  marks, 40 images of 4,096 bytes, 3,600 image changes, one geometry entry, LCG seed 1) is a
+  10,421,911-byte JSON body or an 11,097,407-byte binary body. The release profile ran five runs
+  of each measure, twice; both runs gave the same verdict. Run 2 (the line above): JSON parse and
+  validate [14.377, 13.414, 13.539, 13.938, 13.890] ms; binary [1.261, 0.422, 0.393, 0.396,
+  0.411] ms; `prepare` at smoothing 1 [2.702, 2.684, 2.631, 2.653, 2.680] ms over the JSON body
+  and [2.802, 2.695, 2.629, 2.626, 2.616] ms over the binary body. The median `state at t` was
+  0.416 µs (JSON) and 0.375 µs (binary) prepared, and 0.416 and 0.334 µs raw. Run 1 printed
+  `parse_ms=13.6 state_us=0.42 prepare_ms=2.6`: JSON parse [14.254, 13.648, 13.713, 13.545,
+  13.392] ms, binary [1.048, 0.454, 0.399, 0.400, 0.389] ms. R4a passed both times: the two
+  bodies parsed to equal tracks, with 0 mismatches over 200 state requests (100 seeded times,
+  unprepared and prepared). Each state is a JSON request string to a JSON answer string.
+- **CU-S3** — `VERDICT dirty=owed bursts_within=0/10`. All ten bursts were skipped by name (the
+  console locked). The "0/10" counts measured bursts within 64 pt, and none was measured.
+- **CU-S2** — `VERDICT mapping_display=owed mapping_window=owed separate=owed anchor=owed
+  e1_still_p95_ms=owed`. Every source row and the ten still starts were skipped (the console
+  locked), and the picked window's two rows are a person's.
+- **CU-S1** — `VERDICT positions=owed clicks=owed keys=owed cursor_image=owed hidden=owed
+  image_fallback=owed event_clock=owed secure=owed relaunch=owed grant_api=owed listed=owed`.
+  Measured rows:
+  - A4: `CGEvent(source: nil)?.location` cost 0.083 µs median per call over 10,000 calls (p95
+    0.125 µs, max 17,110 µs, no nil). All 10 `CGWarpMouseCursorPosition` warps were seen, measured
+    with the console locked and recorded with that fact.
+  - A5's safe thread: `NSCursor.currentSystem` answered from a background queue 10 times without
+    a crash or a nil.
+
+  Skipped by name:
+  - A4's real moves, A5, A9's TextEdit rows, A8 and A11 need a person (`--person`).
+  - A1–A3, A6 and A7 need input posted, and the terminal cannot post
+    (`CGPreflightPostEventAccess` false). The runner skipped them under the lock first. They are
+    owed to the person tier's real input in the scratch bundle.
+  - A5's own cursors, A9's helper and A10 need an unlocked console.
+
+**What each verdict feeds.**
+
+- CU-S4 settles CU-10's body and smoothing for CU1a: a JSON body, columnar, with integer µs and
+  points × 100, version 1; smoothing prepared over the whole file. The numbers are tens of times
+  inside every bound, so the shared machine's noise cannot move the verdict.
+- CU-S1 feeds CU-3's pair (`grant_api`, `relaunch`, `listed`) and CU-11 (the capture sources
+  and rates: positions, clicks, keys, the image sampler, hidden spans).
+- CU-S2 feeds CU-20 (the mapping), CU-12 (the anchor) and CU3c's default (`separate`).
+- CU-S3 feeds CU-72 (typing's aim) and CU9b.
+- All three are owed. They are put to the owner before CU1b and CU6. They are not STOPs.
+
+**Owed (JOB-29).** At the unlocked machine, the owner runs `python3
+tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`, then `--person`. A11 answered nothing,
+so CU-3 gains no "Settled at CU0b" line yet.
+
+**Instrument rows.**
+
+- The selftest: 16/16. The ten mutants (`rule-unchecked`, `clicks-95`, `keys-accessibility-ok`,
+  `grant-iohid-first`, `skipped-as-measured`, `inherited-grant-counted`, `caret-unflipped`,
+  `odd-window-ignored`, `dirty-128`, `body-or`) each exited 1.
+- The reader: `cargo fmt --check` and `cargo clippy --release --offline -- -D warnings` clean.
+- B0 builds through `swift_build.build` (optimized) and signs the scratch bundle `Cursor
+  Spike.app` (`com.kgalligan.FrameJob.cursorspike`, flags `adhoc,runtime`).
+- `spec_index_proof.py` 222/222.
+- The gate: `make gate` once, after the instruments and the documents, before this line was
+  written: "gate: PASS 493s". The steps were names 0.6 s, typecheck 7.4 s, fmt 3.1 s, lint
+  25.1 s, test 293.5 s and app 162.7 s (`build/gate/times.tsv`). `name_residue.py` was re-run
+  over the record, exit 0.
+
+**Deviations.**
+
+- `CGCursorIsVisible()` is unavailable to Swift in the macOS 26.2 SDK, not deprecated with a
+  warning as the CU header expected. The probe reaches it through `dlsym` for the record.
+- The probe gates only In the picture rows on being active. Separate's marker needs no
+  activation.
+- The runner skips screen rows when the console is locked. That case is not in the spec, and the
+  void runs above show why.
+- The S3 mode gained three diagnostic job flags (`distractors`, `color_space`, `cover`), which
+  the rule's run never sets.
+- `keys` uses the same ≥ 99 % per-window delivery as `clicks`, because the rule names no figure
+  for keys.
+- `relaunch=not-needed` when the chosen pair's tap, made after the grant in the running process,
+  delivers keys.
+- With no candidate passing, `event_clock` answers `none`.
+- MB is 10^6 bytes.
+
+**Review and fix pass.** The first review found a blocker and two should-fixes, all in the
+person and posted tiers; fix 1 (`8ea44d42`, on `66bf29e2`) changed only `cursor_spike.py`,
+`cursor_spike_probe.swift` and the README:
+
+- The posted tier's listener was opened after the input was posted. `listen_row` now opens the
+  scratch bundle first, then runs the poster, then waits for the answer. The bundle answers
+  `ready_wall` once its tap or monitors exist, and a row whose `ready_wall` is missing or not
+  before the poster's start is an instrument failure. A poster's `skipped` skips the row.
+- A7 was measured under whatever grant the bundle held. It now runs only under
+  `input-monitoring` or `both`, and is otherwise skipped as `scratch bundle holds <grant>`.
+- A8/A11's count windows raced the person. Grant mode now counts both taps side by side, each in
+  its own slot, over one 8 s window that opens at the later of the grant's detection and a go
+  file the runner writes on the owner's Return (bounded at 150 s). A11 fails when `go_seen` is
+  false.
+
+Fix 1's runs: `--build-only` exit 0, no warning; `--selftest` 16/16; `--only s1` exit 0, the
+pinned hash, every field `owed`; a direct run of the reordered row skipped by the poster's reason
+with `ready_wall` 4.571 s before `start_wall`; `make gate` "gate: PASS 313s". The mutants and
+s2–s4 were not re-run, since fix 1 touched none of their code. The second review passed with two
+nits: a reader `cargo test` figure no run printed (dropped from this record), and A11's prompt
+not naming where to type, so keys typed into the terminal would pre-answer the next prompt. At
+integration `ask()` flushes a terminal's pending input before each prompt and the prompt names
+TextEdit; `--selftest` 16/16 after.
+
+**Integration.** Cherry-picked onto `worktree-creator-jobs` after CJ5a and CJ2a. Three conflicts,
+each kept both sides: the decisions index's `creator-jobs.md` row keeps the CJ-20…CJ-27 and CJ-50
+summary, its Lines cell 465 → 471, and the spec README's `11-decisions/` total 17205 → 17211 in 35
+files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_index_proof.py`
+222/222. No `CLAUDE.md` edit and no issue owed.
+
 ### CJ2b — the Analyzing sheet and Split at Shot Changes
 
 - **What a person gets:** Clip ▸ Split at Shot Changes on a flattened video (a finished edit, a
