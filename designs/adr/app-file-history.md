@@ -545,7 +545,10 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `ClipSnapshot.swift` with `import AppKit`, and the blank line after the block went too,
   diffed empty against `git show HEAD:app/Sources/ProjectSnapshot.swift` lines 896–1172; nothing
   widened (`CodingKeys` moved nested with its type). `wc -l app/Sources/ProjectSnapshot.swift`:
-  1454 before, 1176 after; `ClipSnapshot.swift` is 283. No proof anchor moved.
+  1454 before, 1176 after; `ClipSnapshot.swift` is 283. No proof anchor moved. T11: `VideoProps`
+  with its doc (784–894) went whole to `VideoProps.swift` with `import AppKit`, the blank line
+  after it too, diffed empty against HEAD; nothing widened. 1176 before, 1064 after;
+  `VideoProps.swift` is 116. No proof anchor moved.
 - `GradeProps.swift`: grading-4's T4-0 paid the seam G2-3 named. The curve types, from
   `// MARK: - The curves (spec §11 GR-12, grading-2 G2-3)` through the `apply(curves:)`
   extension's closing brace (`CurvePoint`, `CurveChannel`, `ColorCurves`, `ColorCurvesPatch`,
