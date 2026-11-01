@@ -4,7 +4,7 @@
 //!
 //! **Rust decides, Metal does** (spec §7): the numbers are checked here
 //! (`grade_check.rs`), evaluated and clamped like every other number
-//! (`actions.rs`, `actions_clamp.rs`) and published in the recipe; the
+//! (`actions.rs`, `actions_clamp_grade.rs`) and published in the recipe; the
 //! compositor maps the push to RGB at step 4c.1, after tone and before the
 //! look.
 //!

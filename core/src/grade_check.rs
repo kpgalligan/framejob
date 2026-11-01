@@ -7,7 +7,7 @@
 //!
 //! The rule is `props_check.rs`'s: a value out of range is NAMED in the
 //! rule's own sentence, never clamped (an action's end is clamped instead,
-//! by `actions_clamp.rs`'s `clamp_wheels`). The circle test allows
+//! by `actions_clamp_grade.rs`'s `clamp_wheels`). The circle test allows
 //! [`WHEEL_RIM_TOLERANCE`] past 1, so a rim point made by `cos`/`sin` or
 //! divided by its `hypot` — the inspector's puck and `clamp_wheels` both
 //! make one — is never refused; the sentence still says `≤ 1`.

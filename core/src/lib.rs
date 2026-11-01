@@ -14,6 +14,7 @@
 pub mod actions;
 mod actions_audio;
 mod actions_clamp;
+mod actions_clamp_grade;
 mod actions_color;
 mod actions_curves;
 mod actions_graphic;

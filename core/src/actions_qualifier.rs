@@ -7,7 +7,7 @@
 //! The owner chose the SHORT way round (G2-4's choice 11): before the lerp,
 //! [`align_hue_center`] moves the interpolation TARGET's centre by ±360 when
 //! the two centres are more than 180 degrees apart, so the lerp takes the
-//! shorter arc (350 → 370), and `actions_clamp.rs`'s `clamp_qualifier`
+//! shorter arc (350 → 370), and `actions_clamp_grade.rs`'s `clamp_qualifier`
 //! brings the lerped centre back onto the circle with `rem_euclid 360`
 //! (355, then 0, then 5). Two centres exactly 180 apart have no shorter
 //! arc and go linearly. Only the target of the action the time is INSIDE

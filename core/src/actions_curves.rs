@@ -25,7 +25,7 @@
 use serde_json::{Map, Value};
 
 use crate::actions::to_json;
-use crate::actions_clamp::clamp_curves;
+use crate::actions_clamp_grade::clamp_curves;
 use crate::model::{CurveDomain, CurvePoint, Curves};
 
 /// One channel blended inside an action (spec §11 GR-34): its held curve
