@@ -1128,10 +1128,12 @@ area."
 
 #### CJ0c's record (2026-11-01)
 
-**Landed.** Five commits on lane B's own branch, base `ba535d61` (`app/Sources` and `tools/`
+**Landed.** Six commits on lane B's own branch, base `ba535d61` (`app/Sources` and `tools/`
 unchanged there from `d0661e5d`, so the ranges above held when re-read): one per toll, each a pure
-move typechecked alone, then this record's documents commit. Nothing a person or an agent can see
-changed.
+move typechecked alone, then this record's documents commit and the review's fix. On
+`worktree-creator-jobs` they are `1c73b6e0` (T5), `5b64debe` (T6), `59c77fe3` (T7), `a6c54e44`
+(T8), `14aed878` (documents) and `d085a0ad` (the fix), cherry-picked without conflict. Nothing a
+person or an agent can see changed.
 
 - **T5:** `viewMenu`, `trackHeightMenu` and `previewQualityMenu` (442–526) to
   `AppDelegate+ViewMenu.swift`; `viewMenu` internal. `wc -l`: `AppDelegate+Menus.swift` 554 → 471,
@@ -1174,6 +1176,21 @@ changed.
 tsc silent. `make gate`: names, typecheck, fmt, lint, test and app each `pass`, "gate: PASS 483s" (exactly
 the four baseline warnings, the `timeRange` one in `CompositionBuilder+HeldFrame.swift`; BUILD
 SUCCEEDED through the Write Agent Catalog step's parity check over the merged handlers).
+
+**Review.** The first review re-ran the three moved-line diffs (as above) and found one blocker:
+the record's insertion had replaced the `#### CJ0d` heading, leaving CJ0d's body under this record.
+`d085a0ad` restored the heading, so this file's diff against `ba535d61` is a pure insertion of the
+record; the second review re-ran the diffs and passed with no findings.
+
+**Map entries, at integration.** Root `CLAUDE.md`'s typecheck-baseline sentence names one warning
+in `CompositionBuilder.swift` and one in `CompositionBuilder+HeldFrame.swift`; `app/CLAUDE.md`
+gains `+ViewMenu` in the `AppDelegate.swift` entry, `+HeldFrame` in `CompositionBuilder.swift`'s,
+`+Reverse` in `ProjectDocument.swift`'s, and an `AgentServer+CreatorJobs.swift` bullet before
+`AgentServer+DevTools.swift`'s (the frozen `AgentServer.swift` entry unchanged). `make gate` on
+`worktree-creator-jobs` after the picks and these edits: names, typecheck, fmt, lint, test and app
+each `pass`, "gate: PASS 361s", the four baseline warnings as above.
+
+**Owed.** Nothing: no proof rows, mutants or manual checks, and nothing to file.
 
 #### CJ0d — the app's tolls T11–T17: snapshots, recipe, core edge, importer, reverse
 

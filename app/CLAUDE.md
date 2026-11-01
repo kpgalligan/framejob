@@ -211,7 +211,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`, +`Reverse`)
   — NSDocument, `.framejob` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -729,7 +729,9 @@ the key map behind it.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
   Background, Transition, Motion, Look and Label, a pure move out of `+Menus`,
-  grading GR1 — +`Recording`, +`Updates` — Frame Job ▸ Check for Updates…
+  grading GR1 — +`ViewMenu` — the View menu and its Timeline Track Height
+  and Preview Quality submenus, a pure move out of `+Menus`, creator-jobs
+  CJ0c — +`Recording`, +`Updates` — Frame Job ▸ Check for Updates…
   and the Sparkle updater, compiled only under `FRAMEJOB_UPDATER`
   (Distribution, spec §11 PUB-6..PUB-9) —, +`GraphicMenu` — the Insert
   menu's builder (Adjustment Clip first, then Graphic ▸), File's three graphic-file items (`addGraphicFileItems(to:)`,
@@ -1501,7 +1503,9 @@ the key map behind it.
   key's options: BT.709 for the SDR version, BT.2020/PQ for HDR10, spec §11
   HD-14; +`InstructionRanges`, +`Orientation` (each source's orientation
   codes and the tracks an instruction needs, a pure move at the 600 cap,
-  SR2b), +`AudioTracks`, +`Silence` (an audio track none of whose segments
+  SR2b), +`HeldFrame` (the held last frame: `heldTail`, `timeRange(of:)`,
+  `oneFrame`, `convertsSources`, `keyed`, `missingClips`; it carries the
+  `timeRange` warning), +`AudioTracks`, +`Silence` (an audio track none of whose segments
   has a readable source, its media missing or its reverse pending, holds the
   bundled `Silence.caf` copies back to back instead of empty edits, which
   failed the export; spec §11 #336),
@@ -3336,6 +3340,10 @@ free.
   `captions_removed` (spec §11 SR-27).
 - `AgentServer+Grading.swift` — the grading tools' handlers: `add_adjustment_clip`
   (spec §11 GR-6), mirroring Insert ▸ Adjustment Clip.
+- `AgentServer+CreatorJobs.swift` — road map "creator-jobs"'s dispatch seam
+  (spec §11 CJ-8 (d)): `creatorHandlers` and `creatorOffMainTools`, merged
+  by the frozen file's `withDevHandlers(withCreatorHandlers(productHandlers))`
+  and its `offMainTools` union; a clash keeps the product handler.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and
