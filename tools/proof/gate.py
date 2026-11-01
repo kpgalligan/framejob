@@ -84,7 +84,7 @@ TYPECHECK_BASELINE = (
      "generateCGImageAsynchronouslyForTime:completionHandler: instead [#DeprecatedDeclaration]"),
     ("CompositionBuilder.swift", "'tracks(withMediaType:)' was deprecated in macOS 13.0: Use "
      "loadTracks(withMediaType:) instead [#DeprecatedDeclaration]"),
-    ("CompositionBuilder.swift", "'timeRange' was deprecated in macOS 13.0: Use "
+    ("CompositionBuilder+HeldFrame.swift", "'timeRange' was deprecated in macOS 13.0: Use "
      "load(.timeRange) instead [#DeprecatedDeclaration]"),
     ("CompositionBuilder+Orientation.swift", "'preferredTransform' was deprecated in macOS 13.0: Use "
      "load(.preferredTransform) instead [#DeprecatedDeclaration]"),
