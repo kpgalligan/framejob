@@ -30,8 +30,8 @@
 //! frame reads this one description and nothing else, so preview,
 //! `render_frame` and an export cannot disagree about it. The arithmetic
 //! is [`crate::recipe_text`]'s, a file away under the size rule; what
-//! stays here is the layer it lands in and the `content_hash` it folds
-//! into.
+//! stays here is the layer it lands in, and the `content_hash` it folds
+//! into is `recipe_hash.rs`'s, re-exported here.
 //!
 //! ### A recipe can be asked for more than the instant
 //!

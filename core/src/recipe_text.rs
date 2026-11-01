@@ -43,12 +43,11 @@
 //! [`crate::recipe::content_hash`] and the FNV under it live in
 //! `recipe_hash.rs`, re-exported `pub(crate)` by `recipe.rs` for this file
 //! to call: a SHAPE layer hashes its description through the same
-//! function, so the hash is the
-//! recipe's texture-cache primitive and not a text concern. The layer
-//! object around `source` stays there too, and so does the arm that
-//! decides a clip HAS a text description at all — this file is handed one,
-//! which is what lets it serve a layer the core synthesizes as readily as
-//! one it read off a clip.
+//! function, so the hash is the recipe's texture-cache primitive and not a
+//! text concern. The layer object around `source` stays in `recipe.rs`
+//! too, and so does the arm that decides a clip HAS a text description at
+//! all — this file is handed one, which is what lets it serve a layer the
+//! core synthesizes as readily as one it read off a clip.
 //!
 //! # Paths
 //!

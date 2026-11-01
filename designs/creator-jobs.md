@@ -1149,6 +1149,34 @@ below is a `wc -l` run.
   `op_table.rs` bullet and extended `model.rs`'s, `recipe.rs`'s and `edit_clip.rs`'s. The
   `core/CLAUDE.md` map entries are owed to the integrator (lanes edit no `CLAUDE.md`).
 
+**On `worktree-creator-jobs`.** Cherry-picked after CJ0c's record without conflict: `70993ac5`
+(T1), `52e83fb5` (T2), `97cf2158` (T3), `23debe6e` (T4), `ccb0bc21` (this record's first
+part), each toll still its own commit.
+
+**Deviations.** `props_check.rs:13` ("a new title or shape") also named `edit_clip.rs` and now
+names `edit_described.rs`, under the rule that a doc sentence a move makes false is fixed;
+`recipe_text.rs`'s T3 rewrite took three lines; `edit_described.rs`'s opening sentence takes two
+`//!` lines (100 columns); the acceptance line above asks for `make gate` after each toll, and
+per this phase's spec each toll was held to fmt, test and lint, with `make gate` once after T4.
+
+**Review.** Verdict pass, two nits, both doc sentences T3 made false and the spec's list missed:
+`recipe.rs`'s module doc still said the `content_hash` stays there, and `recipe_text.rs`'s "What
+is NOT here" paragraph kept a short unreflowed line and a "stays there too" that, after two files
+are named, no longer said which. Fixed at integration: `recipe.rs` says the hash is
+`recipe_hash.rs`'s, re-exported, and the paragraph is reflowed with "stays in `recipe.rs` too"
+(`recipe_text.rs` 551 → 550).
+
+**Map entries, at integration.** `core/CLAUDE.md`: `model_media.rs`, `edit_described.rs` and
+`recipe_hash.rs` entries, the `op_table.rs` entry naming `op_rows.rs` and the `pub(crate)`
+builders, `model.rs`'s naming `model_media.rs`, `edit_graphic.rs`'s and `edit_clip.rs`'s naming
+`edit_described.rs`; `edit_clip.rs` (444) is no longer over the cap, so its "known debt" clause
+and its name in the Rules paragraph's over-the-cap sentence went, leaving `edit.rs` alone there.
+`make gate` after the picks, the two fixes and these edits: names pass, typecheck skip (no Swift
+or header changed), fmt, lint, test (198 result lines, 1976 passed, 0 failed) and app (D25, D26
+ok) each pass, "gate: PASS 232s".
+
+**Owed.** Nothing: no proof rows, mutants or manual checks, and nothing to file.
+
 #### CJ0c — the app's tolls T5–T8: menus, builder, document, dispatch
 
 - **What a person gets:** nothing.

@@ -13,7 +13,8 @@ governs a module now.
 
 - `lib.rs` — module declarations and re-exports only. No implementation code.
 - `model.rs` — the spec §5.2 SHAPE: the project, its clips, sources,
-  actions, markers and nests (a track is `model_track.rs`, re-exported), with
+  actions, markers and nests (a track is `model_track.rs` and the media
+  types `model_media.rs`, both re-exported), with
   the serde defaults that say what an absent key means. The struct field
   names ARE the JSON keys. Nothing else lives here but `CanvasOutput`
   (`Canvas.output`, `sdr` or `hlg`, written only when `hlg`, format 23, spec
@@ -28,6 +29,10 @@ governs a module now.
   (−1…1, written only when not 0), spec §11 AU-102, and format 36's
   `compressor` and `limiter` (the clip's `model_audio.rs` types, after `pan`,
   written only when set), spec §11 AU-150.
+- `model_media.rs` — the media types (`Media`, `MediaOriginal`, `MediaKind`,
+  spec §5.2's `media[]`), moved out of `model.rs` whole (road map
+  "creator-jobs" CJ0b's toll T2) and re-exported by it, so every
+  `crate::model::Media*` path holds; a media record's new keys land here.
 - `model_props.rs` — the schema's VOCABULARY: the per-clip property types
   (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`,
   `Reflection`, `BlendMode`) and their defaults (the audio group's are
@@ -350,7 +355,11 @@ governs a module now.
   whether the
   decoder requires it and, for the few that have one, its `Bound` — and
   `OP_NAMES` as a projection of it, re-exported by
-  `edit.rs` so no caller moved. A published interface, where the `Op` enum
+  `edit.rs` so no caller moved. The rows (`OP_TABLE`) and `OP_NAMES` live in
+  `op_rows.rs` (road map "creator-jobs" CJ0b's toll T1, a pure move),
+  re-exported by `op_table.rs` so every `op_table::` path holds; an op's row
+  is added there, and the four builders `req`, `opt`, `within` and `op` are
+  `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
   reader is every one of the sixty-four op tools in the agent catalog,
@@ -394,22 +403,29 @@ governs a module now.
   op, so a new op does not compile until it is classified. The READ half is
   `rc_project_scoped` in `ffi.rs`, which calls the same `scoped_view`.
 - `edit_graphic.rs` — `add_graphic_clip` and `set_graphic`: every argument
-  checked through `model_graphic.rs` BEFORE `edit_clip.rs`'s
+  checked through `model_graphic.rs` BEFORE `edit_described.rs`'s
   `add_described_clip` (`pub(crate)`, with `Described`) places the clip, so
   the op table's bound probe reaches the side check on any project;
   `set_graphic`'s patch reader takes `name`, `width`, `height`, `length`,
   `props` and refuses `in` by name. With a `schema`, a `null` for a prop
   an action on the clip names stores the schema's default (G-34 (d)).
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
-  duplicate, delete, join; move, split, delete and duplicate take a linked
+  duplicate, delete, join (the described clips are `edit_described.rs`'s);
+  move, split, delete and duplicate take a linked
   partner through `edit_link.rs`'s closures. `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
   `in + duration × speed ≤ media.duration` and the plan's segment rate is
   exactly the clip's speed (spec §11, #22 and D4-2 to D4-5); the other
   writers are `edit_canvas.rs`'s `resnap`, `edit_paste.rs`'s two loops,
-  `edit_nest.rs`'s `unnest` and `edit_background.rs`'s timed plate. Over
-  the cap, known debt (below).
+  `edit_nest.rs`'s `unnest` and `edit_background.rs`'s timed plate.
+- `edit_described.rs` — the described clips: `add_text_clip` (the Title
+  preset, `TITLE_FONT`, `TITLE_CONTENT`), `add_shape_clip`, and
+  `add_described_clip` with `Described` (`pub(crate)`), the placement tail
+  `edit_graphic.rs`'s `add_graphic_clip` and `edit_adjustment.rs`'s
+  `add_adjustment_clip` share; a pure move out of `edit_clip.rs` (road map
+  "creator-jobs" CJ0b's toll T4), reading its `DEFAULT_CLIP_DURATION`
+  (`pub(crate)`).
 - `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
   their speed bounds and clip-relative action rescaling; `AUDIO_SPEED_MAX`
   (×12, spec §11 #190) and `speed_limits`, which `rc_speed_limits` publishes;
@@ -832,6 +848,13 @@ governs a module now.
   of a map.
   A graphic layer's source is one arm calling `recipe_graphic.rs`'s
   `graphic_source`; `missing_source` is `pub(crate)` for it.
+- `recipe_hash.rs` — the content hash (`FNV_OFFSET`, `FNV_PRIME`, `fnv1a`,
+  `content_hash`, `sorted`), the key Swift's texture cache is keyed by,
+  moved out of `recipe.rs` whole (road map "creator-jobs" CJ0b's toll T3);
+  `recipe.rs` re-exports `content_hash` `pub(crate)`, so
+  `recipe_graphic.rs`'s and `recipe_text.rs`'s `crate::recipe::content_hash`
+  holds. It sorts every object's keys before it hashes (the
+  `preserve_order` note above).
 - `recipe_matte.rs` — what the mattes do at one instant (spec §7.3, §11 MT-2,
   MT-5): `matte_target` (the track directly behind a matte track in its
   container, when that is not a matte track — the one place that says a matte
@@ -1077,7 +1100,7 @@ gives something up BEFORE it takes anything on**: the cut is a PURE MOVE,
 landed and gated alone, so the feature's diff is attributable; budget the cut
 against the pessimistic number, because an estimate here has run about two
 thirds of the truth. Over the cap today and known debt, not licence:
-`edit_clip.rs` and `edit.rs`, whose
+`edit.rs`, whose
 standing exemption is that its module doc IS the op table's semantics half
 (the cut there, if ever forced, is the `Op` enum into an `edit_ops.rs`, and
 never in the same phase as a feature). The current list is `wc -l`; named
