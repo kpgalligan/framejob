@@ -73,9 +73,9 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 156 fields in one
+    // checking it against `Compositor.metal` has to see all 160 fields in one
     // list (104 to here, the tone group's twelve, the wheels' twelve, the HLG
-    // group's four and the cursor's twenty-four at the end).
+    // group's four, the cursor's twenty-four and the cutout's four at the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -282,6 +282,16 @@ struct LayerUniforms {
     var cursorOpacity: Float = 0
     var rippleCount: Float = 0
     var rippleRadius: Float = 0
+    // The cutout (spec §11 CO-27, road map creator-jobs CO2a2), filled by
+    // `MetalRenderer.cutoutMask` (`Compositor+Cutout.swift`): `cutoutEnabled`
+    // (the one gate, 1 only when a mask is bound and drawn: 0 draws exactly
+    // what was drawn before), `cutoutEdge` (−1…1) and `cutoutFeather` (0…1),
+    // r0's remap of the mask at `texture(4)`, and a spare.
+    // 156 + 4 = 160 floats = 640 bytes, 40 × 16.
+    var cutoutEnabled: Float = 0
+    var cutoutEdge: Float = 0
+    var cutoutFeather: Float = 0
+    var cutoutReserved: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

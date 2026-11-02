@@ -500,7 +500,7 @@ See [Speed](speed.md).
 
 | Tool | What it does |
 |---|---|
-| `set_video` | *op* — position, scale, rotation, opacity, crop, corners, shadow, colour and grading, chroma key, filters, reflection, spotlight and motion. |
+| `set_video` | *op* — position, scale, rotation, opacity, crop, corners, shadow, colour and grading, chroma key, filters, reflection, spotlight, motion and Remove Background (`cutout`: the clip drawn as the person in it, where its media's person masks are cached). |
 | `set_audio` | *op* — volume, mute, fades, ducking, mono, keep pitch, pan, compression and noise reduction. |
 | `set_text` | *op* — a text clip's words and typography. |
 | `set_shape` | *op* — a shape clip's geometry and paint. |
@@ -571,7 +571,7 @@ See [Audio](audio.md) and [Remove Silences and Remove Filler Words](cleanup-tool
 | `export_captions` | One text track as `.srt` or `.vtt` (**File ▸ Export Captions…**). |
 | `get_transcript` | One clip's spoken words with timeline times; never uploads anything. |
 | `get_timeline_transcript` | Every heard word of the timeline (or the open nest) in timeline order, nested clips included, each with its clip, track, whether it can be cut, a stable identity and the `cut_start`/`cut_end` the Transcript tab would cut it by (cut a run with one `ripple_delete_ranges` from its first word's `cut_start` to its last word's `cut_end`); each file read once on this Mac and kept, in pages of 2,000 words; never uploads anything. |
-| `get_media_analysis` | The hard cuts (`kind: "shots"`) in one media file, or in the part of it one clip plays, with clip and timeline times for a clip; or where a person is found (`kind: "masks"`): the runs of frames whose person masks agree on whether a person is there, with the masks' size and frame counts, never the masks themselves. Found on this Mac, kept in the project's cache, no key and nothing uploaded. A cut inside a gradual dissolve or a single flash frame is not reported; a dissolve between flat-coloured pictures (slides, title cards) can show as one cut. |
+| `get_media_analysis` | The hard cuts (`kind: "shots"`) in one media file, or in the part of it one clip plays, with clip and timeline times for a clip; or where a person is found (`kind: "masks"`): the runs of frames whose person masks agree on whether a person is there, with the masks' size and frame counts, never the masks themselves. Found on this Mac, kept in the project's cache, no key and nothing uploaded. A cut inside a gradual dissolve or a single flash frame is not reported; a dissolve between flat-coloured pictures (slides, title cards) can show as one cut. A clip whose `set_video` `cutout` is set draws the cached masks: the person alone, in the preview, `render_frame` and every export; a frame with no mask cached draws the clip whole. |
 
 See [Captions](captions.md) and [Remove Silences and Remove Filler Words](cleanup-tools.md).
 

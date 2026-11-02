@@ -4797,6 +4797,81 @@ CLAUDE.md map entries were applied at integration: `core/CLAUDE.md`'s `model_cut
   the owner's Mac.
 - **Depends on:** CO2a1, CO1, CJ0c (T6). **Lane** C. **Questions:** none expected.
 
+#### CO2a2's record (2026-11-02)
+
+**Landed.** Lane C, base `f82c5b20` (I's HEAD, TX3; the harness made the worktree at `eb350b86`
+and it was fast-forwarded to `f82c5b20` before any edit, nothing of its own on it). Commits: the
+decisions alone (CO-24…CO-29 with their index rows), then the code, the proof and the documents,
+then this record. No format bump, no `rc_*`, no core change. A clip whose recipe `cutout` has
+`background` remove draws only the person wherever its media's mask pack covers the frame shown —
+in the preview, `render_frame` and every export, through the one compositor — and uncut wherever
+it does not; a project without a cutout renders and exports byte-identically to the base (D15).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/CutoutLookup.swift` | 164 | `CutoutPlan` (a handle's segments per track, reversed pivots, clip windows) and `CutoutLookup` (`sourceTick`, `ends`, `slot`, `subjectFound`), pure |
+| `app/Sources/CutoutMasks.swift` | 200 | `CutoutPack` and `CutoutMasks`: plans per key against a weak handle, packs per (cache folder, media) re-read on the marker's stat, stamps, found windows, an LRU of eight `r8Unorm` textures |
+| `app/Sources/Compositor+Cutout.swift` | 49 | `MetalRenderer.cutoutMask`: the group filled and `texture(4)` answered, the placeholder on any miss |
+| `app/Resources/Shaders/Compositor.metal` | — | the cutout group, `cutoutCover`, `texture(4)` on both layer fragments, step 7b's multiply |
+| `LayerUniforms.swift` · `CompositorEffects.swift` · `Compositor+Dissolve.swift` · `Compositor+Shadow.swift` · `Compositor+Uniforms.swift` · `MetalRenderer.swift` | 368 · 473 · 214 · 299 · — · 378 | the group (160 floats, 640 bytes), `PreparedLayer.cutout`, the bindings, `partnerBox`'s cutout clause |
+
+- **Deviations from the spec.**
+  - `CutoutMasks.pack` takes `urls` beside the media's URL, and its stamp key carries the LUT's
+    URL: `ThumbnailInput(media:urls:)` reads a LUT Camera Log's file from the map, so the stamp
+    `ProjectDocument.analysisRequest` makes cannot be made from the media's URL alone.
+  - The bar-code movie is CO-S2's writer (`mask_track_writer.swift`'s `writeBarcode`) run through
+    `co2a_probe`'s `barcode` mode for 300 frames, not `cutout_spike.barcode_fixtures()`, which also
+    writes `barcode_rev` and an hour of `long_60m` this phase has no use for.
+  - D2's uncut class is every pixel over a 3 × 3 neighbourhood of texels ≥ 192 rather than = 255:
+    the push-in's person never reaches 255 (its masks top out at 246, as CO-S1 found), and r0's
+    remap at edge 0 is exactly 1 for any m ≥ 0.75. D2's times are 1.5, 1.667 and 1.9 s, where the
+    push-in's masks hold more than 6,000 such pixels (at 0.5 s and 1 s they hold none).
+  - D1 scores the cross-dissolve's incoming codes after the overlap: inside it the incoming's alpha
+    band is `p` × the mask over the outgoing's `1 − p`, too faint to read at small p.
+  - D11 and D16 are read from D1's freeze and reverse frames, not separate renders.
+  - The `mask-lifted` mutant changes the mask's value in an HLG project only (`pow(m, 0.8)`), a
+    stand-in for a lift through step 0, which an `r8Unorm` mask cannot take.
+
+**Measured.**
+
+- `make typecheck` exit 0 with the 4 baseline warnings; the shader compiles with the base's two
+  warnings (`kTransitionNone`, `kMatteNone`); `swift_build.py typecheck` of the probe exit 0;
+  `spec_index_proof.py` 240/240; `name_residue.py` exit 0.
+- The five size pins on Debug: `tone_proof.py --only P3`, `wheels_proof.py --only P3`,
+  `look_proof.py --only L3`, `curves_proof.py --only P13`, `hdr_proof.py --only P9`, each 1/1.
+- `co2a_proof.py --only B0,D13p,D1p` 3/3 (3,060 lookup rows over 20 case × rate pairs).
+- `co2a_proof.py` whole on Debug (`make app-debug`): 18/18, after three fixes to the instrument
+  (D1's fixture ids clashing, its split asked at the freeze's rippled start, D2's uncut class
+  above). D15's base Debug app built in 29 s.
+- `make gate`: PASS 474 s (names 1, typecheck 7, fmt and lint skipped, test 297, app 168).
+- `RC_PROOF_APP=release co2a_proof.py`: 18/18 — D1 every frame and 15/s, each case's every frame
+  (trim 60, ×0.5 60, ×2 60, ×1.37 60, ramp 90, freeze 90, reverse 60, split 60, nest 60, the
+  dissolve's incoming 30) and the dissolve's 30 overlap frames at round(255·(1 − p)) ±1; D2 at
+  1.5 s, 1.667 s and 1.9 s: 147,385, 144,683 and 149,923 pixels over all-0 neighbourhoods equal to
+  the clip hidden and 9,154, 11,430 and 6,232 over saturated ones equal to the uncut frame, none
+  differing (masks 512 × 384); D3 both misses byte-identical to cutout off; D4's three frames
+  byte-identical (no person, 60 frames analysed); D6 worst 0/255 over 137,261 pixels; D7 worst
+  1/255 over 230,400 pixels (1,137 partial); D12 codes 15, 40, 75 upright; D15 three PNGs and 60
+  frames' md5 equal to the base `f82c5b20`'s Release app (built in a tree copy in 174 s).
+- Mutants, each once on Release in a tree copy (the tree's files untouched, SHA-256 checked
+  before and after): all nine CAUGHT, each copy built in 157–162 s. `partner-box` D1 (the dissolve's outgoing alpha 255 through the overlap at both rates); `oriented-uv` D12 (neither code reads at any of the three frames); `one-frame-late` D1 (every case at both rates, the mask one frame behind the picture); `nearest-frame` D1 (×0.5, ×1.37, the ramp and the freeze at every frame, ×0.5, ×1.37 and the ramp at 15/s); `miss-transparent` D3 (both misses); `shadow-placeholder` D6 (worst 255/255); `co5-per-range` D4 (the three frames differ); `mask-lifted` D7 (worst 60/255); `pivot` D16 (all 60 reversed frames at every frame, 30 at 15/s, the mask one frame off).
+
+**Review.** Verdict pass, no blocker or should-fix: every item of the spec done, deviations
+reasoned; checked that `cutoutUV` registers under crop, lens and snap (D12), that no draw through
+the layer fragments leaves `texture(4)` unbound, that `CutoutMasks` needs no lock (one renderer
+per compositor, its serial render queue) and that the plan is decoded once per handle. One nit,
+left as is: the found-window LRU (256) holds a superseded `CutoutPack` mapped until evicted after
+a re-publish, although no lookup can hit it — the memory is mapped and bounded.
+
+**Integration** (2026-11-02, onto `worktree-creator-jobs` after CJ5b): `creator-jobs-4.md` and the
+two index files met CJ5b's CJ-51 and CJ-52 and were kept both, CJ5b's first (`creator-jobs-4.md`
+278 lines, `11-decisions/` 18551 in 38 files; `spec_index_proof.py` 240/240). `app/CLAUDE.md`
+took the four owed edits: the `FrameRecipe.swift` entry, the compositor's list with
+`Compositor+Cutout.swift`, `CutoutMasks.swift` and `CutoutLookup.swift`, the uniform block's 160
+floats and its cutout group, and the `texture(4)` sentence beside `texture(5)`'s.
+
+**Owed.** JOB-61 (`docs/manual-checks.md`): the owner's playback check. Nothing to file.
+
 ### CP1 — the owner's checkpoint: T1 cut by deleting words
 
 - **What a person gets:** the first real use of the Transcript tab. In the build with TX3 landed,

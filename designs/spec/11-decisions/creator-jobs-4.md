@@ -197,3 +197,82 @@ FFI or format change.
   - **(c) Ask-first for the assistant only when it names `path`** (AI-7 amended): a package
     written where the model chose. The row carries `askOnlyWith: "path"`; a call without one
     runs unasked, and the system prompt names the row "`new_project_from_range` with `path`".
+
+CO-24…CO-29 are CO2a2's (Remove Background drawn from the cached masks), recorded before its code.
+The owner's answer for CO2a is CO-15's; CO2a2 adds none and asks none. No format bump, no `rc_*`
+and no core change: the recipe's `cutout` key (CO-21) is what the compositor reads.
+
+- **CO-24 — The per-request lookup.** For each composition request, `t` is
+  `CompositionBuilder.ticks(request.compositionTime)`. Only a layer whose source is a `.track`, not
+  drawn as a slate, with `cutout.background == remove` and `cutout.mask.kind == media` looks
+  anything up; every other layer binds the placeholder. The plan is `CutoutMasks.plan(for:
+  instruction.recipeKey, project: RecipeSource.shared.project(for:))`: the handle's plan's video
+  tracks and its snapshot, decoded once per handle (`CutoutPlan`). The segment is the one of the
+  layer's composition track that covers `t` (`duration > 0`, `start ≤ t < start + duration`), and
+  its `media` must be the mask's; else a miss. The source tick is `s = sourceIn + (t − start) ·
+  sourceDuration / duration`, rounded to the nearest tick, halves away from 0
+  (`CutoutLookup.sourceTick`), in the stream the segment reads. **Forward:** the frame shown is
+  `f = pack.shown(at: s)`, the last pack frame at or before `s`. **Reversed** (the clip, top level
+  or inside a nest, plays its media reversed; T its media's model duration): `f = pack.shown(at:
+  T − s − 1)` — `ReverseMirror.mirrored(s, about: T) − 1`, because the reversed stream shows
+  forward frame f over `[T − end(f), T − pts(f))`. `f` is used only when its grid index and
+  `grid.index(of:)` of the queried forward tick lie in the same coverage range; else a miss (a
+  frame outside what was analysed is never borrowed from a neighbour across a gap). The mask's
+  slot: forward, `f`'s own slot (CO-10's nearest analysed mask, ties to the earlier); reversed, the
+  mask `a` minimising `|end(a) − end(f)|`, ties to the larger `end(a)` — the earlier in the
+  reversed stream, CO-3's tie rule there — where `end(x)` is the pts of the pack frame after `x`,
+  else `x.pts + round(grid.frameTicks)`. Every miss draws the layer uncut (CO-6).
+- **CO-25 — When a pack answers.** The cache folder is `ReverseSource.shared.resolution(for:
+  key).cache` and the media's URL `RecipeSource.shared.lookURLs(for:)`'s. The marker must
+  `answers(for:)` the stamp made exactly as `ProjectDocument.analysisRequest` makes it
+  (`AnalysisStamp.make` over `ProjectDocument.analysisInput`), canned markers included where they
+  are honoured (CJ-26); its first payload file must read as a `MaskPack`. Per request a cut-out
+  layer costs one `stat` of the marker: the marker, the stamp and the pack are read again only
+  when the marker's (inode, size, modification time) or the media or its URL changes, and the
+  stamp's asset read only when the media or URL does. Until then the old mapping is kept: a
+  publish renames a new pack into place, so the mapped old one stays whole.
+- **CO-26 — CO-5 as built.** A clip draws its masks only when a subject was found somewhere in
+  its window: the forward source-tick hull of every plan video segment of that clip and media,
+  mirrored about T for a reversed clip (`CutoutPlan.window`), read by `AnalysisMasks.runs` and
+  checked for a run with `subject_found` (`CutoutLookup.subjectFound`) — once per (pack, clip,
+  window), cached. None found: the clip draws uncut, every frame of it, a person walking out of
+  an analysed window still leaving an empty picture where one was found.
+- **CO-27 — How the mask is drawn.** The mask is uploaded as stored: `r8Unorm`, the pack footer's
+  width × height, `replace(region:)` — never through AVFoundation, step 0, `InputStage` or
+  `LayerLift`, so an HLG project's coverage is the SDR project's (CO-7). It is bound at
+  `texture(4)` on every draw through the two layer fragments — a layer, its reflection, its
+  shadow's mask pass, a matte member and a routed dissolve's half, all of which draw through
+  `drawLayer` — the 1×1 white placeholder when none; an adjustment clip's pass never binds it.
+  `cutoutCover` samples `.r` with the layer's sampler at the display-space `uv` captured after
+  steps 1–2 (the spotlight's lens, the pixelate snap) and before `orientedUV`, and remaps it by
+  r0: `c = 0.5 − 0.5·edge`, `w = 0.5 + 0.5·feather`, `lo = clamp(c − w/2, 0, 1)`, `hi = clamp(c +
+  w/2, 0, 1)`, `cover = smoothstep(lo, hi, m)`. Step 7b multiplies `alpha` by it beside the corner
+  radius, only when `cutoutEnabled > 0.5` — a uniform outside the effects sum, as `linearLight` —
+  so a layer without a drawn mask is the same arithmetic as before. `LayerUniforms` gains the
+  cutout group (`cutoutEnabled`, `cutoutEdge`, `cutoutFeather`, a spare): 156 → 160 floats, 624 →
+  640 bytes, 40 × 16; the integrator renumbers at a collision (CJ-8 (b)). **A same-track dissolve
+  whose incoming half has `cutout.background == remove` gets no `partnerBox`**, decided from the
+  recipe whether or not its masks are found: the cutout is per-pixel coverage the box cannot see,
+  as a corner radius or a clip rectangle is, so the outgoing half takes the uncorrected `alpha *=
+  1 − p` and fades out across the overlap, rather than staying opaque through it and vanishing at
+  its last frame.
+- **CO-28 — What does not change.** The plan, the composition, its instructions,
+  `CompositionBuilder` and `ReverseCache`; no request waits for masks (CO2b's CO-6 waits); no new
+  tool. `render_frame` and every export draw through the same compositor, so each draws the cached
+  masks the preview draws.
+- **CO-29 — The proof.** `co2a_proof.py` keeps CO2a1's rows and adds: D1p, the lookup's slot for
+  ten cases' plans (a trim, ×0.5, ×2, ×1.37, a ramp, a freeze, a reverse, a split, a nest and a
+  cross-dissolve) at every frame and at a 15/s canned pack against `deciders.expected_mask`; D1,
+  the same ten cases drawn from canned bar-code packs and exported as `prores_4444`, each frame's
+  picture code and alpha code scored the same way, and the cross-dissolve's outgoing alpha
+  `round(255·(1 − p))` within 1/255 where the incoming's mask is 0; D2, a real person pack's frames
+  equal to the clip hidden where the mask neighbourhood is all 0 and to the uncut frame where all
+  255; D3, a pack whose coverage misses the frame and a marker of another stamp drawing as
+  cutout off; D4, a real pack with no person drawing uncut; D6, a blur-0 shadow's alpha the
+  layer's shifted; D7, HLG coverage equal to SDR within 1/255; D11, a freeze drawing its held
+  frame's mask; D12, a 90°-tagged clip's mask upright; D16, a reversed clip's frame k the forward
+  mask at `T − end`; D15, a cutout-less project's frames and export byte-identical to the base
+  app's. Nine mutants (the `partnerBox` clause, `orientedUV`, one frame late, the nearest frame,
+  a miss drawing transparent, the shadow's placeholder, CO-5 per range, step 0, the pivot), each
+  once on Release. **JOB-61**: a cut-out 1080p camera over a 4K screen recording plays without
+  stutter at Full and Half Preview Quality.

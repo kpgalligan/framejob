@@ -403,6 +403,12 @@ extension MetalRenderer {
             ? placeholder
             : cursorSprite(
                 for: layer, instruction: instruction, output: canvas.output, uniforms: &uniforms)
+        // The cutout's mask (spec §11 CO-24, CO-27): looked up through the plan's segment
+        // under the request's time; never on a slate.
+        let cutout = uniforms.slate > 0.5
+            ? placeholder
+            : cutoutMask(
+                for: layer, request: request, instruction: instruction, uniforms: &uniforms)
         // The chroma key's reading in an HLG project (spec §11 HD-19 (c)), asked
         // only of a keyed layer: 0 (HD-13 (h)'s un-lift) in every other block.
         if canvas.output == .hlg, layer.chroma != nil {
@@ -426,7 +432,7 @@ extension MetalRenderer {
         }
         return PreparedLayer(
             uniforms: uniforms, texture: texture, look: look ?? looks.placeholder, curves: curves,
-            cursor: cursor)
+            cursor: cursor, cutout: cutout)
     }
 
     /// True only when the buffer's `kCVImageBufferAlphaChannelModeKey`
@@ -443,14 +449,15 @@ extension MetalRenderer {
 }
 
 /// What `MetalRenderer.prepare` hands `render`: a layer's uniform block,
-/// the texture it samples, its look's lattice, its curves' strip and its
-/// cursor's sprite (each the placeholder for none).
+/// the texture it samples, its look's lattice, its curves' strip, its
+/// cursor's sprite and its cutout's mask (each the placeholder for none).
 struct PreparedLayer {
     var uniforms: LayerUniforms
     let texture: MTLTexture
     let look: MTLTexture
     let curves: MTLTexture
     let cursor: MTLTexture
+    let cutout: MTLTexture
 }
 
 /// `value` into 0…1 as a `Float`. Spelled out once because the effect block

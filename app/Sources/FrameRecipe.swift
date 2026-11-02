@@ -286,7 +286,8 @@ struct RecipeLayer: Codable, Equatable {
     let cursor: RecipeCursor?
     /// The clip's Remove Background as a draw instruction — the mask to look
     /// up and how to draw it (format 39, spec §11 CO-21,
-    /// `CutoutProps.swift`); nil for none. Not drawn yet (CO2a2).
+    /// `CutoutProps.swift`); nil for none. Drawn by `Compositor+Cutout.swift`
+    /// since CO2a2 (spec §11 CO-24…CO-27).
     let cutout: RecipeCutout?
 
     init(from decoder: Decoder) throws {

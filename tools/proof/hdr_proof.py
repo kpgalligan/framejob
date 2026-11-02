@@ -302,7 +302,7 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   the encoded one printed beside C0's 0.21 ms (REASONED).
 - **P9** (hdr H-6): `hdr_probe.swift`'s `RecipeCanvas.blended` against IEC 61966-2-1's
   EOTF and HLG's inverse OETF, `uniforms(for:)` over output × blending × range, the
-  Blending popup's items, and `LayerUniforms` 624 (528 until creator-jobs CU3a2),
+  Blending popup's items, and `LayerUniforms` 640 (624 until creator-jobs CO2a2, 528 until creator-jobs CU3a2),
   `QualifierUniforms` 80, `MatteUniforms`
   16 and `OutputUniforms` 16 bytes.
 - **H7w, DA, P10, P11** (clean-up batch 2, #316, #315, #317, spec §11 HD-18). H7w: the

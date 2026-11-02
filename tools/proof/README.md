@@ -27840,6 +27840,46 @@ make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
 
 The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.
 
+## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 beside CO2a1's rows; nine mutants; spec §11 CO-24…CO-29)
+
+The same script, its probe built with `cutout_spike/mask_track_writer.swift` (CO-S2's bar code)
+beside `app/Sources`; the app is launched with `-RCDevAnalysisCanned YES`, so a canned `masks`
+marker (CJ-26) answers. The probe has three modes beside its rows: `barcode <out> <frames>` writes
+the bar-code movie, `pack <spec>` a canned `masks.pack` (the picture's band 255, the analysed frame's
+index as a bar code below it; every frame or a capped rate), and `mask <pack> <slot> <out>` one
+mask's bytes. Fixtures: `media/cutout/co2a/barcode.mov` (300 frames, 1920 × 1080, frame k carrying
+k) and `barcode_rot.mov` (its first 3 s transposed and tagged `-display_rotation 90`), made on
+first use; `push_1080.mov` and `screen_4k.mov`, `cutout_spike.fixtures()`'s.
+
+| Row | What it holds |
+|---|---|
+| D1p | the lookup (CO-24) over ten cases' plans at every composition frame, against packs at every frame and 15 a second: the source tick exact and the slot's mask frame `deciders.expected_mask`'s |
+| D1 | the ten cases on a transparent 640 × 360 canvas, exported as `prores_4444` at each rate and decoded: every frame's picture code and alpha code agree by `deciders.expected_mask`; the cross-dissolve's outgoing alpha round(255·(1 − p)) ±1 where the incoming's mask is 0 |
+| D11 · D16 | the freeze's and the reverse's frames of D1 |
+| D2 | `push_1080.mov`'s real masks: pixels over an all-0 3 × 3 mask neighbourhood equal the clip hidden, over an all-≥ 192 one (r0's remap exactly 1) the uncut frame, byte for byte |
+| D3 | a pack whose coverage misses the frame, and a stamped marker of another stamp: byte-identical to cutout off (a frame inside the coverage draws its mask) |
+| D4 | `screen_4k.mov`'s real masks, no person: byte-identical to cutout off |
+| D6 | a blur-0 shadow's alpha is the cut layer's, shifted 20 px, ±1 |
+| D7 | the HLG project's alpha within 1/255 of the SDR project's |
+| D12 | a 90°-tagged bar-code clip: picture and alpha codes both k |
+| D15 | a cutout-less project's three PNGs and a 2 s `prores_4444` export's frame md5s equal the base's app (`BASE`, built in a tree copy) |
+
+Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration): `partner-box`
+(the `partnerBox` cutout clause, D1), `oriented-uv` (the mask sampled through `orientedUV`, D12),
+`one-frame-late` (D1), `nearest-frame` (the source tick rounded to a frame, D1), `miss-transparent`
+(a miss draws the layer at opacity 0, D3), `shadow-placeholder` (D6), `co5-per-range` (a window
+with any analysed run counts as found, D4), `mask-lifted` (the mask's value changed in an HLG
+project, a stand-in for a lift through step 0, D7) and `pivot` (the reversed query at `T − s`,
+D16).
+
+```sh
+make app-debug && python3 tools/proof/co2a_proof.py --only B0,D13p,D1p
+make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co2a_proof.py --mutant NAME
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO2a2 record.
+
 ## Road map "creator-jobs" TX3a — delete words (`transcript_cut_proof.py` U0–U6, Z0, C1–C9, C4b; ten mutants; `transcript_spike/` TX-S3; spec §11 TX-30…TX-33)
 
 ```sh

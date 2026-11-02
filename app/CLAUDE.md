@@ -1832,7 +1832,7 @@ the key map behind it.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve`, `cursor` — CU-32's key, drawn
-  by `Compositor+Cursor.swift` since CU3a2 — and `cutout`, CO-21's, not drawn until CO2a2)
+  by `Compositor+Cursor.swift` since CU3a2 — and `cutout`, CO-21's, drawn by `Compositor+Cutout.swift` since CO2a2)
   and `FrameRecipe` (with
   `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
   `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
@@ -1939,6 +1939,17 @@ the key map behind it.
   when none; spec §11 CU-33) · `CursorSprites.swift` (a cursor image's texture
   made once, lifted in an HLG project, an LRU of 64; `uploads` the probe's
   count) ·
+  `Compositor+Cutout.swift` (`MetalRenderer.cutoutMask`: Remove Background drawn, spec §11
+  CO-24…CO-27 — a `.track` layer whose recipe `cutout` has `background` remove, looked up per
+  request through the covering plan segment to the pack frame shown and its mask, the placeholder
+  with `cutoutEnabled` 0 on any miss; never on a slate) · `CutoutMasks.swift` (per
+  `MetalRenderer`, render queue only: plans per recipe key against a weak handle, packs per
+  (cache folder, media) re-read only when the marker's stat, the media or its URL changes, the
+  stamp `analysisRequest` would make, found windows, an LRU of eight `r8Unorm` mask textures
+  uploaded as stored; `uploads` the count) · `CutoutLookup.swift` (pure: `CutoutPlan` — a
+  handle's segments, reversed pivots and clip windows — and `CutoutLookup` — the source tick,
+  a reversed clip's frame at `T − s − 1` and its mask by `end`, the coverage test, CO-5's
+  `subjectFound`) ·
   `DestinationPass.swift` (the destination render pass as a value a shadow
   or a routed dissolve suspends and resumes) ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
@@ -1954,14 +1965,15 @@ the key map behind it.
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
   0…1 where the shader samples it. The uniform block's field ORDER is a contract
   with the shader checked only by reading both, so change them in one edit; it
-  is 156 floats (624 bytes): the tone group (spec §11 GR-2: the nine tone
+  is 160 floats (640 bytes): the tone group (spec §11 GR-2: the nine tone
   values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
   then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
   each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, `hueCurvesEnabled`,
   spec §11 GR-32), the HLG group (`hlgOutput`, `liftedWhite`, `linearLight`,
   `keyReading`) and the cursor group (spec §11 CU-33: the sprite's rect, four
   ripples, the ripple colour, `cursorEnabled`, `cursorOpacity`, `rippleCount`,
-  `rippleRadius`; provisional by landing order, CJ-8 (b)); a next field adds a
+  `rippleRadius`) and the cutout group (spec §11 CO-27: `cutoutEnabled`, `cutoutEdge`,
+  `cutoutFeather`, a spare; provisional by landing order, CJ-8 (b)); a next field adds a
   group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
@@ -1983,7 +1995,13 @@ the key map behind it.
   reflection, its shadow's mask pass), the 1×1 placeholder when none;
   `layerSample` composites the cursor per source texel near it, before
   `gradeSample` (`Compositor+Cursor.swift`, `CursorSprites.swift`, spec §11
-  CU-33). **Nine pipelines from seven
+  CU-33). A layer's cutout mask is `texture(4)` on every draw through the two layer fragments (a
+  layer, its reflection, its shadow's mask pass, a matte member, a routed dissolve's half), the
+  1×1 placeholder when none, never on an adjustment pass; `cutoutCover` samples it at the
+  display `uv` after the lens and the snap, before `orientedUV`, and step 7b multiplies alpha by
+  r0's remap only when `cutoutEnabled` is 1; the mask never passes step 0 or `LayerLift`, and a
+  same-track dissolve whose incoming half is cut out gets no `partnerBox`
+  (`Compositor+Cutout.swift`, spec §11 CO-27). **Nine pipelines from seven
   fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
   adjustment clip's full-frame pass reading the destination, blending off, its
   weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a

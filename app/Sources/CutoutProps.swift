@@ -4,7 +4,8 @@ import Foundation
 
 // The read-only mirror of `core/src/model_cutout.rs` (format 39, spec §11
 // CO-20) and of the recipe layer's `cutout` key (CO-21). Nothing here draws:
-// the compositor's use of `RecipeCutout` is road map creator-jobs CO2a2's.
+// the compositor draws `RecipeCutout` through `Compositor+Cutout.swift` since
+// road map creator-jobs CO2a2 (spec §11 CO-24…CO-27).
 // Every decode is lenient, the core's defaults standing in for a key that
 // does not read, as the other snapshot types do, but for the mask's `kind`
 // and `media`, without which there is no mask to look up.

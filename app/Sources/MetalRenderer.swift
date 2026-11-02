@@ -53,6 +53,8 @@ final class MetalRenderer {
     private let lift: LayerLift
     /// The cursor's sprites, made once per image (spec §11 CU-33, `Compositor+Cursor.swift`).
     let cursorSprites: CursorSprites
+    /// The cutout's plans, packs and mask textures (spec §11 CO-24…CO-27, `Compositor+Cutout.swift`).
+    let cutoutMasks: CutoutMasks
     let sampler: MTLSamplerState
     let textureCache: CVMetalTextureCache
     /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
@@ -212,6 +214,7 @@ final class MetalRenderer {
         self.inputs = inputs
         self.lift = lift
         self.cursorSprites = CursorSprites(device: device)
+        self.cutoutMasks = CutoutMasks(device: device)
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder

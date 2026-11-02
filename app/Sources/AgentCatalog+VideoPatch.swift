@@ -172,8 +172,10 @@ extension AgentServer {
         + "text, shape, graphic, adjustment, image or nest clip is refused. In an action's end "
         + "edge and feather animate and background switches at the end; subject and quality "
         + "are refused there, the cutout cannot be keyed off, and on a clip with no cutout an "
-        + "end's cutout keys do nothing. Drawing the cutout is not built yet: the keys are "
-        + "stored and read back)"
+        + "end's cutout keys do nothing. The cutout is drawn, in the preview, render_frame and "
+        + "every export, where the clip's media has person masks cached "
+        + "(get_media_analysis {kind: \"masks\"} makes them); a frame without its mask, or "
+        + "a clip window in which no person was found, draws uncut)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an

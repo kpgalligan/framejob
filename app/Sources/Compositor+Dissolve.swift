@@ -184,13 +184,15 @@ extension MetalRenderer {
         // The look's lattice, or the placeholder (spec §11 GR-7, GR-8), and
         // the curves' strip, or its placeholder (GR-12): every draw through
         // the layer fragments binds `texture(2)` and `texture(3)`, the
-        // shadow's mask pass and the reflection's included; and the cursor's
+        // shadow's mask pass and the reflection's included; the cutout's mask,
+        // or the placeholder, at `texture(4)` (spec §11 CO-27); and the cursor's
         // sprite, or the placeholder, at `texture(5)` (spec §11 CU-33 (g)).
         let look = prepared.look
         if let shadow = layer.shadow {
             encodeShadow(
                 shadow, uniforms: uniforms, texture: prepared.texture, matte: matte, look: look,
-                curves: prepared.curves, cursor: prepared.cursor, canvas: canvas,
+                curves: prepared.curves, cutout: prepared.cutout, cursor: prepared.cursor,
+                canvas: canvas,
                 maskState: pipelineState(gather: layer.needsGather, blend: false), pass: &pass)
         }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
@@ -198,6 +200,7 @@ extension MetalRenderer {
         encoder.setFragmentTexture(matte, index: 1)
         encoder.setFragmentTexture(look, index: 2)
         encoder.setFragmentTexture(prepared.curves, index: 3)
+        encoder.setFragmentTexture(prepared.cutout, index: 4)
         encoder.setFragmentTexture(prepared.cursor, index: 5)
         if layer.reflection != nil {
             encodeReflection(uniforms: uniforms, texture: prepared.texture, encoder: encoder)

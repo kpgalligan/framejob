@@ -414,6 +414,15 @@ struct LayerUniforms {
     float cursorOpacity;
     float rippleCount;
     float rippleRadius;
+    // ── The cutout (spec §11 CO-27): the person's mask at `texture(4)`,
+    // multiplied into alpha at step 7b when `cutoutEnabled` is 1 (outside the
+    // effects sum, as `linearLight`); `cutoutEdge` −1…1 and `cutoutFeather`
+    // 0…1 are r0's remap (`cutoutCover`); then a spare.
+    // 156 + 4 = 160 floats = 640 bytes, 40 × 16.
+    float cutoutEnabled;
+    float cutoutEdge;
+    float cutoutFeather;
+    float cutoutReserved;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -1525,7 +1534,8 @@ static inline float3 gradeSteps(float3 rgb, constant LayerUniforms &u, texture2d
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
-//   7. coverage                corner radius × nest clip rectangle × matte;
+//   7. coverage                corner radius × the cutout (spec §11 CO-27,
+//                              `texture(4)`) × nest clip rectangle × matte;
 //                              an adjustment layer's weight also × the
 //                              qualifier's `q` (spec §11 GR-13), read from
 //                              the destination before step 3
@@ -1645,6 +1655,22 @@ static inline float3 gradeSteps(float3 rgb, constant LayerUniforms &u, texture2d
 // landed and phases 1–5 re-proved BEFORE any blend code existed, so a
 // one-LSB drift in the plain path could be attributed to the move rather
 // than to the feature.
+/// The cutout's coverage at display uv `uv` (spec §11 CO-27): the mask's `.r`,
+/// stored at Vision's own size in display orientation, read with the layer's
+/// sampler at the same display-space coordinate as the picture — after the
+/// spotlight's lens and the pixelate snap, before `orientedUV` — and remapped
+/// by r0: `edge` moves the threshold (`c = 0.5 − 0.5·edge`, so a positive edge
+/// grows the outline), `feather` widens the ramp (`w = 0.5 + 0.5·feather`).
+static inline float cutoutCover(texture2d<float> mask, sampler samp, float2 uv,
+                                constant LayerUniforms &u) {
+    float m = mask.sample(samp, uv).r;
+    float c = 0.5 - 0.5 * clamp(u.cutoutEdge, -1.0, 1.0);
+    float w = 0.5 + 0.5 * clamp(u.cutoutFeather, 0.0, 1.0);
+    float lo = clamp(c - w * 0.5, 0.0, 1.0);
+    float hi = clamp(c + w * 0.5, 0.0, 1.0);
+    return smoothstep(lo, hi, m);
+}
+
 static inline float4 layerColorPremultiplied(Varyings in,
                                              constant LayerUniforms &u,
                                              texture2d<float> source,
@@ -1652,7 +1678,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
                                              texture2d<float> matte,
                                              texture3d<float> look,
                                              texture2d<float> curves,
-                                             texture2d<float> cursor) {
+                                             texture2d<float> cursor,
+                                             texture2d<float> cutout) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1734,6 +1761,10 @@ static inline float4 layerColorPremultiplied(Varyings in,
             uv = ((floor(px / plan.block) + 0.5) * plan.block) / srcSize;
         }
     }
+
+    // The cutout's sampling point (spec §11 CO-27): display space, after the
+    // lens and the snap above. Read at step 7b only when a mask is drawn.
+    float2 cutoutUV = uv;
 
     // (3) The sample.
     LayerSample base;
@@ -1935,6 +1966,12 @@ static inline float4 layerColorPremultiplied(Varyings in,
         float feather = max(1.0 / max(u.scale, 1e-4), 1e-4);
         alpha *= clamp(0.5 - d / feather, 0.0, 1.0);
     }
+    // The cutout (spec §11 CO-27): the person's mask, pure alpha like the
+    // corner radius. Gated by its own uniform, outside the effects sum, so a
+    // layer with no mask drawn runs exactly the arithmetic it ran before.
+    if (u.cutoutEnabled > 0.5) {
+        alpha *= cutoutCover(cutout, samp, cutoutUV, u);
+    }
 
     // (7c) The matte coverage (spec §11 MT-3, MT-6): the product of every
     // matte cutting this layer, resolved into one r8 texture the size of the
@@ -2058,8 +2095,9 @@ fragment float4 framejob_layer_fragment(Varyings in [[stage_in]],
                                        texture2d<float> matte [[texture(1)]],
                                        texture3d<float> look [[texture(2)]],
                                        texture2d<float> curves [[texture(3)]],
+                                       texture2d<float> cutout [[texture(4)]],
                                        texture2d<float> cursor [[texture(5)]]) {
-    return layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor);
+    return layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor, cutout);
 }
 
 /// Step 11: one layer's colour combined with the destination under a
@@ -2183,8 +2221,10 @@ fragment float4 framejob_layer_blend_fragment(Varyings in [[stage_in]],
                                              texture2d<float> matte [[texture(1)]],
                                              texture3d<float> look [[texture(2)]],
                                              texture2d<float> curves [[texture(3)]],
+                                             texture2d<float> cutout [[texture(4)]],
                                              texture2d<float> cursor [[texture(5)]]) {
-    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor);
+    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor,
+                                         cutout);
     // Clamped, because the 16-bit-float canvas keeps whatever is returned
     // and a blend can step past 1 or below 0 (spec §11 PR-1).
     return saturate(blendPremultiplied(int(u.blendMode + 0.5), src, dst));

@@ -73,9 +73,9 @@ do {
     let flag = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.wheelsEnabled) ?? -1
     let reserved = MemoryLayout<LayerUniforms>.offset(of: \LayerUniforms.hueCurvesEnabled) ?? -1
     check(
-        "P3 LayerUniforms is 624 bytes (156 floats, 39 × 16) with liftX at 464 and "
+        "P3 LayerUniforms is 640 bytes (160 floats, 40 × 16) with liftX at 464 and "
             + "wheelsEnabled at 500",
-        stride == 624 && lift == 464 && flag == 500 && reserved == 508,
+        stride == 640 && lift == 464 && flag == 500 && reserved == 508,
         "stride \(stride), liftX at \(lift), wheelsEnabled at \(flag), hueCurvesEnabled at "
             + "\(reserved)")
 }

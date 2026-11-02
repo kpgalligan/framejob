@@ -127,7 +127,10 @@ extension MetalRenderer {
     /// A clipped partner is refused for the same reason a rounded one is: the
     /// nest rectangle cuts coverage the box would claim, and over-claiming is
     /// the one direction that shows — the outgoing layer would be brightened
-    /// where nothing is coming in to darken it. A partner with a REFLECTION
+    /// where nothing is coming in to darken it. A cut-out partner (`cutout`
+    /// with `background` remove, spec §11 CO-27) is refused too, from the
+    /// recipe and whether or not its masks are found: its coverage is per pixel.
+    /// A partner with a REFLECTION
     /// needs no such guard: a reflection only ever adds coverage below the
     /// box, so the box under-claims, which is the reading this function
     /// already returns nil to get.
@@ -135,6 +138,7 @@ extension MetalRenderer {
         _ partner: RecipeLayer, canvas: RecipeCanvas, progress: Double
     ) -> CGRect? {
         guard partner.rotation == 0, partner.cornerRadius == 0, partner.clipRect == nil,
+            partner.cutout?.background != .remove,
             let size = partner.sourceSizeCG, size.width > 0, size.height > 0
         else { return nil }
         let anchor = CGPoint(

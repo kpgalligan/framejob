@@ -92,8 +92,8 @@ extension MetalRenderer {
     /// and inherits the blend — `encodeReflection` says why.)
     func encodeShadow(
         _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture,
-        look: MTLTexture, curves: MTLTexture, cursor: MTLTexture, canvas: RecipeCanvas,
-        maskState: MTLRenderPipelineState, pass: inout DestinationPass
+        look: MTLTexture, curves: MTLTexture, cutout: MTLTexture, cursor: MTLTexture,
+        canvas: RecipeCanvas, maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) {
         func component(_ index: Int) -> Float {
             index < shadow.color.count ? Float(min(max(shadow.color[index], 0), 1))
@@ -118,7 +118,8 @@ extension MetalRenderer {
         guard
             let silhouette = shadowSilhouette(
                 uniforms: uniforms, texture: texture, matte: matte, look: look, curves: curves,
-                cursor: cursor, sigma: sigma, canvas: canvas, maskState: maskState, pass: &pass),
+                cutout: cutout, cursor: cursor, sigma: sigma, canvas: canvas,
+                maskState: maskState, pass: &pass),
             let encoder = pass.open()
         else { return }
 
@@ -182,7 +183,8 @@ extension MetalRenderer {
     /// the reason `DestinationPass` exists.
     private func shadowSilhouette(
         uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture, look: MTLTexture,
-        curves: MTLTexture, cursor: MTLTexture, sigma: Float, canvas: RecipeCanvas,
+        curves: MTLTexture, cutout: MTLTexture, cursor: MTLTexture, sigma: Float,
+        canvas: RecipeCanvas,
         maskState: MTLRenderPipelineState,
         pass: inout DestinationPass
     ) -> MTLTexture? {
@@ -229,6 +231,8 @@ extension MetalRenderer {
         // and `texture(3)`.
         encoder.setFragmentTexture(look, index: 2)
         encoder.setFragmentTexture(curves, index: 3)
+        // The cutout's mask (spec §11 CO-27): the silhouette is the cut outline.
+        encoder.setFragmentTexture(cutout, index: 4)
         // The cursor's sprite (spec §11 CU-33 (g)): part of the layer's picture,
         // so of its silhouette too.
         encoder.setFragmentTexture(cursor, index: 5)

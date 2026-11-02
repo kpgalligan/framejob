@@ -45,11 +45,11 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 226 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 315 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 405 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor and cutout keys. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 406 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor and cutout keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 89 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
-| [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 360 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
+| [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 387 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 57 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 243 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 761 | Export: writers, formats, stems, loudness, the queue, the wait for ramp audio, isolated voice and voice effects. |
@@ -63,7 +63,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 243 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 18466 in 38 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 18551 in 38 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
