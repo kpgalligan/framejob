@@ -13,11 +13,15 @@ enum AssistantToolRule {
 
 /// One row. `onlyWith` narrows the row to calls carrying that argument with
 /// that string value (`transcribe` is withheld only for the cloud engine).
+/// `askOnlyWith` narrows an ask-first row to calls carrying that argument
+/// (`new_project_from_range` asks only when it names `path`, CJ-52); declared
+/// last, with a default, so every other row's init is unchanged.
 struct AssistantToolRow {
     let tool: String
     let rule: AssistantToolRule
     let onlyWith: (key: String, value: String)?
     let reason: String
+    var askOnlyWith: String? = nil
 }
 
 /// What the person is asked before an ask-first tool runs: the tool, where it
@@ -79,6 +83,11 @@ enum AssistantToolTable {
             tool: "export_graphic", rule: .askFirst, onlyWith: nil,
             reason: "It writes a .fjgraphic package where the model chose, replacing any file "
                 + "already there."),
+        AssistantToolRow(
+            tool: "new_project_from_range", rule: .askFirst, onlyWith: nil,
+            reason: "It writes a project package where the model chose, when the call names a "
+                + "path.",
+            askOnlyWith: "path"),
     ]
 
     static let devToolReason =
@@ -108,12 +117,15 @@ enum AssistantToolTable {
     }
 
     /// The question an ask-first call puts to the person, or nil for any other
-    /// tool. Main only: it reads the document and the file system.
+    /// tool, and for an ask-first row's call without its `askOnlyWith`
+    /// argument, which the lane then runs unasked. Main only: it reads the
+    /// document and the file system.
     static func question(
         tool: String, arguments: [String: Any], document: ProjectDocument
     ) -> AssistantQuestion? {
         assert(Thread.isMainThread)
-        guard row(for: tool)?.rule == .askFirst else { return nil }
+        guard let entry = row(for: tool), entry.rule == .askFirst else { return nil }
+        if let key = entry.askOnlyWith, arguments[key] == nil { return nil }
         let given = (arguments["path"] as? String).map { ($0 as NSString).expandingTildeInPath }
         let path: String?
         switch tool {
@@ -126,6 +138,12 @@ enum AssistantToolTable {
             // Where the tool will write: `.fjgraphic` added as `destinationURL` adds it.
             path = given.map {
                 AgentServer.destinationURL($0, extension: GraphicPackage.fileExtension).path
+            }
+        case "new_project_from_range":
+            // Where the tool will write: `.framejob` added as `destinationURL` adds it.
+            path = given.map {
+                AgentServer.destinationURL($0, extension: ProjectDocument.projectFileExtension)
+                    .path
             }
         default:
             path = given

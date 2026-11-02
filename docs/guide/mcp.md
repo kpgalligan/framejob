@@ -416,6 +416,7 @@ spells out each argument; the area pages cover the features in depth.
 |---|---|
 | `open_project` | Opens a `.framejob` package, or a movie, sound or picture as a new untitled project sized and rated to the file, with the file as the first clip on track 1. Answers `already_open` when it is. |
 | `new_project` | A blank 1920×1080, 30 fps project (**File ▸ New Project**), saved straight away when given a `path` (`.framejob` is added when missing). A path another open project holds is refused, and nothing is created. |
+| `new_project_from_range` | `[from, to)` of the top-level timeline opened as a new project (**File ▸ New Project from Range…**), with the kept media's caches and the drawn graphics, fonts and assets carried; untitled and unsaved, or saved first at `path` (refused where anything already exists). The project it comes from does not change. Answers the new project and `carried` (files, bytes, seconds). The assistant asks first when it names a `path`. |
 | `save_project` | Saves; a `path` saves there (Save As). Required the first time. Answers once the package is on disk. A path another open project holds is refused. |
 | `close_project` | Closes a project and its window (**File ▸ Close**, ⌘W). Refuses unsaved changes unless `discard: true`. |
 | `get_project` | The whole project plus playhead, selection and in/out range. |

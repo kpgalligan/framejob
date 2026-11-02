@@ -445,6 +445,7 @@ APP_STATE_TOOLS = {
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
     "get_transcript", "list_graphics", "insert_graphic", "export_graphic",
     "import_graphic", "get_media_analysis", "split_at_shots", "get_timeline_transcript",
+    "new_project_from_range",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`

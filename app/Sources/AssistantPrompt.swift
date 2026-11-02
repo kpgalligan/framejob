@@ -29,8 +29,8 @@ enum AssistantPrompt {
     static let searchTopics: [(words: String, tools: [String])] = [
         ("open, create or save a project, move the playhead, set the in and out range, "
             + "select clips, enter or leave a nest",
-         ["open_project", "new_project", "save_project", "set_playhead", "set_range",
-          "set_selection", "set_scope"]),
+         ["open_project", "new_project", "new_project_from_range", "save_project",
+          "set_playhead", "set_range", "set_selection", "set_scope"]),
         ("add, remove, reorder, rename, hide, mute or lock tracks",
          ["add_track", "remove_track", "move_track", "set_track", "remove_empty_tracks"]),
         ("markers and the canvas (size, frame rate, background)",
@@ -124,10 +124,11 @@ enum AssistantPrompt {
 
     /// The ask-first tools and the conditional withheld rows, read from
     /// `AssistantToolTable.rows` (AI-7). A tool withheld outright is never
-    /// named: the model never sees it.
+    /// named: the model never sees it. An ask-first row that asks only with
+    /// an argument is spelled "`<tool>` with `<key>`" (CJ-52).
     private static var askFirstParagraph: String {
         let asking = AssistantToolTable.rows.filter { $0.rule == .askFirst }
-            .map { "`\($0.tool)`" }
+            .map { row in row.askOnlyWith.map { "`\(row.tool)` with `\($0)`" } ?? "`\(row.tool)`" }
         let narrowed = AssistantToolTable.rows.compactMap { row -> String? in
             guard row.rule == .withheld, let only = row.onlyWith else { return nil }
             return "`\(row.tool)` with `\(only.key)` \"\(only.value)\""

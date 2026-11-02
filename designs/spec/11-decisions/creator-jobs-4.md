@@ -119,3 +119,81 @@ transcript and lifts on the timeline — **yes**; a word selection sets the time
   repeats no words is a judgement of meaning, so cut one only when the person asks: say which
   words you will cut, then cut them in one `ripple_delete_ranges` call." TX5, TX6 and TX7 extend
   it, each with its own Amended line.
+
+CJ-51 and CJ-52 are CJ5b's (File ▸ New Project from Range…, the derived document VR3 and FC8a
+build on), recorded before its code; CJ5a's CJ-50 is in `creator-jobs.md`. The owner's answer of
+2026-11-01 for CJ5b: the new document opens with the range as its first state, with no undo back
+to the whole source — **yes**. Nothing here sends anything: no `ModelKeys` row (CJ-3). No core,
+FFI or format change.
+
+- **CJ-51 — The derived document.** `ProjectDocument+Derived.swift`'s
+  `derived(from:handle:range:path:display:name:)` answers a new document built from a handle,
+  and what it carried (`DerivedCarry.Report`: files, bytes, seconds). Main thread.
+  - **(a) The handle.** With a range, `ReelOp.keepRange(from:to:)` is applied PURELY to
+    `handle` (`ReelProject.applying`, never `applyEdit`: the source document never changes):
+    `.applied` gives the new project, `.identity` keeps the handle, `.refused` is thrown with
+    the core's own sentence, and an `Err` is thrown. With no range the handle is used unchanged
+    (VR3's copy).
+  - **(b) What is carried**, for each kept media id `m` (a media the derived snapshot still
+    lists): `thumbs/m/`; `peaks/m.bin` and `peaks/m.complete.json`; `loudness/m.bin` and its
+    marker; `speech/m.bin` and its marker; `sync/m.bin`, `sync/m.pcm` and their marker; every
+    `device-transcripts/m-*.json`; for every folder `k` under `analysis/`, `analysis/k/m.json`
+    and `analysis/k/m/` (masks and mirrored chunks included, CO-4); `transcripts/m.json` and
+    `transcripts/m.complete.json` only when `MediaTranscript.read(for:in:)` records
+    `remote_deleted: true` — one still owed a DELETE stays in the source, so R6-11 and R6-3 hold
+    (N4); and `ReverseCache.existing(media:source:in:)` for each media a kept clip, top level or
+    nest, plays reversed and is not an image — the digest is over the same media file, so it
+    stays valid, and nothing renders a reverse for a windowless document (N5). Thumbnails join
+    the draft's list because "no pass starts on open" needs them. Never carried: media files (a
+    derived project points at the source's media; a consolidated source's shorts point into its
+    package), `ramp-audio/`, `isolated/` and `voiced/` (the export waits for and makes them),
+    and `graphics/history/`. It carries the graphics its clips draw (every graphic clip's
+    module, top level and every nest, `reconcileGraphicNames`' set) plus every file of `fonts/`
+    and `assets/`, through the started `GraphicStore` (G-14): each module by
+    `write(name:bytes:)`, each font and asset by `importFile(from:into:as:)`, then one
+    `rescan()`. (SW-44 later adds every per-source cache key.)
+  - **(c) The order (N6).** 1. `P/project.json` is written (`handle.json`, atomic), P being
+    `path` or a staging folder `NSTemporaryDirectory()/FrameJob/<UUID>-derived/`. 2. The
+    document opens: with `path`, `NSDocumentController.shared.makeDocument(withContentsOf: P,
+    ofType: projectTypeIdentifier)` then `addDocument`, so `cache/` lands once, in the package;
+    untitled, `openUntitledDocumentAndDisplay(false)`, `read(from: P, ofType:
+    projectTypeIdentifier)`, the staging folder removed, `displayName` the name, then
+    `fileModificationDate = nil` and `countEditChange(.changeDone)`, so it opens dirty with no
+    undo step (`untitled(around:)`'s shape). 3. With S the source's `intendedCacheDirectory`,
+    `CacheLedger.shared.saveBegan(cacheDir: S)`; the carried paths listed in S and copied into
+    the new document's `cacheDirectory`; `saveEnded(cacheDir: S, save:)` in a `defer`, so a
+    throw ends it too. This is `ProjectDocument+CacheSaves.swift`'s bracket: the listing and
+    the copy never straddle a publication into the source's cache. No ledger call is made on the
+    derived directory, which nothing publishes into before step 4. 4. `makeWindowControllers()`,
+    so `startCaches()` finds every carried marker current (markers carry no path) and starts no
+    pass, and the graphic store starts. 5. The graphics carried through `document.graphicStore`
+    from the source's `graphicStore?.folderURL`, else `<source fileURL>/graphics`. 6.
+    `showWindows()` when `display`. 7. With `path`, `noteNewRecentDocumentURL`. `display: false`
+    makes the window controllers (so caches and the graphic store start) and shows no window
+    (N7). A source pass still running when the call is made leaves its kind for the derived
+    document's own pass.
+  - **(d) Failure.** A throw after the document exists closes it; with `path`, P — which this
+    call created — is removed. The staging folder is removed on every exit.
+  - **(e) Copies** are APFS clones where the volume allows (`copyfile` with `COPYFILE_CLONE`),
+    else copies (N6). The copy runs on the main thread; its seconds are in the report.
+- **CJ-52 — File ▸ New Project from Range… and `new_project_from_range {from, to, path?}`.**
+  - **(a) The menu item**, in the File menu directly below Pause Recording, no key equivalent,
+    is on only with an In–Out range set (`inOutRange`), no nest open (`scope == nil`) and no
+    sheet on the window. The new document opens untitled and dirty with the range as its first
+    state and no undo step, named "<source name> (range)" (`displayStem` plus " (range)") until
+    saved; the source document never changes. A refusal or an error beeps and posts
+    `.projectDocumentDidRefuse` with `ReelRefusal(op: "keep_range", reason:)`, its sentence at
+    the inspector's foot (`refuseShotSplit`'s shape, CI-10).
+  - **(b) The tool** mirrors it, off main (`creatorOffMainTools`), its body one main hop:
+    `target(a)`; refused while a nest is open ("new_project_from_range works on the top-level
+    timeline: set_scope with no nest first."); `from` and `to` read and snapped by `timeArg`;
+    with `path` (`.framejob` added by `destinationURL`), `refuseHeldPath(url, except: nil,
+    tool: "new_project_from_range")` (#40), then refused when anything exists at the path
+    ("<path> already exists, so new_project_from_range did not write there: pass a new path."
+    — the door never replaces a file; FC-82 picks free names); then the door with `display:
+    true` and the same name. It answers `{project, saved (only with path), carried: {files,
+    bytes, seconds}}`. A dev-only launch default, `-RCDevDerivedHidden YES` (dev tools only),
+    makes the tool pass `display: false`, so a proof can see a windowless derived document.
+  - **(c) Ask-first for the assistant only when it names `path`** (AI-7 amended): a package
+    written where the model chose. The row carries `askOnlyWith: "path"`; a call without one
+    runs unasked, and the system prompt names the row "`new_project_from_range` with `path`".

@@ -41,21 +41,25 @@ extension AgentServer {
         "split_at_shots": { $0.splitAtShots },
         // AgentServer+TimelineTranscript.swift (TX1, spec §11 TX-13)
         "get_timeline_transcript": { $0.getTimelineTranscript },
+        // AgentServer+Derived.swift (CJ5b, spec §11 CJ-52)
+        "new_project_from_range": { $0.newProjectFromRange },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
     /// `AgentServer.offMainTools`.
     static let creatorOffMainTools: Set<String> = [
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
+        "new_project_from_range",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
     /// (CJ2a) and `split_at_shots` (CJ2b), both `AgentCatalog+Analysis.swift`,
-    /// then `get_timeline_transcript` (TX1, `AgentCatalog+Transcript.swift`).
+    /// then `get_timeline_transcript` (TX1, `AgentCatalog+Transcript.swift`),
+    /// then `new_project_from_range` (CJ5b, `AgentCatalog+Derived.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
     func creatorTools() -> [[String: Any]] {
-        analysisTools() + transcriptTools()
+        analysisTools() + transcriptTools() + derivedTools()
     }
 }

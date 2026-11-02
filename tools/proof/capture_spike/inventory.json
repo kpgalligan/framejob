@@ -65,6 +65,13 @@
    ],
    "note": "pauses or resumes the recording in place (the panel's pauseRecording/resumeRecording, else ScreenRecorder.shared.pause/resume); no window, sheet or modal; disabled with no recording (#98)"
   },
+  "newProjectFromRange:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/EditorViewController+NewFromRange.swift `@objc func newProjectFromRange(`"
+   ],
+   "note": "ProjectDocument.derived: the In–Out range opened as a new untitled document and its window shown (CJ-52); beeps with no range, inside a nest or with a sheet up"
+  },
   "openDocument:": {
    "verdict": "framework",
    "code": [

@@ -27908,3 +27908,51 @@ Mutants: nine are probe mutants on a copy of `app/Sources`
 `no-ceiling`, `after-no-spanning` and `ceiling-on-after` (U5), `snap-apart`
 (U6). `no-replan` builds the app in a tree copy
 (`work/transcript_cut/mutant-app-no-replan/`) and runs C9.
+
+## Road map "creator-jobs" CJ5b — File ▸ New Project from Range… and the derived document (`derived_proof.py` D1–D11, Z1; six mutants; spec §11 CJ-51, CJ-52)
+
+**`derived_proof.py`** drives the app (`proof_app.binary()`) on a scratch
+`CFFIXED_USER_HOME` in three launches, its packages saved under
+`tools/proof/work/derived-proof/`: plain (D1–D6, D8–D10), `-RCDevDerivedHidden YES` (D7, the
+door with `display: false`) and the assistant (D11, against `anthropic_fake.py` with a dummy
+key in a scratch `-RCSecretFolder`, `assistant_session_proof.py`'s launch). Fixture F1, saved
+at a package, range [2 s, 6 s): `A.mov` and `B.mov` with a 1 s dissolve holding 6 s, `C.mov`
+under a ×2 ramp across 2 s, `silence.mov` reversed, the graphic `drawn` across 6 s (with
+`unused` written and drawn by nothing, Arial and `red.png` imported), a timed caption page
+across 2 s and `AV.mov` with its sound detached across 2 s. Before the one call the proof waits
+(bounded) for every media's markers, `A.mov`'s shots analysis and the reversed render, and
+writes two fake cloud transcripts (`A`'s `remote_deleted: false`, `AV`'s `true`). Z1 is each
+launch's parity grep.
+
+| Row | What it holds |
+|---|---|
+| D1 | the derived project: every track passes the proof's own half-shorter overlap check; its end is to − from; every track a source clip crossed `from` on starts a clip at 0, and every track one crossed `to` on ends one at to − from |
+| D2 | fixture F2 (`A.mov`, `toneA.m4a`, range [1 s, 4 s), nothing near the edges): the derived `prores_422` export (`range: "project"`) against the source's (`range: "in_out"`), decoded: every frame's md5 equal, PCM equal sample for sample away from 0.1 s at each end |
+| D3 | every carried file byte-identical to the source's; thumbs, peaks, loudness, speech, sync, analysis, transcripts and reversed all carried; the derived `cache/` listing (path, size, inode, mtime) at the answer equals one 15 s later |
+| D4 | the `false` transcript and its marker absent from the copy and present in the source; the `true` one carried |
+| D5 | the reversed `.mov` in the copy at the answer, byte-identical; `render_frame` of the derived project at 3 s byte-equal to the source's at 5 s |
+| D6 | the derived `graphics/` holds exactly `drawn.js`, `fonts/Arial.ttf` and `assets/red.png` (beside the store's own `API.md` and `API.d.ts`); the source holds `unused.js` |
+| D7 | (hidden) `snapshot_ui {project: path, window: "editor"}`'s `window_facts.visible` false, no window listed for it by `snapshot_ui {}`, and `get_project {project: path}` answers it |
+| D8 | `$TMPDIR/FrameJob/` listed just before and just after the `path` call: no entry the call created holds the reversed file's name, and no `*-derived` staging folder is left |
+| D9 | `carried` files, bytes and seconds of two calls over two movies and two sound files, recorded; S-PC1 from `tools/proof/media/creator/` when present, else skipped by name and owed |
+| D10 | the source's `get_project` project and undo top unchanged by the call; File ▸ New Project from Range… (`perform_menu_item`) opens "d1-source (range)" untitled and dirty, the source unchanged again |
+| D11 | an assistant turn calling `new_project_from_range` with `path` waits on "new_project_from_range writes <path>"; `assistant_answer deny` sends the model "The person declined: …" and nothing is at the path |
+
+Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`; CAUGHT exits 1,
+SURVIVED 0, a control not performed 2): `deleted-transcript-carried` D4 (every cloud transcript
+carried), `reverse-not-carried` D5, `windows-before-caches` D3 (`makeWindowControllers()` before
+the caches land, so a pass starts), `every-module-carried` D6, `caches-in-temp-then-saved` D8
+(the path package opened untitled, its caches in a temporary folder, and saved after),
+`source-edited` D10 (the tool applies `keep_range` to the source first).
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 110, and `new_project_from_range`
+in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
+`assistant_prompt_probe.swift`'s F5 pins the ask-first row's spelling "`new_project_from_range`
+with `path`".
+
+```sh
+make app-debug && python3 tools/proof/derived_proof.py [--only D1,D3,D4]
+RC_PROOF_APP=release python3 tools/proof/derived_proof.py [--mutant <name>]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CJ5b record.

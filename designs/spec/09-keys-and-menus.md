@@ -77,7 +77,9 @@ open, Hide Frame Job, Hide Others, Show All, Quit Frame Job),
 File (New Project, New Recording… (road map 3 — directly under New
 Project with no separator, because both make a document out of nothing),
 Pause Recording (#98 — under New Recording…, live only while a recording
-runs, retitled Resume Recording while paused, no key), Open…, Open Recent, Close, Save, Save As…,
+runs, retitled Resume Recording while paused, no key), New Project from
+Range… (§11 CJ-52 — under Pause Recording, on only with an In–Out range,
+no nest open and no sheet, no key), Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,

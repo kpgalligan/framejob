@@ -23,6 +23,7 @@ extension UIMenu {
         "newProject:": .modal,
         "newRecording:": .window,
         "pauseOrResumeRecording:": .plain,
+        "newProjectFromRange:": .window,
         "openDocument:": .framework,
         "clearRecentDocuments:": .framework,
         "performClose:": .framework,

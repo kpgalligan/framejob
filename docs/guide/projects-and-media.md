@@ -30,6 +30,22 @@ Dropping several files at once on a window, the Welcome window or the Dock icon 
 
 *Agents:* `new_project` (an optional `path` saves it there straight away; without one it stays an untitled draft).
 
+### New Project from Range
+
+With an In–Out range set on the timeline (Mark ▸ Set In and Set Out), **File ▸ New Project from Range…** opens a new project holding exactly that range, moved to start at 0. A clip across the range's In or Out is cut there, as **Split** cuts it; a transition across an edge becomes a hard start or end; markers inside the range are kept. Media that no kept clip plays are left out. The item is off with no range set, while a nest is open, and while a sheet is on the window.
+
+The new project opens untitled and with unsaved changes, named after the project it came from with " (range)" added (for example "Interview (range)"). It starts at the range: there is no undo step back to the whole timeline. The project you made it from does not change.
+
+What it brings with it, so nothing has to be measured again when it opens:
+
+- each kept media's filmstrip, waveform, loudness, speech and sync caches, the transcripts read on this Mac, its analyses (shots, people's masks) and the backwards render of a reversed clip;
+- a cloud transcript only once AssemblyAI has been told to delete its copy; one still waiting for that stays in the original project;
+- the graphic modules its clips draw, and every font and asset of the project's graphics.
+
+It does not copy media files (the new project uses the same files), speed-ramp, isolated-voice or voice-effect renders (they are made again when needed), or a graphic's kept history. If the range cannot be kept — a nest clip across an edge, or nothing playing in it — the item beeps and shows why at the foot of the inspector.
+
+*Agents:* `new_project_from_range {from, to, path?}` (with `path`, the new project is saved there first; nothing may exist there yet).
+
 ### The Welcome window
 
 When Frame Job starts with nothing to open, and when you click its Dock icon with no window open, it shows the Welcome window. It holds:

@@ -242,7 +242,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`, +`Reverse`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`, +`Reverse`, +`Derived`)
   — NSDocument, `.framejob` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -531,6 +531,27 @@ detail there.
   dismisses, its one owner released in `viewDidDisappear`);
   `EditorViewController+ShotSplit` the menu door, its stale test and
   `validateShotSplitAction`.
+- `ProjectDocument+Derived.swift` · `DerivedCarry.swift` ·
+  `EditorViewController+NewFromRange.swift` · `AgentServer+Derived.swift` ·
+  `AgentCatalog+Derived.swift` — File ▸ New Project from Range… and the
+  derived document VR3 and FC8a build on (road map creator-jobs CJ5b, spec
+  §11 CJ-51, CJ-52). `ProjectDocument.derived(from:handle:range:path:display:name:)`
+  is the door. It applies `keep_range` purely to a handle (the source never
+  changes) and writes `project.json` into `path` or a `<UUID>-derived`
+  staging folder. It then opens the document, saved or untitled and dirty
+  with no undo step, and carries the caches inside the SOURCE's
+  `saveBegan`/`saveEnded` bracket. Only after that does it call
+  `makeWindowControllers()`, so no cache pass starts. The graphics follow
+  through the started store, then the window. A throw closes the document
+  and removes the package it wrote. `DerivedCarry` says which cache paths
+  the kept media own (CJ-51 (b)). It does the `COPYFILE_CLONE` copy and its
+  `Report`, gives the drawn module names, and carries the modules, fonts and
+  assets. `EditorViewController+NewFromRange` holds the command and
+  `validateNewFromRangeAction` (an In–Out range, no nest, no sheet), with a
+  refusal at the inspector's foot as `keep_range`. `AgentServer+Derived` is
+  `new_project_from_range`, off main with one main hop;
+  `-RCDevDerivedHidden` (dev only) makes it pass `display: false`.
+  `AgentCatalog+Derived` holds its row.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -3469,8 +3490,10 @@ free.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
   (`record_screen`; `close_project`; `transcribe` only with
   `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,
-  `export_captions`, `save_project`, `consolidate_media`), a reason on every
-  row; the refusal sentence, the question (main only: the path the call
+  `export_captions`, `save_project`, `consolidate_media`, `export_graphic`,
+  and `new_project_from_range` only with `path` — `AssistantToolRow.askOnlyWith`,
+  after which the question is nil and the lane runs the call unasked,
+  CJ-52), a reason on every row; the refusal sentence, the question (main only: the path the call
   writes, tilde-expanded, and whether a file is already there — "REPLACES")
   and the assistant's catalog, which drops only an unconditional withheld row.
 - `AssistantSession.swift` · `AssistantHelperInput.swift` — one window's
@@ -3596,7 +3619,10 @@ free.
 - `AgentServer+CreatorJobs.swift` — road map "creator-jobs"'s dispatch seam
   (spec §11 CJ-8 (d)): `creatorHandlers` and `creatorOffMainTools`, merged
   by the frozen file's `withDevHandlers(withCreatorHandlers(productHandlers))`
-  and its `offMainTools` union; a clash keeps the product handler.
+  and its `offMainTools` union; a clash keeps the product handler. Its
+  tools: `get_media_analysis`, `split_at_shots`, `get_timeline_transcript`
+  and `new_project_from_range` (CJ5b); the catalog rows are
+  `analysisTools() + transcriptTools() + derivedTools()`.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and

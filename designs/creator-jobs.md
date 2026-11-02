@@ -5960,6 +5960,102 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
   to the whole source)? *Recommended: yes* — undo into the source's whole timeline would be a second
   copy of the source, not a range.
 
+#### CJ5b's record (2026-11-02)
+
+**Landed.** File ▸ New Project from Range…, the derived document and `new_project_from_range`
+(spec §11 CJ-51, CJ-52, recorded and committed before the code, with AI-7's amendment) on lane
+A's branch, base `f82c5b20`. No core, FFI, header or format change; `RC_FORMAT_VERSION` is
+unchanged. Owner, 2026-11-01: the new document opens with the range as its first state — yes.
+Every count below is a `wc -l` or a run's own output.
+
+- **Swift:** `ProjectDocument+Derived.swift` (new, 144 lines): the door
+  `derived(from:handle:range:path:display:name:)` — `keep_range` applied purely to the handle
+  (`ReelProject.applying`; a refusal thrown in the core's sentence), `project.json` written
+  atomically into `path` or a `<UUID>-derived` staging folder, the document made from the
+  package and added, or opened untitled, read, named and counted dirty; the caches copied inside
+  `saveBegan(cacheDir:)` … `saveEnded` on the SOURCE's cache folder; then
+  `makeWindowControllers()`, the graphics through the started store, `showWindows()` when
+  `display` and the recent item with `path`; a throw after the document exists closes it and
+  removes the package it wrote. `DerivedCarry.swift` (new, 193 lines): `cachePaths` (CJ-51 (b)'s
+  list per kept media id, the cloud transcript only with `remote_deleted: true`, the reversed
+  render through `ReverseCache.existing`), `copy` (`copyfile` with `COPYFILE_CLONE`, a `Report`
+  of files, bytes and seconds), `drawnGraphicNames`, `carryGraphics` (modules by
+  `write(name:bytes:)`, fonts and assets by `importFile`, one `rescan()`).
+  `EditorViewController+NewFromRange.swift` (new, 42 lines): the command and
+  `validateNewFromRangeAction`; `EditorViewController.swift` one validator line; the File item
+  under Pause Recording in `AppDelegate+Menus.swift` (475 → 480); `UIMenuTable.swift`'s `.window`
+  row. `AgentServer+Derived.swift` (new, 77 lines) the off-main handler and the dev-only
+  `-RCDevDerivedHidden`; `AgentCatalog+Derived.swift` (new, 55 lines) its row;
+  `AgentServer+CreatorJobs.swift` the handler row, the off-main name and `derivedTools()`.
+  `AssistantToolTable.swift` (148 → 166): `AssistantToolRow.askOnlyWith` (declared last, default
+  nil), the ask-first row, `question(…)`'s nil for a call without `path` and the tool's case;
+  `AssistantPrompt.swift` (177 → 178): `askFirstParagraph` spells the row "`new_project_from_range`
+  with `path`", and the tool joins `searchTopics`' first topic (its words unchanged).
+- **Proofs:** `tools/proof/derived_proof.py` (new): D1–D11, Z1 and the six mutants;
+  `assistant_prompt_probe.swift`'s F5 pins the conditional spelling; `op_argument_proof.py`'s
+  `PRODUCT_TOOLS` 109 → 110; `new_project_from_range` in `APP_STATE_TOOLS` of `phase9_proof.py`,
+  `recording_proof.py` and `recording_probe.py`; `inventory.json`'s row after
+  `pauseOrResumeRecording:`.
+- **Documents:** spec §5.6 (what a derived package holds; 303 → 322), §7.4 (the five files' row;
+  88 → 89), §7.9b (AI-7's conditional row; 161 → 165), §7.9e (the tool; 513 → 524), §9 (the File
+  item; 241 → 243), the spec README's cells and the `11-decisions/` total (18385 → 18466), the
+  decisions index's CJ-51 and CJ-52 rows, AI-7's row, and the `creator-jobs-4.md` (121 → 199) and
+  `assistant.md` (233 → 234) rows; `docs/guide/projects-and-media.md` (### New Project from
+  Range), `menus-and-shortcuts.md` (the File row), `mcp.md` (the tool row), `assistant.md` (the
+  sixth ask-first tool); `tools/proof/README.md`'s CJ5b section.
+- **Checks in the loop:** `make typecheck` exit 0, no error, the four baseline warnings (twice);
+  `inventory.py --check` 5/5; `v2_menu.py --only H` 5 pass, 0 fail; `assistant_prompt_proof.py
+  --probe` 14/14 (F5 names "new_project_from_range with path"; F6 system 3257/6000, guide
+  1498/1500); `spec_index_proof.py` 240/240; `make app-debug` BUILD SUCCEEDED (the Debug parity
+  trap did not fire); `recording_probe.py --only catalog` 31/31; `derived_proof.py --only
+  D1,D3,D4` on Debug 4/4 (after two fixture fixes: a caption of five words with four timings, and
+  `detach_audio`'s twin landing on the caption track); the whole proof on Debug 11/12, D6 failing
+  on the store's own `API.md` and `API.d.ts`, which the row now sets aside; then D6 2/2.
+- **`make gate`** once, on the tree committed as `e9623c8e` (before this record): PASS 447 s — names 1 s,
+  typecheck 7 s (the four baseline warnings), fmt and lint skipped (no Rust input changed), test
+  281 s (206 result lines, 2058 passed, 0 failed), app 157 s (D25 and D26 ok).
+- **Against Release** (after the gate's `make app`): `derived_proof.py` 12/12 — D1 7 clips on 6
+  tracks, end 2400000; D2 90 frames' md5s equal, 144000 samples equal away from 0.1 s at each end;
+  D3 58 files carried (the answer said 58), 0 differ, eight kinds, the listing unchanged 15 s
+  later; D4, D5 (`render_frame` 69453 bytes equal), D6, D8 (0 entries the call created under
+  `$TMPDIR/FrameJob`), D10, D7, D11 ok; D9 40 files, 458492 bytes, 11.0 ms and 11.4 ms over two
+  calls; S-PC1 skipped by name (not in `tools/proof/media/creator/`), owed. D7's check was then
+  tightened from "no visible window listed" to "no window listed" (the run had listed none of 2)
+  and re-run alone: 2/2. On one instance from `proof_app.py launch --app release`, stopped by its
+  pid: `op_argument_proof.py` 186/186 (110 product tools; the gate refuses two strangers to
+  `new_project_from_range`), `op_catalog_proof.py` 23/23, and `grep "Frame Job: "` on its log
+  printed nothing.
+- **Mutants** (six, on Release, each a tree copy built by `tree_copy.py`): all six CAUGHT, each exiting 1, each copy built in 159–191 s — `deleted-transcript-carried` (D4: `A`'s transcript and its marker in the copy), `reverse-not-carried` (D5: the reversed file absent and `render_frame` unequal), `windows-before-caches` (D3: the call failed, "cache/thumbs/4/0.jpg could not be carried: File exists" — the started pass had written it first), `every-module-carried` (D6: `unused.js` in the copy), `caches-in-temp-then-saved` (D8: 79 entries the call created under `$TMPDIR/FrameJob`, the reversed file among them), `source-edited` (D10: the source's project changed, its undo top "Detach Audio" → "Keep Range").
+
+**Deviations.** The guide's `assistant.md` (the ask-first list and its question table) is edited
+too: it is the page of a user-visible change the spec's guide list left out. D6 sets the store's
+own manual (`API.md`, `API.d.ts`, written into every `graphics/` by `GraphicStore+Manual.swift`)
+aside rather than counting it as carried. `derived_proof.py`'s mutant exit codes follow the spec
+(CAUGHT 1, SURVIVED 0, not performed 2), as `assistant_session_proof.py`'s do, not
+`shot_split_proof.py`'s. The door also refuses a `path` where anything exists (the tool refuses
+first, in its own sentence), so the package it removes on a throw is always one it wrote.
+
+**Review.** One review (`f82c5b20..664be1f3`, 33 files), verdict pass, two nits, both left as
+they are. The carry is compared byte for byte only through the `path` door (D3–D6); the menu's
+untitled door runs the same `carryCaches`, so a D10 comparison would be coverage only. And
+`question(…)` takes a JSON `"path": null` as present, so such a call asks a question naming no
+path where it need not: it fails safe, never running a write unasked.
+
+**Integration.** Cherry-picked (`581258be…664be1f3`) onto `worktree-creator-jobs` at TX3's
+`f82c5b20`, the lane's own base: no conflict, nothing renumbered. The owed `CLAUDE.md` edits
+were applied. Root: the argument gate's "one hundred and ten product tools",
+`new_project_from_range` in the app-state tool list, and `-RCDevDerivedHidden YES` among the
+dev-only launch defaults. `app/CLAUDE.md`: `+Derived` in `ProjectDocument.swift`'s entry, the
+five files' entry after the analysis entry, `AssistantToolTable.swift`'s ask-first list (adding
+the `export_graphic` row it lacked and the conditional row), and the tool and
+`creatorTools()`'s three parts in `AgentServer+CreatorJobs.swift`'s bullet. `make gate` on the
+integrated tree, before this sentence: "gate: PASS 307s" (names 1 s, typecheck 7 s, fmt and lint
+skipped, test 151 s with 206 result lines, 2058 passed, 0 failed, app 147 s with D25 and D26 ok).
+The Release proof is the lane's above; the integration changed no app input.
+
+**Owed.** No manual check, and nothing to file. D9's S-PC1 half, when the owner's sample lands
+in `tools/proof/media/creator/`.
+
 ### CU6 — record shortcuts, under Input Monitoring
 
 - **What a person gets:** a **Record shortcuts** checkbox in the recorder panel (off by default).

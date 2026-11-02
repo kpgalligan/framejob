@@ -24,7 +24,9 @@
 //   F4  the search topics and the core tools cover the assistant's catalog
 //       exactly, once each, and the guide shows every topic's words
 //   F5  the ask-first and conditional withheld rows of
-//       `AssistantToolTable.rows` are named in the system prompt
+//       `AssistantToolTable.rows` are named in the system prompt; an
+//       ask-first row with `askOnlyWith` exactly as "`<tool>` with `<key>`"
+//       (CJ-52)
 //   F6  no blank line in any text; the length bounds
 //   F7  the live context block, exactly, and `AssistantPrompt.message`; and
 //       `checkLiterals` (#158): every `none` and `null` in the three texts is
@@ -436,7 +438,11 @@ func rowF5() {
     var problems: [String] = []
     var named: [String] = []
     for entry in AssistantToolTable.rows {
-        if entry.rule == .askFirst {
+        if entry.rule == .askFirst, let key = entry.askOnlyWith {
+            let spelled = "`\(entry.tool)` with `\(key)`"
+            named.append("\(entry.tool) with \(key)")
+            if !system.contains(spelled) { problems.append("\(spelled) missing") }
+        } else if entry.rule == .askFirst {
             named.append(entry.tool)
             if !system.contains("`\(entry.tool)`") { problems.append("`\(entry.tool)` missing") }
         } else if let only = entry.onlyWith {
