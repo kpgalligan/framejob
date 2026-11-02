@@ -28,6 +28,13 @@ struct PlanSegment: Codable, Equatable {
     /// clip's evaluated audio at each point, sorted; empty when no action on
     /// the clip names a tap key (`AudioAutomation.swift`).
     let automation: [PlanAudioPoint]
+    /// A NESTED audio segment's instance (spec §11 TX-10): the enclosing nest
+    /// clip ids outermost first, then the clip's own. The clip alone on a
+    /// top-level segment, which the core writes no key for.
+    let path: [UInt32]
+    /// A nested audio segment's inner clip's first frame in project time
+    /// (TX-10); nil on a top-level segment.
+    let origin: Ticks?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -42,6 +49,9 @@ struct PlanSegment: Codable, Equatable {
         ramp = c.lenient(.ramp)
         trackPans = c.lenient(.trackPans, [])
         automation = c.lenient(.automation, [])
+        let read: [UInt32] = c.lenient(.path, [])
+        path = read.isEmpty ? [clip] : read
+        origin = c.lenient(.origin)
     }
 
     /// Whether the segment needs `scaleTimeRange` — speed, or the

@@ -423,7 +423,7 @@ enum SilenceDetector {
     /// ramps cover a track's whole extent with no gaps, so a span nothing
     /// covers is a plan this build does not understand — believe the segment
     /// rather than silence it.
-    private static func isAudible(_ ramps: [PlanRamp]?, over span: (Ticks, Ticks)) -> Bool {
+    static func isAudible(_ ramps: [PlanRamp]?, over span: (Ticks, Ticks)) -> Bool {
         guard let ramps = ramps, !ramps.isEmpty else { return true }
         var covered = false
         for ramp in ramps {

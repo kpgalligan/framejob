@@ -5,7 +5,8 @@ import Foundation
 /// rule, from the media's cached transcript or else from this Mac's
 /// recogniser over the clip's own window. Never the network (TR-5). What the
 /// recogniser heard is cached per media and language by
-/// `DeviceTranscriptCache` (TR-14), which only `get_transcript` reads.
+/// `DeviceTranscriptCache` (TR-14), which `get_transcript` and the timeline
+/// transcript's fill (`TranscriptFill`, TX-12) read.
 ///
 /// Three pieces, kept apart so a probe can reach each one:
 /// - `cached(for:url:in:)` is the cache DOOR, and it is `FillerDetector`'s
@@ -222,10 +223,12 @@ enum TranscriptReader {
     /// the engine's availability, then whether the ONE chosen locale is
     /// installed (a question that could not be answered is `.unavailable`,
     /// never "not installed"). It never downloads (W-8). The extract is the
-    /// clip's own source window, removed on every exit.
+    /// clip's own source window, removed on every exit. `progress` gets each
+    /// result's end in seconds into the extract (`SpeechEngine.transcribe`'s),
+    /// on the analysis task's thread; `get_transcript` passes none.
     static func recognize(
         _ job: Transcriber.Job, language: Transcriber.Language,
-        cancel: Transcriber.CancelToken
+        cancel: Transcriber.CancelToken, progress: @escaping (Double) -> Void = { _ in }
     ) throws -> [SpeechEngine.Run] {
         try Transcriber.requireModel(language)
         if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
@@ -233,6 +236,6 @@ enum TranscriptReader {
         defer { try? FileManager.default.removeItem(at: extract.url) }
         return try SpeechEngine.transcribe(
             file: extract.url, locale: language.locale, seconds: extract.seconds,
-            name: job.name, cancel: cancel, progress: { _ in })
+            name: job.name, cancel: cancel, progress: progress)
     }
 }

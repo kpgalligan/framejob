@@ -870,7 +870,12 @@ governs a module now.
 - `plan.rs` — `composition_plan()` (spec §7.2): the plan's JSON from
   `assign()`, the instruction tiling, and the decoder-budget warning
   (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move
-  out of `evaluate.rs` (grading GR1).
+  out of `evaluate.rs` (grading GR1). A NESTED audio segment (a voice with
+  more than one stage) carries `path` (the enclosing nest clip ids outermost
+  first, then the clip's own) and `origin` (the inner clip's first frame in
+  project time) after `automation`. A top-level segment carries neither, so
+  every plan without a nest is the text it was (spec §11 TX-10;
+  `core/tests/plan_instances.rs` pins eight non-nest plans' digests).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by

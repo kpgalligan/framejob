@@ -1,0 +1,72 @@
+import Foundation
+
+/// The catalog row of `get_timeline_transcript` (spec §11 TX-13; road map
+/// "creator-jobs" TX1), spliced in by `creatorTools()`.
+extension AgentServer {
+
+    func transcriptTools() -> [[String: Any]] {
+        [
+            // It mirrors the words the Transcript tab (TX2a) will show: the
+            // edited container's heard words, read on this Mac once per media
+            // (`TranscriptFill`). `get_transcript` stays one clip. A read: no
+            // op, no `scope`, no undo step.
+            tool(
+                "get_timeline_transcript",
+                "Answers every word HEARD on the timeline (or inside the nest set_scope has "
+                    + "open), in timeline order, nested clips included: words is [{text, start, "
+                    + "end, clip, track, media, engine, filler, speaker?, editable, why?, id}], "
+                    + "times in TIMELINE ticks (600000 per second), ordered by start, then end, "
+                    + "then the front track first. A clip that is muted, soloed out or at volume "
+                    + "0 is not heard and gives no words. track is the timeline track the word "
+                    + "plays on (a nested word's is its nest clip's). editable is false, with "
+                    + "why, for a word inside a nest, under a transition or on a locked track. "
+                    + "id {nest_path, media, source, k} names the word across edits: the nest "
+                    + "clips it plays through, its media, its start in the media's SOURCE ticks "
+                    + "and k, counting earlier words with the same three (0 unless one piece of "
+                    + "the source plays twice). Each media's words come from its cached "
+                    + "transcript (engine assemblyai) when it has a current one, else this "
+                    + "Mac's own recogniser, which reads the WHOLE file once (about 0.7 s per "
+                    + "minute of speech on an M2 Max) and keeps it in the project's cache, so a "
+                    + "later call answers at once. It NEVER makes a network request and needs no "
+                    + "API key. media is [{media, engine, language, fillers_reported}] for each "
+                    + "media read; no_words lists the media clips that cannot be read, "
+                    + "[{clip, nest_path, tag, reason}]; notes names two clips carrying the same "
+                    + "speech and says when the words were not transcribed with filler words. "
+                    + "filler is true for um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er and erm. "
+                    + "With from or to it answers only the words that overlap that part of the "
+                    + "timeline (a word across an edge whole), echoed as from and to. At most "
+                    + "2000 words come back: then truncated is true and next_from is where to "
+                    + "call again (pass it as from; a word overlapping it may come back again "
+                    + "with the same id). It edits nothing and makes no undo step.",
+                [
+                    "from": [
+                        "type": "integer",
+                        "description": "Where on the TIMELINE to start reading, in ticks "
+                            + "(600000 per second), snapped to frames; the timeline's start by "
+                            + "default. A word across this edge comes back whole.",
+                    ],
+                    "to": [
+                        "type": "integer",
+                        "description": "Where on the TIMELINE to stop reading, in ticks, "
+                            + "snapped to frames; the timeline's end by default. Must be after "
+                            + "from.",
+                    ],
+                    "tracks": [
+                        "type": "array", "items": ["type": "integer"],
+                        "description": "Only the words playing on these timeline tracks (ids "
+                            + "from get_project); every track by default.",
+                    ],
+                    "language": [
+                        "type": "string",
+                        "description": "A language tag, e.g. en-US, for this Mac's recogniser "
+                            + "only (a cached transcript answers in its own language). This "
+                            + "Mac's own language by default; each language is kept apart in "
+                            + "the cache. A tag speech recognition does not know is refused "
+                            + "with the tags it knows, and one whose on-device model is not "
+                            + "installed is refused as not installed — this tool never "
+                            + "downloads.",
+                    ],
+                ], required: []),
+        ]
+    }
+}

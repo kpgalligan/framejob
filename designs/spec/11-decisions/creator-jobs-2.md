@@ -302,3 +302,121 @@ road map's draft CU-31 is CU3c's (the stream's cursor only In the picture).
   one clears it); no probe — Consolidate, the open-time re-anchor — keeps it; paste carries it with
   its row; `validate` does not check it. Until CU3b the app's probe never carries one, so Relink…
   clears it.
+
+TX-10…TX-14 are TX1's (`get_timeline_transcript`), recorded before its code. TX-S1 ran at the
+phase's head on 2026-11-01 (its rule's `rule_sha256` `5f784283…2b65d548576861d12ff1d25b2c043b`
+matches CJ0a's table): outcome A and `.userInitiated`, the numbers in TX-12. The owner's TX1 answers
+of 2026-11-01: (1) two tracks carrying the same speech — show both and name the pair; (2) fill only
+when the tab shows or a tool asks, never after import — yes; (3) read each media whole (minor,
+taken as recommended).
+
+- **TX-10 — The timeline transcript reads the words of every heard instance of a media clip in the
+  edited container, nested ones included, in timeline order.** The edited container is the open
+  nest when one is open (`document.editedProject`), else the timeline. **Instances** are the plan's
+  audio segments of positive duration (the core's one flattening walk). The plan gains two keys on a
+  NESTED audio segment only (`voice.stages.len() > 1`), after `automation`, as `track_pans` is
+  written only when needed: `path` (the enclosing nest clip ids outermost first, then the clip's
+  own — `Instance::path`, `voice.stages` ids reversed) and `origin` (the project time of the inner
+  clip's first frame, `stages[0].origin`). A top-level segment carries neither, so every plan
+  without a nest is the text it was (the plan is not persisted: no format change); Swift's
+  `PlanSegment` reads `path` (default the clip alone) and `origin` (nil) leniently. An instance is
+  read when its inner clip (from the container's clips or any nest's) passes `Transcriber.jobs`'
+  gate on its own `ClipSnapshot` — its source map, for a nested clip, the scoped handle of the nest
+  that holds it — and its plan track's envelope is not zero throughout the segment
+  (`SilenceDetector.isAudible`: mute, solo, volume 0 and the same on an enclosing nest's track drop
+  its words). **Words** come by TR-11's order — the media's cached transcript when its marker serves
+  `.captions`, else this Mac's (TX-12) — as source words: a cloud word at
+  `MediaTranscript.sourceTicks(milliseconds:)` of its start and of `max(start, end)`, a device word
+  at its stored source ticks. A source word whose start lies in the job's window `[in, in +
+  length)` is placed by R6-10's mapping (`MediaTranscript.project`, through S for a ramp); a nested
+  word moves by the segment's `origin` less the inner clip's start and is kept only when its start
+  lies inside the segment's span. **Order:** start, end, track (front first: the container track's
+  index descending; a nested word's track is its enclosing nest clip's, `PlanTrack.track`), source
+  order. **Identity:** `id {nest_path, media, source, k}` — `nest_path` the segment's `path` without
+  its last id (empty on the timeline), `source` the word's source start tick, and k counting the
+  earlier words in TX-10's order with the same nest path, media and tick, over every instance of
+  that media in the container BEFORE the window, `tracks` and paging (0 unless one source plays
+  twice). The inner clip's id is left out because a ripple gives every split's second half a fresh
+  id. **No words:** `no_words` lists, once per clip id, every `.media` clip the gate refuses, found
+  by walking the clips — the edited container's and, recursively, those of every nest a nest clip in
+  it shows, unwindowed — NOT the segments (the core places no audio segment for a clip with its
+  audio off or a media without audio): `{clip, nest_path, tag, reason}`, `tag` "clip 12" or "clip 12
+  in nest Intro" (the nest that holds it), `reason` the gate's sentence, `nest_path` the nest clip
+  ids leading to it (the first nest clip showing it, outermost first). Silently absent: a muted or
+  zero-envelope instance, and a clip that passes the gate but has no segment (a frozen still, a
+  speed above `AUDIO_SPEED_MAX`, an enclosing nest clip's audio off). **The same speech twice:** over
+  the windowed words before `tracks` and paging, two clips of different media whose instances
+  overlap on the timeline for at least 5 s (3,000,000 ticks) are compared by their words starting
+  inside the overlap, tokenised by `FillerWords.normalized` with empties dropped; with at least one
+  token on each side and a longest common subsequence of at least 0.6 × the shorter side they are
+  named in a note, clip ids ascending, one note per pair: "Clips 3 and 7 carry the same speech. Mute
+  one, or switch its audio off, to read it once." Nothing is hidden.
+- **TX-11 — A word is shown but not editable when cutting it would break something**, and the
+  first rule that applies is its `why`: inside a nest ("Inside nest <name>: open it (⌘↓) to cut its
+  words.", naming the OUTERMOST enclosing nest); under a transition ("Under a transition: a cut here
+  would leave one clip's tail under its neighbour.", when the word's `[start, max(end, start + 1))`
+  meets a `SilenceDetector.overlapWalls(snapshot)` wall of the container); on a locked track
+  ("Track <name> is locked: a cut would leave these words in place and move everything after
+  them.", the word's container track). A ramped clip's words are editable (SR-18 (e)).
+- **TX-12 — The fill reads each heard media once, whole, on this Mac, and keeps it in TR-14's cache
+  (amends TR-14).** It runs only when a tool needs words (and, from TX2a, while the Transcript tab
+  shows), never at import. It reads each heard media with no cloud transcript serving `.captions`
+  and no stored run covering the whole file as ONE run, a `Transcriber.Job` from tick 0 for the
+  media's duration at speed 1 (clip 0), through `TranscriptReader.recognize`, then
+  `DeviceTranscriptCache.Heard(runs:over:)` and `store` — only when the run was not cancelled and
+  the file's stamp did not change during it. A hit is `DeviceTranscriptCache.lookup` of that whole
+  job (a cache hit needs one stored run containing the asked span and runs never merge, so a
+  played-span read would re-read on any growth). `TranscriptFill` is one per document (keyed by its
+  `recipeKey`, dropped when the document is no longer open for analysis): owners each want a list
+  of items (`want` replaces that owner's list), `release` withdraws only its caller's want, an item
+  no owner wants is cancelled through its `Transcriber.CancelToken`, `wait` blocks off main until
+  the owner's items settle, and `progress` answers the running media's fraction. One media at a
+  time, on one serial `.userInitiated` queue, off main: the media under the playhead first, then by
+  first instance start. **TX-S1's verdict (2026-11-01, OS build 25F80, Apple M2 Max, 12 cores, 96
+  GiB, on AC; three lanes sharing the machine, load average about 14):** a 3,600 s file of `say`
+  phrases recognised whole twice in 40.7 s and 40.8 s (judged on the slower: 0.68 s per minute of
+  speech, rule ≤ 360 s), peak added `phys_footprint` 16.3 MB (rule ≤ 1/32 of physical memory,
+  3.22 GB; the recogniser's own service process is not counted), a 115 MB temporary WAV, 10,225
+  words; 600 s in 7.3 s; the six 600 s windows of the same audio matched 10,119 words with median
+  |Δ start| 0.00 s and p95 0.18 s; S-TH1 and S-LONG1 do not exist yet and are owed. **Outcome A**:
+  one whole-file run per media. `play_preview` over 10 s of a 1080p timeline in the Release app
+  composed 300 frames idle (median of 3), 300 while a sibling process recognised the 3,600 s file at
+  default QoS and 300 under `taskpolicy -c utility` (100 % of idle; a sibling process's reading, the
+  fill not yet built): the fill keeps **`.userInitiated`**, so `SpeechEngine.swift` pays no toll and
+  takes no priority argument. The language is the Mac's unless chosen (a separate cache file). The
+  measured rate replaces "a few seconds per minute" in the guide. TR-14's line: "**Amended
+  2026-11-01, by TX-12:** the Transcript tab, `get_timeline_transcript` and `review_transcript` also
+  read this cache, and the tab's fill stores one run per media over the whole file. Captions,
+  Remove Filler Words, `detect_fillers` and `transcribe_for_fillers` still never read it (TR-7)."
+- **TX-13 — `get_timeline_transcript {from?, to?, tracks?, language?}`**, an app-state read with no
+  `scope`: off main, the assistant's Stop reaches its fill, never the network, no AI-7 row, no undo
+  step. One main-thread hop reads the document, the edited container's plan and snapshot, the
+  arguments (`from`/`to` through `optionalTimeArg`; `tracks` through `intsArg`, each id checked
+  against the call's id scope and refused with `noSuchId("track", id)`), the instances and
+  `no_words`, and each heard media's cached transcript; then the language's spelling is checked,
+  and the installed model asked only when a heard media has no cloud transcript. The fill runs what
+  the window needs — the media of the instances meeting the window — as this call's want, released
+  when the call ends or Stop withdraws it. `words[]` carry `text`, `start`, `end`, `clip`, `track`,
+  `media`, `engine`, `filler`, `speaker` when known, `editable`, `why` when not editable, and `id
+  {nest_path, media, source, k}`; `media[]` carries each heard media's `engine`, `language` (a
+  cloud transcript's own code when it has one) and `fillers_reported`; `no_words[]`, `notes[]`,
+  `count` (the words answered), `project`. **The window** is TR-13's: snapped, the overlap rule (a
+  word across an edge answered whole), `to` not after `from` refused as `.empty`, then clamped to
+  `[0, container duration)`; nothing left is refused: "The window <bounds> is outside the timeline,
+  which runs from 0 to <D> ticks." `from`/`to` are echoed when given. `tracks` keeps the words on
+  those container tracks. **Paging:** a page is the first 2,000 windowed words; when more follow,
+  `truncated: true` and `next_from` = `frameFloor(the next word's start)` (the largest frame
+  boundary at or before it, `ReelTime.snapToFrame`, so `optionalTimeArg`'s nearest-frame snap
+  returns it unchanged). The page is cut back until `frameFloor(next.start) > frameFloor(last
+  kept.start)`; if that empties it, the page stays whole and `next_from` is the frame boundary after
+  its last word's frame. Passing `next_from` back drops no word; a word overlapping it may reappear
+  with the same `id`. Notes carry TR-11's filler sentence once when any heard media has
+  `fillers_reported` false, and the same-speech notes. A failed fill refuses the call with the
+  recogniser's sentence; a cancelled one answers "The transcription was cancelled." `get_transcript`
+  stays one clip (TR-11…TR-14).
+- **TX-14 — This bet applies CJ-3 through `ModelKeys` and adds no key rule of its own.** The
+  transcript, cuts, restore, pauses and retakes need no key; filler strikes read any media whose
+  AssemblyAI transcript serves `.fillers`, key or no key; Transcribe… (which uploads) is offered
+  only with the key; the Fillers box is disabled only on CJ-12's condition; the hand-off is keyed
+  as CJ-12's Assistant row. `get_timeline_transcript` sends nothing, so it has no `ModelKeys.keyed`
+  row.

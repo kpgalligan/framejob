@@ -196,10 +196,24 @@ impl Project {
     /// clip has an action naming a tap key (spec §11 AU-85), after
     /// `track_pans`, so every other plan is the text it was. `voice` is the
     /// segment's own: `CompTrack.voices` is one per audio segment, in order.
+    ///
+    /// A NESTED voice (more than one stage) also carries, after
+    /// `automation`, `path` — the enclosing nest clip ids outermost first,
+    /// then the clip's own (`Instance::path`'s order: the stages reversed) —
+    /// and `origin`, the project time of the inner clip's first frame (spec
+    /// §11 TX-10). A top-level segment carries neither, so every plan
+    /// without a nest is the text it was.
     fn audio_segment(&self, mut segment: Value, voice: &Voice<'_>) -> Value {
         let points = self.automation(voice);
-        if let (false, Value::Object(fields)) = (points.is_empty(), &mut segment) {
-            fields.insert("automation".to_string(), json(&points));
+        if let Value::Object(fields) = &mut segment {
+            if !points.is_empty() {
+                fields.insert("automation".to_string(), json(&points));
+            }
+            if let (true, Some(inner)) = (voice.stages.len() > 1, voice.stages.first()) {
+                let path: Vec<u32> = voice.stages.iter().rev().map(|s| s.clip.id).collect();
+                fields.insert("path".to_string(), json(&path));
+                fields.insert("origin".to_string(), Value::from(inner.origin));
+            }
         }
         segment
     }

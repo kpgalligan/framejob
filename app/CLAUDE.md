@@ -160,7 +160,9 @@ detail there.
   spell out; `MotionProps.with(_:)` is motion's per-slot copy (#357). `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
   `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`; `PlanSpeedRamp.source` is
-  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c)); `PlanDuck`
+  its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c));
+  `PlanSegment.path` (the clip alone when absent) and `origin` (nil) read a nested audio
+  segment's instance (spec §11 TX-10); `PlanDuck`
   and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113). `AudioProps.swift`
   (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
   `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
@@ -499,6 +501,30 @@ detail there.
   dismisses, its one owner released in `viewDidDisappear`);
   `EditorViewController+ShotSplit` the menu door, its stale test and
   `validateShotSplitAction`.
+- `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
+  `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
+  `AgentCatalog+Transcript.swift` — the timeline transcript (road map
+  creator-jobs TX1, spec §11 TX-10…TX-14, §7.9f). `TimelineTranscript` is
+  pure. `read` takes the instances from the plan's audio segments: each
+  inner clip must pass `Transcriber.jobs`' gate and
+  `SilenceDetector.isAudible`, and a nested segment is placed by its `path`
+  and `origin`. `no_words` comes from a walk of the clips, never the
+  segments. `words` places each media's source words by R6-10, orders them
+  (start, end, front track first, source order) and counts identities `(nest
+  path, media, source tick, k)` over the whole container before the window.
+  `+Rules` holds TX-11's editability (nest, transition wall, locked track,
+  in that order) and the same-speech note (≥ 5 s overlap, LCS ≥ 0.6 of the
+  shorter side). `window`, `overlapping`, `page` (2,000 words, `next_from`
+  on a frame floor) and `frameFloor` are TX-13's. `TranscriptFill` is one
+  per document, keyed by `recipeKey` and dropped when the document closes.
+  Owners `want`, `release` and `wait`; one serial `.userInitiated` queue
+  reads each media whole through `TranscriptReader.recognize` into
+  `DeviceTranscriptCache`, and stores only when the run was not cancelled
+  and the stamp did not change. A run no owner wants is cancelled through
+  its `CancelToken`; one cancelled by a release and wanted again before it
+  unwound records no outcome, so it runs afresh. `get_timeline_transcript`
+  runs off main (`creatorOffMainTools`) with one main hop, and the
+  assistant's Stop releases only its own want.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
@@ -2254,8 +2280,9 @@ free.
   window (TR-13) answers only the words that overlap it (`window`,
   `overlapping`, both engines alike), and the on-device run hears only the
   window plus `recognitionPadSeconds` each side (`recognitionJob`).
-- `DeviceTranscriptCache.swift` — `get_transcript`'s own cache of what the
-  on-device recogniser heard (spec §11 TR-14): one file per media and
+- `DeviceTranscriptCache.swift` — the cache of what the on-device
+  recogniser heard, read by `get_transcript` and by the timeline
+  transcript's whole-file fill (spec §11 TR-14, amended by TX-12): one file per media and
   language in the package's `cache/device-transcripts/`, keyed by the
   file's source stamp, the language, the OS version and `version`, each run
   a heard source span and its words in source ticks. `heard(...)` answers
@@ -3243,7 +3270,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and five
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and nine
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

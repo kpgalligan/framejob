@@ -217,7 +217,7 @@ APP_STATE_TOOLS = {
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
     "get_transcript", "list_graphics", "insert_graphic", "export_graphic",
-    "import_graphic", "get_media_analysis", "split_at_shots",
+    "import_graphic", "get_media_analysis", "split_at_shots", "get_timeline_transcript",
 }
 
 # The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence

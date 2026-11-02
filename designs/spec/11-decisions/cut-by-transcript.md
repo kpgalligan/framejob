@@ -362,6 +362,10 @@ TR-11.
     cloud-only); `TranscriptReader.cached`, `FillerDetector.transcriptFile` and `CloudEstimate`
     never read it. A cloud transcript that serves `.captions` still answers first.
     `fillers_reported` stays false for the on-device engine.
+    **Amended 2026-11-01, by TX-12:** the Transcript tab, `get_timeline_transcript` and
+    `review_transcript` also read this cache, and the tab's fill stores one run per media over the
+    whole file. Captions, Remove Filler Words, `detect_fillers` and `transcribe_for_fillers` still
+    never read it (TR-7).
   - **Stop and failure:** Stop ends a run as before. Nothing is stored when a run throws (cancel
     or error), when the token was cancelled after the run returned, or when the file's stamp
     changed during the run.

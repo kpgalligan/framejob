@@ -1,14 +1,16 @@
 import Foundation
 
 /// What this Mac's recogniser heard for `get_transcript` (spec §11 TR-14,
-/// #332), cached per media and language so a later call inside a stored run
-/// answers without recognising again.
+/// #332) and for the timeline transcript's whole-file fill
+/// (`TranscriptFill`, TX-12), cached per media and language so a later call
+/// inside a stored run answers without recognising again.
 ///
 /// `cache/device-transcripts/<media id>-<language identifier>.json`: one
 /// `File` per (media, language), the whole cached state, sorted keys and
 /// `.atomic`, written only through `CacheLedger.publish` so it never lands
 /// mid-save. It never shares `cache/transcripts/` with AssemblyAI's files,
-/// and only `get_transcript` reads it: captions, Remove Filler Words,
+/// and only `get_transcript` and `get_timeline_transcript` (through
+/// `TranscriptFill`, TX-12) read it: captions, Remove Filler Words,
 /// `detect_fillers` and `transcribe_for_fillers` never do (TR-7).
 ///
 /// - The KEY is `Stamp`: R6-15's four-field source stamp, the language, the
@@ -164,8 +166,9 @@ enum DeviceTranscriptCache {
     // MARK: - The door
 
     /// The stamp of `media`'s file as it is now, or nil when there is no
-    /// media or the file cannot be stat'ed.
-    private static func currentStamp(
+    /// media or the file cannot be stat'ed. Internal for `TranscriptFill`'s
+    /// whole-file items (TX-12).
+    static func currentStamp(
         _ media: MediaSnapshot?, url: URL, language: String
     ) -> Stamp? {
         guard let media, let source = MediaImporter.CacheStamp.stamp(for: media, url: url) else {

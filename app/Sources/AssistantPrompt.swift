@@ -61,7 +61,8 @@ enum AssistantPrompt {
          ["import_media", "add_media", "relink_media", "remove_media", "set_media_color",
           "set_media_speech", "consolidate_media", "get_media_analysis"]),
         ("captions: import, transcribe speech, read a clip's timed words, export a caption file",
-         ["import_captions", "transcribe", "get_transcript", "export_captions"]),
+         ["import_captions", "transcribe", "get_transcript", "get_timeline_transcript",
+          "export_captions"]),
         ("audio: find silences and filler words, even out loudness, line up recordings by "
             + "their sound",
          ["detect_silence", "detect_fillers", "normalize_clip", "enhance_voice", "match_audio",

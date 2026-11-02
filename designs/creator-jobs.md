@@ -2677,6 +2677,157 @@ TX-70 was recorded at CJ0a; this bet writes no key sentence of its own.
   *Recommended: only when asked.* (3) Read each media whole, or only its played span? *Recommended:
   whole* (TX-12).
 
+#### TX1's record (2026-11-01)
+
+**Landed.** Lane A, on the lane's branch from base `0210dfe7` (the lane's worktree was made at
+`eb350b86` and fast-forwarded to the integration branch's head before any work). The owner's TX1
+answers (2026-11-01): the same speech on two tracks — show both and name the pair; fill only when
+asked — *yes*; read each media whole (minor, taken as recommended). TX-S1 ran at the head, then
+TX-10…TX-14 were appended to `11-decisions/creator-jobs-2.md` with five index rows, and TR-14 got
+its "Amended 2026-11-01, by TX-12" line, before the code. No op, no FFI, no format change, no UI. An
+agent gets `get_timeline_transcript {from?, to?, tracks?, language?}`, the hundred-and-ninth
+product tool.
+
+**TX-S1** (`tools/proof/transcript_spike/fill_spike.py` and `fill_spike.swift`; `rule_sha256`
+`5f784283c6a525aa8029942d0cf5aa91ac2b65d548576861d12ff1d25b2c043b`, matching CJ0a's table; OS
+build 25F80, Apple M2 Max, 12 cores, 96 GiB, on AC, three lanes sharing the machine, load average
+about 14 at the start). On `say` phrases joined into 16 kHz WAVs:
+- 600 s: 7.30 s wall (0.40 s extract, 6.90 s recognition), 1,700 words, a 19,204,096-byte WAV,
+  peak added `phys_footprint` 17,252,592 bytes.
+- 3,600 s, twice: 40.74 s and 40.85 s wall (judged on the slower: 0.68 s per minute of speech;
+  rule ≤ 360 s), 10,225 words each, a 115,204,096-byte WAV, peak added 16,220,400 and 16,253,168
+  bytes (rule ≤ 1/32 of physical memory, 3,221,225,472). The figure is this process's footprint;
+  the recogniser's own service process is not counted.
+- Six 600 s windows of the 3,600 s file: 10,223 words, 10,119 matched to the whole run by spelling
+  within 5 s, in order; median |Δ start| 0.00 s, p95 0.18 s, max 4.98 s (a common word matched one
+  phrase over). A first matcher (`difflib`'s longest blocks) paired words a phrase cycle apart
+  (median 113.9 s) and was replaced before the recorded run.
+- `--playback` in the Release app: `play_preview` over 10 s of the 1080p H.264 timeline composed
+  288, 300, 300 frames idle (median 300); 299, 300, 300 while a sibling process recognised the
+  3,600 s file at default QoS (median 300, 100 % of idle); and the same under `taskpolicy -c
+  utility` (100 %). The fill did not exist yet: this is a sibling process's reading.
+- S-TH1 and S-LONG1 do not exist: skipped by name, **owed**.
+- **Verdict: outcome A** (one whole-file run per media) and **`.userInitiated`**, so
+  `SpeechEngine.swift` paid no toll and takes no priority argument.
+
+**What changed.**
+- Core: `plan.rs`'s `audio_segment` writes `path` and `origin` after `automation` when the voice
+  has more than one stage. New `core/tests/plan_instances.rs` (7 tests): the SHA-256 of eight
+  non-nest plans (plain, a speed ramp, `track_pans`, `automation`, `ducks`, `output` hlg, a
+  transition, a muted track) printed at the base before `plan.rs` changed and pinned; no top-level
+  segment carries either key; a nest shown by two clips gives paths `[3, 6]` and `[7, 6]` with
+  origins at 4 s and 11 s; a nest clip shorter than its nest cuts the segment and keeps the origin;
+  a nest in a nest gives `[3, 6, 9]`; the keys follow `automation` and no video segment has them.
+  The spec's "a nest clip that cuts its head" case does not exist (a nest source has no `in`), so
+  that test is the trimmed-tail case.
+- Swift, new (`wc -l`): `TimelineTranscript.swift` 309, `TimelineTranscript+Rules.swift` 116,
+  `TranscriptFill.swift` 248, `AgentServer+TimelineTranscript.swift` 270,
+  `AgentCatalog+Transcript.swift` 72. Changed: `CompositionPlan.swift` (`PlanSegment.path`,
+  `origin`), `AgentServer+CreatorJobs.swift` (the row, the off-main name, `transcriptTools()`),
+  `SilenceDetector.swift` (`isAudible` internal), `DeviceTranscriptCache.swift` (its reader list;
+  `currentStamp` internal), `TranscriptReader.swift` 238 → 241 (the corrected reader line;
+  `recognize`'s defaulted `progress:`), `AssistantPrompt.swift` (`get_timeline_transcript` in the
+  captions topic; the topic words unchanged). Not touched: `SpeechEngine.swift`,
+  `ProjectDocument.swift`, `AgentServer.swift`.
+- Instruments: `timeline_transcript_probe.swift` (T1–T11) and `timeline_transcript_proof.py` (G0,
+  G1, P1–P13 with P3b–P3e, P10, P11b, C1; eight mutants); `PRODUCT_TOOLS = 109`;
+  `get_timeline_transcript` in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and
+  `recording_probe.py`.
+- Documents: spec `07.9f-agent-transcript.md` (new) and its README row; §7.2 (the nested keys),
+  §5.6 (`device-transcripts`' readers and the whole-file run), §7.4 (a row); the §11 file
+  `creator-jobs-2.md` (252 → 370) with five index rows, `cut-by-transcript.md` (TR-14's line) and
+  their Lines cells; `docs/guide/cleanup-tools.md` ("### Reading the whole timeline", and the
+  measured rate in place of "a few seconds per minute"); `docs/guide/mcp.md` (a row);
+  `tools/proof/README.md`'s TX1 section.
+
+**Commands and results** (three lanes shared the machine; load average 72 at the end).
+- `cd core && cargo test --release --test plan_instances`: printed the eight digests at the base;
+  after `plan.rs`, 7/7. The nest suites (`nest`, `ramp_nest`, `matte_nest`, `dissolve_nest`,
+  `track_mix`, `audio_automation`, `scope`) 115 tests passed. `cargo clippy --all-targets -- -D
+  warnings` exit 0; `cargo fmt --check` after `cargo fmt`, exit 0.
+- `make typecheck`: exit 0, the four baseline warnings, tsc silent.
+- `python3 tools/proof/swift_build.py typecheck tools/proof/timeline_transcript_probe.swift`: exit 0.
+- `assistant_prompt_proof.py --probe`: 14/14 (F4 "14 topics, 102 tools + 4 core against 106";
+  F6 the guide 1498/1500).
+- `spec_index_proof.py`: stale Lines cells fixed, then 228/228.
+- Probe rows on the tree: first T3 and T4 failed because the probe linked the staticlib copied from
+  the integration worktree (`cargo test` had not rebuilt it); after `cargo build --release`, 11/11.
+- Debug (`make app-debug`): first 14/19 — P1's setup trimmed a clip past its file's end ("Trim End
+  made no change"), an instrument fix; then P1, P10, P11, P11b, P2 5/5, and P12 1/1.
+- `make gate`: names, typecheck, fmt, lint, test and app `pass` (1 s, 13 s, 6 s, 5 s, 266 s, 159 s),
+  "gate: PASS 452s". After this record was written, again: names `pass`, the rest skipped,
+  "gate: PASS 1s".
+- `RC_PROOF_APP=release python3 tools/proof/timeline_transcript_proof.py`: 33/33 (T0–T11, G0, G1,
+  P1–P13 with P3b–P3e, P10, P11b, C1). P1: 46 words from three media; P13: pages of 2,000 and
+  1,839 over 3,838 words; P12: Stop on a 3,625 s WAV, "The transcription was cancelled.", nothing
+  stored.
+- `RC_PROOF_APP=release python3 tools/proof/transcript_proof.py`: 23/23 (`get_transcript`
+  unchanged on the shared cache).
+- On one instance from `proof_app.py launch --app release`: `grep "Frame Job: "` printed nothing;
+  `op_argument_proof.py` 184/184; `op_catalog_proof.py` 23/23. `recording_probe.py --only
+  catalog`: 31/31.
+- Mutants (`timeline_transcript_proof.py --mutants`, Release, once on the final instrument):
+  **eight of eight caught** — `no-heard` T2, `track-tie` T1, `no-nest-offset` T3 and T4, `no-k` T5,
+  `stop-all` T11 (owner a answered cancelled, nothing stored), `page-off-by-one` T10 (1,999 words),
+  `path-top-level` C1 (a CoW copy of `core/`), `played-span` P10 and P11b (a Release tree copy
+  built in 152 s; runs shorter than their files, and a file rewritten after the outward trim).
+
+**Deviations.**
+- **The base.** The harness made the lane's worktree at `eb350b86`, three commits behind the
+  integration branch; it was fast-forwarded to `0210dfe7` (CJ1 and CJ2b) before any work, so the
+  range applies to the integration head.
+- **`TranscriptFill.Item` carries the media record** (`record`), which the spec's interface did not
+  list: the stamp is re-read after the run through `DeviceTranscriptCache.currentStamp`, which
+  takes a `MediaSnapshot`. `init(key:)` is internal so the probe drives the fill without a
+  document; the app makes one through `fill(for:)`.
+- **The items are made off main, after the hop.** The hop reads the document, plan, snapshot,
+  arguments, instances, `no_words` and each media's cloud transcript; the language, each media's
+  stamp and the whole-file lookup follow `checkSpelling` and `transcriptionLanguage` off main,
+  since the cache file is keyed by the language. `transcriptionLanguage` is asked only when a media
+  in the window has no cloud transcript.
+- **A fill whose file changed during the run, or whose store fails, refuses** the call with its
+  own sentence ("… changed while it was being transcribed. Call again." / "… could not be kept in
+  the project's cache."); TX-13 names only the recogniser's failure and a cancel.
+- **TX-11's lock sentence names the track as stored**, so a default track reads "Track Track 1 is
+  locked: …" — the road map's "Track <name>" taken literally.
+- **P12b is a probe row (T11)**, not an app row: the Transcript tab (TX2a) does not exist, and two
+  MCP calls do not run at once through the agent lane, so the second owner is driven directly on
+  `TranscriptFill`.
+
+**Fix pass 1 (review finding 1).** A run cancelled by one owner's release and wanted by another
+before it unwound recorded `.cancelled`, so the second owner was refused "The transcription was
+cancelled." without having stopped anything. `TranscriptFill`'s completion now leaves no outcome
+when the token was cancelled and the item is wanted again, and the reconcile starts a fresh run.
+T11 gained the case (over an empty `cache-rewant/`: d's run under way by `progress()`, d releases,
+e wants, e answered `.stored` with one stored run), and a ninth mutant, `cancel-sticks` (the
+completion records the outcome as before), fails it. Run: the probe rows T0–T11 12/12; `--mutant
+cancel-sticks` caught (e answered cancelled, 0 runs stored); `--mutant stop-all` caught again. `make
+gate`: names, typecheck, test and app `pass` (fmt and lint skipped, no Rust changed), "gate: PASS
+419s".
+
+**Reviews.** The first review (range `0210dfe7..a48a3f87`): one should-fix (the re-want race,
+fixed in fix pass 1 above) and three nits. The second (`0210dfe7..b68d8008`): pass, with three
+nits. The guide's "playback carried on at full frame rate while it ran" claimed the fill, which
+TX-S1 never measured; corrected at integration to a separate process's read. "Track Track 1 is
+locked" is the owner's wording call (Deviations). A run that ends `.failed` after its token was
+cancelled and the item re-wanted keeps the failure for the second owner: rare, accepted as is.
+`plan_instances`' "after `automation`" check finds the first `"path"` in the whole text (weak,
+not wrong): accepted.
+
+**Integration (2026-11-01).** Cherry-picked onto the integration branch after CU3a1 (format 38;
+this phase has no format change). Conflicts only in shared indexes, each resolved keeping both:
+`11-decisions/creator-jobs-2.md` (CU3a1's CU-30…CU-39 block, then TX-10…TX-14; 422 lines), its
+README row and Lines cell, `designs/spec/README.md` (07.2 315, 07.3 497, 07.4 86, the 07.9f
+row, 07.10 136, §11 17,670 in 36 files; `spec_index_proof.py` 228/228) and
+`tools/proof/README.md` (CU3a1's section, then TX1's). The `CLAUDE.md` edits owed went in: the
+root's app-state tool list and "one hundred and nine product tools", `app/CLAUDE.md`'s map entry
+for the five new files, `PlanSegment.path`/`origin`, `DeviceTranscriptCache`'s readers and the
+gate's count, and `core/CLAUDE.md`'s `plan.rs` nested keys.
+
+**Owed.** TX-S1 on S-TH1 and S-LONG1 when they exist. The CJ-5 baseline cuts T1 and T2 are the
+owner's (they were due when TX1 started). `07.9e` took no edit (499 lines). The lock sentence's
+wording ("Track Track 1") is the owner's to settle.
+
 ### CU0b — the spikes
 
 - **What a person gets:** nothing in the app; four verdicts.

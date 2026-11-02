@@ -27589,3 +27589,55 @@ make app-debug && python3 tools/proof/cursor_layer_proof.py [--only IDS] [--app 
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU3a1 record.
+
+## Road map "creator-jobs" TX1 — the timeline transcript (`timeline_transcript_proof.py` T1–T11, G0–G1, P1–P13, C1; eight mutants; `transcript_spike/` TX-S1; `core/tests/plan_instances.rs`; spec §11 TX-10…TX-14)
+
+```sh
+python3 tools/proof/transcript_spike/fill_spike.py --part short|long|windows|owner|verdict
+python3 tools/proof/transcript_spike/fill_spike.py --playback --socket <dir>/agent.sock   # Release app
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/timeline_transcript_proof.py [--only IDS]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/timeline_transcript_proof.py --mutant NAME | --mutants
+```
+
+**TX-S1** (`transcript_spike/fill_spike.py` and `fill_spike.swift`, built
+through `swift_build.build()` over `app/Sources`): one whole-file
+`Transcriber.Job` a process through `requireModel`, `extractAudio` and
+`SpeechEngine.transcribe`, on `say` phrases joined into 600 s and 3,600 s
+WAVs under `work/transcript_spike/`, with wall time, peak added
+`phys_footprint`, WAV bytes and words; the 3,600 s file also as six 600 s
+windows, each word's start matched by spelling within 5 s; `--playback`
+reads `play_preview`'s composed frames over 10 s of a 1080p timeline idle,
+beside a sibling process's 3,600 s run, and under `taskpolicy -c utility`.
+Each part merges into `work/creator_spike/TX-S1/results.json` with its
+`rule_sha256` (`creator_spike/rule.py`). S-TH1 and S-LONG1 skip by name until
+they exist.
+
+**The probe rows** (`timeline_transcript_probe.swift` into
+`work/timeline_transcript/tree/`): projects made through the core, words
+written by hand — T1 order with the front track first on a tie, T2 a muted
+twin, T3 a nested word's offset and nest sentence, T4 a nest shown twice and
+trimmed, T5 k and identities across a move, T6 `no_words`, T7 TX-11's
+transition and lock sentences, T8 the same-speech note, T9 the window, T10
+paging and `frameFloor`, T11 the fill's owners against a real `say` file (a
+named SKIP with no installed model).
+
+**The app rows** (one `assistant_session_proof.App` with a scratch
+`-RCSecretFolder` of dummy keys, `assemblyai_fake.py` and `anthropic_fake.py`;
+fixtures `say`'d into `work/timeline_transcript/`, `media/speech.mov` for P7
+and P9): G0 the schema and the parity log, G1 the refusals, P1–P13 as the
+docstring lists. Every expected word is the package's own
+`cache/device-transcripts/` file placed by R6-10 in Python (P9: the fake's
+served words through `cloud_captions_proof.mapped`); nothing is recognised
+twice to make an oracle, and "recognised nothing" is a cache file's
+modification time and size unchanged.
+
+**C1** is `cargo test --release --test plan_instances` (the eight pinned
+non-nest plan digests, and the nested `path`/`origin`).
+
+Mutants: `no-heard`, `track-tie`, `no-nest-offset`, `no-k`, `stop-all`,
+`cancel-sticks` and `page-off-by-one` rebuild the probe over a copy of
+`app/Sources`;
+`path-top-level` copies `core/` (CoW, beside a link to `graphic/`) and runs
+C1 there; `played-span` builds the app in a tree copy
+(`work/timeline_transcript/mutant-app-played-span/`) and runs P1, P10, P11
+and P11b.

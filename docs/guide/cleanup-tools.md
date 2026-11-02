@@ -130,7 +130,7 @@ Filler words never reach your captions. **File ▸ Generate Captions…** remove
 
 An agent can read the words of any clip that plays speech from a media file, each with its start and end in timeline time. The times can be passed directly to a cut.
 
-- **Where the words come from.** The file's saved AssemblyAI transcript when it has a current one. Otherwise this Mac's own speech recogniser runs over the clip, which takes a few seconds per minute of speech. Reading a transcript never uses the network and never uploads anything.
+- **Where the words come from.** The file's saved AssemblyAI transcript when it has a current one. Otherwise this Mac's own speech recogniser runs over the clip, which takes under a second per minute of speech (an hour of speech took 41 seconds on an M2 Max). Reading a transcript never uses the network and never uploads anything.
 - **Fillers are flagged.** Each word says whether it is a filler. The answer also says whether the transcript was made with filler words at all. An on-device transcript never is, so a filler can be in the audio but missing from the words.
 - **A part of the clip.** A `from`/`to` window in timeline time returns only the words that overlap it; a word crossing an edge comes back whole. With a window, the on-device recogniser hears only that part plus 2 seconds on each side. It is faster, but with less context a windowed answer can differ slightly from a whole-clip one. Either end may be given alone: a missing `from` is the clip's start and a missing `to` its end. The window is clamped to the clip and echoed back as `from`/`to`. An empty window, or one outside the clip, is refused.
 - **Saved for next time.** What the on-device recogniser heard is saved in the project, per media file and language. A later request inside a stretch it has already heard comes back at once, even from another clip of the same file at any speed. A saved on-device transcript is used only while the media file and the macOS version are unchanged (the recogniser ships with macOS).
@@ -139,6 +139,19 @@ An agent can read the words of any clip that plays speech from a media file, eac
 - **Language.** On-device recognition uses this Mac's language unless another tag (such as `en-US`) is given. A language whose speech model isn't installed is refused. Agents never download one; you can install it from **File ▸ Generate Captions…**.
 
 *Agents:* `get_transcript` (`clip`, optional `language`, `from`, `to`) answers `words` (`text`, `start`, `end`, `filler`, and `speaker` when known), `fillers_reported`, `engine` and, for an on-device answer, `cached`. It edits nothing.
+
+### Reading the whole timeline
+
+An agent can also read every word heard on the timeline at once, or inside the nest that is open, in timeline order.
+
+- **Only what is heard.** Words come from every clip that plays speech from a media file, clips inside nests included. A clip that is muted, soloed out or turned down to nothing gives no words. A clip whose words can't be read (its audio switched off, played in reverse, its file missing) is listed with the reason instead.
+- **Which words can be cut.** Each word says whether cutting it is safe. A word inside a nest, under a transition or on a locked track is marked as not editable, with the reason; open the nest (⌘↓) to cut words inside it.
+- **Read once per file.** Each file without a saved AssemblyAI transcript is read whole by this Mac's recogniser the first time it is needed, and the words are saved in the project. Trimming a clip, adding another clip of the same file, or reading again later doesn't read the file again. An hour of speech took 41 seconds on an M2 Max, and playback held its full frame rate while another process read a file that long beside it. The assistant's **Stop** ends a read; nothing is saved from a stopped read.
+- **The same speech twice.** When two clips of different files carry the same speech at the same time (a camera's sound and a separate microphone, say), the answer names the pair. Both are kept; mute one, or switch its audio off, to read the speech once.
+- **Long timelines come in pages.** At most 2,000 words come back at a time, with a place to continue from. A word that crosses the page edge can come back again on the next page.
+- **A stable name for each word.** Each word carries an identity made of the nests it plays through, its file and its time in that file, so it can be found again after edits elsewhere on the timeline.
+
+*Agents:* `get_timeline_transcript` (optional `from`, `to`, `tracks`, `language`) answers `words` (`text`, `start`, `end`, `clip`, `track`, `media`, `engine`, `filler`, `speaker` when known, `editable`, `why` when not editable, and `id` `{nest_path, media, source, k}`), `media` (each file's `engine`, `language` and `fillers_reported`), `no_words`, `notes`, `count`, and `truncated` with `next_from` when there is more. It edits nothing.
 
 ## Cutting false starts with the assistant
 
