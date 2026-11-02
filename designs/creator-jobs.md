@@ -3381,6 +3381,76 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
   time); `ready` blocking on a load (T3).
 - **Depends on:** CU1a (CU1b for T1's data). **Lane** B.
 
+#### CU2's record (2026-11-01)
+
+**Landed.** Lane B, base `eb350b86` (I's HEAD). One decisions commit (`ce498633`: CU-20…CU-26
+and their index rows), then one commit with the code, the probe and the documents; landed on
+`worktree-creator-jobs` as one commit. Nothing a person or an agent sees changed: no tool,
+catalog, menu, recorder file or format version moved, so the parity check is untouched.
+`RecipeSource.set` and `Playback.update` are not wired to `CursorTracks` yet (CU-26: CU3a2,
+when the recipe carries cursor media; no media has a cursor before CU3a1). A deviation from the
+spec's first CU-26 text, which capped "unpinned" paths and smoothings: both caps count every held
+entry, pinned ones included, and only unpinned ones are evicted (T5 (b) needs it); CU-26 was
+amended in the fix pass to say so. The fix pass also moved `want`'s and `release`'s queueing of
+prepares and `unprepare`s inside the lock, so the queue's order follows the lock's (review
+finding 1: a concurrent `want` could otherwise land a smoothing whose late `unprepare` then ran).
+After it: `make typecheck` the 4 baseline warnings, `cursor_track_probe.py` 5/5 (T1 skip) on
+Debug, `make gate` PASS 445 s, and `RC_PROOF_APP=release` `cursor_track_probe.py` 5/5 (T1 skip).
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/cursor_track.rs` | 283 | `CursorTrack` (the handle: the file, the down clicks, the prepared paths under a `Mutex`), ticks ↔ µs, the constants, CU-20's M1 mapping (`to_movie`, the one function), the raw path, idle opacity, the image in force, ripples |
+| `core/src/cursor_smooth.rs` | 226 | `hold_end` (the one hold rule), `SmoothPath` (pins, RDP with an explicit stack, centripetal Catmull–Rom by Barry–Goldman) |
+| `core/src/cursor_query.rs` | 365 | the request vocabulary (its module doc), `query`, every refusal |
+| `core/src/cursor_bursts.rs` | 25 | `typing_stretches` |
+| `core/src/cursor_file_check.rs` | 357 | `encode_base64` beside `decode_base64` |
+| `core/src/ffi_cursor.rs` | 102 | `rc_cursor_open` / `rc_cursor_free` over `CursorTrack`, `rc_cursor_query` |
+| `app/Sources/ReelCore+Cursor.swift` | 45 | `ReelCursor.query` |
+| `app/Sources/CursorValues.swift` | 331 | `CursorStateProps`, `CursorState`, `CursorImage`, `CursorEventKind`, `CursorEvents`, `CursorPath`, the typed `ReelCursor` requests; `CursorKind` `Codable` |
+| `app/Sources/CursorTracks.swift` | 280 | the registry, `.cursorTrackDidLand`, `-RCDevCursorLoadHold` |
+| `core/tests/cursor_track.rs` | 595 | 15 tests through `rc_cursor_open` / `rc_cursor_query` |
+| `tools/proof/cursor_track_probe.swift` · `.py` | 307 · 180 | B0, T1 (skipped by name), T2–T5 and two mutants |
+
+**Measured.**
+
+- `cargo test --release --test cursor_track`: 15 passed — each decision's numbers at fixture
+  times (linear and collinear-uniform answers to 1e-9 px; a two-pin smoothed segment to its
+  smoothstep within 1e-5 px, the knot floor's share), a continuous run's pinned ends at 0.5,
+  `unprepare` answering true and `state` then raw, every refusal, a v2 body with only v1 keys
+  refused "…is version 2…" through `rc_cursor_open`. `--test cursor_file` 12 passed;
+  `--test model_tests null_safety` 1 passed with `rc_cursor_query` in the sweep.
+- `cargo fmt`, `make lint` clean; `make typecheck` 0 errors and the 4 baseline warnings.
+- Core mutants, each run once and reverted byte-identical (SHA-256 checked), all caught: click
+  pin dropped; tolerance not scaled; idle lead 0; geometry from the first entry only; the
+  newer-version refusal removed; `state` preparing on demand (the unprepared-is-raw test; T2
+  times a non-storing core only, so this mutant is the core test's); dwell hold dropped; ripple
+  window 0.5 s.
+- `cursor_track_probe.py` (Debug-shaped build): T1 skip, T2–T5 pass, 5/5 — `state` medians
+  4.46 / 4.25 µs prepared and 4.21 / 4.04 µs unprepared, `prepare` at 1 0.012 / 0.011 s; T3
+  `ready` 0.009 ms, the track after 2.15 s, one landing. Mutants `ready-blocks` (T3: `ready`
+  took 2011.1 ms) and `evict-pinned` (T5: 8 of 10 ready, `wait` cancelled) caught.
+- `cursor_capture_probe.py`: 7/7.
+- `make gate`: PASS 606 s (names 1, typecheck 8, fmt 9, lint 17, test 382, app 189).
+- Release (`RC_PROOF_APP=release`, the probe built `-O`): `cursor_track_probe.py` 5/5, T1 skip —
+  `state` medians 4.25 / 3.83 µs prepared and 3.75 / 3.67 µs unprepared, `prepare` at 1 0.030 /
+  0.013 s, T3 the track after 2.15 s; `cursor_capture_probe.py` 7/7. Three lanes shared the
+  machine; each timing is one run of two.
+- After the fix pass: Release `cursor_track_probe.py` 5/5 (T1 skip), `state` medians 4.29 /
+  4.00 µs prepared and 3.71 / 3.83 µs unprepared, T3 the track after 2.14 s;
+  `spec_index_proof.py` 225/225.
+
+**Review.** Review 1 found two should-fix items, both fixed in one pass (`95fd0ff7`): the
+queueing race above, and CU-26's text, which still capped only unpinned entries. Review 2
+passed with three nits left as nits: `CursorTracks`' class doc still words the caps as
+unpinned-only; `wait` calls `cancelled()` while holding the lock, so a closure that reads
+`ready` or `failure` would deadlock; and `perform`'s `try? prepare` lands a smoothing the core
+refused as `ready`. The CLAUDE.md map entries (`core/CLAUDE.md`'s cursor modules,
+`app/CLAUDE.md`'s `ReelCursor.query` and `CursorTracks.swift`, the root's
+`-RCDevCursorLoadHold`) were applied when the phase landed.
+
+**Owed.** T1 (the mapping against K1's granted recordings) waits for CU1b's recordings, and
+CU-S2's verdict (JOB-29) may amend CU-20's mapping function.
+
 ### CO2a — Remove Background in the model, then drawn
 
 CO2a is two pipelines (CJ-7's re-split): CO2a1 puts the cutout in the model, the plan and the

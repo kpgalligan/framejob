@@ -27440,3 +27440,34 @@ python3 tools/proof/cursor_capture_probe.py --mutant <name>
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU1a record.
+
+## Road map "creator-jobs" CU2 — the core evaluates a cursor file (`cursor_track_probe.py` T1–T5; two mutants; spec §11 CU-20…CU-26)
+
+**`cursor_track_probe.py`** builds `cursor_track_probe.swift` from `app/Sources` with
+`swift_build.py`'s line and `FRAMEJOB_DEV_TOOLS` (it links `libframejob_core.a`, so `make rust`
+first; optimised when `RC_PROOF_APP=release`) and runs it once with `-RCDevCursorLoadHold 2`.
+It writes `CursorFileBody` fixtures under `tools/proof/work/cursor-track-probe/<tree|mutant-NAME>/files/`
+and drives `ReelCursor.query`, its typed requests and fresh `CursorTracks` registries. No app,
+no grant, no media. The arithmetic itself is pinned by the core's `core/tests/cursor_track.rs`
+(hand-written fixtures, hand-computed answers, eight mutants).
+
+| Row | What it holds |
+|---|---|
+| B0 | the probe builds |
+| T1 | skipped by name: the core's mapping against K1's granted recordings, ≤ 1.5 px p95, needs CU1b's recordings; owed |
+| T2 | a one-hour worst case (432,000 moves, 3,600 clicks as 7,200 records, 20,000 typed marks, 40 images, 3,600 image changes): the median `state` over 1,000 prebuilt requests through `ReelCursor.query` ≤ 20 µs at a prepared smoothing and at an unprepared one, and `prepare` at 1 ≤ 1 s, each run twice |
+| T3 | with the dev hold at 2 s, `ready` answers nil at once in under 50 ms, the track is there after the hold, exactly one landing posts over 4 s and a second `want` posts none |
+| T4 | `path` at 10 Hz equals hand-computed positions within 1e-9 px: a collinear uniform run (raw), a hold and a click pin (smoothed 0.5) |
+| T5 | (a) one owner wants 10 paths at once: all land and `wait` on the 10 returns; (b) one path, smoothings 0.1…0.6 wanted alone in turn: after the sixth 0.1 and 0.2 are not ready and 0.3…0.6 are, and wanting 0.1 again lands it again with one post |
+
+Mutants (each must fail its row; each edits a copy of `app/Sources`): `ready-blocks` T3 (`ready`
+waits on the queue), `evict-pinned` T5 (eviction ignores the pinned set). Rule R as above; T1
+prints `skip` and is not scored.
+
+```sh
+make rust
+python3 tools/proof/cursor_track_probe.py [--only T2,T4]
+python3 tools/proof/cursor_track_probe.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU2 record.

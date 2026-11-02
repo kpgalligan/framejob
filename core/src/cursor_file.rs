@@ -106,7 +106,7 @@
 //! shape and the base64 follow our own CU-S4 reader prototype, whose parse
 //! order is not followed.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::cursor_file_check::{check, check_typed, decode_base64};
@@ -158,8 +158,9 @@ pub enum CursorImageMode {
     None,
 }
 
-/// A known system cursor an image equals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+/// A known system cursor an image equals; `Serialize` for the `image`
+/// request's answer (`cursor_query.rs`), in the same spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CursorKind {
     Arrow,

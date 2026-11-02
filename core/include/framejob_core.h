@@ -859,8 +859,8 @@ void rc_cube_free(RcCube *cube);
  * ("the cursor file is version 2; this Frame Job reads cursor files up to
  * version 1", "this is not a Frame Job cursor file: its \"format\" is not
  * \"framejob-cursor\"", "moves.t[3] is 5, before moves.t[2] (9); a
- * column's times never go back", …). An RcCursor is immutable and may be
- * read from any thread. */
+ * column's times never go back", …). An RcCursor holds its prepared paths
+ * under a lock; any thread may query it. */
 #define RC_CURSOR_FILE_VERSION 1
 
 typedef struct RcCursor RcCursor;
@@ -871,6 +871,19 @@ RcCursor *rc_cursor_open(const uint8_t *bytes, size_t len, char **err_out);
 
 /* Releases a cursor file. NULL-tolerant. */
 void rc_cursor_free(RcCursor *cursor);
+
+/* Answers one JSON request against the `n` tracks at `tracks` (spec §11
+ * CU-25; the vocabulary is the module doc of core/src/cursor_query.rs):
+ * `prepare {smoothing}`, `unprepare {smoothing}`, `state {at, props}`,
+ * `image {id}`, `events {from, to, kinds}` and `path {from, to, step,
+ * smoothing}`, each reading one track. Ticks are source ticks, positions
+ * movie px. `project` may be NULL; no request reads it yet. NULL with the
+ * sentence through `err_out` on any refusal ("request_json is NULL",
+ * "tracks is NULL", "tracks[i] is NULL", "the cursor request at \"<path>\":
+ * …", "state reads one cursor track; 2 were given", …). The answer is freed
+ * with `rc_string_free`. */
+char *rc_cursor_query(const RcCursor *const *tracks, size_t n, const RcProject *project,
+                      const char *request_json, char **err_out);
 
 /* ----------------------------------------------------------------- hdr10 */
 

@@ -1,8 +1,9 @@
-//! The cursor file's check (spec §11 CU-10) and its base64 decoder: the
-//! rules `cursor_file.rs`'s module doc specifies, each refused in its own
-//! lowercase sentence naming the column and the entry. A module of its own
-//! because the doc, the types and the check together pass the cap for a
-//! new file.
+//! The cursor file's check (spec §11 CU-10): the rules `cursor_file.rs`'s
+//! module doc specifies, each refused in its own lowercase sentence naming
+//! the column and the entry. A module of its own because the doc, the types
+//! and the check together pass the cap for a new file. Base64 lives here
+//! too, both ways: the parse's decoder and the `image` request's encoder
+//! (CU-25).
 //!
 //! The order and the sentences are `cursor_file.rs`'s module doc's
 //! ("The check").
@@ -222,6 +223,29 @@ pub(crate) fn decode_base64(text: &str) -> Result<Vec<u8>, String> {
         }
     }
     Ok(out)
+}
+
+/// Bytes into standard-alphabet, padded base64: [`decode_base64`]'s
+/// inverse, so base64 has one home (the `image` request's answer, CU-25).
+pub(crate) fn encode_base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            chunk.get(1).copied().unwrap_or(0),
+            chunk.get(2).copied().unwrap_or(0),
+        ];
+        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        for (i, shift) in [18u32, 12, 6, 0].into_iter().enumerate() {
+            if i <= chunk.len() {
+                out.push(char::from(ALPHABET[((n >> shift) & 63) as usize]));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
 }
 
 fn positive(name: &str, value: f64) -> Result<(), String> {

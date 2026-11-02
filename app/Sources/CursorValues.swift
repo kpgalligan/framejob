@@ -1,8 +1,10 @@
 import AppKit
 
 // The cursor file's typed values (spec §11 CU-10, CU-16, CU-17): the header a segment opens
-// with, the body `CursorCaptureBuffer` encodes, the anchor and the writer's problem. Names no
-// `rc_*` (CJ-8 (l)); the format's specification is `core/src/cursor_file.rs`'s module doc.
+// with, the body `CursorCaptureBuffer` encodes, the anchor and the writer's problem; and the
+// typed requests and answers of `ReelCursor.query` (CU-25). Names no `rc_*` (CJ-8 (l)); the
+// format's specification is `core/src/cursor_file.rs`'s module doc, the vocabulary's
+// `core/src/cursor_query.rs`'s.
 
 /// What the recording captured.
 enum CursorSourceKind: String, Encodable {
@@ -16,7 +18,7 @@ enum CursorImageMode: String, Encodable {
 }
 
 /// A known system cursor an image equals; the core's closed list, the same raw strings.
-enum CursorKind: String, Encodable, CaseIterable {
+enum CursorKind: String, Codable, CaseIterable {
     case arrow, ibeam
     case ibeamVertical = "ibeam_vertical"
     case pointingHand = "pointing_hand"
@@ -190,4 +192,140 @@ struct CursorFileBody: Encodable {
 /// never the recording's failure (CU-14).
 struct CursorFileProblem: Error, Equatable {
     let message: String
+}
+
+// MARK: - Queries (CU-25)
+
+/// A `state` request's props: the smoothing (0…1), idle hide in seconds (nil for never), the
+/// image's scale, and whether click ripples are answered.
+struct CursorStateProps: Encodable, Equatable {
+    var smoothing = 0.0
+    var hideIdle: Double? = nil
+    var scale = 1.0
+    var ripples = false
+
+    enum CodingKeys: String, CodingKey {
+        case smoothing, hideIdle = "hide_idle", scale, clicks
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(smoothing, forKey: .smoothing)
+        try c.encodeIfPresent(hideIdle, forKey: .hideIdle)
+        try c.encode(scale, forKey: .scale)
+        try c.encode(ripples ? "ripple" : "none", forKey: .clicks)
+    }
+}
+
+/// The cursor at one source time, in movie pixels.
+struct CursorState: Decodable, Equatable {
+    struct Image: Decodable, Equatable {
+        let id: Int
+        let w: Double, h: Double, hotX: Double, hotY: Double
+    }
+
+    struct Ripple: Decodable, Equatable {
+        let x: Double, y: Double, phase: Double
+    }
+
+    let visible: Bool
+    let x: Double, y: Double, opacity: Double, pxPerPoint: Double
+    let image: Image?
+    let ripples: [Ripple]
+}
+
+/// One cursor image: its PNG, its size and hot spot in points, the system cursor it equals.
+struct CursorImage: Decodable {
+    let id: Int
+    let png: Data
+    let w: Double, h: Double, hotX: Double, hotY: Double
+    let kind: CursorKind?
+}
+
+/// What an `events` request asks for.
+enum CursorEventKind: String, Encodable {
+    case clicks, scrolls, shortcuts, typing
+}
+
+/// The events in a range; a kind not asked for is nil.
+struct CursorEvents: Decodable {
+    struct Click: Decodable, Equatable {
+        let t: Int64
+        let button: Int, down: Int
+        let x: Double, y: Double
+        let count: Int
+    }
+
+    struct Scroll: Decodable, Equatable {
+        let t: Int64
+        let x: Double, y: Double, dx: Double, dy: Double
+    }
+
+    struct Shortcut: Decodable, Equatable {
+        let t: Int64
+        let keys: String
+        let code: Int
+    }
+
+    struct Stretch: Decodable, Equatable {
+        let from: Int64, to: Int64
+        let marks: Int
+    }
+
+    let clicks: [Click]?
+    let scrolls: [Scroll]?
+    let shortcuts: [Shortcut]?
+    let typing: [Stretch]?
+}
+
+/// A path sampled in source ticks, in movie pixels (VR5's read).
+struct CursorPath: Decodable, Equatable {
+    let t: [Int64]
+    let x: [Double]
+    let y: [Double]
+}
+
+extension ReelCursor {
+    /// Builds and stores the path at `smoothing`; the points it keeps.
+    func prepare(smoothing: Double) throws -> Int {
+        struct Kept: Decodable { let kept: Int }
+        struct Answer: Decodable { let prepared: Kept }
+        let answer: Answer = try ask(["prepare": ["smoothing": smoothing]])
+        return answer.prepared.kept
+    }
+
+    /// Drops the stored path at `smoothing`; whether one was stored.
+    func unprepare(smoothing: Double) throws -> Bool {
+        let answer: [String: Bool] = try ask(["unprepare": ["smoothing": smoothing]])
+        return answer["unprepared"] ?? false
+    }
+
+    func state(at: Int64, props: CursorStateProps) throws -> CursorState {
+        struct Body: Encodable { let at: Int64, props: CursorStateProps }
+        return try ask(["state": Body(at: at, props: props)])
+    }
+
+    func image(id: Int) throws -> CursorImage {
+        try ask(["image": ["id": id]])
+    }
+
+    func events(from: Int64, to: Int64, kinds: [CursorEventKind]) throws -> CursorEvents {
+        struct Body: Encodable { let from: Int64, to: Int64, kinds: [CursorEventKind] }
+        return try ask(["events": Body(from: from, to: to, kinds: kinds)])
+    }
+
+    func path(from: Int64, to: Int64, step: Int64, smoothing: Double) throws -> CursorPath {
+        struct Body: Encodable { let from: Int64, to: Int64, step: Int64, smoothing: Double }
+        return try ask(["path": Body(from: from, to: to, step: step, smoothing: smoothing)])
+    }
+
+    /// One request, encoded and answered through `query`, decoded from snake case.
+    private func ask<Body: Encodable, Answer: Decodable>(_ request: [String: Body]) throws
+        -> Answer
+    {
+        let text = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(Answer.self, from: Data(try query(text).utf8))
+    }
 }

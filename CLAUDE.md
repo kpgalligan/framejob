@@ -355,7 +355,9 @@ launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for
 a turn in a launch without the server; and `-RCDevSyncHold <s>`, which holds
 Synchronize Audio's background analysis so a proof can act during it; and
 `-RCDevRampRenderHold <s>`, which holds each speed-ramp audio render so a
-proof can act while it is pending; and `-RCDevWebMFault audio@N|video@N|audio-hold@N`,
+proof can act while it is pending; and `-RCDevCursorLoadHold <s>`, which
+holds each cursor track's load so a proof can act while it is pending (road
+map creator-jobs CU2, spec §11 CU-26); and `-RCDevWebMFault audio@N|video@N|audio-hold@N`,
 which puts a fault in an `av1_webm` export's audio pump or video sink so a
 proof can time the stop, spec §11 CX-15 (6); and
 `-RCDevGraphicImportAccept YES`, with which the Import Graphic sheet presses

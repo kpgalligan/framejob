@@ -177,8 +177,18 @@ governs a module now.
   refused by its version and a project by its format. `cursor_file_check.rs` — its
   check (`check`, `check_typed`) and the base64 decoder, a module of its own because
   the two together pass the 400-line cap for a new file. `ffi_cursor.rs` —
-  `rc_cursor_open` (parse and check; an open is the recorder's read-back, CU-15) and
-  `rc_cursor_free`. No file I/O, no pixel work: a PNG is checked by its signature.
+  `rc_cursor_open` (parse and check; an open is the recorder's read-back, CU-15),
+  `rc_cursor_free` and `rc_cursor_query` (road map creator-jobs CU2, spec §11 CU-25).
+  `cursor_track.rs` — `CursorTrack`, the handle: the parsed file and its prepared
+  paths under a `Mutex` (a `state` holds it only to clone an `Arc`, a poisoned lock
+  taken with `into_inner`), ticks ↔ µs through `time.rs`, CU-20's M1 mapping per
+  geometry entry (`to_movie`, the one function), the raw path, idle opacity (CU-22),
+  the image in force and ripples (CU-23). `cursor_smooth.rs` — `hold_end`, the one
+  hold rule, and `SmoothPath` (pins, RDP, centripetal Catmull–Rom; CU-21).
+  `cursor_query.rs` — the request vocabulary (its module doc) and `query`.
+  `cursor_bursts.rs` — typing stretches (CU7 adds scroll bursts). `encode_base64`
+  sits beside `decode_base64` in `cursor_file_check.rs`, base64's one home. No file
+  I/O, no pixel work: a PNG is checked by its signature.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and

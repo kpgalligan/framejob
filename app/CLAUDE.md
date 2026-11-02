@@ -30,7 +30,8 @@ detail there.
   `stillPeak`, `rc_hdr10_still_peak`, HD-20), `ReelAV1` and `ReelWebM` (`rc_webm_*`, the
   `av1_webm` writer, spec §11 CX-15) — `ReelCore+Cursor.swift` holds `ReelCursor`
   (`rc_cursor_open`, `rc_cursor_free`: a cursor file's open, which is its check, spec
-  §11 CU-9, CU-15; road map creator-jobs CU1a) — and `ReelCore+Graphics.swift` the graphics engine's
+  §11 CU-9, CU-15; road map creator-jobs CU1a; and `query`, `rc_cursor_query`'s one
+  JSON request, CU2, spec §11 CU-25) — and `ReelCore+Graphics.swift` the graphics engine's
   wrappers (below), with `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`,
   `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`)
   and `GraphicLibrary.imageCache(limit:)` (`rc_graphic_image_cache`, G-39) — both pure moves
@@ -3056,12 +3057,14 @@ free.
   start minus its offset, floored and head-trimmed through the voices'
   shared `headTrimmed`, then put in the bottom-right corner by one
   `set_video`, read back.
-- `CursorValues.swift` · `CursorCaptureBuffer.swift` · `CursorFileWriter.swift` — the
-  cursor file's Swift side (road map creator-jobs CU1a, spec §11 CU-10, CU-14…CU-17),
-  naming no `rc_*`. `CursorValues` the typed header (`CursorSegmentStart` with its
-  opening `geometry`, `CursorGeometry`, `CursorPixelSize`), the v1 body
-  `CursorFileBody`, `CursorAnchor.choose(e2:e1:)` (E2 when given, else E1) and
-  `CursorFileProblem`. `CursorCaptureBuffer` is PURE: fed host-timed samples per
+- `CursorValues.swift` · `CursorCaptureBuffer.swift` · `CursorFileWriter.swift` ·
+  `CursorTracks.swift` — the cursor file's Swift side (road map creator-jobs CU1a, CU2,
+  spec §11 CU-10, CU-14…CU-17, CU-24…CU-26), naming no `rc_*`. `CursorValues` the
+  typed header (`CursorSegmentStart` with its opening `geometry`, `CursorGeometry`,
+  `CursorPixelSize`), the v1 body `CursorFileBody`, `CursorAnchor.choose(e2:e1:)` (E2
+  when given, else E1) and `CursorFileProblem`, and `ReelCursor`'s typed requests and
+  answers (`CursorStateProps`, `CursorState`, `CursorImage`, `CursorEvents`,
+  `CursorPath`). `CursorCaptureBuffer` is PURE: fed host-timed samples per
   segment, it answers the body at `closeSegment(movieSize:anchor:)` by CU-17's rules
   (reset at each open; the latest move, image change and geometry before the anchor
   kept at t 0, events before it dropped; columns sorted; hidden spans clipped,
@@ -3070,7 +3073,16 @@ free.
   `<stem>.fjcursor.partial` beside the movie, reads it back through `ReelCursor`, and
   `rename(2)`s it into place; a failure leaves neither path and answers the core's
   sentence as that segment's `cursorProblem`, never the recording's failure (CU-14).
-  The recorder's wiring is CU1b's.
+  The recorder's wiring is CU1b's. `CursorTracks` is the process-wide registry of
+  loaded and prepared cursor tracks (CU-24, CU-26), `RampAudioRenders`' owner shape:
+  keyed by path, size and modification second; each owner's latest `want` pinned
+  until `release(owner:)` (`wait` wants its set first); caps of 8 paths and 4
+  prepared smoothings a path, counting every held entry but evicting only unpinned
+  ones, the `ready` entry removed and the `unprepare` queued in one lock hold; one serial `.utility` queue loads, opens, prepares
+  and unprepares; `ready` a locked read that never waits; one `.cursorTrackDidLand`
+  per landing on main; a failed key not retried until the file changes;
+  `-RCDevCursorLoadHold <s>` (dev only). Wired to `RecipeSource.set` /
+  `Playback.update` by CU3a2.
 - `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
   AU-68): the recording's voice paths and clips, readiness and busy, the
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
