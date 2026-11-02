@@ -20,9 +20,13 @@ enum FillerWords {
     /// Lowercased, then leading and trailing punctuation and whitespace
     /// trimmed: `"Um,"` is `"um"`, and an inner hyphen stays.
     static func normalized(_ text: String) -> String {
-        text.lowercased().trimmingCharacters(
-            in: CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines))
+        text.lowercased().trimmingCharacters(in: trimmed)
     }
+
+    /// The set `normalized` trims, made once: building the union on every
+    /// call was nine tenths of placing a 27,000-word timeline transcript
+    /// (185 of 200 ms, measured for TX2a's T6).
+    private static let trimmed = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
 
     /// Whether a word is a filler: its normalised text is in the list.
     static func isFiller(_ text: String) -> Bool {

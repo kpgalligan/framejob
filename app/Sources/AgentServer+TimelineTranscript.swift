@@ -50,21 +50,8 @@ extension AgentServer {
 
         // The media the window needs: the playhead's first, then by first start.
         let window = context.window
-        var order: [(media: UInt32, first: Ticks, underPlayhead: Bool)] = []
-        for instance in context.instances {
-            let start = instance.segment.start
-            let end = start + instance.segment.duration
-            if let window, !(start < window.to && end > window.from) { continue }
-            let under = start <= context.playhead && context.playhead < end
-            if let at = order.firstIndex(where: { $0.media == instance.job.media }) {
-                order[at].first = min(order[at].first, start)
-                order[at].underPlayhead = order[at].underPlayhead || under
-            } else {
-                order.append((instance.job.media, start, under))
-            }
-        }
-        order.sort { ($0.underPlayhead ? 0 : 1, $0.first, $0.media) < ($1.underPlayhead ? 0 : 1, $1.first, $1.media) }
-        let needed = order.map(\.media)
+        let needed = TimelineTranscript.neededMedia(
+            context.instances, window: window, playhead: context.playhead)
 
         var media = context.cloud.filter { needed.contains($0.key) }
         let device = needed.filter { context.cloud[$0] == nil }
@@ -151,39 +138,24 @@ extension AgentServer {
                 tracks?.insert(track)
             }
         }
-        let urls = document.mediaURLs()
-        var scoped: [UInt32: ReelProject] = [:]
-        guard let plan = edited.plan ?? Self.noPlan else {
+        guard let read = TimelineTranscript.read(document: document) else {
             throw ToolError(message: "The timeline's composition plan could not be read.")
         }
-        let read = TimelineTranscript.read(
-            plan: plan, snapshot: snapshot, urls: urls,
-            maps: { clip, nestPath in
-                guard !nestPath.isEmpty else { return edited.sourceMap(clip) }
-                guard let nest = snapshot.nests.first(where: { $0.clips.contains { $0.id == clip } })
-                else { return nil }
-                if scoped[nest.id] == nil { scoped[nest.id] = document.project.scoped(nest.id) }
-                return scoped[nest.id]?.sourceMap(clip)
-            })
-        let cacheDir = document.cacheDirectory
         var cloud: [UInt32: TimelineTranscript.MediaWords] = [:]
-        var records: [UInt32: MediaSnapshot] = [:]
-        for instance in read.instances {
-            let id = instance.job.media
-            guard records[id] == nil, let record = snapshot.media(id) else { continue }
-            records[id] = record
-            guard let cacheDir,
-                let cached = TranscriptReader.cached(for: record, url: instance.job.source, in: cacheDir)
-            else { continue }
-            cloud[id] = TimelineTranscript.MediaWords(
-                media: id, engine: .assemblyai, language: cached.file.header.languageCode,
-                fillersReported: cached.fillersReported,
-                words: TimelineTranscript.sourceWords(cloud: cached.file))
+        if let cacheDir = read.cacheDir {
+            for instance in read.instances {
+                let id = instance.job.media
+                guard cloud[id] == nil, let record = read.records[id],
+                    let words = TimelineTranscript.cloudWords(
+                        record, url: instance.job.source, cacheDir: cacheDir)
+                else { continue }
+                cloud[id] = words
+            }
         }
         return TimelineTranscriptContext(
-            document: document, snapshot: snapshot, window: window, tracks: tracks,
-            instances: read.instances, noWords: read.noWords, cloud: cloud, records: records,
-            urls: urls, cacheDir: cacheDir, playhead: document.playhead,
+            document: document, snapshot: read.snapshot, window: window, tracks: tracks,
+            instances: read.instances, noWords: read.noWords, cloud: cloud, records: read.records,
+            urls: read.urls, cacheDir: read.cacheDir, playhead: read.playhead,
             fill: TranscriptFill.fill(for: document))
     }
 
@@ -201,18 +173,13 @@ extension AgentServer {
         for id in ids {
             guard let record = context.records[id], let url = context.urls[id] else { continue }
             guard
-                let stamp = DeviceTranscriptCache.currentStamp(
-                    record, url: url, language: language.identifier)
+                let item = TimelineTranscript.fillItem(
+                    record, url: url, cacheDir: cacheDir, language: language)
             else {
                 throw ToolError(message: "“\(record.name)” cannot be read.")
             }
-            let item = TranscriptFill.Item(
-                media: id, url: url, name: record.name, duration: record.duration, stamp: stamp,
-                cacheDir: cacheDir, language: language, record: record)
-            if let heard = DeviceTranscriptCache.lookup(
-                item.job, media: id, stamp: stamp, in: cacheDir)
-            {
-                out[id] = Self.deviceMediaWords(id, heard, language)
+            if let words = TimelineTranscript.deviceWords(item) {
+                out[id] = words
             } else {
                 items.append(item)
             }
@@ -229,31 +196,17 @@ extension AgentServer {
         }
         for item in items {
             if case .failed(let why)? = outcomes[item.media] { throw ToolError(message: why) }
-            guard
-                let heard = DeviceTranscriptCache.lookup(
-                    item.job, media: item.media, stamp: item.stamp, in: cacheDir)
-            else {
+            guard let words = TimelineTranscript.deviceWords(item) else {
                 throw ToolError(
                     message: "What was heard in “\(item.name)” could not be read back from the "
                         + "project's cache.")
             }
-            out[item.media] = Self.deviceMediaWords(item.media, heard, language)
+            out[item.media] = words
         }
         return out
     }
 
-    /// A plan with nothing in it, for a container the core gave none.
-    private static let noPlan = ReelJSON.decode(CompositionPlan.self, from: "{}")
-
-    private static func deviceMediaWords(
-        _ id: UInt32, _ heard: DeviceTranscriptCache.Heard, _ language: Transcriber.Language
-    ) -> TimelineTranscript.MediaWords {
-        TimelineTranscript.MediaWords(
-            media: id, engine: .apple, language: language.identifier, fillersReported: false,
-            words: TimelineTranscript.sourceWords(device: heard))
-    }
-
-    private static func wordRow(_ word: TimelineTranscript.Word) -> [String: Any] {
+    static func wordRow(_ word: TimelineTranscript.Word) -> [String: Any] {
         var row: [String: Any] = [
             "text": word.text, "start": word.start, "end": word.end, "clip": Int(word.clip),
             "track": Int(word.track), "media": Int(word.media), "engine": word.engine.rawValue,

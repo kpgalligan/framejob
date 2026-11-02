@@ -3238,6 +3238,188 @@ app `pass` (fmt and lint skipped), "gate: PASS 274s".
   with ⌃⌘A; checked for a clash). (5) Find in the transcript (⌘F) now or later? *Recommended: later,
   filed, unless TX-S2's view gets `NSTextFinder` for free.*
 
+#### TX2a's record (2026-11-01)
+
+**Landed.** Lane A, on the lane's branch from base `118ebe9a` (the lane's worktree was made at
+`eb350b86`, before TX1; it was reset to the integration branch's head `118ebe9a` before any
+work). The owner's TX2a answers (2026-11-01): the host is the fifth inspector tab; a timeline click
+while the transcript shows stays and scrolls; the title "Transcript" if T1 passes, else "Words";
+⌃⌘T; ⌘F later (the last three minor, taken as recommended). The toll was committed alone first
+(`ab28f128`); then TX-S2 ran; then TX-20…TX-23 were appended to `11-decisions/creator-jobs-2.md`
+(moved to `creator-jobs-3.md` at integration, below) with four index rows, and AI-4, AI-14 and
+AI-19 got their "Amended 2026-11-01, by TX-20" lines,
+before the tab's code. No core, FFI, op or format change. A person gets View ▸ Transcript ⌃⌘T and
+the inspector's fifth tab; an agent gets nothing new (the tab is view state), a proof the dev tool
+`transcript_view`.
+
+**The toll.** `EditorViewController+Inspector.swift` 403 → 175 (`wc -l`): lines 142–370 at
+`118ebe9a` (`// MARK: - Commands the inspector made real` through the blank line before `//
+MARK: - Validation`) moved whole into `EditorViewController+InspectorCommands.swift` (237), a
+pure move, nothing widened; `inventory.json`'s `presentNoFootageForTransition` site and its two
+citations and `tools/proof/README.md`'s row re-pointed to `:157`. `make typecheck` (the four
+baseline warnings), `inventory.py --check` 5/5, `make gate` "gate: PASS 411s"; committed alone.
+TX2a's own `inspectorPlayheadMoved()` line then made it 176.
+
+**TX-S2** (`tools/proof/transcript_spike/view_spike.py` and `view_spike.swift`; `rule_sha256`
+`543a30274c8dc99a2404daee513faeefc6248c912cc078036d74c24dad40c09a`, matching CJ0a's table; OS build
+25F80, macOS 26.5.1, Apple M2 Max, 12 cores, 96 GiB, on AC, three lanes sharing the machine).
+Candidate (b), `TranscriptView`, built `-O` over `app/Sources`, in a 304 × 800 pt scroll view in an
+offscreen window, over 27,000 synthetic words in 900 paragraphs on two tracks (40 collapsed, 300
+struck, 10 % not editable); medians of 20.
+- The head's recorded run (load average 21.05 30.45 28.38): first layout and draw 10.7 ms (rule ≤
+  200), a rebuild with one word removed 24.9 ms with the anchor kept (≤ 100), a highlight to the
+  adjacent word 0.036 ms and to one 5,000 words away 0.037 ms (≤ 2), `tokenIndex(at:)` 0.0047 ms
+  (≤ 1), a three-paragraph selection drawn 0.17 ms, 30,736,408 bytes of added `phys_footprint` (≤
+  1/256 of physical memory, 402,653,184); not an `NSText`; `SpaceKey.route` `.transport` with the
+  view first responder; J, K and L reached a sink past the view. **Verdict: (b)**; (c) and (a) not
+  built.
+- Before it: the first two runs met every bound but drew no text (`view.png` held only the
+  selection): TextKit 2 draws a dynamic colour (`labelColor`) into a `CGContext` as nothing
+  (a stand-alone check drew 0 dark pixels with `labelColor` and 3,767 with black), so the view
+  resolves its colours in its appearance. A third run, under load average 44.70, missed the
+  rebuild bound by 31.8 % (131.8 ms; the near-miss rule's re-run did not apply): one attributed
+  string per word, replaced by one string styled by ranges; the run after it read 25.4 ms. A
+  fourth showed the selection drawn over unlaid text: `draw` now walks the fragments from the
+  dirty top. Each run was a 58–60 s build and well under a minute of measuring.
+- On the final tree (T11, load average 52.32 34.30 31.83): first layout 10.9 ms, rebuild 24.7 ms,
+  highlight 0.033 and 0.033 ms, hit-test 0.0047 ms, selection 0.16 ms, 31,096,880 bytes; verdict (b).
+
+**What changed.**
+- Swift, new (`wc -l`, after the fix passes): `TranscriptTokens.swift` 164,
+  `TranscriptTabSource.swift` 399, `TranscriptPane.swift` 215, `TranscriptView.swift` 356,
+  `TranscriptView+Layout.swift` 160,
+  `TranscriptView+Highlight.swift` 82, `TranscriptView+Keys.swift` 103,
+  `TimelineTranscript+Document.swift` 110, `EditorViewController+Transcript.swift` 26,
+  `AgentServer+TranscriptView.swift` 183. Changed: `InspectorTab.swift` (`transcript` before
+  `assistant`), `InspectorViewController.swift` 359 → 363 (frozen: the `pane(for:)` arm, the
+  `clipPicked()` line, the head doc), `InspectorTabBadge.swift` (the raised dot), `AssistantPane.swift`
+  (its doc), `EditorViewController+Inspector.swift` (the playhead forward),
+  `AgentServer+TimelineTranscript.swift` 270 → 223 (the factored read; `wordRow` internal),
+  `AppDelegate+ViewMenu.swift`, `UIMenuTable.swift`, `AgentServer+DevTools.swift` 120 → 123, and
+  `FillerWords.swift` (below). Not touched: `EditorViewController.swift`, `EditorWindow.swift`,
+  `TranscriptFill.swift`, `ProjectDocument*.swift`, `AgentServer.swift`, `Controls.swift`, core.
+- Instruments: `transcript_tab_probe.swift` (T1, T3p, T4p, T5, T7–T10) and `transcript_tab_proof.py`
+  (Z0, M1, T2–T4, T6, T11, T12; seven mutants); `assistant_tab_probe.swift`'s P14 (e) accepts the
+  raised dot; `v3_tools.py`'s `TABS`; `dev_tools.py`'s `DEV_TOOLS`; `inventory.json`'s
+  `showTranscript:`; `timeline_transcript_proof.py`'s `played-span` anchor (the line it edited moved
+  into the factored read).
+- Documents: spec `04.3e-inspector-transcript-tab.md` (new) and its README row, the lettered-files
+  sentence and the Lines cells; §4.3a, §3, §7.9b, §7.9c (`transcript_view`), §9 (⌃⌘T, the View list,
+  the view's keys), §7.4 (a row); §11 TX-20…TX-23 (`creator-jobs-2.md` 422 → 519 on the lane,
+  `creator-jobs-3.md` 146 → 243 at integration) and `assistant.md` (225 → 233) with their index
+  rows and cells; `docs/guide/transcript.md` (new, page 10), the guide index
+  renumbered, the README highlight, `menus-and-shortcuts.md`, `assistant.md`, `timeline.md`;
+  `docs/developing.md`; `docs/manual-checks.md` (JOB-10; AS-9's Expect); `tools/proof/README.md`'s
+  TX2a section.
+
+**Commands and results** (three lanes shared the machine; load averages 21 to 59).
+- `make typecheck`: exit 0 after each Swift change, the four baseline warnings, tsc silent.
+- `python3 tools/proof/swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS
+  tools/proof/transcript_tab_probe.swift`: exit 0.
+- `inventory.py --check` 5/5; `v2_menu.py --only H` 5/5; `spec_index_proof.py` 231/231.
+- Probe rows in the loop: first 8/9 — T10's view kept the width it was made with plus the clip
+  view's growth (584 pt in a 304 pt clip view), fixed in `TranscriptView` (it follows its clip
+  view's width); then two fixture fixes (longer words, T10 before T7's trim); then 9/9.
+- Debug (`make app-debug`): first 4/7 (two arguments spelled wrong in the instrument:
+  `set_playhead`'s `t`, `split`'s `clips`); then T2, T3, T12 passed and T6 failed at a median
+  311 ms over five splits.
+- `make gate`: first FAIL at test (`assistant_lane_proof.py` L3, "B frontmost false", a window
+  ordering on the shared machine, nothing this phase touches); re-run "gate: PASS 278s" (test 110 s,
+  app 167 s).
+- `RC_PROOF_APP=release python3 tools/proof/transcript_tab_proof.py`: 15/17. M1 read the re-shown
+  tab before it had read its words again (an instrument wait, fixed: `wait: 30`); T6's median was
+  223.8 ms. A bench over the app's own read (`-O`, 27,000 words in six clips of one media) put
+  `TimelineTranscript.words` at 200 ms, 185 of them in `FillerWords.isFiller`, which built its
+  `CharacterSet` union on every call; made once, `words` read 13 ms and the whole rebuild about
+  30 ms. On Debug the median fell to 123 ms.
+- `make gate` again: "gate: PASS 293s" (names 1 s, typecheck 7 s, test 147 s, app 136 s). After
+  the documents were finished, again: names `pass`, the rest skipped, "gate: PASS 1s".
+- `RC_PROOF_APP=release python3 tools/proof/transcript_tab_proof.py`: **17/17** (T0, T1, T3p,
+  T4p, T5, T7–T10, Z0, M1, T2–T4, T6, T12, T11). T2: 57 tokens equal to `get_timeline_transcript`'s
+  57 words, every key and id, and one `no_words` row; T6: 27,000 tokens in 900 paragraphs, rebuilds
+  after five splits 22.0, 22.1, 22.8, 21.3, 21.8 ms (median 22.0); T12: A's 21 tokens shown while
+  the 3,625 s WAV's run stood at 0.052, the hidden tab refused, and shown again the fill read none
+  (the run was cancelled).
+- `python3 tools/proof/transcript_tab_proof.py --mutants` (Release, once on the final
+  instrument): **seven of seven caught** — `highlight-containment` T3p (nil in the gap),
+  `follow-pause-ignored` T8 (scrolled 8,745 pt one second after the person's scroll),
+  `space-consumed` T5 (J and L rates 0), `paragraph-1.0s` T9 (a break after the 1.2 s gap),
+  `live-rebuild` T7 (3 rebuilds during the trim), `clip-picked-switches` T10 (the tab switched),
+  `one-wait` T12 (a Release tree copy; A's tokens never shown while the long WAV read).
+- `RC_PROOF_APP=release python3 tools/proof/timeline_transcript_proof.py`: 33/33 (the tool's
+  factored read; P13 pages of 2,000 and 1,839 over 3,838 words).
+- `RC_PROOF_APP=release python3 tools/proof/assistant_tab_proof.py`: 26/26; P14 (e) at 280 pt: the
+  dot raised at (272, 1) above the title's top 7.5, at 480 pt right of the title.
+- `python3 tools/proof/v3_tools.py --app release` took `release` as a bundle path and exited 1
+  before any row; `RC_PROOF_APP=release python3 tools/proof/v3_tools.py`: 8/8 (`TABS` with
+  `transcript`; the dev-tool block ends `transcript_view`).
+- `python3 tools/proof/proof_app.py launch --app release`: `grep "Frame Job: "` on its log printed
+  nothing; the instance was stopped by its pid.
+
+**Deviations.**
+- **The base.** The worktree was made at `eb350b86`, before TX1, which this phase depends on; it
+  was reset to the integration head `118ebe9a`, whose counts matched the spec's.
+- **The view was written before the decisions**: TX-S2 measures `TranscriptView` itself, so the
+  view and `TranscriptTokens` came first, the decisions after the verdict, the rest after them.
+- **`FillerWords.swift` is outside the spec's files**: its `normalized` made the trimmed set once
+  (a pure speed-up, the same set); without it T6 failed at 224 ms on Release.
+- **`timeline_transcript_proof.py`'s `played-span` anchor moved** with the factored read: the
+  mutant now appends the item with the played length at the tool's `items.append(item)`.
+- **T4's playing half is the probe's T4p**: no MCP door starts playback, so the app row checks the
+  playhead and that a paused transport stays paused, and T4p clicks a word while playing.
+- **T12 reads the release by the run's restart**, not `owns_want` false: `transcript_view`
+  refuses a hidden tab (TX-23), so the row checks the refusal, then shows the tab again and reads
+  the fill — none running, so the long run was cancelled.
+- **T1 reads the titles by `PanelTabsView.tabRect`'s arithmetic only**: `Controls.swift` is not
+  forked, so the dump half of the road map's T1 is dropped.
+- **`TranscriptPane.source` is `TranscriptTabSource!`** set after `super.init`, since its
+  `onChange` closure needs the pane; `TranscriptTabSource.init` takes `ProjectDocument?`.
+- **`transcript_view` also answers `status_text`**, the status line's sentences.
+- **`space-consumed`** swallows every key the view does not take (Space never reaches the view:
+  `SpaceKey.route` takes it at the window), so J and L never reach the editor.
+
+**Fix pass 1 (`136d6451`, review 1's blocker and should-fix).** (1) `show(_:)` left the ⇧ anchor
+an old index, so ⇧→, an edit that shrank the tokens, ⇧-arrow and any rebuild trapped on
+`model.tokens[$0.upperBound]`; the anchor is now remapped by its word's `Identity` (else the
+selection's lower bound, nil with no selection) and clamped in `move(to:extend:)`. New probe row
+T13p: ⇧← again 1...3; cut to 3 words, ⇧→ 0...0, anchor 0; rebuilt. Its control (the remap removed)
+scored 1/2. (2) `setShown(false)` left `waiting` set, so a show before the waiter woke dropped
+that media from `pending` as still running and never wanted it again; it now clears `waiting`
+under the lock, and T12 polls until the long media is read anew after a hide and after a hide and
+show at once. Run: probe rows 10/10; `make gate` "gate: PASS 442s"; Release
+`transcript_tab_proof.py` **18/18** (T6 median 22.64 ms; T12 shown again `{'media': 3,
+'fraction': 0.0029}`, hidden and shown at once from 0.0151 `{'fraction': 0.0038, 'media': 3}`);
+the launch grep printed nothing. The mutants, TX1's, the Assistant's and v3's proofs were not
+re-run: no anchor line or file they cover changed.
+
+**Fix pass 2 (`69c54bdb`, review 2's should-fix).** The pass-1 comment had taken
+`TranscriptTabSource.swift` to 401, over the new-file 400; folded to one trailing comment, 399. No
+code changed. `make typecheck` the four baseline warnings; `make gate` "gate: PASS 401s".
+
+**Reviews.** Review 1 (`118ebe9a..54ec9698`): one blocker and one should-fix (fix pass 1) and
+three nits. Review 2 (`118ebe9a..136d6451`): one should-fix (fix pass 2) and three nits. Review 3
+(`118ebe9a..69c54bdb`): pass, with three nits carried. Two were done at integration:
+`inventory.json`'s `setTransitionKind:` note re-pointed from `(:282)` to `(:157)`, and the §7.9c
+row's summary in `designs/spec/README.md` names `transcript_view`. The third, T12's quick hide and
+show making two MCP round trips (so it catches the race only when the timing lines up, with no
+control run recorded), is accepted as is.
+
+**Integration (2026-11-01).** Cherry-picked onto the integration branch after CO0 and CU3a2
+(no format change in this phase). Conflicts only in shared indexes, each resolved keeping both:
+`11-decisions/creator-jobs-2.md` kept CU3a2's CU-33 and CU-37 at 475 lines, and TX-20…TX-23 went
+to the end of `creator-jobs-3.md` (146 → 243) instead, since `creator-jobs-2.md` had passed the
+series' ~500-line rule at CO0 and would have read 572; their four index rows follow CO-1…CO-9 and
+name `creator-jobs-3.md`, whose Holds cell gained them; `creator-jobs.md`'s row kept CU3a2's 478;
+`designs/spec/README.md`'s §11 cell 17,997 in 37 files (`spec_index_proof.py` 234/234). The
+`CLAUDE.md` edits owed went in: the root's dev tool list (`transcript_view`), and `app/CLAUDE.md`'s
+`InspectorTab` entry (five tabs, the Assistant 4), the `InspectorViewController` entry (the
+`clipPicked()` guard and the `.transcript` arm), the raised dot, `+InspectorCommands`, and one
+entry for the tab's ten new files. `make gate` on the merged tree: names, typecheck, test and app
+`pass` (fmt and lint skipped, no Rust changed), "gate: PASS 293s".
+
+**Owed.** JOB-10 (a person, with S-TH1 once it exists). Find in the Transcript tab (⌘F) is filed
+as an issue.
+
 ### CU1a — the cursor file and its read-back
 
 - **What a person gets:** nothing visible. The format, the core's check and the writer exist, proved

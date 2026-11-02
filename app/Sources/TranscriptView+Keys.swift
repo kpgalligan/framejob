@@ -1,0 +1,103 @@
+import AppKit
+
+/// `TranscriptView`'s keys and clicks (spec §11 TX-21). It takes ← and →
+/// (one word, selected and sought, through `onActivate`), ↑ and ↓ (the word
+/// nearest in x on the adjacent laid-out line, the same), ⇧ with any of them
+/// (extend the selection, no seek), ⌘A (`selectAll(_:)`, which the nil-target
+/// Edit ▸ Select All reaches first), and Esc (clear the selection, or pass the
+/// key up when there is none). ⌫, ⌦ and Return pass up unchanged until TX3
+/// and TX5. Every other key goes to `super.keyDown`, so J, K, L, I, O and M
+/// reach `handleEditorKey` as from the timeline; Space never arrives here
+/// (`SpaceKey.route` takes it at the window). A click makes the view first
+/// responder.
+extension TranscriptView {
+
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first?.value,
+            flags.isSubset(of: [.shift])
+        else {
+            super.keyDown(with: event)
+            return
+        }
+        let extend = flags.contains(.shift)
+        switch scalar {
+        case UInt32(NSLeftArrowFunctionKey): step(by: -1, extend: extend)
+        case UInt32(NSRightArrowFunctionKey): step(by: 1, extend: extend)
+        case UInt32(NSUpArrowFunctionKey): line(up: true, extend: extend)
+        case UInt32(NSDownArrowFunctionKey): line(up: false, extend: extend)
+        case 27 where !extend && selection != nil: select(nil)
+        default: super.keyDown(with: event)
+        }
+    }
+
+    override func selectAll(_ sender: Any?) {
+        guard !tokenStarts.isEmpty else { return }
+        select(0...(tokenStarts.count - 1))
+    }
+
+    /// The token a key moves from: the selection's moving end, else the
+    /// highlighted word.
+    private var caret: Int? {
+        guard let selection else { return highlighted }
+        if let anchor = selectionAnchor, anchor == selection.upperBound, anchor != selection.lowerBound {
+            return selection.lowerBound
+        }
+        return selection.upperBound
+    }
+
+    private func step(by delta: Int, extend: Bool) {
+        guard !tokenStarts.isEmpty else { return }
+        let from = caret ?? (delta > 0 ? -1 : tokenStarts.count)
+        move(to: min(max(from + delta, 0), tokenStarts.count - 1), extend: extend)
+    }
+
+    private func line(up: Bool, extend: Bool) {
+        guard let from = caret ?? (tokenStarts.isEmpty ? nil : 0),
+            let target = tokenOnAdjacentLine(to: from, up: up)
+        else {
+            NSSound.beep()
+            return
+        }
+        move(to: target, extend: extend)
+    }
+
+    /// Selects `index` and seeks there, or, extending, grows the selection
+    /// from its anchor without a seek.
+    private func move(to index: Int, extend: Bool) {
+        if extend {
+            let anchor = min(max(selectionAnchor ?? caret ?? index, 0), tokenStarts.count - 1)
+            setSelection(min(anchor, index)...max(anchor, index))
+            selectionAnchor = anchor
+        } else {
+            select(index...index)
+            onActivate?(index)
+        }
+        if let rect = rects(forToken: index).first, !visibleRect.contains(rect) {
+            scrollToVisible(rect.insetBy(dx: 0, dy: -24))
+            layoutViewport()
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        let point = convert(event.locationInWindow, from: nil)
+        if let paragraph = paragraphIndex(at: point) {
+            onParagraph?(paragraph)
+            return
+        }
+        guard let index = tokenIndex(at: point) else { return }
+        if event.modifierFlags.contains(.shift) {
+            move(to: index, extend: true)
+        } else {
+            click(token: index)
+        }
+    }
+
+    /// A plain click on token `index`: it alone selected, and sought. The
+    /// mouse's path, which `transcript_view`'s `click` takes too.
+    func click(token index: Int) {
+        select(index...index)
+        onActivate?(index)
+    }
+}

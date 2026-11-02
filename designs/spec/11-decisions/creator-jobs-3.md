@@ -144,3 +144,100 @@ or tool is in `ModelKeys.keyed` (CJ-3).
   MT-2, MT-4 (CO5), R5-4, AU-110 (CO9), CAM-10 (3), CAM-10 (5), CAM-4, CAM-11 (CO8). Standing:
   R5-1, G-1, R5-4's mechanism, R5-5, D4-6, W-8, #367, CU-5, MT-9, the Concat rule and its
   extension to AGPL recorders.
+
+TX-20…TX-23 are TX2a's (the Transcript tab), recorded before its code but the view TX-S2 measures.
+TX-S2 ran at the phase's head on 2026-11-01 (its rule's `rule_sha256` `543a3027…24dad40c09a`
+matches CJ0a's table): candidate (b) meets every bound, the numbers in TX-21. The owner's TX2a
+answers of 2026-11-01: (1) the host is the fifth inspector tab; (2) a timeline click while the
+transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, else "Words"; (4)
+⌃⌘T, yes; (5) ⌘F later, unless it comes free (the last three minor, taken as recommended).
+
+- **TX-20 — The Transcript is the inspector's fifth tab: Clip, Media, Document, Transcript,
+  Assistant. View ▸ Transcript (⌃⌘T) shows it. Amends AI-4, AI-14 and AI-19.** The pane is
+  `AssistantPane`'s shape (one view, built once, scrolling itself, exactly the visible height); the
+  menu item is in `AppDelegate+ViewMenu.swift` directly before View ▸ Assistant. ⌃⌘T is free: ⌘T is
+  Split, and no ⌃⌘T is bound in `AppDelegate*`. `InspectorTab`'s raw value is the strip index, so
+  the Assistant moves from 3 to 4; every reader goes through `.assistant` or `allCases`. **The
+  title** is "Transcript": at the 280 pt minimum each title's `DS.sans(12, weight: .semibold)` width
+  fits its `tabRect` (`transcript_tab_probe.swift`'s T1). **A click on a clip** while the
+  Transcript tab shows leaves it showing and scrolls the transcript so the clip's first word (for a
+  nest clip, the first word whose `id.nest_path` starts with it) is at the top, with no seek
+  (`clipPicked()`'s first line); from every other tab a click still shows Clip. A selection change
+  that is not a click leaves the Transcript tab showing, as it leaves the Assistant's. **Find
+  (⌘F)** is later, filed: a TextKit 2 view gets no `NSTextFinder` for free. AI-4's line: "the strip
+  has five tabs; the Assistant is fifth, after Transcript." AI-14's line: "the Transcript tab is
+  kept like the Assistant tab on a selection change that is not a click; a click on a clip also
+  leaves it showing and scrolls the transcript to that clip's first word." AI-19's line: where the
+  Assistant tab is too narrow for the dot right of its title (`title.maxX + gap + diameter > tab.maxX
+  − 2`), the dot is raised at the title's top-right corner, `x = (tab.maxX − 2 − diameter).rounded()`,
+  `y = max(1, (title.minY − diameter).rounded(.down))` in the flipped badge; at 280 pt the Assistant
+  tab is about 56 pt and the old clamp put the dot on the word. Risk accepted: the transcript gets
+  the inspector's 280–440 pt, and showing it hides the Clip tab.
+- **TX-21 — The transcript view is not an `NSText`**, so the editor's bare keys still reach
+  `handleEditorKey`, with no change to a frozen file. It is TX-S2's candidate (b): a custom `NSView`
+  laid out by TextKit 2 (`NSTextLayoutManager` over `NSTextContentStorage`, viewport layout).
+  **TX-S2's verdict (2026-11-01, OS build 25F80, macOS 26.5.1, Apple M2 Max, 12 cores, 96 GiB, on
+  AC; three lanes sharing the machine, load average 21.05 30.45 28.38):** over 27,000 synthetic
+  words in 900 paragraphs on two tracks (40 collapsed, 300 struck, 10 % not editable) in a 304 ×
+  800 pt scroll view, medians of 20: the first layout and draw of the visible part 10.7 ms (rule ≤
+  200), a rebuild with one word removed 24.9 ms with the anchor kept (≤ 100), a highlight moved to
+  the adjacent word 0.036 ms and to one 5,000 words away 0.037 ms (≤ 2; moved, then
+  `displayIfNeeded`), `tokenIndex(at:)` 0.0047 ms (≤ 1), a selection across three paragraphs drawn
+  0.17 ms, 30.7 MB of added `phys_footprint` (≤ 1/256 of physical memory, 402.7 MB); the view is no
+  `NSText`, `SpaceKey.route` answers `.transport` with it first responder, and J, K and L sent
+  through `window.sendEvent` reach a sink past it. (c) and (a) were not built. Two findings shaped
+  the view: TextKit 2 draws a dynamic colour (`labelColor`) into a `CGContext` as nothing, so the
+  text is styled with colours resolved in the view's appearance and restyled when it changes; and
+  one attributed string per word made a rebuild 131.8 ms on a busier machine (load average 44.70),
+  so the text is built as one string and styled by ranges. **Keys**, as first responder: ← and →
+  select one word and seek to it (`onActivate`); ↑ and ↓ select the word nearest in x on the
+  adjacent laid-out line and seek; ⇧ with any of these extends the selection without seeking; ⌘A
+  through `selectAll(_:)`, which the nil-target Edit ▸ Select All reaches first; Esc clears the
+  selection, or passes the key up when there is none; ⌫, ⌦ and Return pass up unchanged until TX3
+  and TX5. Every other key goes to `super.keyDown`, so J, K, L, I, O and M work as on the
+  timeline, and Space never reaches the view (`SpaceKey.route` takes it at the window). Arrows
+  deviate on purpose: words here, frames on the timeline. A click makes the view first responder.
+- **TX-22 — The view.** **The highlight** is the latest word whose start is at or before the
+  playhead, lit through the pause after it (a binary search over the tokens, which are in start
+  order), an accent-tinted rect behind the word; a move invalidates only the old and the new rects.
+  While playing the view keeps it in sight unless the person scrolled within the last 3 s
+  (`NSScrollView.willStartLiveScrollNotification` or `didLiveScrollNotification`). **A click** on a
+  word puts the playhead at the word's frame-snapped start (`setPlayhead`), playback continuing if
+  it was playing. **Paragraphs:** consecutive tokens a and b are in different paragraphs when the
+  track or the speaker label changes; across instances (clip or nest path) on one track when
+  b.start − a.end ≥ 1.5 s; within one instance when the media's pause set holds a's source tick.
+  The pause set comes from `TranscriptTokens.pauses`, once per media, off main: word w is in it
+  when the voice cache has a run of 32 ms chunks inside [w.source, w′.sourceEnd) — w′ the next
+  source word — all below `SilenceDetector.Settings.defaultVoiceConfidence` and lasting ≥ 1.5 s of
+  SOURCE time; with no voice cache (`MediaImporter.loadSpeech` answers nil), when w′.source −
+  w.sourceEnd ≥ 1.5 s. Each paragraph leads with `ReelTime.format(start, fps:, frames:)` in the
+  canvas's timecode style, and a click on it seeks there. Words that cannot be cut are drawn in
+  `DS.textFaint` with TX-11's sentence as the tooltip, one per contiguous run, on the visible line
+  fragments only; clips with no words are listed above the text as "clip N — reason". **Rebuilds**
+  happen on a new `editedProject` handle while the tab shows, never while `document.isLiveEditing`
+  (the next refresh after the gesture rebuilds once), anchored on the top visible word's `Identity`
+  at its offset, else the nearest later start. **The fill:** while it shows, the tab's fill owner
+  (TX-12) wants the needed media ONE AT A TIME, the one under the playhead first, then by first
+  start, in the Mac's default language (`Transcriber.defaultLanguage(in: Transcriber.languages())`,
+  off main), each media's words shown as soon as its run is stored. The misses wait in a
+  lock-guarded list the next `update()` replaces; one waiter, on a serial `.utility` queue of its
+  own (never the load queue), wants the first, waits for it, and moves on; a media dropped from the
+  list while it runs is released, and the waiter takes the next. A failed run shows its sentence
+  and is not wanted again until the tab is next shown. Hiding the tab releases the want. **The
+  status** reads "Reading “name” on this Mac… NN % (k of n)", polled every 0.25 s; with no model,
+  "This Mac has no speech model installed. Choose File ▸ Generate Captions…, pick a language and
+  press Download." Notes are the same-speech notes only. Risk accepted: a cloud transcript made
+  while the tab shows appears the next time the tab is shown. (TX2b's bar — Words from, a
+  per-window track filter, and Language — is not this phase's.)
+- **TX-23 — `transcript_view` is a dev tool** (Debug and Release, never Distribution), off main
+  with every step through `onMain`: `transcript_view {project?, focus?: boolean, select?: [integer,
+  integer] | null, click?: integer, wait?: number}`. It applies `focus` (the view made first
+  responder), then `select` (inclusive token indices; null clears), then `click` (the mouse-click
+  path: the selection and `onActivate`), then polls every 0.05 s for up to `wait` seconds (0–60,
+  default 0) until the tab's source is settled. It refuses a project with no window in
+  `select_inspector_tab`'s sentence shape, and a tab that is not shown: "select_inspector_tab {tab:
+  "transcript"} first." It answers `{ok, settled, tokens: [TX-13's word row + {index, paragraph,
+  struck}], paragraphs: [{index, start, timecode, first_token}], highlight, playhead, playing,
+  selection, first_responder, fill: {media, fraction} | null, owns_want, status, no_words: [{clip,
+  nest_path, tag, reason}], notes, rebuilds, last_rebuild_ms, top_token, project}`. TX2b's buttons
+  are not in it.

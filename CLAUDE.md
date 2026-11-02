@@ -354,7 +354,10 @@ owner and returns at once, or waits for every such job and answers their
 runs (spec §11 CJ-27); and `-RCDevAnalysisHold <s>`, which holds each
 analysis job before its first frame, polling cancellation, so a proof can
 act during it; and `-RCDevAnalysisCanned YES`, with which a canned analysis
-marker is honoured (spec §11 CJ-26); and
+marker is honoured (spec §11 CJ-26); and `transcript_view`, which answers
+what a window's Transcript tab shows — its tokens, paragraphs, highlight,
+selection, fill and status — after focusing its view, selecting words or
+clicking one (road map "creator-jobs" TX2a, spec §11 TX-23); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

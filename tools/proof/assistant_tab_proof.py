@@ -84,7 +84,8 @@ DUMMY key in a `-RCSecretFolder` of its own,
       second question shows it and Stop hides it; in Source Sans 3 (the
       registration checked) at 280 and 480 pt the dot is inside the
       Assistant tab with ≥ 1 pt to its trailing edge and ≥ 1 pt right of the
-      title; the inspector drawn with the dot hidden and with the badge
+      title, or raised above it (`dot.maxY ≤ title.minY`, `dot.minY ≥ 1`;
+      spec §11 TX-20); the inspector drawn with the dot hidden and with the badge
       removed is byte-identical, and with it shown differs inside the dot's
       rect (outset 1 pt) and nowhere else (`probe/looks/badge-light.png`); no
       file; and no failure in the stand-in's log

@@ -15,7 +15,7 @@ on [Editing](editing.md).
 | Title bar | top | The project name, with canvas size, frame rate and "edited" (while unsaved) as the subtitle, e.g. `1920 × 1080 · 30 fps · edited` |
 | Toolbar | under the title bar | Transport, timecode, preview zoom, safe-area guides, **Export…** |
 | Preview | middle left | The frame under the playhead, at canvas size, letterboxed |
-| Inspector | middle right | The Clip, Media, Document and Assistant tabs |
+| Inspector | middle right | The Clip, Media, Document, Transcript and Assistant tabs |
 | Timeline bar | above the timeline | The selection block, clip buttons, Snap, the level meter, zoom, track size (see [below](#the-timeline-bar)) |
 | Timeline | bottom | The ruler, track headers and lanes |
 

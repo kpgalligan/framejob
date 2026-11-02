@@ -72,7 +72,8 @@
 //       shows on Clip, Media and Assistant; Deny hides it at once and it stays
 //       hidden once idle; a second question shows it and Stop hides it; in
 //       Source Sans 3 at 280 and 480 pt the dot is inside the Assistant tab,
-//       ≥ 1 pt from its trailing edge and ≥ 1 pt right of the title; the
+//       ≥ 1 pt from its trailing edge and ≥ 1 pt right of the title, or
+//       raised (its bottom at or above the title's top, its top ≥ 1 pt; TX-20); the
 //       inspector drawn with the dot hidden and with it removed is
 //       byte-identical, and with it shown differs only inside the dot's rect
 //       (outset 1 pt); no file at the path
@@ -1173,10 +1174,16 @@ func rowP14(_ path: String) {
         let title = InspectorTabBadge.titleRect(stripWidth: width, stripHeight: DS.tabHeight)
         let dot = InspectorTabBadge.dotRect(stripWidth: width, stripHeight: DS.tabHeight)
         let inside = tab.contains(dot) && tab.maxX - dot.maxX >= 1
-        let clear = dot.minX >= title.maxX + 1
+        // Right of the title, or RAISED at its top-right corner where the tab
+        // is too narrow (spec §11 AI-19 as TX-20 amends it): above the word,
+        // and never above the strip's top less 1 pt.
+        let right = dot.minX >= title.maxX + 1
+        let raised = dot.maxY <= title.minY && dot.minY >= 1
+        let clear = right || raised
         geometryOK = geometryOK && inside && clear
         geometry.append("at \(width): tab \(tab), title \(title), dot \(dot) (inside with ≥ 1 pt "
-            + "to the trailing edge \(inside), ≥ 1 pt right of the title \(clear))")
+            + "to the trailing edge \(inside), ≥ 1 pt right of the title \(right), raised "
+            + "above it \(raised))")
     }
     check("(e)", geometryOK,
           "SourceSans3-SemiBold registered \(registered); " + geometry.joined(separator: "; "))

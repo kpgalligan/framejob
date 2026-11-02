@@ -1,9 +1,10 @@
 import AppKit
 
 /// The Assistant tab's question dot (spec §11 AI-19): a small accent-coloured
-/// dot just right of "Assistant" in the inspector's tab strip, shown while
-/// the window's assistant waits on an ask-first question, whichever tab is
-/// showing.
+/// dot just right of "Assistant" in the inspector's tab strip — raised at the
+/// title's top-right corner when the tab is too narrow for that (TX-20) —
+/// shown while the window's assistant waits on an ask-first question,
+/// whichever tab is showing.
 ///
 /// Its own view laid over the strip rather than a fork of `PanelTabsView`
 /// (`Controls.swift` is carried from Rasterize and kept in sync), so it
@@ -78,12 +79,21 @@ final class InspectorTabBadge: NSView {
             width: size.width, height: size.height)
     }
 
-    /// Just right of the title, never past the tab's trailing edge less 2 pt.
+    /// Just right of the title while it fits there, `gap` clear of the word
+    /// and 2 pt inside the tab's trailing edge; otherwise RAISED at the
+    /// title's top-right corner (spec §11 AI-19 as TX-20 amends it): at the
+    /// 280 pt minimum, with five tabs, the Assistant tab is about 56 pt and the
+    /// old clamp put the dot on the word. The badge is flipped, so "above" is
+    /// a smaller y, never above the strip's top less 1 pt.
     static func dotRect(stripWidth: CGFloat, stripHeight: CGFloat) -> NSRect {
         let tab = tabRect(stripWidth: stripWidth, stripHeight: stripHeight)
         let title = titleRect(stripWidth: stripWidth, stripHeight: stripHeight)
-        let x = min(title.maxX + gap, tab.maxX - 2 - diameter).rounded()
-        let y = (tab.midY - diameter / 2).rounded()
+        guard title.maxX + gap + diameter > tab.maxX - 2 else {
+            let y = (tab.midY - diameter / 2).rounded()
+            return NSRect(x: (title.maxX + gap).rounded(), y: y, width: diameter, height: diameter)
+        }
+        let x = (tab.maxX - 2 - diameter).rounded()
+        let y = max(1, (title.minY - diameter).rounded(.down))
         return NSRect(x: x, y: y, width: diameter, height: diameter)
     }
 }

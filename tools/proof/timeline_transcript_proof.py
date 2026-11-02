@@ -130,9 +130,11 @@ MUTANTS = {
          "(!voice.stages.is_empty(), voice.stages.first())")]),
     "no-k": ("probe", ["T5"], [(TT, "let k = counts[key, default: 0]", "let k = 0")]),
     "played-span": ("app", ["P10", "P11b"], [
-        (TH, "duration: record.duration, stamp: stamp,",
-         "duration: context.instances.first(where: { $0.job.media == id })?.job.sourceLength "
-         "?? record.duration, stamp: stamp,")]),
+        (TH, "                items.append(item)\n",
+         "                items.append(TranscriptFill.Item(media: item.media, url: item.url, "
+         "name: item.name, duration: context.instances.first(where: { $0.job.media == id })?"
+         ".job.sourceLength ?? item.duration, stamp: item.stamp, cacheDir: item.cacheDir, "
+         "language: item.language, record: item.record))\n")]),
     "stop-all": ("probe", ["T11"], [
         (TF, "        owners[owner] = nil\n        reconcileLocked()\n",
          "        owners = [:]\n        reconcileLocked()\n")]),

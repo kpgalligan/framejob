@@ -2,10 +2,11 @@ import AppKit
 
 // MARK: - Tabs
 
-/// The four tabs, in strip order: the three of the chrome cleanup — the
-/// selected CLIP, the project's media, the document itself — and the
-/// Assistant (spec §11 AI-4). The raw value is the strip index, so the order
-/// is API.
+/// The five tabs, in strip order: the three of the chrome cleanup — the
+/// selected CLIP, the project's media, the document itself — the Transcript
+/// (spec §11 TX-20) and the Assistant (AI-4). The raw value is the strip
+/// index, so the order is API: the Transcript's arrival moved the Assistant
+/// from 3 to 4, and every reader goes through `.assistant` or `allCases`.
 ///
 /// It was six — Video, Audio, Text, Shape, Media, Document — and four of those
 /// were the same thing viewed four ways: the selected clip. Collapsing them
@@ -17,13 +18,14 @@ import AppKit
 /// The four kind tests below — three of them outlived the tabs they were
 /// written for — are now what decides which sections the Clip tab shows.
 enum InspectorTab: Int, CaseIterable {
-    case clip, media, document, assistant
+    case clip, media, document, transcript, assistant
 
     var title: String {
         switch self {
         case .clip: return "Clip"
         case .media: return "Media"
         case .document: return "Document"
+        case .transcript: return "Transcript"
         case .assistant: return "Assistant"
         }
     }

@@ -8012,7 +8012,9 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   once idle; a second question shows it and `assistantStop()` hides it; with
   `SourceSans3-SemiBold` registered, at strip widths 280 and 480 the
   `dotRect` is inside the Assistant tab's `tabRect` with ≥ 1 pt to its
-  trailing edge and ≥ 1 pt right of the `titleRect`; `cacheDisplay` of the
+  trailing edge and ≥ 1 pt right of the `titleRect`, or raised above it
+  (`dot.maxY ≤ title.minY` and `dot.minY ≥ 1`: five tabs make the
+  Assistant's about 56 pt at 280, spec §11 TX-20); `cacheDisplay` of the
   inspector with the dot hidden and with the badge removed is
   byte-identical, and with it shown differs inside the dot's rect (outset
   1 pt) and nowhere else, written to `probe/looks/badge-light.png`; no
@@ -12607,7 +12609,7 @@ regardless of any sheet.
 | `EditorViewController+GraphicMenus.swift:45` (`insertGraphicFromFile`; since G-45 :50) | A | since G-45 reached only from the graphic browser's From File…, in the browser's `viewDidDisappear` (`showGraphicBrowser:` validates false while any sheet is attached) | V1 (`showGraphicBrowser:`); `graphics_menu_proof.py` M32 |
 | `EditorViewController+GraphicMenus.swift:157` (`chooseGraphicFile`) | A | reached from `addGraphicFont:` / `addGraphicImage:` only | V1 |
 | `EditorViewController+GraphicMenus.swift:174` (`reportingGraphicFailure`; since G-45 :162) | B via a panel | synchronous in the open panel's completion (since G-45 the browser's Insert shows a refusal in its own message line, not here) | P1 (stand-in panel) |
-| `EditorViewController+Inspector.swift:283` (`presentNoFootageForTransition`) | A | the menu (`setTransitionKind:`) and the Clip tab's controls | V1 (the menu); the tab's controls by event routing |
+| `EditorViewController+InspectorCommands.swift:157` (`presentNoFootageForTransition`) | A | the menu (`setTransitionKind:`) and the Clip tab's controls | V1 (the menu); the tab's controls by event routing |
 | `EditorViewController+SaveFrame.swift:130` (`saveFrameCommand`) | A | reached from `saveFrame:` only | V1 |
 | `EditorViewController+SaveFrame.swift:209` (`frameSaved`) | C | after the frame grab queue's hop; AppKit queues it behind the queue's alert, order kept | S1 |
 | `EditorViewController+Timeline.swift:324` (`removeTrackCommand`) | A | the menu (`removeTrack:`) and the track header's context menu | V1 (the menu); the context menu by event routing |
@@ -27695,4 +27697,53 @@ Mutants: `no-heard`, `track-tie`, `no-nest-offset`, `no-k`, `stop-all`,
 `path-top-level` copies `core/` (CoW, beside a link to `graphic/`) and runs
 C1 there; `played-span` builds the app in a tree copy
 (`work/timeline_transcript/mutant-app-played-span/`) and runs P1, P10, P11
-and P11b.
+and P11b (its anchor moved with TX2a's factored read: the tool's
+`items.append(item)` now appends the item with the played length).
+
+## Road map "creator-jobs" TX2a — the Transcript tab (`transcript_tab_proof.py` T0–T10, T3p, T4p, Z0, M1, T2–T4, T6, T11, T12; seven mutants; `transcript_spike/` TX-S2; spec §11 TX-20…TX-23)
+
+```sh
+python3 tools/proof/transcript_spike/view_spike.py [--measure]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py [--only IDS]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py --mutant NAME | --mutants
+```
+
+**TX-S2** (`transcript_spike/view_spike.py` and `view_spike.swift`, built
+through `swift_build.build()` over `app/Sources`, `-O`): candidate (b),
+`TranscriptView` itself, in a 304 × 800 pt scroll view in an offscreen window
+(aqua, Source Sans 3 registered) over a synthetic `TranscriptTokens` of 27,000
+words in 900 paragraphs on two tracks (40 collapsed, 300 struck, 10 % not
+editable). Medians of 20: the first layout and draw, a rebuild with one word
+removed (the top word's identity kept), a highlight moved one word and 5,000
+words, `tokenIndex(at:)`, a three-paragraph selection drawn, and the added
+`phys_footprint`; then the key rows (not an `NSText`; `SpaceKey.route`
+`.transport`; J, K and L reach a sink past the view). A bound missed by under
+20 % is re-run once. `work/creator_spike/TX-S2/results.json` holds the runs,
+`rule_sha256`, the host and the load average; `work/transcript_spike/view.png`
+the last capture. Exit 1 means (b) failed: record and STOP.
+
+**The probe rows** (`transcript_tab_probe.swift` into
+`work/transcript_tab/tree/`, `-D FRAMEJOB_DEV_TOOLS`, `--fonts
+app/Resources/Fonts`, `space_key_proof.build_shader`'s `default.metallib`
+beside it): T1 the five titles at 280 pt; T3p the highlight in a 1 s gap; T9
+the paragraph rule; T8 the follow pause with `now` injected, in a standalone
+view; then in the app's own editor window over `work/transcript_tab/probe.framejob`
+(a 120 s silent WAV under two clips, words through `preload`): T5 Space, J, L
+and ←; T4p a click while playing; T10 `clipPicked()` on the Transcript tab
+and from Media; T7 a live trim.
+
+**The app rows** (one `assistant_session_proof.App` with dummy keys,
+`assemblyai_fake.py` and `anthropic_fake.py`, as TX1's): Z0 the schema and
+the parity log; M1 View ▸ Transcript and the hidden-tab refusal; T2 the tab's
+tokens against `get_timeline_transcript` on TX1's `say` fixtures (two tracks,
+a nest, a locked track, a clip with its audio off); T3 the highlight after
+`play_preview`; T4 a click; T6 27,000 words served by the fake for a 3,600 s
+silent AAC (`ffmpeg anullsrc`), five `split`s and the median rebuild; T12 the
+playhead's media read first and shown while the long WAV (`long_fixture`)
+still reads, then the tab hidden and shown again with the long run started
+over. T11 runs `view_spike.py --measure`.
+
+Mutants: `highlight-containment`, `follow-pause-ignored`, `space-consumed`,
+`paragraph-1.0s`, `live-rebuild` and `clip-picked-switches` rebuild the probe
+over a copy of `app/Sources`; `one-wait` builds the app in a tree copy
+(`work/transcript_tab/mutant-app-one-wait/`) and runs T12.

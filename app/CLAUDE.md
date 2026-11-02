@@ -714,7 +714,11 @@ the key map behind it.
   playhead to its end FIRST, then `document.selectAction`), leaves the mode
   (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
   removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
-  Back just added.
+  Back just added. `+InspectorCommands` holds the two commands the
+  inspector made real (Add Action at the playhead, Clip ▸ Transition ▸, the
+  no-footage sheet and `transitionPlacement`), a pure move out of
+  `+Inspector` (road map creator-jobs TX2a's toll); `+Inspector` keeps their
+  validator arm and forwards each playhead move to the Transcript pane.
 - `SpeedAudioDrop.swift` — the ×`audio_max` crossing (a trial through the
   core), the question's and the agent note's copy, and its one alert sheet
   (`ask`); every door that sets speed asks through it (#212, §11 #190), and
@@ -1027,8 +1031,9 @@ the key map behind it.
   (`forScale(of:)`): `set_shape` has no action form.
 
 **Inspector.**
-- `InspectorTab.swift` — `InspectorTab` (Clip, Media, Document, Assistant; the
-  raw value is the strip index) and the three kind tests the Clip tab's
+- `InspectorTab.swift` — `InspectorTab` (Clip, Media, Document, Transcript,
+  Assistant — five tabs, spec §11 TX-20; the raw value is the strip index, so
+  the Assistant is 4) and the three kind tests the Clip tab's
   sections are chosen by; a pure move out of `InspectorPane.swift` (road map
   12 A2) before `assistant` was added.
 - `InspectorNameField.swift` — a pure move out of `InspectorPane.swift`:
@@ -1054,7 +1059,10 @@ the key map behind it.
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
   CI-5; a changed selection switches to Clip only from the Media and
   Document tabs, never from the Assistant tab, and `clipPicked()` from any,
-  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view;
+  spec §11 AI-14; never from the Transcript tab either, and `clipPicked()`'s
+  first line keeps the Transcript tab and calls `TranscriptPane.reveal`
+  (spec §11 TX-20); `pane(for:)` makes `TranscriptPane` for `.transcript`;
+  `onAssistantView` hands the editor the Assistant tab's view;
   `assistantBadge`, the Assistant tab's question dot, installed over the strip
   as the root's last subview, spec §11 AI-19)
   · `InspectorClipView.swift` (the inspector scroll view's clip view,
@@ -1067,7 +1075,9 @@ the key map behind it.
   `projectDocumentDidRefuse`) · `InspectorTabBadge.swift` (spec §11 AI-19: the
   Assistant tab's question dot, a passive view over the tab strip — `hitTest`
   nil — mirroring `PanelTabsView.tabRect`'s arithmetic, since `Controls.swift`
-  is not forked; `showAssistantBadge(_:)` is its inspector-side setter) ·
+  is not forked; the dot sits right of the title while it fits there, else
+  RAISED at the title's top-right corner (`y = max(1, title.minY −
+  diameter)`, spec §11 AI-19 as TX-20 amends it); `showAssistantBadge(_:)` is its inspector-side setter) ·
   `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
   stacked; `commandButton(_:_:toolTip:enabled:)`, every section's one-click
@@ -1401,6 +1411,28 @@ the key map behind it.
   `shared-undo` and `tall-placeholder` mutants edit its `.newline` arm,
   `insertTab`'s body, the override and `placeholderRect`'s height, each
   exactly once.
+- `TranscriptPane.swift` · `TranscriptTabSource.swift` · `TranscriptTokens.swift` ·
+  `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) · `TimelineTranscript+Document.swift`
+  · `EditorViewController+Transcript.swift` · `AgentServer+TranscriptView.swift` — the
+  Transcript tab (road map creator-jobs TX2a, spec §11 TX-20…TX-23, §4.3e). The pane is
+  `AssistantPane`'s shape (one view built in `init`, exactly the visible height, its own
+  `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
+  finds itself through a static weak table keyed by the inspector (`TranscriptPane.pane(in:)`);
+  shown follows its superview, window and hidden state. `TranscriptTabSource` (main) reads
+  `TimelineTranscript.read(document:)`, rebuilds from a per-media words cache (never while
+  `isLiveEditing`), loads misses on a serial `.utility` LOAD queue (cloud first, then the stored
+  run, then `TranscriptTokens.pauses`) and runs ONE waiter on a second serial `.utility` queue
+  that wants each miss of the document's `TranscriptFill` one at a time (`let take = 1`, the
+  `one-wait` mutant's anchor) from a lock-guarded `pending` list `update()` replaces; hiding
+  releases the want, clears the waiter's media and drops the words. `TranscriptTokens` is pure
+  (TX-22's paragraph rule, the pause sets, the binary-search highlight). `TranscriptView` is NOT
+  an `NSText` (TX-21): a TextKit 2 view (viewport layout) whose text is ONE string styled by
+  ranges, with colours resolved in its appearance (TextKit 2 draws a dynamic colour into a
+  `CGContext` as nothing, TX-S2) and restyled on an appearance change; it tracks its clip view's
+  width (`resize(withOldSuperviewSize:)`), draws by walking fragments from the dirty top, remaps
+  its selection, highlight and ⇧ anchor by `Identity` across a rebuild, and passes every key it
+  does not take to `super.keyDown`. `TimelineTranscript+Document` is `get_timeline_transcript`'s
+  document read, shared with the tab. `transcript_view` is the dev tool (off main).
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·

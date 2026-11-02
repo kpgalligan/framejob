@@ -82,11 +82,13 @@ extension AgentServer {
         "land_recording": { $0.landRecording },
         // AgentServer+AnalysisJob.swift
         "analysis_job": { $0.analysisJob },
+        // AgentServer+TranscriptView.swift
+        "transcript_view": { $0.transcriptView },
     ]
 
     static let devOffMainTools: Set<String> = [
         "snapshot_ui", "perform_menu_item", "cancel_sheet", "assistant_send", "assistant_answer",
-        "play_preview", "graphic_memory", "land_recording", "analysis_job",
+        "play_preview", "graphic_memory", "land_recording", "analysis_job", "transcript_view",
     ]
 
     /// The dev tools' catalog rows, in catalog order: `snapshot_ui` (V2a),
@@ -95,14 +97,15 @@ extension AgentServer {
     /// `play_preview` (issue #127, G-36), `graphic_memory` (issue #127,
     /// G-37), `loudness_meter` (road map "audio" AP7, AU-77), `land_recording`
     /// (road map "audio" AP6 part 3, AU-69), `analysis_job` (road map
-    /// "creator-jobs" CJ2a, CJ-27). The log is what keeps `devToolsMarker` in the optimised binary;
+    /// "creator-jobs" CJ2a, CJ-27), `transcript_view` (road map "creator-jobs"
+    /// TX2a, TX-23). The log is what keeps `devToolsMarker` in the optimised binary;
     /// it never says `Frame Job: `, the prefix a proof reads as the parity
     /// check complaining.
     func devTools() -> [[String: Any]] {
         let rows: [[String: Any]] = [
             snapshotUITool(), performMenuItemTool(), cancelSheetTool(), selectInspectorTabTool(),
             assistantSendTool(), assistantAnswerTool(), playPreviewTool(), graphicMemoryTool(),
-            loudnessMeterTool(), landRecordingTool(), analysisJobTool(),
+            loudnessMeterTool(), landRecordingTool(), analysisJobTool(), transcriptViewTool(),
         ]
         NSLog("Frame Job agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
         return rows

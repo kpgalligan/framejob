@@ -25,7 +25,7 @@ If no key is saved, Frame Job uses the `ANTHROPIC_API_KEY` environment variable 
 
 ## Opening the Assistant
 
-The Assistant is the fourth tab of the inspector, after Clip, Media and Document. **View ▸ Assistant** (⌃⌘A) shows the inspector if it was hidden, switches to the Assistant tab and puts the cursor in the message field.
+The Assistant is the fifth tab of the inspector, after Clip, Media, Document and Transcript. **View ▸ Assistant** (⌃⌘A) shows the inspector if it was hidden, switches to the Assistant tab and puts the cursor in the message field.
 
 From top to bottom, the tab has:
 

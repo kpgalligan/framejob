@@ -15,13 +15,13 @@ splices its rows in immediately before `import_media`, the first file tool:
 G-36), then `graphic_memory` (issue #127, spec §11 G-37), then `loudness_meter`
 (road map "audio" AP7, spec §11 AU-77), then `land_recording` (road map "audio" AP6
 part 3, spec §11 AU-69), then `analysis_job` (road map "creator-jobs" CJ2a, spec §11
-CJ-27)."""
+CJ-27), then `transcript_view` (road map "creator-jobs" TX2a, spec §11 TX-23)."""
 
 import re
 
 DEV_TOOLS = ["snapshot_ui", "perform_menu_item", "cancel_sheet", "select_inspector_tab",
              "assistant_send", "assistant_answer", "play_preview", "graphic_memory",
-             "loudness_meter", "land_recording", "analysis_job"]
+             "loudness_meter", "land_recording", "analysis_job", "transcript_view"]
 
 MARKER = re.compile(r"Frame Job agent server: framejob-dev-tools-compiled-in, (\d+) dev tools")
 

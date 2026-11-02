@@ -484,9 +484,9 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func setTransitionKind(`",
-    "app/Sources/EditorViewController+Inspector.swift:283"
+    "app/Sources/EditorViewController+InspectorCommands.swift:157"
    ],
-   "note": "an edit; when there is no spare footage at the cut, an alert SHEET (:282) inside the call"
+   "note": "an edit; when there is no spare footage at the cut, an alert SHEET (:157) inside the call"
   },
   "setMotionIn:": {
    "verdict": "none",
@@ -711,6 +711,13 @@
    "verdict": "none",
    "code": [
     "app/Sources/EditorViewController.swift `func toggleInspector(`"
+   ],
+   "note": "view state"
+  },
+  "showTranscript:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Transcript.swift `func showTranscript(`"
    ],
    "note": "view state"
   },
@@ -1183,14 +1190,14 @@
    "reached_after": [],
    "other_caller": "app/Sources/VideoPane+Look.swift `self?.inspector?.onCommand?(#selector(EditorViewController.importLUT(_:)))` — the Look section's Import LUT… button (spec §11 GR-8 [b]); no menu item"
   },
-  "app/Sources/EditorViewController+Inspector.swift:283": {
+  "app/Sources/EditorViewController+InspectorCommands.swift:157": {
    "token": "beginSheetModal",
    "func": "presentNoFootageForTransition",
    "reached_from": [
     "setTransitionKind:"
    ],
    "reached_after": [],
-   "other_caller": "the Clip tab's transition controls (app/Sources/EditorViewController+Inspector.swift `presentNoFootageForTransition(clips: requested, kind: kind, duration: half)`, the same command)"
+   "other_caller": "the Clip tab's transition controls (app/Sources/EditorViewController+InspectorCommands.swift `presentNoFootageForTransition(clips: requested, kind: kind, duration: half)`, the same command)"
   },
   "app/Sources/EditorViewController+SaveFrame.swift:130": {
    "token": "beginSheetModal",

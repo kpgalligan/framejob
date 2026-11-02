@@ -11,8 +11,10 @@ import AppKit
 ///    asked about — `clipPicked()` for a click (which switches even when the
 ///    click re-picks the clip that was already selected) and, on top of it, a
 ///    selection that changed under an unrelated path (paste, ⌘A, the agent),
-///    from the Media and Document tabs only — the Assistant tab stays, since
-///    the assistant's own calls change the selection mid-turn (spec §11 AI-14);
+///    from the Media and Document tabs only — the Assistant and Transcript
+///    tabs stay, since the assistant's own calls change the selection
+///    mid-turn (spec §11 AI-14), and a click on a clip while the Transcript
+///    shows keeps it and scrolls to the clip's first word (TX-20);
 ///  - a pane is REBUILT only when the model's shape changes
 ///    (`structureSignature`) and merely refreshed otherwise, so a live canvas
 ///    drag updates every field without tearing down the control the user is
@@ -233,6 +235,7 @@ final class InspectorViewController: NSViewController {
     /// tab reading "Select a clip to edit its properties" is not what the user
     /// asked to see.
     func clipPicked() {
+        if tab == .transcript { (pane(for: .transcript) as? TranscriptPane)?.reveal(selectedClips); return }
         guard isViewLoaded, !selectedClips.isEmpty else { return }
         select(.clip)
     }
@@ -262,6 +265,7 @@ final class InspectorViewController: NSViewController {
         case .clip: made = ClipPane(inspector: self)
         case .media: made = MediaPane(inspector: self)
         case .document: made = DocumentPane(inspector: self)
+        case .transcript: made = TranscriptPane(inspector: self)
         case .assistant: made = AssistantPane(inspector: self)
         }
         panes[tab] = made

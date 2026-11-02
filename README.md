@@ -127,6 +127,12 @@ open project with the same tools an agent uses, asks before it writes a file,
 and shows what each turn cost.
 → [The Assistant](docs/guide/assistant.md)
 
+**The Transcript.** Everything said on the timeline as text in the inspector,
+in paragraphs with timecodes, read on this Mac or from an AssemblyAI
+transcript; the spoken word lights up and the text follows it as the video
+plays, and a click on a word moves the playhead there.
+→ [The Transcript](docs/guide/transcript.md)
+
 **Agents over MCP.** The whole editor as MCP tools — one per edit plus open,
 save, render a frame, export and the rest — for Claude Code or any MCP client.
 → [Driving Frame Job from an AI agent](docs/guide/mcp.md)

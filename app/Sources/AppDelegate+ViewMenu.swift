@@ -32,6 +32,12 @@ extension AppDelegate {
             item(
                 "Hide Inspector", #selector(EditorViewController.toggleInspector(_:)), "i",
                 [.command, .option]))
+        // Road map creator-jobs TX2a (spec §11 TX-20): the Transcript tab, ⌃⌘T,
+        // beside the Assistant's ⌃⌘A; `select_inspector_tab` reaches it too.
+        menu.addItem(
+            item(
+                "Transcript", #selector(EditorViewController.showTranscript(_:)), "t",
+                [.command, .control]))
         menu.addItem(
             item(
                 "Assistant", #selector(EditorViewController.showAssistant(_:)), "a",

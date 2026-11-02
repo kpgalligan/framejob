@@ -1,6 +1,6 @@
 import AppKit
 
-/// The inspector's fourth tab (spec §11 AI-4, road map 12 A2): one
+/// The inspector's fifth tab (spec §11 AI-4 as TX-20 amends it, road map 12 A2): one
 /// `AssistantView`, built ONCE in `init` and never in `makeSections()` —
 /// `rebuild()` replaces what the sections hold, and a rebuild under the
 /// composer would take the person's first responder and half-typed message

@@ -205,6 +205,11 @@ the same way.
 - **Expect:** 1–2: the sheet names the file and its bar moves from "Waiting" through the percentages to "Done", then closes by itself. 3: there is an edit at every hard cut and none inside a shot or the dissolve; ⌘Z takes them all back as one step. 4: the sheet closes at once and nothing is split. 5: after the restore the bar keeps moving, the sheet closes by itself and the split lands.
 - **Source:** road map "creator-jobs" CJ2b, spec §11 CJ-28, CJ-29.
 
+**JOB-10 — Reading and following a long transcript**
+- **Do:** With a long talking-head recording (sample S-TH1 once it exists), place it, choose View ▸ Transcript (⌃⌘T) and wait for the words. Play it for a few minutes from the middle; scroll the text by hand while it plays and wait; click a word, then a paragraph's timecode, while playing.
+- **Expect:** the highlighted word keeps time with the voice and the scrolling is calm, never jumping more than it needs to keep the word in sight; after your own scroll the text stays put for about three seconds, then follows again; a click moves the playhead to the word (or the paragraph) and playback goes on.
+- **Source:** road map "creator-jobs" TX2a, spec §11 TX-22.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).
@@ -1119,8 +1124,8 @@ Needs your own Anthropic API key (Setup 3).
 
 **AS-9 — A question while another tab shows**
 - **Do:** With a real key, light then dark: View ▸ Assistant; ask for an export; while the question is up click Clip, Media, Document, then Assistant and Deny; repeat and press Stop; repeat and Allow; with a question up drag the inspector to its narrowest.
-- **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
-- **Source:** issue batch B47 (#152); spec §11 AI-19.
+- **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, or raised at its top-right corner when the tab is too narrow, never touching the word, on every tab; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
+- **Source:** issue batch B47 (#152); spec §11 AI-19 (amended by TX-20).
 
 **AS-10 — False starts with a real key**
 - **Do:** With a real recording that holds a false start, ask the assistant to take out the false starts.

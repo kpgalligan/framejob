@@ -274,6 +274,7 @@ bounds it clears the range).
 | Snapping | N (key) | Turns snapping on or off. A checkmark shows when it is on |
 | Safe Areas | | Shows or hides the safe-area guides on the canvas |
 | Hide Inspector | ⌥⌘I | Hides the inspector. The item is called **Show Inspector** while it is hidden |
+| Transcript | ⌃⌘T | Shows the inspector's Transcript tab, ready for its keys ([The Transcript](transcript.md)) |
 | Assistant | ⌃⌘A | Shows the inspector's Assistant tab and puts the cursor in its message field ([Assistant](assistant.md)) |
 | Timeline Track Height ▸ Small · Medium · Large | | Sets the height of the timeline rows |
 | Preview Quality ▸ Full · Half · Quarter | | The preview's render size while you play. Export is not affected |
@@ -365,6 +366,11 @@ instead ([below](#preview-canvas-gestures)).
 | | ⎋ | Stops editing. If the text changed, you are asked to choose **Apply**, **Revert** or **Cancel** |
 | Rename field on the timeline (clip, track or marker) | ↩, Tab, or a click elsewhere | Saves the new name |
 | | ⎋ | Keeps the old name |
+| Transcript text | ← → | Selects the previous or next word and moves the playhead to it ([The Transcript](transcript.md#keys)) |
+| | ↑ ↓ | Selects the word on the line above or below and moves the playhead to it |
+| | ⇧ with an arrow | Extends the selection without moving the playhead |
+| | ⌘A | Selects every word |
+| | ⎋ | Clears the selection. Every other key, Space and J, K, L included, works as on the timeline |
 | Assistant message field | ↩ | Sends the message |
 | | ⇧↩ (or ↩ with any modifier) | Starts a new line |
 | | Tab / ⇧Tab | Moves to the next or previous control |

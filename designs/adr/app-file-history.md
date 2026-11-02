@@ -1165,6 +1165,19 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   is the shape rows'. The header doc names the new file. No anchor named the range. `wc -l
   app/Sources/AgentCatalog+Properties.swift`: 410 before, 244 after; `AgentCatalog+VideoPatch.swift`
   is 180, and takes CU3a1's `cursorClause`. No next seam is named.
+- `EditorViewController+Inspector.swift`: at 403, over the new-file 400, since the Clip tab's
+  road map. Road map creator-jobs TX2a paid its toll before `inspectorPlayheadMoved()` took the
+  Transcript tab's forward: lines 142–370 at `118ebe9a` (`// MARK: - Commands the inspector made
+  real` through the blank line before `// MARK: - Validation`: `addActionAtPlayheadCommand`,
+  `setTransitionKindCommand`, `presentNoFootageForTransition`, `shiftingOps`,
+  `TransitionPlacement` and both `transitionPlacement`s) moved byte for byte into `extension
+  EditorViewController` in `EditorViewController+InspectorCommands.swift` with `import AppKit`; a
+  pure move gated alone, nothing widened (the two `private` functions are called only from the
+  moved block). The validator arm stays behind, and the head doc names the new file.
+  `inventory.json`'s `presentNoFootageForTransition` site and its two citations, and
+  `tools/proof/README.md`'s row for it, re-pointed to `EditorViewController+InspectorCommands.swift:157`.
+  `wc -l app/Sources/EditorViewController+Inspector.swift`: 403 before, 175 after;
+  `EditorViewController+InspectorCommands.swift` is 237. No next seam is named.
 - `ExportWebMWriter.swift`: at 400, the new-module cap, since codec-export C4, so C5 paid toll
   T2 before taking the alpha row's shape guard, a pure move gated alone (`make typecheck`, its
   four baseline warnings): `// MARK: - The audio pump` (`pumpAudio` and its doc) went whole to

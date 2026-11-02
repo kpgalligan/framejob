@@ -49,7 +49,7 @@ from media_less_playback_probe import console_locked  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v3_tools")
 ROWS = ["L1", "T1", "T2", "T3", "T4", "R1", "R2", "R3"]
-TABS = ["clip", "media", "document", "assistant"]
+TABS = ["clip", "media", "document", "transcript", "assistant"]
 SUBS = ["text", "shape", "graphic", "picture", "color", "sound", "clip"]
 states = {}
 

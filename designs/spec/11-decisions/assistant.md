@@ -38,6 +38,8 @@ in §6).
   lives on `EditorViewController` and survives tab switches, pane rebuilds and inspector
   collapse (§3h). Risk accepted: the transcript gets only the inspector's width, and showing it
   hides the other tabs.
+  **Amended 2026-11-01, by TX-20:** the strip has five tabs; the Assistant is fifth, after
+  Transcript.
 - **AI-5 — The assistant edits its own window's project.** The lane pins the call's document
   the way `callScope` pins the scope: a per-call `callDocument` that `targetDocument` checks
   first, cleared by a `defer`. A `project` argument naming a DIFFERENT open project is refused
@@ -124,6 +126,9 @@ in §6).
   `clipPicked()` — a click on a clip in the timeline or canvas — still shows Clip from any
   tab. Risk accepted: a selection made by an MCP caller or a menu item while the Assistant tab
   shows does not bring the clip's properties forward; a click does.
+  **Amended 2026-11-01, by TX-20:** the Transcript tab is kept like the Assistant tab on a
+  selection change that is not a click; a click on a clip also leaves it showing and scrolls the
+  transcript to that clip's first word.
 - **AI-15 — The window's live context rides on each person message; the system prompt is fixed
   for a session.** `AssistantSession.send` writes the person's text behind a
   `<framejob_context>` block (`AssistantLiveContext.swift`): the project's name and path, the
@@ -199,6 +204,9 @@ in §6).
   never answers (AI-17, K-2); the tab never switches itself and no note appears. Risk accepted:
   a collapsed inspector shows no dot (no strip is on screen), and another window shows nothing —
   a question in one window draws no attention in the others.
+  **Amended 2026-11-01, by TX-20:** where the tab is too narrow for the dot right of the title
+  (at 280 pt the Assistant tab is about 56 pt, and the old clamp put the dot on the word), the dot
+  is raised at the title's top-right corner.
 - **AI-20 — The chat settings are the person's, in Settings' Assistant pane, and a change
   reaches an open conversation without ending it** (issue batch B48, #151; the owner,
   2026-09-30: "Yes, make these settings available to the user"). They are Rasterize's two:
