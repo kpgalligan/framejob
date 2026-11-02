@@ -33,18 +33,38 @@ extension MetalRenderer {
         }
         var sprite = placeholder
         var drawsSprite = false
-        // The recorded image (CU-33 (c)); Frame Job's arrow, and a null image's, are CU4's.
-        if props.show, props.style == .recorded, state.visible, let image = state.image,
-           let texture = cursorSprites.texture(
-            track: track, id: image.id, output: output, lift: { self.lifted($0) })
-        {
-            sprite = texture
-            drawsSprite = true
-            uniforms.cursorX = Float(state.x - image.hotX)
-            uniforms.cursorY = Float(state.y - image.hotY)
-            uniforms.cursorW = Float(image.w)
-            uniforms.cursorH = Float(image.h)
-            uniforms.cursorOpacity = Float(min(max(state.opacity, 0), 1))
+        // The sprite, only while shown and visible (CU-33 (c) as CU-41 amends it): the recorded
+        // image when the style is `recorded`, the frame has one and its texture is made; Frame
+        // Job's arrow otherwise — for `style: arrow`, and for a file that recorded no image.
+        if props.show, state.visible {
+            if props.style == .recorded, let image = state.image,
+               let texture = cursorSprites.texture(
+                track: track, id: image.id, output: output, lift: { self.lifted($0) })
+            {
+                sprite = texture
+                drawsSprite = true
+                uniforms.cursorX = Float(state.x - image.hotX)
+                uniforms.cursorY = Float(state.y - image.hotY)
+                uniforms.cursorW = Float(image.w)
+                uniforms.cursorH = Float(image.h)
+            } else {
+                let size = CursorArrow.pixelSize(pxPerPoint: state.pxPerPoint, scale: props.scale)
+                if let texture = cursorSprites.arrow(
+                    width: size.width, height: size.height, output: output,
+                    lift: { self.lifted($0) })
+                {
+                    sprite = texture
+                    drawsSprite = true
+                    // 1:1 at (x − 1.5·W/14, y − 1.5·H/21, W, H): the tip on the hot spot.
+                    let w = Double(size.width), h = Double(size.height)
+                    let hot = CursorArrow.hotSpot, box = CursorArrow.size
+                    uniforms.cursorX = Float(state.x - Double(hot.x) * w / Double(box.width))
+                    uniforms.cursorY = Float(state.y - Double(hot.y) * h / Double(box.height))
+                    uniforms.cursorW = Float(w)
+                    uniforms.cursorH = Float(h)
+                }
+            }
+            if drawsSprite { uniforms.cursorOpacity = Float(min(max(state.opacity, 0), 1)) }
         }
         // Ripples (CU-33 (d)): the core answers them newest first; drawn oldest first.
         let ripples = props.clicks == .ripple ? Array(state.ripples.prefix(4).reversed()) : []

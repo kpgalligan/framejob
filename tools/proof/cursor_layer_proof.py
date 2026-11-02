@@ -114,6 +114,26 @@ weights a centroid, less the sprite's centroid offset × the drawn scale.
   `ExportQueueRowView.toolTip(for:)` of a completed job holding one cursor warning, which ends
   with its sentence.
 
+**CU4's rows** (road map creator-jobs CU4, spec §11 CU-40…CU-43): the probe's `cursor_dir` also
+writes `cursor_idle.fjcursor` (frame vertices k 0–29 at (60 + 6k, 100 + 8·(k mod 2)), still from
+k 30 to 104, k 105–119 at (60 + 6(k − 75), 100 + 8·(k mod 2)), moves every 120th of a second
+between a run's vertices; down clicks at k 9 and 20, ups at 10 and 21) and
+`cursor_none.fjcursor` (`cursor.fjcursor` with `cursor_image: "none"` and no image). A drawn
+bounds is the bbox of the pixels more than 8/255 from the `show: false` render.
+- S1 (probe, the request's `cu4`) outside an action each row's control commits one named step
+  of one `set_video {cursor: {<key>: v}}`; Polish one step of `{smoothing: 0.5, hide_idle: 3}`.
+- S2 `scale` 2 against 1 doubles the bounds ±1 px for the sprite and for `style: arrow`; the
+  arrow's at 1 are 13–15 × 19–21 px.
+- S3 `cursor_idle.fjcursor` with `hide_idle` 2: frames 99 and 100 `show: false`'s bytes, frame
+  101 `hide_idle` null's.
+- S4 the same at `smoothing` 1: the tip within 0.5 px of each click at its frame, more than 2 px
+  from the raw tip at frame 15.
+- S5 (probe) an action selected: Smoothing and Hide when idle base-only and ⊘, Size an end;
+  with no base cursor Size stores the defaults too and `props.scale` animates.
+- S6 `cursor_none.fjcursor`: `recorded` byte-identical to `arrow`, not to `show: false`.
+- S7 (probe) `CursorSprites.arrow`: one upload per pixel size, the sizes, a fill and an outside
+  texel.
+
 Prints `scores: P/N` and each skip with its reason; exits 0 iff every scored row passed.
 """
 
@@ -142,10 +162,11 @@ HEADER = ROOT / "core/include/framejob_core.h"
 MOVIE = ROOT / "tools/proof/media/A.mov"
 CALL_BOUND = 300
 SEC = 600_000
-PROBE_ROWS = ["B0", "L1d", "L3r", "L9", "L7", "I4", "I6"]
+PROBE_ROWS = ["B0", "L1d", "L3r", "L9", "L7", "I4", "I6", "S1", "S5", "S7"]
 DRAWING_ROWS = ["L2", "L4", "L5", "L6", "L8", "L8r", "L10", "L11"]
 ATTACH_ROWS = ["I1", "I2", "I3", "I5"]
-APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + ["Z1"]
+SECTION_ROWS = ["S2", "S3", "S4", "S6"]
+APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + SECTION_ROWS + ["Z1"]
 ROWS = PROBE_ROWS + APP_ROWS
 RENDER_TIMES = [SEC // 2, 2 * SEC, 4 * SEC]
 SCALE_SENTENCE = "video.cursor.scale must be between 0.25 and 8, not 9"
@@ -245,7 +266,8 @@ def probe_rows():
     shutil.copyfile(ROOT / "app/Resources/Blank.mp4", out / "Blank.mp4")
     check("B0", True, f"built {binary.name} and its default.metallib")
     request = out / "request.json"
-    asked = {"fixture": json.dumps(fixture()), "cursor_dir": str(CU), "i4": "I4" in selected}
+    asked = {"fixture": json.dumps(fixture()), "cursor_dir": str(CU), "i4": "I4" in selected,
+             "cu4": bool(selected & {"S1", "S5", "S7"})}
     if "L7" in selected:
         asked["l7"] = {"movie": str(CLEAN), "cursor": str(CU / "cursor.fjcursor"), "runs": 3}
     request.write_text(json.dumps(asked))
@@ -982,6 +1004,118 @@ def i3(client):
         close(client, doc.path)
 
 
+# ---- CU4: the Cursor section's rows as drawn, and the arrow ---------------------------------
+
+BOUNDS_THRESHOLD = 8            # /255, a pixel the cursor changed (S2)
+TIP_EXACT = 0.5                 # px, S4's located tip on a click
+
+
+def bounds(frame, bare, width=640):
+    """The bbox (w, h) of the pixels more than `BOUNDS_THRESHOLD` from `bare` in any channel,
+    or None when none differ."""
+    if frame is None or bare is None or len(frame) != len(bare):
+        return None
+    xs, ys = [], []
+    for i in range(0, len(frame), 3):
+        if max(abs(frame[i] - bare[i]), abs(frame[i + 1] - bare[i + 1]),
+               abs(frame[i + 2] - bare[i + 2])) > BOUNDS_THRESHOLD:
+            p = i // 3
+            xs.append(p % width)
+            ys.append(p // width)
+    if not xs:
+        return None
+    return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
+def s2(client):
+    """Size 200 % against 100 % doubles the drawn bounds, for the recorded sprite and the arrow;
+    the arrow's bounds at 100 % are 13–15 × 19–21 px."""
+    doc = Drawn(client, "s2", CLEAN, FIXTURE["cursor"])
+    try:
+        t = 30 * FRAME
+        doc.cursor(show=False)
+        bare, _, _ = doc.render(t, "off")
+        got = {}
+        for style in ("recorded", "arrow"):
+            for scale in (1.0, 2.0):
+                doc.cursor(show=True, style=style, scale=scale)
+                drawn, _, _ = doc.render(t, f"{style}-{scale}")
+                got[(style, scale)] = bounds(drawn, bare)
+        for style in ("recorded", "arrow"):
+            one, two = got[(style, 1.0)], got[(style, 2.0)]
+            ok = one is not None and two is not None and abs(two[0] - 2 * one[0]) <= 1 \
+                and abs(two[1] - 2 * one[1]) <= 1
+            check("S2", ok, f"{style}: bounds at scale 1 {one}, at 2 {two}")
+        arrow = got[("arrow", 1.0)]
+        check("S2", arrow is not None and 13 <= arrow[0] <= 15 and 19 <= arrow[1] <= 21,
+              f"the arrow's bounds at scale 1 {arrow}, wanted 13–15 × 19–21")
+    finally:
+        doc.close()
+
+
+def s3(client):
+    """`cursor_idle.fjcursor` with `hide_idle` 2: frames 99 and 100 are `show: false`'s bytes,
+    frame 101 the render with `hide_idle` null, which is not `show: false`'s."""
+    doc = Drawn(client, "s3", CLEAN, FIXTURE["idle"])
+    try:
+        doc.cursor(hide_idle=2.0)
+        hidden = {k: doc.render(k * FRAME, "idle2")[0] for k in (99, 100, 101)}
+        doc.cursor(show=False)
+        bare = {k: doc.render(k * FRAME, "off")[0] for k in (99, 100, 101)}
+        doc.cursor(show=True, hide_idle=None)
+        never = doc.render(101 * FRAME, "never")[0]
+        for k in (99, 100):
+            check("S3", hidden[k] is not None and hidden[k] == bare[k],
+                  f"frame {k} with hide_idle 2 equals show: false: {hidden[k] == bare[k]}")
+        check("S3", hidden[101] is not None and hidden[101] == never and never != bare[101],
+              f"frame 101 with hide_idle 2 equals hide_idle null: {hidden[101] == never}; "
+              f"differs from show: false: {never != bare[101]}")
+    finally:
+        doc.close()
+
+
+def s4(client):
+    """`cursor_idle.fjcursor` at smoothing 1: the tip on each down click's position at its
+    frame (≤ 0.5 px), and more than 2 px from the raw tip at frame 15."""
+    doc = Drawn(client, "s4", CLEAN, FIXTURE["idle"])
+    try:
+        doc.cursor(smoothing=1.0)
+        vertices = FIXTURE["idle_vertices"]
+        for k in FIXTURE["idle_downs"]:
+            tip = doc.tip(k * FRAME, f"k{k}")
+            want = (vertices[k][1], vertices[k][2])
+            check("S4", near(tip, want, TIP_EXACT),
+                  f"the click at frame {k}: tip {show(tip)}, click {show(want)}")
+        tip = doc.tip(15 * FRAME, "k15")
+        raw = (vertices[15][1], vertices[15][2])
+        apart = None if tip is None else ((tip[0] - raw[0]) ** 2 + (tip[1] - raw[1]) ** 2) ** 0.5
+        check("S4", apart is not None and apart > 2,
+              f"frame 15: tip {show(tip)}, raw {show(raw)}, "
+              f"{'none' if apart is None else f'{apart:.2f}'} px apart")
+    finally:
+        doc.close()
+
+
+def s6(client):
+    """`cursor_none.fjcursor` (`cursor_image: none`): `recorded` draws Frame Job's arrow, byte
+    for byte `arrow`'s, and not `show: false`'s."""
+    doc = Drawn(client, "s6", CLEAN, FIXTURE["none"])
+    try:
+        frames = (30, 60, 90)
+        recorded = {k: doc.render(k * FRAME, "recorded")[0] for k in frames}
+        doc.cursor(style="arrow")
+        arrow = {k: doc.render(k * FRAME, "arrow")[0] for k in frames}
+        doc.cursor(show=False)
+        bare = {k: doc.render(k * FRAME, "off")[0] for k in frames}
+        for k in frames:
+            check("S6", recorded[k] is not None and recorded[k] == arrow[k]
+                  and recorded[k] != bare[k],
+                  f"frame {k}: recorded == arrow {recorded[k] == arrow[k]}, "
+                  f"!= show: false {recorded[k] != bare[k]}")
+    finally:
+        doc.close()
+
+
 def i5(_client):
     skip("I5", "owed to CU1b2: the drawn tip against a burned tip on a real In-the-picture "
          "recording needs CU1b2's burned-tip helper (the road map's granted L1)")
@@ -1002,12 +1136,14 @@ def app_rows(binary):
                    [("L2", l2), ("L4", l4), ("L5", l5), ("L6", l6), ("L8", l8), ("L8r", l8r),
                     ("L10", l10)]]
         attaching = [("I1", i1), ("I2", i2), ("I3", i3), ("I5", i5)]
-        bodies = [("L1", l1), ("L3", l3)] + drawing + attaching
+        section = [("S2", s2), ("S3", s3), ("S4", s4), ("S6", s6)]
+        bodies = [("L1", l1), ("L3", l3)] + drawing + attaching + section
         held = None
         for name, body in bodies:
             if name not in selected:
                 continue
-            if name in DRAWING_ROWS + ["I1", "I2", "I3"] and not FIXTURE.get("cursor"):
+            if name in DRAWING_ROWS + ["I1", "I2", "I3"] + SECTION_ROWS \
+                    and not FIXTURE.get("cursor"):
                 check(name, False, f"no fixture: {FIXTURE.get('problems') or 'the probe wrote none'}")
                 continue
             try:
@@ -1059,15 +1195,17 @@ def main():
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
-        if selected & ({"L1", "L3"} | set(DRAWING_ROWS) | set(ATTACH_ROWS)):
+        if selected & ({"L1", "L3"} | set(DRAWING_ROWS) | set(ATTACH_ROWS)
+                       | set(SECTION_ROWS)):
             selected.add("Z1")
-        if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | {"L7", "I4", "I6"}):
+        if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | set(SECTION_ROWS)
+                       | {"L7", "I4", "I6", "S1", "S5", "S7"}):
             selected.add("B0")
     remove_work()
     HOME.mkdir(parents=True)
-    print(f"CU3a1, CU3a2 and CU3b — the cursor in the model and the recipe, drawn, then "
-          f"attached ({proof_app.config()} build)", flush=True)
-    if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | {"L7"}):
+    print(f"CU3a1, CU3a2, CU3b and CU4 — the cursor in the model and the recipe, drawn, "
+          f"attached, then its section ({proof_app.config()} build)", flush=True)
+    if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | set(SECTION_ROWS) | {"L7"}):
         try:
             make_clean()
         except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:

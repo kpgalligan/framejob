@@ -88,3 +88,91 @@ product-tool change; only the dev tool `transcript_view` gains an argument.
     the back extension and its floor), U8 (the cut) and U9 (the plan); app rows P1–P4 on
     `pause_fixture` (`say` phrases joined by 2.5 s, 1.5 s and 0.5 s of zeros); ten mutants. JOB-11
     is the person's check.
+
+## CU4 — the Cursor section (2026-11-02)
+
+Recorded before the code. CU-40…CU-43 are CU4's: the Picture sub-tab's Cursor section grows from
+Show cursor to every `video.cursor` key (CU-30), `style: arrow` and a frame with no recorded image
+draw Frame Job's own arrow, and the look a recording lands with is settled. No core source, FFI,
+format (41 stands), op, tool, `LayerUniforms` or shader change; the arrow uses the sprite slots
+and `texture(5)` CU-33 laid down. Nothing here sends anything anywhere, so nothing is keyed
+(CJ-3). The owner's answer (2026-11-01): a recording lands with its cursor as captured, plus
+ripples when Show Clicks was on.
+
+- **CU-40 — The Cursor section's rows, in order, and how each routes.** Id `video.cursor`, title
+  "Cursor", after Background and before Shadow, closed by default (CU-38 (b)'s gate and place,
+  unchanged). Each row has its own undo name:
+  - Show cursor: checkbox, "Show Cursor".
+  - Size: value row 25–800 %, slider to 400 %, quick 50/100/150/200/400; writes `scale` = v/100;
+    "Cursor Size".
+  - Style: popup As recorded / Arrow; "Cursor Style".
+  - Smoothing: popup Off 0 · Light 0.25 · Medium 0.5 · Strong 1 (`CursorProps.smoothingSteps`);
+    "Cursor Smoothing".
+  - Hide when idle: popup Never (null) · 1 s · 2 s · 3 s · 5 s · 10 s
+    (`CursorProps.hideIdleSteps`); "Hide Cursor When Idle".
+  - Clicks: popup None / Ripple; "Cursor Clicks".
+  - Ripple color: a colour row, discrete ("at end" when keyed); "Ripple Color".
+  - Ripple size: 25–400 %, quick 50/100/150/200; writes `click_size` = v/100; "Ripple Size".
+  - A button row: **Polish** writes `{smoothing: 0.5, hide_idle: 3}` (`CursorProps.polished`),
+    "Polish Cursor", its tooltip "Smoothing Medium and Hide when idle after 3 s".
+  - **(a) Writes.** Each row writes only its own key through `VideoPatch(cursorPart:)`
+    (`CursorPatch`, all eight keys optional, `hide_idle`'s null written as `NSNull`). Reset
+    writes all eight defaults as one `cursorPart`, "Reset Cursor".
+  - **(b) Reads.** Ripple color and Ripple size are enabled only while Clicks reads Ripple.
+    Smoothing and Hide when idle READ the clip's BASE `video.cursor` (0 and null when it has
+    none; the defaults under `.defaults`), never the evaluated props: `clip_state` does not apply
+    `with_base_cursor`, so an evaluated smoothing can be an end's no-op value. A stored value
+    matching no step shows a blank popup with nothing checked; their mixed test compares the
+    clips' base values. Colour reads `ReelColor.normalise(click_color)` then
+    `GraphicSchemaRows.rgba(css:)`, and writes `GraphicSchemaRows.css(_:)`.
+  - **(c) Summary.** "off" when `show` is false and `clicks` none; else "on" ("arrow" when
+    `style` is arrow), plus " + ripples" when `clicks` is ripple.
+  - **(d) Routing inside an action** (`InspectorBinding.structural(video:for:)`). Size and Ripple
+    size animate; Show, Style, Clicks and Ripple color switch at the action's end (CU-30); Smoothing,
+    Hide when idle and Polish are the clip's, ⊘ inside an action. Two independent rules split a
+    `cursorPart` into `own` (smoothing, hide_idle) and `end` (the other six): **(1)** a non-empty
+    `own` goes to the base and only `end` stays in the end, an empty end dropped; **(2)** a
+    non-empty `end` on a clip with no BASE `video.cursor` also stores the whole defaults cursor on
+    the base, merged with `own`, in the same step — so Size animates rather than switching
+    (CU-30: an end over no cursor switches). With (1) and not (2) the base gets `cursorPart =
+    own`; with neither, no cursor key.
+- **CU-41 — The Arrow: Frame Job's own vector arrow.** One path in a 14 × 21 pt box, tip (the hot
+  spot) at (1.5, 1.5): `M1.5 1.5 L1.5 17 L5.3 13.4 L7.9 19.4 L10.6 18.3 L8.1 12.4 L13 12.4 Z`,
+  fill `#000`, stroke `#fff` 1.25 with round joins (`CursorArrow`); no Apple artwork (CU-8).
+  Rasterized by the graphic engine (`GraphicLibrary.rasterize`) at W × H = max(1, round(14·k)) ×
+  max(1, round(21·k)), k = `px_per_point` × `scale`, through a library `CursorSprites` owns; one
+  texture per pixel size and output in a second LRU of 64, never one per frame at a fixed size,
+  lifted in HLG as a sprite is (CU-33 (e)); `uploads` counts it. Drawn 1:1 at (x − 1.5·W/14, y −
+  1.5·H/21, W, H) with the sprite's opacity, for `style: arrow`, and for `recorded` whenever
+  `state.image` is null (`cursor_image: none`, CU-6's fallback) or its texture cannot be made;
+  only inside `props.show && state.visible`, ripples unaffected. It is drawn at its own size ×
+  `px_per_point` × `scale`, NOT at the recorded image's size, deviating from the road map's "at
+  the image's size": a recorded image's size changes with the cursor kind, and CU-11 records
+  none. **Amends CU-33 (c):** "Drawn when `props.show` and `visible`: the recorded image when
+  `style == recorded`, `image` non-null and its texture made, Frame Job's arrow otherwise
+  (CU-41)."
+- **CU-42 — The look a recording lands with (owner, 2026-11-01).** As captured: no `video.cursor`
+  is written at landing except `{clicks: "ripple"}` on its screen clips, and only when Show Clicks
+  was on and the file is not in the picture. That write is CU3c's, inside the landing's grouped
+  edit with its B3 row; until CU3c every landed file is `in_picture: true`, so CU4 writes nothing
+  at landing. The polished look (Smoothing Medium, Hide after 3 s) is one click — **Polish** — or
+  CU10's landing option, never a silent default.
+- **CU-43 — CU4's proof.** `cursor_layer_proof.py` on a 640 × 360 canvas over `clean.mov`, bounds
+  the bbox of pixels more than 8/255 from the `show: false` render: S1 (probe) each row's control
+  outside an action commits one named step whose one op is `set_video {cursor: {<its key>: v}}`
+  (Size 200 → 2, Arrow, Medium 0.5, 3 s → 3 and Never → null, Ripple, a colour's CSS, Ripple size
+  150 → 1.5, Polish → `{smoothing: 0.5, hide_idle: 3}`); S2 `scale` 2 against 1 doubles the
+  bounds ±1 px for the recorded 12 × 16 sprite and for the arrow, whose bounds at 1 are 13–15 ×
+  19–21 px; S3 the probe's `cursor_idle.fjcursor` (a zig-zag at k 0–29, still from k 30 to 104,
+  moving from k 105; clicks at k 9 and 20): with `hide_idle` 2 frames 99 and 100 byte-identical to
+  `show: false` and frame 101 equal to `hide_idle` null; S4 the same file at `smoothing` 1: the tip
+  within 0.5 px of the click position at frames 9 and 20, more than 2 px from the raw tip at 15;
+  S5 (probe) inside an action Smoothing Strong and Hide 2 s commit only a base `set_video` and
+  their gutters are ⊘, Size 200 only `set_action_end {video: {cursor: {scale: 2}}}`, and on a clip
+  with no base cursor the base defaults plus that end, `props.scale` strictly between 1 and 2
+  mid-action; S6 `cursor_none.fjcursor` (`cursor_image: none`): `recorded` byte-identical to
+  `arrow` at three frames and not to `show: false`; S7 (probe) `CursorSprites.arrow`: 14 × 21 twice
+  one upload, 28 × 42 one more, the sizes as asked, a fill texel opaque and dark, texel (12, 2)
+  transparent. Seven mutants: smoothing and hide_idle routed into the end, the base defaults
+  skipped (S5); Size writing `click_size` (S1); Arrow ignored (S2); the null-image fallback removed
+  (S6); an arrow made per frame (S7). Person check JOB-22.

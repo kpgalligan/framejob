@@ -101,6 +101,25 @@ extension InspectorBinding {
             base.cutout = patch.cutout
             animatable.cutout = nil
         }
+        // A cursor's `smoothing` and `hide_idle` are the clip's (spec §11 CU-30, CU-40): the
+        // recipe reads them from the BASE, so an end carrying them would have no effect. Two
+        // independent rules. (a) The clip's own keys go to the base; only the other six stay
+        // in the end, an empty end part dropped. (b) An end key on a clip with no BASE cursor
+        // also stores the defaults cursor on the base, merged with (a)'s keys, in the same
+        // step — an end over no cursor switches at its end (CU-30), and with the defaults
+        // stored Size and Ripple size animate. A whole cursor wins over `cursorPart` in
+        // `VideoPatch.dictionary`, so (b)'s base carries (a)'s keys inside it.
+        if let part = patch.cursorPart, !part.isEmpty {
+            let own = part.clipsOwn
+            let end = part.animatable
+            if !own.isEmpty { animatable.cursorPart = end.isEmpty ? nil : end }
+            if !end.isEmpty, clip.video?.cursor == nil {
+                base.cursor = .some(
+                    CursorProps(smoothing: own.smoothing ?? 0, hideIdle: own.hideIdle ?? nil))
+            } else if !own.isEmpty {
+                base.cursorPart = own
+            }
+        }
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

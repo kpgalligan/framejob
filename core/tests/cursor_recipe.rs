@@ -463,3 +463,38 @@ fn add_media_stores_the_cursor_and_a_relink_probe_replaces_it() {
         json!({ "path": CURSOR_FILE, "bookmark": "Qk0=", "in_picture": false })
     );
 }
+
+// ---- paste_attributes (CU4, spec §11 CU-40) ---------------------------------
+
+#[test]
+fn paste_attributes_carries_the_cursor() {
+    // Clip 11 with a cursor, clip 12 without one; Copy's raw JSON of clip 11 pasted onto 12.
+    let cursor = json!({ "show": true, "scale": 2.0, "style": "arrow", "smoothing": 0.5,
+                         "hide_idle": 3.0, "clicks": "ripple", "click_color": "#ffffffcc",
+                         "click_size": 1.0 });
+    let source = clip(json!({ "video": { "cursor": cursor.clone() } }));
+    let target = clip(json!({ "id": 12, "start": START + 5 * SEC }));
+    let handle = project(file_cursor(), json!([source, target]));
+    let copied = by_id(&handle.value(), "/clips", 11).clone();
+    let pasted = handle.apply(&json!({ "op": "paste_attributes", "clips": [12],
+                                       "payload": { "clips": [copied.clone()], "media": [] } }));
+    let value = pasted.value();
+    assert_eq!(
+        by_id(&value, "/clips", 12)["video"]["cursor"],
+        cursor,
+        "{value}"
+    );
+    let key = key(&pasted, START + 6 * SEC, 12);
+    assert_eq!(key["props"], cursor, "{key}");
+    assert_eq!(num(&key, "/smoothing"), 0.5, "{key}");
+    assert_eq!(num(&key, "/hide_idle"), 3.0, "{key}");
+
+    let mut wide = copied;
+    wide["video"]["cursor"]["scale"] = json!(9);
+    let error = handle.errors(&json!({ "op": "paste_attributes", "clips": [12],
+                                       "payload": { "clips": [wide], "media": [] } }));
+    assert!(
+        error.contains("video.cursor.scale must be between 0.25 and 8, not 9"),
+        "{error}"
+    );
+}

@@ -180,9 +180,11 @@ detail there.
   creator-jobs CU3a1, spec §11 CU-30, CU-39) holds `CursorStyle`, `CursorClicks` (`off` is the
   core's `none`: a case named `none` warns), `CursorProps` (`VideoProps.cursor` and
   `VideoPatch.cursor`; its `dictionary` writes all eight keys, `NSNull` for a nil `hideIdle`),
-  `CursorPatch` (the sparse write `VideoPatch.cursorPart` carries — written under `cursor` only
-  when `cursor` is nil, never decoded, `cutoutPart`'s shape — so the Cursor section's Show
-  cursor writes `{cursor: {show}}` alone, CU3b, spec §11 CU-38 (b)),
+  `CursorPatch` (all eight keys, the sparse write `VideoPatch.cursorPart` carries — written
+  under `cursor` only when `cursor` is nil, never decoded, `cutoutPart`'s shape — so each Cursor
+  row writes its own key alone, CU3b, CU4, spec §11 CU-38 (b), CU-40; `clipsOwn` (smoothing,
+  hide_idle) and `animatable` (the other six)), with `CursorProps.smoothingSteps`,
+  `hideIdleSteps` and `polished`,
   `MediaCursor` (`MediaSnapshot.cursor`, `MediaDescriptor.cursor`, kept by `probeDictionary`) and
   `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required).
   `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21;
@@ -1294,6 +1296,8 @@ the key map behind it.
   four typed ones derive a row's DEFAULT from its own `read` and `ops` unless `resets: false`;
   `inspectorRow(discrete:)` makes a row discrete — "at end" — when its control is none of the
   popup, checkbox or segmented control: the graphic string row and the Text tab's Content area;
+  `inspectorColorRow(discrete:)` for a colour that switches at an action's end (a cursor's
+  ripple colour, CU-40);
   a row's widest `OptionPopupControl` — or, in a row with none, its widest
   `OptionCheckboxControl`, clipped to its bounds so its title stops at its edge — holds its
   intrinsic width only at compression resistance 749, below the one-line tag's 750, so a keyed
@@ -1332,6 +1336,8 @@ the key map behind it.
   an action selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a `filters` or `obscure` list of a different LENGTH, or
   `motion`, or a `cutout`'s presence (a whole one or null, spec §11 CO-30 (b)),
+  or a cursor's `smoothing` and `hide_idle` (the clip's, spec §11 CU-40; with the
+  defaults stored on a base that has no cursor when an end key is written),
   to the BASE props (the sparse `cutoutPart` animates; a curve never: every
   count animates, spec §11 GR-34), and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
@@ -1441,12 +1447,14 @@ the key map behind it.
   through `VideoPatch.cutoutPart`, which animates), Status read through the
   pane's `cutoutMemo` (`CutoutStatus.Memo`, kept on `ClipPane`, whose
   `onChange` refreshes the pane), and Analyze Now; +`Cursor` — the Picture sub-tab's Cursor
-  section (road map creator-jobs CU3b, spec §11 CU-38 (b)), registered after the
+  section (road map creator-jobs CU3b, CU4, spec §11 CU-38 (b), CU-40), registered after the
   `allSourcePixels` block (after Background) and before Shadow when `allCursored` (every
   selected clip a media or still clip whose media has `cursor` with `in_picture` false;
   `ClipPane.structureSignature` carries it, so a relink, an undo or a landing that changes the
-  media's `cursor` adds or removes it): Show cursor, a sparse `{cursor: {show}}` through
-  `VideoPatch.cursorPart` (an end inside an action), "Show Cursor", Reset writing true;
+  media's `cursor` adds or removes it): Show cursor, Size, Style, Smoothing, Hide when idle,
+  Clicks, Ripple color, Ripple size and Polish (spec §11 CU-40), each its own key through
+  `VideoPatch.cursorPart` with its own undo name; Smoothing and Hide when idle read the clip's
+  BASE cursor and are the clip's (⊘); Reset writes all eight defaults;
   +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
@@ -2122,10 +2130,15 @@ the key map behind it.
   GR-35) ·
   `Compositor+Cursor.swift` (`MetalRenderer.cursorSprite`: the uniform block's
   cursor group from `CursorTracks.ready` and the core's `state`, a reversed clip
-  read at `pivot − at − frame`, and the sprite for `texture(5)`, the placeholder
-  when none; spec §11 CU-33) · `CursorSprites.swift` (a cursor image's texture
-  made once, lifted in an HLG project, an LRU of 64; `uploads` the probe's
-  count) ·
+  read at `pivot − at − frame`, and the sprite for `texture(5)` — the recorded
+  image, else Frame Job's arrow for `style: arrow` or a frame with no image
+  (CU-41) — the placeholder when none; spec §11 CU-33) · `CursorSprites.swift`
+  (a cursor image's texture made once, lifted in an HLG project, an LRU of 64,
+  + Frame Job's arrow rasterized once per pixel size and output through a
+  `GraphicLibrary` it owns, a second LRU of 64 (CU-41); `uploads` the probe's
+  count, arrows included) · `CursorArrow.swift` (Frame Job's own pointer, road
+  map creator-jobs CU4, spec §11 CU-41: the 14 × 21 pt path's SVG, its hot spot
+  (1.5, 1.5) and `pixelSize(pxPerPoint:scale:)`; no Apple artwork, CU-8) ·
   `Compositor+Cutout.swift` (`MetalRenderer.cutoutMask`: Remove Background drawn, spec §11
   CO-24…CO-27 — a `.track` layer whose recipe `cutout` has `background` remove, looked up per
   request through the covering plan segment to the pack frame shown and its mask, the placeholder

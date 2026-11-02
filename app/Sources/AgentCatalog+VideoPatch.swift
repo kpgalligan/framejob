@@ -138,8 +138,8 @@ extension AgentServer {
         + "{selection: clip} shows what it selects)"
     // `video.cursor`'s clause (format 38, spec §11 CU-30), its own
     // explicitly-typed local for `lookClause`'s reason: the style and clicks
-    // names are non-literal operands. Nothing in the UI writes it yet
-    // (road map creator-jobs CU4's Cursor section).
+    // names are non-literal operands. The UI path is the Picture sub-tab's
+    // Cursor section (road map creator-jobs CU4, spec §11 CU-40, CU-41).
     private static let cursorStyleNames: [String] = CursorStyle.allCases.map { $0.rawValue }
     private static let cursorClicksNames: [String] = CursorClicks.allCases.map { $0.rawValue }
     private static let cursorClause: String =
@@ -156,8 +156,10 @@ extension AgentServer {
         + "the end; smoothing and hide_idle act only from the clip's own props — in an end "
         + "they have no effect, and a split or a freeze frame keeps the clip's. On a clip "
         + "with no cursor an end's cursor keys all switch at the end; give it one first "
-        + "with set_video {cursor: {}} to animate them. Drawing the cursor is not built "
-        + "yet: the keys are stored and read back)"
+        + "with set_video {cursor: {}} to animate them. smoothing and hide_idle are the "
+        + "clip's own: write them with set_video, never in an end. style arrow draws Frame "
+        + "Job's own arrow, and so does recorded at a time the cursor file recorded no "
+        + "cursor image. The UI path is the Picture sub-tab's Cursor section)"
     // Remove Background (format 39, spec §11 CO-20), explicitly typed for
     // `lookClause`'s reason. Nothing in the UI writes it yet (road map
     // creator-jobs CO3's Background section).

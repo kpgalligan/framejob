@@ -6533,6 +6533,102 @@ edges. No `CLAUDE.md` edit.
   ripples when Show Clicks is on*; the polished look (smoothing 0.5, hide after 3 s) is one click in
   the section, or CU10's landing option, not a silent default.
 
+#### CU4's record (2026-11-02)
+
+**Landed.** Lane B, base `6ac3fb68` (I's HEAD, CU3b), integrated onto I after TX3b as one
+commit. The lane's two commits: the decisions (`3f0e443a`: CU-40…CU-43 with their index rows and
+"(c) amended by CU-41" on CU-33's, appended to `creator-jobs-5.md`), then the code, the proof and
+the documents. At integration TX3b had started `creator-jobs-6.md` and closed `-5` to new entries,
+so CU4's section moved there (`-5` stays 468 lines, `-6` 90 → 178) and the four index rows point
+at it. The owner's answer (2026-11-01) — a recording lands with its cursor as captured, plus
+ripples when Show Clicks was on — is CU-42; the ripple write is CU3c's, and until CU3c every
+landed file is `in_picture: true`, so CU4 writes nothing at landing. No core source, FFI, op,
+format (41 stands), product tool, `LayerUniforms` or shader change. No toll: every file stayed
+under its cap.
+
+- **The section.** `VideoPane+Cursor.swift` grows from Show cursor to CU-40's nine rows: Size,
+  Style, Smoothing, Hide when idle, Clicks, Ripple color (`inspectorColorRow(discrete: true)`),
+  Ripple size and Polish, each writing its own key through `VideoPatch(cursorPart:)` with its own
+  undo name. Smoothing and Hide when idle read the first clip's BASE cursor (the defaults under
+  `.defaults`), a value matching no step a blank popup.
+- **The routing.** `structural(video:for:)` splits a `cursorPart` into `clipsOwn` (smoothing,
+  hide_idle → the base) and `animatable` (the other six → the end), and stores the defaults
+  cursor, merged with the own keys, on a base that has none when an end key is written.
+- **The arrow.** `CursorArrow` (Frame Job's 14 × 21 pt path, CU-41) rasterized by
+  `CursorSprites.arrow` through a `GraphicLibrary` it owns, one texture per pixel size and output
+  in a second LRU of 64, lifted in HLG; `cursorSprite` draws it for `style: arrow` and whenever
+  the recorded image is absent or its texture not made, inside `props.show && state.visible`.
+- **Paste Attributes** carries `video.cursor` with no core change; `cursor_recipe.rs`'s
+  `paste_attributes_carries_the_cursor` pins it and CU-30's refusal through a payload.
+- **The catalog's prose** names the Cursor section as the UI path, `arrow` and its fallback, and
+  smoothing and hide_idle as the clip's; the stale "Drawing the cursor is not built yet" is gone.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/VideoPane+Cursor.swift` | 147 | the full section (46 before) |
+| `app/Sources/CursorArrow.swift` | 34 | new: the arrow's SVG, size, hot spot and `pixelSize` |
+| `app/Sources/CursorSprites.swift` | 139 | `arrow(width:height:output:lift:)`, the arrow pool, `upload(raster:)`, `makeTexture` |
+| `app/Sources/Compositor+Cursor.swift` | 119 | the sprite branch: recorded image, else the arrow |
+| `app/Sources/CursorProps.swift` | 209 | `CursorPatch`'s eight keys, `clipsOwn`, `animatable`; the step tables and `polished` |
+| `app/Sources/InspectorBinding+Writes.swift` | 323 | the cursor rule in `structural(video:for:)` |
+| `app/Sources/InspectorRows.swift` · `AgentCatalog+VideoPatch.swift` | 329 · 237 | `discrete:`; `cursorClause` |
+| `core/tests/cursor_recipe.rs` | 500 | `paste_attributes_carries_the_cursor` |
+| `tools/proof/cursor_layer_proof.py` · `cursor_layer_probe.swift` | 1,232 · 1,094 | S1–S7; `cursor_idle.fjcursor`, `cursor_none.fjcursor` |
+
+**Deviations.** (1) **S3/S4's fixture.** The spec's `cursor_idle.fjcursor` put one move a frame
+at (60 + 6k, 100 + 24·(k mod 2)). At 30 fps every gap between moves is longer than CU-21's 25 ms,
+so every move is a hold and both its ends are pins: the smoothed path passes through every move
+and S4's "more than 2 px from the raw tip at frame 15" could not hold at any smoothing. And with a
+24 px zig-zag, RDP at 12 pt keeps every vertex. The file therefore has moves every 120th of a
+second on the line between a run's frame vertices (no hold inside a run, the raw path at a frame
+its vertex), a zig-zag of 8 px (100 + 8·(k mod 2)), and k 105–119 at (60 + 6(k − 75), …) so the
+second run starts where the first did not end. The timing the spec set — moves k 0–29, still from
+30 to 104, moving from 105, clicks at 9 and 20 — is unchanged. (2) `CursorSprites`' texture
+descriptor is shared by `upload(png:)` and `upload(raster:)` through a private `makeTexture`,
+`upload(png:)`'s own descriptor moved into it unchanged. (3) Polish is a row built by
+`inspectorRow(nil, [button], binding:writes:)` rather than `inspectorButtonRow`, so it carries the
+⊘ mark CU-40 gives it inside an action. (4) The probe's app setup (`ProbeDocumentController`,
+`AppDelegate.applicationWillFinishLaunching`) moved into a `prepareApp()` run once, so I4 and the
+CU4 rows share it. (5) S1 drives Ripple color through the swatch's own `mouseDown` (which binds the
+shared Colors panel to it), then sets the panel's colour and, when that sent nothing, the panel's
+`colorChanged:` to its target. Outside the Files list: none.
+
+**Measured.**
+
+- `cargo test --release --test cursor_recipe` 14 passed (the new test included); `cargo fmt`.
+- `make typecheck`: exit 0, 0 errors and the 4 baseline warnings. `swift_build.py typecheck
+  tools/proof/cursor_layer_probe.swift`: exit 0 once the colour panel's read was fixed (the
+  first: `NSColorPanel` has no `action` getter).
+- Debug: `cursor_layer_proof.py --only B0,S1,S5,S7,I4,L1d,L9` 6/7 at first (S1: Polish found the
+  section header's button), then 7/7; `make app-debug`, then `--only S2,S3,S4,S6,L7,I3,Z1` 8/8.
+  S2 bounds: the sprite 12 × 16 → 24 × 32, the arrow 13 × 20 → 27 × 39. S4: the tip (114.00,
+  108.00) and (180.00, 100.00) on the clicks, (149.90, 103.07) at frame 15, 4.93 px from the raw
+  (150, 108). `spec_index_proof.py` 249/249.
+- Mutants, seven, each once on Debug and restored byte-identical (SHA-256), all CAUGHT:
+  `smoothing-to-end` and `hide-idle-to-end` (S5: an end op and a keyed gutter), `no-base-defaults`
+  (S5: the end alone, `props.scale` 1.0 mid-action), `size-writes-click-size` (S1),
+  `arrow-ignored` (S2: the arrow's bounds 12 × 16), `no-null-image-fallback` (S6: recorded drew
+  nothing), `arrow-per-frame` (S7: uploads [0, 2, 3]).
+- `make gate`: PASS 553 s (names 1, typecheck 12, fmt 3, lint 19, test 349, app 169); on I after
+  TX3b, with the decisions moved to `-6`: PASS 321 s (`spec_index_proof.py` 252/252).
+- `RC_PROOF_APP=release cursor_layer_proof.py` (the final instrument): 28/28, I5 skipped by name;
+  L7's difference medians 0.099, 0.461 and 0.303 ms (limits 0.3, 1 and 1); S2–S6 as on Debug;
+  Z1 both launches empty.
+
+**Review.** Pass, two nits. (1) The guide said a clip with no cursor settings gets them when Size
+or Ripple size is first animated, while `structural(video:for:)` stores them on any end key:
+fixed at integration in `screen-recording.md` ("any row but Smoothing or Hide when idle").
+(2) A failed arrow rasterize or lift is not remembered, so `arrow(...)` would retry it each
+frame, as `texture(...)` does for a PNG that fails to decode: left as it is, to cache a failed key
+only if a refusal is ever seen.
+
+**Owed.** JOB-22 (`docs/manual-checks.md`), once CU3c lands: smoothing and idle hide look natural
+on a real Separate recording. The picked-window row of the cursor spike (the owner's report of
+2026-11-02, the ruling above) is filed as the issue "Cursor spike: the picked-window row needs a
+helper-owned grey window", `ai-drafted`, to land before CU3c. §5.2a's `video.cutout` entry still
+says "(nothing draws it yet, CO-23)" though the compositor draws `edge` and `feather` since CO2a2:
+lane C's area, filed as an issue.
+
 ### CO5 — Text Behind Subject
 
 - **What a person gets:** Insert ▸ Text Behind Subject puts a title on a new track directly above

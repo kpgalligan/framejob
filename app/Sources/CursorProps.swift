@@ -81,24 +81,80 @@ struct CursorProps: Codable, Equatable {
 }
 
 /// A sparse cursor (road map creator-jobs CU3b, spec §11 CU-38 (b)): only the keys set are
-/// written, so the Cursor section's Show cursor writes `{cursor: {show}}` alone — on the base a
-/// merge, inside an action an end naming `show`, which switches at the end (CU-30). CU4 adds the
-/// section's other keys.
+/// written, so each row of the Cursor section writes its own key alone — on the base a merge,
+/// inside an action an end naming it. CU4 (spec §11 CU-40) gave it all eight keys: `scale` and
+/// `clickSize` animate, `show`, `style`, `clicks` and `clickColor` switch at the end (CU-30), and
+/// `smoothing` and `hideIdle` are the clip's — `InspectorBinding.structural(video:for:)` sends
+/// `clipsOwn` to the base and keeps `animatable` in the end. `hideIdle` is a `T??`: `.some(nil)`
+/// writes `NSNull` (never hidden).
 struct CursorPatch: Codable, Equatable {
     var show: Bool?
+    var scale: Double?
+    var style: CursorStyle?
+    var smoothing: Double?
+    var hideIdle: Double??
+    var clicks: CursorClicks?
+    var clickColor: String?
+    var clickSize: Double?
 
-    init(show: Bool? = nil) {
+    init(
+        show: Bool? = nil, scale: Double? = nil, style: CursorStyle? = nil,
+        smoothing: Double? = nil, hideIdle: Double?? = nil, clicks: CursorClicks? = nil,
+        clickColor: String? = nil, clickSize: Double? = nil
+    ) {
         self.show = show
+        self.scale = scale
+        self.style = style
+        self.smoothing = smoothing
+        self.hideIdle = hideIdle
+        self.clicks = clicks
+        self.clickColor = clickColor
+        self.clickSize = clickSize
     }
 
-    /// The set keys under the model's names.
+    /// The set keys under the model's names (`click_color`, `click_size`, `hide_idle`).
     var dictionary: [String: Any] {
         var d: [String: Any] = [:]
         if let show { d["show"] = show }
+        if let scale { d["scale"] = scale }
+        if let style { d["style"] = style.rawValue }
+        if let smoothing { d["smoothing"] = smoothing }
+        if let hideIdle { d["hide_idle"] = hideIdle.map { $0 as Any } ?? NSNull() }
+        if let clicks { d["clicks"] = clicks.rawValue }
+        if let clickColor { d["click_color"] = clickColor }
+        if let clickSize { d["click_size"] = clickSize }
         return d
     }
 
-    var isEmpty: Bool { show == nil }
+    var isEmpty: Bool {
+        show == nil && scale == nil && style == nil && smoothing == nil && hideIdle == nil
+            && clicks == nil && clickColor == nil && clickSize == nil
+    }
+
+    /// The clip's own keys, `smoothing` and `hideIdle` (CU-30): the base's, even inside an action.
+    var clipsOwn: CursorPatch { CursorPatch(smoothing: smoothing, hideIdle: hideIdle) }
+
+    /// The other six: what an action's end carries.
+    var animatable: CursorPatch {
+        CursorPatch(
+            show: show, scale: scale, style: style, clicks: clicks, clickColor: clickColor,
+            clickSize: clickSize)
+    }
+}
+
+extension CursorProps {
+    /// The Smoothing popup's steps (spec §11 CU-40).
+    static let smoothingSteps: [(title: String, value: Double)] = [
+        ("Off", 0), ("Light", 0.25), ("Medium", 0.5), ("Strong", 1),
+    ]
+
+    /// The Hide when idle popup's steps, in seconds; nil is never hidden (CU-40).
+    static let hideIdleSteps: [(title: String, value: Double?)] = [
+        ("Never", nil), ("1 s", 1), ("2 s", 2), ("3 s", 3), ("5 s", 5), ("10 s", 10),
+    ]
+
+    /// Polish: Smoothing Medium and Hide when idle after 3 s (CU-40, CU-42).
+    static let polished = CursorPatch(smoothing: 0.5, hideIdle: .some(3))
 }
 
 /// A media's `media.cursor` (CU-39): its cursor file, the app's bookmark for

@@ -195,7 +195,26 @@ A recording's cursor file (`<name>.fjcursor`, beside its movie) travels with the
 - **When you import a movie**, by **File ▸ Add Media…**, a drop, opening it, or an agent's `import_media`, Frame Job looks beside it for a file with the same name ending in `.fjcursor`. It takes the file only when the file reads as a cursor file and was made for a movie of exactly this movie's size. A file that is missing, damaged or made for another size is left alone, and the movie imports without it. A copy Frame Job makes of a WebM or Matroska file is not looked beside.
 - **When you relink a movie** (**Relink…**, the Media tab, or an agent's `relink_media`), Frame Job takes the cursor file beside the new movie. If there is none, it keeps the cursor file the media already had, as long as that file is still there and the new movie is the same size. Otherwise the media has no cursor file after the relink.
 
-**Show cursor.** A clip whose movie has a cursor file the picture doesn't already show gets a **Cursor** section on the Clip tab's **Picture** sub-tab, after **Background**. Its one checkbox, **Show cursor**, draws the pointer from the file over the clip, on by default. With an action selected it switches at the action's end. Selecting clips that disagree shows the checkbox mixed. **Reset** turns it back on.
+**The Cursor section.** A clip whose movie has a cursor file the picture doesn't already show gets a **Cursor** section on the Clip tab's **Picture** sub-tab, after **Background**. It starts closed; its summary says **off**, **on** or **arrow**, with **+ ripples** when clicks ripple. Each row is its own undo step:
+
+| Row | What it does | Range |
+|---|---|---|
+| **Show cursor** | Draws the pointer from the file over the clip. On by default. | on, off |
+| **Size** | How big the pointer is drawn. Quick picks 50, 100, 150, 200 and 400 %; the slider runs to 400 %, the field to 800 %. | 25–800 % |
+| **Style** | **As recorded** draws the pointer images the file recorded. **Arrow** draws Frame Job's own arrow instead. | As recorded, Arrow |
+| **Smoothing** | Calms a shaky path. The pointer still passes exactly through every click, at the moment of the click, and still holds still where it held still. | Off, Light, Medium, Strong |
+| **Hide when idle** | Fades the pointer out after this long with no movement or click, and brings it back just before it next moves. | Never, 1, 2, 3, 5, 10 s |
+| **Clicks** | **Ripple** draws a ring growing out of every click. | None, Ripple |
+| **Ripple color** | The ring's colour, with opacity. Live only while Clicks is Ripple. | any colour |
+| **Ripple size** | How big the ring grows. Live only while Clicks is Ripple. | 25–400 % |
+
+**Polish** sets Smoothing to Medium and Hide when idle to 3 s in one step.
+
+With an action selected, **Size** and **Ripple size** animate across it. **Show cursor**, **Style**, **Clicks** and **Ripple color** switch at the action's end. **Smoothing**, **Hide when idle** and **Polish** belong to the clip, not to an action: their rows show ⊘ and they always change the clip itself. A clip with no cursor settings yet gets them the first time you change any row but Smoothing or Hide when idle with an action selected, so Size and Ripple size can animate rather than jump. Selecting clips that disagree shows a row mixed. **Reset** puts every row back to its default.
+
+**The arrow.** Frame Job's own arrow is drawn crisp at any size, at the size of a standard pointer times **Size**. It is also what a clip draws when its cursor file recorded no pointer images, whichever **Style** is chosen.
+
+**Paste Attributes** (⌥⌘V) carries a clip's cursor settings to another clip, with the rest of its picture settings.
 
 The recorder still draws the pointer into the movie itself, so its cursor files say the pointer is already in the picture. A recording therefore shows no **Cursor** section yet, and nothing is drawn twice.
 

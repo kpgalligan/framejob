@@ -168,6 +168,7 @@ Picture's sections, in order:
 | Behind Subject | every clip that draws but an adjustment or nest clip, at the top level |
 | Crop, Corner Radius, Chroma Key | video, image and still clips |
 | Background | clips of a video file, and freeze frames of one |
+| Cursor | clips of a movie whose cursor file the picture doesn't already show ([The cursor](screen-recording.md#the-cursor)) |
 | Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included |
 
 Each section folds open and shut and shows a one-line summary while closed.

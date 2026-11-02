@@ -46,11 +46,23 @@
 //   for details)."), `cursorWarningDetails` (the sentences, one a line; nil for none) and
 //   `ExportQueueRowView.toolTip(for:)` of a completed job holding one cursor warning, which
 //   ends with its sentence.
+//
+// CU4 (spec §11 CU-40, CU-41): `cursor_dir` also writes `cursor_idle.fjcursor` (`idleBody`) and
+// `cursor_none.fjcursor` (no image), answered as `fixture.idle` and `fixture.none` with the idle
+// file's vertices and down clicks. When the request says `cu4: true`:
+// - S1 outside an action each Cursor row's control commits one named `set_video {cursor:
+//   {<key>: v}}`, and Polish `{smoothing: 0.5, hide_idle: 3}`.
+// - S5 with an action selected: Smoothing and Hide when idle a base `set_video` alone with a ⊘
+//   gutter, Size 200 an end alone; on a clip with no base cursor the defaults on the base and
+//   the end in one step, the recipe's `props.scale` strictly between 1 and 2 mid-action.
+// - S7 `CursorSprites.arrow`: one upload per pixel size, the sizes, a fill texel opaque and dark
+//   and texel (12, 2) transparent.
 
 import AVFoundation
 import AppKit
 import Foundation
 import ImageIO
+import Metal
 
 var rows: [[String: Any]] = []
 /// The CU3a2 fixture's facts, answered beside the rows when the request names `cursor_dir`.
@@ -322,13 +334,16 @@ func spritePNG() -> Data? {
 /// The v1 cursor file through the app's own encoder (`CursorFileBody`): identity geometry
 /// (640 × 360 points at 1 px a point, the screen at the origin), the moves, the clicks, the
 /// one image from t 0. `movieSize` is the header's `movie_size` (CU3b's `cursor_wide.fjcursor`
-/// names 1280 × 720, a size the clean movie does not have).
-func cursorBody(png: Data, movieSize: [Int] = [640, 360]) -> CursorFileBody {
+/// names 1280 × 720, a size the clean movie does not have); `image: .none` is CU4's
+/// `cursor_none.fjcursor`, the same moves and clicks with no image at all.
+func cursorBody(
+    png: Data, movieSize: [Int] = [640, 360], image: CursorImageMode = .currentSystem
+) -> CursorFileBody {
     var b = CursorFileBody(
         version: ReelCursor.fileVersion, inPicture: false, source: .display, displayID: 1,
         sourceFrame: [0, 0, 64000, 36000], pointSize: [64000, 36000], pixelsPerPoint: 1,
         contentSize: [640, 360], movieSize: movieSize, anchor: .e2, anchorHostUs: 0,
-        cursorImage: .currentSystem)
+        cursorImage: image)
     b.geometry = [.init(t: 0, screenRect: [0, 0, 64000, 36000],
                         contentRect: [0, 0, 64000, 36000], contentScale: 1, scaleFactor: 1)]
     for k in 0..<moveCount {
@@ -346,11 +361,55 @@ func cursorBody(png: Data, movieSize: [Int] = [640, 360]) -> CursorFileBody {
         b.clicks.y.append(y * 100)
         b.clicks.count.append(1)
     }
+    guard image == .currentSystem else { return b }
     b.images = [.init(png: png.base64EncodedString(), hotX: Int64(spriteHot.0 * 100),
                       hotY: Int64(spriteHot.1 * 100), w: Int64(spriteWidth * 100),
                       h: Int64(spriteHeight * 100), kind: nil)]
     b.imageChanges.t = [0]
     b.imageChanges.id = [0]
+    return b
+}
+
+/// CU4's idle zig-zag (`cursor_idle.fjcursor`, S3 and S4): the frame vertices k 0–29 at
+/// (60 + 6k, 100 + 8·(k mod 2)), still from k 30 to 104, then k 105–119 at
+/// (60 + 6(k − 75), 100 + 8·(k mod 2)); between two vertices of a run, moves every 120th of a
+/// second on the line joining them, so no gap inside a run is a hold (CU-21's 25 ms) and the
+/// raw path at a frame's time is its vertex. Down clicks at k 9 and 20, ups at k 10 and 21, at
+/// their vertices. One image from t 0, as `cursorBody`'s.
+let idleRuns = [0...29, 105...119]
+let idleDowns = [9, 20]
+let idleUps = [10, 21]
+func idleVertex(_ k: Int) -> (Double, Double) {
+    (Double(60 + 6 * (k >= 105 ? k - 75 : k)), Double(100 + 8 * (k % 2)))
+}
+func idleBody(png: Data) -> CursorFileBody {
+    var b = cursorBody(png: png)
+    b.moves = .init()
+    b.clicks = .init()
+    for run in idleRuns {
+        for k in run {
+            let steps = k == run.upperBound ? 1 : 4
+            for j in 0..<steps {
+                let (x0, y0) = idleVertex(k)
+                let (x1, y1) = k == run.upperBound ? (x0, y0) : idleVertex(k + 1)
+                let f = Double(j) / 4
+                b.moves.t.append(Int64(4 * k + j) * 1_000_000 / 120)
+                b.moves.x.append(Int64(((x0 + f * (x1 - x0)) * 100).rounded()))
+                b.moves.y.append(Int64(((y0 + f * (y1 - y0)) * 100).rounded()))
+            }
+        }
+    }
+    for (k, down) in (idleDowns.map { ($0, Int64(1)) } + idleUps.map { ($0, Int64(0)) })
+        .sorted(by: { $0.0 < $1.0 })
+    {
+        let (x, y) = idleVertex(k)
+        b.clicks.t.append(Int64(4 * k) * 1_000_000 / 120)
+        b.clicks.button.append(0)
+        b.clicks.down.append(down)
+        b.clicks.x.append(Int64(x * 100))
+        b.clicks.y.append(Int64(y * 100))
+        b.clicks.count.append(1)
+    }
     return b
 }
 
@@ -369,6 +428,13 @@ if let dir = request["cursor_dir"] as? String {
             _ = try ReelCursor(data: bytes)
             try wide.write(to: folder.appendingPathComponent("cursor_wide.fjcursor"))
             _ = try ReelCursor(data: wide)
+            // CU4: the idle zig-zag and the file with no cursor image.
+            let idle = idleBody(png: png).encoded()
+            try idle.write(to: folder.appendingPathComponent("cursor_idle.fjcursor"))
+            _ = try ReelCursor(data: idle)
+            let none = cursorBody(png: png, image: .none).encoded()
+            try none.write(to: folder.appendingPathComponent("cursor_none.fjcursor"))
+            _ = try ReelCursor(data: none)
         } catch {
             problems.append("the fixture did not write or read back: \(error)")
         }
@@ -392,6 +458,13 @@ if let dir = request["cursor_dir"] as? String {
                 let (x, y) = movePixel(k)
                 return [moveMicros(k), x, y]
             },
+            "idle": folder.appendingPathComponent("cursor_idle.fjcursor").path,
+            "none": folder.appendingPathComponent("cursor_none.fjcursor").path,
+            "idle_vertices": (0..<120).map { k -> [Double] in
+                let (x, y) = idleVertex(k)
+                return [Double(k), x, y]
+            },
+            "idle_downs": idleDowns,
         ]
     } else {
         problems.append("the sprite PNG could not be made")
@@ -542,13 +615,21 @@ final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
 }
 
-if request["i4"] as? Bool == true {
+/// The app's pieces a `ProjectDocument` and a `ClipPane` need, made once for I4 and CU4's rows.
+var appDelegate: AppDelegate?
+func prepareApp() {
+    guard appDelegate == nil else { return }
     _ = ProbeDocumentController()
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     let delegate = AppDelegate()
     delegate.applicationWillFinishLaunching(
         Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
+    appDelegate = delegate
+}
+
+if request["i4"] as? Bool == true {
+    prepareApp()
     var documents: [ProjectDocument] = []
     var kept: [AnyObject] = []
     var sent: [(name: String, ops: [ReelOp])] = []
@@ -727,6 +808,287 @@ do {
         ? "suffixes \(suffixes); the details two lines; the queue row's tooltip ends with "
             + "\"\(sentence)\""
         : problems.joined(separator: "; "))
+}
+
+// ---- CU4: S1 and S5 the Cursor section's writes, S7 the arrow's textures ----------------------
+
+if request["cu4"] as? Bool == true {
+    prepareApp()
+    var documents: [ProjectDocument] = []
+    var kept: [AnyObject] = []
+    var sent: [(name: String, ops: [ReelOp])] = []
+    let separate = MediaCursor(path: "/proof/cu4/movie.fjcursor", inPicture: false)
+    /// A document with one 640 × 360 media whose cursor is not in the picture and one clip of
+    /// it at 0 for 4 s; `cursor` stored on the clip's base when given; an action over [1 s,
+    /// 3 s) when `action`.
+    func makeDocument(cursor: CursorProps?, action: Bool) -> (ProjectDocument, UInt32, UInt32?)? {
+        let document = ProjectDocument()
+        documents.append(document)
+        document.performGroupedEdit("Media", [.addMedia(descriptor: MediaDescriptor(
+            path: "/proof/cu4/movie.mov", kind: .video, duration: 4 * second, width: 640,
+            height: 360, fps: .thirty, hasVideo: true, hasAudio: false, cursor: separate))])
+        guard let media = document.project.snapshot.media.first?.id else { return nil }
+        if document.project.snapshot.tracks.isEmpty {
+            document.performGroupedEdit("Track", [.addTrack(index: 0)])
+        }
+        guard let track = document.project.snapshot.tracks.first?.id else { return nil }
+        document.performGroupedEdit("Clip", [.addClip(track: track, media: media, at: 0)])
+        guard let clip = document.project.snapshot.clips.first?.id else { return nil }
+        if let cursor {
+            document.performGroupedEdit(
+                "Cursor", [.setVideo(clips: [clip], patch: VideoPatch(cursor: .some(cursor)))])
+        }
+        var actionID: UInt32?
+        if action {
+            document.performGroupedEdit(
+                "Action", [.addAction(clip: clip, at: second, duration: 2 * second)])
+            actionID = document.project.snapshot.clip(clip)?.actions.first?.id
+        }
+        return (document, clip, actionID)
+    }
+    /// A Clip pane on the Picture sub-tab over `document`, `clip` selected and `action` with it;
+    /// every commit recorded in `sent` and applied.
+    func clipPane(_ document: ProjectDocument, _ clip: UInt32, action: UInt32?) -> ClipPane {
+        let inspector = InspectorViewController()
+        inspector.document = document
+        inspector.onEdit = { [weak document] name, ops in
+            sent.append((name, ops))
+            document?.applyEdit(name, ops)
+        }
+        inspector.onSelectAction = { [weak document] id in document?.selectAction(id) }
+        document.selection = [clip]
+        document.selectAction(action)
+        inspector.binding.invalidate()
+        let pane = ClipPane(inspector: inspector)
+        kept += [inspector, pane]
+        pane.binding.invalidate()
+        pane.choose(.picture)
+        pane.rebuild()
+        pane.refresh()
+        return pane
+    }
+    func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+    func section(_ pane: ClipPane) -> InspectorSection? {
+        pane.sections.first { $0.id == "video.cursor" }
+    }
+    func labelled(_ pane: ClipPane, _ label: String) -> InspectorRowView? {
+        guard let section = section(pane) else { return nil }
+        return walk(section).compactMap { $0 as? InspectorRowView }.first { row in
+            row.arrangedSubviews.contains { ($0 as? InspectorRowLabel)?.stringValue == label }
+        }
+    }
+    func parsed(_ op: ReelOp) -> [String: Any] {
+        (try? JSONSerialization.jsonObject(with: Data(op.json.utf8))) as? [String: Any] ?? [:]
+    }
+    func same(_ a: Any?, _ b: Any) -> Bool {
+        guard let a else { return false }
+        return (a as AnyObject).isEqual(b)
+    }
+    func popup(_ pane: ClipPane, _ label: String, _ index: Int) {
+        let control = labelled(pane, label).flatMap {
+            walk($0).lazy.compactMap { $0 as? OptionPopupControl }.first
+        }
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.tag = index
+        _ = control?.perform(NSSelectorFromString("itemPicked:"), with: item)
+    }
+    func quick(_ pane: ClipPane, _ label: String, _ index: Int) {
+        let control = labelled(pane, label).flatMap {
+            walk($0).lazy.compactMap { $0 as? OptionFieldControl }.first
+        }
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.tag = index
+        _ = control?.perform(NSSelectorFromString("quickPicked:"), with: item)
+    }
+    func gutter(_ pane: ClipPane, _ label: String) -> RowMark? {
+        let mark = labelled(pane, label)?.arrangedSubviews.first as? InspectorMarkGutter
+        mark?.refresh()
+        return mark?.mark
+    }
+    let click = NSEvent.mouseEvent(
+        with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+        context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+
+    // ---- S1: outside an action, one named step of one `set_video {cursor: {key: v}}` --------
+    var s1: [String] = []
+    var s1Notes: [String] = []
+    if let (document, clip, _) = makeDocument(cursor: nil, action: false) {
+        let pane = clipPane(document, clip, action: nil)
+        func expect(_ label: String, _ name: String, _ key: String, _ value: Any,
+                    _ drive: () -> Void) {
+            sent = []
+            drive()
+            pane.binding.invalidate()
+            pane.refresh()
+            let op = sent.count == 1 && sent[0].ops.count == 1 ? parsed(sent[0].ops[0]) : [:]
+            let written = (op["patch"] as? [String: Any])?["cursor"] as? [String: Any] ?? [:]
+            let ok = sent.count == 1 && sent[0].name == name && op["op"] as? String == "set_video"
+                && (op["patch"] as? [String: Any])?.count == 1 && written.count == 1
+                && same(written[key], value)
+            s1Notes.append("\(label) → \(sent.map { ($0.name, $0.ops.map(\.json)) })")
+            if !ok { s1.append("\(label) committed \(sent.map { ($0.name, $0.ops.map(\.json)) })") }
+        }
+        expect("Size 200", "Cursor Size", "scale", 2.0) { quick(pane, "Size", 3) }
+        expect("Arrow", "Cursor Style", "style", "arrow") { popup(pane, "Style", 1) }
+        expect("Medium", "Cursor Smoothing", "smoothing", 0.5) { popup(pane, "Smoothing", 2) }
+        expect("3 s", "Hide Cursor When Idle", "hide_idle", 3.0) {
+            popup(pane, "Hide when idle", 3)
+        }
+        expect("Never", "Hide Cursor When Idle", "hide_idle", NSNull()) {
+            popup(pane, "Hide when idle", 0)
+        }
+        expect("Ripple", "Cursor Clicks", "clicks", "ripple") { popup(pane, "Clicks", 1) }
+        let red = NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
+        let css = GraphicSchemaRows.css(red.rgbaComponents)
+        expect("a colour", "Ripple Color", "click_color", css) {
+            let swatch = labelled(pane, "Ripple color").flatMap {
+                walk($0).lazy.compactMap { $0 as? OptionSwatchControl }.first
+            }
+            guard let swatch, let click else { return }
+            swatch.mouseDown(with: click)
+            let panel = NSColorPanel.shared
+            // The swatch bound the shared panel to its relay; a pick is the panel's action.
+            panel.color = red
+            if sent.isEmpty {
+                NSApp.sendAction(NSSelectorFromString("colorChanged:"), to: panel.value(
+                    forKey: "target"), from: panel)
+            }
+            panel.orderOut(nil)
+        }
+        expect("Ripple size 150", "Ripple Size", "click_size", 1.5) {
+            quick(pane, "Ripple size", 2)
+        }
+        // Polish: one step, its two keys.
+        sent = []
+        // The row holding a button (the section header's own buttons are not in a row).
+        let button = section(pane).flatMap { s in
+            walk(s).compactMap { $0 as? InspectorRowView }.lazy.compactMap { row in
+                row.arrangedSubviews.lazy.compactMap { $0 as? OptionButtonControl }.first
+            }.first
+        }
+        if let click { button?.mouseDown(with: click) }
+        let op = sent.count == 1 && sent[0].ops.count == 1 ? parsed(sent[0].ops[0]) : [:]
+        let written = (op["patch"] as? [String: Any])?["cursor"] as? [String: Any] ?? [:]
+        s1Notes.append("Polish → \(sent.map { ($0.name, $0.ops.map(\.json)) })")
+        if !(sent.count == 1 && sent[0].name == "Polish Cursor"
+            && op["op"] as? String == "set_video" && written.count == 2
+            && same(written["smoothing"], 0.5) && same(written["hide_idle"], 3.0))
+        {
+            s1.append("Polish committed \(sent.map { ($0.name, $0.ops.map(\.json)) })")
+        }
+        let stored = document.project.snapshot.clip(clip)?.video?.cursor
+        let want = CursorProps(
+            scale: 2, style: .arrow, smoothing: 0.5, hideIdle: 3, clicks: .ripple,
+            clickColor: css, clickSize: 1.5)
+        if stored != want { s1.append("stored \(String(describing: stored)), not \(want)") }
+    } else {
+        s1.append("the fixture could not be made")
+    }
+    row("S1", s1.isEmpty, (s1 + s1Notes).joined(separator: "; "))
+
+    // ---- S5: with an action selected ---------------------------------------------------------
+    var s5: [String] = []
+    var s5Notes: [String] = []
+    if let (document, clip, action) = makeDocument(cursor: CursorProps(), action: true),
+       let action
+    {
+        let pane = clipPane(document, clip, action: action)
+        let picks: [(String, Int, String, Any)] = [
+            ("Smoothing", 3, "smoothing", 1.0), ("Hide when idle", 2, "hide_idle", 2.0),
+        ]
+        for (label, index, key, value) in picks {
+            sent = []
+            popup(pane, label, index)
+            let op = sent.count == 1 && sent[0].ops.count == 1 ? parsed(sent[0].ops[0]) : [:]
+            let written = (op["patch"] as? [String: Any])?["cursor"] as? [String: Any] ?? [:]
+            s5Notes.append("\(label) → \(sent.map { $0.ops.map(\.json) })")
+            if !(op["op"] as? String == "set_video" && written.count == 1
+                && same(written[key], value))
+            {
+                s5.append("\(label) committed \(sent.map { $0.ops.map(\.json) })")
+            }
+            pane.binding.invalidate()
+            pane.refresh()
+            let mark = gutter(pane, label)
+            if mark != .notAnimatable { s5.append("\(label)'s gutter \(String(describing: mark))") }
+        }
+        sent = []
+        quick(pane, "Size", 3)
+        let op = sent.count == 1 && sent[0].ops.count == 1 ? parsed(sent[0].ops[0]) : [:]
+        s5Notes.append("Size 200 → \(sent.map { $0.ops.map(\.json) })")
+        if !(op["op"] as? String == "set_action_end"
+            && same(op["patch"], ["video": ["cursor": ["scale": 2.0]]]))
+        {
+            s5.append("Size 200 committed \(sent.map { $0.ops.map(\.json) })")
+        }
+    } else {
+        s5.append("the base-cursor fixture could not be made")
+    }
+    if let (document, clip, action) = makeDocument(cursor: nil, action: true), let action {
+        let pane = clipPane(document, clip, action: action)
+        sent = []
+        quick(pane, "Size", 3)
+        let ops = sent.count == 1 ? sent[0].ops.map(parsed) : []
+        s5Notes.append("no base cursor, Size 200 → \(sent.map { $0.ops.map(\.json) })")
+        let base = ops.first.flatMap { ($0["patch"] as? [String: Any])?["cursor"] as? [String: Any] }
+        let defaults = CursorProps().dictionary
+        if !(ops.count == 2 && ops[0]["op"] as? String == "set_video"
+            && (base.map { ($0 as NSDictionary).isEqual(to: defaults) } ?? false)
+            && ops[1]["op"] as? String == "set_action_end"
+            && same(ops[1]["patch"], ["video": ["cursor": ["scale": 2.0]]]))
+        {
+            s5.append("no base cursor: Size 200 committed \(sent.map { $0.ops.map(\.json) })")
+        }
+        let mid = document.project.recipe(at: 2 * second)?.layers.first?.cursor?.props.scale
+        s5Notes.append("props.scale mid-action \(String(describing: mid))")
+        if !(mid.map { $0 > 1 && $0 < 2 } ?? false) {
+            s5.append("props.scale mid-action \(String(describing: mid)), not strictly in (1, 2)")
+        }
+    } else {
+        s5.append("the no-cursor fixture could not be made")
+    }
+    row("S5", s5.isEmpty, (s5 + s5Notes).joined(separator: "; "))
+    for document in documents { document.removeTemporaryCacheDirectory() }
+
+    // ---- S7: CursorSprites.arrow, one texture per pixel size -------------------------------
+    var s7: [String] = []
+    var s7Notes: [String] = []
+    if let renderer = MetalRenderer() {
+        let sprites = renderer.cursorSprites
+        let before = sprites.uploads
+        let first = sprites.arrow(width: 14, height: 21, output: .sdr, lift: { $0 })
+        let again = sprites.arrow(width: 14, height: 21, output: .sdr, lift: { $0 })
+        let afterSame = sprites.uploads
+        let double = sprites.arrow(width: 28, height: 42, output: .sdr, lift: { $0 })
+        let afterDouble = sprites.uploads
+        s7Notes.append("uploads \(before) → \(afterSame) after 14×21 twice → \(afterDouble) after 28×42")
+        if afterSame != before + 1 || afterDouble != before + 2 {
+            s7.append("uploads \([before, afterSame, afterDouble])")
+        }
+        if first == nil || first !== again { s7.append("14×21 asked twice was not one texture") }
+        let sizes = [first, double].map { t in t.map { [$0.width, $0.height] } ?? [] }
+        s7Notes.append("sizes \(sizes)")
+        if sizes != [[14, 21], [28, 42]] { s7.append("sizes \(sizes)") }
+        func texel(_ texture: MTLTexture?, _ x: Int, _ y: Int) -> [UInt8] {
+            guard let texture else { return [] }
+            var bytes = [UInt8](repeating: 0, count: 4)
+            texture.getBytes(
+                &bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
+            return bytes
+        }
+        let fill = texel(first, 3, 10)
+        let outside = texel(first, 12, 2)
+        s7Notes.append("texel (3, 10) BGRA \(fill), (12, 2) \(outside)")
+        if !(fill.count == 4 && fill[3] == 255 && fill[0] < 40 && fill[1] < 40 && fill[2] < 40) {
+            s7.append("the fill texel (3, 10) is \(fill), not opaque and dark")
+        }
+        if !(outside.count == 4 && outside[3] == 0) {
+            s7.append("texel (12, 2) is \(outside), not transparent")
+        }
+    } else {
+        s7.append("no MetalRenderer")
+    }
+    row("S7", s7.isEmpty, (s7 + s7Notes).joined(separator: "; "))
 }
 
 finish()

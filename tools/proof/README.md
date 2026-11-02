@@ -27800,6 +27800,39 @@ make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py --only K17
 
 The recorded runs are in `designs/creator-jobs.md`'s CU3b record.
 
+### CU4 — the Cursor section and Frame Job's arrow (`cursor_layer_proof.py` S1–S7; seven mutants by hand; `core/tests/cursor_recipe.rs`'s `paste_attributes_carries_the_cursor`; spec §11 CU-40…CU-43)
+
+The probe's `cursor_dir` also writes `cursor_idle.fjcursor` (640 × 360, one image from t 0: a
+zig-zag of frame vertices k 0–29 at (60 + 6k, 100 + 8·(k mod 2)), still from k 30 to 104, then k
+105–119 at (60 + 6(k − 75), 100 + 8·(k mod 2)), with moves every 120th of a second between a
+run's vertices so no gap in a run is a hold; down clicks at k 9 and 20, ups at k 10 and 21) and
+`cursor_none.fjcursor` (`cursor.fjcursor`'s moves and clicks with `cursor_image: "none"` and no
+image). S1, S5 and S7 are the probe's (the request's `cu4: true`), over the app's own
+`ClipPane` as I4's; the app rows render a 640 × 360 canvas over `clean.mov`, and a drawn bounds
+is the bbox of the pixels more than 8/255 from the `show: false` render.
+
+| Row | What it holds |
+|---|---|
+| S1 | (probe) outside an action each row's control commits one named step of one `set_video {cursor: {<key>: v}}`: Size 200 → `scale` 2, Arrow, Medium 0.5, 3 s → 3 and Never → null, Ripple, a colour's CSS, Ripple size 150 → 1.5; Polish one "Polish Cursor" step of `{smoothing: 0.5, hide_idle: 3}` |
+| S2 | `scale` 2 against 1 doubles the drawn bounds, ±1 px, for the 12 × 16 sprite and for `style: arrow`; the arrow's bounds at 1 are 13–15 × 19–21 px |
+| S3 | `cursor_idle.fjcursor` with `hide_idle` 2: frames 99 and 100 byte-identical to `show: false`, frame 101 equal to `hide_idle` null and not to `show: false` |
+| S4 | the same file at `smoothing` 1: the located tip within 0.5 px of the click at frames 9 and 20, more than 2 px from the raw tip at frame 15 |
+| S5 | (probe) an action selected: Smoothing Strong and Hide when idle 2 s commit only a base `set_video` and their gutters are ⊘; Size 200 only `set_action_end {video: {cursor: {scale: 2}}}`; on a clip with no base cursor, Size 200 the eight defaults on the base and that end in one step, the recipe's `props.scale` strictly between 1 and 2 mid-action |
+| S6 | `cursor_none.fjcursor`: `style: recorded` byte-identical to `style: arrow` at three frames, and not to `show: false` |
+| S7 | (probe) `CursorSprites.arrow`: 14 × 21 asked twice one upload, 28 × 42 one more, the sizes as asked, texel (3, 10) opaque and dark, (12, 2) transparent |
+
+The seven mutants are run by hand, each once on Debug and restored byte-identical (SHA-256):
+smoothing routed into the end, hide_idle routed into the end, the base defaults skipped (S5);
+Size writing `click_size` (S1); Arrow ignored, drawing the recorded image (S2); the null-image
+fallback removed (S6); an arrow made per frame (S7).
+
+```sh
+python3 tools/proof/cursor_layer_proof.py --only B0,S1,S5,S7
+make app-debug && python3 tools/proof/cursor_layer_proof.py --only S2,S3,S4,S6,Z1
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU4 record.
+
 ## Road map "creator-jobs" TX1 — the timeline transcript (`timeline_transcript_proof.py` T1–T11, G0–G1, P1–P13, C1; eight mutants; `transcript_spike/` TX-S1; `core/tests/plan_instances.rs`; spec §11 TX-10…TX-14)
 
 ```sh

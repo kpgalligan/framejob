@@ -184,11 +184,13 @@ func inspectorCheckRow(
 }
 
 /// A colour well bound to one property, with the unchanged-colour guard the
-/// continuous colour panel needs (`changedRGBA`).
+/// continuous colour panel needs (`changedRGBA`). `discrete: true` for a colour
+/// that switches at an action's end rather than blending (a cursor's ripple
+/// colour, spec §11 CU-40), so the keyed row says "at end".
 func inspectorColorRow(
     _ label: String, _ binding: InspectorBinding, name: String, read: @escaping () -> RGBA,
     ops: @escaping (RGBA) -> [ReelOp], mixed: (() -> Bool)? = nil,
-    enabled: @escaping () -> Bool = { true }, resets: Bool = true
+    enabled: @escaping () -> Bool = { true }, resets: Bool = true, discrete: Bool = false
 ) -> NSView {
     let swatch = OptionSwatchControl(
         read: { read().nsColor },
@@ -200,6 +202,7 @@ func inspectorColorRow(
         onEdit: {})
     return inspectorRow(
         label, [swatch], mixed: mixed, binding: binding, writes: ops(read()),
+        discrete: discrete,
         default: resets ? .derived(binding, name: name, read: read, ops: ops) : nil)
 }
 

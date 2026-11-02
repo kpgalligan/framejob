@@ -24,14 +24,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 171 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 144 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
-| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 304 | The Clip tab's sections: every video section. |
+| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 326 | The Clip tab's sections: every video section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 232 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
 | [`04.3d-inspector-clip-sections-audio-text-shape.md`](04.3d-inspector-clip-sections-audio-text-shape.md) | 246 | The Clip tab's audio, text and shape sections (continues §4.3b). |
 | [`04.3e-inspector-transcript-tab.md`](04.3e-inspector-transcript-tab.md) | 152 | The inspector's Transcript tab (road map "creator-jobs" TX2a, TX2b, TX3a, TX1b, TX3b): the timeline's words in paragraphs, the bar (Words from, Language, the status with Stop or Read, the notes), the highlight that follows the playhead, a click to seek, the keys, selecting words as the in/out range and deleting them as one "Delete Words" (where a cut falls, the refusals), pause tokens shortened as one "Delete Pause", the reading on this Mac and the rebuilds. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 275 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 441 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
+| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 443 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
 | [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 314 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 195 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
@@ -50,7 +50,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 92 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
-| [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 396 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
+| [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 403 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 256 | `MediaImporter.probe`, the formats import accepts, the cursor file attached at import and relink, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 775 | Export: writers, formats, stems, loudness, the queue, the wait for person masks, ramp audio, isolated voice and voice effects. |
@@ -65,7 +65,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 262 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 19526 in 40 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 19618 in 40 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
