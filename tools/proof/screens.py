@@ -102,6 +102,10 @@ STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_i
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")
 APPEARANCE_KEY = "RCDevAppearance"
+# Every launch holds each analysis job (spec §11 CJ-21's dev hold) so the
+# Analyzing sheet stays up, its rows "Waiting", for 15f's capture (road map
+# "creator-jobs" CJ2b); no other screen runs an analysis. P2 counts it pinned.
+ANALYSIS_HOLD = ("RCDevAnalysisHold", "600")
 WINDOWS = ("welcome", "settings", "editor", "sheet", "recorder")
 REGIONS = ("toolbar", "preview", "inspector", "timeline")
 NEW_RECORDING = ["File", "New Recording…"]
@@ -258,6 +262,8 @@ NOT_SHOWN = {
                                 "with it",
     "RCDevMatchAudioAccept": "a dev launch default with which the Match Audio sheet presses "
                              "its own Match (spec §11 AU-128); no screen launches with it",
+    "RCDevAnalysisCanned": "a dev launch default with which a canned analysis marker is "
+                           "honoured (spec §11 CJ-26); no screen launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,
@@ -363,6 +369,7 @@ def launch(app, out, look=None):
         argv += [f"-{key}", value]
     if look is not None:
         argv += [f"-{APPEARANCE_KEY}", look]
+    argv += [f"-{ANALYSIS_HOLD[0]}", ANALYSIS_HOLD[1]]
     socket_path = scratch_socket()
     env = bounded.child_env({"RC_AGENT_SOCKET": socket_path})
     env.pop("ANTHROPIC_API_KEY", None)
@@ -1052,7 +1059,7 @@ class Run:
             text = open(os.path.join(SOURCES, name), encoding="utf-8").read()
             declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z._]+)", title:', text))
             literals |= set(re.findall(r'static let \w*Key = "((?:FrameJob|RC)[^"]*)"', text))
-        pinned = {key for key, _ in PINS} | {APPEARANCE_KEY}
+        pinned = {key for key, _ in PINS} | {APPEARANCE_KEY, ANALYSIS_HOLD[0]}
         problems = []
         if declared != set(SECTIONS):
             problems.append(f"sections in app/Sources but not SECTIONS "

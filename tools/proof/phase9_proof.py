@@ -217,7 +217,7 @@ APP_STATE_TOOLS = {
     "delete_graphic", "rename_graphic", "restore_graphic", "sync_audio",
     "export_status", "cancel_export", "detect_fillers", "transcribe_for_fillers",
     "get_transcript", "list_graphics", "insert_graphic", "export_graphic",
-    "import_graphic", "get_media_analysis",
+    "import_graphic", "get_media_analysis", "split_at_shots",
 }
 
 # The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence
@@ -390,6 +390,7 @@ def content(clip):
     out = dict(clip)
     out.pop("id", None)
     out.pop("track", None)
+    out.pop("linked", None)
     actions = out.get("actions")
     if isinstance(actions, list):
         out["actions"] = [

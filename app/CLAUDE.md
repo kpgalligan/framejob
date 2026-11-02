@@ -460,9 +460,11 @@ detail there.
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
   `AnalysisFrames.swift` · `AnalysisShots.swift` ·
   `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
-  `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` —
+  `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
+  `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
+  `EditorViewController+ShotSplit.swift` —
   on-device analysis of the media (road map creator-jobs CJ2a, spec §11
-  CJ-20…CJ-27): a cache made on demand in `cache/analysis/<kind>/`, never at
+  CJ-20…CJ-29): a cache made on demand in `cache/analysis/<kind>/`, never at
   import, never project state, never read by the plan or the recipe.
   `AnalysisLane` is the process-wide analysis lane, the analysis twin of
   `MediaCacheLane.swift`'s rule: owners want requests (`want` replaces, an
@@ -477,11 +479,21 @@ detail there.
   by field (`AnalysisStamp.matches`). `AnalysisFrames` reads direct (turned
   upright) or converted through `MediaImporter.oneClip` and step 0 when a
   `ThumbnailInput` exists, its pre-roll two DECODED frames.
-  `get_media_analysis` (`AgentServer+Analysis.swift`, off main) waits
-  holding the agent lane's lock, at most `AnalysisLane.callWaitLimit` (60
-  s). `-RCDevAnalysisHold <s>` and `-RCDevAnalysisCanned YES` are dev only,
-  and `analysis_job` (`AgentServer+AnalysisJob.swift`) is the dev tool
-  proofs act through.
+  `get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`,
+  off main) wait holding the agent lane's lock, at most
+  `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and
+  `-RCDevAnalysisCanned YES` are dev only, and `analysis_job`
+  (`AgentServer+AnalysisJob.swift`) is the dev tool proofs act through.
+  Clip ▸ Split at Shot Changes (road map creator-jobs CJ2b, CJ-28, CJ-29):
+  `ShotSplit` is the planner both doors call — targets, one request per
+  media over the union of the played windows, cuts mapped to the canvas
+  grid with the edge rule, the ceiling counted with partners on the
+  unscoped project before any op, one `split` per cut latest first;
+  `AnalyzingSheetController` the generic Analyzing sheet (a row per missed
+  media polled from `AnalysisLane.progress(of:)` and `run(of:)`, Stop only
+  dismisses, its one owner released in `viewDidDisappear`);
+  `EditorViewController+ShotSplit` the menu door, its stale test and
+  `validateShotSplitAction`.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.

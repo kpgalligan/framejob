@@ -228,6 +228,111 @@ extension AgentServer {
                 + "%.0f s a call waits; what it covered is kept — call again to continue.",
             call.kind.rawValue, call.media.id, seconds, total, AnalysisLane.callWaitLimit)
     }
+
+    // MARK: - split_at_shots
+
+    /// `split_at_shots {clips?}` (spec §11 CJ-29; road map "creator-jobs"
+    /// CJ2b) — mirrors Clip ▸ Split at Shot Changes
+    /// (`EditorViewController+ShotSplit.swift`) through the same planner,
+    /// `ShotSplit`, with no Analyzing sheet: it waits instead (CJ-28).
+    /// `get_media_analysis`'s shape, on the server thread: one main hop
+    /// resolves the document, the targets and what the store misses; the call
+    /// wants that under an owner of its own and waits holding the agent
+    /// lane's lock, at most `AnalysisLane.callWaitLimit`; a last main hop
+    /// checks the project and scope are still the ones it read, plans and
+    /// edits as one undo step. An app-state composite of `split`: no `scope`
+    /// key; it acts in the document's current scope.
+    func splitAtShots(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
+        guard !Thread.isMainThread else {
+            throw ToolError(
+                message: "split_at_shots must run on the server thread — its name is missing "
+                    + "from AgentServer.creatorOffMainTools.")
+        }
+        let (document, targets, skipped, wants, asked, scope) = try onMain {
+            let document = try target(a)
+            let named = try optionalClipsArg(a, "clips", document)
+            let ids = named ?? ShotSplit.unlockedCandidates(in: document.editedProject.snapshot)
+            let (targets, skipped) = ShotSplit.targets(ids, in: document.editedProject)
+            guard !targets.isEmpty else {
+                throw ToolError(
+                    message: ShotSplit.Refusal.nothingToSplit(named: named != nil)
+                        .localizedDescription)
+            }
+            let wants: [ShotSplit.Want]
+            do {
+                wants = try ShotSplit.wants(targets, in: document)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+            return (document, targets, skipped, wants, document.project, document.scope)
+        }
+        if !wants.isEmpty {
+            try waitForShots(wants, document: document, stop: stop)
+        }
+        return try onMain {
+            guard document.project === asked, document.scope == scope else {
+                throw ToolError(
+                    message: "the project changed while \(ShotSplit.actionName) was analyzing, "
+                        + "so nothing was split. Call split_at_shots again.")
+            }
+            let plan: ShotSplit.Plan
+            do {
+                plan = try ShotSplit.plan(targets, in: document)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+            let fields: [String: Any] = [
+                "cuts": plan.cuts.map { ["clip": Int($0.clip), "at": $0.at] as [String: Any] },
+                "added": plan.added, "skipped": skipped.map { Int($0) }, "cached": wants.isEmpty,
+            ]
+            guard !plan.ops.isEmpty else {
+                var answer = fields
+                answer["ok"] = true
+                answer["note"] = "no hard cut lies inside the clips' played windows, so nothing "
+                    + "was split"
+                answer["project"] = summary(document)
+                return try jsonResult(answer)
+            }
+            return try editResult(document, ShotSplit.actionName, plan.ops, fields)
+        }
+    }
+
+    /// Wants every request under an owner of the call's own and waits;
+    /// throws naming the first media not landed when one failed, the call
+    /// was stopped, or the bound passed.
+    private func waitForShots(
+        _ wants: [ShotSplit.Want], document: ProjectDocument, stop: AgentCallCancel?
+    ) throws {
+        let lane = AnalysisLane.shared
+        let requests = wants.map(\.request)
+        let owner = lane.newOwner()
+        defer { lane.release(owner: owner) }
+        lane.want(
+            requests, owner: owner,
+            alive: { document.isOpenForAnalysis && !(stop?.isCancelled ?? false) },
+            settled: { document.packageContentsDidChangeOnDisk() })
+        let outcome = lane.wait(
+            for: requests, owner: owner,
+            deadline: Date().addingTimeInterval(AnalysisLane.callWaitLimit),
+            cancelled: { stop?.isCancelled ?? false })
+        let open = wants.first { lane.run(of: $0.request)?.outcome != .landed } ?? wants[0]
+        let media = open.media.id
+        switch outcome {
+        case .landed: return
+        case .failed(let why):
+            throw ToolError(message: "The shots analysis of media \(media) failed: \(why).")
+        case .cancelled:
+            throw ToolError(
+                message: "The shots analysis of media \(media) was stopped before it finished, "
+                    + "so nothing was split.")
+        case .timedOut:
+            throw ToolError(
+                message: "The shots analysis of media \(media) did not finish in the "
+                    + "\(Int(AnalysisLane.callWaitLimit)) s a call waits; what it covered is "
+                    + "kept — call split_at_shots again to continue.")
+        }
+    }
 }
 
 /// A clip's played source window and its times (CJ-25): source ticks of the

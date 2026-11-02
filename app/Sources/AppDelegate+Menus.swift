@@ -254,6 +254,10 @@ extension AppDelegate {
     private func clipMenu() -> NSMenu {
         let menu = NSMenu(title: "Clip")
         menu.addItem(item("Split", #selector(EditorViewController.splitAtPlayhead(_:)), "t"))
+        // Road map "creator-jobs" CJ2b (spec §11 CJ-29), beside Split: the UI
+        // path `split_at_shots` names. No key equivalent, for Normalize's reason.
+        menu.addItem(
+            item("Split at Shot Changes", #selector(EditorViewController.splitAtShotChanges(_:))))
         // W and E are BARE keys (spec §9), handled in the editor's keyDown so
         // they can never be stolen from a text field the way a modifier-less
         // key equivalent would be.

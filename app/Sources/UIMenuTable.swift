@@ -59,6 +59,7 @@ extension UIMenu {
         "insertAdjustmentClip:": .plain,
         "showGraphicBrowser:": .sheet,
         "splitAtPlayhead:": .plain,
+        "splitAtShotChanges:": .sheet,
         "trimStartToPlayhead:": .plain,
         "trimEndToPlayhead:": .plain,
         "freezeFrame:": .plain,

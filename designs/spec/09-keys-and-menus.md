@@ -99,7 +99,11 @@ Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Paste Graphic
 Properties (no key equivalent; the copied graphic's props onto the selected
 clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
-Select After Playhead, Select All on Track), Clip (Split, Trim Start to Playhead,
+Select After Playhead, Select All on Track), Clip (Split, Split at Shot Changes (road map
+"creator-jobs" CJ2b, §11 CJ-28, CJ-29: right after Split, no key equivalent; the selected
+clips of a video file split at every hard cut inside them as one undo step, under the
+Analyzing sheet while the cuts are found on this Mac; its mirror `split_at_shots`), Trim
+Start to Playhead,
 Trim End to Playhead, Freeze Frame, Detach Audio, Attach Audio (⇧⌥⌘D, road map "audio"
 AP9, §11 AU-95: each linked pair in the selection merged back), Normalize (following the Volume
 section's Normalize mode, Peak or Loudness, its title unchanged, §11 AU-15; road map 2's phase 5, beside

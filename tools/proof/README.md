@@ -27382,6 +27382,49 @@ python3 tools/proof/analysis_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CJ2a record.
 
+## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S8, S4n, Z1; eight mutants; spec §11 CJ-28, CJ-29)
+
+**`shot_split_proof.py`** drives the app (`proof_app.binary()`) on a scratch
+`CFFIXED_USER_HOME` in two launches, its packages saved under
+`tools/proof/work/shot-split-proof/`: plain (S1–S4, S4n, S8, through `split_at_shots`) and
+`-RCDevAnalysisHold 3` (S5–S7, through `perform_menu_item` Clip ▸ Split at Shot Changes and the
+Analyzing sheet, each row on its own fresh package so every press misses the cache). Its
+fixtures are `analysis_fixtures.py`'s `shots.mov` and `shots_sound.mov` (`shots.mov`'s video
+copied with a 1 kHz sine AAC track, so `detach_audio` gives the picture a linked sound). Z1 is
+each launch's parity grep.
+
+| Row | What it holds |
+|---|---|
+| S1 | `shots.mov` placed whole at 0 on a 30 fps canvas splits into clips starting at frames 0, 60, 120, 180, 240, each later piece's source `in` its cut; none at the flash or in the dissolve; `undo` answers "Split at Shot Changes" and one clip; `redo` |
+| S2 | a trimmed (in 1 s…9 s), a ×2 and a reversed placement: each clip's new starts equal the proof's own arithmetic (in, speed, start, the media's duration, the nearest canvas frame, the edge rule), each cut once |
+| S3 | a placement from one frame before cut 60 to one frame after cut 240 splits at 120 and 180 only |
+| S4 | a picture with its detached sound and fillers to 4,091 clips: refused naming 8 and 5, the clip count and the undo top unchanged; three fillers deleted, `added: 8` and the sound cut at the same four times |
+| S4n | a nest holding `shots.mov` and top-level fillers to 4,093 clips (nests counted): inside the nest refused naming 4 and 3 in the composite's sentence; one filler deleted, `added: 4` |
+| S8 | two placements playing 0…2 s and 8…10 s: the shots marker's coverage holds no range over index 150 (the union of the windows, never their hull) |
+| S5 | the menu puts the Analyzing sheet up; `cancel_sheet` (Stop): for 10 s no clip added and no marker |
+| S6 | the sheet up; within 30 s S1's split lands, and `undo` answers "Split at Shot Changes" |
+| S7 | the sheet up; `add_marker` while it is held: after it goes nothing is split and the marker is kept |
+
+Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`):
+`edge-rule-removed` S3, `mirror-skipped` S2, `ceiling-after-first-split` S4 (the ceiling not
+checked before the splits, so the core's cap refuses only the splits past it after the first
+ones land), `partners-uncounted` S4, `ceiling-counts-scope` S4n (`clipCount` of the scoped
+view), `windows-hulled` S8, `stop-keeps-want` S5 (the sheet's one release of its owner removed),
+`stale-test-removed` S7.
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 108, and `split_at_shots` in
+`APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`. Every
+`screens.py` launch adds `-RCDevAnalysisHold 600` (`ANALYSIS_HOLD`, counted pinned by P2) so
+`designs/screens/15f-analyzing-sheet.md` captures the sheet with its row "Waiting".
+
+```sh
+make app-debug && python3 tools/proof/shot_split_proof.py [--only S1,S4,…]
+python3 tools/proof/shot_split_proof.py --mutant <name>
+RC_PROOF_APP=release python3 tools/proof/screens.py --only 15f-analyzing-sheet
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CJ2b record.
+
 ## Road map "creator-jobs" CU0b — the cursor spike (`cursor_spike/`)
 
 The spikes behind the cursor recorder:

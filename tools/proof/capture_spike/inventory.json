@@ -331,6 +331,14 @@
    ],
    "note": "an edit"
   },
+  "splitAtShotChanges:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+ShotSplit.swift `@objc func splitAtShotChanges(`",
+    "app/Sources/EditorViewController+ShotSplit.swift:43"
+   ],
+   "note": "an edit at once when every selected clip's shots analysis is cached; else presentAsSheet(AnalyzingSheetController), the Analyzing sheet while the cuts are found on this Mac (CJ-28), its answer an edit (CJ-29); beeps with no clip of a video file selected"
+  },
   "trimStartToPlayhead:": {
    "verdict": "none",
    "code": [
@@ -996,6 +1004,15 @@
      "gate": "app/Sources/ExportSheetCommit.swift `if queue {` — Export…, not Add to Queue, and the save panel answered OK"
     }
    ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+ShotSplit.swift:43": {
+   "token": "presentAsSheet",
+   "func": "splitAtShotChanges",
+   "reached_from": [
+    "splitAtShotChanges:"
+   ],
+   "reached_after": [],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Audio.swift:97": {

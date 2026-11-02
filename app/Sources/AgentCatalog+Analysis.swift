@@ -1,13 +1,14 @@
 import Foundation
 
-/// The catalog row of `get_media_analysis` (spec §11 CJ-25; road map
-/// "creator-jobs" CJ2a), spliced in by `creatorTools()`.
+/// The catalog rows of `get_media_analysis` (spec §11 CJ-25; road map
+/// "creator-jobs" CJ2a) and `split_at_shots` (CJ-29, CJ2b), spliced in by
+/// `creatorTools()`.
 extension AgentServer {
 
     func analysisTools() -> [[String: Any]] {
         [
             // It mirrors what the Analyzing sheet's command (CJ2b, Clip ▸ Split
-            // at Shot Changes…) will read: a media's analysis on this Mac,
+            // at Shot Changes) reads: a media's analysis on this Mac,
             // made or reused. `get_transcript` is its counterpart for words.
             // A read: no op, no `scope`, no undo step.
             tool(
@@ -60,7 +61,43 @@ extension AgentServer {
                             + "ticks: the media's end, or the clip's played window's end, by "
                             + "default; must be after from.",
                     ],
-                ], required: ["kind"])
+                ], required: ["kind"]),
+            // Mirrors Clip ▸ Split at Shot Changes
+            // (EditorViewController+ShotSplit.swift): the same planner,
+            // `ShotSplit`, waiting where the menu shows the Analyzing sheet.
+            // An app-state composite of `split`: no `scope` key; it acts in
+            // the document's current scope, one undo step.
+            tool(
+                "split_at_shots",
+                "Splits media clips at every hard cut (shot change) inside the part of their "
+                    + "media they play, as ONE undo step \"\(ShotSplit.actionName)\" — the "
+                    + "mirror of Clip ▸ Split at Shot Changes. The cuts are found ON THIS MAC "
+                    + "(get_media_analysis's kind shots: no network request, no API key) and "
+                    + "kept in the project's cache, so a second call answers from it. A target "
+                    + "is a clip of a video file with its picture on; other clips named are "
+                    + "answered under skipped. Each cut is mapped to the timeline through the "
+                    + "clip's speed, ramp and reversal and snapped to the canvas's frame grid; a "
+                    + "cut within one frame of either end of the clip is not split. Each split "
+                    + "is split's: a clip on a locked track is still cut when named, and its "
+                    + "linked partner is cut too when the partner is on an unlocked track. The "
+                    + "whole call is refused before any split when it would pass the project's "
+                    + "\(Int(RC_MAX_CLIPS))-clip ceiling, counting each linked partner it also "
+                    + "cuts, naming how many it would add and how many fit. It waits at most "
+                    + "\(Int(AnalysisLane.callWaitLimit)) s for the analysis and then refuses — "
+                    + "what was covered is kept, so call again to continue. A cut inside a "
+                    + "gradual dissolve is not found, and a dissolve between flat-coloured "
+                    + "pictures (slides, title cards) can be found as one cut. Answers cuts "
+                    + "([{clip, at: [timeline ticks]}]), added (the clips the splits made), "
+                    + "skipped, cached (whether the analysis came from the cache alone), the "
+                    + "new clip ids and project; with no cut inside any clip, added 0 and a "
+                    + "note, and no undo step. It acts in the scope set_scope has open.",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"],
+                        "description": "The clips to split; every clip of a video file on an "
+                            + "unlocked track in the open scope when left out.",
+                    ]
+                ], required: []),
         ]
     }
 }

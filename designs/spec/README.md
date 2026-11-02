@@ -45,7 +45,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 226 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 306 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 488 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in, ungraded. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 83 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 84 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 326 | The compositor's per-layer passes and pipelines, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 57 | What playback does after every edit: rebuild or refresh. |
@@ -55,12 +55,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 161 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.9c-agent-graphics-dev-tools-transport.md`](07.9c-agent-graphics-dev-tools-transport.md) | 410 | The graphics loop's tools (write, read, render, import, delete, rename and restore a module, list, insert and export from the graphic browser, import a `.fjgraphic`), an action's graphic props and the graphics menus, the dev tools (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `assistant_send` / `assistant_answer` and their launch defaults, `play_preview`, `graphic_memory`, `loudness_meter`, `land_recording`, `analysis_job` and the analysis launch defaults), and the transport (the Unix socket, `framejob-mcp`, Copy MCP Command). |
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 57 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, `enhance` (Enhance Voice after the landing), and its answer. |
-| [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 483 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, the media analysis (`get_media_analysis`), detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
+| [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 499 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, the media analysis (`get_media_analysis`) and Split at Shot Changes (`split_at_shots`), detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 135 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 234 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 238 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 17435 in 36 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 17487 in 36 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

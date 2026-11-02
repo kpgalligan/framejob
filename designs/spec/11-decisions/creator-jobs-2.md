@@ -200,3 +200,53 @@ appended here from now on, before its code.
   the catalog, and its description contains its key's clause (CJ-11); every offender is named.
   `AgentServer.keyedToolFailure` in `AgentServer+Parity.swift`, chained after the fifth part in
   `AgentServer.swift`'s parity line, reported as the other five are.
+
+CJ-28 and CJ-29 are CJ2b's (the Analyzing sheet and Clip ▸ Split at Shot Changes), recorded before its
+code. The owner's answer of 2026-11-01 to the road map's CJ2b question — "Split at Shot Changes is the
+analysis lane's first door" — was *yes* (taken as recommended). They were drafted as CJ-27 and CJ-28;
+CJ2a took CJ-27 for `analysis_job`.
+
+- **CJ-28 — One Analyzing sheet for every kind whose result a command plans with.** A menu command
+  whose analysis misses the cache shows the sheet: title "Analyzing"; hint "\<command\> needs what
+  Frame Job finds in these files on this Mac, kept in the project's cache. Nothing changes until it is
+  found; Stop leaves everything as it is."; one row per media whose request missed — the file name, a
+  determinate bar, "Waiting" until the job's first frame, then "NN %", then "Done" — polled every
+  0.1 s (a `Timer` in the `.common` modes) from `AnalysisLane.progress(of:)` and `run(of:)`. Stop
+  (secondary, Escape; `makeButtonRow` with a hidden primary, as `AudioSyncSheetController`) only
+  dismisses: no edit lands, and what a job already published stays cached (CJ-21). The sheet wants
+  every row's request under one lane owner (`alive`: `document.isOpenForAnalysis`; `settled`:
+  `document.packageContentsDidChangeOnDisk()`) and releases it in `viewDidDisappear`, its one
+  release, on every exit — Stop, landing, failure, the window closing. It calls `finished` once, on
+  the main queue's next turn after `viewDidDisappear`: `.landed` when every run's outcome is
+  `.landed`, `.failed` at the first failure; Stop calls nothing. A tool call shows no sheet and
+  waits. While the sheet is attached every editor action validates false. The words are the menu's
+  American verbs ("Analyzing"). CO-6 amends this for a render-substituted kind.
+- **CJ-29 — Clip ▸ Split at Shot Changes and `split_at_shots {clips?}`.** A target is a media clip
+  whose media is a video (`kind` `video`, `hasVideo`) and whose `enabled.video` is true; any other
+  clip in the selection or `clips` is skipped (answered under `skipped`). The menu item validates on
+  when a selected clip qualifies; with `clips` absent the tool takes every qualifying clip on an
+  unlocked track in the scope. **One request per media over the union of its targets' played
+  windows (`AnalysisClipTimes.window`), never their hull:** `document.analysisRequest` once per
+  target window, and a media's miss `ranges` merged by `AnalysisStore.merged` into one
+  `AnalysisRequest` (the first miss's other fields), so a gap no clip plays is never read. Each
+  target's cuts are `AnalysisShots.cuts` over its own played window, mapped to clip time by
+  `AnalysisClipTimes.clipTime(ofSource:)` (source map, speed, the reversed mirror), to timeline
+  time `clip.start + clip_time`, snapped with `ReelTime.snapToFrame` to the canvas grid, and
+  deduplicated; a cut is dropped when it lies within one canvas frame of either edge (`t − start ≤
+  frame` or `end − t ≤ frame`, `Fps.frameDuration`). The ops are one `split {clips: [clip], at: t}`
+  per cut, latest first, so the original id keeps the head; locks and partners are `split`'s (a
+  named clip is cut, its linked partner only on an unlocked track, AU-92). **The ceiling, before any
+  op:** `added` is Σ over the cuts of 1, plus 1 when the clip's partner exists, sits on an unlocked
+  track and holds the cut strictly inside (`partner.start < t < partner.end`); the command is
+  refused when `added > RC_MAX_CLIPS − clipCount`, `clipCount` the top level's clips and every
+  nest's counted on the UNSCOPED project (`document.project`) in both doors, because a scoped view
+  holds only the nest's clips while the core's `check_caps` counts every clip: "Split at Shot
+  Changes would add N clips — each split counted with the linked clip it also cuts — more than this
+  project has room for: M more clip(s) would fit, out of 4096." — the composite's own reading (D2-1,
+  as `CaptionLayout`'s `tooMany`). It is one undo step, "Split at Shot Changes". When the project or
+  scope changed while the sheet analysed, nothing is split: "the project changed while Split at Shot
+  Changes was analyzing, so nothing was split. Choose Split at Shot Changes again." (the tool: "…
+  Call split_at_shots again."). With no cut inside any target the command beeps and the tool answers
+  `added: 0` with a note and no undo step. The planner lives in `ShotSplit.swift`, not in the
+  editor's extension, because the tool calls it too (SY-1's shape). On device, no key (CJ-3); no
+  core, FFI or format change (a composite of `split`, CJ-8 (f)).

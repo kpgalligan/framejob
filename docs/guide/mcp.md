@@ -253,8 +253,9 @@ is looking and outranks whatever nest is open. Media ids are unaffected: a
 nest shares the document's media. The answer echoes the `scope` it landed in.
 
 **Tools that are not ops follow the open nest.** `detect_silence`,
-`normalize_clip`, `sync_audio`, `transcribe`, `import_captions`,
-`export_captions` and `record_screen` take no `scope` argument. They work in
+`normalize_clip`, `sync_audio`, `split_at_shots`, `transcribe`,
+`import_captions`, `export_captions` and `record_screen` take no `scope`
+argument. They work in
 whatever nest `set_scope` has open (`record_screen` places its clip there),
 so open the nest first to measure or place inside it. `detect_silence`
 names, under `protected_nests`, the nest clips a quiet run crossed and left
@@ -466,6 +467,7 @@ See [Editing](editing.md), [Canvas and layers](canvas-and-layers.md) and [Graphi
 | `slip` | *op* — slides the source under a fixed clip (⌥⇧-drag the body). |
 | `roll` | *op* — moves a hard cut between two clips (⌥⇧-drag an edge). |
 | `split` | *op* — cuts clips in two at `at`, the playhead by default (**Clip ▸ Split**, ⌘T). |
+| `split_at_shots` | Cuts clips of a video file at every hard cut inside them, as one undo step (**Clip ▸ Split at Shot Changes**); `clips` left out, every such clip on an unlocked track. The cuts are found on this Mac and kept in the project's cache; the call waits up to 60 s for them and shows no sheet. Refused before any split when the project would pass 4,096 clips. |
 | `delete` | *op* — removes clips and leaves the gaps (⌫). |
 | `ripple_delete` | *op* — removes clips and closes the gaps (⌘⌫). |
 | `ripple_delete_range` | *op* — cuts a time range out of the whole timeline and closes it. |

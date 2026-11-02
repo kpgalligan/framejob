@@ -163,10 +163,17 @@ enum AnalysisShots {
 
     /// Runs `request`'s ranges in order, publishing at each range's end and
     /// every `publishInterval`. False when `cancelled()` stopped it.
-    static func run(_ request: AnalysisRequest, cancelled: () -> Bool) throws -> Bool {
+    /// `progress` hears done / total of the ranges' indices after each
+    /// stored frame (the Analyzing sheet's bar, spec §11 CJ-28).
+    static func run(
+        _ request: AnalysisRequest, cancelled: () -> Bool,
+        progress: (Double) -> Void = { _ in }
+    ) throws -> Bool {
         let grid = AnalysisGrid(media: request.media)
         let source = AnalysisFrames.Source(
             media: request.media, url: request.url, input: request.input)
+        let total = max(1, request.ranges.reduce(0) { $0 + $1.count })
+        var before = 0
         for range in request.ranges {
             var records: [Int: Record] = [:]
             var p1: [Int32]?
@@ -184,6 +191,7 @@ enum AnalysisShots {
                         pts: pts, d1: p1.map { distance(signature, $0) } ?? 0,
                         d2: p2.map { distance(signature, $0) } ?? 0)
                     lastIndex = k
+                    progress(Double(before + k - range.lowerBound + 1) / Double(total))
                 }
                 p2 = p1
                 p1 = signature
@@ -200,6 +208,7 @@ enum AnalysisShots {
             if coveredFrom <= range.upperBound {
                 try publish(request, grid: grid, covered: coveredFrom...range.upperBound, records)
             }
+            before += range.count
         }
         return true
     }

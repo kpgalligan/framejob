@@ -90,6 +90,9 @@ final class AnalysisLane: @unchecked Sendable {
     private var running: [AnalysisRequest: Bool] = [:]
     private var runs: [AnalysisRequest: AnalysisRun] = [:]
     private var runOrder: [AnalysisRequest] = []
+    /// A running job's share of its ranges read (CJ-28), from its first
+    /// frame until its run ends.
+    private var fractions: [AnalysisRequest: Double] = [:]
     private var lastPoll = 0.0
     private let picture = DispatchQueue(
         label: "com.kgalligan.framejob.analysis-picture", qos: .utility, attributes: .concurrent)
@@ -176,6 +179,15 @@ final class AnalysisLane: @unchecked Sendable {
         return runs[request]
     }
 
+    /// How much of the request's ranges its running job has read, 0…1: nil
+    /// until its first frame and again once its run ended (the Analyzing
+    /// sheet's bar, spec §11 CJ-28). Any thread.
+    func progress(of request: AnalysisRequest) -> Double? {
+        condition.lock()
+        defer { condition.unlock() }
+        return fractions[request]
+    }
+
     // MARK: - The queue
 
     private func wantedLocked(_ request: AnalysisRequest) -> Bool {
@@ -255,6 +267,7 @@ final class AnalysisLane: @unchecked Sendable {
         let outcome = perform(request)
         condition.lock()
         running[request] = nil
+        fractions[request] = nil
         let started = runs[request]?.startedAt
         runs[request] = AnalysisRun(
             queuedAt: queuedAt, startedAt: started, endedAt: Self.now, outcome: outcome)
@@ -275,7 +288,10 @@ final class AnalysisLane: @unchecked Sendable {
         do {
             let finished: Bool
             switch request.kind {
-            case .shots: finished = try AnalysisShots.run(request, cancelled: cancelled)
+            case .shots:
+                finished = try AnalysisShots.run(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
             }
             return finished ? .landed : .cancelled
         } catch {
@@ -284,6 +300,13 @@ final class AnalysisLane: @unchecked Sendable {
                 request.media.id, why)
             return .failed(why.hasSuffix(".") ? String(why.dropLast()) : why)
         }
+    }
+
+    /// Stores a running job's share read; no broadcast — nothing waits on it.
+    private func setProgress(_ fraction: Double, of request: AnalysisRequest) {
+        condition.lock()
+        if running[request] != nil { fractions[request] = fraction }
+        condition.unlock()
     }
 
     /// `-RCDevAnalysisHold <s>`: the job waits s seconds first, polling

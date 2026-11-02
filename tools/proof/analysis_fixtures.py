@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Road map "creator-jobs" CJ2a — the analysis fixtures, made with ffmpeg
-(spikes CJ-S3 and CJ-S4, `analysis_proof.py`).
+(spikes CJ-S3 and CJ-S4, `analysis_proof.py`; CJ2b's `shot_split_proof.py`).
 
     python3 tools/proof/analysis_fixtures.py                 # every file fixture
     python3 tools/proof/analysis_fixtures.py --flattened SOCK  # and the 40-clip export
@@ -17,6 +17,9 @@ while it probes as made; `--force` remakes them.
   `hue` filter leaves Y alone). The dissolve is between photographs, whose
   histograms move a little each frame; `dissolve_patterns.mov` is the one
   between test patterns.
+- `shots_sound.mov` (CJ2b): `shots.mov`'s video stream copied (`-c:v copy`)
+  with a 1 kHz sine AAC track of its length, so `detach_audio` gives the
+  picture a linked sound (`shot_split_proof.py` S4).
 - `dissolve_patterns.mov`: `testsrc` dissolving into `testsrc2` over [60, 90),
   140 frames: CJ-S4's measure of a dissolve between flat-coloured patterns,
   whose every bar crosses a histogram bin in one frame.
@@ -122,6 +125,23 @@ def shots(force=False):
     count = len(probe(out) or [])
     if count != SHOTS_FRAMES:
         raise SystemExit(f"shots.mov has {count} frames, not {SHOTS_FRAMES}")
+    return out
+
+
+def shots_sound(force=False):
+    """`shots.mov`'s video copied, with a 1 kHz sine AAC track of its length."""
+    source = shots(force)
+    out = OUT / "shots_sound.mov"
+    if ready(out, force):
+        return out
+    seconds = SHOTS_FRAMES / FPS
+    ffmpeg(["-i", str(source), "-f", "lavfi", "-i",
+            f"sine=frequency=1000:sample_rate=48000:duration={seconds:.6f}",
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+            "-t", f"{seconds:.6f}"], out)
+    count = len(probe(out) or [])
+    if count != SHOTS_FRAMES:
+        raise SystemExit(f"shots_sound.mov has {count} frames, not {SHOTS_FRAMES}")
     return out
 
 
@@ -286,7 +306,7 @@ def main(argv=None):
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--still-minutes", type=float, default=10)
     args = parser.parse_args(argv)
-    for make in (shots, vfr_twin, dissolve_patterns, hlg_4k, h264_1080, variants):
+    for make in (shots, shots_sound, vfr_twin, dissolve_patterns, hlg_4k, h264_1080, variants):
         made = make(args.force)
         print(f"ok {made}")
     print(f"ok {moving_still(args.still_minutes, args.force)}")

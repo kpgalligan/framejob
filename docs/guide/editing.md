@@ -95,6 +95,19 @@ The second piece carries on playing the footage from where the first stopped. An
 
 *Agents:* `split` takes `at` (the playhead when left out) and optional `clips`. Without `clips` it cuts every unlocked clip at that time.
 
+### Split at Shot Changes
+
+**Clip ▸ Split at Shot Changes** cuts each selected clip of a video file at every hard cut inside the part of the file it plays: a finished edit, a downloaded clip or a stream recording comes apart into one clip per shot, as one undo step ("Split at Shot Changes"). It is on when a selected clip shows a video file's picture; any other clip in the selection is left alone.
+
+Frame Job finds the cuts on this Mac, with nothing sent anywhere and no key needed, and keeps them in the project's cache, so a second split of the same footage starts at once. While they are being found the **Analyzing** sheet shows each file with a bar: "Waiting" until its first frame is read, then the share done, then "Done". **Stop** closes the sheet and changes nothing; what was already found stays in the cache. If you change the project while the sheet is up, nothing is split and the inspector says to choose the command again.
+
+- Each cut lands on the timeline's frame grid, through the clip's speed, ramp and reversal. A cut within one frame of either end of a clip is not made.
+- A clip on a locked track is still cut, and its linked sound is cut with it when the sound is on an unlocked track, as **Split** does.
+- If the splits would take the project past 4,096 clips, counting each linked clip they also cut, nothing is split and the inspector says how many clips it would add and how many fit.
+- A hard cut is a change from one picture to another between two frames. A gradual dissolve is not a cut, and a single flash frame is not one. A dissolve between flat-coloured pictures, such as slides or title cards, can be found as one cut.
+
+*Agents:* `split_at_shots` takes optional `clips`; without them it splits every clip of a video file on an unlocked track. It waits up to 60 s for the cuts to be found and shows no sheet, and it answers each clip's cuts and how many clips it added.
+
 ## Deleting
 
 The two delete keys pair up. Each acts on the selection, or on the in/out range when nothing is selected. The difference is whether the hole closes.

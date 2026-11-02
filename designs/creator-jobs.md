@@ -2838,12 +2838,12 @@ files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_ind
   downloaded clip, a stream VOD): the Analyzing sheet while the cuts are found, with Stop, then one
   undo step that splits the clip at every hard cut.
 - **Decisions (draft):**
-  - **CJ-27 — One Analyzing sheet for every kind whose result a command plans with.** A command
+  - **CJ-28 — One Analyzing sheet for every kind whose result a command plans with.** A command
     whose analysis is not cached shows "Analyzing" and its name, each media's progress, and Stop,
     which withdraws the command's wants and lands nothing. A tool call shows no sheet and waits. The
     words follow the menu's American verbs ("Analyzing", "Analyze"). (CO-6 amends this for a
     render-substituted kind, which shows no sheet.)
-  - **CJ-28 — Clip ▸ Split at Shot Changes and `split_at_shots {clips?}`.** The selected media clips
+  - **CJ-29 — Clip ▸ Split at Shot Changes and `split_at_shots {clips?}`.** The selected media clips
     (none selected: the item validates off) are split at each cut inside their played window, mapped
     to clip time through the source map, on the canvas grid, as one undo step "Split at Shot
     Changes". A cut within one frame of a clip's edge is dropped. Locked tracks and linked partners
@@ -2859,7 +2859,7 @@ files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_ind
 - **MCP mirror:** `split_at_shots {clips?}` in `AgentServer+Analysis.swift`, naming Clip ▸ Split at
   Shot Changes, a `creatorHandlers` row and off-main.
 - **Docs:** `docs/guide/editing.md`, `menus-and-shortcuts.md`, `mcp.md`; spec §9, §7.9e; a screen
-  for the sheet (`designs/screens/17-analyzing-sheet.md`, number provisional); the counts for one
+  for the sheet (`designs/screens/15f-analyzing-sheet.md`); the counts for one
   product tool; `docs/manual-checks.md` (JOB-2).
 - **Acceptance:** `make gate`; `shot_split_proof.py` PASS against Release; the screen captured.
 - **Proof rows:** S1 the fixture placed whole splits into one clip per shot, each starting on its
@@ -2877,6 +2877,135 @@ files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_ind
 - **Question for the owner:** ship Split at Shot Changes as the lane's first door? *Recommended:
   yes* — it serves VR's flattened clips, is useful alone (Final Cut Pro 12.3's Edit Detection), and
   proves the lane end to end.
+
+#### CJ2b's record (2026-11-01)
+
+**Landed.** Lane C, on the lane's branch, from base `eb350b86`: `8fbdef73` and the review's fix
+`5bd9e7ab`, landed on the integration branch as one commit. The owner's answer
+(2026-11-01): Split at Shot Changes is the analysis lane's first door — *yes*. Decisions CJ-28 (the
+Analyzing sheet) and CJ-29 (Clip ▸ Split at Shot Changes and `split_at_shots`) were recorded in
+`11-decisions/creator-jobs-2.md` before the code, renumbered from the draft's CJ-27 and CJ-28
+because CJ2a took CJ-27 (`analysis_job`); the screen is `15f-analyzing-sheet.md`, before
+`16-recorder-panel.md`, which must run last. No core, FFI or format change (CJ-8 (f)). A person
+gets Clip ▸ Split at Shot Changes (no key) and the Analyzing sheet; an agent gets `split_at_shots
+{clips?}`.
+
+- **New files** (`wc -l`): `ShotSplit.swift` 201 (the planner both doors call),
+  `AnalyzingSheetController.swift` 178 (193 after the fix), `EditorViewController+ShotSplit.swift`
+  112. Wiring and growth: `AnalysisLane.swift` 297 → 320 (`progress(of:)`, a running job's
+  share read, stored under the lane's lock with no broadcast and cleared when its run ends),
+  `AnalysisShots.swift` 218 → 227 (`run`'s defaulted `progress`), `AgentServer+Analysis.swift` 268 → 373
+  (`splitAtShots`, `waitForShots`), `AgentCatalog+Analysis.swift` 66 → 103,
+  `AgentServer+CreatorJobs.swift` 53 → 56, `AppDelegate+Menus.swift` 471 → 475,
+  `EditorViewController.swift` 1,079 → 1,080 (the validator line, frozen), `UIMenuTable.swift`
+  131 → 132, `AssistantPrompt.swift` (`split_at_shots` in the "cut and time" topic, no words).
+  Not touched: `AgentServer.swift`, `ProjectDocument.swift`.
+- **Instruments:** `shot_split_proof.py` (S1–S8, S4n, Z1, eight mutants);
+  `analysis_fixtures.py`'s `shots_sound.mov`; `PRODUCT_TOOLS = 108`; `split_at_shots` in
+  `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`;
+  `inventory.json`'s `splitAtShotChanges:` row and its `presentAsSheet` site; `screens.py`'s
+  `ANALYSIS_HOLD` (`-RCDevAnalysisHold 600` on every launch, counted pinned by P2) and
+  `RCDevAnalysisCanned` in `NOT_SHOWN`.
+- **Documents:** spec §7.4 (83 → 84), §7.9e (482 → 498), §9 (228 → 232) and their index cells;
+  the §11 file `creator-jobs-2.md` (59 → 109) with two index rows; `docs/guide/editing.md`
+  (### Split at Shot Changes), `menus-and-shortcuts.md` (two rows), `mcp.md` (a row, and the
+  open-nest list); `docs/manual-checks.md` JOB-2; `tools/proof/README.md`'s CJ2b section.
+
+**Commands and results** (host on AC power; three lanes shared it, load average 75 at the end).
+- `make typecheck`: exit 0, the four baseline warnings, tsc silent.
+- `python3 tools/proof/swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS
+  tools/proof/analysis_probe.swift`: exit 0 (the probe compiles unchanged).
+- `analysis_proof.py --only P1,…,P9`: 9/9. `capture_spike/inventory.py --check`: 5/5.
+  `v2_menu.py --only H`: 5 pass of 5. `assistant_prompt_proof.py --probe`: 14/14, F4 "14 topics,
+  101 tools + 4 core against 105". `spec_index_proof.py`: first four Lines cells stale, then
+  225/225.
+- Debug, `make app-debug` then `shot_split_proof.py --only S1,S2,S3,S8`: 5/5; `--only
+  S4,S4n,S5,S6,S7`: first 4/6 — S4's filler track was looked up among two tracks (there is no
+  third until one is added) and S4n compared clip counts read inside the nest's scope (where
+  `get_project` answers the scoped view); both instrument fixes, then `--only S4,S4n` 3/3.
+- `make gate`: names, typecheck, test and app `pass` (fmt and lint skipped, no Rust input
+  changed), "gate: PASS 593s". After the `phase9_proof.py` fix, the screen's prose and this
+  record, again: names and test `pass`, the rest skipped, "gate: PASS 88s".
+- `RC_PROOF_APP=release python3 tools/proof/shot_split_proof.py`: 10/10 (S1–S8, S4n, Z1 on both
+  launches); S6's split landed 5.1 s after the press, S7's sheet went after 5.47 s.
+- `RC_PROOF_APP=release python3 tools/proof/analysis_proof.py`: 22/22.
+- On one instance from `proof_app.py launch --app release`: `op_argument_proof.py` 183/183;
+  `phase9_proof.py` 246/247 — the `detach_audio` row (below), then, after the instrument fix, on a
+  second instance 247/247; `recording_proof.py --no-screen --no-microphone` 142/142 (79 skipped
+  by name); `grep "Frame Job: "` on both logs printed nothing. `recording_probe.py --only
+  catalog`: 31/31.
+- `RC_PROOF_APP=release python3 tools/proof/screens.py --only 15f-analyzing-sheet`: 6 pass of 6,
+  the sheet captured light and dark, "Waiting" visible.
+- Mutants (`shot_split_proof.py --mutant <name>`, once each on the final instrument): **eight of
+  eight caught** — on Debug tree copies `edge-rule-removed` S3 (60 and 240 split),
+  `mirror-skipped` S2 (the reversed clip's starts 1260…1440 for 1340…1520), `windows-hulled` S8
+  (coverage [[0, 312]]), `ceiling-after-first-split` S4, `partners-uncounted` S4 and
+  `ceiling-counts-scope` S4n (each answered the core's "too many clips: 4097 (max 4096)" in
+  place of the composite's sentence); on Release tree copies `stop-keeps-want` S5 (the marker
+  written 3.0 s after Stop) and `stale-test-removed` S7 (the split landed after the marker).
+
+**Deviations.**
+- **The planner is `ShotSplit.swift`**, not the editor extension the draft named, because the
+  tool calls it too (SY-1's shape); the editor file is the door, its stale test and its arm.
+- **The two held-row mutants ran on Release tree copies.** On a Debug copy the first analysis job
+  of a fresh launch, under three lanes' load, outlasted the rows' bounds: `stop-keeps-want`
+  SURVIVED (no marker within S5's 10 s) and `stale-test-removed` failed S7 only because the sheet
+  had not gone within 30 s (S7 alone on the Debug app took 25.47 s). On Release the job lands
+  about 2 s after the 3 s hold, and both were caught for their own reasons. The bounds are the
+  spec's and unchanged; the recorded run is Release's.
+- **A failed `split` past the ceiling is the core's error, not a partial edit:** the ceiling
+  mutants answered "too many clips: 4097 (max 4096)" with nothing applied, so S4 and S4n catch
+  them by the sentence (and S4n by its count) rather than by a partial split.
+- **The menu's no-cut press beeps**; the tool answers `added: 0` with a note and no undo step.
+
+**Files outside the spec's list.** `tools/proof/phase9_proof.py`'s `content()` now strips
+`linked` beside `id` and `track` (the file is in the list for `APP_STATE_TOOLS`): its
+`detach_audio` row compared a detached pair's `linked` ids, which differ between the two paths
+it compares (`content()` predates the field, format 28), so the row failed on code this phase
+does not touch; with the id stripped as its docstring says ("everything that names an id"),
+247/247.
+
+**Review.** Review 1: fix-required, one should-fix — AppKit runs `viewDidDisappear` and
+`viewDidAppear` when the window is ordered out and back (a minimize), so the release cancelled
+the job and the `didStart` guard left the restored sheet frozen at its last percentage, Stop its
+only way out. Fixed in `5bd9e7ab`: a `viewDidDisappear` with no outcome and no Stop clears
+`didStart` and sets `reappearing`, and the next `viewDidAppear` wants every row not yet landed
+again and restarts the poll; `viewDidDisappear` stays the one release, and `stop-keeps-want`'s
+anchor line is unchanged. The fix pass: `make typecheck` exit 0 (four baseline warnings, tsc
+silent); `make gate` "PASS 453s"; `RC_PROOF_APP=release python3 tools/proof/shot_split_proof.py`
+10/10; `screens.py --only 15f-analyzing-sheet` (Release) 6 pass of 6; the mutants not re-run (no
+anchor line touched). Review 2: pass, one nit — no row, mutant or person check exercised the
+minimize path; resolved at integration by JOB-2's step 5 (minimize while the sheet shows a
+percentage, restore, the split lands).
+
+**Integration.** Conflicts only in the indexes and the decision file, where CJ1 and CU2 had
+landed first: `creator-jobs-2.md` keeps CJ-28 and CJ-29 after CJ1's CJ-10…CJ-13 (252 lines), its
+row in `11-decisions/README.md` gains CJ2b's clause, and the spec index's cells are §7.4 84,
+§7.9e 499, §9 238 and `11-decisions/` "17487 in 36 files"; `spec_index_proof.py` 225/225. On
+the merged tree with the CLAUDE.md edits and this record, `make gate`: names, typecheck, test and
+app `pass` (fmt and lint skipped), "gate: PASS 274s".
+
+**CLAUDE.md edits** (applied at integration):
+- Root `CLAUDE.md`: "for all one hundred and seven product tools" → "for all one hundred and
+  eight product tools"; in "Verifying a build"'s app-state list, "`get_transcript`,
+  `get_media_analysis`," → "`get_transcript`, `get_media_analysis`, `split_at_shots`,".
+- `app/CLAUDE.md`, "The document.", the analysis bullet: its file list gains "·
+  `ShotSplit.swift` · `AnalyzingSheetController.swift` · `EditorViewController+ShotSplit.swift`"
+  after `AgentServer+AnalysisJob.swift`, its citation "spec §11 CJ-20…CJ-27" becomes "spec §11
+  CJ-20…CJ-29", "`get_media_analysis` (`AgentServer+Analysis.swift`, off main) waits" becomes
+  "`get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`, off main) wait", and
+  at its end: "Clip ▸ Split at Shot Changes (road map creator-jobs CJ2b, CJ-28, CJ-29):
+  `ShotSplit` is the planner both doors call — targets, one request per media over the union of
+  the played windows, cuts mapped to the canvas grid with the edge rule, the ceiling counted with
+  partners on the unscoped project before any op, one `split` per cut latest first;
+  `AnalyzingSheetController` the generic Analyzing sheet (a row per missed media polled from
+  `AnalysisLane.progress(of:)` and `run(of:)`, Stop only dismisses, its one owner released in
+  `viewDidDisappear`); `EditorViewController+ShotSplit` the menu door, its stale test and
+  `validateShotSplitAction`."
+
+**To file:** none.
+
+**Owed.** JOB-2 (the owner's finished video, at the machine, steps 1–5).
 
 ### TX2a — the Transcript tab
 
@@ -3161,7 +3290,7 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
     found"; once any chunk of its window finds one, every analysed frame honours its mask, so a
     person who walks out leaves an empty picture. Swift decides it from the runs' `subject_found`;
     the core never reads analysis (CJ-20).
-  - **CO-6 — A frame without its mask draws uncut; a file waits (amends CJ-27).** Pending, cancelled
+  - **CO-6 — A frame without its mask draws uncut; a file waits (amends CJ-28).** Pending, cancelled
     and failed chunks draw the clip uncut, never blank and never the slate. An export waits for
     every chunk its range needs through `Exporter.withRampAudio` and fails with `cutoutFailed`
     naming the clip when one fails. `render_frame` and File ▸ Save Frame… wait up to 30 s for their
@@ -3190,7 +3319,7 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
     and reflection follow the cut outline (MT-3).
   - **CO-9 — The spikes' rules are CJ0's**; CO-S4 is retired into CJ-S3 (b), which CO1 re-runs with
     a masks job.
-- **Amendments recorded now:** CJ-22 (CO-4's clarification), CJ-23 (CO-7's third arm), CJ-27 (CO-6).
+- **Amendments recorded now:** CJ-22 (CO-4's clarification), CJ-23 (CO-7's third arm), CJ-28 (CO-6).
   CJ5b writes CJ-51 with the masks included (CO-4). Recorded in later phases: MT-1, MT-2, MT-4
   (CO5), R5-4, AU-110 (CO9), CAM-10 (3), CAM-10 (5), CAM-4, CAM-11 (CO8). Standing: R5-1, G-1,
   R5-4's mechanism, R5-5, D4-6, W-8, #367, CU-5, MT-9, the Concat rule and its extension to AGPL
@@ -5202,7 +5331,7 @@ face pass of its own (CJ2a, CJ2b, CJ3); it adds one kind, `subjects`. Nothing in
     clip with a picture, one undo step "Follow Subject": an `add_track` "Backgrounds" at index 0
     applied first on a pure handle (a refusal stops the command with its sentence, since the grouped
     fold runs on after a refusal), each `reframe_clip` with that track as `backdrop`, and a
-    `remove_track` of it when no backdrop was needed. CJ-27's Analyzing sheet shows while VR-12's
+    `remove_track` of it when no backdrop was needed. CJ-28's Analyzing sheet shows while VR-12's
     kinds run. The sheet: Follow (Subject, Faces, People, Salient Region, Center), Zoom (100–400 %;
     100 % when the canvas's shape differs from the picture's, 125 % when it matches), Where Empty
     (Show Whole, Center); it remembers Follow and Where Empty (`FrameJobFollow*` keys); the tool
@@ -6795,7 +6924,7 @@ rule by one named file (SW-43).
     guess who is talking; check the cuts" and `min_shot` defaults to 3 s.
 - **Swift:** new `FaceActivity.swift` (SW-81 over the store), `SpeakerSwitch+Faces.swift` (the
   one-microphone mode feeding SW-22); the sheet's one-microphone form; the "still being analysed"
-  refusal, with CJ-27's Analyzing sheet when the command wants faces made.
+  refusal, with CJ-28's Analyzing sheet when the command wants faces made.
 - **MCP:** `switch_by_speaker` accepts one microphone with two or more angles and no pairing; its
   answer says which mode ran.
 - **Docs:** `multicam.md`; spec §7.9e; `docs/manual-checks.md` (JOB-55).

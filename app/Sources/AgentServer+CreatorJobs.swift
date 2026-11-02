@@ -37,16 +37,19 @@ extension AgentServer {
     private static let creatorHandlers: [String: ToolHandler] = [
         // AgentServer+Analysis.swift (CJ2a, spec §11 CJ-25)
         "get_media_analysis": { $0.getMediaAnalysis },
+        // AgentServer+Analysis.swift (CJ2b, spec §11 CJ-29)
+        "split_at_shots": { $0.splitAtShots },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
     /// `AgentServer.offMainTools`.
-    static let creatorOffMainTools: Set<String> = ["get_media_analysis"]
+    static let creatorOffMainTools: Set<String> = ["get_media_analysis", "split_at_shots"]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
-    /// (CJ2a, `AgentCatalog+Analysis.swift`). `catalogJSON()` splices them in
-    /// immediately before the dev tools' rows, so the dev block still runs
-    /// straight into `import_media` and the file groups stay last.
+    /// (CJ2a) and `split_at_shots` (CJ2b), both `AgentCatalog+Analysis.swift`.
+    /// `catalogJSON()` splices them in immediately before the dev tools' rows,
+    /// so the dev block still runs straight into `import_media` and the file
+    /// groups stay last.
     func creatorTools() -> [[String: Any]] {
         analysisTools()
     }

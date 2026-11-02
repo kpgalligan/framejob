@@ -200,6 +200,11 @@ the same way.
 - **Expect:** 1–4 and 6: each value is applied once (one undo step each), no space appears in any field, and Space plays at once with no beep and no extra click. In 4 ⇧Return starts a new line and Return applies both lines. 5: the field keeps its caret. 7: Tab moves to the next control instead.
 - **Source:** spec §11 K-4.
 
+**JOB-2 — Split at Shot Changes on a finished video**
+- **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.
+- **Expect:** 1–2: the sheet names the file and its bar moves from "Waiting" through the percentages to "Done", then closes by itself. 3: there is an edit at every hard cut and none inside a shot or the dissolve; ⌘Z takes them all back as one step. 4: the sheet closes at once and nothing is split. 5: after the restore the bar keeps moving, the sheet closes by itself and the split lands.
+- **Source:** road map "creator-jobs" CJ2b, spec §11 CJ-28, CJ-29.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).

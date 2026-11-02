@@ -131,6 +131,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Item | Shortcut | What it does |
 |---|---|---|
 | Split | ⌘T | Cuts the selected clips at the playhead. With nothing selected, it cuts every clip under the playhead |
+| Split at Shot Changes | — | Cuts each selected clip of a video file at every hard cut inside it, as one undo step. The Analyzing sheet shows while the cuts are found on this Mac ([Editing](editing.md#split-at-shot-changes)) |
 | Trim Start to Playhead | W (key) | Trims the selected clips' starts to the playhead |
 | Trim End to Playhead | E (key) | Trims their ends to the playhead |
 | Freeze Frame | ⇧⌘F | Holds the frame under the playhead as a still clip |
@@ -189,6 +190,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Item | Enabled when |
 |---|---|
 | Split | The timeline has any clip |
+| Split at Shot Changes | A selected clip shows a video file's picture |
 | Trim Start / End to Playhead, Freeze Frame | A selected clip is under the playhead |
 | Detach Audio | Something is selected |
 | Attach Audio | A selected clip is linked to its detached sound or picture |
