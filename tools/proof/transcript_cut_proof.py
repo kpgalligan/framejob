@@ -2,7 +2,9 @@
 """Road map "creator-jobs" TX3a (spec §11 TX-30…TX-33): delete words — the
 Transcript tab's selection as the in/out range, ⌫ as one "Delete Words",
 TX-32's widening and refusals, and `get_timeline_transcript`'s `cut_start` and
-`cut_end`.
+`cut_end`. TX3b (spec §11 TX-34): the pause token — a voice-cache silence over
+1 s between two words of one clip, its cut keeping 0.2 s each end, ⌫ as one
+"Delete Pause", and `get_timeline_transcript`'s `pauses[]`.
 
     python3 tools/proof/transcript_cut_proof.py [--only IDS]
     python3 tools/proof/transcript_cut_proof.py --mutant NAME
@@ -13,12 +15,13 @@ launch is TX1's (`assistant_session_proof.App` with a 0700 `-RCSecretFolder`
 holding the dummy `proof-key`, `-RCAssemblyAIEndpoint` at the fake). Fixture
 media: TX1's `say` phrases (`timeline_transcript_proof.fixtures`), TX-S3's
 joined fixture (`transcript_spike/cut_spike.joined_fixture`: phrases joined by
-60–1,000 ms of zero samples, every true onset known) and a 20 s silent WAV,
-all under `tools/proof/work/`. Every word is this Mac's (the package's own
+60–1,000 ms of zero samples, every true onset known), TX3b's pause fixture
+(`pause_fixture`: four of the same phrases joined by 2.5 s, 1.5 s and 0.5 s of
+zero samples) and a 20 s silent WAV, all under `tools/proof/work/`. Every word is this Mac's (the package's own
 `cache/device-transcripts/`); nothing is recognised twice to make an oracle.
 
 Probe rows (`transcript_cut_probe.swift`, built through `swift_build.build()`
-over `app/Sources` or a mutant's copy): U0 builds; U1…U6 as its header says.
+over `app/Sources` or a mutant's copy): U0 builds; U1…U9 as its header says.
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; every `get_timeline_transcript` word carries
@@ -55,10 +58,34 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   C9  words selected after a clip B: `in_out_range` is `transcript_view`'s
       `cut`; B ripple-deleted, the range follows the re-mapped selection's new
       `cut`; after `set_range` elsewhere a further edit leaves it alone.
+  P1  the pause fixture, its voice and peaks caches waited for
+      (`word_onsets.wait_voice`): the tool's `pauses` equal the tab's (span and
+      cut; `follows` and `precedes` the tab's tokens `after` and `after + 1`);
+      the spans EQUAL the oracle (`pause_oracle`: TX-34's window and back
+      extension recomputed over `cache/speech/<media>.bin` from the tool's
+      words); exactly one per gap over 1 s, `follows` and `precedes` the last
+      word of the phrase before it and the first of the phrase after (by
+      spelling), overlapping the gap's zero samples by more than 1 s; none
+      for 0.5 s. Each span is reported against the gap's quiet under
+      −40 dBFS, in ms.
+  P2  every pause's cut is the unclamped `[snap(start + 0.2 s), snap(end −
+      0.2 s)]` (30 fps) and `0 < precedes.start − cut_end ≤ 159,200` (0.2 s,
+      a frame and a voice cell; kept before and after reported against the
+      quiet); `select_pause` sets `in_out_range` to the first pause's cut;
+      Edit ▸ Delete (`perform_menu_item`) is one step `undo` names "Delete
+      Pause"; its placements equal `ripple_delete_ranges` of the tool's
+      `cut_start`/`cut_end` on the original; every word id is still answered
+      and that pause is gone.
+  P3  Words from track 1, a locked track-2 word inside the 2.5 s pause's cut:
+      `cut.refusal` is TX-32's locked sentence naming the track, and Edit ▸
+      Delete changes nothing.
+  P4  the same with track 2 unlocked: no pause token over that silence with All
+      tracks (track 2's words lie between), and one with Words from track 1.
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once;
 a mutant is caught when every row it names fails. Mutants 1–9 are caught by
-the probe, which runs the very functions C1–C6 drive; 10 needs an app copy.
+the probe, which runs the very functions C1–C6 drive; 10 needs an app copy;
+11–20 are TX3b's, caught by the probe, which runs the functions P1–P4 drive.
   guard-0             E2's onset is the run's end, no guard (U1)
   no-cap              the 1 s cap removed (U2)
   snap-apart          the start snapped down, the end up (U6)
@@ -70,6 +97,17 @@ the probe, which runs the very functions C1–C6 drive; 10 needs an app copy.
   ceiling-on-after    the ceiling tested on `clipsAfter`, not the peak (U5)
   no-replan           no re-plan after a rebuild (C9; an app built from a tree
                       copy)
+  pause-source-length     a pause measured in source ticks, not timeline (U7)
+  pause-across-instances  two clips of one media may pause between them (U7)
+  pause-window-at-start   the window opens at a's start, not its end (U7)
+  pause-no-keep           nothing kept at either end (U8)
+  pause-start-clamp-off   the word after's start left inside the cut (U8)
+  pause-crosstalk-off     another shown word in the cut no longer drops it (U8)
+  pause-locked-off        no locked refusal (U9)
+  pause-ceiling-off       no ceiling refusal (U9)
+  pause-match-source      the source words matched on `source` (the moved
+                          start), not `identityTick` (U7)
+  pause-no-extend         the quiet run not extended back (U7)
 
 Exit: 0 iff every row passed or was a named host SKIP (a mutant run: 0 when
 caught, 1 when it survived, 2 when the control could not be performed).
@@ -95,11 +133,13 @@ import timeline_transcript_proof as ttp  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_cut"
 PROBE = ROOT / "tools/proof/transcript_cut_probe.swift"
-PROBE_ROWS = ["U0", "U1", "U2", "U3", "U4", "U5", "U6"]
-APP_ROWS = ["Z0", "C1", "C2", "C3", "C4", "C4b", "C5", "C6", "C7", "C8", "C9"]
+PROBE_ROWS = ["U0", "U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "U9"]
+APP_ROWS = ["Z0", "C1", "C2", "C3", "C4", "C4b", "C5", "C6", "C7", "C8", "C9", "P1", "P2", "P3",
+            "P4"]
 ROWS = PROBE_ROWS + APP_ROWS
 SEC = 600_000
 LEAD = 162_000  # CaptionPages.lead(for: .apple): only to find a boundary's word, as TX-S3 does
+CELL = 19_200  # MediaSpeech.chunkTicks: one voice cell, 32 ms
 MAX_CLIPS = 4096  # RC_MAX_CLIPS, core/include/framejob_core.h
 TOOL = "transcript_view"
 LOCKED = "Track {} is locked and has words in this cut: unlock it to cut here."
@@ -109,6 +149,7 @@ CEILING = ("This cut would make {} clips; a project holds at most 4096. Lock a t
 TC = "TranscriptCut.swift"
 TP = "TranscriptCut+Plan.swift"
 PANE = "TranscriptPane.swift"
+PAUSE = "TranscriptCut+Pause.swift"
 MUTANTS = {
     "guard-0": ("probe", ["U1"], [(TC, "onset = runEnd - guardTicks", "onset = runEnd")]),
     "no-cap": ("probe", ["U2"], [
@@ -141,6 +182,31 @@ MUTANTS = {
     "no-replan": ("app", ["C9"], [
         (PANE, "        if rangeSet != nil, host?.transcriptRange == rangeSet {\n",
          "        if false, rangeSet != nil, host?.transcriptRange == rangeSet {\n")]),
+    "pause-source-length": ("probe", ["U7"], [
+        (PAUSE, "guard span.end - span.start > pauseLongerThan else { continue }",
+         "guard run.end - run.start > pauseLongerThan else { continue }")]),
+    "pause-across-instances": ("probe", ["U7"], [
+        (PAUSE, "let number = instance(of: a), instance(of: b) == number,",
+         "let number = instance(of: a),")]),
+    "pause-window-at-start": ("probe", ["U7"], [
+        (PAUSE, "let low = max(aw.source, aw.sourceEnd, job.sourceIn)",
+         "let low = max(aw.source, job.sourceIn)")]),
+    "pause-no-keep": ("probe", ["U8"], [
+        (PAUSE, "static let pauseKept: Ticks = ReelTime.perSecond / 5",
+         "static let pauseKept: Ticks = 0")]),
+    "pause-start-clamp-off": ("probe", ["U8"], [
+        (PAUSE, "if s <= b.start, b.start < e {", "if false, s <= b.start, b.start < e {")]),
+    "pause-crosstalk-off": ("probe", ["U8"], [
+        (PAUSE, "if before || beyond { continue }", "if false, before || beyond { continue }")]),
+    "pause-locked-off": ("probe", ["U9"], [
+        (PAUSE, "if let held = table.all.indices.first(where: { index in",
+         "if false, let held = table.all.indices.first(where: { index in")]),
+    "pause-ceiling-off": ("probe", ["U9"], [
+        (PAUSE, "} else if ceiling < peak {", "} else if false, ceiling < peak {")]),
+    "pause-match-source": ("probe", ["U7"], [
+        (PAUSE, "let tick = source.identityTick  // TX-17", "let tick = source.source  // TX-17")]),
+    "pause-no-extend": ("probe", ["U7"], [
+        (PAUSE, "        return Ticks(k) * chunk\n", "        return runStart\n")]),
 }
 
 
@@ -206,6 +272,49 @@ def silent_wav(name, seconds):
     return path
 
 
+PAUSE_GAPS_MS = (2500, 1500, 500)
+
+
+def pause_fixture():
+    """WORK/pauses.wav, four `say` phrases (`fill_spike.PHRASES` 0–3) joined
+    by PAUSE_GAPS_MS of zero samples, and per gap {quiet: [start, end) in
+    ticks from the phrase before's last sample over −40 dBFS to the next
+    one's first (the zero samples and `say`'s own quiet edges, 15–87 ms),
+    zeros: [start, end) in ticks of the zero samples alone, before: the last
+    word of the phrase before it, next: the first word of the phrase after}."""
+    import cut_spike
+    bodies = cut_spike.fill_spike.say_phrases()
+    rate = cut_spike.RATE
+    body, gaps = bytearray(), []
+    for index in range(len(PAUSE_GAPS_MS) + 1):
+        first, last = cut_spike.audible(bodies[index])
+        at = len(body) // 2
+        if gaps:
+            gaps[-1]["quiet"] = (gaps[-1]["quiet"][0], round((at + first) * SEC / rate))
+        body += bodies[index]
+        if index < len(PAUSE_GAPS_MS):
+            length = rate * PAUSE_GAPS_MS[index] // 1000
+            zero = at + len(bodies[index]) // 2
+            gaps.append({"ms": PAUSE_GAPS_MS[index],
+                         "quiet": (round((at + last + 1) * SEC / rate), None),
+                         "zeros": (round(zero * SEC / rate), round((zero + length) * SEC / rate)),
+                         "before": cut_spike.fill_spike.PHRASES[index].split()[-1],
+                         "next": cut_spike.fill_spike.PHRASES[index + 1].split()[0]})
+            body += b"\0\0" * length
+    path = WORK / "pauses.wav"
+    WORK.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(bytes(body))
+    return path, gaps
+
+
+def spelled(text):
+    return "".join(c for c in text.lower() if c.isalnum())
+
+
 def ceiling_package(name, speech, total):
     """A package of `total` clips: `speech` (media 1) at 0 on track 3, then
     `total − 1` one-frame text clips on track 4 after it (one id space)."""
@@ -248,6 +357,44 @@ def snap(ticks, fps=(30, 1)):
     num, den = fps
     frame = SEC * den / num
     return round(round(ticks / frame) * frame)
+
+
+def pause_oracle(words, speech, length):
+    """TX-34's spans recomputed from the decision over `speech` (the voice
+    cache's float32 cells) for consecutive `words` (the tool's, one clip at
+    0, ×1, so timeline ticks are source ticks) of a clip `length` long: the
+    window [max(a.start, a.end), min(max(b.start, b.end), length)), its
+    longest run of non-speech cells wholly inside (the earliest of equal
+    runs), extended back while the cell before is non-speech and starts at or
+    after a's start; a pause when longer than 1 s. [(after, start, end)]."""
+    import word_onsets
+    out = []
+    for after in range(len(words) - 1):
+        a, b = words[after], words[after + 1]
+        low = max(a["start"], a["end"], 0)
+        high = min(max(b["start"], b["end"]), length)
+        first = -(-low // CELL)
+        past = min(high // CELL, len(speech))
+        best, run, count = None, first, 0
+        for k in range(first, past):
+            if speech[k] < word_onsets.CONFIDENCE:
+                if count == 0:
+                    run = k
+                count += 1
+                if best is None or count > best[1]:
+                    best = (run, count)
+            else:
+                count = 0
+        if best is None:
+            continue
+        k = best[0]
+        floor = max(a["start"], 0)
+        while k > 0 and speech[k - 1] < word_onsets.CONFIDENCE and (k - 1) * CELL >= floor:
+            k -= 1
+        start, end = k * CELL, (best[0] + best[1]) * CELL
+        if end - start > SEC:
+            out.append((after, start, end))
+    return out
 
 
 def pcm(path):
@@ -632,6 +779,186 @@ def app_rows(results, wanted, app_path, files):
                 finally:
                     close(s)
             run("C9", c9)
+
+            def paused(name):
+                """A session with the pause fixture at 0 on track 1, its voice
+                and peaks caches waited for (`word_onsets.wait_voice`), then
+                the tab's words: (session, gaps, media, t1)."""
+                import word_onsets
+                path, gaps = pause_fixture()
+                s = session_of(name)
+                media = s.media_of(str(path))
+                t1 = tracks(s)[0]
+                s.add(media, at=0, track=t1)
+                if not word_onsets.wait_voice(s.path, media):
+                    raise RuntimeError("the pause fixture's caches did not land in 300 s")
+                show(s)
+                return s, gaps, media, t1
+
+            def key(pause):
+                return (pause["start"], pause["end"], pause["cut_start"], pause["cut_end"])
+
+            def p1():
+                import word_onsets
+                s, gaps, media, _ = paused("p1")
+                try:
+                    shown = show(s)
+                    answer = read(s)
+                    words = {json.dumps(w["id"], sort_keys=True): w for w in answer["words"]}
+                    tool, tab = answer.get("pauses", []), shown.get("pauses", [])
+                    tokens = shown.get("tokens", [])
+                    same = ([key(p) for p in tool] == [key(p) for p in tab]
+                            and all(p["follows"] == tokens[q["after"]]["id"]
+                                    and p["precedes"] == tokens[q["after"] + 1]["id"]
+                                    for p, q in zip(tool, tab)))
+                    speech, _ = word_onsets.load(s.path, media)
+                    length = s.project()["clips"][0]["duration"]
+                    oracle = [(o[1], o[2]) for o in pause_oracle(answer["words"], speech or [],
+                                                                  length)]
+                    equal = [(p["start"], p["end"]) for p in tool] == oracle
+
+                    def text(of):
+                        return spelled(words.get(json.dumps(of, sort_keys=True), {}).get("text", ""))
+                    found, notes = [], []
+                    for gap in gaps:
+                        low, high = gap["quiet"]
+                        z0, z1 = gap["zeros"]
+                        inside = [p for p in tool if p["start"] < z1 and p["end"] > z0]
+                        if gap["ms"] > 1000:
+                            ok = (len(inside) == 1
+                                  and text(inside[0]["follows"]) == spelled(gap["before"])
+                                  and text(inside[0]["precedes"]) == spelled(gap["next"])
+                                  and min(inside[0]["end"], z1) - max(inside[0]["start"], z0) > SEC)
+                        else:
+                            ok = not inside
+                        found.append(ok)
+                        notes.append(
+                            f"{gap['ms']} ms gap, zeros [{z0}, {z1}), quiet [{low}, {high}): "
+                            + (", ".join(
+                                f"[{p['start']}, {p['end']}) ({(p['start'] - low) / 600:+.1f} ms, "
+                                f"{(p['end'] - high) / 600:+.1f} ms against the quiet) cut "
+                                f"[{p['cut_start']}, {p['cut_end']}) {text(p['follows'])!r}→"
+                                f"{text(p['precedes'])!r}" for p in inside) or "none"))
+                    return (same and equal and all(found) and len(tool) == 2,
+                            f"tool {len(tool)} pauses, tab {len(tab)}, equal {same}; oracle "
+                            f"{oracle} equal {equal}; " + "; ".join(notes))
+                finally:
+                    close(s)
+            run("P1", p1)
+
+            def p2():
+                s, gaps, _, _ = paused("p2")
+                try:
+                    shown = show(s)
+                    answer = read(s)
+                    pauses = answer.get("pauses", [])
+                    if not pauses:
+                        return False, "no pause read"
+                    by_id = {json.dumps(w["id"], sort_keys=True): w for w in answer["words"]}
+                    cuts, leads, margins = True, True, []
+                    for p in pauses:
+                        want = (snap(p["start"] + SEC // 5), snap(p["end"] - SEC // 5))
+                        cuts = cuts and (p["cut_start"], p["cut_end"]) == want
+                        nxt = by_id.get(json.dumps(p["precedes"], sort_keys=True), {})
+                        lead = nxt.get("start", 0) - p["cut_end"]
+                        leads = leads and 0 < lead <= 159_200
+                        gap = next((g for g in gaps if g["zeros"][0] < p["end"]
+                                    and p["start"] < g["zeros"][1]), None)
+                        if gap:
+                            margins.append(
+                                f"{gap['ms']} ms gap: kept before "
+                                f"{(p['cut_start'] - gap['quiet'][0]) / 600:.1f} ms, kept after "
+                                f"{(gap['quiet'][1] - p['cut_end']) / 600:.1f} ms, "
+                                f"precedes.start − cut_end {lead}")
+                    pause = pauses[0]
+                    index = next((q["index"] for q in shown.get("pauses", [])
+                                  if key(q) == key(pause)), None)
+                    if index is None:
+                        return False, f"the tab shows no token for {key(pause)}"
+                    original = placements(s.project())
+                    ids = {json.dumps(w["id"], sort_keys=True) for w in answer["words"]}
+                    picked = view(s, focus=True, select_pause=index)
+                    ranged = s.op("get_project").get("in_out_range")
+                    s.op("perform_menu_item", path=["Edit", "Delete"])
+                    view(s, wait=30)
+                    tab = placements(s.project())
+                    after = read(s)
+                    kept = {json.dumps(w["id"], sort_keys=True) for w in after["words"]} == ids
+                    left = [key(p) for p in after.get("pauses", []) if p["follows"] == pause["follows"]]
+                    undone = s.op("undo").get("undone")
+                    back = placements(s.project()) == original
+                    s.op("ripple_delete_ranges", ranges=[[pause["cut_start"], pause["cut_end"]]])
+                    tool = placements(s.project())
+                    want = {"start": pause["cut_start"], "end": pause["cut_end"]}
+                    return (cuts and leads and ranged == want
+                            and picked.get("pause_selection") == index
+                            and undone == "Delete Pause" and back and tab == tool
+                            and tab != original and kept and not left,
+                            f"every cut unclamped {cuts}; 0 < precedes.start − cut_end ≤ 159200 "
+                            f"{leads} ({'; '.join(margins)}); pause {index} cut "
+                            f"[{pause['cut_start']}, {pause['cut_end']}): in_out_range {ranged}; "
+                            f"undo names {undone!r}, back {back}; the tab's placements equal "
+                            f"ripple_delete_ranges' {tab == tool}; every word id kept {kept}; the "
+                            f"pause gone {not left} (left after it: {left})")
+                finally:
+                    close(s)
+            run("P2", p2)
+
+            def layered(name, locked):
+                """The pause fixture on track 1 and A on track 2 from inside the
+                2.5 s pause's cut: (session, the pause read before A, t2)."""
+                s, _, _, t1 = paused(name)
+                show(s)
+                first = read(s).get("pauses", [])
+                if not first:
+                    raise RuntimeError("no pause read on track 1 alone")
+                pause = first[0]
+                t2 = new_track(s)
+                s.add(s.media_of(str(files["A"])), at=pause["cut_start"], track=t2)
+                if locked:
+                    s.op("set_track", track=t2, locked=True)
+                view(s, wait=60)
+                return s, pause, t1, t2
+
+            def p3():
+                s, pause, t1, t2 = layered("p3", locked=True)
+                try:
+                    name = next(t["name"] for t in s.project()["tracks"] if t["id"] == t2) or str(t2)
+                    shown = view(s, words_from=t1)
+                    shown = view(s, wait=10)
+                    index = next((q["index"] for q in shown.get("pauses", [])
+                                  if key(q) == key(pause)), None)
+                    if index is None:
+                        return False, f"no token for {key(pause)} with Words from {t1}"
+                    before = placements(s.project())
+                    picked = view(s, focus=True, select_pause=index)
+                    refusal = (picked.get("cut") or {}).get("refusal")
+                    s.op("perform_menu_item", path=["Edit", "Delete"])
+                    view(s, wait=10)
+                    same = placements(s.project()) == before
+                    return (refusal == LOCKED.format(name) and same,
+                            f"pause {index} {key(pause)}; cut {picked.get('cut')}; refusal "
+                            f"{refusal!r}; placements unchanged {same}")
+                finally:
+                    close(s)
+            run("P3", p3)
+
+            def p4():
+                s, pause, t1, _ = layered("p4", locked=False)
+                try:
+                    every = view(s, wait=10)
+                    over = [q for q in every.get("pauses", []) if key(q) == key(pause)]
+                    between = [t["text"] for t in every.get("tokens", [])
+                               if pause["start"] < t["start"] < pause["end"]]
+                    view(s, words_from=t1)
+                    one = view(s, wait=10)
+                    alone = [q for q in one.get("pauses", []) if key(q) == key(pause)]
+                    return (not over and between and len(alone) == 1,
+                            f"All tracks: {len(over)} tokens over {key(pause)}, words between "
+                            f"{between[:4]}; Words from {t1}: {len(alone)}")
+                finally:
+                    close(s)
+            run("P4", p4)
         finally:
             if app is not None:
                 app.stop()

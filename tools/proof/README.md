@@ -28401,3 +28401,31 @@ RC_PROOF_APP=release python3 tools/proof/word_onset_proof.py [--mutants]
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s TX1b record.
+
+## Road map "creator-jobs" TX3b — the pause token (`transcript_cut_proof.py` U7–U9, P1–P4; ten mutants; spec §11 TX-34)
+
+Rows beside TX3a's in `transcript_cut_proof.py` (whose docstring holds each row's full text).
+
+| Row | What it holds |
+|---|---|
+| U7 | detection, on synthetic projects and voice caches written on the page: 33 non-speech cells between two words of one clip a pause, 31 none; a ×2 clip's 1.5 s source silence none (timeline time); the longest run, the earliest of equal runs; the clip's window clamps it; E0's early onset gives exactly one pause; two clips of one media none; a locked track's words none; no voice cache none; moved starts (`recognisedStart` ≠ `source`) matched on `identityTick`; a recognised end 7 cells inside a 40-cell silence still starts the span at its first cell (the back extension); the extension stops at the word before's start |
+| U8 | the cut: `[span + 0.2 s, span − 0.2 s)` snapped, exact ticks; the word after's start inside moves the start past it; another shown word's extent, or an unread clip's start, drops it; a cut left empty drops it |
+| U9 | `planPause`: the locked refusal in TX-32's sentence; the counts equal `clipsAfter`/`clipsPeak`; the ceiling on the peak |
+| P1 | `pause_fixture` (four `say` phrases joined by 2.5, 1.5 and 0.5 s of zeros, clip at 0, ×1), both caches waited for with `word_onsets.wait_voice`: the tool's `pauses` equal the tab's; the spans equal `pause_oracle` (TX-34's window and extension over `cache/speech/<media>.bin` from the tool's words); one pause per gap over 1 s, `follows`/`precedes` spelling the phrases' last and first words, overlapping the zeros by more than 1 s; none for the 0.5 s gap; each span reported against the −40 dBFS quiet in ms |
+| P2 | every cut the unclamped `[snap(start + 0.2 s), snap(end − 0.2 s)]` and `0 < precedes.start − cut_end ≤ 159,200`; `select_pause` sets the range; Edit ▸ Delete is one step "Delete Pause" equal to `ripple_delete_ranges` of the tool's cut; every word id kept and the pause gone |
+| P3 | Words from track 1, a locked track-2 word inside the 2.5 s pause's cut: the locked sentence, nothing changed |
+| P4 | the same unlocked: no token over that silence with All tracks, one with Words from track 1 |
+
+The mutants are probe mutants on `TranscriptCut+Pause.swift`: `pause-source-length`,
+`pause-across-instances`, `pause-window-at-start`, `pause-match-source` and `pause-no-extend` (U7);
+`pause-no-keep`, `pause-start-clamp-off` and `pause-crosstalk-off` (U8); `pause-locked-off` and
+`pause-ceiling-off` (U9). `transcript_tab_proof.py`'s Z0 holds `select_pause` in the tool's
+argument set.
+
+```sh
+python3 tools/proof/transcript_cut_proof.py --only U0,U7,U8,U9   # probe, no app
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_cut_proof.py --only Z0,P1,P2,P3,P4
+python3 tools/proof/transcript_cut_proof.py --mutant pause-no-extend
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s TX3b record.

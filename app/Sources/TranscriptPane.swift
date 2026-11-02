@@ -3,14 +3,15 @@ import AppKit
 /// What the Transcript tab asks of the editor (spec §11 TX-22): whether the
 /// transport plays, and a seek that leaves playback as it was; since TX3a
 /// (TX-31, TX-32) the document's in/out range, read and set through
-/// `set_range`'s door, the cut as one "Delete Words" step (true when it
-/// applied), and a refusal's beep and sentence.
+/// `set_range`'s door, the cut as one step named "Delete Words" or, since
+/// TX3b (TX-34), "Delete Pause" (true when it applied), and a refusal's beep
+/// and sentence.
 protocol TranscriptHost: AnyObject {
     var transcriptIsPlaying: Bool { get }
     func transcriptSeek(to time: Ticks)
     var transcriptRange: TranscriptCut.Range? { get }
     func transcriptSetRange(_ range: TranscriptCut.Range?)
-    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range) -> Bool
+    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range, name: String) -> Bool
     func transcriptRefuse(_ sentence: String)
 }
 
@@ -81,6 +82,7 @@ final class TranscriptPane: InspectorPaneView {
         transcriptView.onParagraph = { [weak self] index in self?.seek(paragraph: index) }
         transcriptView.onSelect = { [weak self] selection in self?.selectionChanged(selection) }
         transcriptView.onDelete = { [weak self] in self?.deleteWords() }
+        transcriptView.onSelectPause = { [weak self] index in self?.pauseSelected(index) }
         NotificationCenter.default.addObserver(
             self, selector: #selector(cacheLanded(_:)), name: .mediaCacheDidChange, object: nil)
     }
@@ -167,23 +169,35 @@ final class TranscriptPane: InspectorPaneView {
         guard source.rebuilds != shownRebuilds, let document = inspector?.document else { return }
         shownRebuilds = source.rebuilds
         let canvas = document.editedProject.snapshot.canvas
-        transcriptView.show(source.model, fps: canvas.fps, timecodeFrames: canvas.timecodeFrames)
+        // The pauses, once per rebuild, from the cut's table (TX-34).
+        let pauses = TranscriptCut.pauses(source.cutTable(), fps: canvas.fps)
+        transcriptView.show(
+            source.model, pauses: pauses, fps: canvas.fps, timecodeFrames: canvas.timecodeFrames)
         transcriptView.setHighlight(source.model.highlight(at: document.playhead), follow: false)
         // The selection was re-mapped by identity: while the document's range
-        // is still the one it set, the range follows it (TX-31).
+        // is still the one it set, the range follows it (TX-31) — a selected
+        // pause's re-planned with no seek (TX-34).
         if rangeSet != nil, host?.transcriptRange == rangeSet {
-            selectionChanged(transcriptView.selection)
+            if let index = transcriptView.pauseSelection, let plan = pausePlan(index) {
+                host?.transcriptSetRange(plan.range)
+                rangeSet = plan.range
+            } else {
+                selectionChanged(transcriptView.selection)
+            }
         }
     }
 
     /// A voice or peaks cache landed: that media's on-device words are read
-    /// again, their starts moved to their sound (TX-18).
+    /// again, their starts moved to their sound (TX-18); a voice cache also
+    /// remakes the table and its pauses, whatever engine heard the words
+    /// (TX-34).
     @objc private func cacheLanded(_ note: Notification) {
         let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
         guard kind == MediaImporter.speechKind || kind == MediaImporter.peaksKind,
             let media = note.userInfo?[MediaImporter.mediaIDKey] as? UInt32
         else { return }
         source.reloadDeviceWords(media: media)
+        if kind == MediaImporter.speechKind { source.update() }
     }
 
     // MARK: - Selecting and deleting words (TX-31, TX-32)
@@ -214,8 +228,13 @@ final class TranscriptPane: InspectorPaneView {
     }
 
     /// ⌫, ⌦, Edit ▸ Delete or Edit ▸ Ripple Delete with words selected:
-    /// planned again, refused in TX-32's order, else one "Delete Words".
+    /// planned again, refused in TX-32's order, else one "Delete Words"; with
+    /// a pause selected, `deletePause`.
     func deleteWords() {
+        if let index = transcriptView.pauseSelection {
+            deletePause(index)
+            return
+        }
         guard let host, let selection = transcriptView.selection, let plan = plan(selection) else {
             NSSound.beep()
             return
@@ -232,7 +251,47 @@ final class TranscriptPane: InspectorPaneView {
         // Cleared first, so the rebuild the cut causes does not re-plan.
         let held = rangeSet
         rangeSet = nil
-        if !host.transcriptDelete(plan.range) { rangeSet = held }
+        if !host.transcriptDelete(plan.range, name: "Delete Words") { rangeSet = held }
+    }
+
+    // MARK: - Selecting and deleting a pause (TX-34)
+
+    /// The plan of the view's pause `index` against the edited container.
+    private func pausePlan(_ index: Int) -> TranscriptCut.PausePlan? {
+        guard let document = inspector?.document, transcriptView.pauses.indices.contains(index)
+        else { return nil }
+        return TranscriptCut.planPause(
+            transcriptView.pauses[index], table: source.cutTable(),
+            container: document.editedProject.snapshot,
+            total: ShotSplit.clipCount(document.project.snapshot))
+    }
+
+    /// A click on a pause: its cut made the in/out range, and the playhead
+    /// sought to the cut's start. Nil acts as a cleared word selection.
+    func pauseSelected(_ index: Int?) {
+        guard let index, let host, let plan = pausePlan(index) else {
+            selectionChanged(nil)
+            return
+        }
+        host.transcriptSetRange(plan.range)
+        rangeSet = plan.range
+        host.transcriptSeek(to: plan.range.start)
+    }
+
+    /// ⌫ and the delete family with a pause selected: planned again,
+    /// refused in TX-34's order, else one "Delete Pause".
+    private func deletePause(_ index: Int) {
+        guard let host, let plan = pausePlan(index) else {
+            NSSound.beep()
+            return
+        }
+        if let refusal = plan.refusal {
+            host.transcriptRefuse(refusal.sentence)
+            return
+        }
+        let held = rangeSet
+        rangeSet = nil
+        if !host.transcriptDelete(plan.range, name: "Delete Pause") { rangeSet = held }
     }
 
     // MARK: - Seeking

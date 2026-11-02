@@ -4604,7 +4604,8 @@ run that counts finds it by spelling (the spike's header says why).
    real speech.
 2. Open T1 in a new project, choose View ▸ Transcript (⌃⌘T) and wait for the words.
 3. Cut T1 to a state you would publish by deleting words in the tab: select (click, drag,
-   ⇧-click), listen to the shaded range with Loop, press ⌫; undo what sounds wrong.
+   ⇧-click), listen to the shaded range with Loop, press ⌫; click a pause token and press ⌫ to
+   shorten it; undo what sounds wrong.
 4. Note, in CJ-5's form: each time you left for another tool or gave up, and why; each slow
    step; each cut that sounded wrong, with its time (a clipped start, a fragment left, an
    unnatural pause, the end of the word before eaten — TX-S3's E0 risk); and what you want
@@ -4652,6 +4653,95 @@ skipped, no Rust changed), "gate: PASS 291s"; a Release instance of that build l
 S-RT1 once they are copied (CP1's step 1 above); TX3b, the pause token (TX-34), is the next
 pipeline, not an issue. Filed after the commit: "TX-S3: E0's cut edges fall inside the previous
 word on the `say` fixture (13 of 20)".
+
+#### TX3b's record (2026-11-02)
+
+**Landed.** Lane A, second attempt, base `6ac3fb68` (I's HEAD with TX1b and CU3b). The first
+attempt (`5eefd22c`) stopped: under E0 the word after a pause started about 1.1 s inside the
+silence, so the no-sliver clamp left a pause over 1 s after Delete Pause. The owner answered
+"Fix word starts first" (2026-11-02): TX1b moved on-device starts to their sound, and this
+attempt keeps the clamp as written (option (a): no two-range cut, no slivers). Attempt 1's work
+was cherry-picked without its `TranscriptTabSource.swift` hunk or its decision text, then revised.
+TX-34 is in a new `11-decisions/creator-jobs-6.md` (90 lines): `creator-jobs-5.md` was at 468 and
+TX-34's block would have passed ~500. No core, FFI, op, format, product tool or key change; only
+the dev tool `transcript_view` gains `select_pause`. Nothing here sends anything (CJ-3).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/TranscriptCut+Pause.swift` (new) | 183 | pure: `pauses` (one instance, `identityTick` match, the window from a's end, `longestQuietRun`, `quietStart`'s back extension to a's start, over 1 s of timeline time, the cut and its clamp), `planPause` |
+| `app/Sources/TranscriptCut.swift` | 284 | `Table.context` |
+| `app/Sources/TranscriptView.swift` · `+Pause` (new) · `+Highlight` · `+Keys` · `+Delete` | 411 · 46 · 85 · 116 · 39 | the " [x.x s]" token, its exclusive selection, click, mark and keys |
+| `app/Sources/TranscriptPane.swift` | 308 | the pauses computed per rebuild from `cutTable()`; `pauseSelected` (range, seek), the re-plan, `deletePause` ("Delete Pause"); `source.update()` on a `speech` cache post |
+| `app/Sources/EditorViewController+Transcript.swift` | 80 | `transcriptDelete(_:name:)`, `transcriptHoldsWords` with a pause selected |
+| `app/Sources/AgentServer+TimelineTranscript.swift` · `+TranscriptView.swift` · `AgentCatalog+Transcript.swift` | 313 · 378 · 90 | one `cutTable` for words and `pauses[]`, `idRow`; `select_pause`, `pauses`, `pause_selection`, a pause's `cut`, `select_pause` refused beside `words_from` or `language`; the descriptions |
+| `tools/proof/transcript_cut_probe.swift` · `transcript_cut_proof.py` | 607 · 1075 | U7 (12 cases), U8, U9; `pause_fixture`, `pause_oracle`, P1–P4; ten pause mutants |
+
+`TranscriptTabSource.swift` (598) has no new line.
+
+**Measured** (Apple M2 Max, OS build 25F80, on AC).
+
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings; the probe's typecheck exit 0;
+  `transcript_cut_proof.py --only U0…U9` 10/10; on Debug `--only Z0,P1,P2,P3,P4` 4/4 after Z0
+  passed in a first run whose P rows called `transcript_view` before the tab was shown (the
+  fixture's helper now shows the tab after both caches land).
+- `make gate`: "gate: PASS 469s" (names 1 s, typecheck 11 s, fmt and lint skipped, test 284 s,
+  app 171 s).
+- On Release after the gate: `transcript_cut_proof.py` "scores: 25/25" (TX3a's 18 rows
+  unchanged, U7–U9, P1–P4); `transcript_tab_proof.py --only Z0,T2,T4,T6` 4/4 (Z0's argument set
+  holds `select_pause`; T6's rebuild median 42.6 ms with the pauses computed each rebuild);
+  `timeline_transcript_proof.py` 33/33. Z0's parity grep printed nothing.
+- The ten mutants, once: every one caught — `pause-source-length`, `pause-across-instances`,
+  `pause-window-at-start`, `pause-match-source` ("moved starts") and `pause-no-extend` ("late
+  end") by U7; `pause-no-keep`, `pause-start-clamp-off` and `pause-crosstalk-off` by U8;
+  `pause-locked-off` and `pause-ceiling-off` by U9.
+- **The pause fixture** (2.5, 1.5 and 0.5 s of zeros; P1, P2 on Release): two pauses, the spans
+  equal to the oracle. 2.5 s gap ("dog" → "pack"): span [1,670,400, 3,187,200), +71.5 ms after
+  the −40 dBFS quiet's start and +2.4 ms after its end; cut [1,800,000, 3,060,000), the unclamped
+  one; **kept before 287.5 ms, kept after 209.6 ms**, the word after 120,000 ticks past the cut.
+  1.5 s gap ("jugs" → "how"): span [4,646,400, 5,587,200), +52.7 ms and +17.7 ms; cut
+  [4,760,000, 5,460,000); **kept before 242.0 ms, kept after 194.3 ms**, the word after 114,000
+  ticks past the cut. 0.5 s gap: no pause. Kept before is over 0.2 s by the voice model's lag at
+  a phrase's end (the span starts where Silero first hears non-speech). After Delete Pause no
+  pause follows "dog": the Goal's "⌫ shortens it to 0.2 s each end" holds on this fixture, and
+  the start clamp did not fire.
+
+**Deviations.**
+
+- `pause_fixture`'s helper shows the tab (`select_inspector_tab`, then `transcript_view wait`)
+  after `word_onsets.wait_voice`; `transcript_view` refuses before the tab is shown.
+- `README.md`'s Transcript highlight gains the pause, by the guide rule.
+- `creator-jobs-5.md`'s head sentence naming `-6` was added to an existing line (468 lines kept).
+
+**Reviews.** Review 1 (`6ac3fb68..228ddd03`, fix-required): one should-fix and one nit. The
+should-fix: `transcript_view` accepted `select_pause` with `words_from` or `language`, checking the
+index against `view.pauses` before the rebuild and then clicking the rebuilt list, so a call could
+click another pause or none. Fix pass 1 (`b04a06f4`) refuses it as TX-27 refuses `select` and
+`click` — "select, click and select_pause name tokens of the view as it is; set words_from or
+language in a call of their own." — in the handler, the tool's description, spec §7.9c and TX-34
+(TX-27 keeps its own sentence); `make typecheck` at the baseline, `spec_index_proof.py` 252/252,
+"gate: PASS 562s", and the three refusals over MCP on Release. The Release proofs and mutants were
+not re-run: no row or mutant anchor reads that line, and no proof call combines those arguments.
+Review 2 (`6ac3fb68..b04a06f4`): pass, with the nit left as it stands — two description lines of
+`AgentServer+TranscriptView.swift` run to 131 and 123 columns where their neighbours wrap near 100.
+
+**Integration (2026-11-02).** Cherry-picked (`228ddd03`, `b04a06f4`) onto the integration branch at
+`6ac3fb68`, the lane's own base, with no conflict and no format change. The `CLAUDE.md` edits owed
+went in: `app/CLAUDE.md`'s Transcript-tab entry names `TranscriptCut.swift` (+`Pause`) and
+`TranscriptView+Pause.swift` and gains TX3b's paragraph (the pure detection and cut, `planPause`,
+the pane's pauses per rebuild and `source.update()` on a `speech` landing, the exclusive click and
+seek, one "Delete Pause"); its `TimelineTranscript.swift` entry says the tool answers `pauses[]` from
+the same table. Every `app/Sources` file and instrument is the lane's byte for byte, so the lane's
+Release runs stand. `make gate` on the merged tree: names, typecheck (the four baseline warnings),
+test and app `pass` (fmt and lint skipped, no Rust changed), "gate: PASS 316s"; a Release instance
+of that build launched by `proof_app.py launch --app release`: `grep "Frame Job: "` printed nothing.
+
+**What CP1 needs from the owner** is TX3a's list above, its step 3 now with "click a pause token
+and press ⌫ to shorten it".
+
+**Owed.** JOB-11 (now with the pause step) on S-TH1; TX-S3's re-run on S-TH1 and S-RT1. To file:
+"Transcript tab: a replaced voice cache under a cloud-transcribed media is not re-read until the
+tab shows again" (`cutTable()` keeps its old `speech[media]`; the fix needs a line in
+`TranscriptTabSource.swift`, at its cap).
 
 ### TX1b — word starts moved to their sound
 

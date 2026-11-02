@@ -220,6 +220,8 @@ enum TranscriptCut {
         /// scan stops at.
         let reachBefore: [Ticks]
         let onsetAfter: [Ticks]
+        /// What the table was made from: TX-34's pauses read it.
+        let context: Context
 
         init(
             all: [TimelineTranscript.Word], tracks: Set<UInt32>?, context: Context,
@@ -227,6 +229,7 @@ enum TranscriptCut {
         ) {
             self.all = all
             self.rule = rule
+            self.context = context
             let edges = TranscriptCut.edges(all, context: context, rule: rule)
             allEdges = edges
             let shown = all.indices.filter { tracks?.contains(all[$0].track) ?? true }

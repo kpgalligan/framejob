@@ -20,6 +20,9 @@ import Foundation
 /// (`TranscriptCut.wordCut`: widened, snapped) over every read word of
 /// `tracks`, before the window and paging, against the container as this
 /// call read it; each needed media's voice cache is read here, off main.
+/// Since TX3b (spec §11 TX-34) the same table answers `pauses[]`: each voice-
+/// cache silence over 1 s between two words of one clip, with the cut the tab
+/// makes of it, one row per pause whose word before is on the page.
 extension AgentServer {
 
     /// What the main-thread hop read.
@@ -75,7 +78,9 @@ extension AgentServer {
         let kept = context.tracks.map { tracks in windowed.filter { tracks.contains($0.track) } }
             ?? windowed
         let page = TimelineTranscript.page(kept, fps: context.snapshot.canvas.fps)
-        let cuts = wordCuts(all, page: page.words, context: context, heard: media)
+        let table = cutTable(all, context: context, heard: media)
+        let cuts = wordCuts(page.words, table: table, context: context)
+        let pauses = pauseRows(page.words, table: table, context: context)
         if needed.contains(where: { media[$0]?.fillersReported == false }) {
             notes.append(
                 "These words were not transcribed with filler words, so a filler missing here "
@@ -89,6 +94,7 @@ extension AgentServer {
             "ok": true,
             "count": page.words.count,
             "words": zip(page.words, cuts).map { Self.wordRow($0, cut: $1) },
+            "pauses": pauses,
             "media": needed.compactMap { media[$0] }.map { heard -> [String: Any] in
                 var row: [String: Any] = [
                     "media": Int(heard.media), "engine": heard.engine.rawValue,
@@ -216,24 +222,31 @@ extension AgentServer {
         return out
     }
 
-    /// Each page word's `TranscriptCut.wordCut` over a table of every read
-    /// word of `tracks`, with each heard media's voice cache. Server thread.
-    private func wordCuts(
-        _ all: [TimelineTranscript.Word], page: [TimelineTranscript.Word],
-        context: TimelineTranscriptContext, heard: [UInt32: TimelineTranscript.MediaWords]
-    ) -> [TranscriptCut.Range] {
+    /// The cut's table of every read word of `tracks`, with each heard
+    /// media's voice cache. Server thread.
+    private func cutTable(
+        _ all: [TimelineTranscript.Word], context: TimelineTranscriptContext,
+        heard: [UInt32: TimelineTranscript.MediaWords]
+    ) -> TranscriptCut.Table {
         var speech: [UInt32: [Float]] = [:]
         if let cacheDir = context.cacheDir {
             for media in heard.keys {
                 speech[media] = MediaImporter.loadSpeech(for: media, in: cacheDir)
             }
         }
-        let table = TranscriptCut.Table(
+        return TranscriptCut.Table(
             all: all, tracks: context.tracks,
             context: TranscriptCut.Context(
                 instances: context.instances, media: heard, speech: speech))
+    }
+
+    /// Each page word's `TranscriptCut.wordCut` over `table`.
+    private func wordCuts(
+        _ page: [TimelineTranscript.Word], table: TranscriptCut.Table,
+        context: TimelineTranscriptContext
+    ) -> [TranscriptCut.Range] {
         var token: [TimelineTranscript.Identity: Int] = [:]
-        for (index, at) in table.shown.enumerated() { token[all[at].id] = index }
+        for (index, at) in table.shown.enumerated() { token[table.all[at].id] = index }
         let fps = context.snapshot.canvas.fps
         return page.map { word in
             guard let index = token[word.id] else {
@@ -250,6 +263,34 @@ extension AgentServer {
             + "it has no voice cache yet. Call again once it has."
     }
 
+    /// The pauses of `table` (TX-34) whose word before is on `page`:
+    /// `{start, end, cut_start, cut_end, clip, track, media, follows,
+    /// precedes}`, the span, the tab's cut and the two words' ids.
+    private func pauseRows(
+        _ page: [TimelineTranscript.Word], table: TranscriptCut.Table,
+        context: TimelineTranscriptContext
+    ) -> [[String: Any]] {
+        let onPage = Set(page.map(\.id))
+        return TranscriptCut.pauses(table, fps: context.snapshot.canvas.fps).compactMap { pause in
+            let before = table.word(pause.after)
+            guard onPage.contains(before.id) else { return nil }
+            return [
+                "start": pause.span.start, "end": pause.span.end,
+                "cut_start": pause.cut.start, "cut_end": pause.cut.end,
+                "clip": Int(before.clip), "track": Int(before.track), "media": Int(before.media),
+                "follows": Self.idRow(before.id), "precedes": Self.idRow(table.word(pause.after + 1).id),
+            ]
+        }
+    }
+
+    /// A word's identity as a row: `{nest_path, media, source, k}`.
+    static func idRow(_ id: TimelineTranscript.Identity) -> [String: Any] {
+        [
+            "nest_path": id.nestPath.map { Int($0) }, "media": Int(id.media), "source": id.source,
+            "k": id.k,
+        ]
+    }
+
     /// A word's row; with `cut`, its `cut_start` and `cut_end` (TX-30: always
     /// `TranscriptCut.wordCut`, never the unwidened `own`).
     static func wordRow(
@@ -259,10 +300,7 @@ extension AgentServer {
             "text": word.text, "start": word.start, "end": word.end, "clip": Int(word.clip),
             "track": Int(word.track), "media": Int(word.media), "engine": word.engine.rawValue,
             "filler": word.filler, "editable": word.editable,
-            "id": [
-                "nest_path": word.id.nestPath.map { Int($0) }, "media": Int(word.id.media),
-                "source": word.id.source, "k": word.id.k,
-            ] as [String: Any],
+            "id": idRow(word.id),
         ]
         if let speaker = word.speaker { row["speaker"] = speaker }
         if let why = word.why { row["why"] = why }

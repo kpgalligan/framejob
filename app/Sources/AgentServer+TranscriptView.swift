@@ -10,7 +10,10 @@ import AppKit
 /// `AgentLane`'s one lock, so no call could press Stop while
 /// `get_timeline_transcript` waits. Since TX3a (TX-23 amended by TX-31) each
 /// token carries the tab's `cut_start`/`cut_end` (`TranscriptCut.wordCut`
-/// over the tab's `cutTable()`), and `cut` is the selection's plan.
+/// over the tab's `cutTable()`), and `cut` is the selection's plan. Since
+/// TX3b (TX-34) it clicks a pause token (`select_pause`, the mouse's
+/// `TranscriptView.clickPause`) and answers the pauses shown, the selected
+/// one and, with one selected, its plan as `cut`.
 ///
 /// **It runs on the SERVER thread** (`devOffMainTools`) so `wait` may poll
 /// the tab's source until it is settled; every step is an `onMain` hop.
@@ -30,6 +33,7 @@ extension AgentServer {
         }
         let focus = try boolArg(a, "focus") ?? false
         let click = try intArg(a, "click")
+        let selectPause = try intArg(a, "select_pause")
         let wait = try doubleArg(a, "wait") ?? 0
         guard (0...60).contains(wait) else {
             throw ToolError(message: "wait must be 0…60 seconds (got \(wait)).")
@@ -47,11 +51,16 @@ extension AgentServer {
                 select = .some(pair)
             }
         }
+        if selectPause != nil, select != nil || click != nil {
+            throw ToolError(message: "select, click and select_pause each set the selection: pass one.")
+        }
         let bar = try transcriptBarArguments(a)
-        if select != nil || click != nil, bar.wordsFrom != nil || bar.language != nil {
+        if select != nil || click != nil || selectPause != nil,
+            bar.wordsFrom != nil || bar.language != nil
+        {
             throw ToolError(
-                message: "select and click name tokens of the view as it is; set words_from or "
-                    + "language in a call of their own.")
+                message: "select, click and select_pause name tokens of the view as it is; set "
+                    + "words_from or language in a call of their own.")
         }
         if bar.read, bar.wordsFrom != nil || bar.language != nil {
             throw ToolError(
@@ -69,6 +78,11 @@ extension AgentServer {
             if let click, !(0..<count).contains(click) {
                 throw ToolError(message: "click names token \(click); the tab shows \(count).")
             }
+            let shownPauses = view.pauses.count
+            if let selectPause, !(0..<shownPauses).contains(selectPause) {
+                throw ToolError(
+                    message: "select_pause names pause \(selectPause); the tab shows \(shownPauses).")
+            }
             try Self.checkBar(bar, pane)
             if let track = bar.wordsFrom { pane.bar.chooseWordsFrom(track) }
             if let language = bar.language { pane.bar.chooseLanguage(language) }
@@ -76,6 +90,7 @@ extension AgentServer {
             if focus { view.window?.makeFirstResponder(view) }
             if let select { view.select(select.map { $0[0]...$0[1] }) }
             if let click { view.click(token: click) }
+            if let selectPause { view.clickPause(selectPause) }
             return pane
         }
         let deadline = Date().addingTimeInterval(wait)
@@ -184,10 +199,19 @@ extension AgentServer {
         let container = document.editedProject.snapshot
         let canvas = container.canvas
         let table = source.cutTable()
-        let cut: Any = view.selection.map { selection -> [String: Any] in
+        let total = ShotSplit.clipCount(document.project.snapshot)
+        let pauseCut: [String: Any]? = view.pauseSelection.map { index in
+            let plan = TranscriptCut.planPause(
+                view.pauses[index], table: table, container: container, total: total)
+            return [
+                "pause": index, "start": plan.range.start, "end": plan.range.end,
+                "clips_after": plan.clipsAfter, "clips_peak": plan.clipsPeak,
+                "refusal": plan.refusal?.sentence ?? NSNull(),
+            ]
+        }
+        let cut: Any = pauseCut ?? view.selection.map { selection -> [String: Any] in
             let plan = TranscriptCut.plan(
-                selection, table: table, container: container,
-                total: ShotSplit.clipCount(document.project.snapshot), fps: canvas.fps)
+                selection, table: table, container: container, total: total, fps: canvas.fps)
             return [
                 "selection": [plan.selection.lowerBound, plan.selection.upperBound],
                 "start": plan.range.start, "end": plan.range.end, "clips_after": plan.clipsAfter,
@@ -230,6 +254,13 @@ extension AgentServer {
             "playing": editor(document)?.playback.isPlaying ?? false,
             "selection": view.selection.map { [$0.lowerBound, $0.upperBound] } ?? NSNull(),
             "cut": cut,
+            "pauses": view.pauses.enumerated().map { index, pause -> [String: Any] in
+                [
+                    "index": index, "after": pause.after, "start": pause.span.start,
+                    "end": pause.span.end, "cut_start": pause.cut.start, "cut_end": pause.cut.end,
+                ]
+            },
+            "pause_selection": view.pauseSelection ?? NSNull(),
             "first_responder": view.window?.firstResponder === view,
             "fill": fill,
             "owns_want": source.ownsWant,
@@ -268,24 +299,29 @@ extension AgentServer {
             "DEV TOOL (absent from Distribution builds). What a project's Transcript tab shows "
                 + "(spec §11 TX-23, TX-27), after optionally setting its bar's Words from and "
                 + "Language, pressing its Read, focusing its view, selecting tokens and clicking "
-                + "one as a person would. Applies words_from, then language, then read, then "
-                + "focus, then select, then click; schedules stop_after's press of the bar's Stop "
-                + "that many seconds after the answer; then waits up to wait seconds for the "
+                + "one or a pause token as a person would. Applies words_from, then language, "
+                + "then read, then focus, then select, then click or select_pause; schedules "
+                + "stop_after's press of the bar's Stop that many seconds after the answer; then waits up to wait seconds for the "
                 + "tab's source to settle (no load, fill or pending media left). Answers settled, "
                 + "tokens (get_timeline_transcript's word rows, cut_start and cut_end the tab's "
                 + "own, plus index, paragraph and struck), paragraphs {index, start, timecode, "
                 + "first_token}, highlight, playhead, playing, selection, cut (null with no "
                 + "selection, else the selection's plan: {selection [first, last] widened, start, "
                 + "end, clips_after, clips_peak, refusal: the sentence Delete would refuse with, "
-                + "or null}), first_responder, fill {media, fraction} or null, owns_want, status "
+                + "or null}; with a pause selected {pause, start, end, clips_after, clips_peak, "
+                + "refusal}), pauses (the pause tokens shown, [{index, after: the token before "
+                + "it, start, end: the silence, cut_start, cut_end: what Delete cuts}]), "
+                + "pause_selection (an index or null), first_responder, fill {media, fraction} or null, owns_want, status "
                 + "(idle, loading, reading, no_model, failed or stopped) with status_text, "
                 + "no_words, notes, rebuilds, last_rebuild_ms, top_token, bar {words_from, "
                 + "tracks [{id, name}], language, languages [{identifier, name}], stop_shown, "
                 + "read_shown, stop_after: pending, pressed, not shown or null} and project. "
                 + "Refused, changing nothing: a project with no window, a Transcript tab not "
                 + "shown (select_inspector_tab first), an index past the tokens shown, a track "
-                + "not in the container, a language not installed, select or click together "
-                + "with words_from or language, read together with words_from or language, "
+                + "not in the container, a language not installed, a pause index past the "
+                + "pauses shown, select_pause together with select or click, select, click or "
+                + "select_pause together with words_from or language, read together with "
+                + "words_from or language, "
                 + "stop_after while Stop is not shown, and read while Read is not shown.",
             [
                 "focus": [
@@ -305,6 +341,12 @@ extension AgentServer {
                     "description": "A token index to click: it alone is selected and the "
                         + "playhead moves to its frame-snapped start, playback going on if it "
                         + "was playing.",
+                ],
+                "select_pause": [
+                    "type": "integer", "minimum": 0,
+                    "description": "A pause token's index (pauses[].index) to click: the word "
+                        + "selection is cleared, the pause selected, its cut made the in/out range "
+                        + "and the playhead moved to the cut's start.",
                 ],
                 "wait": [
                     "type": "number", "minimum": 0, "maximum": 60,

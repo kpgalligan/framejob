@@ -1,4 +1,4 @@
-// Road map "creator-jobs" TX3a — the word cut's probe (`transcript_cut_proof.py`
+// Road map "creator-jobs" TX3a and TX3b — the word cut's and the pause token's probe (`transcript_cut_proof.py`
 // builds and runs it). Compiled from `app/Sources` minus the app's
 // `main.swift`, through `swift_build.py`, with THIS file as `main.swift`, so
 // every row calls the app's own code: projects are made through the core
@@ -29,6 +29,23 @@
 //   U6  the range is the core's own snap, each bound to its nearest frame, but
 //       a start past the cut word's start, or an end past the next word's
 //       start, is that start's frame floor.
+//   U7  pause detection (TX3b, spec §11 TX-34): a 33-cell silence between two
+//       words of one clip is a pause, 31 cells none; a ×2 clip's 1.5 s source
+//       silence none (timeline time); the longest run, the earliest of equal
+//       runs; the clip's window clamps it; under E0's early onset (a word
+//       starting before the silence and ending after it) exactly one pause,
+//       after the word before; two clips of one media none; a locked track's
+//       words none; no voice cache none; words whose start was moved (TX1b)
+//       matched on `identityTick` still give their pause; a recognised end
+//       inside the silence still starts the span at its first cell (the back
+//       extension); and the extension stops at the word before's start.
+//   U8  a pause's cut: `[span + 0.2 s, span − 0.2 s)` snapped, exact ticks; the
+//       word after's start inside raises the start past it; another shown
+//       word's extent in the cut, or an unread clip's start, drops it; a cut
+//       left empty after the clamp drops it.
+//   U9  `planPause`: a locked track's word in the cut refused in TX-32's
+//       sentence naming the track; the ceiling on the peak with N; the counts
+//       equal `clipsAfter` and `clipsPeak`.
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -51,10 +68,11 @@ func track(_ id: UInt32, locked: Bool = false, name: String? = nil) -> String {
     #"{"id":\#(id),"name":"\#(name ?? "T\(id)")","muted":false,"locked":\#(locked)}"#
 }
 
-func clip(_ id: UInt32, on: UInt32, at start: Ticks, length: Ticks, media: UInt32, from: Ticks = 0)
+func clip(_ id: UInt32, on: UInt32, at start: Ticks, length: Ticks, media: UInt32, from: Ticks = 0,
+          speed: Double = 1)
     -> String
 {
-    #"{"id":\#(id),"track":\#(on),"start":\#(start),"duration":\#(length),"source":{"kind":"media","media":\#(media),"in":\#(from),"reversed":false},"enabled":{"video":true,"audio":true}}"#
+    #"{"id":\#(id),"track":\#(on),"start":\#(start),"duration":\#(length),"speed":\#(speed),"source":{"kind":"media","media":\#(media),"in":\#(from),"reversed":false},"enabled":{"video":true,"audio":true}}"#
 }
 
 func nestClip(_ id: UInt32, on: UInt32, at start: Ticks, length: Ticks, shows: UInt32) -> String {
@@ -93,7 +111,8 @@ func words(_ media: UInt32, _ list: [(String, Double, Double)]) -> TimelineTrans
 /// The cut's table of `project` for `heard` (every track shown), its
 /// container and its total clip count.
 func table(_ project: ReelProject?, _ heard: [TimelineTranscript.MediaWords],
-           rule: TranscriptCut.Rule = TranscriptCut.shipped)
+           rule: TranscriptCut.Rule = TranscriptCut.shipped, tracks: Set<UInt32>? = nil,
+           speech: [UInt32: [Float]] = [:])
     -> (TranscriptCut.Table, ProjectSnapshot, Int)?
 {
     guard let project, let plan = project.plan else { return nil }
@@ -103,8 +122,8 @@ func table(_ project: ReelProject?, _ heard: [TimelineTranscript.MediaWords],
     let byMedia = Dictionary(uniqueKeysWithValues: heard.map { ($0.media, $0) })
     let all = TimelineTranscript.words(found.instances, media: byMedia, snapshot: snapshot)
     let made = TranscriptCut.Table(
-        all: all, tracks: nil,
-        context: TranscriptCut.Context(instances: found.instances, media: byMedia, speech: [:]),
+        all: all, tracks: tracks,
+        context: TranscriptCut.Context(instances: found.instances, media: byMedia, speech: speech),
         rule: rule)
     return (made, snapshot, ShotSplit.clipCount(snapshot))
 }
@@ -350,6 +369,238 @@ do {
     } else {
         row("U6", false, "no plan")
     }
+}
+
+// MARK: - U7–U9 the pause token (TX3b, spec §11 TX-34)
+
+/// A voice cache of 2,000 cells (64 s), speech everywhere but `quiet`.
+func cache(_ quiet: [Swift.Range<Int>]) -> [Float] {
+    var out = [Float](repeating: 0.9, count: 2000)
+    for run in quiet { for k in run { out[k] = 0.1 } }
+    return out
+}
+
+/// The pauses of one 10 s clip of media 1 at 0 (track 10), its words
+/// `list` and its cache quiet over `quiet`, plus `extra` clips and tracks.
+func pausesOf(
+    _ list: [(String, Double, Double)], quiet: [Swift.Range<Int>], speed: Double = 1,
+    extraTracks: [String] = [], extraClips: [String] = [],
+    heard more: [TimelineTranscript.MediaWords] = [], tracks: Set<UInt32>? = nil,
+    noCache: Bool = false, locked: Bool = false
+) -> (pauses: [TranscriptCut.Pause], table: TranscriptCut.Table, container: ProjectSnapshot, total: Int)? {
+    let p = project(
+        media: mediaRows, tracks: [track(10, locked: locked)] + extraTracks,
+        clips: [clip(20, on: 10, at: 0, length: Ticks(Double(10 * SEC) / speed), media: 1, speed: speed)]
+            + extraClips)
+    let speech: [UInt32: [Float]] = noCache ? [:] : [1: cache(quiet)]
+    guard let (t, container, total) = table(p, [words(1, list)] + more, tracks: tracks, speech: speech)
+    else { return nil }
+    return (TranscriptCut.pauses(t, fps: container.canvas.fps), t, container, total)
+}
+
+func describe(_ pauses: [TranscriptCut.Pause]) -> String {
+    pauses.isEmpty ? "none"
+        : pauses.map { "after \($0.after) span \(describe($0.span)) cut \(describe($0.cut))" }
+            .joined(separator: "; ")
+}
+
+let ab = [("a", 1.0, 1.4), ("b", 4.0, 4.4)]
+
+do {
+    var checks: [(String, Bool, String)] = []
+    // 33 cells (1,056 ms) between a (ends 1.4 s) and b: a pause; 31 none.
+    if let long = pausesOf(ab, quiet: [50..<83]), let short = pausesOf(ab, quiet: [50..<81]) {
+        checks.append((
+            "33 cells", long.pauses.map(\.after) == [0]
+                && long.pauses.first?.span == .init(start: 50 * chunk, end: 83 * chunk),
+            describe(long.pauses)))
+        checks.append(("31 cells", short.pauses.isEmpty, describe(short.pauses)))
+    }
+    // A ×2 clip: 47 cells (1.5 s of source) are 0.75 s of timeline.
+    if let fast = pausesOf(ab, quiet: [50..<97], speed: 2) {
+        checks.append(("×2 1.5 s source", fast.pauses.isEmpty, describe(fast.pauses)))
+    }
+    // Runs of 10, 40 and 40 cells: the first 40.
+    if let three = pausesOf(ab, quiet: [45..<55, 56..<96, 97..<137]) {
+        checks.append((
+            "longest", three.pauses.first?.span == .init(start: 56 * chunk, end: 96 * chunk)
+                && three.pauses.count == 1, describe(three.pauses)))
+    }
+    // The clip plays source 0–3 s; b (2.9–4.4 s) runs past it: the window
+    // stops at 3 s (cell 93).
+    if let p = project(
+        media: mediaRows, tracks: [track(10)],
+        clips: [clip(20, on: 10, at: 0, length: 3 * SEC, media: 1)]),
+        let (t, c, _) = table(p, [words(1, [("a", 1.0, 1.4), ("b", 2.9, 4.4)])],
+                              speech: [1: cache([50..<130])])
+    {
+        let found = TranscriptCut.pauses(t, fps: c.canvas.fps)
+        checks.append((
+            "window clamp", found.map(\.span) == [.init(start: 50 * chunk, end: 93 * chunk)],
+            describe(found)))
+    }
+    // E0's early onset: a starts at 0.9 s, inside z (0.5–1.0 s), and ends at
+    // 3.6 s, after the silence (cells 35–89): one pause, after z.
+    if let early = pausesOf(
+        [("z", 0.5, 1.0), ("a", 0.9, 3.6), ("b", 3.7, 4.0)], quiet: [35..<90])
+    {
+        checks.append((
+            "E0 early onset", early.pauses.map(\.after) == [0]
+                && early.pauses.first?.span == .init(start: 35 * chunk, end: 90 * chunk),
+            describe(early.pauses)))
+    }
+    // Two clips of media 1: source 0–3.5 s at 0, then 3.5 s on at 3.5 s.
+    if let p = project(
+        media: mediaRows, tracks: [track(10)],
+        clips: [clip(20, on: 10, at: 0, length: 3 * SEC + SEC / 2, media: 1),
+                clip(21, on: 10, at: 3 * SEC + SEC / 2, length: 3 * SEC, media: 1,
+                     from: 3 * SEC + SEC / 2)]),
+        let (t, c, _) = table(p, [words(1, ab)], speech: [1: cache([50..<120])])
+    {
+        let found = TranscriptCut.pauses(t, fps: c.canvas.fps)
+        checks.append(("two clips", t.shown.count == 2 && found.isEmpty, describe(found)))
+    }
+    if let shut = pausesOf(ab, quiet: [50..<83], locked: true) {
+        checks.append(("locked track", shut.pauses.isEmpty, describe(shut.pauses)))
+    }
+    if let bare = pausesOf(ab, quiet: [50..<83], noCache: true) {
+        checks.append(("no cache", bare.pauses.isEmpty, describe(bare.pauses)))
+    }
+    // (i) Moved starts (TX1b): a recognised at 1.0 s moved to 1.1 s, b at
+    // 3.6 s moved to 4.1 s; the ids carry the recognised ticks.
+    let moved = TimelineTranscript.MediaWords(
+        media: 1, engine: .apple, language: "en-US", fillersReported: false,
+        words: [
+            TimelineTranscript.SourceWord(
+                text: "a", source: 1100 * MS, sourceEnd: 1400 * MS, speaker: nil,
+                recognisedStart: 1000 * MS),
+            TimelineTranscript.SourceWord(
+                text: "b", source: 4100 * MS, sourceEnd: 4400 * MS, speaker: nil,
+                recognisedStart: 3600 * MS),
+        ])
+    if let p = project(
+        media: mediaRows, tracks: [track(10)],
+        clips: [clip(20, on: 10, at: 0, length: 10 * SEC, media: 1)]),
+        let (t, c, _) = table(p, [moved], speech: [1: cache([50..<83])])
+    {
+        let found = TranscriptCut.pauses(t, fps: c.canvas.fps)
+        checks.append((
+            "moved starts", found.map(\.after) == [0]
+                && found.first?.span == .init(start: 50 * chunk, end: 83 * chunk),
+            describe(found)))
+    }
+    // (ii) a's recognised end 7 cells inside a 40-cell silence (cells
+    // 50–89): the span starts at cell 50, not 57.
+    if let late = pausesOf([("a", 1.0, 57 * 0.032), ("b", 4.0, 4.4)], quiet: [50..<90]) {
+        checks.append((
+            "late end", late.pauses.first?.span == .init(start: 50 * chunk, end: 90 * chunk)
+                && late.pauses.count == 1, describe(late.pauses)))
+    }
+    // (iii) Quiet from cell 20, before a (1.0 s, cell 31.25) and over its own
+    // cells: the extension stops at the first cell at or after a's start, 32.
+    if let floor = pausesOf(ab, quiet: [20..<83]) {
+        checks.append((
+            "floor at a's start",
+            floor.pauses.first?.span == .init(start: 32 * chunk, end: 83 * chunk)
+                && floor.pauses.count == 1, describe(floor.pauses)))
+    }
+    let bad = checks.filter { !$0.1 }
+    row("U7", checks.count == 12 && bad.isEmpty,
+        "\(checks.count)/12 cases built; " + checks.map { "\($0.0): \($0.1 ? "ok" : "FAIL") (\($0.2))" }
+            .joined(separator: "; "))
+}
+
+do {
+    var checks: [(String, Bool, String)] = []
+    let frame: Ticks = 20_000
+    // Span [960,000, 1,593,600): 1,080,000 is a frame; 1,473,600 snaps to
+    // 1,480,000.
+    if let plain = pausesOf(ab, quiet: [50..<83]) {
+        checks.append((
+            "exact", plain.pauses.map(\.cut) == [.init(start: 1_080_000, end: 1_480_000)]
+                && ReelTime.snapToFrame(50 * chunk + SEC / 5, fps: plain.container.canvas.fps)
+                    == 1_080_000, describe(plain.pauses)))
+    }
+    // b starts at 3.0 s (1,800,000), inside [1,080,000, 2,380,000): the cut
+    // starts on the frame after it.
+    if let inside = pausesOf([("a", 1.0, 1.4), ("b", 3.0, 4.4)], quiet: [50..<130]) {
+        checks.append((
+            "b's start inside", inside.pauses.map(\.cut)
+                == [.init(start: 1_800_000 + frame, end: 2_380_000)], describe(inside.pauses)))
+    }
+    // z on track 11 (0.8–2.0 s) ends inside the cut.
+    if let cross = pausesOf(
+        ab, quiet: [50..<83], extraTracks: [track(11)],
+        extraClips: [clip(21, on: 11, at: 0, length: 10 * SEC, media: 2)],
+        heard: [words(2, [("z", 0.8, 2.0)])])
+    {
+        let texts = (0..<cross.table.shown.count).map { cross.table.word($0).text }
+        checks.append((
+            "another word", texts == ["z", "a", "b"] && cross.pauses.isEmpty,
+            "tokens \(texts); \(describe(cross.pauses))"))
+    }
+    // Media 3, with no words, starts at 2.0 s on track 12.
+    if let wall = pausesOf(
+        ab, quiet: [50..<83], extraTracks: [track(12)],
+        extraClips: [clip(22, on: 12, at: 2 * SEC, length: SEC, media: 3)])
+    {
+        checks.append((
+            "unread start", wall.table.unread == [2 * SEC] && wall.pauses.isEmpty,
+            "unread \(wall.table.unread); \(describe(wall.pauses))"))
+    }
+    // b starts at 1,790,000, one frame under e (1,800,000): the clamp leaves
+    // nothing.
+    if let empty = pausesOf(
+        [("a", 1.0, 1.4), ("b", 1_790_000.0 / Double(SEC), 3.4)], quiet: [50..<100])
+    {
+        checks.append(("empty", empty.pauses.isEmpty, describe(empty.pauses)))
+    }
+    let bad = checks.filter { !$0.1 }
+    row("U8", checks.count == 5 && bad.isEmpty,
+        "\(checks.count)/5 cases built; " + checks.map { "\($0.0): \($0.1 ? "ok" : "FAIL") (\($0.2))" }
+            .joined(separator: "; "))
+}
+
+do {
+    var checks: [(String, Bool, String)] = []
+    // Words from track 10; y (2.0–2.2 s) on the locked track "Music" lies in
+    // the cut.
+    if let held = pausesOf(
+        ab, quiet: [50..<83], extraTracks: [track(11, locked: true, name: "Music")],
+        extraClips: [clip(21, on: 11, at: 0, length: 10 * SEC, media: 2)],
+        heard: [words(2, [("y", 2.0, 2.2)])], tracks: [10]), let pause = held.pauses.first
+    {
+        let plan = TranscriptCut.planPause(
+            pause, table: held.table, container: held.container, total: held.total)
+        checks.append((
+            "locked", plan.refusal == .locked(track: "Music")
+                && plan.refusal?.sentence
+                    == "Track Music is locked and has words in this cut: unlock it to cut here.",
+            plan.refusal?.sentence ?? "none"))
+    }
+    if let plain = pausesOf(ab, quiet: [50..<83]), let pause = plain.pauses.first {
+        let fit = TranscriptCut.planPause(
+            pause, table: plain.table, container: plain.container, total: plain.total)
+        let over = TranscriptCut.planPause(
+            pause, table: plain.table, container: plain.container, total: plain.total,
+            ceiling: fit.clipsPeak - 1)
+        let at = TranscriptCut.planPause(
+            pause, table: plain.table, container: plain.container, total: plain.total,
+            ceiling: fit.clipsPeak)
+        let after = TranscriptCut.clipsAfter(cutting: pause.cut, container: plain.container, total: plain.total)
+        let peak = TranscriptCut.clipsPeak(cutting: pause.cut, container: plain.container, total: plain.total)
+        checks.append((
+            "counts", fit.clipsAfter == after && fit.clipsPeak == peak && after == plain.total + 1
+                && peak == plain.total + 2 && fit.range == pause.cut && fit.refusal == nil,
+            "N \(plain.total), after \(fit.clipsAfter) (\(after)), peak \(fit.clipsPeak) (\(peak))"))
+        checks.append((
+            "ceiling", over.refusal == .ceiling(clips: fit.clipsPeak) && at.refusal == nil,
+            "peak−1: \(over.refusal?.sentence ?? "none"); at peak: \(at.refusal?.sentence ?? "none")"))
+    }
+    let bad = checks.filter { !$0.1 }
+    row("U9", checks.count == 3 && bad.isEmpty,
+        "\(checks.count)/3 cases built; " + checks.map { "\($0.0): \($0.1 ? "ok" : "FAIL") (\($0.2))" }
+            .joined(separator: "; "))
 }
 
 let data = try JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys])

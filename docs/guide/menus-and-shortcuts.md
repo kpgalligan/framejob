@@ -378,7 +378,7 @@ instead ([below](#preview-canvas-gestures)).
 | | ⇧ with an arrow | Extends the selection without moving the playhead |
 | | ⌘A | Selects every word |
 | | ⎋ | Clears the selection |
-| | ⌫ or ⌦ | Deletes the selected words and closes the gap, one undo step "Delete Words". Every other key, Space and J, K, L included, works as on the timeline |
+| | ⌫ or ⌦ | Deletes the selected words and closes the gap, one undo step "Delete Words"; with a pause selected, shortens it to 0.2 s each end, one undo step "Delete Pause". Every other key, Space and J, K, L included, works as on the timeline |
 | Assistant message field | ↩ | Sends the message |
 | | ⇧↩ (or ↩ with any modifier) | Starts a new line |
 | | Tab / ⇧Tab | Moves to the next or previous control |

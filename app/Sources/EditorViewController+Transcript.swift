@@ -41,12 +41,13 @@ extension EditorViewController: TranscriptHost {
         applyLoopRange()
     }
 
-    /// One `ripple_delete_ranges` as the step "Delete Words"; applied, the
-    /// range clears and the playhead lands at the cut.
-    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range) -> Bool {
+    /// One `ripple_delete_ranges` as the step `name` ("Delete Words", or
+    /// "Delete Pause", TX-34); applied, the range clears and the playhead
+    /// lands at the cut.
+    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range, name: String) -> Bool {
         guard let document else { return false }
         let before = document.project
-        document.applyEdit("Delete Words", .rippleDeleteRanges(ranges: [(range.start, range.end)]))
+        document.applyEdit(name, .rippleDeleteRanges(ranges: [(range.start, range.end)]))
         guard document.project !== before else { return false }
         document.inOutRange = nil
         setPlayhead(range.start)
@@ -61,10 +62,11 @@ extension EditorViewController: TranscriptHost {
         inspector?.showRefusal(ReelRefusal(op: "ripple_delete_ranges", reason: sentence))
     }
 
-    /// The window's first responder is a Transcript view with words
-    /// selected: the delete family forwards to it (`+Timeline`).
+    /// The window's first responder is a Transcript view with words or a
+    /// pause selected: the delete family forwards to it (`+Timeline`).
     var transcriptHoldsWords: Bool {
-        (view.window?.firstResponder as? TranscriptView)?.selection != nil
+        guard let shown = view.window?.firstResponder as? TranscriptView else { return false }
+        return shown.selection != nil || shown.pauseSelection != nil
     }
 
     /// The delete family's forward: the Transcript pane deletes its words.

@@ -7,7 +7,9 @@ import AppKit
 /// Edit ▸ Select All reaches first), Esc (clear the selection, or pass the key
 /// up when there is none), and ⌫ and ⌦ with words selected (`deleteKey()`,
 /// TX3a, spec §11 TX-31: one "Delete Words"; Edit ▸ Delete's bare ⌫ reaches
-/// the editor's forward first). With nothing selected they pass up, and
+/// the editor's forward first). Since TX3b (TX-34) a click on a pause token
+/// selects it; Esc, ⌫ and ⌦ act on it, and the arrows move from the word
+/// before it. With nothing selected they pass up, and
 /// Return passes up unchanged until TX5. Every other key goes to
 /// `super.keyDown`, so J, K, L, I, O and M reach `handleEditorKey` as from the
 /// timeline; Space never arrives here (`SpaceKey.route` takes it at the
@@ -24,14 +26,14 @@ extension TranscriptView {
             return
         }
         let extend = flags.contains(.shift)
+        let held = selection != nil || pauseSelection != nil
         switch scalar {
         case UInt32(NSLeftArrowFunctionKey): step(by: -1, extend: extend)
         case UInt32(NSRightArrowFunctionKey): step(by: 1, extend: extend)
         case UInt32(NSUpArrowFunctionKey): line(up: true, extend: extend)
         case UInt32(NSDownArrowFunctionKey): line(up: false, extend: extend)
-        case 27 where !extend && selection != nil: select(nil)
-        case 0x7F where !extend && selection != nil,
-            UInt32(NSDeleteFunctionKey) where !extend && selection != nil:
+        case 27 where !extend && held: select(nil)
+        case 0x7F where !extend && held, UInt32(NSDeleteFunctionKey) where !extend && held:
             deleteKey()
         default: super.keyDown(with: event)
         }
@@ -43,9 +45,9 @@ extension TranscriptView {
     }
 
     /// The token a key moves from: the selection's moving end, else the
-    /// highlighted word.
+    /// word before a selected pause, else the highlighted word.
     private var caret: Int? {
-        guard let selection else { return highlighted }
+        guard let selection else { return pauseSelection.map { pauses[$0].after } ?? highlighted }
         if let anchor = selectionAnchor, anchor == selection.upperBound, anchor != selection.lowerBound {
             return selection.lowerBound
         }
@@ -91,6 +93,10 @@ extension TranscriptView {
         let point = convert(event.locationInWindow, from: nil)
         if let paragraph = paragraphIndex(at: point) {
             onParagraph?(paragraph)
+            return
+        }
+        if !event.modifierFlags.contains(.shift), let pause = pauseIndex(at: point) {
+            clickPause(pause)
             return
         }
         guard let index = tokenIndex(at: point) else { return }

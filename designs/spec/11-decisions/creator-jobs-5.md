@@ -9,7 +9,7 @@ The IDs continue the series of [`creator-jobs.md`](creator-jobs.md),
 to say which file; `creator-jobs.md` says what the road map builds and how its IDs are made (CJ-7).
 This file is new because `creator-jobs-4.md` passed the road map's ~500-line split rule with CO3's
 entries (620 lines, 2026-11-02); each phase's decisions are appended here from now on, before its
-code.
+code. The series continues in [`creator-jobs-6.md`](creator-jobs-6.md) from TX3b's TX-34.
 
 CO-40…CO-42 are CO4's (the cutout's edges), recorded before its code. S-KEY1 (`samples/README.md`:
 the owner before an evenly lit plain cloth) does not exist, so CO-S3 — whether the edge needs

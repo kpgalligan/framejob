@@ -31,12 +31,13 @@ extension TranscriptView {
         return now() - last < Self.followPause
     }
 
-    /// Selects `range` of tokens, or clears the selection.
+    /// Selects `range` of tokens, or clears the selection — a pause's too.
     func select(_ range: ClosedRange<Int>?) {
         let valid = range.flatMap { r -> ClosedRange<Int>? in
             guard r.lowerBound >= 0, r.upperBound < tokenStarts.count else { return nil }
             return r
         }
+        if valid == nil { setPauseSelection(nil) }
         selectionAnchor = valid?.lowerBound
         setSelection(valid)
         onSelect?(valid)
@@ -48,8 +49,9 @@ extension TranscriptView {
         for rect in rects(for: tokenRange(tokens)) { setNeedsDisplay(rect.insetBy(dx: -3, dy: -2)) }
     }
 
-    /// The selection and the highlight, behind the text.
+    /// The selection, a selected pause and the highlight, behind the text.
     func drawMarks(in dirtyRect: NSRect) {
+        drawPauseMark(in: dirtyRect)
         if let selection {
             DS.selectionFill.setFill()
             for rect in rects(for: tokenRange(selection)) where rect.intersects(dirtyRect) {

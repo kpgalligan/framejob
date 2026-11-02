@@ -700,7 +700,8 @@ detail there.
   runs off main (`creatorOffMainTools`) with one main hop, and the
   assistant's Stop releases only its own want. `get_timeline_transcript`'s
   rows carry `cut_start`/`cut_end` (`TranscriptCut.wordCut`, TX-30, TX-33),
-  each needed media's voice cache read on the server thread.
+  and the answer `pauses[]` (TX-34), from the same table, each needed
+  media's voice cache read on the server thread.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
@@ -1629,8 +1630,8 @@ the key map behind it.
   `TranscriptTabSource+Statics.swift` · `WordOnsets.swift` ·
   `TranscriptTokens.swift` · `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) ·
   `TimelineTranscript+Document.swift` · `EditorViewController+Transcript.swift` ·
-  `AgentServer+TranscriptView.swift` · `TranscriptCut.swift` (+`Plan`) ·
-  `TranscriptView+Delete.swift` — the Transcript tab (road map creator-jobs TX2a, spec
+  `AgentServer+TranscriptView.swift` · `TranscriptCut.swift` (+`Plan`, +`Pause`) ·
+  `TranscriptView+Delete.swift` · `TranscriptView+Pause.swift` — the Transcript tab (road map creator-jobs TX2a, spec
   §11 TX-20…TX-23, §4.3e). The pane is `AssistantPane`'s shape (one view built in `init`,
   exactly the visible height, its own `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
   finds itself through a static weak table keyed by the inspector (`TranscriptPane.pane(in:)`);
@@ -1676,6 +1677,17 @@ the key map behind it.
   re-read through `loadStored` (one in flight per media, `rereading`) and stay shown until that
   merges, and a load that read before a landing is read again instead of merged.
   `TranscriptTabSource+Statics` holds `resolve`, `pauses`, `Read` and the probes' `loadHold`.
+  Since TX3b (spec §11 TX-34): `TranscriptCut+Pause` is pure — a voice-cache silence over 1 s of
+  timeline time between two shown words of one instance (the source words matched on
+  `identityTick`), the longest non-speech run from the word before's end, extended back
+  (`quietStart`) to no earlier than its start; its cut keeps 0.2 s each end, snapped, never a shown
+  word's start (no two-range cut), dropped when it meets another shown word or an unread clip;
+  `planPause` refuses on a locked track's words, then the peak ceiling. The pane computes the
+  pauses once per rebuild from `cutTable()` and passes them to `show`, and calls `source.update()`
+  when a `speech` cache lands so the table and pauses are remade; the view shows each as
+  " [x.x s]" after its word, a click selects it exclusively of the word selection (`onSelectPause`)
+  and the pane sets its cut as the range and seeks to it; ⌫ and the delete family send one
+  "Delete Pause" (`transcriptDelete(_:name:)`).
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·

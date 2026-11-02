@@ -24,8 +24,11 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     /// A person's selection changed: a click, an arrow, a drag, ⇧, ⌘A or Esc
     /// (spec §11 TX-31). Never a rebuild's re-mapping, nor `adopt`.
     var onSelect: ((ClosedRange<Int>?) -> Void)?
-    /// ⌫ or ⌦ with words selected (spec §11 TX-31).
+    /// ⌫ or ⌦ with words selected (spec §11 TX-31), or a pause (TX-34).
     var onDelete: (() -> Void)?
+    /// A click on a pause token (spec §11 TX-34); nil when a person's clear
+    /// dropped it. Never a rebuild's re-mapping.
+    var onSelectPause: ((Int?) -> Void)?
     /// The clock the 3 s follow pause reads (TX-22). Internal: a probe sets it.
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
@@ -50,6 +53,12 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     private(set) var timecodeRanges: [NSRange] = []
     /// Each contiguous run of words that cannot be cut, with its reason.
     private(set) var dimRuns: [(range: NSRange, why: String)] = []
+    /// The pause tokens shown (TX-34), each after its token `after`, and
+    /// each one's UTF-16 range; the selected one, never beside a word
+    /// selection.
+    private(set) var pauses: [TranscriptCut.Pause] = []
+    private(set) var pauseRanges: [NSRange] = []
+    private(set) var pauseSelection: Int?
     var highlighted: Int?
     /// The timecode style the last `show` used, for a restyle.
     private var shownStyle: (fps: Fps, frames: Bool)?
@@ -82,8 +91,12 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     // MARK: - The text
 
     /// Lays `tokens` out, keeping the top visible token's identity at its
-    /// offset from the visible top, else the nearest later start.
-    func show(_ tokens: TranscriptTokens, fps: Fps, timecodeFrames: Bool) {
+    /// offset from the visible top, else the nearest later start; with them
+    /// `pauses` (TX-34), a selected pause re-mapped by the identities of the
+    /// tokens on its two sides.
+    func show(
+        _ tokens: TranscriptTokens, pauses: [TranscriptCut.Pause] = [], fps: Fps, timecodeFrames: Bool
+    ) {
         let anchor = topVisibleToken().map { index -> (TimelineTranscript.Identity, Ticks, CGFloat) in
             let token = model.tokens[index]
             let y = (rects(forToken: index).first?.minY ?? visibleRect.minY) - visibleRect.minY
@@ -92,7 +105,13 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
         let selected = selection.map { (model.tokens[$0.lowerBound].word.id, model.tokens[$0.upperBound].word.id) }
         let lit = highlighted.map { model.tokens[$0].word.id }
         let anchored = selectionAnchor.flatMap { model.tokens.indices.contains($0) ? model.tokens[$0].word.id : nil }
+        let pausedBetween = pauseSelection.flatMap { index -> (TimelineTranscript.Identity, TimelineTranscript.Identity)? in
+            let after = self.pauses[index].after
+            guard after + 1 < model.tokens.count else { return nil }
+            return (model.tokens[after].word.id, model.tokens[after + 1].word.id)
+        }
         model = tokens
+        self.pauses = pauses.filter { $0.after + 1 < tokens.tokens.count }
         shownStyle = (fps, timecodeFrames)
         contentStorage.textStorage?.setAttributedString(text(fps: fps, frames: timecodeFrames))
         highlighted = lit.flatMap { model.index(of: $0) }
@@ -100,6 +119,11 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
             guard let low = model.index(of: pair.0), let high = model.index(of: pair.1), low <= high
             else { return nil }
             return low...high
+        }
+        pauseSelection = pausedBetween.flatMap { pair in
+            self.pauses.firstIndex {
+                model.tokens[$0.after].word.id == pair.0 && model.tokens[$0.after + 1].word.id == pair.1
+            }
         }
         // The ⇧-extension's anchor follows its word, else the selection's
         // start: an old index can lie past a shrunk text.
@@ -129,6 +153,9 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
         var faint: [NSRange] = []
         var struck: [NSRange] = []
         var dim: [(range: NSRange, why: String)] = []
+        var paused: [NSRange] = []
+        var pauseAfter: [Int: TranscriptCut.Pause] = [:]
+        for pause in pauses { pauseAfter[pause.after] = pause }
         starts.reserveCapacity(model.tokens.count)
         lengths.reserveCapacity(model.tokens.count)
         func extend(_ ranges: inout [NSRange], _ range: NSRange) {
@@ -168,6 +195,13 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
                         dim.append((range, why))
                     }
                 }
+                if let pause = pauseAfter[index] {
+                    let seconds = Double(pause.span.end - pause.span.start) / Double(ReelTime.perSecond)
+                    let label = String(format: "[%.1f s]", seconds)
+                    plain.append(" ")
+                    paused.append(NSRange(location: plain.length, length: (label as NSString).length))
+                    plain.append(label)
+                }
             }
             plain.append("\n")
         }
@@ -179,6 +213,8 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
                 [.foregroundColor: faintColor, .strikethroughStyle: NSUnderlineStyle.single.rawValue],
                 range: range)
         }
+        let pauseColor = resolved(DS.textMuted)
+        for range in paused { out.addAttribute(.foregroundColor, value: pauseColor, range: range) }
         let timecode = timecodeAttributes
         for range in timecodes {
             out.setAttributes(timecode, range: NSRange(location: range.location, length: range.length + 1))
@@ -187,6 +223,7 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
         tokenLengths = lengths
         timecodeRanges = timecodes
         dimRuns = dim
+        pauseRanges = paused
         return out
     }
 
@@ -218,7 +255,7 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         guard let style = shownStyle else { return }
-        show(model, fps: style.fps, timecodeFrames: style.frames)
+        show(model, pauses: pauses, fps: style.fps, timecodeFrames: style.frames)
     }
 
     // MARK: - Viewport layout
@@ -352,10 +389,23 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
         layoutViewport()
     }
 
+    /// Sets the word selection; a range clears the pause selection.
     func setSelection(_ range: ClosedRange<Int>?) {
+        if range != nil, pauseSelection != nil { setPauseSelection(nil) }
         let old = selection
         selection = range
         invalidate(old)
         invalidate(range)
+    }
+
+    /// Sets the pause selection and marks its rects dirty; tells nobody.
+    func setPauseSelection(_ index: Int?) {
+        let valid = index.flatMap { pauses.indices.contains($0) ? $0 : nil }
+        guard valid != pauseSelection else { return }
+        let old = pauseSelection
+        pauseSelection = valid
+        for changed in [old, valid].compactMap({ $0 }) where pauseRanges.indices.contains(changed) {
+            for rect in rects(for: pauseRanges[changed]) { setNeedsDisplay(rect.insetBy(dx: -3, dy: -2)) }
+        }
     }
 }

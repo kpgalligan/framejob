@@ -153,8 +153,25 @@ take the very end of the word before it, or leave a sliver of the word you
 deleted. Play the cut back (Loop plays the shaded range before you delete) and
 undo if it sounds wrong.
 
+### Shortening a pause
+
+Where the speech stops for more than a second between two words of one clip,
+the transcript shows the pause's length after the word before it, in grey:
+"[2.4 s]". The pause is what the voice model hears as silence between the end
+of that word and the next one. Click it: it is selected on its own, the part
+that would go becomes the timeline's in/out range, and the playhead moves to
+it. Press ⌫ (or ⌦, **Edit ▸ Delete** or **Edit ▸ Ripple Delete**) and the
+pause is shortened to 0.2 s at each end, the gap closed on every unlocked
+track, as one undo step, **Delete Pause**. The cut lands on whole frames and
+never takes the start of a word. The tab refuses it for the same reasons as
+words (a locked track's words in the cut, the 4096-clip limit). A pause
+appears once the file's voice model has run (it runs when the project opens
+the file); a pause across two clips, inside a nest or under a transition is
+not shown. ⎋ clears it; dragging, ⇧ and ⌘A select words only.
+
 An agent cuts words the same way: each word it reads carries the range the
-tab would cut it by, and it deletes a run of words with one ripple delete.
+tab would cut it by, and it deletes a run of words with one ripple delete;
+it reads the same pauses, each with the range the tab would cut it by.
 See [Driving Frame Job from an AI agent](mcp.md).
 
 ## Keys
@@ -168,7 +185,7 @@ With the transcript text active:
 | ⇧ with an arrow | Extend the selection without moving the playhead |
 | ⌘A | Select every word |
 | ⎋ | Clear the selection |
-| ⌫ or ⌦ | Delete the selected words and close the gap |
+| ⌫ or ⌦ | Delete the selected words and close the gap, or shorten the selected pause |
 
 Every other key works as it does on the timeline: Space plays and pauses, J,
 K and L shuttle, I and O set the range, and M adds a marker.

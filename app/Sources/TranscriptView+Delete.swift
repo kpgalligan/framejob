@@ -22,9 +22,9 @@ extension TranscriptView {
         onSelect?(range)
     }
 
-    /// ⌫ or ⌦ with words selected.
+    /// ⌫ or ⌦ with words or a pause selected (TX-34).
     func deleteKey() {
-        guard selection != nil else { return }
+        guard selection != nil || pauseSelection != nil else { return }
         onDelete?()
     }
 
