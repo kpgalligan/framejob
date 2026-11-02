@@ -13,6 +13,11 @@ CO-S1 and CO-S2) applied to the rows the runner hands it:
   under 5 % to analysis time per minute), the encoding (the smaller MB per
   minute of those passing all six) and the compositor class from (2).
 - `s2_pack(rows)` — the per-media mask pack on (1), (2), (5), (6).
+- `device_rule(rows)` — CJ-S2's rule 1 read for the mask request (road map
+  CO1's head): the fastest of CPU, GPU and Neural Engine whose three runs'
+  mask bytes are identical; else the CPU when its every-frame 1080p30 median
+  reaches 1.0× (CO-S1 (c)'s bar standing in for rule 2's rate); else the
+  fastest, every proof then comparing against the cache only.
 - `nearest(analysed, t)` — the analysed time nearest `t`, ties to the
   earlier, both in the stream the segment reads: the one expectation every
   registration row is scored against.
@@ -39,6 +44,38 @@ MB_PER_MIN_MAX = 15.0          # (4): 10^6 bytes per minute of 30 fps source
 PLAYBACK_MIN = 0.99            # (5): with masks ≥ 99 % of without
 BUILD_MAX_MS = 100.0           # (6): median build, with − without
 FIXED_PCT_MAX = 5.0            # L: per-chunk fixed cost, % of analysis time
+DEVICES = ("cpu", "gpu", "neural_engine")
+CPU_BAR = 1.0                  # CJ-S2 rule 1's CPU branch, read for masks: 1.0× at 1080p30
+
+
+def device_rule(rows):
+    """`rows[device]` = {"sha256": [three runs' digests], "realtime": [three
+    factors]}. Answers {device, branch (1, 2 or 3), identical, realtime (the
+    medians), compare ("cross_run" or "cache_only")}. A device with fewer than
+    three runs is neither identical nor counted fastest."""
+    def median(values):
+        values = sorted(values)
+        n = len(values)
+        return None if n == 0 else (values[n // 2] if n % 2 else (values[n // 2 - 1]
+                                                                  + values[n // 2]) / 2)
+    medians, identical = {}, {}
+    for device in DEVICES:
+        row = rows.get(device) or {}
+        shas, factors = row.get("sha256") or [], row.get("realtime") or []
+        medians[device] = median(factors) if len(factors) >= 3 else None
+        identical[device] = len(shas) >= 3 and len(set(shas)) == 1
+    timed = [d for d in DEVICES if medians[d] is not None]
+    same = [d for d in timed if identical[d]]
+    if same:
+        device, branch = max(same, key=lambda d: medians[d]), 1
+    elif medians.get("cpu") is not None and medians["cpu"] >= CPU_BAR:
+        device, branch = "cpu", 2
+    elif timed:
+        device, branch = max(timed, key=lambda d: medians[d]), 3
+    else:
+        device, branch = None, 3
+    return {"device": device, "branch": branch, "identical": identical, "realtime": medians,
+            "compare": "cache_only" if branch == 3 else "cross_run"}
 
 
 def nearest(analysed, t):
@@ -269,6 +306,28 @@ def selftest():
     got = s1(0.2, 0.4, 0.6)
     row("S1 none reaching 1.0× → 10, risk", got["rate"] == "10" and got["risk"]
         and got["realtime_1080"] == 0.6 and got["best"] == "owed", got)
+
+    # The device rule for masks — each branch.
+    def dev(cpu, gpu, ane):
+        return device_rule({name: {"sha256": shas, "realtime": factors}
+                            for name, (shas, factors) in
+                            (("cpu", cpu), ("gpu", gpu), ("neural_engine", ane))})
+    same, mixed = ["a", "a", "a"], ["a", "b", "a"]
+    got = dev((same, [0.3] * 3), (same, [0.9] * 3), (same, [1.8] * 3))
+    row("device: all identical → the fastest (ANE)", got["device"] == "neural_engine"
+        and got["branch"] == 1, got)
+    got = dev((same, [0.3] * 3), (same, [0.9] * 3), (mixed, [1.8] * 3))
+    row("device: ANE differs → the fastest identical (GPU)", got["device"] == "gpu"
+        and got["branch"] == 1 and got["compare"] == "cross_run", got)
+    got = dev((mixed, [1.0, 1.2, 0.9]), (mixed, [0.9] * 3), (mixed, [1.8] * 3))
+    row("device: none identical, CPU at exactly 1.0× → CPU", got["device"] == "cpu"
+        and got["branch"] == 2, got)
+    got = dev((mixed, [0.5] * 3), (mixed, [0.9] * 3), (mixed, [1.8] * 3))
+    row("device: none identical, CPU slow → the fastest, cache only",
+        got["device"] == "neural_engine" and got["branch"] == 3
+        and got["compare"] == "cache_only", got)
+    got = dev((["a", "a"], [2.0, 2.0]), (same, [0.9] * 3), (mixed, [1.8] * 3))
+    row("device: two runs are not three", got["device"] == "gpu", got)
 
     # nearest — a tie goes to the earlier.
     row("nearest tie → earlier", nearest([0, 2, 4], 1) == 0 and nearest([0, 2, 4], 3) == 2,

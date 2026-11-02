@@ -6,18 +6,26 @@
 // `tools/proof/work/cutout_spike/bin/mask_speed/main.swift`, through
 // `swift_build.build` (`cutout_spike.py`).
 //
-//   mask_speed job <movie> <candidate> <every|15|10> <source|1920>
+//   mask_speed job <movie> <candidate> <every|15|10> <source|1920> [device]
 //   mask_speed first <movie> <candidate>
 //   mask_speed dump <movie> <every|15|10> <out-dir>
+//   mask_speed devices <movie> <cpu|gpu|neural_engine>
 //
 // Candidates: `person-balanced`, `person-accurate`
 // (`VNGeneratePersonSegmentationRequest` at that quality, 8-bit output) and
 // `instance-scaled` (`VNGeneratePersonInstanceMaskRequest`, then
 // `generateScaledMaskForImage` over every instance). Every request is pinned
 // to the Neural Engine with `setComputeDevice(_:for:)` on each stage it
-// supports (`effects_spike/vision_common.swift`'s `pin`), and a FRESH request
-// is made for every sampled frame (CJ-23's sample rule: every frame, or the
-// first frame at or after each k / rate s).
+// supports (`effects_spike/vision_common.swift`'s `pin`), or to `job`'s
+// optional device (`cpu`, `gpu`, `neural_engine`; road map CO1's re-measure),
+// and a FRESH request is made for every sampled frame (CJ-23's sample rule:
+// every frame, or the first frame at or after each k / rate s).
+//
+// `devices` (road map CO1's head, CJ-S2 rule 1 for the mask request): person
+// `.balanced`, a fresh request per frame, EVERY decoded frame of the movie at
+// its source size, pinned to the one device named; last line JSON {sha256 (of
+// every mask's bytes in order), realtime, frames, requests, mask_w, mask_h,
+// device, revision}.
 //
 // `job` decodes every frame through `AVAssetReaderTrackOutput`, 32BGRA, at
 // the read size (`source`, or a long side of 1920 for a larger source), runs
@@ -35,6 +43,7 @@
 // index…], all_pts: [every decoded frame's time…], source_frames}.
 import AVFoundation
 import CoreML
+import CryptoKit
 import CoreVideo
 import Foundation
 import Vision
@@ -58,17 +67,30 @@ enum Candidate: String {
     case instanceScaled = "instance-scaled"
 }
 
-/// The Neural Engine on every stage the request supports; answers the
-/// device's description, or "auto" when a stage has none.
-func pinNeuralEngine(_ request: VNRequest) -> String {
+/// The device `name` (`cpu`, `gpu`, `neural_engine`) on every stage the
+/// request supports; answers the device's description, or "auto" when a
+/// stage has none.
+var pinned = "neural_engine"
+
+func pinNeuralEngine(_ request: VNRequest) -> String { pin(request, to: pinned) }
+
+func pin(_ request: VNRequest, to name: String) -> String {
     guard let stages = try? request.supportedComputeStageDevices else { return "auto" }
     var named = "auto"
     for (stage, devices) in stages {
         guard let pick = devices.first(where: {
-            if case .neuralEngine = $0 { return true } else { return false }
-        }) else { return "auto (no neural engine on a stage)" }
+            switch ($0, name) {
+            case (.cpu, "cpu"), (.gpu, "gpu"), (.neuralEngine, "neural_engine"): return true
+            default: return false
+            }
+        }) else { return "auto (no \(name) on a stage)" }
         request.setComputeDevice(pick, for: stage)
-        if case .neuralEngine(let engine) = pick { named = "ane(\(engine.totalCoreCount) cores)" }
+        switch pick {
+        case .neuralEngine(let engine): named = "ane(\(engine.totalCoreCount) cores)"
+        case .gpu(let gpu): named = "gpu(\(gpu.metalDevice.name))"
+        case .cpu: named = "cpu"
+        @unknown default: named = "unknown"
+        }
     }
     return named
 }
@@ -204,9 +226,12 @@ guard arguments.count >= 4 else {
 
 switch arguments[1] {
 case "job":
-    guard arguments.count == 6, let candidate = Candidate(rawValue: arguments[3]) else {
-        die("job <movie> <candidate> <every|15|10> <source|1920>")
+    guard arguments.count == 6 || arguments.count == 7,
+        let candidate = Candidate(rawValue: arguments[3])
+    else {
+        die("job <movie> <candidate> <every|15|10> <source|1920> [device]")
     }
+    if arguments.count == 7 { pinned = arguments[6] }
     let started = nowS()
     let input = open(arguments[2], readSize: arguments[5])
     var sampler = Sampler(arguments[4])
@@ -288,6 +313,38 @@ case "dump":
     let data = try! JSONSerialization.data(withJSONObject: index_, options: [.sortedKeys])
     try! data.write(to: out.appendingPathComponent("index.json"))
     emit(["masks": pts.count, "width": width, "height": height, "source_frames": index + 1])
+case "devices":
+    guard arguments.count == 4, ["cpu", "gpu", "neural_engine"].contains(arguments[3]) else {
+        die("devices <movie> <cpu|gpu|neural_engine>")
+    }
+    pinned = arguments[3]
+    let started = nowS()
+    let input = open(arguments[2], readSize: "source")
+    var digest = SHA256()
+    var frames = 0, requests = 0, maskW = 0, maskH = 0, revision = 0, device = ""
+    while let sample = input.output.copyNextSampleBuffer() {
+        guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
+        frames += 1
+        do {
+            let answer = try autoreleasepool { try mask(.personBalanced, buffer) }
+            requests += 1
+            digest.update(data: answer.bytes)
+            maskW = answer.width
+            maskH = answer.height
+            revision = answer.revision
+            device = answer.device
+        } catch {
+            die("frame \(frames): \(error.localizedDescription)")
+        }
+    }
+    guard input.reader.status == .completed else {
+        die("reader ended \(input.reader.status.rawValue): \(String(describing: input.reader.error))")
+    }
+    let wall = nowS() - started
+    let hex = digest.finalize().map { String(format: "%02x", $0) }.joined()
+    emit(["sha256": hex, "realtime": input.duration / wall, "wall_s": wall,
+          "source_s": input.duration, "frames": frames, "requests": requests, "mask_w": maskW,
+          "mask_h": maskH, "device": device, "revision": revision])
 default:
     die("unknown mode \(arguments[1])")
 }

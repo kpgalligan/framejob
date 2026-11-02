@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Road map "creator-jobs" CO0 — the cutout spikes CO-S1 and CO-S2.
 
-    python3 tools/proof/cutout_spike/cutout_spike.py [--only s1,s2] [--pack]
+    python3 tools/proof/cutout_spike/cutout_spike.py [--only s1,s2,device] [--pack]
+                                                      [--device cpu|gpu|neural_engine]
                                                       [--build-only] [--selftest]
 
 CO-S1 (speed only: S-KEY1 is missing) — `mask_speed`, built from its own file
@@ -23,6 +24,22 @@ fixed cost of one chunk; then `deciders.s2_track`. `--pack` (and
 automatically when the track answers `none`) measures the per-media mask pack
 on (1), (2), (5), (6) after a free-space check, then `deciders.s2_pack`.
 CO-S3 is not run (S-KEY1 missing).
+
+`--only device` (road map CO1's head) — CJ-S2's rule 1 read for the mask
+request: `mask_speed devices` on every frame of `push_1080.mov`, person
+`.balanced`, a fresh request per frame, three runs pinned to each of the CPU,
+the GPU and the Neural Engine, each run's SHA-256 over its masks' bytes and
+its realtime factor; then `deciders.device_rule`. R0 checks CJ-S2's hash;
+results in `tools/proof/work/creator_spike/CJ-S2-masks/`. `--only s1 --device
+D` re-measures Standard alone (person `.balanced` at every, 15 and 10 a second
+on both push-ins) pinned to D, results in `CO-S1-D/`.
+
+`fixtures()` also makes M5's 640 × 360 lossless push-in and its three
+rotation twins (`co1_proof.py`'s M5): `push_640.mov`, `push_640_cw.mov` (its
+`transpose=1`, tagged to display as it does), `push_640_t.mov` (the same
+frames untagged, 360 × 640) and `push_640_r.mov` (`push_640.mov` tagged to
+display as `push_640_t.mov`); each pair is checked to decode, rotated by
+ffmpeg, to the same first frame.
 
 R0: each spike's rule hash is checked first (`rule.check_rule`); a mismatch
 prints `RULE CHANGED <id>` and writes nothing. Results:
@@ -159,8 +176,9 @@ def ffmpeg(args, out, seconds=1800):
 
 
 def fixtures(record):
-    """The push-ins and the screen recording (CO-S1, CO-S2 (5)); a missing
-    source image is a scored failure naming its path."""
+    """The push-ins and the screen recording (CO-S1, CO-S2 (5)), and M5's
+    640 × 360 push-in and its rotation twins; a missing source image is a
+    scored failure naming its path."""
     MEDIA.mkdir(parents=True, exist_ok=True)
     # FlexAudio's cover first: person `.balanced` finds no person in MUSE's
     # back view (a 1080p still of it: mask maximum 45 levels, no pixel above
@@ -205,9 +223,47 @@ def fixtures(record):
                 and probe["height"] == height):
             raise Failure(f"{name} probes as {probe}, not {frames} frames at {width}×{height}")
         made[name] = probe
+    made.update(rotation_fixtures())
     record["fixtures"] = made
     (MEDIA / "fixtures.json").write_text(json.dumps(record, indent=1, sort_keys=True))
     return made
+
+
+def first_frame_md5(path):
+    """The first frame's MD5 as ffmpeg decodes it, display rotation applied."""
+    run = subprocess.run([FFMPEG, "-v", "error", "-i", str(path), "-frames:v", "1", "-f",
+                          "framemd5", "-pix_fmt", "rgb24", "-"], capture_output=True, text=True,
+                         timeout=120)
+    lines = [line for line in run.stdout.splitlines() if line and not line.startswith("#")]
+    return lines[0].split(",")[-1].strip() if lines else None
+
+
+def rotation_fixtures():
+    """M5's four: a 3 s 640 × 360 push-in in MOV (`push_1080.mov`'s first 3 s),
+    uncompressed BGRA (`rawvideo` bgra: AVFoundation on macOS 26.5.1 refuses
+    PNG in MOV, -11833, and decodes rgb24 twins up to 0.65 levels apart), its
+    `transpose=1` tagged `-display_rotation 90` to display alike
+    (`push_640_cw`), the transposed frames untagged (`push_640_t`, 360 × 640)
+    and the original tagged `-display_rotation -90` to display as that
+    (`push_640_r`). Each pair must decode, rotated, to the same first frame."""
+    base, cw = MEDIA / "push_640.mov", MEDIA / "push_640_cw.mov"
+    upright, tagged = MEDIA / "push_640_t.mov", MEDIA / "push_640_r.mov"
+    probe = frame_count(base) if base.exists() else None
+    if not (probe and probe["frames"] == 90 and probe["width"] == 640
+            and probe["codec"] == "rawvideo"):
+        ffmpeg(["-i", str(MEDIA / "push_1080.mov"), "-t", "3", "-vf", "scale=640:360",
+                "-c:v", "rawvideo", "-pix_fmt", "bgra", "-video_track_timescale", "600"], base)
+    if not upright.exists() or upright.stat().st_mtime < base.stat().st_mtime:
+        ffmpeg(["-i", str(base), "-vf", "transpose=1", "-c:v", "rawvideo", "-pix_fmt", "bgra",
+                "-video_track_timescale", "600"], upright)
+    for source, out, angle in ((upright, cw, "90"), (base, tagged, "-90")):
+        if not out.exists() or out.stat().st_mtime < source.stat().st_mtime:
+            ffmpeg(["-display_rotation", angle, "-i", str(source), "-c", "copy"], out)
+    for a, b in ((base, cw), (upright, tagged)):
+        if first_frame_md5(a) is None or first_frame_md5(a) != first_frame_md5(b):
+            raise Failure(f"{b.name} does not display as {a.name}: first frames "
+                          f"{first_frame_md5(a)} and {first_frame_md5(b)}")
+    return {p.name: frame_count(p) for p in (base, cw, upright, tagged)}
 
 
 def barcode_fixtures(probe):
@@ -281,17 +337,22 @@ def run_probe(binary, args, timeout=1800):
 
 # MARK: - CO-S1
 
-def s1(binaries, results):
+def s1(binaries, results, device=None):
+    """CO-S1; with `device` (road map CO1's re-measure) Standard alone,
+    pinned to it, and no first-request row."""
     speed = binaries["mask_speed"]
     rows, firsts = {}, {}
+    candidates = (deciders.STANDARD,) if device else CANDIDATES
+    pinned = [device] if device else []
     for movie, sizes in (("push_1080", ("source",)), ("push_4k", ("source", "1920"))):
         for size in sizes:
-            for candidate in CANDIDATES:
+            for candidate in candidates:
                 for rate in deciders.RATES:
                     runs = []
                     for _ in range(RUNS):
                         answer = run_probe(speed, ["job", str(MEDIA / f"{movie}.mov"),
-                                                   candidate, rate, size], timeout=3600)
+                                                   candidate, rate, size, *pinned],
+                                           timeout=3600)
                         answer["load"] = load()
                         runs.append(answer)
                     key = f"{candidate}/{rate}/{movie}/{size}"
@@ -305,7 +366,7 @@ def s1(binaries, results):
                     log(f"CO-S1 {key}: {rows[key]['realtime']:.3f}× "
                         f"({', '.join(f'{f:.3f}' for f in factors)}) mask {rows[key]['mask']} "
                         f"load {runs[-1]['load']}")
-    for candidate in CANDIDATES:
+    for candidate in () if device else CANDIDATES:
         firsts[candidate] = run_probe(speed, ["first", str(MEDIA / "push_1080.mov"), candidate])
         log(f"CO-S1 first {candidate}: {firsts[candidate]['first_call_ms']:.1f} ms")
     verdict = deciders.s1_speed_only(rows)
@@ -314,14 +375,16 @@ def s1(binaries, results):
     k_1920 = rows.get(f"{standard}/push_4k/1920", {}).get("realtime")
     verdict.update({"realtime_4k_source": k_source, "realtime_4k_1920": k_1920,
                     "mask": rows[f"{standard}/push_1080/source"]["mask"],
-                    "first_call_ms": firsts[verdict["standard"]]["first_call_ms"]})
+                    "first_call_ms": (firsts.get(verdict["standard"]) or {}).get(
+                        "first_call_ms"), "device": device or "neural_engine"})
     owed = ["S-KEY1 missing: J, B (gesture), flicker, Best (d), the read size (e) and the "
             "rotated composite (f) are owed, and CO-S3",
             "S-TH1 missing: its speed rows are owed"]
     for line in owed:
         log(f"SKIP {line}")
     line = (f"VERDICT standard={verdict['standard']} rate={verdict['rate']} "
-            f"realtime_1080={fmt(verdict['realtime_1080'])} "
+            + (f"device={device} " if device else "")
+            + f"realtime_1080={fmt(verdict['realtime_1080'])} "
             f"realtime_4k={fmt(k_source)}@source,{fmt(k_1920)}@1920 mask={verdict['mask']} "
             f"first_call_ms={fmt(verdict['first_call_ms'], 1)} read_size=owed best=owed "
             f"flicker=owed rotation=owed")
@@ -332,6 +395,37 @@ def s1(binaries, results):
 
 def fmt(value, places=2):
     return "none" if value is None else f"{value:.{places}f}"
+
+
+# MARK: - CJ-S2 rule 1 for the mask request (road map CO1)
+
+def device_spike(binaries, results):
+    speed = binaries["mask_speed"]
+    rows = {}
+    movie = str(MEDIA / "push_1080.mov")
+    for device in deciders.DEVICES:
+        runs = []
+        for n in range(RUNS):
+            answer = run_probe(speed, ["devices", movie, device], timeout=7200)
+            answer["load"] = load()
+            runs.append(answer)
+            log(f"CJ-S2 masks {device} run {n + 1}: {answer['realtime']:.3f}× sha256 "
+                f"{answer['sha256'][:16]}… {answer['requests']} masks of "
+                f"{answer['mask_w']}x{answer['mask_h']} on {answer['device']} "
+                f"load {answer['load']}")
+        rows[device] = {"sha256": [r["sha256"] for r in runs],
+                        "realtime": [r["realtime"] for r in runs],
+                        "requests": runs[0]["requests"], "frames": runs[0]["frames"],
+                        "mask": f"{runs[0]['mask_w']}x{runs[0]['mask_h']}",
+                        "revision": runs[0]["revision"], "named": runs[0]["device"],
+                        "loads": [r["load"] for r in runs]}
+    verdict = deciders.device_rule(rows)
+    same = ",".join(f"{d}:{'yes' if verdict['identical'][d] else 'no'}" for d in deciders.DEVICES)
+    speeds = ",".join(f"{d}:{fmt(verdict['realtime'][d])}" for d in deciders.DEVICES)
+    line = (f"VERDICT device={verdict['device']} branch={verdict['branch']} identical={same} "
+            f"realtime={speeds} compare={verdict['compare']}")
+    results.update({"rows": rows, "verdict": verdict, "verdict_line": line})
+    return line
 
 
 # MARK: - CO-S2
@@ -525,6 +619,7 @@ def s2_pack_rows(probe, frames_of, dump):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="s1,s2")
+    parser.add_argument("--device", choices=deciders.DEVICES)
     parser.add_argument("--pack", action="store_true")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--selftest", action="store_true")
@@ -536,7 +631,7 @@ def main(argv=None):
         print(f"NOT PERFORMED: {', '.join(missing)} missing (cargo build --release, make codecs)")
         return 2
     only = {part.strip() for part in args.only.split(",") if part.strip()}
-    spikes = {"s1": "CO-S1", "s2": "CO-S2"}
+    spikes = {"s1": "CO-S1", "s2": "CO-S2", "device": "CJ-S2"}
     if not args.build_only:
         for part in sorted(only):
             computed, table, match = rule.check_rule(spikes[part])
@@ -560,9 +655,19 @@ def main(argv=None):
             record = {}
             fixtures(record)
             results = {"fixtures": record, "load_start": load()}
-            lines.append(s1(binaries, results))
+            lines.append(s1(binaries, results, args.device))
             results["load_end"] = load()
-            path = rule.write_results("CO-S1", results)
+            path = rule.write_results(
+                "CO-S1", results, folder=f"CO-S1-{args.device}" if args.device else None)
+            log(f"results: {path}")
+        if "device" in only:
+            record = {}
+            fixtures(record)
+            results = {"fixtures": record, "load_start": load(),
+                       "ac_power": rule.host()["ac_power"]}
+            lines.append(device_spike(binaries, results))
+            results["load_end"] = load()
+            path = rule.write_results("CJ-S2", results, folder="CJ-S2-masks")
             log(f"results: {path}")
         if "s2" in only:
             record = {}

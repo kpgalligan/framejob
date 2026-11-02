@@ -65,8 +65,11 @@ def check_rule(spike):
     return computed, table, computed == table
 
 
-def write_results(spike, results):
-    folder = WORK / spike
+def write_results(spike, results, folder=None):
+    """`folder` (a name under `WORK`) when a spike's rule is re-run for
+    another kind (road map CO1's `CJ-S2-masks`, `CJ-S3-masks`); the rule hash
+    is still `spike`'s."""
+    folder = WORK / (folder or spike)
     folder.mkdir(parents=True, exist_ok=True)
     computed, table, match = check_rule(spike)
     document = {"spike": spike, "rule_sha256": computed, "rule_sha256_recorded": table,

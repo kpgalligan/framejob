@@ -467,8 +467,11 @@ detail there.
   folder under it: `0700` at each level it makes, an existing folder left
   alone (#108).
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
-  `AnalysisFrames.swift` · `AnalysisShots.swift` ·
+  `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
+  `AnalysisShots.swift` · `AnalysisMasks.swift` · `MaskPack.swift` ·
+  `AnalysisClipTimes.swift` ·
   `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
+  `AgentServer+AnalysisMasks.swift` ·
   `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
   `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
   `EditorViewController+ShotSplit.swift` —
@@ -481,13 +484,32 @@ detail there.
   the next 50 ms poll, `settled` runs on main), a `.utility` picture queue
   of `pictureWidth` (1, CJ-S3) and a serial sound queue, never the
   cooperative pool and never `MediaCacheLane`; a job takes no `CachePass`
-  and writes only through `AnalysisStore.publish` — a lock per (cache, kind,
-  media) inside `CacheLedger.publish(in:for: nil)`, re-reading and merging
-  what is on disk — so an import pass and a job never cancel or wait on each
-  other, and nothing in a publish waits on main. A stamp is compared field
-  by field (`AnalysisStamp.matches`). `AnalysisFrames` reads direct (turned
-  upright) or converted through `MediaImporter.oneClip` and step 0 when a
-  `ThumbnailInput` exists, its pre-roll two DECODED frames.
+  and writes only through `AnalysisStore.publish` or `publishFile` — a lock
+  per (cache, kind, media) inside `CacheLedger.publish(in:for: nil)`,
+  re-reading and merging what is on disk — so an import pass and a job never
+  cancel or wait on each other, and nothing in a publish waits on main. A
+  stamp is compared field by field (`AnalysisStamp.matches`).
+  `AnalysisFrames` reads direct (turned upright) or converted through
+  `MediaImporter.oneClip` and step 0 when a `ThumbnailInput` exists, its
+  pre-roll two DECODED frames.
+  The `masks` kind (road map creator-jobs CO1, spec §11 CO-10…CO-14):
+  `AnalysisMasks` makes a fresh person `.balanced` request (revision 1) per
+  frame, pinned to the GPU, and refuses one that reads back another device.
+  It also sets the found flag, reads runs from a pack, and publishes every
+  30 s and at a range's end, mid-range only through the last analysed frame
+  done. `MaskPack` is `masks.pack`, with LZFSE masks in append order, the
+  frame and mask tables and a 40-byte `FJMP` footer holding the size Vision
+  answered. It has an append-merge writer (on-disk slots never move, on disk
+  wins at an equal pts) and a mapped reader. A kind that writes its own
+  `.partial` publishes through `AnalysisStore.publishFile`; the marker keeps
+  the on-disk coverage only when the write merged, and a lookup hits only
+  when its first payload file is on disk. `AnalysisFrames+InputPass` is
+  CO-7's third arm: `AVAssetReaderTrackOutput` and step 0's `InputPass` to
+  SDR in a per-read `.shared` target, every frame's own time kept, for
+  `masks` on a converting media (`Source.arm`). `AnalysisClipTimes` is a
+  clip's played window (a pure move, CO1's toll), and
+  `AgentServer+AnalysisMasks` holds the answer's `mask_size`, `frames`,
+  `subject_found` and `runs`, never pixels.
   `get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`,
   off main) wait holding the agent lane's lock, at most
   `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and

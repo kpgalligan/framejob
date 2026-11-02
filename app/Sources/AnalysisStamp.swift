@@ -11,6 +11,8 @@ import Foundation
 /// lives under `cache/analysis/<kind>/`). Names use underscores.
 enum AnalysisKind: String, Codable, CaseIterable {
     case shots
+    /// Person masks (spec §11 CO-4, CO-10; road map CO1): `AnalysisMasks`.
+    case masks
 
     /// The kind's version: a change to what it stores bumps it, and every
     /// marker of the old version is a miss (Vision request revisions go in
@@ -18,21 +20,24 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var version: Int {
         switch self {
         case .shots: return 1
+        case .masks: return 1
         }
     }
 
     /// Whether the kind decodes sound (the sound queue) rather than pictures.
     var usesSoundQueue: Bool {
         switch self {
-        case .shots: return false
+        case .shots, .masks: return false
         }
     }
 
     /// The compute device the stamp records: `cpu` for `shots`, whose
-    /// signature is integer arithmetic on the CPU.
+    /// signature is integer arithmetic on the CPU; for `masks` the device a
+    /// pinned request reads back (spec §11 CO-11).
     var device: String {
         switch self {
         case .shots: return "cpu"
+        case .masks: return AnalysisMasks.device
         }
     }
 
@@ -41,6 +46,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var parameters: [String: Any] {
         switch self {
         case .shots: return AnalysisShots.parameters
+        case .masks: return AnalysisMasks.parameters
         }
     }
 
@@ -48,6 +54,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var margin: Int {
         switch self {
         case .shots: return AnalysisShots.margin
+        case .masks: return 0
         }
     }
 
@@ -55,6 +62,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var files: [String] {
         switch self {
         case .shots: return [AnalysisShots.payloadName]
+        case .masks: return [MaskPack.fileName]
         }
     }
 }
@@ -78,6 +86,16 @@ struct AnalysisSourceID: Codable, Equatable {
     }
 }
 
+/// A Vision kind's request, as its stamp records it (spec §11 CJ-22, CO-10):
+/// the request, its quality and revision, the rate and the read size.
+struct AnalysisVisionStamp: Codable, Equatable {
+    let request: String
+    let quality: String
+    let revision: Int
+    let rate: String
+    let readSize: String
+}
+
 /// A marker's stamp (spec §11 CJ-22): a stamp that differs in any field is a
 /// miss, and the next store deletes the marker, then the payload.
 struct AnalysisStamp: Codable, Equatable {
@@ -95,6 +113,9 @@ struct AnalysisStamp: Codable, Equatable {
     /// The conversion, as a converted filmstrip's marker records it; non-nil
     /// iff `reader` is `converted`.
     let conversion: ConvertedThumbsStamp?
+    /// A Vision kind's request (`masks`); nil, and absent on disk, for
+    /// `shots`.
+    var vision: AnalysisVisionStamp? = nil
 
     /// The stamp of `kind` over `media` at `url`, read through `input` (nil:
     /// the direct reader); nil when the file cannot be stat'ed.
@@ -113,7 +134,8 @@ struct AnalysisStamp: Codable, Equatable {
         return AnalysisStamp(
             source: source, kind: kind, version: kind.version,
             parameters: digest(kind.parameters), osBuild: osBuild, device: kind.device,
-            reader: input == nil ? "raw" : "converted", conversion: conversion)
+            reader: input == nil ? "raw" : "converted", conversion: conversion,
+            vision: kind == .masks ? AnalysisMasks.vision : nil)
     }
 
     /// Field by field, so no field can drop out of the comparison unseen
@@ -124,6 +146,7 @@ struct AnalysisStamp: Codable, Equatable {
             && osBuild == other.osBuild
             && device == other.device
             && reader == other.reader && conversion == other.conversion
+            && vision == other.vision
     }
 
     /// This Mac's OS build, `kern.osversion` (e.g. `25F80`).

@@ -96,13 +96,17 @@ enum AnalysisFrames {
         }
     }
 
-    /// What a job reads: the media, its file, and the converted reader's
-    /// input (nil: the direct reader).
+    /// What a job reads: the media, its file, the converted reader's input
+    /// (nil: the direct reader) and, for an input, which converted reader
+    /// (`.inputPass`: CO-7's third arm, `AnalysisFrames+InputPass.swift`).
     struct Source {
         let media: MediaSnapshot
         let url: URL
         let input: ThumbnailInput?
+        var arm: Arm = .standard
     }
+
+    enum Arm { case standard, inputPass }
 
     /// The display size at `longSide`, each side at least 2.
     static func size(of media: MediaSnapshot, longSide: Int) -> (width: Int, height: Int) {
@@ -163,6 +167,11 @@ enum AnalysisFrames {
         let range = CMTimeRange(
             start: CMTime(value: from, timescale: 600_000),
             end: CMTime(value: max(from + 1, to), timescale: 600_000))
+        if let input = source.input, source.arm == .inputPass {
+            return try decodeThroughInputPass(
+                source, input: input, longSide: longSide, range: range, cancelled: cancelled,
+                each: each)
+        }
         if let input = source.input {
             return try decodeConverted(
                 source, input: input, longSide: longSide, range: range, cancelled: cancelled,
@@ -243,7 +252,7 @@ enum AnalysisFrames {
 
     /// The sample loop both readers share: `cancelReading` on this thread,
     /// after `copyNextSampleBuffer` returned (G-17).
-    private static func pump(
+    static func pump(
         _ reader: AVAssetReader, _ output: AVAssetReaderOutput, cancelled: () -> Bool,
         each: (Int64, CVPixelBuffer) throws -> Bool
     ) throws -> Bool {
@@ -277,7 +286,7 @@ enum AnalysisFrames {
 
     /// The track's `preferredTransform`, read by key (the property is
     /// deprecated for its async load; `CompositionBuilder.keyed`'s posture).
-    private static func preferredTransform(of track: AVAssetTrack) -> CGAffineTransform {
+    static func preferredTransform(of track: AVAssetTrack) -> CGAffineTransform {
         guard let value = CompositionBuilder.keyed(track, "preferredTransform") as? NSValue else {
             return .identity
         }
@@ -287,7 +296,7 @@ enum AnalysisFrames {
     }
 
     /// A half-float RGBA buffer rounded to 8-bit BGRA in `scratch`.
-    private static func halfToBGRA(
+    static func halfToBGRA(
         _ buffer: CVPixelBuffer, into scratch: inout [UInt8], _ body: (AnalysisPicture) throws -> Bool
     ) throws -> Bool {
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
@@ -321,7 +330,7 @@ enum AnalysisFrames {
     /// The direct reader's turn upright: the transform's quarter turns and
     /// mirror (`orientationCode` classifies nothing else), each display pixel
     /// read from the natural pixel under its centre. Identity is no copy.
-    private struct Upright {
+    struct Upright {
         let a: Int, b: Int, c: Int, d: Int
         var scratch: [UInt8] = []
 

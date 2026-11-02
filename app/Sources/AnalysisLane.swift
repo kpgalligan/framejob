@@ -292,6 +292,10 @@ final class AnalysisLane: @unchecked Sendable {
                 finished = try AnalysisShots.run(
                     request, cancelled: cancelled,
                     progress: { [self] fraction in setProgress(fraction, of: request) })
+            case .masks:
+                finished = try AnalysisMasks.run(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
             }
             return finished ? .landed : .cancelled
         } catch {

@@ -2,8 +2,9 @@ import Foundation
 
 /// `get_media_analysis` (spec §11 CJ-25; road map "creator-jobs" CJ2a): any
 /// analysis kind of one media or clip, made on this Mac or read from its
-/// cache — `shots`, the hard cuts, first. `get_transcript`'s counterpart for
-/// pictures and sounds.
+/// cache — `shots`, the hard cuts, first, and `masks`, the person masks' runs
+/// (CO1, spec §11 CO-14, `AgentServer+AnalysisMasks.swift`).
+/// `get_transcript`'s counterpart for pictures and sounds.
 ///
 /// An APP-STATE tool and a read: nothing is edited and no undo step is made.
 /// **It runs on the SERVER thread** (`creatorOffMainTools`), for
@@ -17,7 +18,7 @@ import Foundation
 extension AgentServer {
 
     /// What the one main-thread hop resolves.
-    private struct AnalysisCall {
+    struct AnalysisCall {
         let document: ProjectDocument
         let kind: AnalysisKind
         let media: MediaSnapshot
@@ -145,14 +146,46 @@ extension AgentServer {
 
     // MARK: - The answer, from captured values
 
-    /// The answer's cap on its `cuts` (CJ-25).
+    /// The answer's cap on its `cuts` and `runs` (CJ-25, CO-14).
     static let analysisAnswerCap = 512 * 1024
 
+    /// The common fields (`ok`, `kind`, `media`, `clip`, `from`, `to`,
+    /// `size`, `cached`, `stamp`, `run`) and the kind's own.
     private static func analysisAnswer(_ call: AnalysisCall, ran: AnalysisRun?) throws
         -> [String: Any]
     {
-        let grid = AnalysisGrid(media: call.media)
         let marker = AnalysisStore.readMarker(call.kind, media: call.media.id, in: call.cacheDir)
+        var result: [String: Any] = [
+            "ok": true, "kind": call.kind.rawValue, "media": Int(call.media.id),
+            "from": call.from, "to": call.to, "size": [call.media.width, call.media.height],
+            "cached": call.request == nil,
+        ]
+        switch call.kind {
+        case .shots: result.merge(try shotsFields(call)) { _, kind in kind }
+        case .masks: result.merge(try masksFields(call)) { _, kind in kind }
+        }
+        if let clip = call.clip { result["clip"] = Int(clip.id) }
+        if marker?.canned == true {
+            result["stamp"] = NSNull()
+            result["canned"] = true
+        } else if let stamp = marker?.stamp,
+            let object = try? JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(stamp))
+        {
+            result["stamp"] = object
+        }
+        if let ran {
+            var run: [String: Any] = ["queued_at": ran.queuedAt]
+            if let started = ran.startedAt { run["started_at"] = started }
+            if let ended = ran.endedAt { run["ended_at"] = ended }
+            result["run"] = run
+        }
+        return result
+    }
+
+    /// `shots`' fields: `count` and `cuts`, refused past the cap.
+    private static func shotsFields(_ call: AnalysisCall) throws -> [String: Any] {
+        let grid = AnalysisGrid(media: call.media)
         let data =
             AnalysisStore.readPayload(
                 call.kind, media: call.media.id, file: AnalysisShots.payloadName,
@@ -185,28 +218,7 @@ extension AgentServer {
                     + "bytes of JSON, more than the \(analysisAnswerCap) an answer holds; call "
                     + "with to at most \(fits) from from \(call.from).")
         }
-        var result: [String: Any] = [
-            "ok": true, "kind": call.kind.rawValue, "media": Int(call.media.id),
-            "from": call.from, "to": call.to, "size": [call.media.width, call.media.height],
-            "cached": call.request == nil, "count": cuts.count, "cuts": cuts,
-        ]
-        if let clip = call.clip { result["clip"] = Int(clip.id) }
-        if marker?.canned == true {
-            result["stamp"] = NSNull()
-            result["canned"] = true
-        } else if let stamp = marker?.stamp,
-            let object = try? JSONSerialization.jsonObject(
-                with: JSONEncoder().encode(stamp))
-        {
-            result["stamp"] = object
-        }
-        if let ran {
-            var run: [String: Any] = ["queued_at": ran.queuedAt]
-            if let started = ran.startedAt { run["started_at"] = started }
-            if let ended = ran.endedAt { run["ended_at"] = ended }
-            result["run"] = run
-        }
-        return result
+        return ["count": cuts.count, "cuts": cuts]
     }
 
     /// The bound's sentence: how much of the window is covered, and to call
@@ -332,42 +344,5 @@ extension AgentServer {
                     + "\(Int(AnalysisLane.callWaitLimit)) s a call waits; what it covered is "
                     + "kept — call split_at_shots again to continue.")
         }
-    }
-}
-
-/// A clip's played source window and its times (CJ-25): source ticks of the
-/// FORWARD media to clip ticks, through its source map when it ramps, its
-/// speed when not, and the reversed mirror first when it plays backwards.
-struct AnalysisClipTimes {
-    let id: UInt32
-    let start: Ticks
-    let sourceIn: Ticks
-    let speed: Double
-    let pivot: Ticks?
-    let map: SourceMap?
-    /// The played window in the forward media's ticks, [lower, upper).
-    let window: ClosedRange<Ticks>
-
-    init(clip: ClipSnapshot, media: MediaSnapshot, map: SourceMap?) {
-        id = clip.id
-        start = clip.start
-        speed = clip.speed > 0 && clip.speed.isFinite ? clip.speed : 1
-        let ramp = map.flatMap { $0.ramped ? $0 : nil }
-        self.map = ramp
-        sourceIn = ramp?.sourceIn ?? clip.source.sourceIn
-        let length = ramp?.sourceLength ?? Transcriber.contentLength(of: clip)
-        pivot = clip.source.isReversed ? media.duration : nil
-        let played = sourceIn...(sourceIn + length)
-        let forward = pivot.map { ReverseMirror.mirrored(played, about: $0) } ?? played
-        let low = min(max(0, forward.lowerBound), media.duration)
-        window = low...max(low, min(media.duration, forward.upperBound))
-    }
-
-    /// Ticks from the clip's start, in its playing direction, at forward
-    /// source tick `source`.
-    func clipTime(ofSource source: Int64) -> Ticks {
-        let played = pivot.map { ReverseMirror.mirrored(source, about: $0) } ?? source
-        if let map { return Ticks(map.clip(atSource: Double(played)).rounded()) }
-        return Ticks((Double(played - sourceIn) / speed).rounded())
     }
 }

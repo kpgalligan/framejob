@@ -4,6 +4,7 @@ CJ-23).
 
     python3 tools/proof/creator_spike/lane_spike.py              # (a) and (c)
     python3 tools/proof/creator_spike/lane_spike.py --playback   # (b), over MCP
+    python3 tools/proof/creator_spike/lane_spike.py --playback --kind masks   # (b), CO1
 
 (a) and (c): `lane_spike.swift`, built from `app/Sources` through
 `swift_build.py`, decodes a whole file through the direct reader and, for a
@@ -24,6 +25,11 @@ converted reader at 256, × 2, rounded up to 10 s, clamped to 30…300 s.
 with another document's `shots` job wanted through `analysis_job` (which
 returns at once), three times each, median. A drop of more than 2 % turns the
 pause on (CJ-21's amendment).
+
+`--kind masks` (road map CO1's head, CO-12): (b) re-run with a `masks` job on
+the ten-minute still over its first 120 s, wanted through `analysis_job`; each
+busy run's document is its own and is CLOSED after the run (the job
+cancelled) instead of drained. Results in `CJ-S3-masks/results.json`.
 
 Writes `tools/proof/work/creator_spike/CJ-S3/results.json` (merged: a
 `--playback` run keeps (a) and (c)).
@@ -153,6 +159,8 @@ def decide(table):
 def playback(socket, args):
     import mcp  # noqa: E402
 
+    if args.kind == "masks":
+        return playback_masks(socket)
     client = mcp.MCP(socket)
     movie = fixtures.h264_1080()
     package = WORK / "playback.framejob"
@@ -219,13 +227,75 @@ def playback(socket, args):
             "drop": drop, "pause": drop is not None and drop > 0.02}
 
 
+def playback_masks(socket):
+    """(b) with a masks job: per run an idle play, then a document of its own
+    wanting a masks job over the still's first 120 s, the play, and the
+    document closed (its job cancelled)."""
+    import mcp  # noqa: E402
+
+    client = mcp.MCP(socket)
+    folder = ROOT / "tools/proof/work/creator_spike/CJ-S3-masks"
+    folder.mkdir(parents=True, exist_ok=True)
+    movie = fixtures.h264_1080()
+    package = folder / "playback.framejob"
+    try:
+        client.call("close_project", project=str(package), discard=True)
+    except Exception:  # noqa: BLE001 — not open
+        pass
+    if package.exists():
+        shutil.rmtree(package)
+    client.call("new_project", path=str(package))
+    state = client.call("get_project", project=str(package))["project"]
+    track = state["tracks"][0]["id"]
+    media = client.call("import_media", project=str(package), path=str(movie))["media"]
+    client.call("add_clip", project=str(package), track=track, media=media, at=0)
+    client.call("save_project", project=str(package))
+    still = fixtures.moving_still(10)
+
+    def composed():
+        client.call("set_playhead", project=str(package), t=0)
+        return client.call("play_preview", project=str(package), seconds=20)["frames_composed"]
+
+    idle, busy, jobs = [], [], []
+    for n in range(RUNS):
+        idle.append(composed())
+        other = folder / f"other-{n}.framejob"
+        if other.exists():
+            shutil.rmtree(other)
+        client.call("new_project", path=str(other))
+        clone = folder / f"still-{n}.mov"
+        clone.unlink(missing_ok=True)
+        subprocess.run(["cp", "-c", str(still), str(clone)], check=True)
+        media_n = client.call("import_media", project=str(other), path=str(clone))["media"]
+        client.call("save_project", project=str(other))
+        wanted = client.call("analysis_job", project=str(other), media=media_n, kind="masks",
+                             **{"from": 0, "to": 120 * 600_000})
+        busy.append(composed())
+        row = next((j for j in client.call("analysis_job")["jobs"]
+                    if j["media"] == media_n and j["project"]
+                    and Path(j["project"]).resolve() == other.resolve()), {})
+        client.call("close_project", project=str(other), discard=True)
+        jobs.append({"hit": wanted["wanted"]["hit"], "started_at": row.get("started_at"),
+                     "ended_at": row.get("ended_at"), "outcome": row.get("outcome")})
+    try:
+        client.call("close_project", project=str(package), discard=True)
+    except Exception:  # noqa: BLE001
+        pass
+    i, b = statistics.median(idle), statistics.median(busy)
+    drop = (i - b) / i if i else None
+    return {"kind": "masks", "idle_runs": idle, "busy_runs": busy, "jobs": jobs, "idle": i,
+            "busy": b, "drop": drop, "pause": drop is not None and drop > 0.02}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--playback", action="store_true")
     parser.add_argument("--socket")
+    parser.add_argument("--kind", choices=("shots", "masks"), default="shots")
     args = parser.parse_args(argv)
     rule.check_rule("CJ-S3")
-    path = WORK / "results.json"
+    folder = "CJ-S3-masks" if args.kind == "masks" else None
+    path = (WORK.parent / folder if folder else WORK) / "results.json"
     previous = json.loads(path.read_text()) if path.exists() else {}
     results = {k: previous[k] for k in ("lane", "verdict", "owed") if k in previous}
     if args.playback:
@@ -238,7 +308,7 @@ def main(argv=None):
         results["lane"], results["owed"] = table, owed
         results["verdict"] = decide(table)
         print(json.dumps(results["verdict"], indent=1))
-    written = rule.write_results("CJ-S3", results)
+    written = rule.write_results("CJ-S3", results, folder=folder)
     print(f"results: {written}")
     return 0
 

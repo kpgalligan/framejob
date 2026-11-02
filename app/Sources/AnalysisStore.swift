@@ -6,18 +6,23 @@ import Foundation
 ///
 /// `cache/analysis/<kind>/<media id>.json` is the marker (`AnalysisMarker`);
 /// `cache/analysis/<kind>/<media id>/` holds the payload files the kind names.
-/// A request is a HIT when the marker answers for its stamp and the coverage
-/// holds every index it needs (its window plus the kind's read margin);
-/// otherwise the job runs only the missing ranges.
+/// A request is a HIT when the marker answers for its stamp, its first payload
+/// file is on disk, and the coverage holds every index it needs (its window
+/// plus the kind's read margin); otherwise the job runs only the missing
+/// ranges (all of them when the file is gone, road map CO1).
 ///
-/// **The publish** runs under a lock keyed by (cache folder, kind, media id)
-/// and inside `CacheLedger.publish(in:for: nil)` — never mid-save, never
-/// waiting on main. It re-reads the marker, deletes marker then payload when
-/// the on-disk stamp is not the job's, reads the payload as it is on disk,
-/// applies the job's merge, writes it through a `.partial` and a rename, then
-/// writes the marker with the union of the on-disk and the job's coverage,
-/// sorted keys, `.atomic`. Two jobs of one media therefore merge rather than
-/// overwrite one another (P8).
+/// **The publish** (`publishFile`) runs under a lock keyed by (cache folder,
+/// kind, media id) and inside `CacheLedger.publish(in:for: nil)` — never
+/// mid-save, never waiting on main. It re-reads the marker, deletes marker
+/// then payload when the on-disk stamp is not the job's or its first payload
+/// file is missing, removes any old `.partial`, lets the kind write the
+/// `.partial` (handed the on-disk file when there is one to merge onto), and
+/// renames it into place; then it writes the marker LAST with the union of
+/// the on-disk and the job's coverage when the kind merged, else the job's
+/// alone, sorted keys, `.atomic`. A throw removes the `.partial` and leaves
+/// marker and payload as they were. Two jobs of one media therefore merge
+/// rather than overwrite one another (P8). `publish(…merge:)` is the same
+/// door for a kind that edits its payload's bytes in memory (`shots`).
 enum AnalysisStore {
 
     enum StoreError: LocalizedError {
@@ -81,7 +86,10 @@ enum AnalysisStore {
         _ kind: AnalysisKind, media: UInt32, stamp: AnalysisStamp, need: ClosedRange<Int>,
         in cacheDir: URL
     ) -> Lookup {
-        guard let marker = readMarker(kind, media: media, in: cacheDir), marker.answers(for: stamp)
+        guard let marker = readMarker(kind, media: media, in: cacheDir), marker.answers(for: stamp),
+            let file = marker.files.first,
+            FileManager.default.fileExists(
+                atPath: payloadURL(kind, media: media, file: file, in: cacheDir).path)
         else { return .miss([need]) }
         let missing = missingRanges(need, covered: marker.ranges)
         return missing.isEmpty ? .hit(marker) : .miss(missing)
@@ -158,15 +166,37 @@ enum AnalysisStore {
         kind: AnalysisKind, cacheDir: URL, mediaID: UInt32, stamp: AnalysisStamp,
         covered: [ClosedRange<Int>], files: [String], merge: (inout Data) throws -> Void
     ) throws {
+        try publishFile(
+            kind: kind, cacheDir: cacheDir, mediaID: mediaID, stamp: stamp, covered: covered,
+            files: files
+        ) { onDisk, partial in
+            var data = onDisk.flatMap { try? Data(contentsOf: $0) } ?? Data()
+            try merge(&data)
+            try data.write(to: partial)
+            return onDisk != nil
+        }
+    }
+
+    /// The publish (above), for a kind that writes its own `.partial`:
+    /// `write(onDisk, partial)` is handed the first payload file when the
+    /// on-disk marker answers for `stamp` and the file exists (else nil),
+    /// writes `partial`, and answers whether it merged `onDisk` — only then
+    /// does the marker keep the on-disk coverage. Throws when a save held the
+    /// cache past the ledger's wait, or a write failed.
+    static func publishFile(
+        kind: AnalysisKind, cacheDir: URL, mediaID: UInt32, stamp: AnalysisStamp,
+        covered: [ClosedRange<Int>], files: [String],
+        write: (_ onDisk: URL?, _ partial: URL) throws -> Bool
+    ) throws {
         let perMedia = lock(kind, media: mediaID, in: cacheDir)
         perMedia.lock()
         defer { perMedia.unlock() }
         var failure: Error?
         func body() {
             do {
-                try write(
+                try store(
                     kind: kind, cacheDir: cacheDir, mediaID: mediaID, stamp: stamp,
-                    covered: covered, files: files, merge: merge)
+                    covered: covered, files: files, write: write)
             } catch {
                 failure = error
             }
@@ -177,35 +207,42 @@ enum AnalysisStore {
     }
 
     /// The publish's body; the per-media lock and the ledger are held.
-    private static func write(
+    private static func store(
         kind: AnalysisKind, cacheDir: URL, mediaID: UInt32, stamp: AnalysisStamp,
-        covered: [ClosedRange<Int>], files: [String], merge: (inout Data) throws -> Void
+        covered: [ClosedRange<Int>], files: [String],
+        write: (_ onDisk: URL?, _ partial: URL) throws -> Bool
     ) throws {
         let fm = FileManager.default
         let marker = markerURL(kind, media: mediaID, in: cacheDir)
         let folder = payloadFolder(kind, media: mediaID, in: cacheDir)
+        guard let file = files.first else { throw StoreError.write("the kind names no file") }
+        let target = folder.appendingPathComponent(file)
         var onDisk = readMarker(kind, media: mediaID, in: cacheDir)
         if fm.fileExists(atPath: marker.path),
             onDisk?.canned == true || onDisk?.stamp?.matches(stamp) != true
+                || !fm.fileExists(atPath: target.path)
         {
             try? fm.removeItem(at: marker)
             try? fm.removeItem(at: folder)
             onDisk = nil
         }
+        let partial = folder.appendingPathComponent(file + ".partial")
         do {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            guard let file = files.first else { throw StoreError.write("the kind names no file") }
-            let target = folder.appendingPathComponent(file)
-            var data = onDisk == nil ? Data() : ((try? Data(contentsOf: target)) ?? Data())
-            try merge(&data)
-            let partial = folder.appendingPathComponent(file + ".partial")
-            try data.write(to: partial)
+            try? fm.removeItem(at: partial)
+            let mergedOnDisk: Bool
+            do {
+                mergedOnDisk = try write(onDisk == nil ? nil : target, partial)
+            } catch {
+                try? fm.removeItem(at: partial)
+                throw error
+            }
             guard rename(partial.path, target.path) == 0 else {
                 let why = String(cString: strerror(errno))
                 try? fm.removeItem(at: partial)
                 throw StoreError.write(why)
             }
-            let coverage = merged((onDisk?.ranges ?? []) + covered)
+            let coverage = merged((mergedOnDisk ? onDisk?.ranges ?? [] : []) + covered)
             let next = AnalysisMarker(
                 stamp: stamp, canned: nil, source: stamp.source, files: files,
                 coverage: coverage.map { [$0.lowerBound, $0.upperBound] })

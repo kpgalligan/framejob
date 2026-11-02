@@ -27474,6 +27474,30 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s1            # then --o
 python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack     # the mask pack measured whatever the track answers
 ```
 
+## Road map "creator-jobs" CO1 — person masks on the Mac (`co1_proof.py` P1–P10, M1–M9, Z1; eight mutants; `cutout_spike/` `--only device`; `creator_spike/lane_spike.py --playback --kind masks`; spec §11 CO-10…CO-15)
+
+**`co1_proof.py`** builds `co1_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through `swift_build.py`.
+- **P1–P10** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, and a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage.
+- The probe's `compare` mode is the app rows' mask reader. It answers, for a pair of packs, their sizes, frame counts, the pts both hold, and at those pts the largest byte difference and the IoU above 127. The proof never decompresses LZFSE itself; it parses the tables in Python.
+- **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
+
+The fixtures are `cutout_spike.fixtures()`'s and the proof's own, all in `tools/proof/media/cutout/`:
+- `push_60.mov`: `push_1080.mov` looped three times, `-c copy`.
+- M4's person is the owner's own talking head, `tools/proof/media/owner-sync/IMG_0018.MOV` (gitignored, never committed; without it M4 is skipped by name and owed). The push-in's poster is too weak a person for an IoU bar: a plain HEVC re-encode of `push_1080.mov` keeps a mean IoU of only 0.73 of its masks. From it:
+  - `talk_sdr.mov`: its first 20 s as SDR (the HLG signal re-matrixed to BT.709).
+  - `talk_applelog.mov`: a 33³ `lut3d` cube that undoes `log_proof.py`'s display transform and applies Apple's encode, HEVC Main 10 tagged BT.709, with `set_media_color {log: apple_log}`.
+  - `talk_hlg.mov`: a cube that inverts GR-15's HLG arm into SDR (`hdr_proof.convert`), frames 119 and 270 dropped, HEVC Main 10 tagged bt2020/arib-std-b67/bt2020nc. Not `InputConversions.liftSDR`, HD-3's lift into an HLG project: a lifted twin converts back 34 levels darker on average.
+  - `talk_sdr_hevc.mov`: the SDR re-encoded as HEVC 10-bit, the masks' noise floor, printed beside M4.
+- `push_640_relinked.mov`: M6's relink target, `push_640.mov` with a title.
+
+```sh
+python3 tools/proof/co1_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10   # no app
+make app-debug && python3 tools/proof/co1_proof.py
+RC_PROOF_APP=release python3 tools/proof/co1_proof.py                 # the recorded run, M9 included
+python3 tools/proof/co1_proof.py --mutant <name>
+python3 tools/proof/creator_spike/lane_spike.py --playback --kind masks --socket <dir>/agent.sock   # CO-12, Release
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

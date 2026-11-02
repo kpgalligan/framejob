@@ -22,7 +22,14 @@ extension AgentServer {
                     + "per second, of the file played forwards), with count. A cut inside a "
                     + "gradual dissolve is not reported, and a single flash frame is not a "
                     + "cut; a dissolve between flat-coloured pictures (slides, title cards) can "
-                    + "show as one cut. With clip, from and to default to and are held inside "
+                    + "show as one cut. kind \"masks\" finds a person's outline in every frame "
+                    + "(Vision's person segmentation, on the Mac) and answers its runs, never "
+                    + "pixels: mask_size [w, h] (the masks' own size), frames (frames held in "
+                    + "the window), subject_found (whether any frame holds a person: at least "
+                    + "0.5 % of the mask above half), count and runs [{from, to, subject_found, "
+                    + "frames}] in SOURCE ticks — a run is consecutive analysed frames that "
+                    + "agree on subject_found. No menu or pane reaches masks yet. With "
+                    + "clip, from and to default to and are held inside "
                     + "the clip's played window, and each cut also has clip_time (ticks from "
                     + "the clip's start, in its playing direction — through its speed, ramp "
                     + "and reversal) and timeline (the clip's start plus clip_time). cached "
@@ -32,8 +39,8 @@ extension AgentServer {
                     + "upright picture size; stamp what the cache was made with. A call waits "
                     + "at most \(Int(AnalysisLane.callWaitLimit)) s and then refuses naming "
                     + "how much of the window was covered — what was covered is kept, so call "
-                    + "again to continue; an answer over 512 KiB of cuts is refused naming the "
-                    + "largest to that fits. It edits nothing and makes no undo step.",
+                    + "again to continue; an answer over 512 KiB of cuts or runs is refused "
+                    + "naming the largest to that fits. It edits nothing and makes no undo step.",
                 [
                     "media": [
                         "type": "integer",
@@ -47,7 +54,8 @@ extension AgentServer {
                     ],
                     "kind": [
                         "type": "string", "enum": AnalysisKind.allCases.map(\.rawValue),
-                        "description": "What to find: shots, the hard cuts.",
+                        "description": "What to find: shots, the hard cuts; masks, a person's "
+                            + "masks' runs.",
                     ],
                     "from": [
                         "type": "integer",

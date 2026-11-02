@@ -448,7 +448,7 @@ by the first phase that must edit it, which names the seam in the history's "Nam
 | `app/Sources/SpeechEngine.swift` | 399 of 400 | `// MARK: - Locales and models` (234–316) → `SpeechEngine+Locales.swift`, only if TX-S1 makes the fill take a priority | TX1 |
 | `core/src/edit_action.rs` | 595 | the end-patch door (`prune_removed` with its doc … `key_off`, 99–290) → `edit_action_end.rs` | CO2a1 (VR2b reuses it) |
 | `core/src/actions.rs` | 587 | named: `color_json`, `wheels_json`, `video_json` → `actions_json.rs`, only if wiring would pass ~590 | CO2a1 or CO9 |
-| `core/src/evaluate.rs` | 559 | `Segment` and its `impl` with `to_json` (127–204; 206–208 are `CompTrack`'s doc and derive and stay) → `plan_segment.rs` | the first of CO2a1 (only if `mask_of` would pass ~590), SW3a, SW2c |
+| `core/src/evaluate.rs` | 559 | `Segment` and its `impl` with `to_json` (127–204; 206–208 are `CompTrack`'s doc and derive and stay) → `plan_segment.rs` | the first of SW3a, SW2c (CO2a1 no longer edits it: no mask track, CO-3) |
 | `core/src/format_history.rs` | 371 of 400 | versions 2–24 → `format_history_early.rs` | the bump whose paragraph would pass 400 |
 | `app/Sources/AgentCatalog+Properties.swift` | 410, over its 400 | the video patch's clauses and `videoPatchDescription` (23–191) → `AgentCatalog+VideoPatch.swift`, `private` widened | CO2a1 |
 | `app/Sources/Exporter.swift` | 598 | `// MARK: - Offline single frame` (478–598) → `Exporter+Frame.swift`, carrying the `copyCGImage` deprecation (:583): its `TYPECHECK_BASELINE` row and root `CLAUDE.md`'s "1 in `Exporter.swift`" move with it | paid by CU3a2 (CO2b does not repeat it) |
@@ -516,7 +516,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CO1 | CO | Agents read person masks (`masks`) made on the Mac | CO0, CJ2a | C | — |
 | TX3 | TX | Select words and delete them on every unlocked track as one step | TX2a; TX-S3 at its head | A | — |
 | CU2 | CU | Nothing: the core evaluates a cursor file (mapping, smoothing, idle hide, ripples, path) | CU1a | B | — |
-| CO2a1 | CO | Agents set `video.cutout`; the plan carries mask tracks and the recipe a `cutout` key; nothing drawn yet | CO0, CJ0b (T3), CJ0d (T11, T14) | C | p |
+| CO2a1 | CO | Agents set `video.cutout`; the recipe carries a `cutout` key (the plan is unchanged); nothing drawn yet | CO0, CJ0b (T3), CJ0d (T11, T14) | C | p |
 | CO2a2 | CO | Remove Background drawn from cached masks in the preview, `render_frame` and every export | CO2a1, CO1, CJ0c (T6) | C | — |
 | CP1 | trial | The owner's checkpoint: T1 cut by deleting words; verdict recorded before TX4 | TX3 | A (holds TX4) | — |
 | CJ5a | CJ | Nothing: `keep_range`, a timeline range as a whole project (built during CP1) | CJ0b (T1, T4) | A | — |
@@ -2259,10 +2259,10 @@ from this tree's `build/` (`Sparkle.framework` and five dSYMs) were rebuilt by i
     `BackgroundRender.anyPlaying` over its `transports` (:71).
   - **CJ-22 — The store.** A kind's results for one media are a marker `cache/analysis/<kind>/<media
     id>.json` and a payload folder `cache/analysis/<kind>/<media id>/` holding the files the kind
-    names (`shots` a `frames.bin`, `faces` a `samples.bin`, CO's masks one movie per chunk and its
-    mirrored chunks, FC's `sound_events` a `windows.bin`). A kind whose variants must coexist puts
+    names (`shots` a `frames.bin`, `faces` a `samples.bin`, CO's masks one `masks.pack` per media
+    (CO-4 as CO0 rewrote it), FC's `sound_events` a `windows.bin`). A kind whose variants must coexist puts
     the variant in its name (`masks`, `masks_best`). Every kind has a grid on source time — frames
-    by presentation time (`shots`), samples at k / rate (`faces`, `subjects`), fixed chunks (masks),
+    by presentation time (`shots`, masks), samples at k / rate (`faces`, `subjects`),
     windows at k × hop (`sound_events`) — and stores per grid point only values that depend on that
     point's input and a fixed neighbourhood the kind names, never on where a job began or what else
     is cached. Thresholds over time, minimum lengths, smoothing and identity are applied when a
@@ -3665,7 +3665,8 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
 - **Tolls CO pays** (each a pure move gated alone, by the first CO phase that must edit the file,
   unless another lane paid it): `edit_action.rs`'s end-patch door → `edit_action_end.rs` (CO2a1);
   `actions.rs` → `actions_json.rs` (CO2a1 or CO9, only if wiring would pass ~590); `evaluate.rs`'s
-  `Segment` → `plan_segment.rs` (CO2a1, only if `mask_of` would pass ~590);
+  `Segment` → `plan_segment.rs` lapsed for CO (CO-3's pack adds no `mask_of`, so CO2a1 no longer
+  edits `evaluate.rs`; SW3a or SW2c pays it);
   `AgentCatalog+Properties.swift` → `AgentCatalog+VideoPatch.swift` (CO2a1); `Exporter.swift`'s
   offline single frame → `Exporter+Frame.swift` (CO2b); `EditorViewController+SaveFrame.swift`'s
   options → `SaveFrameOptions.swift` (CO2b); `format_history.rs` → `format_history_early.rs` (the CO
@@ -4026,44 +4027,239 @@ Rust changed), "gate: PASS 302s".
 ### CO1 — person masks on the Mac
 
 - **What a person gets:** nothing visible. An agent gets `get_media_analysis {kind: "masks"}`: the
-  runs of a media's person masks for a window, made on the Mac and cached in the package.
-- **Head:** CJ-S2's rule 1 re-run for the mask request (the device), and CJ-S3 (b) re-run with a
-  masks job (the playback pause); verdicts recorded, CJ-21 amended if (b) fails.
+  runs of a media's person masks for a window, made on the Mac and kept in the package as one
+  lossless pack per media (CO-3, CO-4 as CO0 rewrote them: no mask track, no chunk movie, no
+  mirrored file).
+- **Head:** CJ-S2's rule 1 re-run for the mask request (the device; a pick other than the Neural
+  Engine re-measures Standard on it and takes CO-S1's speed-only rate), and CJ-S3 (b) re-run with a
+  masks job (the playback pause); verdicts recorded, CJ-21 amended if (b) fails, the pause then for
+  the `masks` kind only.
+- **Toll first:** `AgentServer+Analysis.swift`'s `AnalysisClipTimes` → `AnalysisClipTimes.swift`,
+  a pure move.
 - **Core:** none (CJ-20).
-- **Swift:** `AnalysisMasks.swift` (the `masks` kind, and `masks_best` if CO-S1 kept Best: a fresh
-  request per frame on the pinned device at CO-S1's rate and read size, one run per chunk, each
-  chunk's movie in CO-S2's encoding at chunk-relative times by CO-3's nearest-hold rule, the run's
-  `subject_found`); `MaskChunks.swift` (the chunks a window needs, the mirrored chunk with no
-  Vision, the mean centroid of a window's cached masks for CO7); `AnalysisFrames.swift`: the third
-  arm (CO-7); `AnalysisLane.swift`: the pause if CJ-S3 (b) chose it.
-- **MCP mirror:** `get_media_analysis` gains `masks`; its prose names the answer (runs with
-  `subject_found` and frame count, the stamp, no pixels) and that a person's path is Remove
-  Background (CO3).
-- **Docs:** `app/CLAUDE.md`; spec §5.6 (`cache/analysis/masks/`), §7.9e; `docs/guide/mcp.md`.
-- **Decisions:** **CO-10** — the mask movie: the encoding, chunk length and nearest-hold times CO-S2
-  chose, and CO-S1's read size.
-- **Acceptance:** proof rows against Release; `make gate`.
-- **Proof** (`co1_proof.py`, through `get_media_analysis`): M1 a 60 s 1080p30 person fixture asked
-  for 12–37 s writes only the chunks covering that window, each chunk's sample times its source
-  frame times, chunk-relative, once each, nearest-hold at a capped rate; M2 two runs on the pinned
-  device decode within 1/255 at every pixel; M3 the stamp names kind version, request and revision,
-  rate, read size, OS build and device, and no path; M4 an Apple Log and an HLG fixture through the
-  third arm give J ≥ 0.98 against the SDR version's masks, their sample times the source track's
-  presentation times; M5 the E9 person movie re-tagged with a 90° rotation gives masks within 1/255
-  of the untagged movie's; M6 a relink to another file changes the stamp and the next store replaces
-  the runs and removes the old chunk files; M7 a save starting while a chunk publishes waits, and
-  the package holds a complete chunk or none; M8 closing the document cancels its wants, and nothing
-  is written after; M9 the realtime factor is at least CO-S1's less 20 %; M10 a mirrored chunk's
-  frame k decodes byte-identical to the forward chunk's at the mirrored time; M11 (only with the
-  pause) a run does not advance while `play_preview` plays and does after.
-- **Mutants** (7): the device unpinned (M3); `.fast` substituted (M2); sample times one frame off
-  (M1); the converting arm taking times from a composition's grid (M4); the marker written before
-  its chunk (M7); a chunk missing from the window's set (M1); the mirror's pivot one frame off
-  (M10).
+- **Swift:** `AnalysisMasks.swift` (the `masks` kind: a fresh person `.balanced` request per frame,
+  revision 1, on the pinned device, at CO-11's rate and the source size, the found flag, the runs,
+  the job's publishes every 30 s and at each range's end); `MaskPack.swift` (the pack's bytes: the
+  LZFSE masks in append order, a frame table sorted by time, a mask table, a 40-byte footer; its
+  append-merge writer and its mapped reader); `AnalysisFrames+InputPass.swift` (CO-7's third arm:
+  `AVAssetReaderTrackOutput` and step 0's `InputPass`, every frame's own time kept);
+  `AnalysisFrames.swift` (`Source.arm`, wiring only); `AnalysisStamp.swift` (`masks`,
+  `AnalysisVisionStamp`); `AnalysisStore.swift` (`publishFile`, a hit needing its payload file);
+  `AgentServer+AnalysisMasks.swift` (the answer's runs); `AnalysisLane.swift` (the `.masks` arm,
+  and the pause if CJ-S3 (b) chose it).
+- **MCP mirror:** `get_media_analysis` gains `masks`; its prose names the answer (`mask_size`,
+  `frames`, `subject_found`, runs with `subject_found` and frame count, the stamp, no pixels) and
+  that a person's path is Remove Background (CO3).
+- **Docs:** `app/CLAUDE.md`; spec §5.6 (`cache/analysis/masks/`), §7.4, §7.9e; `docs/guide/mcp.md`,
+  `projects-and-media.md`.
+- **Decisions:** **CO-10** the pack (its bytes, the append-merge publish, the size Vision answers,
+  the found flag, revision 1, the source read size); **CO-11** the device and rate; **CO-12** CJ-S3
+  (b) with masks; **CO-13** the third arm; **CO-14** the answer; **CO-15** the owner's answer, and
+  M10 and the centroid moved on.
+- **Acceptance:** the head's verdicts recorded; proof rows against Release; `make gate`.
+- **Proof** (`co1_proof.py`: probe rows through `co1_probe.swift`, app rows through
+  `get_media_analysis`): P1 a pack's fresh write reads back byte-exact; P2 two publishes of
+  disjoint ranges in either order give the union, earlier blobs in place; P3 `shown(at:)`; P4 the
+  found flag at 0.5 %; P5 the stamp's `vision` field; P6 a throwing write leaves the store as it
+  was; P7 a publish waits for a save; P8 `runs` and the capped rate's `covered`; P9 a marker whose
+  pack is gone, garbage or another size misses and is rebuilt with the job's coverage alone. M1 a
+  60 s 1080p30 person fixture asked for 12–37 s writes a pack whose frame table is exactly that
+  window's frames at their presentation times, once each; M2 the folder removed and asked again:
+  masks within 1/255; M3 the stamp names kind version, request, quality, revision, rate, read size,
+  OS build and device, and no path; M4 an Apple Log and an HLG twin through the third arm give mean
+  IoU ≥ 0.98 against the SDR push-in's masks, their frame tables the files' own times; M5 a
+  rotation-tagged twin, and a portrait pair, give masks within 1/255; M6 a relink: a miss, the
+  stamp's source changed, the pack holding only the new run's frames; M7 saves during a job never
+  find a half pack and are never refused; M8 closing the document cancels the job and nothing is
+  written after; M9 (Release) realtime at least 0.8 × CO-11's Standard factor; M11 (only with the
+  pause) a masks job waits out `play_preview`, and a `shots` job does not.
+- **Mutants** (8, +1 with the pause): the device unpinned (M3); `.fast` substituted (M2); times one
+  frame off (M1); the third arm through a composition (M4); the marker before the pack (P6); a
+  range's end dropped (M1); the found threshold moved (P4); the hit without its pack (P9); no pause
+  (M11).
 - **Manual checks:** none. **Depends on:** CO0, CJ2a. **Lane** C.
 - **Question for the owner:** a cut-out clip's analysis starts as soon as it is asked for, or after
   the Background render delay (G-38)? *Recommended: at once* — it is the result the person is
-  waiting to see — with CJ-S3 (b)'s pause while playing if it chose one.
+  waiting to see — with CJ-S3 (b)'s pause while playing if it chose one. **Answered 2026-11-01: at
+  once** (CO-15, for CO2b's CO-22).
+
+#### CO1's record (2026-11-02)
+
+**Landed.** Lane C, base `5dbcd8fc`. The worktree began at `eb350b86` and was fast-forwarded to
+the integration head before any edit. The commits, in order:
+- `f8a0e675`: toll T-CO1, `AnalysisClipTimes` out of `AgentServer+Analysis.swift` (373 → 336)
+  into `AnalysisClipTimes.swift` (38), a pure move, `make typecheck` alone.
+- `eb29dd45`: the head. CJ-S2's rule 1 and CO-S1 re-run, CO-10…CO-15 recorded, and this road
+  map's CO1, CO-21, CO2a1, CO2a2, CO2b and Phases rows rewritten to the pack. That commit came
+  before the app code.
+- `4b3d7698`: the app code, its documents and the instruments.
+- `3c8e9883`: this record; then review fix passes `f4e8822f` and `02f296cb`.
+
+No core, FFI or format change (CJ-20). The product tool count stays 107. An agent gets
+`get_media_analysis {kind: "masks"}`; a person sees nothing.
+
+- **New files** (`wc -l`): `AnalysisMasks.swift` 313, `MaskPack.swift` 260,
+  `AnalysisFrames+InputPass.swift` 180, `AgentServer+AnalysisMasks.swift` 61,
+  `AnalysisClipTimes.swift` 38.
+- **Changed:** `AnalysisStamp.swift` 183 → 206, `AnalysisStore.swift` 221 → 258,
+  `AnalysisFrames.swift` 385 → 394 (`Source.arm`; `pump`, `preferredTransform`, `halfToBGRA`,
+  `Upright` internal), `AnalysisLane.swift` 320 → 324 (the `.masks` arm),
+  `AgentServer+Analysis.swift` 336 → 348 (`AnalysisCall` internal; the answer split into common
+  fields, `shotsFields` and `masksFields`), `AgentCatalog+Analysis.swift` 103 → 111.
+- **Not touched:** `BackgroundRender.swift` (CJ-S3 (b) did not fire), and the generic callers of a
+  kind (`AgentServer+AnalysisJob.swift`, `ShotSplit.swift`, `AnalyzingSheetController.swift`).
+- **Instruments:**
+  - `cutout_spike/`: `--only device`, `--device`, `deciders.device_rule` with five selftest rows
+    (25/25), and M5's rotation fixtures.
+  - `creator_spike/rule.py`: `write_results(…, folder=)`.
+  - `creator_spike/lane_spike.py`: `--playback --kind masks`.
+  - `co1_probe.swift` (P1–P10, and the `compare` mode the app rows read masks through) and
+    `co1_proof.py` (P1–P10, M1–M9, Z1, eight mutants; P10 from review fix pass 1).
+- **Documents:** spec §5.6 (286 → 301), §7.4 (row 48), §7.9e (503 → 513) and their index
+  cells, `creator-jobs-3.md` (146 → 281) with six index rows, `docs/guide/mcp.md`,
+  `projects-and-media.md`, and both proof READMEs.
+
+**The head.** The host was macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset`: "Now drawing
+from 'AC Power'"), with three lanes on the machine.
+
+- **CJ-S2 rule 1 for the mask request** (`rule_sha256` `c41417fb…95bb2b11`, matching):
+  `VERDICT device=gpu branch=1 identical=cpu:yes,gpu:yes,neural_engine:yes
+  realtime=cpu:0.34,gpu:1.89,neural_engine:1.60 compare=cross_run`.
+  - Runs, every frame of `push_1080.mov` (600 masks of 512 × 384, revision 1): CPU 0.476, 0.338
+    and 0.319×; GPU 0.981, 1.928 and 1.892×; Neural Engine 1.945, 1.603 and 0.916×.
+  - One-minute loads were 12.5…23.3.
+  - Each device's three digests were equal to one another, and the three devices' digests
+    differed from each other.
+- **Standard re-measured on the GPU** (CO-S1's `rule_sha256` `035665d1…9fd05a`, matching):
+  `VERDICT standard=person-balanced rate=every device=gpu realtime_1080=1.23
+  realtime_4k=1.59@source,1.98@1920 mask=512x384`.
+  - At 1080p30: every frame 0.917, 1.228 and 1.971×; 15 a second 3.93×; 10 a second 5.44×.
+  - Loads were 9.6…44.
+  - The rate stays every frame, and 1.228× is M9's Standard factor.
+- **CJ-S3 (b) with masks** (`rule_sha256` `209c6f01…f0309ce830`, matching; Release, PID 45721,
+  stopped after): `play_preview` composed 599, 600 and 600 frames idle, and 600, 600 and 600 with
+  a masks job wanted on another document over the still's first 120 s. That is a 0.0 % drop, so
+  **no pause** (CO-12): CJ-21 is unamended and there is no M11 or `no-pause` mutant. Each busy
+  run's job had started and not ended when its play returned; closing its document cancelled it.
+- The results files are `tools/proof/work/creator_spike/CJ-S2-masks/`, `CO-S1-gpu/` and
+  `CJ-S3-masks/results.json`, each storing its `rule_sha256` with `rule_matches: true`.
+
+**Commands and results.**
+- `make typecheck` after the toll and after the app code: exit 0, the four baseline warnings.
+- `swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS tools/proof/co1_probe.swift`: exit 0.
+- `co1_proof.py --only P1,…,P9`: 7/9 at first. P5 and P8 failed because the PNG fixture did not
+  probe (below). After the fix, 9/9.
+- `analysis_proof.py --only P1,…,P9`: 9/9.
+- Debug (`make app-debug`), the whole proof: 16/18.
+  - M7 and M8 failed on the instrument. M7 asked `analysis_job` to wait 120 s (its bound is 60),
+    so its job was left running, and M8's job then queued behind it at width 1. Fixed: M7 closes
+    its document, and M8 fails by name if its job never starts. `--only M7,M8` was then 3/3.
+  - M9 was skipped by name (Release only).
+  - The third arm reads about half a frame a second on Debug, so M4 took about 20 minutes there.
+- `make gate`: the first run failed test on two Lines cells, `creator-jobs-3.md` and the
+  `11-decisions/` total. Fixed, then "gate: PASS 92s" (names, test and app ran; typecheck, fmt and
+  lint were skipped). Over this record, before this sentence: "gate: PASS 1s" (names alone ran).
+- **Release** (`RC_PROOF_APP=release`, after the gate's `make app`), on the final instrument:
+  - `co1_proof.py`: **19/19**. M9's realtime was 1.792, 1.784 and 1.782×, median 1.784× against
+    0.982 (0.8 × 1.228).
+  - `analysis_proof.py`: **22/22**.
+- Z1 printed nothing on every launch.
+- `spec_index_proof.py` 231/231; `name_residue.py` exit 0.
+- **Mutants** (eight; the app's five built in tree copies as Release):
+  - `marker-before-pack` (P6), `found-threshold` (P4) and `missing-pack-hit` (P9): CAUGHT.
+  - `device-unpinned`: CAUGHT on M3 (the stamp's device `auto`).
+  - `fast-quality`: CAUGHT on M2 (masks 256 × 192, not 512 × 384; its two runs were
+    byte-identical, so the size is what catches it).
+  - `times-off-by-one`: CAUGHT on M1 (every pts one frame late).
+  - `converted-via-composition`: CAUGHT on M4. The HLG twin's table held the composition's
+    20067, 40134 … in place of the file's 20000, 40000 …; the Apple Log twin, at an even 30 fps,
+    passed.
+  - `range-end-dropped`: CAUGHT on M1 (749 frames, coverage [[360, 1108]]).
+  - Each was built in about 150–200 s and the copy removed after.
+
+**What the rows found.**
+- The pack's mask is 512 × 384 for every landscape media read and 384 × 512 for the portrait pair,
+  whether coded 360 × 640 or rotated by its track's transform (CO-10).
+- M2's second run was byte-identical to the first (max difference 0 over 750 masks), as were M5's
+  rotated twins (90 masks each).
+- The push-in's person is weak. M1's 25 s window answered 57 runs, its `found` flag flickering.
+- A scratch probe read frame 60 of each M4 twin through the third arm and through the one-clip
+  composition's reader. The two pictures were byte-identical for both twins: the third arm is
+  step 0's picture.
+
+**Deviations.**
+- **M5's fixtures are uncompressed BGRA in MOV (`rawvideo` bgra), not PNG.** AVFoundation on macOS
+  26.5.1 refuses PNG in MOV ("Cannot Decode", -11833). An `rgb24` twin decoded 0.65 levels apart
+  from its original (mean); BGRA twins decode identically.
+- **M4's person is the owner's talking head** (`owner-sync/IMG_0018.MOV`, gitignored and never
+  committed; without it M4 is skipped by name and owed), not the push-in. A plain HEVC re-encode
+  of `push_1080.mov`'s first 150 frames kept a mean IoU of only 0.73 of its masks
+  (`mask_speed dump`, scored on every other pixel). The same re-encode of the talking head's first
+  150 frames kept 0.985. M4 prints the talking head's floor beside its rows (HEVC 10-bit at
+  40 Mb/s: mean 0.9895).
+- **M4's HLG twin inverts GR-15's HLG arm into SDR** (`hdr_proof.convert`, in closed form), not
+  `InputConversions.liftSDR`. The lift is HD-3's mapping into an HLG project. A lifted twin read
+  back 34 levels darker (frame 60's mean 127 against 93) and kept a mean IoU of 0.9707, below the
+  bar.
+- **M4 reads 0–10 s** (both of the HLG twin's dropped frames) to bound the Debug run.
+- **M4 scores its frame table on the media's own grid.** The HLG twin probes at 29.9 fps (598
+  frames in 20 s), and CJ-23's first-frame-wins grid drops one of the two frames that round to an
+  index. Its table held 297 of the file's 298 frames in the window, each at the file's own pts.
+- **M2 also requires CO-10's 512 × 384**, so `fast-quality` is caught on the size if not the bytes.
+- **The app mutants were built as Release** in their tree copies, for M4's speed. The spec names no
+  configuration.
+- The spec's M10 moved to CO2a2's D16 and the centroid to CO3, as CO-15 records.
+- M4 results on Release: Apple Log mean IoU 0.9801 (median 0.9977, 5 frames under 0.9); HLG
+  0.9865 (median 0.9981, 5 under 0.9). Both pass 0.98, the Apple Log twin by 0.0001.
+
+**Owed.**
+- S-TH4: CJ-S3 (b)'s and CJ-S2's rows on the owner's own HLG VFR file (the synthetic 1080p file and
+  the push-in stood in).
+- S-KEY1's CO-S1 rows (Best, the read size, flicker, rotation), as CO0 owed them.
+- To file: a timed-out call loses up to one publish interval of a job's work. A tool call that
+  passes its 60 s bound releases its owner, which cancels the job, and a masks job publishes only
+  every 30 s and at a range's end. So each further call keeps only what was published. It matters
+  for slow kinds; `shots` is fast. Filed after integration (`ai-drafted`, `low-priority`).
+
+None is a STOP. No manual check.
+
+**Review.** Review 1 found two should-fix items and three nits; fix pass 1 fixed the two:
+- A job whose range decoded no frame (every index a dropped VFR frame) has no mask size, and its
+  publish wrote a fresh 0 × 0 pack over the populated one, shrinking the coverage to the empty
+  range. `MaskPack.write` now merges a write with no masks onto the on-disk pack at the pack's own
+  size. New probe row P10 publishes 0 × 0 with no frames onto a 600-frame pack: against the
+  unfixed writer it failed ("merged false … size 0×0 … coverage [[600, 600]]"); fixed, it passed.
+- `get_media_analysis`'s description sent a person to Remove Background, which is CO3 and not
+  built. It now says no menu or pane reaches masks yet.
+- Verified: `co1_proof.py --only P1,…,P10` 10/10 (Debug probe); `make gate` "gate: PASS 398s"
+  (names, typecheck, test and app ran; fmt and lint skipped); Release
+  `co1_proof.py --only P10,M1,M2,M6,Z1` 5/5. No mutant anchor was touched.
+- Review 2 (`5dbcd8fc..f4e8822f`, fix-required): one should-fix. CO-10 and §5.6 still said a pack
+  of another size is written fresh, against the fixed writer. Fix pass 2 (documents only) added
+  the exception to both ("a publish that made no mask (a range of only dropped frames) merges onto
+  the pack at the pack's own size"), `05.6` 301 → 303, `creator-jobs-3.md` 281 → 284;
+  `spec_index_proof.py` 231/231 (230/231 first, the §11 total), `make gate` "gate: PASS 252s". No
+  code or instrument changed, so the Release proof and the mutants were not re-run.
+- Review 3 (`5dbcd8fc..02f296cb`): pass, four nits. Two done at integration: CO-12's "*Pending its
+  run.*" label dropped, and the CO0 tolls line now says `plan_segment.rs` lapsed for CO (no
+  `mask_of`). Two left as they stand: a media's first job that makes no mask writes a fresh 0 × 0
+  pack, so `mask_size` answers `[0, 0]` until a job makes masks; and `offset + length` in
+  `MaskPack`'s table check traps on overflow in a hand-damaged pack instead of a named
+  `MaskPackError`.
+
+**Integration (2026-11-02).** Cherry-picked (`f8a0e675…02f296cb`) onto the integration branch
+after TX2a and TX2b, with no format change. Conflicts only in the indexes and the decision file,
+each kept both: `creator-jobs-3.md` holds TX2a's and TX2b's blocks and then CO1's (443 lines),
+CO-10…CO-15's index rows follow TX-20…TX-27, the file's Holds cell gained CO1's clause after
+TX2b's, and the spec README's `11-decisions/` total is 18207 in 37 files
+(`spec_index_proof.py` 234/234). The `CLAUDE.md` edit owed went in: `app/CLAUDE.md`'s analysis
+entry names the five new files, says a job writes through `publish` or `publishFile`, and gains
+the paragraph on the `masks` kind, `MaskPack`, `publishFile`'s rules, the third arm,
+`AnalysisClipTimes` and the answer. `make gate` on the merged tree: names, typecheck (the four
+baseline warnings), test and app `pass` (fmt and lint skipped, no Rust changed), "gate: PASS
+322s". No Release proof re-run: every file CO1 changed in `app/Sources` and its instruments is the
+lane's byte for byte (TX2a and TX2b touched none of them), and the lane's Release run, 19/19 and
+22/22, stands.
 
 ### TX3 — delete words
 
@@ -4284,53 +4480,47 @@ in a dependency means both. They share CO-20…CO-29.
     `video.cutout`, `.subject` and `.quality` by name in `not_a_target` (as `video.motion`), and the
     evaluator restores the base values (R5-4's mechanism); `edge`, `feather` and `background`
     animate by §5.4's object rule.
-  - **CO-21 — The plan's mask tracks and the recipe's `cutout` key.** The plan gains `mask_tracks`,
-    written only when non-empty, each `{id, segments}`, a segment the picture segment's keys plus
-    `quality`. The recipe layer's twenty-seventh key, after `dissolve`, is `cutout`: `null` or
-    `{mask, background, edge, feather}`, `mask` being `{kind: "track", track_id}` (CO10 adds `{kind:
-    "image", media}`). (If CU3a1 lands first, the key counts follow landing order; the integrator
-    renumbers `recipe_layer.rs`' doc.)
+  - **CO-21 — The recipe's `cutout` key (no mask track: CO-3 as CO0 rewrote it).** The plan
+    gains nothing: a cutout adds no composition track, no segment and no decoder. The recipe
+    layer's key after `dissolve` (and CU3a1's `cursor`, by landing order) is `cutout`: `null` or
+    `{mask, background, edge, feather}`, `mask` carrying what CO-3's pack lookup needs — at least
+    `{kind: "media", media, quality}`, the media whose pack holds the masks (CO10 adds `{kind:
+    "image", media}`); the rest of its shape is settled at CO2a1's head. The integrator renumbers
+    `recipe_layer.rs`' doc by landing order.
 
-#### CO2a1 — the cutout in the model, the plan and the recipe
+#### CO2a1 — the cutout in the model and the recipe
 
 - **What a person gets:** nothing drawn yet. Agents set `video.cutout` with `set_video` and read it
-  back through `get_project`; the plan and the recipe carry the mask tracks and the `cutout` key
-  that CO2a2 draws; a clip with a cutout still draws uncut, as CO-6 says a clip without its masks
-  does.
+  back through `get_project`; the recipe carries the `cutout` key that CO2a2 draws; a clip with a
+  cutout still draws uncut, as CO-6 says a clip without its masks does. The plan is unchanged.
 - **Tolls first:** `edit_action.rs`'s end-patch door (99–290) → `edit_action_end.rs`;
   `AgentCatalog+Properties.swift`'s video patch (23–191) → `AgentCatalog+VideoPatch.swift`;
-  `actions.rs`, `evaluate.rs` and `format_history.rs` only if this phase's wiring would pass their
-  marks.
+  `actions.rs` and `format_history.rs` only if this phase's wiring would pass their marks.
 - **Core:** `model_cutout.rs` (`Cutout`, `CutoutSubject`, `CutoutQuality`, `CutoutBackground`; the
   field `VideoProps.cutout` in `model_props.rs`, after `look`); `cutout_check.rs` (`check_cutout`,
   one call from `props_check.rs`); `edit_action_end.rs` (the base-only refusals); `actions.rs` (the
-  base restore beside `motion`'s); `evaluate.rs` (in `assign`, a cut-out instance's unit placed
-  again on a mask track, `Assignment.mask_of` beside `video_of`); `plan.rs` (`mask_tracks`, counted
-  in the decoder warning); `recipe_layer.rs` (`cutout`), one call in `recipe.rs`; the format bump
-  (`format.rs`, the header's `#define`, `format_history.rs`, `core/tests/schema_vN.rs`) and
-  `core/tests/cutout.rs` (the refusals, the base restore, mask segments through a trim, ×0.5, ×2,
-  ×1.37, a ramp, a freeze, a reverse, a split, a nest and a cross-dissolve against an oracle of the
-  picture segments, the decoder count).
+  base restore beside `motion`'s); `recipe_layer.rs` (`cutout`, with what CO-3's lookup needs), one
+  call in `recipe.rs`; the format bump (`format.rs`, the header's `#define`, `format_history.rs`,
+  `core/tests/schema_vN.rs`) and `core/tests/cutout.rs` (the refusals, the base restore, the
+  recipe's `cutout` key on a trimmed, ×0.5, ×2, ×1.37, ramped, frozen, reversed, split, nested and
+  cross-dissolved clip, and a project without a cutout planning and recipe-ing byte-identically).
 - **FFI:** the bump's `#define` only.
 - **Swift:** `VideoProps.swift` (`CutoutProps`); `TypedPatches.swift`, `OpDictionaries.swift`
-  (`VideoPatch.cutout`); `CompositionPlan.swift` (the mask tracks decoded, not yet built);
-  `FrameRecipe.swift` (`RecipeLayer.cutout` decoded, not yet drawn).
+  (`VideoPatch.cutout`); `FrameRecipe.swift` (`RecipeLayer.cutout` decoded, not yet drawn).
 - **MCP mirror:** `set_video`'s description and `videoPatchDescription` name `cutout`; the gate and
   parity see it through the op table; `get_project` shows it.
-- **Docs:** spec §5.2a (`video.cutout`), §6 (`set_video`), §7.2 (`mask_tracks`), §7.3 (`cutout`);
-  `core/CLAUDE.md` (`model_cutout.rs`, `cutout_check.rs`, `edit_action_end.rs`, the layer's key
-  count); `app/CLAUDE.md` (the snapshot and recipe fields).
+- **Docs:** spec §5.2a (`video.cutout`), §6 (`set_video`), §7.3 (`cutout`); `core/CLAUDE.md`
+  (`model_cutout.rs`, `cutout_check.rs`, `edit_action_end.rs`, the layer's key count);
+  `app/CLAUDE.md` (the snapshot and recipe fields).
 - **Acceptance:** core tests; a project without a cutout plans, recipes and exports byte-identically
   to before the phase; the proof rows against Release; `make gate`.
 - **Proof** (`co2a_proof.py`'s first rows, Release): D8 refusals — `cutout` on a text clip,
-  `video.cutout.quality` in an action end, `edge` 2 — each in its sentence; D9 the plan warns at
-  nine decoders when a mask track is the ninth; D10 golden frames of the existing fixtures
-  unchanged; D13 `set_video {cutout}` read back through `get_project`, and the clip's plan segment
-  copied onto a mask track from id 2001 (`ReelProject.planJSON` through a probe); D14 a cut-out
-  clip draws byte-identical to cutout off until CO2a2.
-- **Mutants** (4): `subject` accepted in an action end (D8); mask tracks left out of the warning
-  (D9); the mask segment not copying the picture segment's map (core test); the cutout written when
-  `null` (D10).
+  `video.cutout.quality` in an action end, `edge` 2 — each in its sentence; D10 golden frames of the
+  existing fixtures unchanged; D13 `set_video {cutout}` read back through `get_project`, and the
+  layer's recipe `cutout` key naming the clip's media (`frame_recipe` through a probe); D14 a
+  cut-out clip draws byte-identical to cutout off until CO2a2.
+- **Mutants** (3): `subject` accepted in an action end (D8); the recipe's `cutout` key naming
+  another media (D13); the cutout written when `null` (D10).
 - **Manual checks:** none. **Depends on:** CO0, CJ0b (T3), CJ0d (T11, T14). **Lane** C.
 
 #### CO2a2 — the mask drawn
@@ -4338,44 +4528,42 @@ in a dependency means both. They share CO-20…CO-29.
 - **What a person gets:** a clip with `video.cutout` draws only the person wherever its masks are
   cached, in the preview, `render_frame` and every export, and draws uncut where they are not.
   Agents make masks with `get_media_analysis`; CO2b makes them on demand, CO3 adds the inspector.
-- **Swift:** new `CompositionBuilder+Masks.swift` (each mask track filled from the store's ready
-  chunks: a segment cut at chunk boundaries in source ticks, each part placed by the picture
-  segment's own map, mirrored chunks for a reversed segment, empty time elsewhere, CO-5's window
-  rule, and the clips drawn uncut for want of a chunk on `BuiltComposition`; one wiring line in
-  `build`); `CompositionBuilder+AudioTracks.swift` (`firstExtraTrackID` counts the mask track ids,
-  CO-3); `CompositionBuilder+Orientation.swift` (an instruction's required tracks include its
-  layers' mask tracks); `ReverseCache.swift` (`ReverseResolution.masks`, computed from `cache` like
-  `voiced`); `LayerUniforms.swift`, `Compositor+Uniforms.swift` (CO-8's group); `Compositor.metal`
+- **Swift:** new `Compositor+Cutout.swift` (CO-3's per-request lookup: the composition time through
+  the covering picture segment's linear map in ticks to the source time shown, the source frame
+  shown there (the last at or before it), and the mask of its nearest analysed frame, ties to the
+  earlier, from the media's forward pack — a reversed segment's times mirrored by `T − end`, the
+  forward pack read mirrored, never a second file; CO-5's window rule; the mask's bytes uploaded as
+  stored, never through AVFoundation or step 0); `MaskPack` read mapped and kept per path and
+  marker; `LayerUniforms.swift`, `Compositor+Uniforms.swift` (CO-8's group); `Compositor.metal`
   (`texture(4)` sampled at display-space `uv` before `orientedUV`, the step-7 multiply with r0's
-  remap); `Compositor+Input.swift` (mask track ids never reach `InputStage`; a
-  `ConvertingCompositor` for a mask composition if CO-S2 (2) said so); `CompositorEffects.swift`,
-  `Compositor+Shadow.swift`, `Compositor+Dissolve.swift`, `Compositor+Matte.swift` (bind the mask or
-  the placeholder). The proofs pinning the uniform size move to CO-8's figure:
-  `phase8_chrome.py:3248–3255`, `tone_probe.swift:72–74`, `look_probe.swift:56–58`,
-  `wheels_probe.swift:76–78`, `curves_probe.swift:338–341`, `hdr_probe.swift:1090, 1103`, and the
-  prose of `tone_proof.py:71`, `wheels_proof.py:76–77`, `look_proof.py:83`, `hdr_proof.py:305`.
+  remap); `CompositorEffects.swift`, `Compositor+Shadow.swift`, `Compositor+Dissolve.swift`,
+  `Compositor+Matte.swift` (bind the mask or the placeholder). The composition, its track ids, its
+  instructions and `ReverseCache` are what they are without a cutout. The proofs pinning the
+  uniform size move to CO-8's figure: `phase8_chrome.py:3248–3255`, `tone_probe.swift:72–74`,
+  `look_probe.swift:56–58`, `wheels_probe.swift:76–78`, `curves_probe.swift:338–341`,
+  `hdr_probe.swift:1090, 1103`, and the prose of `tone_proof.py:71`, `wheels_proof.py:76–77`,
+  `look_proof.py:83`, `hdr_proof.py:305`.
 - **MCP mirror:** `render_frame` draws it; no new tool.
-- **Docs:** spec §7.5b (`texture(4)`, step 7, the step-0 bypass); `app/CLAUDE.md` (the builder's
-  mask tracks, the uniform block's size); `docs/manual-checks.md` (JOB-61).
+- **Docs:** spec §7.5b (`texture(4)`, step 7, the pack lookup, the step-0 bypass); `app/CLAUDE.md`
+  (the compositor's pack lookup, the uniform block's size); `docs/manual-checks.md` (JOB-61).
 - **Acceptance:** proof rows against Release; a project without a cutout renders and exports
   byte-identically to before the phase; `make gate`.
-- **Proof** (`co2a_proof.py`'s drawing rows, Release; canned `masks` runs (CJ-26) whose chunks carry
-  CO-S2's bar code, and a real person fixture's masks from `get_media_analysis`): D1 registration —
-  the cut layer's alpha shows the nearest analysed frame's mask through a trim, ×0.5, ×2, ×1.37
-  across a chunk boundary, a ramp across a chunk boundary, a freeze, a reverse, a split, a nest and
-  a cross-dissolve; D2 on the person fixture, where the bilinear footprint lies in a 3×3 mask-texel
-  neighbourhood all 0 the frame equals the clip hidden byte for byte, and where all 255 the uncut
-  picture; D3 a cut-out clip with no chunks in the store draws byte-identical to cutout off; D4 the
-  no-person UI fixture draws uncut (CO-5); D6 the drop shadow's alpha follows the outline; D7 on a
-  transparent canvas the clip's coverage in an HLG project equals the SDR project's within 1/255;
-  D11 a freeze frame of a cut-out clip draws its held frame's mask; D12 a portrait-tagged bar-code
-  clip registers and its mask lies upright; D15 a cut-out clip beside an audio track whose segments
-  carry two stream formats (R2-1's extra family) builds with no duplicate track id, the extra
-  family's id past the last mask track.
-- **Mutants** (8): the mask sampled through `orientedUV` (D12); the mask segment one frame late
-  (D1); a part placed by the chunk's own rounding (D1's ×1.37); a missing chunk drawing transparent
-  (D3); the shadow pass binding the placeholder (D6); CO-5 judged per chunk (D4); the mask through
-  step 0 (D7); `firstExtraTrackID` blind to mask tracks (D15).
+- **Proof** (`co2a_proof.py`'s drawing rows, Release; canned `masks` packs (CJ-26) carrying CO-S2's
+  bar code, and a real person fixture's pack from `get_media_analysis`): D1 registration — the cut
+  layer's alpha shows the nearest analysed frame's mask through a trim, ×0.5, ×2, ×1.37, a ramp, a
+  freeze, a reverse, a split, a nest and a cross-dissolve, at every frame and at a capped rate; D2
+  on the person fixture, where the bilinear footprint lies in a 3×3 mask-texel neighbourhood all 0
+  the frame equals the clip hidden byte for byte, and where all 255 the uncut picture; D3 a cut-out
+  clip with no pack in the store draws byte-identical to cutout off; D4 the no-person UI fixture
+  draws uncut (CO-5); D6 the drop shadow's alpha follows the outline; D7 on a transparent canvas the
+  clip's coverage in an HLG project equals the SDR project's within 1/255; D11 a freeze frame of a
+  cut-out clip draws its held frame's mask; D12 a portrait-tagged bar-code clip registers and its
+  mask lies upright; D16 (CO1's M10, moved here with CO-3's mirror) a reversed clip's frame k draws
+  the forward pack's mask at the mirrored time, `T − end`.
+- **Mutants** (8): the mask sampled through `orientedUV` (D12); the mask one frame late (D1); the
+  lookup rounding the source time instead of taking the frame shown (D1's ×1.37); a missing mask
+  drawing transparent (D3); the shadow pass binding the placeholder (D6); CO-5 judged per analysed
+  range (D4); the mask through step 0 (D7); the mirror's pivot one frame off (D16).
 - **Manual check:** **JOB-61** — a cut-out 1080p camera over a 4K screen recording plays smoothly on
   the owner's Mac.
 - **Depends on:** CO2a1, CO1, CJ0c (T6). **Lane** C. **Questions:** none expected.
@@ -4863,19 +5051,20 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
 ### CO2b — masks made on demand, and files that wait
 
 - **What a person gets:** turning on a cutout starts the analysis of the windows its clips play; the
-  picture redraws as chunks land. An export waits for the masks it needs; `render_frame` and Save
-  Frame wait briefly and say when a cutout was still pending.
+  picture redraws as each publish lands. An export waits for the masks it needs; `render_frame` and
+  Save Frame wait briefly and say when a cutout was still pending.
 - **Tolls first:** `Exporter.swift`'s `// MARK: - Offline single frame` (478–598) →
   `Exporter+Frame.swift`, carrying the `copyCGImage` deprecation (its `TYPECHECK_BASELINE` row and
   root `CLAUDE.md`'s "1 in `Exporter.swift`" sentence move with it);
   `EditorViewController+SaveFrame.swift`'s options (277–399) → `SaveFrameOptions.swift`.
-- **Decisions (draft):** **CO-22 — Masks are made when a clip asks:** the document wants the chunks
-  its plan's mask segments read (mirrored ones included), after every edit, at once (CO1's
-  question), from inside `ensureRampAudio()`.
+- **Decisions (draft):** **CO-22 — Masks are made when a clip asks:** the document wants the
+  analysed ranges its cut-out clips' windows need (a reversed clip's forward window, read mirrored
+  from the one pack, CO-3), after every edit, at once (CO1's question, answered 2026-11-01, CO-15),
+  from inside `ensureRampAudio()`.
 - **Swift:** new `ProjectDocument+Masks.swift` (the wants, called by one line at the end of
   `ensureRampAudio()` in `ProjectDocument+RampAudio.swift`, so `ProjectDocument.swift` takes
-  nothing; `.reversedMediaDidChange` when a chunk lands); `Exporter+RampAudio.swift` (the mask wait
-  inside `withRampAudio`, before its image-sequence guard, so image sequences wait too);
+  nothing; `.reversedMediaDidChange` when a publish lands); `Exporter+RampAudio.swift` (the mask
+  wait inside `withRampAudio`, before its image-sequence guard, so image sequences wait too);
   `ExporterErrors.swift` (`cutoutFailed`); the export's mask wants released by one line in
   `releaseRecipeKey`; `Exporter+Frame.swift` (`renderFrameReported` takes a cutout wait, default
   none, waits up to it, reports the clips drawn uncut); `AgentServer+Render.swift` (`render_frame`
@@ -4887,14 +5076,15 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
 - **Docs:** spec §7.6 (the wants), §7.8 (the export waits), §7.9 (`render_frame`'s wait);
   `app/CLAUDE.md` (`ProjectDocument+Masks.swift`, the export's wait, `Exporter+Frame.swift`).
 - **Acceptance:** proof rows against Release; `make gate`.
-- **Proof** (`co2b_proof.py`): W1 `set_video {cutout}` makes the store hold every chunk of the
-  clip's window within the analysis time, and only those; W2 a trim that widens the window wants
-  only the new chunks, a hit chunk not rewritten; W3 with `-RCDevAnalysisHold`, `render_frame`
-  returns after 30 s, draws the clip byte-identical to cutout off and names it, and without the hold
-  waits and draws the cut picture; W4 an export started while chunks are pending contains cut frames
-  (decoded against `render_frame`'s); W5 a failing chunk fails the export with `cutoutFailed` naming
-  the clip and leaves no file; W6 a reversed cut-out clip wants and draws the mirrored chunks; W7
-  the export's mask wants are gone after it finishes.
+- **Proof** (`co2b_proof.py`): W1 `set_video {cutout}` makes the store's coverage hold every frame of
+  the clip's window within the analysis time, and only those; W2 a trim that widens the window
+  wants only the new range, the covered range's masks not rewritten; W3 with `-RCDevAnalysisHold`,
+  `render_frame` returns after 30 s, draws the clip byte-identical to cutout off and names it, and
+  without the hold waits and draws the cut picture; W4 an export started while masks are pending
+  contains cut frames (decoded against `render_frame`'s); W5 a failing masks job fails the export
+  with `cutoutFailed` naming the clip and leaves no file; W6 a reversed cut-out clip wants its
+  forward window and draws the forward pack read mirrored; W7 the export's mask wants are gone
+  after it finishes.
 - **Mutants** (5): the export not waiting (W4); the wait outside `withRampAudio` (W4 on a PNG
   sequence); the want made only at open (W2); `render_frame` waiting without a bound (W3); the
   release line removed (W7).
@@ -5025,9 +5215,11 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
   :251–395 at `d0661e5d`) with its validator arm in new `EditorViewController+Cutout.swift`;
   `UIMenuTable.swift` and `inventory.json`.
 - **MCP mirror:** `analyze_cutout {clips, wait}` (`AgentServer+Cutout.swift`, a `creatorHandlers`
-  row; `AgentCatalog+Cutout.swift`), mirroring Status and Analyze Now: it wants each clip's chunks
-  and answers per clip `state`, `progress`, `quality`, `chunks`, `ready`, `subject_found` and
-  `centroid`, waiting up to `wait` seconds. `get_media_analysis` stays the per-media reader.
+  row; `AgentCatalog+Cutout.swift`), mirroring Status and Analyze Now: it wants each clip's
+  analysed ranges and answers per clip `state`, `progress`, `quality`, `covered`, `ready`,
+  `subject_found` and `centroid` (the mean centroid of the window's cached masks, read from
+  `MaskPack`; moved here from CO1, CO-15), waiting up to `wait` seconds. `get_media_analysis`
+  stays the per-media reader.
 - **Docs:** `canvas-and-layers.md` (Remove Background), `menus-and-shortcuts.md`, `mcp.md`, the
   README highlight; spec §4.3b, §7.9e, §9; root `CLAUDE.md`'s product count; a `screens.py` screen
   for the section.
@@ -5037,11 +5229,12 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
 - **Proof** (`co3_proof.py`, Release; the harness for the chrome): I1 the checkbox writes one
   `set_video {cutout}` step; I2 Status walks Analyzing → Ready on a fixture and shows "No person
   found" on the UI fixture; I3 Edge inside a selected action writes the action's end, Quality there
-  is ⊘; I4 `analyze_cutout {wait: 60}` returns `ready` with every chunk; I5 the menu item's
-  checkmark follows a mixed selection; I6 `analyze_cutout`'s `centroid` equals `MaskChunks`'
-  centroid of the clip's cached window.
+  is ⊘; I4 `analyze_cutout {wait: 60}` returns `ready` with every frame of the window covered; I5
+  the menu item's checkmark follows a mixed selection; I6 `analyze_cutout`'s `centroid` equals the
+  mean centroid of the clip's cached window read from `MaskPack` by the probe (CO3 is the
+  centroid's only prover).
 - **Mutants** (3): the section not registered (I1); Quality written to an end (I3); `analyze_cutout`
-  answering before the last chunk (I4).
+  answering before its window is covered (I4).
 - **Manual checks:** none (the look is the harness's). **Depends on:** CO2b. **Lane** C.
 - **Question for the owner:** a key equivalent for Clip ▸ Remove Background? *Recommended: none in
   this phase*; §9 is crowded and the checkbox is one click.
@@ -5483,7 +5676,7 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
     `keep_range` applied when a range is given, the handle unchanged when none (VR3's copy). It
     carries the graphics its clips draw plus `fonts/` and `assets/`, through the started
     `GraphicStore` (G-14), and each kept media's caches: peaks, loudness, sync, speech, device
-    transcripts, `cache/analysis/` whole (masks and mirrored chunks included, CO-4), a cloud
+    transcripts, `cache/analysis/` whole (the mask packs included, CO-4), a cloud
     transcript with its marker only when its file records `remote_deleted: true` (one still owed a
     DELETE stays in the source, so R6-11 and R6-3 hold, N4), and `cache/reversed/<media
     id>-<digest>.mov` for each kept reversed clip (the digest is over the same media file, so it
@@ -7031,7 +7224,7 @@ rule by one named file (SW-43).
   answers the same `centroid`. **CO-71** the section's rows.
 - **Swift:** new `VideoPane+Layout.swift` (registered for a single selected media clip); new
   `LayoutOfferSheet.swift` (after R5-3's shift sheet); `AgentServer+Layout.swift` fills `focus` from
-  `MaskChunks`' centroid; its row in `AgentCatalog+Declarations.swift`.
+  CO3's centroid over `MaskPack`; its row in `AgentCatalog+Declarations.swift`.
 - **MCP mirror:** none new; the declaration row, and the catalog row names the section.
 - **Docs:** spec §4.3b, §7.9a; `canvas-and-layers.md`; `screens.py` screens for the section and the
   sheet.
@@ -7039,7 +7232,7 @@ rule by one named file (SW-43).
   P2 with masks of a person left of centre the circle's crop centre is the masks' centroid within a
   pixel; P3 without masks it is the source centre; P4 the sheet's Nest and Switch is one undo step;
   P5 `switch_layout` without `focus` makes the project the menu makes.
-- **Mutants** (3): the focus read from an unfinished chunk set (P2 on a half-analysed clip); the
+- **Mutants** (3): the focus read from a window not wholly analysed (P2 on a half-analysed clip); the
   sheet's two edits as two steps (P4); the tool leaving `focus` empty (P5).
 - **Acceptance:** the proof against Release; the screens captured; `make gate`.
 - **Manual checks:** none beyond JOB-63. **Depends on:** CO6, CO1. **Lane** B. **Questions:** none.
@@ -8356,7 +8549,7 @@ never committed; their lines in `tools/proof/README.md`):
   a Camera Log set (the converting fixture).
 - **Canned analyses** (CJ-26): `faces` and `subjects` with known motion — a face panned for 20 s,
   leaving for 2 s and returning, two faces 400 px then 1,400 px apart, a still face, known cuts, a
-  no-subject screen (VR2a–VR6, SW8); `masks` chunks carrying CO-S2's bar code (CO2a–CO5).
+  no-subject screen (VR2a–VR6, SW8); `masks` packs carrying CO-S2's bar code (CO2a–CO5).
 - **Masks:** a moving disc as a mask sequence; CO-S2's bar-code movie; the E9 fixtures
   (`vision_fixtures.sh`, the slow push-in, the no-person UI scroll, a rotation-tagged push-in);
   Apple Log, HLG and HLG VFR `ffmpeg` fixtures.
@@ -8446,9 +8639,9 @@ reframe, a cutout or a switch looks right on real footage — is a JOB row.
 - **Mask edges, misses and size.** Vision's 512×384 masks may look cut with scissors on hair and
   fast hands (JOB-60 decides whether a matting-model candidate is filed, which must carry a licence
   an Apache-2.0 app can ship); backlit, from-behind and small figures are missed; a composition must
-  not colour-manage a mask frame (CO-S2 (2)); each cut-out instance adds a decode and each chunk an
-  asset per build (CO-S2 (5), (6)); GPU and Neural Engine masks differ by up to 25 levels across
-  Macs.
+  not colour-manage a mask (CO-S2 (2)); each cut-out layer reads and decompresses one mask from
+  its pack per frame (CO-S2 (5), (6)); the pack is lossless, 62.32 MB a minute (CO0's record); GPU
+  and Neural Engine masks differ by up to 25 levels across Macs.
 - **Layouts against existing placement.** A switch rewrites the base placement of role clips up to
   the next layout action; hand placement there is overwritten unless `through` bounds the reach;
   zooms in the reach are refused and nested, and a nested screen or camera loses rounded corners;
