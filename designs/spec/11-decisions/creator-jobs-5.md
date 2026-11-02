@@ -316,3 +316,75 @@ The owner's answer: the file sits beside the movie as `<stem>.fjcursor` (CU-2, C
   `movie_size` the track's; K15 `record_screen {seconds: 2, place: false, path}` answers
   `segments[0].cursor_path` beside its movie with `cursor_image` "none". JOB-20 is the person's
   check of a real recording's clicks.
+
+## TX1b — on-device word starts moved to their sound (2026-11-02)
+
+TX-15…TX-19 are TX1b's (on-device word starts moved to where their sound begins), recorded before
+its code; they sit in TX1's block (TX-10…TX-14), whose next free numbers they are. The owner's
+decision of 2026-11-02, answering TX3b's STOP: "Fix word starts first." TX-S3 measured E0's
+on-device starts always early (−109.6 to −1,185.6 ms), and TX3b measured "Pack" 1.11 s and "How"
+1.07 s before their audible onsets, so the word after a pause starts inside the silence. No core,
+`rc_*`, op, tool name, format or key change; nothing sends (CJ-3), so there is no `ModelKeys` row.
+
+- **TX-15 — An on-device word's start is moved to where its sound begins.** The rule runs per
+  stored run (`DeviceTranscriptCache.Heard`), in media source ticks, over its words in source order
+  (`WordOnsets.moved`). A word has start `s`, end `e = max(s, end)`, and `limit = min(e, the next
+  word's stored start)` (`e` for the last word). A voice cell k is `[k·chunk, (k+1)·chunk)`,
+  `chunk` `MediaSpeech.chunkTicks`, and is speech when `p ≥ defaultVoiceConfidence`.
+  - (a) **The first speech cell.** `b` is the first cell after `s`'s cell that is speech, with
+    `b < count` and `b·chunk < limit`, whose preceding non-speech run `[a, b)` (the longest run of
+    non-speech cells ending at `b − 1`) either holds `s`'s cell or is at least
+    `TranscriptCut.minimumRunCells` (2) cells long. With none, the start is unmoved.
+  - (b) **The threshold.** `T = max(level, floorRatio × median)`, `level` 0.01 (−40 dBFS, linear)
+    and `floorRatio` 4 (+12 dB), in `Float`. The median is the element at index `(n − 1)/2` of the
+    sorted peaks of the 10 ms buckets (`MediaPeaks.bucketTicks`) whose start lies in `[a·chunk,
+    b·chunk)` — the noise floor of the word's own non-speech run before the onset, never a speech
+    level; with no such bucket it is 0.
+  - (c) **The onset.** The start of the first bucket with `peak ≥ T`, scanning from the bucket
+    holding `max(s, a·chunk, (b − leadCells)·chunk)` (`leadCells` 3, 96 ms) up to, but not
+    including, the first bucket starting at or after `(b + 1)·chunk`, then clamped to at least `s`.
+    With no such bucket, or no peaks cache, the onset is `b·chunk`.
+  - (d) **The walls.** An onset at or past `limit` falls back to `b·chunk`.
+  - So a start never moves earlier, never reaches its own end or the next word's start, and needs
+    no model and no key. Ends are not moved (TX-19).
+- **TX-16 — Applied when words are read, by every on-device reader.** The stored run is unchanged:
+  no cache, version or format change, and a moved start is never written back.
+  `TimelineTranscript.deviceWords` loads the media's voice and peaks caches and applies TX-15, so
+  `get_timeline_transcript`, the Transcript tab and `TranscriptCut` (E0's onset is now the moved
+  start) read moved starts, and `get_transcript` applies the same rule to the run it read
+  (`TranscriptReader.deviceWords(_:for:moved:)`). A word is placed, and its clip found, by its moved
+  start (R6-10's half-open test on the moved tick). Cloud words are read as before. Amends TX-10
+  and TR-14.
+- **TX-17 — Identity and order survive a move.** `Identity.source` stays the recogniser's tick
+  (`SourceWord.identityTick`, `recognisedStart ?? source`), so a selection, an id an agent holds and
+  `k` survive a cache landing that moves a start; `TranscriptCut.edges` matches a word to its
+  source word by that tick, and TX-22's pause set is keyed by it too. Order within a media is kept:
+  by (d) each moved start is earlier than the next word's stored start, which is at most its moved
+  start. Across instances TX-10 orders by the moved start.
+- **TX-18 — A missing cache.** With no voice cache the words are unmoved and the answer says so in
+  its existing note (`get_timeline_transcript`'s `notes[]`, appended to `get_transcript`'s `note`):
+  "The word starts of “<name>” are where this Mac's recogniser put them, often early: it has no
+  voice cache yet. Call again once it has." With no peaks cache the move lands on the 32 ms cell
+  grid (`b·chunk`). There is no new compute path: the open and import cache pass
+  (`generateCaches`) already makes both caches, and a tool answers what is there now, as
+  `detect_silence`'s `voice_pending` does. The tab re-reads a media's words when either cache lands
+  (`.mediaCacheDidChange` of kind `speech` or `peaks`), keeps the shown words and the selection
+  until that re-read merges, and a load that read before a landing (a per-media epoch moved under
+  it) is discarded and read again. The request's recommendation to compute the cache on demand is
+  declined: `async` is confined to `MediaImporter.swift` (585 lines), and the pass is already
+  running for every media a document holds.
+- **TX-19 — What is left alone, and how it is measured.** Cloud (AssemblyAI) words are not moved:
+  no measurement of them exists without a paid run, and their lead is −60 ms. Ends are not moved:
+  TX-S3 measured starts only, and a cut reads a word's end only for its 1 s cap; TX1b's proof
+  reports the error at word ends (O7), and an error over one frame is filed. **The acceptance:** a
+  phrase's onset is its first sample over −40 dBFS after a gap, by the proof's own arithmetic; each
+  phrase-initial on-device word's moved start lies within one 30 fps frame (20,000 ticks) of it; a
+  word cut leaves no fragment of the next kept word and at most 0.2 s (120,000 ticks) from
+  `cut_end` to that word's onset. The pause BEFORE a deleted word stays (TX-30), and a gap over 1 s
+  is TX3b's. TX-S3's E0 note and TX-30 are amended with the re-run's E0 numbers only: E1 and E2
+  add their lead to the tool's start (`TranscriptCut.sourceOnsets`, `cut_spike.py`), which is now
+  moved, so over moved starts they measure no defined rule; their figures and the verdict the
+  spike prints from them are not recorded and are not filed. S-TH1 and S-RT1 do not exist yet:
+  TX-S3's real-speech rows are skipped by name and owed, and JOB-11 stays the judge. TX3b keeps its
+  no-sliver clamp (its option (a)), per the owner's answer of 2026-11-02; it holds once starts sit
+  on their sound.

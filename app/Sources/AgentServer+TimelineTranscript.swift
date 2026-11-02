@@ -81,6 +81,9 @@ extension AgentServer {
                 "These words were not transcribed with filler words, so a filler missing here "
                     + "may still be in the audio.")
         }
+        for id in needed where media[id]?.voiceCacheMissing == true {
+            notes.append(Self.unmovedNote(context.records[id]?.name ?? "media \(id)"))
+        }
 
         var result: [String: Any] = [
             "ok": true,
@@ -238,6 +241,13 @@ extension AgentServer {
             }
             return TranscriptCut.wordCut(index, table: table, container: context.snapshot, fps: fps)
         }
+    }
+
+    /// TX-18's note for a media read with no voice cache: its on-device
+    /// starts are the recogniser's.
+    static func unmovedNote(_ name: String) -> String {
+        "The word starts of “\(name)” are where this Mac's recogniser put them, often early: "
+            + "it has no voice cache yet. Call again once it has."
     }
 
     /// A word's row; with `cut`, its `cut_start` and `cut_end` (TX-30: always

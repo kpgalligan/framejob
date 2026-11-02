@@ -96,15 +96,19 @@ extension TimelineTranscript {
             cacheDir: cacheDir, language: language, record: record)
     }
 
-    /// A stored whole-file run of `item`'s media as words, engine `.apple`;
-    /// nil when none is stored.
+    /// A stored whole-file run of `item`'s media as words, engine `.apple`,
+    /// each start moved to its sound by the media's voice and peaks caches
+    /// (TX-15, TX-16); nil when none is stored. Off main: it reads the caches.
     static func deviceWords(_ item: TranscriptFill.Item) -> MediaWords? {
         guard
             let heard = DeviceTranscriptCache.lookup(
                 item.job, media: item.media, stamp: item.stamp, in: item.cacheDir)
         else { return nil }
+        let caches = WordOnsets.caches(media: item.media, in: item.cacheDir)
+        let moved = WordOnsets.moved(heard.words, speech: caches.speech, peaks: caches.peaks)
         return MediaWords(
             media: item.media, engine: .apple, language: item.language.identifier,
-            fillersReported: false, words: sourceWords(device: heard))
+            fillersReported: false, words: sourceWords(device: heard, moved: moved),
+            voiceCacheMissing: caches.speech == nil)
     }
 }

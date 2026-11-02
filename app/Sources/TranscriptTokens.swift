@@ -95,8 +95,8 @@ struct TranscriptTokens {
         return pauses[a.media]?.contains(a.id.source) == true
     }
 
-    /// One media's pause set (TX-22): the source tick of each word w after
-    /// which the speaker paused. With the voice cache, w is in it when the
+    /// One media's pause set (TX-22): the identity tick (TX-17) of each word
+    /// w after which the speaker paused. With the voice cache, w is in it when the
     /// cache has a run of chunks inside [w.source, w′.sourceEnd), w′ the next
     /// source word, all below `confidence` and lasting ≥ 1.5 s of SOURCE
     /// time; with none, when w′.source − w.sourceEnd ≥ 1.5 s. Off main: it
@@ -112,7 +112,7 @@ struct TranscriptTokens {
             let w = words[index]
             let next = words[index + 1]
             guard let speech else {
-                if next.source - w.sourceEnd >= paragraphPause { out.insert(w.source) }
+                if next.source - w.sourceEnd >= paragraphPause { out.insert(w.identityTick) }
                 continue
             }
             // The chunks wholly inside [w.source, w′.sourceEnd).
@@ -123,7 +123,7 @@ struct TranscriptTokens {
             for k in max(firstChunk, 0)..<pastChunk {
                 run = speech[k] < confidence ? run + 1 : 0
                 if run >= needed {
-                    out.insert(w.source)
+                    out.insert(w.identityTick)
                     break
                 }
             }

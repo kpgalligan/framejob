@@ -672,7 +672,9 @@ detail there.
   and `origin`. `no_words` comes from a walk of the clips, never the
   segments. `words` places each media's source words by R6-10, orders them
   (start, end, front track first, source order) and counts identities `(nest
-  path, media, source tick, k)` over the whole container before the window.
+  path, media, source tick, k)` — an on-device word placed by its moved start,
+  its identity on the recogniser's tick (TX-16, TX-17) — over the whole
+  container before the window.
   `+Rules` holds TX-11's editability (nest, transition wall, locked track,
   in that order) and the same-speech note (≥ 5 s overlap, LCS ≥ 0.6 of the
   shorter side). `window`, `overlapping`, `page` (2,000 words, `next_from`
@@ -1606,6 +1608,7 @@ the key map behind it.
   `insertTab`'s body, the override and `placeholderRect`'s height, each
   exactly once.
 - `TranscriptPane.swift` · `TranscriptBar.swift` · `TranscriptTabSource.swift` ·
+  `TranscriptTabSource+Statics.swift` · `WordOnsets.swift` ·
   `TranscriptTokens.swift` · `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) ·
   `TimelineTranscript+Document.swift` · `EditorViewController+Transcript.swift` ·
   `AgentServer+TranscriptView.swift` · `TranscriptCut.swift` (+`Plan`) ·
@@ -1644,6 +1647,17 @@ the key map behind it.
   while the document's range is still `rangeSet`. `TranscriptTabSource` keeps each media's voice
   cache and `allWords`, and builds `cutTable()` once per rebuild. `+Delete` is the drag,
   `deleteKey()` and `adopt`.
+  Since TX1b (spec §11 TX-15…TX-18): `WordOnsets` is pure — TX-15's move of an on-device word's
+  start to where its sound begins (the voice cache's first speech cell after it, refined to the
+  first 10 ms peaks bucket over max(−40 dBFS, +12 dB over its non-speech run's median), never past
+  its own end or the next word's start) — applied when words are read, by
+  `TimelineTranscript.deviceWords` and `get_transcript`; the stored run is never changed.
+  `SourceWord.identityTick` (the recogniser's start) keys `Identity.source`, `TranscriptCut.edges`'
+  match and the pause set. The pane observes `.mediaCacheDidChange` of kind `speech` or `peaks` and
+  calls `TranscriptTabSource.reloadDeviceWords`: the media's epoch moves under `lock`, its words are
+  re-read through `loadStored` (one in flight per media, `rereading`) and stay shown until that
+  merges, and a load that read before a landing is read again instead of merged.
+  `TranscriptTabSource+Statics` holds `resolve`, `pauses`, `Read` and the probes' `loadHold`.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·

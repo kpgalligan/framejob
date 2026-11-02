@@ -14,8 +14,10 @@ at `anthropic_fake.py` (`assistant_session_proof.Fake`), as `transcript_proof.py
 does. Fixture media are `say` phrases under `tools/proof/work/timeline_transcript/`;
 `media/speech.mov` is host input (P7, P9). Every expected word comes from the
 package's own `cache/device-transcripts/` file (or the fake's served words),
-placed here by R6-10's arithmetic: nothing is recognised twice to make an
-oracle.
+each start moved by `word_onsets.moved` over the package's voice and peaks
+caches (TX1b, spec §11 TX-15), placed here by R6-10's arithmetic: nothing is
+recognised twice to make an oracle. Every import but P12's waits for its
+media's voice and peaks caches (`word_onsets.wait_voice`) before any read.
 
 Probe rows (`timeline_transcript_probe.swift`, built through `swift_build.build()`
 over `app/Sources` or a mutant's copy): T0 builds, T1…T11 as its header says.
@@ -92,6 +94,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import swift_build  # noqa: E402
 import bounded  # noqa: E402 — on swift_build's path
+import word_onsets  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/timeline_transcript"
@@ -332,20 +335,24 @@ def device_file(session, media, language):
         return None
 
 
-def place(clip, offset, words):
+def place(clip, offset, words, moved=None):
     """R6-10 at speed 1 for a clip whose words land `offset` ticks later (a
     nest clip's start plus the inner clip's): `[(text, start, end, source,
-    order)]` for each source word whose start is in the clip's window."""
+    order)]` for each source word whose MOVED start (`moved`, one per word;
+    the stored start without it) is in the clip's window (TX-16); `source`
+    stays the stored tick, the identity's (TX-17), and the end the stored
+    one."""
     source_in = clip["source"].get("in", 0)
     out = []
     for order, word in enumerate(words):
-        src = word["start"]
+        src = moved[order] if moved is not None else word["start"]
         if not source_in <= src < source_in + clip["duration"]:
             continue
 
         def at(tick):
             return offset + clip["start"] + min(max(tick - source_in, 0), clip["duration"])
-        out.append((word["text"], at(src), at(max(src, word["end"])), src, order))
+        out.append((word["text"], at(src), at(max(word["start"], word["end"])), word["start"],
+                    order))
     return out
 
 
@@ -360,7 +367,8 @@ def expected(session, answer, heard):
         media = clip["source"]["media"]
         stored = device_file(session, media, languages.get(media))
         words = stored["runs"][0]["words"] if stored and stored.get("runs") else []
-        for text, start, end, src, order in place(clip, offset, words):
+        moved = word_onsets.moved(words, *word_onsets.load(session.path, media))
+        for text, start, end, src, order in place(clip, offset, words, moved):
             rows.append(((start, end, -index[track], order, number),
                          (text, start, end, clip["id"], track, media)))
     rows.sort(key=lambda r: r[0])
@@ -411,8 +419,17 @@ def app_rows(results, wanted, app_path, files):
                          stand_in.base)
             app.connect()
 
+            class Voiced(cloud.Session):
+                """Each import waits for its voice and peaks caches before any
+                read (TX1b, spec §11 TX-18)."""
+
+                def media_of(self, path):
+                    media = super().media_of(path)
+                    word_onsets.wait_voice(self.path, media)
+                    return media
+
             def session_of(name):
-                return cloud.Session(app, f"tt-{name}")
+                return Voiced(app, f"tt-{name}")
 
             def call(session, **arguments):
                 return session.op(TOOL, **arguments)
@@ -775,7 +792,7 @@ def app_rows(results, wanted, app_path, files):
                 long, seconds = sp.long_fixture(ten)
                 s = session_of("p12")
                 try:
-                    s.add(s.media_of(long), at=0)
+                    s.add(cloud.Session.media_of(s, long), at=0)  # no read: no wait
                     stand_in.scenario([sp.use("toolu_tt", TOOL, {}), sp.say("P12: stopped.")])
                     ok, answer = app.call("assistant_send", project=s.path,
                                           text="Read the timeline (P12).",

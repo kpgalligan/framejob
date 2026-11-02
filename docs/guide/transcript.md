@@ -116,6 +116,18 @@ track and the gap closes, as one undo step, **Delete Words**. On the timeline
   it goes, but never more than one second past the last deleted word: a long
   pause after it keeps the rest. Both ends land on whole frames, never past
   the start of a word that stays.
+- **Where a word starts.** This Mac's recogniser puts a word's start early,
+  often well inside the pause before it. So the tab moves each start to where
+  its sound begins: where the voice model (the one Remove Silences uses) first
+  hears speech after it, then to the first hundredth of a second loud enough
+  to be the word (louder than −40 dBFS, or clearly above the pause's own
+  background noise). A word after a pause therefore starts on its sound, and
+  deleting the word before it ends there instead of keeping a slice of the
+  pause or taking the start of the word you keep. Both are worked out when the
+  project opens a file; until the voice model has heard it, the starts are the
+  recogniser's own, and the tab moves them as soon as it has, keeping your
+  selection. Words from an AssemblyAI transcript, and where any word ends,
+  are left as transcribed.
 - **Other tracks.** If a word on another track starts before your selection
   and runs into it (two people talking at once), the tab adds it to the
   selection first, so you see everything the cut takes before you press ⌫. A

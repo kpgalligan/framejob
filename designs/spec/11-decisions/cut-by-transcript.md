@@ -368,6 +368,8 @@ TR-11.
     `review_transcript` also read this cache, and the tab's fill stores one run per media over the
     whole file. Captions, Remove Filler Words, `detect_fillers` and `transcribe_for_fillers` still
     never read it (TR-7).
+    **Amended 2026-11-02, by TX-16:** every reader of a stored run, `get_transcript` included, moves
+    each word's start to its sound when it reads (TX-15); the stored run is unchanged.
   - **Stop and failure:** Stop ends a run as before. Nothing is stored when a run throws (cancel
     or error), when the token was cancelled after the run returned, or when the file's stamp
     changed during the run.

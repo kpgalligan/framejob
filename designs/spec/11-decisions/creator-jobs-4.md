@@ -65,12 +65,18 @@ transcript and lifts on the timeline — **yes**; a word selection sets the time
     **Measured and not in the rule:** E0 put 13 of the 20 edges on (1) inside the previous
     phrase's audio, 24–316 ms before its last sample over −40 dBFS (E1 2, E2 1): deleting a word
     can take the tail of the word before it. Recorded for JOB-11 and owed as an issue.
+    **Amended 2026-11-02, by TX-15, TX-16 and TX-19:** E0's onset is the MOVED start; re-run on Release:
+    on (1) 0 clipped, error −9.9 to 0.0 ms, 0 of 20 edges inside the previous phrase; on o2 (58
+    edges) 5.2 % in non-speech, 13.8 % under −40 dBFS. E1's and E2's figures are not recorded.
   - A word's own `cut_start`/`cut_end` are its run of one AFTER TX-32's widening, snapped
     (`TranscriptCut.wordCut`), so they are what the tab cuts for that word alone, crosstalk
     included, and TX-33's sentence holds. Cutting words one at a time and together make the same
     timeline, except across a pause over 1 s.
   - **The pause clause** (a pause token cuts `[end of the speech before + 0.2 s, next onset −
     0.2 s)`) is recorded here and built in TX3b as TX-34.
+    **Amended 2026-11-02, by TX-15:** "next onset" is the next word's moved start, at its sound, so
+    the clause no longer meets a word that starts early inside the pause; TX3b keeps its no-sliver
+    clamp (TX-19).
   - Risk accepted: in continuous speech a fragment of a deleted word can remain, and under E0 a
     cut can start inside the word before it (above).
 - **TX-31 — A word selection is the in/out range, and ⌫ in the transcript ripples.** Every

@@ -23,7 +23,7 @@ import Foundation
 /// and to at least `windowStart`.
 ///
 /// **A run's cut.** Words are matched to their instance by clip id and nest
-/// path, and to their source word by source tick in order. `Table.cut` of a
+/// path, and to their source word by its identity tick in order (TX-17). `Table.cut` of a
 /// run of shown tokens is `[min onset, end)`, `end` the least of the next
 /// shown word's onset, the run's latest corrected end plus `cap`, and the
 /// first start of a shown-track instance whose media has no words that is at
@@ -169,7 +169,9 @@ enum TranscriptCut {
                 words, windowStart: job.sourceIn, lead: lead, speech: context.speech[job.media],
                 rule: rule)
             var bySource: [Ticks: [Int]] = [:]
-            for (index, word) in words.enumerated() { bySource[word.source, default: []].append(index) }
+            for (index, word) in words.enumerated() {
+                bySource[word.identityTick, default: []].append(index)  // TX-17
+            }
             let made = Prepared(words: words, onsets: onsets, bySource: bySource, lead: lead)
             prepared[number] = made
             return made

@@ -28324,3 +28324,46 @@ RC_PROOF_APP=release python3 tools/proof/co10_proof.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO10a record.
+
+## Road map "creator-jobs" TX1b — word starts moved to their sound (`word_onset_proof.py` U0–U10, Z1, O1–O7, C1, C2; nine mutants; `word_onsets.py`; spec §11 TX-15…TX-19)
+
+**`word_onset_probe.swift`** (built through `swift_build.build()` with `-D FRAMEJOB_DEV_TOOLS`,
+the shader beside it) calls `WordOnsets`, `TimelineTranscript`, `TranscriptCut` and
+`TranscriptTokens` over voice and peaks caches written on its page (U1–U8), then opens a package's
+editor window (media 20, a 20 s silent WAV) whose stored on-device run and silent caches it writes
+before the window opens, and lands new caches with `MediaImporter.postCacheChange` (U9, U10; U10
+holds the tab's load with `TranscriptTabSource.loadHold`). **`word_onsets.py`** is the oracle:
+TX-15 written from the decision over a package's `cache/speech/<id>.bin` and `cache/peaks/<id>.bin`
+(thresholds in float32, the median over the non-speech run's buckets), and `wait_voice(package,
+media)`, which waits for both caches' markers — `timeline_transcript_proof.py` (every import but
+P12's) and `transcript_proof.py` (every import of speech.mov or its copy) wait for it before a
+read, and `timeline_transcript_proof.expected` places the moved starts, identity and order keeping
+the stored tick.
+
+| Row | What it holds |
+|---|---|
+| U1–U8 | the rule: a start in silence to the exact bucket; a 2-cell run moves it, a 1-cell run does not; the own-end and next-start walls; no voice cache nil, no peaks the cell start; a −34 dBFS floor raises T while a −20 dBFS run with a −60 dBFS gap keeps it at −40 dBFS; identity, `edges`' match and the pause set on the recogniser's tick; a click 7 cells early ignored |
+| U9 | the tab, its load finished: a word selected, both caches land, the starts move to the sounds, the selection's identity kept, no sample with a token dropped |
+| U10 | the tab, its load held: read with no voice cache, both caches land, released: the merged starts are moved (re-read, not merged stale) |
+| Z1 | no `Frame Job: ` line in the launch's log |
+| O1 | `pause.wav` (four `say` phrases joined by 2.5, 1.5 and 0.8 s of zeros): each phrase's first word within 20,000 ticks of its first sample over −40 dBFS |
+| O2, O3 | TX1's A, B and C, and every phrase after a gap in `page.wav` (600 s, 0.5 s gaps): the same |
+| O4 | every fixture: text and `id.source` the stored run's in TX-10's order, each start `word_onsets.moved`, each end the stored one |
+| O5, O6 | `transcript_view`'s tokens and `get_transcript`'s words equal the tool's; `get_transcript` answers no `notes` key |
+| O7 | each phrase's last word's end less its sound's end — reported, not scored (ends are not moved) |
+| C1 | `pause.wav` and `page.wav`: no `cut_end` past the next phrase's onset, at most 0.2 s before it (a gap where TX-30's 1 s cap from an early recognised end bounds the cut is reported, not scored), and no phrase-initial `cut_start` past its onset |
+| C2 | the tab's Delete of the second phrase's first word is one step "Delete Words" equal to `ripple_delete_ranges` of its `[cut_start, cut_end)` |
+
+The mutants: `no-move` (U1, O1), `no-refine` (U1), `threshold-absolute` (U6),
+`median-whole-run` (U6: on `pause.wav` it lands each phrase 5–26 ms late, inside O1's
+frame), `run-any-length` (U3), `no-limit` (U4), `identity-moved` (U7, O4),
+`lead-window` (U8) and `epoch-ignored` (U10); a mutant naming an O row builds a tree copy's app
+(`tree_copy.build_app`).
+
+```sh
+python3 tools/proof/word_onset_proof.py --only U1,U2,U3,U4,U5,U6,U7,U8,U9,U10   # probe, no app
+make app-debug && python3 tools/proof/word_onset_proof.py
+RC_PROOF_APP=release python3 tools/proof/word_onset_proof.py [--mutants]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s TX1b record.

@@ -74,19 +74,21 @@ enum TranscriptReader {
     /// clip's when its source start is in the clip's [sourceIn, sourceIn +
     /// sourceLength) (R6-10's half-open test); its start and `max(start,
     /// end)` map through `MediaTranscript.project`. Sorted as `cloudWords`
-    /// sorts.
+    /// sorts. With `moved` (`WordOnsets.moved` over `heard`, one per word),
+    /// each start is its moved one, and the window test reads it (TX-16).
     static func deviceWords(
-        _ heard: DeviceTranscriptCache.Heard, for job: Transcriber.Job
+        _ heard: DeviceTranscriptCache.Heard, for job: Transcriber.Job, moved: [Ticks]? = nil
     ) -> [Word] {
         let end = job.sourceIn + job.sourceLength
         var mapped: [(index: Int, word: Word)] = []
         for (index, run) in heard.words.enumerated() {
-            guard run.start >= job.sourceIn else { continue }
-            guard run.start < end else { continue }
+            let start = moved.flatMap { index < $0.count ? $0[index] : nil } ?? run.start
+            guard start >= job.sourceIn else { continue }
+            guard start < end else { continue }
             mapped.append(
                 (index,
                  Word(
-                    text: run.text, start: MediaTranscript.project(run.start, in: job),
+                    text: run.text, start: MediaTranscript.project(start, in: job),
                     end: MediaTranscript.project(max(run.start, run.end), in: job),
                     speaker: nil, filler: FillerWords.isFiller(run.text))))
         }

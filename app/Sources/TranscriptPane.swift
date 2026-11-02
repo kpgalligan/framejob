@@ -81,6 +81,8 @@ final class TranscriptPane: InspectorPaneView {
         transcriptView.onParagraph = { [weak self] index in self?.seek(paragraph: index) }
         transcriptView.onSelect = { [weak self] selection in self?.selectionChanged(selection) }
         transcriptView.onDelete = { [weak self] in self?.deleteWords() }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(cacheLanded(_:)), name: .mediaCacheDidChange, object: nil)
     }
 
     @available(*, unavailable)
@@ -172,6 +174,16 @@ final class TranscriptPane: InspectorPaneView {
         if rangeSet != nil, host?.transcriptRange == rangeSet {
             selectionChanged(transcriptView.selection)
         }
+    }
+
+    /// A voice or peaks cache landed: that media's on-device words are read
+    /// again, their starts moved to their sound (TX-18).
+    @objc private func cacheLanded(_ note: Notification) {
+        let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
+        guard kind == MediaImporter.speechKind || kind == MediaImporter.peaksKind,
+            let media = note.userInfo?[MediaImporter.mediaIDKey] as? UInt32
+        else { return }
+        source.reloadDeviceWords(media: media)
     }
 
     // MARK: - Selecting and deleting words (TX-31, TX-32)

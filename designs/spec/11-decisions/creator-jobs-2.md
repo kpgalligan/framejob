@@ -358,6 +358,9 @@ taken as recommended).
   token on each side and a longest common subsequence of at least 0.6 × the shorter side they are
   named in a note, clip ids ascending, one note per pair: "Clips 3 and 7 carry the same speech. Mute
   one, or switch its audio off, to read it once." Nothing is hidden.
+  **Amended 2026-11-02, by TX-16 and TX-17:** a device word sits at its MOVED start (TX-15) and is
+  placed and windowed by it; its identity's `source` stays the stored (recognised) tick, so ids and
+  `k` survive a voice cache landing.
 - **TX-11 — A word is shown but not editable when cutting it would break something**, and the
   first rule that applies is its `why`: inside a nest ("Inside nest <name>: open it (⌘↓) to cut its
   words.", naming the OUTERMOST enclosing nest); under a transition ("Under a transition: a cut here

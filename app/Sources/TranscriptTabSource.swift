@@ -25,6 +25,10 @@ import Foundation
 /// Since TX3a (spec §11 TX-30) each media's voice cache is kept beside its
 /// pause set, every read word (`allWords`, before Words from) beside the
 /// model, and `cutTable()` is the cut's table, made once per rebuild.
+///
+/// Since TX1b (TX-18) a voice or peaks cache landing re-reads that `.apple`
+/// media's words (`reloadDeviceWords`), kept shown until it merges; a load
+/// that read before a landing (its epoch moved) is read again, not merged.
 final class TranscriptTabSource {
     enum Status: Equatable {
         case idle, loading, reading(name: String, fraction: Double, index: Int, of: Int), noModel
@@ -87,6 +91,9 @@ final class TranscriptTabSource {
     private var noModel = false
     private var dirty = false
     private var poll: Timer?
+    /// Each `.apple` media's item, and the media with a re-read in flight (TX-18).
+    private var deviceItems: [UInt32: TranscriptFill.Item] = [:]
+    private var rereading: Set<UInt32> = []
 
     private let fill: TranscriptFill
     private let owner: Int
@@ -104,6 +111,8 @@ final class TranscriptTabSource {
     private var wanting = false
     private var inFlight = 0
     private var generation = 0
+    /// Bumped by each voice or peaks cache landing for a media (TX-18).
+    private var epochs: [UInt32: Int] = [:]
 
     /// Main. A pane is only made for an inspector that has its document;
     /// without one the source answers nothing and its fill is never used.
@@ -148,6 +157,8 @@ final class TranscriptTabSource {
         words = [:]
         pauseSets = [:]
         speech = [:]
+        deviceItems = [:]
+        rereading = []  // a re-read in flight is dropped by the generation; the next show loads it
         missItems = [:]
         loading = []
         status = .idle
@@ -201,7 +212,9 @@ final class TranscriptTabSource {
             words[media] = nil
             pauseSets[media] = nil
             speech[media] = nil
+            deviceItems[media] = nil
         }
+        rereading = []  // as `hide`: the new generation's `loadMisses` must not skip them
         missItems = [:]
         failures = [:]
         loading = []
@@ -233,6 +246,44 @@ final class TranscriptTabSource {
         onChange()
     }
 
+    /// A voice or peaks cache of `media` landed (TX-18): its epoch moves, so
+    /// a load that read before it is read again, and words already shown are
+    /// re-read, kept on screen until that merges. Main.
+    func reloadDeviceWords(media: UInt32) {
+        lock.lock()
+        epochs[media, default: 0] += 1
+        lock.unlock()
+        if let item = deviceItems[media] { reread(item) }
+    }
+
+    /// `media`'s epoch, read before its caches are.
+    private func epoch(_ media: UInt32) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return epochs[media, default: 0]
+    }
+
+    /// An `.apple` media's words and pause set, read at `epoch`, merged; or,
+    /// when a cache landed since, read again instead. Main.
+    private func mergeDevice(_ item: TranscriptFill.Item, _ read: Read, epoch: Int) -> Bool {
+        guard epoch == self.epoch(item.media) else {
+            reread(item)
+            return false
+        }
+        words[item.media] = read.0
+        pauseSets[item.media] = read.1.0
+        speech[item.media] = read.1.1
+        deviceItems[item.media] = item
+        return true
+    }
+
+    /// One re-read of `item`, at most one in flight per media; the shown
+    /// words stay until it merges (TX-18).
+    private func reread(_ item: TranscriptFill.Item) {
+        guard shown, rereading.insert(item.media).inserted else { return }
+        loadStored(item)
+    }
+
     /// The installed languages, read once per show on the load queue.
     private func loadLanguages() {
         lock.lock()
@@ -249,14 +300,6 @@ final class TranscriptTabSource {
         }
     }
 
-    /// The chosen language among `list`, else the Mac's default. Any thread.
-    private static func resolve(
-        _ wanted: String?, in list: [Transcriber.Language]
-    ) -> Transcriber.Language? {
-        wanted.flatMap { Transcriber.language(matching: $0, in: list) }
-            ?? Transcriber.defaultLanguage(in: list)
-    }
-
     /// Words, pause sets and voice caches given whole, then `update()` — for
     /// the probes only.
     func preload(
@@ -269,10 +312,9 @@ final class TranscriptTabSource {
         update()
     }
 
-    /// The cut's table over the last rebuild's words (TX-30), made once per
-    /// rebuild. A media read before its voice cache landed has it read here
-    /// (main; one small file), so the tab cuts as `get_timeline_transcript`
-    /// answers.
+    /// The cut's table over the last rebuild's words (TX-30), made once per rebuild. A media
+    /// read before its voice cache landed has it read here (main; one small file), so the tab
+    /// cuts as `get_timeline_transcript` answers.
     func cutTable() -> TranscriptCut.Table {
         if let table { return table }
         var context = speech
@@ -332,6 +374,7 @@ final class TranscriptTabSource {
         guard let read, let document else { return }
         let toLoad = needed.filter {
             words[$0] == nil && failures[$0] == nil && missItems[$0] == nil && !loading.contains($0)
+                && !rereading.contains($0)
         }
         guard !toLoad.isEmpty else { return }
         let jobs = toLoad.compactMap { media -> (MediaSnapshot, URL)? in
@@ -347,8 +390,10 @@ final class TranscriptTabSource {
         loading.formUnion(toLoad)
         let generation = begin()
         let wanted = self.language
+        let epochs = Dictionary(uniqueKeysWithValues: toLoad.map { ($0, epoch($0)) })
         loadQueue.async { [weak self] in
-            var found: [UInt32: (TimelineTranscript.MediaWords, (Set<Ticks>, [Float]?))] = [:]
+            var found: [UInt32: Read] = [:]
+            var items: [UInt32: TranscriptFill.Item] = [:]
             var missed: [UInt32: TranscriptFill.Item] = [:]
             var unreadable: [UInt32: String] = [:]
             var modelMissing = false
@@ -372,16 +417,22 @@ final class TranscriptTabSource {
                 }
                 if let device = TimelineTranscript.deviceWords(item) {
                     found[record.id] = (device, Self.pauses(device, cacheDir: cacheDir))
+                    items[record.id] = item
                 } else {
                     missed[record.id] = item
                 }
             }
+            Self.holdLoad()
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.end()
                 self.loading.subtract(jobs.map(\.0.id))
                 guard self.isCurrent(generation) else { return }
                 for (media, pair) in found {
+                    if let item = items[media] {
+                        _ = self.mergeDevice(item, pair, epoch: epochs[media] ?? 0)
+                        continue
+                    }
                     self.words[media] = pair.0
                     self.pauseSets[media] = pair.1.0
                     self.speech[media] = pair.1.1
@@ -393,17 +444,6 @@ final class TranscriptTabSource {
                 self.refreshPending()
             }
         }
-    }
-
-    /// A media's pause set, and the voice cache it was read from (TX-30).
-    private static func pauses(
-        _ words: TimelineTranscript.MediaWords, cacheDir: URL
-    ) -> (Set<Ticks>, [Float]?) {
-        let speech = MediaImporter.loadSpeech(for: words.media, in: cacheDir)
-        return (
-            TranscriptTokens.pauses(
-                words.words, speech: speech,
-                confidence: Float(SilenceDetector.Settings.defaultVoiceConfidence)), speech)
     }
 
     private func begin() -> Int {
@@ -495,24 +535,26 @@ final class TranscriptTabSource {
         }
     }
 
-    /// A stored run's words and pause set, read on the load queue, then a
-    /// rebuild on main.
-    private func loadStored(_ item: TranscriptFill.Item, generation: Int) {
+    /// A stored run's words and pause set, read on the load queue at its media's epoch, then
+    /// merged and rebuilt on main; with no `generation`, `reread`'s, at the current one.
+    private func loadStored(_ item: TranscriptFill.Item, generation: Int? = nil) {
         lock.lock()
         inFlight += 1
+        let rereads = generation == nil
+        let generation = generation ?? self.generation
+        let epoch = epochs[item.media, default: 0]
         lock.unlock()
         loadQueue.async { [weak self] in
-            let words = TimelineTranscript.deviceWords(item)
-            let pauses = words.map { Self.pauses($0, cacheDir: item.cacheDir) }
+            let read = TimelineTranscript.deviceWords(item)
+                .map { ($0, Self.pauses($0, cacheDir: item.cacheDir)) }
+            Self.holdLoad()
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.end()
-                guard self.isCurrent(generation), let words, let pauses else { return }
-                self.words[item.media] = words
-                self.pauseSets[item.media] = pauses.0
-                self.speech[item.media] = pauses.1
+                if rereads, self.isCurrent(generation) { self.rereading.remove(item.media) }  // else cleared
+                guard self.isCurrent(generation), let read else { return }
                 self.missItems[item.media] = nil
-                self.rebuild()
+                if self.mergeDevice(item, read, epoch: epoch) { self.rebuild() }
             }
         }
     }

@@ -515,6 +515,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CU1b | CU | Every screen recording saves its cursor file beside each movie (split: CU1b1 the recorder's file and rows K0, K4, K5, K7, K8, K10–K16; CU1b2 K1, K2, K3, K6, K9) | CU1a | B | — |
 | CO1 | CO | Agents read person masks (`masks`) made on the Mac | CO0, CJ2a | C | — |
 | TX3a | TX | Select words and delete them on every unlocked track as one step (TX3 split by size) | TX2a; TX-S3 at its head | A | — |
+| TX1b | TX | On-device word starts moved to where their sound begins: the tool, the tab, word cuts | TX1, TX3a | A | — |
 | TX3b | TX | The pause token: a selectable pause over 1 s, `pauses[]` in `get_timeline_transcript` (TX-34) | TX3a | A | — |
 | CU2 | CU | Nothing: the core evaluates a cursor file (mapping, smoothing, idle hide, ripples, path) | CU1a | B | — |
 | CO2a1 | CO | Agents set `video.cutout`; the recipe carries a `cutout` key (the plan is unchanged); nothing drawn yet | CO0, CJ0b (T3), CJ0d (T11, T14) | C | p |
@@ -4651,6 +4652,165 @@ skipped, no Rust changed), "gate: PASS 291s"; a Release instance of that build l
 S-RT1 once they are copied (CP1's step 1 above); TX3b, the pause token (TX-34), is the next
 pipeline, not an issue. Filed after the commit: "TX-S3: E0's cut edges fall inside the previous
 word on the `say` fixture (13 of 20)".
+
+### TX1b — word starts moved to their sound
+
+**Added 2026-11-02**, the owner's answer to TX3b's STOP: "Fix word starts first." TX-S3 measured this
+Mac's recogniser (E0) putting every start early, by 110–1,186 ms, and TX3b measured "Pack" 1.11 s
+and "How" 1.07 s before their audible onsets, so the word after a pause starts inside the silence:
+a pause cut stops early, and a word cut can keep a slice of the pause or end before the next word's
+sound. TX1b moves each on-device start to its sound before TX3b builds the pause token, which then
+keeps its no-sliver clamp (its option (a)).
+
+- **What a person gets:** in the Transcript tab, in `get_timeline_transcript` and in
+  `get_transcript`, each of this Mac's words starts where its sound begins, so a word after a pause
+  sits on its sound, the highlight lights it as it is heard, and deleting the word before it ends
+  there. A file the voice model has not heard yet shows the recogniser's starts, and the tab moves
+  them when it has, keeping the selection.
+- **Decisions:** TX-15…TX-19 (spec §11 `creator-jobs-5.md`), recorded before the code. TX-15 the
+  rule (the first speech voice cell after the start whose non-speech run holds it or is two cells
+  long, refined to the first 10 ms peaks bucket at max(−40 dBFS, +12 dB over that run's median
+  bucket) from three cells before it; never earlier, never at its own end or the next word's
+  start); TX-16 applied when read by every on-device reader, the stored run unchanged; TX-17
+  identity, `k` and the pause set on the recogniser's tick; TX-18 a missing voice cache named in
+  the note, no new compute path (computing it on demand is declined: `async` is confined to
+  `MediaImporter.swift`, and the open's cache pass already makes it), and the tab's re-read on a
+  landing; TX-19 cloud words and ends left alone, the acceptance, TX-S3 and TX-30 amended with
+  E0's re-run only. Amended: TX-10, TX-30 (twice), TR-14.
+- **Core, FFI:** none. No `rc_*`, op, tool name, format or key change; the parity check is
+  untouched.
+- **Swift:** new `WordOnsets.swift` (pure: TX-15 and a loader for both caches);
+  `TimelineTranscript.swift` (`SourceWord.recognisedStart`, `identityTick`, `MediaWords.voiceCacheMissing`,
+  `sourceWords(device:moved:)`, identities from `identityTick`); `TimelineTranscript+Document.swift`
+  (`deviceWords` loads both caches and moves); `TranscriptCut.swift` and `TranscriptTokens.swift`
+  (keyed by `identityTick`); `TranscriptReader.swift` (`deviceWords(_:for:moved:)`);
+  `AgentServer+Transcript.swift` and `AgentServer+TimelineTranscript.swift` (the move and TX-18's
+  sentence in the existing note); `AgentCatalog+Transcript.swift`, `AgentCatalog+Captions.swift`
+  (descriptions); `TranscriptTabSource.swift` (per-media epochs, `deviceItems`, one re-read in
+  flight per media, a stale load read again; its two statics first moved to
+  `TranscriptTabSource+Statics.swift` as a pure move, with the probes' `loadHold`);
+  `TranscriptPane.swift` (`.mediaCacheDidChange` of kind `speech` or `peaks` → `reloadDeviceWords`).
+- **MCP mirror:** none new: the tools' answers keep their keys; TX-18's sentence goes in
+  `get_timeline_transcript`'s `notes[]` and `get_transcript`'s `note`.
+- **Docs:** `transcript.md` ("Where a word starts"), `cleanup-tools.md` (`get_transcript`'s words);
+  spec §4.3e, §5.6, §7.9e, §7.9f; §11 TX-15…TX-19 and the Amended lines; JOB-11's E0 parenthetical
+  (`docs/manual-checks.md`).
+- **Acceptance:** on TX3b's pause fixture and TX1's fixtures, each on-device phrase-initial word's
+  start within one 30 fps frame of its first sample over −40 dBFS; a word cut leaves no fragment
+  of the next word and at most 0.2 s before it.
+- **Proof** (`word_onset_probe.swift`, `word_onset_proof.py`, `word_onsets.py`, Release): U1–U10
+  (the rule's arms, identity, the tab's re-read and its held load), Z1, O1–O7 (the fixtures, the
+  oracle, the tab and `get_transcript` equal the tool, ends reported), C1–C2 (the cut edges and
+  the tab's Delete); `timeline_transcript_proof.py` and `transcript_proof.py` wait for the caches
+  and place moved starts; `cut_spike.py` re-run for TX-S3's E0 numbers.
+- **Mutants** (9): `no-move`, `no-refine`, `threshold-absolute`, `median-whole-run`,
+  `run-any-length`, `no-limit`, `identity-moved`, `lead-window`, `epoch-ignored`.
+- **Manual check:** JOB-11's parenthetical rewritten for moved starts; S-TH1 and S-RT1 are still
+  owed (CP1 step 1), and JOB-11 stays the judge.
+- **Depends on:** TX1, TX3a. **Lane** A.
+
+#### TX1b's record (2026-11-02)
+
+**Landed.** Lane A, base `7d297a07` (I's HEAD). Two commits on the lane branch: the pure move
+of `TranscriptTabSource`'s two statics to `TranscriptTabSource+Statics.swift`, committed alone,
+then the code, the probe, the proof, the decisions and the documents. No core, FFI, op, tool name,
+format or key change; the parity check is untouched; nothing sends (CJ-3).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/WordOnsets.swift` | 116 | new, pure: TX-15 (`moved`, `onset`, the first speech cell, the run's median) and `caches` |
+| `app/Sources/TimelineTranscript.swift` · `+Document.swift` | 329 · 114 | `SourceWord.recognisedStart`, `identityTick`, `MediaWords.voiceCacheMissing`, `sourceWords(device:moved:)`, identities from `identityTick`; `deviceWords` loads both caches and moves |
+| `app/Sources/TranscriptCut.swift` · `TranscriptTokens.swift` | 281 · 164 | `edges`' match and the pause set keyed by `identityTick` (TX-17) |
+| `app/Sources/TranscriptReader.swift` | 243 | `deviceWords(_:for:moved:)`, the window test on the moved start |
+| `app/Sources/AgentServer+Transcript.swift` · `+TimelineTranscript.swift` | 159 · 275 | the move in `get_transcript`; TX-18's sentence (`unmovedNote`) in `note` and `notes[]` |
+| `app/Sources/AgentCatalog+Transcript.swift` · `+Captions.swift` | 83 · 384 | the descriptions: moved starts, `id.source` the recogniser's, the note |
+| `app/Sources/TranscriptTabSource.swift` · `+Statics.swift` | 598 · 44 | per-media epochs, `deviceItems`, `rereading`, `reloadDeviceWords`, `mergeDevice`, one re-read through `loadStored`; the moved statics, `Read` and the probes' `loadHold` |
+| `app/Sources/TranscriptPane.swift` | 249 | `.mediaCacheDidChange` of kind `speech` or `peaks` → `reloadDeviceWords` |
+| `tools/proof/word_onset_probe.swift` · `word_onset_proof.py` · `word_onsets.py` | 380 · 674 · 130 | U0–U10, Z1, O1–O7, C1–C2, nine mutants; the oracle and `wait_voice` |
+| `tools/proof/timeline_transcript_proof.py` · `transcript_proof.py` | — | `expected` places moved starts (identity on the stored tick); every import waits for its caches (P12's long WAV excepted) |
+
+**Measured.**
+
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings; `swift_build.py typecheck --define
+  FRAMEJOB_DEV_TOOLS tools/proof/word_onset_probe.swift`: exit 0. `spec_index_proof.py`: 249/249.
+- `word_onset_proof.py` on Debug, then on Release after the gate: "scores: 20/20" both times (U0–U10,
+  Z1, O1–O6, C1, C2; O7 reported). O1 on `pause.wav`: The −4.9, Pack −9.6, How −4.3, Sphinx −7.8 ms
+  from the first sample over −40 dBFS (TX3b measured Pack and How 1.11 s and 1.07 s early before);
+  O2 A −1.8, B −6.1, C −6.1 ms; O3 100 of 100 phrases after a gap in `page.wav` found, −9.8…−1.4 ms.
+  O4: pause 30 words (6 moved), A 21 (2), B 17 (2), C 19 (2), page 1,919 (184), each start the
+  oracle's and each `id.source` the stored tick. C1: `pause.wav`'s 0.8 s gap 7.8 ms from `cut_end`
+  to the next onset; `page.wav`'s 100 gaps 8.4…210.8 ms, no `cut_end` past an onset; the one over
+  0.2 s (phrase 74, "afternoon.", 210.8 ms) is bounded by TX-30's 1 s cap from that word's recognised
+  END, 315 ms before its sound ends — an end's error, reported (deviation below). C2: "Pack"
+  `[3180000, 3340000)`, undo "Delete Words", the tab's placements equal the tool's. O7 (ends,
+  reported): dog +227.5, jugs +168.7, jump +137.9, vow +36.4 ms past the phrase's last loud sample.
+- U9: the six starts moved from the recogniser's 0.6 s early to the sounds, the selection 3...3
+  kept with its identity, no sample with a token dropped; U10: the held load read with no voice
+  cache, the caches landed, released: the merged starts moved.
+- TX-S3 re-run (`cut_spike.py`, Release; `rule_sha256` matched): E0 on (1) 0 clipped, 0 unmatched,
+  error −9.9 to 0.0 ms, 0 of 20 edges inside the previous phrase (13 before); o2 58 edges, 5.2 % in
+  voice-cache non-speech, 13.8 % under −40 dBFS. The spike printed "verdict: E0" from E1's and E2's
+  lead added to moved starts; per TX-19 those figures are not recorded. S-TH1 and S-RT1 skipped by
+  name (owed).
+- The gate: `make gate` once, after the code and the documents: "gate: PASS 474s" — names 1 s,
+  typecheck 8 s, fmt and lint skipped (no Rust), test 303 s, app 161 s; once more after this
+  record, the E0 Amended line and `median-whole-run`'s rows: "gate: PASS 83s" (names and test ran,
+  the rest skipped).
+- On Release after the gate: `timeline_transcript_proof.py` 33/33; `transcript_cut_proof.py` 18/18
+  (C1: 20/20 boundaries, no clipped onset, and now no edge inside the previous phrase);
+  `transcript_proof.py` 23/23; `transcript_tab_proof.py` 21/22 — B4 failed on `screens.py`'s P2,
+  "sections in app/Sources but not SECTIONS ['video.behind_subject']", which CO5 left on the base
+  (TX1b touches neither); every TX row, T2 included, passed. Z1's Release launch: no `Frame Job: `
+  line.
+- The nine mutants, once, on Release (`--mutants`): eight caught at once — `no-move`
+  (U1, and O1: "Pack" and "How" not found within 1 s, "Sphinx" −707.8 ms), `no-refine` (U1),
+  `threshold-absolute` (U6), `run-any-length` (U3), `no-limit` (U4), `identity-moved` (U7, and
+  O4: `id.source` the moved tick), `lead-window` (U8), `epoch-ignored` (U10: the held load's
+  unmoved starts merged) — and `median-whole-run` caught by U6 but not O1: over the whole peaks
+  cache it lands `pause.wav`'s phrases +5.1, +10.4, +25.7 and −3.8 ms from their onsets, inside
+  O1's one frame. Its named rows became U6 alone (the docstring and README say why), and
+  `--mutant median-whole-run` re-run on Release: caught (U6 [307200] for [294000]).
+
+**Deviations, each recorded in TX-15…TX-19 or here.**
+
+- **C1's 0.2 s half is scored except where TX-30's 1 s cap from the previous word's recognised end
+  bounds the cut** (that end + 1 s before the next word's moved start); such a gap is reported with
+  the end, not scored. On `page.wav` one gap of 100 is: "afternoon." ends 315 ms before its sound,
+  so the cap stops the cut 210.8 ms before "Turn". The start is right; the end is the recogniser's,
+  which TX-19 leaves unmoved (filed, below). TX3a's C1 precedent: a row scores its own decision's
+  claim and reports what another decision owns.
+- **U9 and U10 write the landing caches directly** (each `.bin` and its marker with the file's
+  stamp, then `MediaImporter.postCacheChange` of kinds `speech` and `peaks`) instead of through
+  `writeSpeech`/`writePeaks`, so every expected tick is arithmetic on the probe's page; the files
+  and the posts are what the passes publish.
+- **TX-15's median reads "the buckets whose start lies in [a·chunk, b·chunk)"** for the spec's
+  "inside": the oracle and the code say the same.
+- **`loadStored` is the re-read** (with no generation it reads at the current one and clears
+  `rereading`), so `TranscriptTabSource.swift` is 598 after the named pure move and the review's fix.
+- **`median-whole-run` names U6 only**, not U6 and O1 (above).
+
+**Review fix.** A hide and a language change clear `rereading` with `deviceItems`, and a re-read's
+main hop removes its entry only while its generation is current, so the next generation's
+`loadMisses` loads a media whose re-read was in flight; two doc comments rewrapped keep the file at
+598. Verified: `make typecheck` 0 errors and the 4 baseline warnings, U1–U10 11/11, `make gate`
+PASS, Release `word_onset_proof.py` 20/20 and `transcript_tab_proof.py` 21/22 (B4, the base failure
+above).
+
+**Integrated (2026-11-02).** The lane's four commits (`340651e1`, `922e993b`, `f48c8b64`,
+`005aa95e`) cherry-picked as one commit onto CU1b1 (`c7a4c0e3`). Three conflicts, both intents
+kept: `creator-jobs-5.md` holds CU1b1's block, then TX1b's under its own heading ("## TX1b — on-device
+word starts moved to their sound"), so it does not read as CU1b1's; the decision index's
+`creator-jobs-5.md` Holds cell names CU-11…CU-19 and then TX-15…TX-19; the spec README keeps
+CU1b1's §7.9d row and TX1b's §7.9e and §7.9f rows. The Lines cells were recounted (`creator-jobs-2.md`
+481, `creator-jobs-5.md` 390, `11-decisions/` 19,354 in 39 files; `spec_index_proof.py` 249/249).
+`app/CLAUDE.md`'s Transcript-tab and `TimelineTranscript.swift` entries name `WordOnsets`, the
+re-read and the identity tick.
+
+**Owed.** JOB-11 on S-TH1 and TX-S3's real-speech rows (CP1 step 1). To file (the lane's notes): "On-device
+word ends are off by up to ±0.3 s: late after a phrase on `pause.wav` (+36 to +228 ms), early on
+`page.wav` (−315 ms on "afternoon."), where TX-30's 1 s cap from the early end leaves 211 ms
+before the next word", and "screens.py's SECTIONS lacks `video.behind_subject` (CO5): B4 and every
+`--only` run fail P2".
 
 ### CU2 — the core evaluates a cursor file
 

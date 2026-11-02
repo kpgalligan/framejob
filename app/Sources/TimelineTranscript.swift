@@ -30,12 +30,19 @@ enum TimelineTranscript {
         let k: Int
     }
 
-    /// One word of a media, in its SOURCE ticks.
+    /// One word of a media, in its SOURCE ticks. An on-device word's
+    /// `source` is its MOVED start (TX-15); `recognisedStart` is the
+    /// recogniser's own when TX-15 moved it.
     struct SourceWord: Equatable {
         let text: String
         let source: Ticks
         let sourceEnd: Ticks
         let speaker: String?
+        var recognisedStart: Ticks? = nil
+
+        /// The tick an identity, a cut's match and a pause set key by
+        /// (TX-17): the recogniser's start, moved or not.
+        var identityTick: Ticks { recognisedStart ?? source }
     }
 
     /// A heard media's words and where they came from.
@@ -45,6 +52,9 @@ enum TimelineTranscript {
         let language: String?
         let fillersReported: Bool
         let words: [SourceWord]
+        /// An on-device media read with no voice cache: its starts are the
+        /// recogniser's, unmoved (TX-18).
+        var voiceCacheMissing: Bool = false
     }
 
     /// One heard instance: a plan audio segment, its inner clip, that clip's
@@ -98,11 +108,20 @@ enum TimelineTranscript {
         }
     }
 
-    /// A stored on-device run's words, already media source ticks.
-    static func sourceWords(device heard: DeviceTranscriptCache.Heard) -> [SourceWord] {
-        heard.words.map {
-            SourceWord(
-                text: $0.text, source: $0.start, sourceEnd: max($0.start, $0.end), speaker: nil)
+    /// A stored on-device run's words, already media source ticks; with
+    /// `moved` (`WordOnsets.moved`, one per word), each start moved to its
+    /// sound and the recogniser's kept for its identity (TX-15, TX-17).
+    static func sourceWords(
+        device heard: DeviceTranscriptCache.Heard, moved: [Ticks]? = nil
+    ) -> [SourceWord] {
+        heard.words.enumerated().map { index, word in
+            let end = max(word.start, word.end)
+            guard let moved, index < moved.count, moved[index] != word.start else {
+                return SourceWord(text: word.text, source: word.start, sourceEnd: end, speaker: nil)
+            }
+            return SourceWord(
+                text: word.text, source: moved[index], sourceEnd: end, speaker: nil,
+                recognisedStart: word.start)
         }
     }
 
@@ -222,7 +241,7 @@ enum TimelineTranscript {
             let instance = instances[p.instance]
             let nestPath = Array(instance.segment.path.dropLast())
             let key = Identity(
-                nestPath: nestPath, media: instance.job.media, source: p.source.source, k: 0)
+                nestPath: nestPath, media: instance.job.media, source: p.source.identityTick, k: 0)
             let k = counts[key, default: 0]
             counts[key] = k + 1
             let why = whyNotEditable(
@@ -234,7 +253,8 @@ enum TimelineTranscript {
                 filler: FillerWords.isFiller(p.source.text), speaker: p.source.speaker,
                 editable: why == nil, why: why,
                 id: Identity(
-                    nestPath: nestPath, media: instance.job.media, source: p.source.source, k: k))
+                    nestPath: nestPath, media: instance.job.media, source: p.source.identityTick,
+                    k: k))
         }
     }
 

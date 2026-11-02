@@ -79,6 +79,7 @@ extension AgentServer {
         let window = context.window
         let words: [TranscriptReader.Word]
         var result: [String: Any]
+        var voiceMissing = false
         if let cached = context.cached {
             let cloudWords = TranscriptReader.cloudWords(for: job, in: cached.file)
             words = window.map { TranscriptReader.overlapping(cloudWords, in: $0) } ?? cloudWords
@@ -106,7 +107,12 @@ extension AgentServer {
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
-            let heard = TranscriptReader.deviceWords(answer.heard, for: job)
+            // Each start moved to its sound by the media's voice and peaks caches (TX-15, TX-16).
+            let caches = context.cacheDir.map { WordOnsets.caches(media: job.media, in: $0) }
+            let moved = WordOnsets.moved(
+                answer.heard.words, speech: caches?.speech, peaks: caches?.peaks)
+            voiceMissing = moved == nil
+            let heard = TranscriptReader.deviceWords(answer.heard, for: job, moved: moved)
             words = window.map { TranscriptReader.overlapping(heard, in: $0) } ?? heard
             result = [
                 "engine": TranscriptionEngine.apple.rawValue,
@@ -143,6 +149,7 @@ extension AgentServer {
                 "These words were not transcribed with filler words, so a filler missing here "
                     + "may still be in the audio.")
         }
+        if voiceMissing { notes.append(Self.unmovedNote(context.media?.name ?? job.name)) }
         if !notes.isEmpty { result["note"] = notes.joined(separator: " ") }
         return try onMain {
             result["project"] = self.summary(context.document)

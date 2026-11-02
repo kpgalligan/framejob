@@ -57,7 +57,9 @@ killed at a 240 s wall):
 
 App rows (the app `proof_app` chooses — Debug by default, `RC_PROOF_APP=release`
 for the record; host-state input `media/speech.mov`, whose absence is a
-scored FAIL):
+scored FAIL). Every import of speech.mov or its copy waits for its voice and
+peaks caches (`word_onsets.wait_voice`) before the first read, so the
+on-device starts are moved alike in every call (TX1b):
   G0  no `Frame Job: ` line; `get_transcript` takes exactly clip, from,
       language, project and to, clip required.
   G1  a 5 s clip at 0, `transcribe {engine: assemblyai, place: false}` over
@@ -165,6 +167,7 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import swift_build  # noqa: E402
+import word_onsets  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript"
@@ -372,6 +375,14 @@ def overlaps(word, lo, hi):
     return word["start"] < hi and max(word["end"], word["start"] + 1) > lo
 
 
+def voiced(session, path):
+    """`path` imported, then its voice and peaks caches waited for, so every
+    read sees the same moved starts (TX1b, spec §11 TX-15, TX-18)."""
+    media = session.media_of(str(path))
+    word_onsets.wait_voice(session.path, media)
+    return media
+
+
 def device_dir(session):
     return os.path.join(session.path, "cache", "device-transcripts")
 
@@ -475,7 +486,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                 cloud.scenario(aai, disfluent_words=words)
                 session = cloud.Session(app, "transcript-G1")
                 state["g1"] = session
-                media = session.media_of(str(SPEECH))
+                media = voiced(session, SPEECH)
                 clip = session.add(media, at=0, duration=5 * SEC)
                 session.op("transcribe", engine="assemblyai", place=False)
                 session.save()
@@ -547,7 +558,7 @@ def app_rows(results, wanted, app_path, mutant=False):
             def g7():
                 session = cloud.Session(app, "transcript-G7")
                 try:
-                    media = session.media_of(str(SPEECH))
+                    media = voiced(session, SPEECH)
                     clip = session.add(media, at=0, duration=5 * SEC)
                     on_grid, snap = grid(session)
                     bounds = [600000, 1200000, 3600000, 0, 5 * SEC]
@@ -591,7 +602,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                 cloud.scenario(aai, disfluent_words=words)
                 session = cloud.Session(app, "transcript-G2")
                 state["g2"] = session
-                media = session.media_of(str(SPEECH))
+                media = voiced(session, SPEECH)
                 clip = session.add(media, at=SEC // 2, duration=5 * SEC)
                 session.op("trim_start", clip=clip, to=SEC)
                 session.op("transcribe", engine="assemblyai", place=False)
@@ -637,7 +648,7 @@ def app_rows(results, wanted, app_path, mutant=False):
             def g4():
                 session = cloud.Session(app, "transcript-G4")
                 try:
-                    media = session.media_of(str(SPEECH))
+                    media = voiced(session, SPEECH)
                     clip = session.add(media, at=0, duration=5 * SEC)
                     track = session.project()["tracks"][0]["id"]
                     session.op("add_track")
@@ -667,7 +678,7 @@ def app_rows(results, wanted, app_path, mutant=False):
             def g5():
                 session = cloud.Session(app, "transcript-G5")
                 try:
-                    media = session.media_of(str(SPEECH))
+                    media = voiced(session, SPEECH)
                     clip = session.add(media, at=0)
                     placed = session.clip(clip)
                     mark = aai_requests()
@@ -712,7 +723,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                     return False, "G5's words are not available"
                 session = cloud.Session(app, "transcript-G8")
                 try:
-                    media = session.media_of(str(SPEECH))
+                    media = voiced(session, SPEECH)
                     clip = session.add(media, at=0)
                     # "fox"'s raw recogniser times widened outward to whole
                     # frames, so a word shorter than a frame cannot snap to an
@@ -749,7 +760,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                 session = None
                 try:
                     session = cloud.Session(app, "transcript-G9")
-                    media = session.media_of(str(copy))
+                    media = voiced(session, copy)
                     clip = session.add(media, at=0)
                     problems = []
                     mark = aai_requests()
@@ -840,7 +851,7 @@ def app_rows(results, wanted, app_path, mutant=False):
                     return None, f"G5 was a host skip: {state['no_device'][:160]!r}"
                 session = cloud.Session(app, "transcript-G10")
                 try:
-                    media = session.media_of(str(SPEECH))
+                    media = voiced(session, SPEECH)
                     clip = session.add(media, at=0)
                     placed = session.clip(clip)
                     _, snap = grid(session)

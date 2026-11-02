@@ -232,8 +232,8 @@ the same way.
 
 **JOB-11 — Word cuts sound natural**
 - **Do:** With S-TH1 placed (a long talking head, once it exists), open View ▸ Transcript (⌃⌘T). Delete a dozen single words and a few runs of words from the middle, some just before a pause and some in fast speech: select, listen to the shaded range with Loop, press ⌫, then play across each cut.
-- **Expect:** no kept word's start is clipped; no audible fragment of a deleted word is left; the pause after each cut sounds natural (no gasp, no doubled pause); in fast speech the end of the word before the cut is not eaten (TX-S3 chose the transcript's own edges, E0, which put 13 of 20 edges on its fixture inside the word before — note each one you hear, with its time).
-- **Source:** road map "creator-jobs" TX3a, spec §11 TX-30.
+- **Expect:** no kept word's start is clipped; no audible fragment of a deleted word is left; the pause after each cut sounds natural (no gasp, no doubled pause); in fast speech the end of the word before the cut is not eaten (TX-S3 chose the transcript's own edges, E0; since TX1b each on-device start is moved to where its sound begins, so a word after a pause starts on its sound, but in fast speech a start the voice model hears no gap before stays where the recogniser put it — note each cut that eats the word before, or leaves a slice of pause, with its time).
+- **Source:** road map "creator-jobs" TX3a and TX1b, spec §11 TX-30, TX-15.
 
 ## Clip tab and action lane
 
