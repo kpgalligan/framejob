@@ -162,6 +162,7 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
         props.blend = BlendMode::Normal;
     }
     crate::cursor_props::clamp_cursor(&mut props.cursor);
+    crate::cutout_check::clamp_cutout(&mut props.cutout);
     props
 }
 

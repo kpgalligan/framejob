@@ -46,6 +46,9 @@ struct VideoProps: Codable, Equatable {
     /// The clip's drawn cursor (format 38, spec §11 CU-30,
     /// `CursorProps.swift`); nil is none written.
     var cursor: CursorProps?
+    /// The clip's Remove Background (format 39, spec §11 CO-20,
+    /// `CutoutProps.swift`); nil is none written.
+    var cutout: CutoutProps?
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -56,7 +59,7 @@ struct VideoProps: Codable, Equatable {
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
         motion: MotionProps? = nil, wheels: ColorWheels = .neutral,
         curves: ColorCurves = .identity, qualifier: ColorQualifier = .none,
-        look: LookProps? = nil, cursor: CursorProps? = nil
+        look: LookProps? = nil, cursor: CursorProps? = nil, cutout: CutoutProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -79,6 +82,7 @@ struct VideoProps: Codable, Equatable {
         self.qualifier = qualifier
         self.look = look
         self.cursor = cursor
+        self.cutout = cutout
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +117,7 @@ struct VideoProps: Codable, Equatable {
         qualifier = c.lenient(.qualifier, ColorQualifier.none)
         look = c.lenient(.look)
         cursor = c.lenient(.cursor)
+        cutout = c.lenient(.cutout)
     }
 
     static let identity = VideoProps()

@@ -284,6 +284,10 @@ struct RecipeLayer: Codable, Equatable {
     /// The media cursor this layer draws (format 38, spec §11 CU-32,
     /// `CursorProps.swift`); nil for none. Not drawn yet (CU3a2).
     let cursor: RecipeCursor?
+    /// The clip's Remove Background as a draw instruction — the mask to look
+    /// up and how to draw it (format 39, spec §11 CO-21,
+    /// `CutoutProps.swift`); nil for none. Not drawn yet (CO2a2).
+    let cutout: RecipeCutout?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -316,6 +320,7 @@ struct RecipeLayer: Codable, Equatable {
         dissolve = c.lenient(.dissolve, [])
         input = c.lenient(.input)
         cursor = c.lenient(.cursor)
+        cutout = c.lenient(.cutout)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer
@@ -337,6 +342,8 @@ struct RecipeLayer: Codable, Equatable {
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
             filters: filters, reflection: reflection, spotlight: spotlight,
             obscure: obscure, blend: blend, wheels: wheels, curves: curves,
+            // No `cutout`: the recipe's is a draw instruction (a mask and how
+            // to draw it), not the clip's props.
             cursor: cursor?.props)
     }
 }

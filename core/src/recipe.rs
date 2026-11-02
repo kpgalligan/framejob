@@ -321,6 +321,7 @@ impl Project {
             matte,
             dissolve,
             cursor: self.layer_cursor(instance.clip, clip_t, &evaluated.video),
+            cutout: self.layer_cutout(instance.clip, &evaluated.video),
             input,
             // No blend on an ungraded frame (GR-4, GR-34).
             curve_blends: if ungraded {

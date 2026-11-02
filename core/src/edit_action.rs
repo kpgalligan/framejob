@@ -38,16 +38,18 @@
 //! group in `patch` is `edit_action_graphic.rs`'s arm (spec §11 G-34); in
 //! `off` it is an `Err`.
 
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 
-use crate::actions::{self, MAX_PATCH_DEPTH};
-use crate::edit_action_graphic::{read_graphic_end, write_graphic_end, GRAPHIC_NOT_KEYED_OFF};
+use crate::actions;
+use crate::edit_action_end::{
+    check_cutout_end, check_end_patch, check_off, key_off, not_a_target, prune_removed,
+};
+use crate::edit_action_graphic::{read_graphic_end, write_graphic_end};
 use crate::edit_action_speed::read_speed_end;
 use crate::export::describe;
-use crate::model::{Action, AudioProps, Curve, Project, ShapeProps, TextProps, VideoProps};
+use crate::model::{Action, Curve, Project};
 use crate::model_graphic::{check_count, check_schema};
 use crate::outcome::Outcome;
-use crate::patch::{check_group_patch, merge_group, unknown_key, Group};
 use crate::speed_map::end_speed;
 use crate::time::{Ticks, TIMESCALE};
 
@@ -94,199 +96,6 @@ pub(crate) fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: 
          end at {length} ticks",
         start.saturating_add(duration)
     )
-}
-
-/// Removes from `value` every key the incoming `patch` set to `null` —
-/// `set_action_end`'s delete rule (spec §6). Only keys the patch mentions
-/// are touched, so a `null` that was already in the end patch (animating a
-/// shadow away, say) survives untouched. `shift_remove`, because under
-/// `preserve_order` `Map::remove` swaps the last key into the hole.
-fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
-    let Value::Object(patched) = patch else {
-        return;
-    };
-    let Value::Object(target) = value else {
-        return;
-    };
-    if depth >= MAX_PATCH_DEPTH {
-        return;
-    }
-    for (key, sub) in patched {
-        if sub.is_null() {
-            target.shift_remove(key);
-        } else if let Some(slot) = target.get_mut(key) {
-            prune_removed(slot, sub, depth + 1);
-        }
-    }
-}
-
-/// What a refusal calls this op's patch. It is not one group's — the paths
-/// inside it carry the group's name (`video.filters[1].kind`) — so it
-/// cannot be a `Group`'s own subject.
-pub(crate) const END_PATCH: &str = "an action end patch";
-
-/// The groups §5.4's end patch may name. `shape` is not among them, and its
-/// absence is a refusal rather than an omission: `evaluate_clip` passes a
-/// clip's shape through untouched, so the key would be stored, reported as
-/// success and animate nothing.
-const END_GROUPS: [Group; 3] = [Group::Video, Group::Audio, Group::Text];
-
-/// Walks an end patch's keys, kinds and values the way every other patch
-/// is walked (`patch.rs`'s `check_group_patch`), group by group, and
-/// refuses by the dotted path.
-///
-/// What belongs to THIS door rather than to a property group, and is why
-/// the walk is composed here rather than called:
-///
-/// - **Three groups and no fourth.** Spec §5.4's patch is a subset of
-///   `video`, `audio` and `text`. `shape` is refused rather than kept,
-///   because `evaluate_clip` passes a clip's shape through untouched: the
-///   key would be stored, reported as success, and animate nothing.
-/// - **A `null` is a REMOVAL at every depth**, not a clear. The walk sees
-///   it (so `{"video": {"blurr": null}}` is still an unknown key) and the
-///   typed read does not (so `{"video": {"crop": null}}` is "stop animating
-///   the crop" rather than a required field being cleared) —
-///   `check_group_patch` is where that split lives, and [`prune_removed`]
-///   below applies the same rule to the STORED end state.
-fn check_end_patch(patch: &Value) -> Result<(), String> {
-    let Value::Object(groups) = patch else {
-        return Ok(());
-    };
-    for (key, body) in groups {
-        // `graphic` is `edit_action_graphic.rs`'s arm and `speed`
-        // `edit_action_speed.rs`'s, each read after this walk.
-        if key == "graphic" || key == "speed" {
-            continue;
-        }
-        // The three groups, by their own names rather than by three string
-        // literals: a group renamed in `patch.rs` cannot drift from the
-        // door that lists it.
-        let group = END_GROUPS
-            .into_iter()
-            .find(|group| group.name() == key)
-            .ok_or_else(|| unknown_key(key, END_PATCH))?;
-        // A group set to `null` removes the whole group from the end state,
-        // which is the same removal one key deep.
-        if body.is_null() {
-            continue;
-        }
-        check_group_patch(body, group, END_PATCH, key)?;
-    }
-    Ok(())
-}
-
-/// The two refusals that are about this op rather than the vocabulary,
-/// asked of a group and a key wherever they came from — a `patch`'s keys
-/// and an `off` path go through the same two sentences.
-fn not_a_target(group: &str, key: &str) -> Result<(), String> {
-    match (group, key) {
-        ("video", "motion") => Err("video.motion is not an animation target".to_string()),
-        ("text", "words") => Err("text.words is not an animation target".to_string()),
-        _ => Ok(()),
-    }
-}
-
-/// The EQ's seven slots, the one group whose slot `off` may name (AU-88).
-#[rustfmt::skip]
-const EQ_SLOTS: [&str; 7] =
-    ["high_pass", "low_shelf", "band_1", "band_2", "band_3", "high_shelf", "low_pass"];
-
-/// One `off` path: `group.key`, or `audio.eq.<slot>` with its `slot`.
-struct OffPath<'a> {
-    group: &'a str,
-    key: &'a str,
-    slot: Option<&'a str>,
-}
-
-/// Reads `set_action_end`'s `off` list (spec §11 CI-14) into its paths,
-/// refusing in this order: a path that is not `group.key` or
-/// `audio.eq.<slot>` (AU-88; an unknown slot named against the seven), a
-/// group an end patch may not name, `video.motion` and `text.words`, a path
-/// `patch` also names, and whatever the group's read says of a `null` there
-/// — an unknown key, a REQUIRED key (`video.opacity`).
-fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<OffPath<'a>>, String> {
-    let mut paths = Vec::with_capacity(off.len());
-    for path in off {
-        let parts: Vec<&str> = path.split('.').collect();
-        let (group_name, key, slot) = match parts.as_slice() {
-            [g, k] if !g.is_empty() && !k.is_empty() => (*g, *k, None),
-            ["audio", "eq", slot] if EQ_SLOTS.contains(slot) => ("audio", "eq", Some(*slot)),
-            ["audio", "eq", slot] => {
-                return Err(format!(
-                    "off path \"{path}\" names no EQ slot: \"{slot}\" is not one of {}",
-                    EQ_SLOTS.join(", ")
-                ))
-            }
-            _ => {
-                return Err(format!(
-                    "off path \"{path}\" must be \"group.key\", a group of video, audio or \
-                     text and one of its top-level keys"
-                ))
-            }
-        };
-        if group_name == "graphic" {
-            return Err(GRAPHIC_NOT_KEYED_OFF.to_string());
-        }
-        let group = END_GROUPS
-            .into_iter()
-            .find(|group| group.name() == group_name)
-            .ok_or_else(|| unknown_key(group_name, END_PATCH))?;
-        not_a_target(group_name, key)?;
-        let named = patch.get(group_name).and_then(|body| body.get(key));
-        if slot
-            .map_or(named, |slot| named.and_then(|eq| eq.get(slot)))
-            .is_some()
-        {
-            return Err(format!(
-                "\"{path}\" is named in both the patch and off; an end state cannot both \
-                 hold it and key it off"
-            ));
-        }
-        let probe = slot.map_or(json!({ key: null }), |slot| json!({ key: { slot: null } }));
-        let read = match group {
-            Group::Video => merge_group(&VideoProps::default(), &probe, group).map(|_| ()),
-            Group::Audio => merge_group(&AudioProps::default(), &probe, group).map(|_| ()),
-            Group::Text => merge_group(&TextProps::default(), &probe, group).map(|_| ()),
-            Group::Shape => merge_group(&ShapeProps::default(), &probe, group).map(|_| ()),
-        };
-        read.map_err(|why| format!("cannot key \"{path}\" off: {why}"))?;
-        paths.push(OffPath {
-            group: group_name,
-            key,
-            slot,
-        });
-    }
-    Ok(paths)
-}
-
-/// The object at `key` of `map`, made `{}` when absent or not an object.
-fn object_at<'v>(map: &'v mut Map<String, Value>, key: &str) -> Option<&'v mut Map<String, Value>> {
-    let slot = map
-        .entry(key.to_string())
-        .or_insert_with(|| Value::Object(Map::new()));
-    if !slot.is_object() {
-        *slot = Value::Object(Map::new());
-    }
-    slot.as_object_mut()
-}
-
-/// Writes `null` at `group.key` of an end state, or at `audio.eq.<slot>`
-/// (AU-88) — the property keyed OFF. A group or `eq` slot that is not an
-/// object (`end` is stored as the file had it) is replaced by `{}`.
-fn key_off(end: &mut Value, path: &OffPath<'_>) {
-    let Value::Object(groups) = end else {
-        return;
-    };
-    let Some(fields) = object_at(groups, path.group) else {
-        return;
-    };
-    let (target, key) = match path.slot {
-        Some(slot) => (object_at(fields, path.key), slot),
-        None => (Some(fields), path.key),
-    };
-    if let Some(target) = target {
-        target.insert(key.to_string(), Value::Null);
-    }
 }
 
 impl Project {
@@ -463,7 +272,9 @@ impl Project {
     /// did nothing. A `text` object naming `words` is an `Err` too (format
     /// version 9, spec §11 W-6): a word's times are anchored to speech, not
     /// a state a clip ramps toward, and interpolating two lists of ticks
-    /// would move every word off what it times.
+    /// would move every word off what it times. A `video.cutout` naming
+    /// `subject` or `quality`, a `null` included, is an `Err` as well
+    /// ([`check_cutout_end`], spec §11 CO-20): both are the clip's base.
     ///
     /// `off` (spec §11 CI-14) is the one way to STORE a `null`: each
     /// `"group.key"` path is written as `null` after the merge and the
@@ -502,6 +313,7 @@ impl Project {
                 not_a_target(group, key)?;
             }
         }
+        check_cutout_end(patch)?;
         check_end_patch(patch)?;
         let graphic = match patch.get("graphic") {
             Some(body) => Some(read_graphic_end(target, body, schema)?),

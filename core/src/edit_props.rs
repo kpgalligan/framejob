@@ -273,7 +273,8 @@ impl Project {
     ///    range check so a malformed identity-shaped curve is still refused
     ///    by name; an identity curve on an uncurved clip is then an identity.
     /// 4. The rules about this CLIP rather than the values — [`check_blend`],
-    ///    the adjustment and qualifier rules, the look's media.
+    ///    the adjustment and qualifier rules, the cutout's clip kinds (spec
+    ///    §11 CO-20), the look's media.
     /// 5. Motion timings snapped to the grid ([`Self::snap_motion`]).
     ///
     /// The look's own normalisation (`normalise_look`) is the patch path's
@@ -287,6 +288,7 @@ impl Project {
         check_blend(clip, props)?;
         check_adjustment_video(clip, props)?;
         check_qualifier_clip(clip, props)?;
+        crate::cutout_check::check_cutout_clip(clip, props)?;
         self.check_look_media(props)?;
         self.snap_motion(props);
         Ok(())

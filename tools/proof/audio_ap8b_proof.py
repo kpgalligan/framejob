@@ -131,7 +131,7 @@ CORE_MUTANTS = [
      "actions.rs",
      "            hold_audio_steps(&state, &mut lerped);\n", ""),
     ("M13", "action_off", "off_keys_one_eq_slot_off_at_the_end",
-     "edit_action.rs",
+     "edit_action_end.rs",
      "        Some(slot) => (object_at(fields, path.key), slot),",
      "        Some(_) => (Some(fields), path.key),"),
 ]

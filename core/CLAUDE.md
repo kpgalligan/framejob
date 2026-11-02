@@ -203,6 +203,20 @@ governs a module now.
   `cursor` key: `null` unless a media or still clip's media has a cursor not `in_picture` and the
   evaluated props show or ripple, else `{media, at, reversed, smoothing, hide_idle, props}`, `at`
   `freeze_frame`'s source tick in the stream the clip plays.
+- `model_cutout.rs` · `cutout_check.rs` — the cutout in the model (format 39, road map
+  "creator-jobs" CO2a1, spec §11 CO-20, CO-21, CO-23): `model_cutout.rs` `Cutout`
+  (`video.cutout`, after `cursor`, written only when set, every field written, `{}` the
+  defaults) with `CutoutSubject`, `CutoutQuality`, `CutoutBackground` and the `CUTOUT_*` ranges,
+  re-exported through `model_props.rs`; `cutout_check.rs` `check_cutout` (one line in
+  `props_check.rs`'s `check_video`: edge, feather, then `best` refused), `check_cutout_clip` (one
+  line in `edit_props.rs`'s `settle_video`: a text, shape, graphic, adjustment, image or nest clip
+  refused naming what it is), `clamp_cutout` (one line in `actions_clamp.rs`'s `clamp_video`; it
+  never fails) and `restore_base_cutout` (one line in `actions.rs`'s `evaluate_clip`, beside
+  motion's restore: the presence, `subject` and `quality` the base's). The recipe's `cutout` key
+  is `recipe_layer.rs`'s `Project::layer_cutout`: `null` unless a media or still clip's media is
+  in the project and the evaluated cutout is set, else `{mask: {kind: "media", media, quality},
+  background, edge, feather}`, `media` the clip's own source media. `add_blurred_background`'s
+  copy drops it.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -667,21 +681,8 @@ governs a module now.
   `edit_transition.rs` under the size rule (road map "audio" AP11's toll, a
   pure move).
 - `edit_action.rs` · `edit_nest.rs` · `edit_paste.rs` — the action ops and
-  their no-overlap rule, plus `check_end_patch`, the END patch's door: the
-  three groups §5.4 allows (a `shape` is an unknown key), a `null` that
-  REMOVES at every depth rather than clearing, and `patch.rs`'s walk and
-  read per group. The door is composed here because which groups an end
-  patch names, and what a `null` in one means, are facts about an ACTION;
-  values are deliberately not range-checked, except a graphic prop's end
-  (G-34 (c), `edit_action_graphic.rs`), and `actions_clamp.rs`'s
-  `clamp_video` is the last line of defence for them. `set_action_end`'s
-  `off` (spec §11 CI-14) is the one way to STORE a `null` — the optional
-  property keyed OFF at the end — written after the merge and the prune; its
-  paths are `group.key`, and `audio.eq.<slot>` (one of `EQ_SLOTS`, AU-88)
-  is the only three-part one; `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
-  and `merge_group`'s read of a `null` for an unknown or a required key),
-  and a non-object group slot is replaced by `{}`, never indexed. `set_action`
-  refuses `action_past_end` only when the new end is past the clip's end AND
+  their no-overlap rule; `set_action_end` composes `edit_action_end.rs`'s door.
+  `set_action` refuses `action_past_end` only when the new end is past the clip's end AND
   later than the action's current end (SR-22, #338), so a value-only edit of
   an action a trim left past the end goes through. `nest` and `unnest`
   (fresh ids, content byte-equal; the nest clip on the front-most non-matte
@@ -693,6 +694,22 @@ governs a module now.
   `graphic` in a `patch` is `edit_action_graphic.rs`'s arm, read against
   the op's `schema` after the three groups' walk (G-34); in an `off` path it
   is an `Err`.
+- `edit_action_end.rs` — `set_action_end`'s END patch door, a pure move out of
+  `edit_action.rs` (road map "creator-jobs" CO2a1's toll; VR2b reuses it):
+  `check_end_patch` (the three groups §5.4 allows — a `shape` is an unknown
+  key — a `null` that REMOVES at every depth rather than clearing, and
+  `patch.rs`'s walk and read per group; values deliberately not range-checked,
+  except a graphic prop's end, G-34 (c), `edit_action_graphic.rs`, and
+  `actions_clamp.rs`'s `clamp_video` is the last line of defence),
+  `prune_removed`, `not_a_target` (`video.motion`, `text.words`, and `off`'s
+  `video.cutout`, spec §11 CO-20), `check_cutout_end` (a patch's
+  `video.cutout` naming `subject` or `quality`, a `null` included, refused,
+  `subject` first), and `off` (spec §11 CI-14), the one way to STORE a
+  `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` the only
+  three-part one, AU-88; it refuses what `patch` refuses, and `merge_group`'s
+  read of a `null` for an unknown or a required key) and `key_off` (written
+  after the merge and the prune; a non-object group slot is replaced by `{}`,
+  never indexed). `END_PATCH` is `edit_action_graphic.rs`'s too.
 - `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
@@ -879,8 +896,9 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-seven keys of a layer written in ONE place (`cursor`
-  the twenty-seventh, `recipe_cursor.rs`'s, CU-32)
+  `recipe.rs`) is the twenty-eight keys of a layer written in ONE place (`cursor`
+  the twenty-seventh, `recipe_cursor.rs`'s, CU-32; `cutout` the twenty-eighth,
+  its own `Project::layer_cutout`, CO-21)
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is

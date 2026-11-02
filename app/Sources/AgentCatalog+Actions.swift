@@ -144,10 +144,12 @@ extension AgentServer {
                     + "video.chroma.key's three numbers do too. A "
                     + "bad key or value is refused by its path with the group in it "
                     + "(video.filters[1].kind), though values are NOT range-checked: an animation "
-                    + "may aim past what a stored property could hold. Two keys are refused: "
+                    + "may aim past what a stored property could hold. These keys are refused: "
                     + "video.motion, a preset anchored to the clip's two ends rather than a value "
-                    + "to ramp between (set it with set_video), and text.words, whose times belong "
-                    + "to speech. In audio, every key the sound's effects read animates — pan, "
+                    + "to ramp between (set it with set_video), text.words, whose times belong "
+                    + "to speech, and video.cutout.subject and video.cutout.quality, the clip's "
+                    + "own (set them with set_video; a cutout's edge, feather and background "
+                    + "animate). In audio, every key the sound's effects read animates — pan, "
                     + "mono, channels, eq, hum, noise_reduction, gate, leveller, de_esser, "
                     + "compressor, limiter and isolation, beside volume and the fades: numbers "
                     + "ramp, and a "
@@ -191,7 +193,8 @@ extension AgentServer {
                         + "{...}}, speed?: number} — the properties the animation ends at.",
                     "off": "\"group.key\" paths (video.shadow, text.width, audio.limiter) to "
                         + "switch OFF at the end — stored as null, where a null in patch removes. "
-                        + "Optional keys only; never graphic. One deeper path: "
+                        + "Optional keys only; never graphic, and never video.cutout (set_video "
+                        + "{cutout: null} removes a cutout). One deeper path: "
                         + "audio.eq.<slot> (high_pass, low_shelf, band_1, band_2, band_3, "
                         + "high_shelf, low_pass) switches that EQ slot off at the end.",
                 ]),

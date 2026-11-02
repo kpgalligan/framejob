@@ -15,7 +15,7 @@ use crate::model::{Canvas, Project};
 /// Bumped by any change to the persisted project schema. Mirrored by
 /// `RC_FORMAT_VERSION` in the C header.
 /// What each version added is [`crate::format_history`].
-pub const RC_FORMAT_VERSION: u32 = 38;
+pub const RC_FORMAT_VERSION: u32 = 39;
 
 /// The number the grading branch's builds wrote (spec §11 GR-9); read as version 15.
 pub const GRADING_BRANCH_VERSION: u32 = 1015;

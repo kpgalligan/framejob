@@ -35,7 +35,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::edit_action::END_PATCH;
+use crate::edit_action_end::END_PATCH;
 use crate::export::describe;
 use crate::model::{Clip, Source};
 use crate::model_color::normalise_color;

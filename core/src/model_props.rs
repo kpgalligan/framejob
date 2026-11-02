@@ -143,6 +143,12 @@ pub use crate::model_audio::*;
 /// `crate::model::CursorProps` path resolves.
 pub use crate::model_cursor::*;
 
+/// The cutout vocabulary — [`Cutout`], [`CutoutSubject`], [`CutoutQuality`],
+/// [`CutoutBackground`] and their ranges (format 39, spec §11 CO-20) — lives
+/// in `model_cutout.rs` and is re-exported whole, so every
+/// `crate::model::Cutout` path resolves.
+pub use crate::model_cutout::*;
+
 // ---- video properties ----------------------------------------------------
 
 /// Placement on the canvas plus the per-clip image controls. `x`/`y` are an
@@ -217,6 +223,11 @@ pub struct VideoProps {
     /// it was. `smoothing` and `hide_idle` are read from the base only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<CursorProps>,
+    /// Remove Background (format 39, spec §11 CO-20): written only when set,
+    /// so a cutout-less file's text is what it was. Its presence, `subject`
+    /// and `quality` are the base's at every time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cutout: Option<Cutout>,
 }
 
 impl Default for VideoProps {
@@ -243,6 +254,7 @@ impl Default for VideoProps {
             qualifier: Qualifier::default(),
             look: None,
             cursor: None,
+            cutout: None,
         }
     }
 }

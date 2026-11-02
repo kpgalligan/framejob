@@ -240,8 +240,12 @@ extern "C" {
  *
  * Version 38 is the cursor (spec §11 CU-30, CU-39): `media[].cursor`, after
  * `speech`, and `video.cursor`, after `look`, each written only when set; no
- * migration step. 39 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 38
+ * migration step.
+ *
+ * Version 39 is the cutout (spec §11 CO-20): `video.cutout`, after `cursor`,
+ * written only when set; no migration step. 40 and above, 1014 included, are
+ * newer. */
+#define RC_FORMAT_VERSION 39
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

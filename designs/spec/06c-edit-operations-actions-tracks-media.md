@@ -63,7 +63,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` or `low_pass` — writes it at that slot
   of the end's `eq`, one EQ slot keyed off (§11 AU-88), the only three-part path (an unknown slot
   is an **error** naming the seven, any other deeper path the `"group.key"` one); a malformed
-  path, `video.motion`,
+  path, `video.motion`, `video.cutout` (format 39, §11 CO-20: `video.cutout cannot be keyed off
+  at an action's end; set_video {cutout: null} removes it`),
   `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
   also names are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a
@@ -76,7 +77,11 @@ The rules every op shares are §6a; the clip ops are §6b.
   **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather
   than being a value to ramp between two states, and the evaluator would restore the base value
   anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version
-  9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. A `graphic` object
+  9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. A
+  `video.cutout` object naming `subject` or `quality` — a `null` included, `subject` first — is an
+  **error** (format 39, §11 CO-20: `video.cutout.subject is not an animation target`): which
+  subject and which masks are the clip's own, and the evaluator restores the base's; `edge`,
+  `feather` and `background` animate. A `graphic` object
   is a graphic clip's props as a fourth target (format version 13, §11 G-34): `{props: {<key>:
   <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` — the module's
   CURRENT revision, which the app fills and never takes from a caller (G-4) — and refused under

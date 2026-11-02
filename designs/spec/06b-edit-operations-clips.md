@@ -61,7 +61,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the
   other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so
   a copy keeping it would duck the mix including the clip it came from — along with its transition,
-  its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or
+  its actions, its label, its `video.cutout` (CO-20) and its `video.motion` (format version 8 — a backdrop that slid in or
   pulsed behind the clip it copies would be two pictures of one recording disagreeing about where
   they are, and a slide would leave the canvas showing down one side, which is the one thing a
   background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST
@@ -399,6 +399,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded
   unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is
   normalised to `null` before the range checks run, so one clip has one spelling of "no motion".
+  `video.cutout` (format 39, §11 CO-20) merges too and `null` removes it; only a `media` or `still`
+  clip takes one (a text, shape, graphic, adjustment, image or nest clip is an **error** naming
+  what it is), and `quality: "best"` is an error until Best masks are made.
   `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
   merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
   **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.

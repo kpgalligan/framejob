@@ -441,3 +441,45 @@ state (CJ-20).
     mirror lives. CO1 writes no mirrored file (D4-6).
   - The mean centroid of a window's cached masks moves to CO3, its only prover (I6, reading
     `MaskPack`). CO7 reads CO3's.
+
+CO-20, CO-21 and CO-23 are CO2a1's (the cutout in the model and the recipe), recorded before its
+code at format version 39 — provisional until the phase lands, the integrator renumbering a
+collision. CO-22 is CO2b's (masks made on demand); the owner's answer for CO2a is CO-15's, and
+CO2a1 adds none.
+
+- **CO-20 — `video.cutout`, a clip's Remove Background (CO2a1, format 39).** `Cutout` in
+  `model_cutout.rs`, after `video.cursor`, written only when set, every field written in this
+  order: `subject` (`person`; CO10 appends `foreground`), `quality` (`standard` | `best`),
+  `background` (`remove`, the layer draws its subject alone, | `keep`, the layer draws whole),
+  `edge` (0, −1…1, shrinks or grows the outline), `feather` (0, 0…1); `{}` reads as the five
+  defaults. `set_video` refuses, through `in_range`, "video.cutout.edge must be between -1 and 1,
+  not 2" and likewise `feather` (0–1), then "video.cutout.quality must be standard: Best masks are
+  not made yet" (the vocabulary holds `best` so CO4 needs no bump; a file's `best` is read and
+  kept). On a text, shape, graphic, adjustment or image clip (images until CO10) it refuses "clip
+  {id} is a text clip and cannot take a cutout" (`a shape clip`, `a graphic clip`, `an adjustment
+  clip`, `an image clip`), and on a nest "clip {id} shows a nest and cannot take a cutout" —
+  checked in `settle_video`, so `paste` and `paste_attributes` meet them too. **In an action:**
+  the key's presence, `subject` and `quality` are BASE-only. `set_action_end` refuses
+  "video.cutout.subject is not an animation target" and the same for `quality` when the patch's
+  `video.cutout` object names either (a `null` included, `subject` first), and an `off` path
+  `video.cutout`: "video.cutout cannot be keyed off at an action's end; set_video {cutout: null}
+  removes it". The evaluator restores the base over any end (`restore_base_cutout`, beside
+  motion's): no base cutout evaluates `null`; a base cutout and an object state take the base's
+  `subject` and `quality`; anything else is the base's whole. `edge` and `feather` lerp and
+  `background` switches at the end, by §5.4's object rule; an end's cutout keys on a clip without
+  one do nothing. The evaluator's clamp (`clamp_cutout`, never failing) bounds `edge` to −1…1 and
+  `feather` to 0…1, NaN to 0. A split's halves and a freeze's still read the evaluated state, which
+  the restore already holds to the base. `add_blurred_background`'s copy drops `video.cutout` as it
+  drops `video.motion`: a backdrop cut down to the person is no backdrop.
+- **CO-21 — The recipe's `cutout` key, a layer's 28th, after `cursor` (CO2a1).** `null` unless
+  the clip's source is `media` or `still`, its media is in the project and the evaluated `cutout`
+  is set; otherwise `{mask: {kind: "media", media, quality}, background, edge, feather}`, `media`
+  the clip's own source media (a nested clip's inner media, a still's media) whose pack holds the
+  masks (CO-3), `quality` `standard` or `best`. The time comes from the picture segment (CO-3), so
+  the key carries no `at` and no `reversed`. Show Ungraded, Show Selection and a matte layer keep
+  it; the burn-in's is `null`. The plan, the composition and `CompositionBuilder` take nothing:
+  a cutout adds no track, segment or decoder. CO10 adds `{kind: "image", media}`.
+- **CO-23 — A project with no cutout plans, saves and draws as before (CO2a1).** The key is never
+  written unless set, so every older file writes the text it did at 38 with no migration step,
+  plans byte-identically, and every layer gains only `"cutout": null`. Until CO2a2 a cut-out clip
+  draws uncut, as CO-6 says a clip without its masks does.

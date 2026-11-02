@@ -374,5 +374,10 @@
 //! `{path, bookmark?, in_picture}` after `speech`, and `video.cursor`, the
 //! eight `CursorProps` keys after `look`, each written only when set; no
 //! migration (CU-35). The bump is so an older build refuses a file with a
-//! cursor instead of opening it and dropping the keys on save. Every number
-//! from 39 up, 1014 included, is newer than this build.
+//! cursor instead of opening it and dropping the keys on save.
+//!
+//! Version 39 is the cutout (spec §11 CO-20, CO-23): `video.cutout`,
+//! `{subject, quality, background, edge, feather}` after `cursor`, written
+//! only when set; no migration. The bump is so an older build refuses a
+//! file with a cutout instead of opening it and dropping the key on save.
+//! Every number from 40 up, 1014 included, is newer than this build.

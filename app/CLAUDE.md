@@ -154,7 +154,7 @@ detail there.
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `VideoProps.swift` · `ClipSnapshot.swift` ·
   `TrackSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` · `CursorProps.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` · `CursorProps.swift` · `CutoutProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. READ-ONLY means never written back as
   is: the stored properties are `var`, so a writer edits a COPY
   (`var s = current(); s.blur = v`) rather than rebuilding one through the
@@ -181,7 +181,13 @@ detail there.
   core's `none`: a case named `none` warns), `CursorProps` (`VideoProps.cursor` and
   `VideoPatch.cursor`; its `dictionary` writes all eight keys, `NSNull` for a nil `hideIdle`),
   `MediaCursor` (`MediaSnapshot.cursor`, `MediaDescriptor.cursor`, kept by `probeDictionary`) and
-  `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required). `VideoProps.swift` (`VideoProps`),
+  `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required).
+  `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21) holds
+  `CutoutSubject`, `CutoutQuality`, `CutoutBackground`, `CutoutProps` (`VideoProps.cutout` and
+  `VideoPatch.cutout`; its `dictionary` writes all five keys), `RecipeCutoutMaskKind`,
+  `RecipeCutoutMask` (`kind` and `media` required) and `RecipeCutout` (the recipe layer's
+  `cutout`, `mask` required); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
+  instruction, not the clip's props. `VideoProps.swift` (`VideoProps`),
   `ClipSnapshot.swift` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`,
   `TransitionSnapshot`) and `TrackSnapshot.swift` (`TrackSnapshot`) are pure moves out of
   `ProjectSnapshot.swift` (road map creator-jobs CJ0d, T11–T13). `ShapeProps.swift` (a pure
@@ -1784,8 +1790,9 @@ the key map behind it.
   (`passActivity`, `endPassActivity`; the owner's choice, G-38).
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve` and `cursor` — CU-32's key, drawn
-  by `Compositor+Cursor.swift` since CU3a2) and `FrameRecipe` (with
+  `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve`, `cursor` — CU-32's key, drawn
+  by `Compositor+Cursor.swift` since CU3a2 — and `cutout`, CO-21's, not drawn until CO2a2)
+  and `FrameRecipe` (with
   `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
   `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
   `RecipeMatteGroup`, a pure move out of it (road map creator-jobs CJ0d, T14).

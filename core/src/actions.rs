@@ -487,6 +487,7 @@ impl Project {
             {
                 video.insert("look".to_string(), Value::Null);
             }
+            crate::cutout_check::restore_base_cutout(video, base_video.cutout.as_ref());
         }
         // A patch that writes a bad type into a field (12.5 into a tick
         // count, say) loses that whole group rather than failing: the

@@ -372,6 +372,18 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   in the two widened `fn` lines. `actions_qualifier.rs`', `grade_check.rs`' and `model_grade.rs`'
   module docs name the new file. `wc -l core/src/actions_clamp.rs`: 405 before, 298 after;
   `actions_clamp_grade.rs` is 114. No next seam is named.
+- `edit_action.rs`: at 595 before road map "creator-jobs" CO2a1, it paid CO2a1's toll, a pure
+  move gated alone (`cargo fmt --check` and `cargo test --release` in `core/`, `make lint`):
+  lines 99–290 at `33bfb571` (`prune_removed` with its doc through `key_off`: `END_PATCH`,
+  `END_GROUPS`, `check_end_patch`, `not_a_target`, `EQ_SLOTS`, `OffPath`, `check_off`,
+  `object_at`, `key_off`) went whole to the new `edit_action_end.rs` under a module doc, with
+  the imports only they use. Its widenings: `prune_removed`, `check_end_patch`, `not_a_target`,
+  `OffPath`, `check_off` and `key_off` became `pub(crate)`, because `set_action_end` stays and
+  calls them; `END_PATCH` already was, and `edit_action_graphic.rs` now imports it from the new
+  file; `END_GROUPS`, `EQ_SLOTS` and `object_at` stay private. `audio_ap8b_proof.py`'s M13 names
+  the new file, its anchor unchanged. `wc -l core/src/edit_action.rs`: 595 before, 402 after;
+  `edit_action_end.rs` is 207. CO2a1 then added `check_cutout_end` and `not_a_target`'s
+  `video.cutout` arm there; VR2b reuses the door. No next seam is named.
 
 ## Open items
 

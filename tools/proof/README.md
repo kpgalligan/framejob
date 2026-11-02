@@ -27806,3 +27806,36 @@ Mutants, both building the app in a tree copy (`work/transcript_tab/mutant-app-<
 lines) and runs B1; `stop-cancels-all` makes `TranscriptFill`'s `drop()`
 internal and has the line ending `// Stop: the tab's want only (TX-26)` call
 it, and runs B3.
+
+## Road map "creator-jobs" CO2a1 — the cutout in the model and the recipe (`co2a_proof.py` B0, D13p, D8, D10, D13, D14, Z1; four mutants by hand; `core/tests/cutout.rs`, `schema_v39.rs`; spec §11 CO-20, CO-21, CO-23)
+
+**`co2a_proof.py`** builds `co2a_probe.swift` from `app/Sources` with `swift_build.py`'s line and
+`FRAMEJOB_DEV_TOOLS` (it links `libframejob_core.a`, so `make rust` first) for its probe rows,
+then drives the app `proof_app` chooses (or `--app PATH`) on a scratch `CFFIXED_USER_HOME` for its
+app rows. Its app fixture is a version-38 project over a copy of `media/A.mov`: one clip and one
+zoom action on a 1280×720 canvas; the probe builds its own two-media project (media 5 and 7,
+clips 11 and 12). Nothing is drawn yet (CO2a2 adds the drawing rows); its docstring is the full
+row list.
+
+| Row | What it holds |
+|---|---|
+| B0 | the probe builds (a failed build fails D13p too) |
+| D13p | the Swift mirrors: `VideoProps.cutout` equal to the JSON; `VideoPatch`'s `cutout` (five keys, `NSNull` for `.some(nil)`); `recipe(at:)`'s layer `cutout` naming mask media 5 for clip 11 and 7 for clip 12; `recipeJSON` naming media 5 |
+| D8 | CO-20's sentences — a cutout on a text clip, an end naming `subject`, then `quality`, `off: ["video.cutout"]`, `edge: 2` — each with `get_project` unchanged |
+| D10 | the v38 fixture opened at the current version, every key equal and no `cutout`; three frames; saved to a new package, reopened: `get_project` equal and the PNGs byte-identical |
+| D13 | `set_video {cutout: {}}` stores the five defaults; `{background: "keep", edge: 0.25}` merges; `null` removes the key |
+| D14 | three frames of a clip with a cutout byte-identical to the same clip without one (uncut until CO2a2) |
+| Z1 | no `Frame Job: ` line in the launch's log |
+
+The four mutants are run by hand (each anchor replaced once, the file restored byte-identical by
+SHA-256): `check_cutout_end` without its `subject` test (`cargo test --release --test cutout`,
+the end-refusal test); `layer_cutout` writing the clip id as `media` (`cutout` and, after `make
+rust`, D13p); `skip_serializing_if` taken off `VideoProps.cutout` (`schema_v39`); `cutout: None`
+taken out of `add_blurred_background`'s literal (`cutout`'s blurred-copy test).
+
+```sh
+make rust && python3 tools/proof/co2a_proof.py --only B0,D13p
+make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.

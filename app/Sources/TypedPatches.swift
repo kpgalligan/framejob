@@ -87,6 +87,9 @@ struct VideoPatch: Codable, Equatable {
     /// `cursor` (format 38, spec §11 CU-30): a `T??`, null removes it; a
     /// written cursor names all eight keys (`CursorProps.dictionary`).
     var cursor: CursorProps??
+    /// `cutout` (format 39, spec §11 CO-20): a `T??`, null removes it; a
+    /// written cutout names all five keys (`CutoutProps.dictionary`).
+    var cutout: CutoutProps??
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -96,7 +99,8 @@ struct VideoPatch: Codable, Equatable {
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
-        qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil
+        qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
+        cutout: CutoutProps?? = nil
     ) {
         self.x = x
         self.y = y
@@ -119,6 +123,7 @@ struct VideoPatch: Codable, Equatable {
         self.curves = curves
         self.qualifier = qualifier
         self.cursor = cursor
+        self.cutout = cutout
     }
 
     init(from decoder: Decoder) throws {
@@ -149,6 +154,7 @@ struct VideoPatch: Codable, Equatable {
         curves = c.lenient(.curves)
         qualifier = c.lenient(.qualifier)
         cursor = c.nullable(.cursor)
+        cutout = c.nullable(.cutout)
     }
 
     var dictionary: [String: Any] {
@@ -176,6 +182,7 @@ struct VideoPatch: Codable, Equatable {
         if let curves = curves, !curves.isEmpty { d["curves"] = curves.dictionary }
         if let qualifier = qualifier, !qualifier.isEmpty { d["qualifier"] = qualifier.dictionary }
         d.putNullable("cursor", cursor) { $0.dictionary }
+        d.putNullable("cutout", cutout) { $0.dictionary }
         return d
     }
 

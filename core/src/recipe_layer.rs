@@ -8,16 +8,16 @@ use serde_json::{Map, Value};
 use crate::actions::{color_json, wheels_json};
 use crate::actions_curves::{blended_curves_json, CurveBlend};
 use crate::evaluate::{json, number};
-use crate::model::{BlendMode, Look, VideoProps};
+use crate::model::{BlendMode, Clip, Look, Project, Source, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-SEVEN keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-EIGHT keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-seven-key object is a copy that
+/// clip — and a second literal copy of a twenty-eight-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -59,6 +59,10 @@ pub(crate) struct RecipeLayer<'a> {
     /// reversed, smoothing, hide_idle, props}` (`recipe_cursor.rs`, spec
     /// §11 CU-32). The burn-in's is `null`.
     pub cursor: Value,
+    /// `null`, or the clip's Remove Background — `{mask, background, edge,
+    /// feather}` ([`Project::layer_cutout`], spec §11 CO-21). The burn-in's
+    /// is `null`.
+    pub cutout: Value,
     /// `null`, or what step 0 converts the source with — its media's Camera
     /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
     /// Show Ungraded keeps it: it is the file's interpretation, not a grade.
@@ -158,6 +162,41 @@ impl RecipeLayer<'_> {
         out.insert("matte".to_string(), self.matte);
         out.insert("dissolve".to_string(), self.dissolve);
         out.insert("cursor".to_string(), self.cursor);
+        out.insert("cutout".to_string(), self.cutout);
+        Value::Object(out)
+    }
+}
+
+impl Project {
+    /// The `cutout` key of `clip`'s layer, given its evaluated video props
+    /// (spec §7.3, §11 CO-21): `null` unless the clip's source is a `media`
+    /// or a `still`, its media is in the project and the evaluated cutout is
+    /// set; otherwise `{mask: {kind: "media", media, quality}, background,
+    /// edge, feather}`, `media` the clip's OWN source media — a nested
+    /// clip's inner one, a still's — whose pack holds the masks (CO-3). The
+    /// picture segment gives the time, so the key carries none. The
+    /// evaluator has already held the presence and `quality` to the base and
+    /// clamped `edge` and `feather`.
+    pub(crate) fn layer_cutout(&self, clip: &Clip, evaluated: &VideoProps) -> Value {
+        let media = match clip.source {
+            Source::Media { media, .. } | Source::Still { media, .. } => media,
+            _ => return Value::Null,
+        };
+        let Some(cutout) = evaluated.cutout else {
+            return Value::Null;
+        };
+        if self.media(media).is_none() {
+            return Value::Null;
+        }
+        let mut mask = Map::new();
+        mask.insert("kind".to_string(), Value::from("media"));
+        mask.insert("media".to_string(), Value::from(media));
+        mask.insert("quality".to_string(), json(&cutout.quality));
+        let mut out = Map::new();
+        out.insert("mask".to_string(), Value::Object(mask));
+        out.insert("background".to_string(), json(&cutout.background));
+        out.insert("edge".to_string(), number(cutout.edge));
+        out.insert("feather".to_string(), number(cutout.feather));
         Value::Object(out)
     }
 }

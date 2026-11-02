@@ -4523,6 +4523,91 @@ in a dependency means both. They share CO-20…CO-29.
   another media (D13); the cutout written when `null` (D10).
 - **Manual checks:** none. **Depends on:** CO0, CJ0b (T3), CJ0d (T11, T14). **Lane** C.
 
+#### CO2a1's record (2026-11-02)
+
+**Landed.** Lane C, base `33bfb571` (I's HEAD, CO1; the harness made the worktree at `eb350b86`
+and it was fast-forwarded to `33bfb571` before any edit, nothing of its own on it). Four
+commits: the decisions (`ae3a802e`: CO-20, CO-21 and CO-23 with their index rows), the toll
+(`34d20441`), the code, the proof and the documents (`9cb9a428`), then this record
+(`abf48c0a`), cherry-picked onto `worktree-creator-jobs` as one commit. Format 39 landed as
+numbered: no other phase had taken it. Nothing is drawn: an agent sets
+`video.cutout` through `set_video` and reads it through `get_project`; every layer carries
+`"cutout": null` unless a media or still clip's media is in the project and its evaluated cutout
+is set, when it is `{mask: {kind: "media", media, quality}, background, edge, feather}` naming
+the clip's own media.
+
+- **No deviation from the spec.** The owner's CO2a answer is CO-15's; CO2a1 adds none.
+- **The toll paid here:** `edit_action.rs`'s end-patch door (lines 99–290, `prune_removed`
+  through `key_off`) to `edit_action_end.rs`, a pure move gated alone (`cargo fmt --check` and
+  `cargo test --release` in `core/`, `make lint`; the moved lines differ from the base only in
+  six widened `fn`/`struct` lines; `grep -c "Some(slot) => (object_at(fields, path.key),
+  slot)," core/src/edit_action_end.rs` 1); 595 → 402 lines. `audio_ap8b_proof.py`'s M13 names
+  the new file. `actions.rs` took one line (588, under 590), so no `actions_json.rs` toll;
+  `format_history.rs` is 383. Spec §7.3 (497) paid its split: the `**Recipe options**`
+  paragraph to its end moved whole to `07.3b-frame-recipe-options.md`.
+- **CO-20's split and freeze:** neither needed an edit. Both read the evaluated state, which
+  `restore_base_cutout` already holds to the base; `core/tests/cutout.rs` checks both halves of
+  a split and a freeze's still name their media and keep the cutout.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/model_cutout.rs` | 76 | `Cutout`, `CutoutSubject`, `CutoutQuality`, `CutoutBackground` and the ranges |
+| `core/src/cutout_check.rs` | 105 | `check_cutout`, `check_cutout_clip`, `clamp_cutout`, `restore_base_cutout` |
+| `core/src/edit_action_end.rs` | 233 | the toll's door, `not_a_target`'s `video.cutout` arm and `check_cutout_end` |
+| `core/src/recipe_layer.rs` | 202 | `Project::layer_cutout`, the layer's 28th key |
+| `core/tests/cutout.rs` · `schema_v39.rs` | 498 · 118 | 10 and 5 tests |
+| `app/Sources/CutoutProps.swift` | 109 | the mirrors: `CutoutSubject`, `CutoutQuality`, `CutoutBackground`, `CutoutProps`, `RecipeCutoutMaskKind`, `RecipeCutoutMask`, `RecipeCutout` |
+| `app/Sources/AgentCatalog+VideoPatch.swift` | 220 | `cutoutClause` |
+| `tools/proof/co2a_proof.py` · `co2a_probe.swift` | 397 · 160 | B0, D13p (probe), D8, D10, D13, D14, Z1 (app) |
+
+**Measured.**
+
+- `cargo test --release` in `core/`: `cutout` 10 passed (`{}` storing the five defaults, a
+  merge, `null` removing, `{}` again an identity; every sentence, each clip kind through
+  `set_video` and the text clip through `paste_attributes`; the end refusals with a `null` and
+  `off`, and `edge`, `feather`, `background` taken; hand-written ends — `quality` and
+  `cutout: null` restored to the base, an end cutout on a base without one `null`, edge 0 → 1
+  at 0.5 mid-action, feather 0.25, edge 5 clamped to 1, feather −3 to 0, `background`
+  switching only at the end; the key through a trim, ×0.5, ×2, ×1.37, `add_speed_ramp`,
+  `freeze_frame`, a reverse, `split` (both halves), a nest and a cross-dissolve (both halves
+  inside the overlap), each naming its own media of 5 and 7; `null` on a hand-written text
+  clip and the burn-in; `add_blurred_background`'s copy with no `video.cutout` and a `null`
+  key, clip 11's unchanged; a cutout-less project and the same with a cutout: `plan_text()`
+  equal, recipes equal with every `cutout` removed at four times, no `"cutout"` in the saved
+  text). `schema_v39` 5, `background` 42, `schema_v38` 5, `recipe` 15 (`LAYER_KEYS` 28),
+  `action_off` 13, `patch_door` 9, `cursor_recipe` 13, `edit_tests` 53, `model_tests` 31
+  passed.
+- `cargo fmt --check`, `make lint` clean; `make typecheck` exit 0 with the 4 baseline
+  warnings; `swift_build.py typecheck tools/proof/co2a_probe.swift` exit 0;
+  `spec_index_proof.py` 237/237; `name_residue.py` exit 0.
+- `co2a_proof.py --only B0,D13p` 2/2; on Debug (`make app-debug`) all rows passed (6/7 on the
+  first run, D8's text clip placed on the media clip's span and refused by the overlap rule;
+  moved to 11 s, `--only D8` 2/2).
+- Mutants, each run once and reverted byte-identical (SHA-256 checked), all caught: M1
+  `check_cutout_end` without its `subject` test (`cutout`'s end-refusal test); M2
+  `layer_cutout` writing the clip id as `media` (five `cutout` tests, and D13p after `make
+  rust`: media 11 and 12); M3 `skip_serializing_if` off `VideoProps.cutout` (`schema_v39`'s
+  v38 text test); M4 `cutout: None` out of `add_blurred_background`'s literal (`cutout`'s
+  blurred-copy test).
+- `make gate`: PASS 467 s (names 1, typecheck 7, fmt 3, lint 7, test 268, app 180).
+  `RC_PROOF_APP=release co2a_proof.py`: 7/7 — D10 reads the version-38 fixture through this
+  build at 39 (every key equal, no `cutout`), three frames, and after a save to a new package
+  and a reopen `get_project` equal and the three PNGs byte-identical; D14's three frames with
+  a cutout equal the uncut ones; no older build is driven.
+- Integration: the cherry-pick onto `33bfb571` applied with no conflict; `make gate` on the
+  integrated tree, with the two review nits and the CLAUDE.md entries: PASS 470 s (names 1,
+  typecheck 8, fmt 3, lint 13, test 283, app 161).
+
+**Review.** Verdict pass, every Files and Approach item done; two nits, both applied at
+integration as doc comments: `check_off`'s refusal order (`edit_action_end.rs`) now names
+`video.cutout` beside `video.motion` and `text.words`, and `set_action_end`'s doc
+(`edit_action.rs`) names `check_cutout_end`'s `subject`/`quality` refusal (CO-20). The
+CLAUDE.md map entries were applied at integration: `core/CLAUDE.md`'s `model_cutout.rs` ·
+`cutout_check.rs` and `edit_action_end.rs` entries (the door out of `edit_action.rs`'s) and
+"twenty-eight keys"; `app/CLAUDE.md`'s `CutoutProps.swift` and `RecipeLayer.cutout`.
+
+**Owed.** No manual check and nothing to file. Drawing is CO2a2's.
+
 #### CO2a2 — the mask drawn
 
 - **What a person gets:** a clip with `video.cutout` draws only the person wherever its masks are

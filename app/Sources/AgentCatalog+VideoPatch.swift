@@ -158,6 +158,22 @@ extension AgentServer {
         + "with no cursor an end's cursor keys all switch at the end; give it one first "
         + "with set_video {cursor: {}} to animate them. Drawing the cursor is not built "
         + "yet: the keys are stored and read back)"
+    // Remove Background (format 39, spec §11 CO-20), explicitly typed for
+    // `lookClause`'s reason. Nothing in the UI writes it yet (road map
+    // creator-jobs CO3's Background section).
+    private static let cutoutClause: String =
+        ", cutout (null, or {subject, quality, background, edge, feather}: Remove Background, "
+        + "the clip drawn as the person in it. subject person (the default and only one); "
+        + "quality standard (best is refused: Best masks are not made yet); background "
+        + "remove (only the person drawn, the default) or keep (the clip drawn whole); edge "
+        + "-1–1 (default 0) shrinks or grows the outline; feather 0–1 (default 0). Refused "
+        + "outside the ranges, never clamped; {cutout: {}} stores all five defaults, an object "
+        + "MERGES and null removes it. Only a media or still clip of a video takes one: a "
+        + "text, shape, graphic, adjustment, image or nest clip is refused. In an action's end "
+        + "edge and feather animate and background switches at the end; subject and quality "
+        + "are refused there, the cutout cannot be keyed off, and on a clip with no cutout an "
+        + "end's cutout keys do nothing. Drawing the cutout is not built yet: the keys are "
+        + "stored and read back)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -196,6 +212,7 @@ extension AgentServer {
         + qualifierClause
         + lookClause
         + cursorClause
+        + cutoutClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "

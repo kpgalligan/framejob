@@ -106,6 +106,9 @@
 //! practice, because a full-strength blur over the whole layer is already
 //! hiding everything the region was hiding.
 //!
+//! `video.cutout` is NOT kept, as `motion` is not (spec §11 CO-20): a
+//! backdrop cut down to the person in front of it is no backdrop.
+//!
 //! # The derived values
 //!
 //! - **`scale`** is [`Project::fill_scale`] of the source's pixel size:
@@ -453,6 +456,8 @@ impl Project {
             // down one side, which is the one thing a background exists to
             // prevent.
             motion: None,
+            // A backdrop cut down to the person is no backdrop (CO-20).
+            cutout: None,
             ..video
         });
         next.clips.push(copy);
