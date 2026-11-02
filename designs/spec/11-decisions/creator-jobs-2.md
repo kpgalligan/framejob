@@ -250,3 +250,55 @@ CJ2a took CJ-27 for `analysis_job`.
   `added: 0` with a note and no undo step. The planner lives in `ShotSplit.swift`, not in the
   editor's extension, because the tool calls it too (SY-1's shape). On device, no key (CJ-3); no
   core, FFI or format change (a composite of `split`, CJ-8 (f)).
+
+CU-30, CU-32, CU-35 and CU-39 are CU3a1's (the cursor in the model and the recipe), recorded before
+its code, at format version 38 — provisional until the phase lands, the integrator renumbering a
+collision. The road map drafted the media record's rule beside CU-30; it is CU-39 here because the
+road map's draft CU-31 is CU3c's (the stream's cursor only In the picture).
+
+- **CU-30 — `video.cursor`, a clip's cursor props (CU3a1, format 38).** `CursorProps` in
+  `model_cursor.rs`, written only when set, after `video.look`, every field always written in
+  declaration order: `show` (true), `scale` (1, 0.25–8), `style` (`recorded` | `arrow`, default
+  `recorded`), `smoothing` (0, 0–1), `hide_idle` (null, or 0.5–30 s; written `null`), `clicks`
+  (`none` | `ripple`, default `none`), `click_color` (`#ffffffcc`, a CSS colour in G-12's grammar,
+  stored as given and read by `model_color::normalise_color`), `click_size` (1, 0.25–4); `{}` reads
+  as all eight defaults. `set_video` accepts `cursor` on any clip and refuses, through
+  `props_check::in_range`, "video.cursor.scale must be between 0.25 and 8, not 9" and likewise for
+  `smoothing` (0–1), `hide_idle` (0.5–30) and `click_size` (0.25–4), and "video.cursor.click_color
+  must be a CSS colour (spec §11 G-12), not "#ffg"". **In an action:** `scale` and `click_size`
+  animate; `show`, `style`, `clicks` and `click_color` switch at the action's end; `smoothing` and
+  `hide_idle` are the clip's — the recipe reads them from the BASE `clip.video.cursor` (0 and null
+  when it has none), as `audio_track.rs` reads a base `audio.mono`, so an end may carry them (CI-3)
+  and they have no effect. A split's second half and a freeze's still keep the original's BASE
+  `smoothing` and `hide_idle` (`cursor_props::with_base_cursor`), so no splitter turns an end's
+  values into a base. On a clip with NO `video.cursor` an end's cursor keys all switch at the end,
+  as `shadow` and `look` do (§5.4: the absent key has nothing to lerp from); `set_video {cursor:
+  {}}` stores the defaults, after which `scale` and `click_size` animate. **The evaluator's clamp**
+  (`clamp_cursor`, never failing, so the video group always decodes): each number to its range,
+  NaN to its default (`hide_idle` NaN → null); `click_color` normalised, an unreadable one
+  `#ffffffcc`.
+- **CU-32 — The recipe's `cursor` key, a layer's 27th, after `dissolve` (CU3a1).** `null` unless
+  the clip's source is `media` or `still`, its media has `media.cursor`, that cursor's `in_picture`
+  is false, and the evaluated `show` is true or `clicks` is `ripple`. Otherwise `{media, at,
+  reversed, smoothing, hide_idle, props}`: `at` is `in + source_read_by(clip, clip_t)`, at least
+  0, for a `media` source — `freeze_frame`'s expression: round(S) on a ramp, the base rate
+  otherwise, in the stream the clip plays, the reversed one when reversed — and the still's own
+  `at` for a still; `reversed` is the source's flag (false for a still), and the core mirrors
+  nothing (D4-6); `smoothing` and `hide_idle` are the base's (CU-30); `props` is all eight keys of
+  the evaluated, clamped props with the base's `smoothing` and `hide_idle`, so it passes whole to
+  `rc_cursor_query`'s `state` (CU-25). The burn-in's is `null`; Show Ungraded and Show Selection
+  leave it alone. `recipe_cursor.rs` writes it, `RecipeLayer` publishes it.
+- **CU-35 — A project with no `media.cursor` writes, saves and draws as before (CU3a1).** Neither
+  key is written unless set, so every older file writes the text it did at 38 with no migration
+  step; every layer gains `"cursor": null` (always written, as `matte`), and a media whose cursor
+  is `in_picture: true` publishes `null` too.
+- **CU-39 — `media.cursor`, a media's cursor file (CU3a1, format 38).** `MediaCursor {path,
+  bookmark?, in_picture}` in `model_cursor.rs`, after `speech`, written only when set, `bookmark`
+  only when set; `in_picture` is required. `add_media`'s descriptor stores it; `check_media_fields`
+  (`add_media`, a relink's probe, a pasted media row) refuses "media cursor path must not be empty"
+  and, on any media not kind `video` with `has_video`, "media.cursor needs a video media with a
+  picture, not an audio media" — "an image media", "a LUT media", "a video media without a
+  picture". The bookmark is stored as given. A probed `relink_media` replaces it (a probe without
+  one clears it); no probe — Consolidate, the open-time re-anchor — keeps it; paste carries it with
+  its row; `validate` does not check it. Until CU3b the app's probe never carries one, so Relink…
+  clears it.

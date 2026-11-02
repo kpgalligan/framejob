@@ -266,7 +266,7 @@ extension AgentServer {
     private func mediaDescriptor(_ object: [String: Any]) throws -> MediaDescriptor {
         let allowed: Set<String> = [
             "path", "bookmark", "kind", "duration", "width", "height", "fps", "has_video",
-            "has_audio", "has_alpha", "original", "color",
+            "has_audio", "has_alpha", "original", "color", "cursor",
         ]
         let unknown = object.keys.filter { !allowed.contains($0) }.sorted()
         if let first = unknown.first {
@@ -295,7 +295,8 @@ extension AgentServer {
             hasAudio: try boolArg(object, "has_audio") ?? (kind == .audio),
             hasAlpha: try boolArg(object, "has_alpha") ?? false,
             original: try mediaOriginal(object["original"]),
-            color: try mediaColor(object["color"]))
+            color: try mediaColor(object["color"]),
+            cursor: try mediaCursor(object["cursor"]))
     }
 
     /// A descriptor's `color` (spec §11 GR-16): `{log?, gamut?, lut?,
@@ -384,6 +385,37 @@ extension AgentServer {
         }
         return MediaOriginal(
             path: (path as NSString).expandingTildeInPath, bookmark: bookmark as? String)
+    }
+
+    /// A descriptor's `cursor` (format 38, spec §11 CU-39): `{path,
+    /// bookmark?, in_picture}`, or nil when absent or null. A wrong shape, an
+    /// unknown key, a wrong type or a missing `path` or `in_picture` is
+    /// refused by name; an empty path and a media that cannot carry a cursor
+    /// are the core's to refuse.
+    func mediaCursor(_ raw: Any?) throws -> MediaCursor? {
+        guard let raw = raw, !(raw is NSNull) else { return nil }
+        guard let object = raw as? [String: Any] else {
+            throw ToolError(
+                message: "descriptor.cursor must be a JSON object {path, bookmark?, in_picture} "
+                    + "— the cursor file recorded beside the movie.")
+        }
+        let allowed: Set<String> = ["path", "bookmark", "in_picture"]
+        if let first = object.keys.filter({ !allowed.contains($0) }).sorted().first {
+            throw ToolError(
+                message: "Unknown cursor key \"\(first)\" — allowed keys are "
+                    + allowed.sorted().joined(separator: ", ") + ".")
+        }
+        guard let path = try stringArg(object, "path") else {
+            throw ToolError(message: "descriptor.cursor.path is required: the cursor file's path.")
+        }
+        guard let inPicture = try boolArg(object, "in_picture") else {
+            throw ToolError(
+                message: "descriptor.cursor.in_picture is required: whether the movie's own "
+                    + "picture already shows the pointer.")
+        }
+        return MediaCursor(
+            path: path.isEmpty ? path : (path as NSString).expandingTildeInPath,
+            bookmark: try stringArg(object, "bookmark"), inPicture: inPicture)
     }
 
     // MARK: - Relinking and removing

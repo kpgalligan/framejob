@@ -45,7 +45,7 @@ const MEDIA_DIMENSION_MAX: u32 = 65536;
 /// silently drop `"widht"` and leave the user with a zero-width media.
 /// `edit_relink.rs` reads it too, for a relink's probe (which may not carry
 /// `color`: a relink keeps the media's Camera Log, spec §11 GR-16).
-pub(crate) const MEDIA_KEYS: [&str; 12] = [
+pub(crate) const MEDIA_KEYS: [&str; 13] = [
     "path",
     "bookmark",
     "kind",
@@ -58,6 +58,7 @@ pub(crate) const MEDIA_KEYS: [&str; 12] = [
     "has_alpha",
     "original",
     "color",
+    "cursor",
 ];
 
 // ---- helpers -------------------------------------------------------------
@@ -113,7 +114,8 @@ pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<Medi
 /// of sentences: an empty
 /// path, a `lut` row with a picture, sound or duration (`lut.rs`), a
 /// negative duration, a media with pixels whose size or rate is not
-/// usable, an original with an empty path.
+/// usable, an original with an empty path, a `cursor` with an empty path or
+/// on a media without a picture (`cursor_props.rs`, spec §11 CU-39).
 pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
     if media.path.trim().is_empty() {
         return Err("media path must not be empty".to_string());
@@ -157,7 +159,7 @@ pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
     {
         return Err("media original path must not be empty".to_string());
     }
-    Ok(())
+    crate::cursor_props::check_media_cursor(media)
 }
 
 // ---- the ops -------------------------------------------------------------

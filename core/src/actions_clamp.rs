@@ -161,6 +161,7 @@ pub(crate) fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     if is_nest {
         props.blend = BlendMode::Normal;
     }
+    crate::cursor_props::clamp_cursor(&mut props.cursor);
     props
 }
 

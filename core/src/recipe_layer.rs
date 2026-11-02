@@ -11,13 +11,13 @@ use crate::evaluate::{json, number};
 use crate::model::{BlendMode, Look, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-SIX keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-SEVEN keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-six-key object is a copy that
+/// clip — and a second literal copy of a twenty-seven-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -55,6 +55,10 @@ pub(crate) struct RecipeLayer<'a> {
     /// `null`, or the routed dissolves and zooms this layer is a half of,
     /// outermost first (`recipe_dissolve.rs`, spec §7.3, §11 MT-8).
     pub dissolve: Value,
+    /// `null`, or the media cursor this layer draws — `{media, at,
+    /// reversed, smoothing, hide_idle, props}` (`recipe_cursor.rs`, spec
+    /// §11 CU-32). The burn-in's is `null`.
+    pub cursor: Value,
     /// `null`, or what step 0 converts the source with — its media's Camera
     /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
     /// Show Ungraded keeps it: it is the file's interpretation, not a grade.
@@ -153,6 +157,7 @@ impl RecipeLayer<'_> {
         out.insert("transition".to_string(), self.transition);
         out.insert("matte".to_string(), self.matte);
         out.insert("dissolve".to_string(), self.dissolve);
+        out.insert("cursor".to_string(), self.cursor);
         Value::Object(out)
     }
 }

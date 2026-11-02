@@ -345,6 +345,7 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
             1.0,
         )?;
     }
+    crate::cursor_props::check_cursor(&props.cursor)?;
     Ok(())
 }
 

@@ -3992,6 +3992,78 @@ files wait for it. "CU3a" in a dependency means both. They share CU-30…CU-39.
   ripples (core test); `smoothing` from the evaluated props (L9).
 - **Manual checks:** none. **Depends on:** CU2, CU0a (U5), CJ0b (T2), CJ0d (T11, T14). **Lane** B.
 
+#### CU3a1's record (2026-11-01)
+
+**Landed.** Lane B, base `0210dfe7` (I's HEAD, CJ2b; the harness made the worktree at `eb350b86`
+and it was fast-forwarded to `0210dfe7` before any edit, nothing of its own on it). Three
+commits: the decisions (`24652dc7`: CU-30, CU-32, CU-35 and CU-39 with their index rows), the toll
+(`e5594294`), then the code, the proof and the documents (`6b2e2179`); landed on
+`worktree-creator-jobs` as one commit, format 38 kept (no other phase had taken it). Format 38
+was provisional: CO2a1 (lane C) bumps the format and
+adds a layer key after `dissolve` too, and whichever lands second renumbers its version and its
+key count. Nothing is drawn: an agent adds a media with a `cursor` through `add_media`, sets
+`video.cursor` through `set_video` and reads both through `get_project`; every layer carries
+`"cursor": null` unless a media cursor would draw.
+
+- **Two deviations.** The media record's decision is **CU-39**, not the spec's CU-31: the road
+  map already drafts CU-31 for CU3c (the stream's cursor only In the picture), so CU-31 keeps that
+  meaning; the decisions file's lead-in says so. The toll moved lines 24–191, not 23–191: line 23
+  is `shapeNames`, the shape rows'.
+- **The toll paid here, CO2a1's by schedule:** `AgentCatalog+Properties.swift`'s video patch
+  (`filterNames` through `videoPatchDescription`) to `AgentCatalog+VideoPatch.swift`, a pure move
+  gated alone (`make typecheck`, its 4 baseline warnings; the moved block diffed line-identical
+  but for `videoPatchDescription`'s dropped `private`); 410 → 244 lines. CO2a1 does not repeat it.
+- **CU-30's split and freeze:** `with_base_cursor` (`cursor_props.rs`) is the one statement that
+  `smoothing` and `hide_idle` are the base's; the recipe, `split`'s second half and
+  `freeze_frame`'s still read it. On a clip with no `video.cursor` an end's cursor keys switch at
+  the end, as `shadow` and `look` do; `set_video {cursor: {}}` gives it one to animate from.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/model_cursor.rs` | 93 | `MediaCursor`, `CursorProps`, `CursorStyle`, `CursorClicks`, the ranges and `CURSOR_CLICK_COLOR` |
+| `core/src/cursor_props.rs` | 114 | `check_cursor`, `clamp_cursor`, `check_media_cursor`, `with_base_cursor` |
+| `core/src/recipe_cursor.rs` | 67 | `Project::layer_cursor`, the layer's 27th key |
+| `core/src/edit_time.rs` | 599 | `freeze_frame`'s still through `with_base_cursor` (wiring, 595 before) |
+| `core/tests/cursor_recipe.rs` · `schema_v38.rs` | 465 · 148 | 13 and 5 tests |
+| `app/Sources/CursorProps.swift` | 132 | the mirrors: `CursorStyle`, `CursorClicks` (`off` for the core's `none`), `CursorProps`, `MediaCursor`, `RecipeCursor` |
+| `app/Sources/AgentCatalog+VideoPatch.swift` | 203 | the toll's 180 lines and `cursorClause` |
+| `app/Sources/AgentServer+Media.swift` | 552 | `mediaCursor`, `add_media`'s `cursor` |
+| `tools/proof/cursor_layer_proof.py` · `cursor_layer_probe.swift` | 365 · 241 | B0, L1d, L3r, L9 (probe), L1, L3, Z1 (app) |
+
+**Measured.**
+
+- `cargo test --release --test cursor_recipe`: 13 passed (`at` at ×2, through a linear ramp's
+  S(t) = t + t²/D, a still, a reversed clip at ×1.5 and a nested clip; `smoothing` and
+  `hide_idle` from the base before, inside and after an action naming them; a split at 3.5 s and
+  at 2 s and a freeze at 3.5 s keeping the base; an end on a clip with no cursor switching at the
+  end; the null cases; every refusal's sentence; the clamps through an end; a relink's probe
+  replacing, clearing and, with none, keeping the cursor; `{}` storing the eight defaults).
+  `--test schema_v38` 5 passed; `--test recipe` 15 passed (`LAYER_KEYS` 27); `--test
+  model_tests` 31, `edit_tests` 53, `ramp_split` 10, `ramp_freeze` 1 passed.
+- `cargo fmt`, `make lint` clean; `make typecheck` 0 errors and the 4 baseline warnings;
+  `swift_build.py typecheck tools/proof/cursor_layer_probe.swift` exit 0.
+- Mutants, each run once and reverted byte-identical (SHA-256 checked), all caught: M1 `at`
+  through `timeline_to_source` (`cursor_recipe`'s ramp test); M2 the `in_picture` test dropped
+  (L3r after `make rust`: the recipe text changed at all five times); M3 the `show` test dropped
+  (`cursor_recipe`'s null test); M4 `layer_cursor` without `with_base_cursor` (L9 after `make
+  rust`: `smoothing` 0.25, 0.75, 1 inside and after the action); M5 `edit_split.rs`'s
+  `with_base_cursor` dropped (`cursor_recipe`'s split test).
+- `cursor_layer_proof.py` on Debug: 7/7. `make gate`: PASS 419 s (names 1, typecheck 7, fmt 3,
+  lint 7, test 238, app 163). `RC_PROOF_APP=release cursor_layer_proof.py`: 7/7 — L3 reads the
+  version-37 fixture through this build at 38 (every key equal, no `cursor`), three frames, and
+  after a save to a new package and a reopen `get_project` equal and the three PNGs
+  byte-identical; no older build is driven.
+
+**Review.** One review, verdict pass with no finding: it checked `layer_cursor`'s null cases and
+`at`, the re-clamp after `with_base_cursor`, a probed relink replacing or clearing the cursor,
+`MEDIA_KEYS` at 13, and a `VideoPatch` with a nil `hideIdle` writing `NSNull` (which clears the
+stored `hide_idle`, the key walk letting `null` through). No fix pass. The CLAUDE.md map entries
+(`core/CLAUDE.md`'s three modules and "twenty-seven keys"; `app/CLAUDE.md`'s `CursorProps.swift`,
+`RecipeLayer.cursor` and `AgentCatalog+VideoPatch.swift`) were applied when the phase landed.
+
+**Owed.** No manual check and nothing to file. Drawing is CU3a2's; CO2a1 renumbers its format
+past 38 and its layer key past the twenty-seventh, and does not repeat the `+Properties` toll.
+
 #### CU3a2 — the cursor drawn, and files that wait for it
 
 - **What a person gets:** a media whose cursor file says the picture has no cursor gets its cursor

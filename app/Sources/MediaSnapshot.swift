@@ -9,6 +9,7 @@ import Foundation
 /// media. `color` is its Camera Log (spec §11 GR-16), nil for none.
 /// `speech` is its saved speech spans, `[start, end]` in forward source
 /// ticks (format 29, spec §11 AU-110), nil until Duck by Speech writes them.
+/// `cursor` is its cursor file (format 38, spec §11 CU-39), nil for none.
 struct MediaSnapshot: Codable, Equatable, Identifiable {
     let id: UInt32
     let path: String
@@ -24,12 +25,14 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
     let original: MediaOriginal?
     let color: MediaColor?
     let speech: [[Ticks]]?
+    let cursor: MediaCursor?
 
     init(
         id: UInt32, path: String, bookmark: String? = nil, kind: MediaKind = .video,
         duration: Ticks = 0, width: Int = 0, height: Int = 0, fps: Fps = .thirty,
         hasVideo: Bool = true, hasAudio: Bool = false, hasAlpha: Bool = false,
-        original: MediaOriginal? = nil, color: MediaColor? = nil, speech: [[Ticks]]? = nil
+        original: MediaOriginal? = nil, color: MediaColor? = nil, speech: [[Ticks]]? = nil,
+        cursor: MediaCursor? = nil
     ) {
         self.id = id
         self.path = path
@@ -45,6 +48,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         self.original = original
         self.color = color
         self.speech = speech
+        self.cursor = cursor
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +67,7 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
         original = c.lenient(.original)
         color = c.lenient(.color)
         speech = c.lenient(.speech)
+        cursor = c.lenient(.cursor)
     }
 
     /// The file's display name, for the Media tab, clip labels, the relink

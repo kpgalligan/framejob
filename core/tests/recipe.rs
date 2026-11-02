@@ -25,12 +25,12 @@ use serde_json::{json, Value};
 use common::{array, at, num, take_string, text, Handle, Outcome};
 use framejob_core::ffi::rc_timecode_format;
 
-/// The twenty-six keys of a recipe layer (spec §7.3), sorted. Written out rather than
+/// The twenty-seven keys of a recipe layer (spec §7.3), sorted. Written out rather than
 /// read off a drawn layer, because a burn-in matching a drawn layer that has
 /// itself lost a key would pass a comparison and fail a renderer:
 /// `RecipeLayer.init(from:)` DEFAULTS a missing key with no diagnostic
 /// anywhere, so nothing downstream would ever complain.
-const LAYER_KEYS: [&str; 26] = [
+const LAYER_KEYS: [&str; 27] = [
     "blend",
     "chroma",
     "clip",
@@ -38,6 +38,7 @@ const LAYER_KEYS: [&str; 26] = [
     "color",
     "corner_radius",
     "crop",
+    "cursor",
     "curves",
     "dissolve",
     "filters",

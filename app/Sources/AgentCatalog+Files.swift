@@ -98,7 +98,10 @@ extension AgentServer {
                     + "has_audio, has_alpha, original {path, bookmark?} — the file a .mov copy "
                     + "or conversion was made from — and color, a video file's Camera Log, as "
                     + "set_media_color takes it plus detected, and a PQ file's pq {file?, "
-                    + "from?, peak?} as get_project shows it). Probing files is the host's "
+                    + "from?, peak?} as get_project shows it, and cursor {path, bookmark?, "
+                    + "in_picture} — the cursor file recorded beside a video, in_picture true "
+                    + "when the movie's own picture already shows the pointer; a video with a "
+                    + "picture only). Probing files is the host's "
                     + "job, so unless you are replaying a project's own JSON, call import_media "
                     + "and let it probe.",
                 ["descriptor": "The media entry to add; only path is required."]),
@@ -112,7 +115,8 @@ extension AgentServer {
                     + "location is stored so the next move is followed automatically. A WebM or "
                     + "Matroska file is copied into a .mov first and recorded as the entry's new "
                     + "original (the result's original), and a file the opt-in ffmpeg step "
-                    + "converts is recorded the same way; any other file clears it. "
+                    + "converts is recorded the same way; any other file clears it. A relink "
+                    + "also clears the entry's cursor file (media.cursor). "
                     + "get_project's missing_media names the entries that need this.",
                 [
                     "media": "Media id.",

@@ -189,6 +189,20 @@ governs a module now.
   `cursor_bursts.rs` — typing stretches (CU7 adds scroll bursts). `encode_base64`
   sits beside `decode_base64` in `cursor_file_check.rs`, base64's one home. No file
   I/O, no pixel work: a PNG is checked by its signature.
+- `model_cursor.rs` · `cursor_props.rs` · `recipe_cursor.rs` — the cursor in the model and the
+  recipe (format 38, road map "creator-jobs" CU3a1, spec §11 CU-30, CU-32, CU-35, CU-39):
+  `model_cursor.rs` `MediaCursor` (`media.cursor`, after `speech`, written only when set,
+  `in_picture` required) and `CursorProps` (`video.cursor`, after `look`, written only when set,
+  every field written, `{}` the defaults) with `CursorStyle`, `CursorClicks` and the `CURSOR_*`
+  ranges, re-exported through `model_props.rs`; `cursor_props.rs` `check_cursor` (one line in
+  `props_check.rs`'s `check_video`), `clamp_cursor` (one line in `actions_clamp.rs`'s
+  `clamp_video`; it never fails, so the video group always decodes), `check_media_cursor`
+  (`check_media_fields`' last check) and `with_base_cursor`, the one statement that `smoothing`
+  and `hide_idle` are the clip's BASE values — read by `recipe_cursor.rs`, `edit_split.rs`'s
+  second half and `freeze_frame`'s still; `recipe_cursor.rs` `Project::layer_cursor`, a layer's
+  `cursor` key: `null` unless a media or still clip's media has a cursor not `in_picture` and the
+  evaluated props show or ripple, else `{media, at, reversed, smoothing, hide_idle, props}`, `at`
+  `freeze_frame`'s source tick in the stream the clip plays.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -860,7 +874,8 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-six keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-seven keys of a layer written in ONE place (`cursor`
+  the twenty-seventh, `recipe_cursor.rs`'s, CU-32)
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is

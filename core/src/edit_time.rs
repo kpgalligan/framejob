@@ -25,6 +25,7 @@
 //! restating them, so a split made by a range delete is the same split ⌘T
 //! makes.
 
+use crate::cursor_props::with_base_cursor;
 use crate::edit_clip::clip_end;
 use crate::model::{Clip, Enabled, Project, Source, VideoProps};
 use crate::outcome::Outcome;
@@ -542,7 +543,10 @@ impl Project {
             .map_or(source_at, |m| self.last_still_time(m));
         let source_at = source_at.clamp(0, limit);
 
-        let video = self.evaluate_clip(&target, clip_t).video;
+        let video = with_base_cursor(
+            self.evaluate_clip(&target, clip_t).video,
+            target.video.as_ref(),
+        );
         let mut next = match self.split_clips(&[clip], at)? {
             Outcome::Applied(split) => split,
             // The playhead sat on a clip boundary: nothing to cut, and the

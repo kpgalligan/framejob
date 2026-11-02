@@ -236,9 +236,12 @@ extern "C" {
  * only when set; no migration step.
  *
  * Version 37 is the leveller (spec §11 AU-66): `audio.leveller`, after
- * `voice`, written only when set; no migration step. 38 and above, 1014
- * included, are newer. */
-#define RC_FORMAT_VERSION 37
+ * `voice`, written only when set; no migration step.
+ *
+ * Version 38 is the cursor (spec §11 CU-30, CU-39): `media[].cursor`, after
+ * `speech`, and `video.cursor`, after `look`, each written only when set; no
+ * migration step. 39 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 38
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

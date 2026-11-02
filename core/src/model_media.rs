@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::MediaColor;
+use crate::model::{MediaColor, MediaCursor};
 use crate::time::{Fps, Ticks};
 
 // ---- media ---------------------------------------------------------------
@@ -44,6 +44,10 @@ pub struct Media {
     /// Speech spans, forward source ticks (format 29, spec §11 AU-110).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speech: Option<Vec<[Ticks; 2]>>,
+    /// The cursor file recorded beside the movie (format 38, spec §11
+    /// CU-39), written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<MediaCursor>,
 }
 
 /// The file a playable copy was made from (format version 11, spec §11

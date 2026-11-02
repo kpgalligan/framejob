@@ -368,4 +368,11 @@
 //! `{target_db, max_up_db, max_down_db, response}` after `voice`, written
 //! only when set; no migration. The bump is so an older build refuses a
 //! levelled file instead of playing it unlevelled and dropping the key on
-//! save. Every number from 38 up, 1014 included, is newer than this build.
+//! save.
+//!
+//! Version 38 is the cursor (spec §11 CU-30, CU-39): `media[].cursor`,
+//! `{path, bookmark?, in_picture}` after `speech`, and `video.cursor`, the
+//! eight `CursorProps` keys after `look`, each written only when set; no
+//! migration (CU-35). The bump is so an older build refuses a file with a
+//! cursor instead of opening it and dropping the keys on save. Every number
+//! from 39 up, 1014 included, is newer than this build.

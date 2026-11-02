@@ -137,6 +137,12 @@ pub use crate::model_grade::*;
 /// "audio" AP0, a pure move).
 pub use crate::model_audio::*;
 
+/// The cursor vocabulary — [`MediaCursor`], [`CursorProps`], [`CursorStyle`],
+/// [`CursorClicks`] and their ranges (format 38, spec §11 CU-30, CU-39) —
+/// lives in `model_cursor.rs` and is re-exported whole, so every
+/// `crate::model::CursorProps` path resolves.
+pub use crate::model_cursor::*;
+
 // ---- video properties ----------------------------------------------------
 
 /// Placement on the canvas plus the per-clip image controls. `x`/`y` are an
@@ -206,6 +212,11 @@ pub struct VideoProps {
     /// key, so a look-less file's text is what it was.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<Look>,
+    /// The drawn cursor of a media with a cursor file (format 38, spec §11
+    /// CU-30): written only when set, so a cursor-less file's text is what
+    /// it was. `smoothing` and `hide_idle` are read from the base only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<CursorProps>,
 }
 
 impl Default for VideoProps {
@@ -231,6 +242,7 @@ impl Default for VideoProps {
             curves: Curves::default(),
             qualifier: Qualifier::default(),
             look: None,
+            cursor: None,
         }
     }
 }

@@ -9,6 +9,9 @@
 //! the join is invisible; the actions that had not finished, rebased to its
 //! own clip time, with a straddled one narrowed to the keys it animated;
 //! and, since E2, the halves of a preset anchored to the clip's two ends.
+//! The cursor's `smoothing` and `hide_idle` are the one exception to "the
+//! evaluation at the cut": the second half keeps the original's base values
+//! (spec §11 CU-30).
 //! That inheritance question is the whole of this module and appears
 //! nowhere else in the crate.
 //!
@@ -24,6 +27,7 @@
 use serde_json::Value;
 
 use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
+use crate::cursor_props::with_base_cursor;
 use crate::edit_clip::clip_end;
 use crate::model::{Action, Curve, Project, VideoProps};
 use crate::model_words::{rebase_words, token_count};
@@ -132,7 +136,12 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     }
     // Presence of a group is a fact about the clip, so an audio-only clip
     // stays audio-only; only the values come from the evaluation.
-    second.video = original.video.as_ref().map(|_| state.video.clone());
+    // The cursor's `smoothing` and `hide_idle` stay the original's BASE
+    // values, never an end's (spec §11 CU-30).
+    second.video = original
+        .video
+        .as_ref()
+        .map(|_| with_base_cursor(state.video.clone(), original.video.as_ref()));
     second.audio = original.audio.map(|_| state.audio);
     second.text = state.text.clone();
     second.shape = original.shape.clone();

@@ -169,6 +169,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   record (§11, #63). The descriptor and the probe both carry `original`,
   the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
   probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
+  They carry `cursor` the same way (format 38, §11 CU-39): `{path, bookmark?, in_picture}`, the
+  cursor file recorded beside a video, stored, replaced, cleared and kept as `original` is; an
+  empty path and any media but a video with a picture are errors in `check_media_fields`' words.
   A `lut` row (§11 GR-8) — a `.cube` file — carries no video, audio,
   alpha or duration (`a lut media has no video, audio, alpha or duration`), and `remove_media` of a
   LUT refuses while it is some clip's base look (`media 7 is the look of clip 3; pass with_clips:

@@ -281,6 +281,9 @@ struct RecipeLayer: Codable, Equatable {
     /// Log (spec §11 GR-16); nil for none, when the source's own labels
     /// decide (GR-15). Show Ungraded keeps it.
     let input: MediaColor?
+    /// The media cursor this layer draws (format 38, spec §11 CU-32,
+    /// `CursorProps.swift`); nil for none. Not drawn yet (CU3a2).
+    let cursor: RecipeCursor?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -312,6 +315,7 @@ struct RecipeLayer: Codable, Equatable {
         matte = c.lenient(.matte)
         dissolve = c.lenient(.dissolve, [])
         input = c.lenient(.input)
+        cursor = c.lenient(.cursor)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer
@@ -332,7 +336,8 @@ struct RecipeLayer: Codable, Equatable {
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
             filters: filters, reflection: reflection, spotlight: spotlight,
-            obscure: obscure, blend: blend, wheels: wheels, curves: curves)
+            obscure: obscure, blend: blend, wheels: wheels, curves: curves,
+            cursor: cursor?.props)
     }
 }
 

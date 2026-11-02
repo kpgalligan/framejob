@@ -149,7 +149,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   `graphic.in + (at − start)`, and BOTH halves' `graphic.length` are pinned to the original's
   effective length — `length`, or `in + duration` when `null` — so the animation continues across
   the cut and plays its outro once, at the true end (§11 G-9); the second half's `graphic.props` are
-  the evaluated ones, and a straddled action's first half ends at them (§11 G-34). The second keeps
+  the evaluated ones, and a straddled action's first half ends at them (§11 G-34). The second half's
+  `video.cursor` keeps the original's BASE `smoothing` and `hide_idle` (§11 CU-30). The second keeps
   every `text.words`
   entry rebased by the cut — a negative start is legal and means "already said", so the split is
   invisible — and the first half's words are untouched; a second half whose EVALUATED content (a
@@ -252,7 +253,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   a frame that is meant to hold. The placement it keeps is the un-moved one, since evaluation never
   applies a preset, so a freeze taken mid-motion jumps to where the inspector said the clip was. On
   a ramped clip the still's source time is `in + round(S(at − start))`, the tick the split's halves
-  meet at, and the speed actions divide as `split`'s do (§11 SR-18 (f)).
+  meet at, and the speed actions divide as `split`'s do (§11 SR-18 (f)). The still's `video.cursor`
+  keeps the original's BASE `smoothing` and `hide_idle` (§11 CU-30).
   Media sources only, an **error** on any other kind (as `rate_stretch`).
 - **`detach_audio {clip}`** — `enabled.audio = false` on the clip; a new clip with `enabled =
   {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track

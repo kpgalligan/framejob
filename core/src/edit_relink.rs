@@ -12,7 +12,8 @@
 //! stored one, so a probe without one clears it, and no probe keeps it. A
 //! probe never carries `color`, and a relink keeps the media's Camera Log
 //! (spec §11 GR-16): it is the person's reading of the footage, which a new
-//! path to the same footage does not change. A probe never carries `speech`
+//! path to the same footage does not change. A probe's `cursor` replaces the
+//! stored one as `original` does (spec §11 CU-39). A probe never carries `speech`
 //! either; a probed relink clips the stored spans to the new file or clears
 //! them (spec §11 AU-116).
 //!
@@ -101,6 +102,7 @@ impl Project {
                 found.has_audio = new.has_audio;
                 found.has_alpha = new.has_alpha;
                 found.original = new.original.clone();
+                found.cursor = new.cursor.clone();
                 found.speech = clipped_speech(found.speech.take(), new);
             }
         }

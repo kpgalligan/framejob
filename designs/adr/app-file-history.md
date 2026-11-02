@@ -1152,6 +1152,17 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `agent-catalog.json` parsed equal before and after. `wc -l
   app/Sources/AgentCatalog+Recording.swift`: 390 before, 264 after;
   `AgentCatalog+RecordingArguments.swift` is 141. No next seam is named.
+- `AgentCatalog+Properties.swift`: at 410, over the new-module cap, since road map "audio"'s
+  patch prose. Road map creator-jobs scheduled the toll for CO2a1; CU3a1 paid it, landing first:
+  lines 24–191 at `0210dfe7` (`filterNames` through `videoPatchDescription`'s last line: the video
+  patch's clauses and the description they build) moved byte for byte into `extension
+  AgentServer` in `AgentCatalog+VideoPatch.swift` with `import Foundation`; a pure move gated
+  alone (`make typecheck`, its four baseline warnings), the moved block diffed line-identical
+  against the base but for the one widening: `videoPatchDescription` dropped `private`, because
+  `propertyTools(clipsDescription:)` stays behind and reads it. `shapeNames` (line 23) stays: it
+  is the shape rows'. The header doc names the new file. No anchor named the range. `wc -l
+  app/Sources/AgentCatalog+Properties.swift`: 410 before, 244 after; `AgentCatalog+VideoPatch.swift`
+  is 180, and takes CU3a1's `cursorClause`. No next seam is named.
 - `ExportWebMWriter.swift`: at 400, the new-module cap, since codec-export C4, so C5 paid toll
   T2 before taking the alpha row's shape guard, a pure move gated alone (`make typecheck`, its
   four baseline warnings): `// MARK: - The audio pump` (`pumpAudio` and its doc) went whole to

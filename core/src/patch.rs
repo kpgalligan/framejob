@@ -27,9 +27,9 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Compressor, Filter, HueRange, LevelRange, Limiter, Look, LookKind, Motion,
-    ObscureRegion, Qualifier, Reflection, Shadow, ShapeProps, Spotlight, TextProps, VideoProps,
-    LOOK_DEFAULT_AMOUNT, QUALIFIER_BLUR_MAX,
+    AudioProps, Chroma, Compressor, CursorProps, Filter, HueRange, LevelRange, Limiter, Look,
+    LookKind, Motion, ObscureRegion, Qualifier, Reflection, Shadow, ShapeProps, Spotlight,
+    TextProps, VideoProps, LOOK_DEFAULT_AMOUNT, QUALIFIER_BLUR_MAX,
 };
 
 // ---- property groups -----------------------------------------------------
@@ -77,7 +77,7 @@ impl Group {
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `leveller`, `outline`,
+    /// `chroma`, `reflection`, `spotlight`, `look`, `qualifier`, `cursor`, `duck`, `compressor`, `limiter`, `eq`, `hum`, `gate`, `de_esser`, `voice`, `leveller`, `outline`,
     /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
     /// when the clip currently has `null` there — and one `filters` entry,
     /// one `obscure` region and one `text.words` entry, so it can see inside
@@ -120,6 +120,11 @@ impl Group {
                     invert: true,
                     blur: QUALIFIER_BLUR_MAX,
                 },
+                // `hide_idle` set, so the walk reads it as a number (CU-30).
+                cursor: Some(CursorProps {
+                    hide_idle: Some(1.0),
+                    ..CursorProps::default()
+                }),
                 ..VideoProps::default()
             }),
             // Format 29's and 31's keys are left out of `to_json` at their

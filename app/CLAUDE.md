@@ -152,7 +152,7 @@ detail there.
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `VideoProps.swift` · `ClipSnapshot.swift` ·
   `TrackSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` · `GradeProps.swift` · `CurveProps.swift` · `AudioProps.swift` · `CursorProps.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. READ-ONLY means never written back as
   is: the stored properties are `var`, so a writer edits a COPY
   (`var s = current(); s.blur = v`) rather than rebuilding one through the
@@ -172,7 +172,12 @@ detail there.
   (`VoiceProps.swift`, AU-140), and format 37's `leveller`
   (`AudioDynamicsProps.swift`, AU-66);
   `ClipSnapshot.swift`'s `TransitionSnapshot.audioShape` is `plus_3db` when absent, and
-  `MediaSnapshot.speech` the media's saved spans. `VideoProps.swift` (`VideoProps`),
+  `MediaSnapshot.speech` the media's saved spans. `CursorProps.swift` (format 38, road map
+  creator-jobs CU3a1, spec §11 CU-30, CU-39) holds `CursorStyle`, `CursorClicks` (`off` is the
+  core's `none`: a case named `none` warns), `CursorProps` (`VideoProps.cursor` and
+  `VideoPatch.cursor`; its `dictionary` writes all eight keys, `NSNull` for a nil `hideIdle`),
+  `MediaCursor` (`MediaSnapshot.cursor`, `MediaDescriptor.cursor`, kept by `probeDictionary`) and
+  `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required). `VideoProps.swift` (`VideoProps`),
   `ClipSnapshot.swift` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`,
   `TransitionSnapshot`) and `TrackSnapshot.swift` (`TrackSnapshot`) are pure moves out of
   `ProjectSnapshot.swift` (road map creator-jobs CJ0d, T11–T13). `ShapeProps.swift` (a pure
@@ -1688,7 +1693,8 @@ the key map behind it.
   (`passActivity`, `endPassActivity`; the owner's choice, G-38).
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with
+  `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve` and `cursor` — CU-32's key, decoded,
+  not drawn until CU3a2) and `FrameRecipe` (with
   `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
   `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
   `RecipeMatteGroup`, a pure move out of it (road map creator-jobs CJ0d, T14).
@@ -3187,8 +3193,11 @@ free.
   `width × height ≤ max_width × maxSide`, `maxSide` being
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter (its
   `paintChecker` internal, the browser preview's checker too) and
-  `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
-  vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
+  `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the text, shape,
+  audio and clip patch vocabularies, spliced in place by `propertyTools`, a pure move out of
+  `+Clips`, grading GR1; the video patch's (`videoPatchDescription` and its clauses,
+  `cursorClause` among them) in +`VideoPatch`, a pure move out of +`Properties`, road map
+  creator-jobs CU3a1's toll —
   +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0, its argument descriptions in +`RecordingArguments` (`recordScreenArguments()`, CU0a U4) —, +`Graphics`,
   +`Tracks` — the five track rows, spliced back where they stood by
   `trackTools(trackDescription:)`, a pure move out of `AgentCatalog.swift`,

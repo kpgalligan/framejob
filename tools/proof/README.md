@@ -27557,3 +27557,35 @@ Mutants: probe mutants (`presence-memo`, `control-tooltip-unset`,
 over a copy of `app/Sources`; app mutants (`present-ignores-environment`,
 `credential-before-ready`, `no-transcript-arm`) build the app in a tree copy
 (`tree_copy.build_app`, `work/keys/mutant-app/`) and run K2 with their row.
+
+## Road map "creator-jobs" CU3a1 — the cursor in the model and the recipe (`cursor_layer_proof.py` B0, L1d, L3r, L9, L1, L3, Z1; five mutants by hand; `core/tests/cursor_recipe.rs`, `schema_v38.rs`; spec §11 CU-30, CU-32, CU-35, CU-39)
+
+**`cursor_layer_proof.py`** builds `cursor_layer_probe.swift` from `app/Sources` with
+`swift_build.py`'s line and `FRAMEJOB_DEV_TOOLS` (it links `libframejob_core.a`, so `make rust`
+first) for its probe rows, then drives the app `proof_app` chooses (or `--app PATH`) on a scratch
+`CFFIXED_USER_HOME` for its app rows. Its fixture is a version-37 project over a copy of
+`media/A.mov`: one clip and one zoom action. Nothing is drawn yet (CU3a2), so every row is a
+read-back; its docstring is the full row list.
+
+| Row | What it holds |
+|---|---|
+| B0 | the probe builds (a failed build fails every probe row) |
+| L1d | the Swift mirrors: `MediaSnapshot.cursor`, `VideoProps.cursor`, `MediaDescriptor`'s `cursor` and `VideoPatch`'s (eight keys, `NSNull` for `.some(nil)`) |
+| L3r | every layer's `cursor` null at five times; `in_picture: true` byte-identical recipe text; the control (`in_picture: false`) keyed |
+| L9 | an end naming `smoothing: 1, hide_idle: 5` on a base of 0: the key's and `props`' `smoothing` 0 and `hide_idle` null at 0.5–3.5 s, `props.scale` 1 → 3 |
+| L1 | `add_media` with a `cursor` read back; an unknown cursor key refused; `set_video {cursor}` stores all eight keys; `click_color: "#ffg"` and `scale: 9` refused in CU-30's sentences, the project unchanged |
+| L3 | the v37 fixture opened at the current version, every key equal and no `cursor`; three frames; saved to a new package, reopened: `get_project` equal and the PNGs byte-identical |
+| Z1 | no `Frame Job: ` line in the launch's log |
+
+The five mutants are run by hand (each anchor replaced once, the file restored byte-identical):
+`at` through `timeline_to_source` (`cursor_recipe`'s ramp test), the `in_picture` test dropped
+(L3r after `make rust`), the `show` test dropped (`cursor_recipe`'s null test), `layer_cursor`
+without `with_base_cursor` (L9 after `make rust`), `edit_split.rs`'s `with_base_cursor` dropped
+(`cursor_recipe`'s split test).
+
+```sh
+make rust && python3 tools/proof/cursor_layer_proof.py --only B0,L1d,L3r,L9
+make app-debug && python3 tools/proof/cursor_layer_proof.py [--only IDS] [--app PATH]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU3a1 record.
