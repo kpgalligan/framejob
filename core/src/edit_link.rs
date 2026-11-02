@@ -44,6 +44,16 @@ fn is_linked_sound(clip: &Clip) -> bool {
     clip.linked.is_some() && !clip.enabled.video
 }
 
+/// AU-94's sentence: `clip`'s rate may not change while it is linked to
+/// `partner`. Written once for `linked_rate_refusal` and `retime_range`
+/// (spec §11 CU-90 (b)).
+pub(crate) fn linked_rate_sentence(clip: u32, partner: u32) -> String {
+    format!(
+        "clip {clip} is linked to clip {partner}: Attach Audio before changing its speed or \
+         direction"
+    )
+}
+
 /// Every `(clip, named)` in one container whose link is one-sided: the
 /// clip it names is absent, is itself, or does not name it back. Read off
 /// the container as it stands, so a mutual pair is never on the list and
@@ -222,13 +232,7 @@ impl Project {
         let same = before.speed == after.speed
             && reversed(before) == reversed(after)
             && speed_actions(before) == speed_actions(after);
-        (!same).then(|| {
-            format!(
-                "clip {} is linked to clip {partner}: Attach Audio before changing its speed \
-                 or direction",
-                before.id
-            )
-        })
+        (!same).then(|| linked_rate_sentence(before.id, partner))
     }
 
     /// An edge edit carried to the partner (AU-93): `edit` applied to

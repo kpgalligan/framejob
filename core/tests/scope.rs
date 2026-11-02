@@ -642,7 +642,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use framejob_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 65, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 66, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -774,6 +774,10 @@ fn every_op() -> Vec<(&'static str, Value)> {
         (
             "close_gap",
             json!({"op":"close_gap","track":6,"at":2*SEC+SEC/2}),
+        ),
+        (
+            "retime_range",
+            json!({"op":"retime_range","from":SEC/2,"to":SEC,"rate":2.0}),
         ),
         ("set_speed", json!({"op":"set_speed","clip":7,"rate":2.0})),
         (
@@ -912,7 +916,7 @@ fn every_op() -> Vec<(&'static str, Value)> {
 fn every_op_in_the_table_works_inside_a_nest_except_the_eleven() {
     // The empirical half of `scope.rs`'s exhaustive `refused_inside` match.
     // The match makes the compiler classify every op; this makes the
-    // CLASSIFICATION true — that the fifty-four actually apply against a
+    // CLASSIFICATION true — that the fifty-five actually apply against a
     // real nest and come back through `validate` on the merged parent, and
     // that exactly eleven do not.
     use framejob_core::OP_NAMES;

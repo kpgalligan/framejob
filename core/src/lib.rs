@@ -72,6 +72,8 @@ pub mod edit_paste;
 pub mod edit_paste_attributes;
 pub mod edit_props;
 pub mod edit_relink;
+mod edit_retime;
+mod edit_speed_profile;
 pub mod edit_split;
 pub mod edit_time;
 pub mod edit_track;

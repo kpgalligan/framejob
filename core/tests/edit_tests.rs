@@ -624,6 +624,9 @@ fn op_table() -> Vec<Value> {
         json!({"op": "keep_range", "from": 3000000, "to": 6000000}),
         json!({"op": "insert_time", "at": 0, "length": 600000}),
         json!({"op": "close_gap", "track": 6, "at": 3600000}),
+        // Clip 20, the music, is cut at both bounds and its middle played at ×2;
+        // nothing else overlaps 16 s – 18 s.
+        json!({"op": "retime_range", "from": 9600000, "to": 10800000, "rate": 2.0}),
         json!({"op": "set_speed", "clip": 10, "rate": 2.0}),
         json!({"op": "set_reversed", "clip": 10, "reversed": true}),
         json!({"op": "freeze_frame", "clip": 10, "at": 3000000}),

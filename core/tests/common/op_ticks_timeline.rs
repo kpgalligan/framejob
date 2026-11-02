@@ -125,6 +125,30 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
                 ("/clips/1/start", json!(44 * f)),
             ],
         ),
+        // ×2 over [10f, 30f): clip 10 (20f–30f) lands at 15f for 5f, and
+        // clip 11 moves up by the 10f the range lost.
+        applied(
+            "retime_range.from",
+            "from",
+            two.clone(),
+            json!({"op":"retime_range","from":off(9,f),"to":30*f,"rate":2.0}),
+            vec![
+                ("/clips/0/start", json!(15 * f)),
+                ("/clips/0/duration", json!(5 * f)),
+                ("/clips/1/start", json!(30 * f)),
+            ],
+        ),
+        applied(
+            "retime_range.to",
+            "to",
+            two.clone(),
+            json!({"op":"retime_range","from":10*f,"to":off(29,f),"rate":2.0}),
+            vec![
+                ("/clips/0/start", json!(15 * f)),
+                ("/clips/0/duration", json!(5 * f)),
+                ("/clips/1/start", json!(30 * f)),
+            ],
+        ),
         applied(
             "close_gap.at beside edge",
             "at",

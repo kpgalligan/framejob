@@ -93,7 +93,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-four op tools.
+  `AgentCatalog.opTool` prints for all sixty-five op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -552,6 +552,20 @@ detail there.
   `new_project_from_range`, off main with one main hop;
   `-RCDevDerivedHidden` (dev only) makes it pass `display: false`.
   `AgentCatalog+Derived` holds its row.
+- `RetimeSheetController.swift` · `EditorViewController+Retime.swift` ·
+  `AgentServer+Retime.swift` · `AgentCatalog+Retime.swift` — Clip ▸ Retime
+  Range… and `retime_range` (road map creator-jobs CU9a, spec §11 CU-90).
+  - The sheet: Rate (×2 to start, `SpeedRateControls`) and Preserve pitch
+    (the first media clip on an unlocked track overlapping the range, on
+    when none).
+  - Apply at ×1 closes the sheet. Otherwise it sends one `retime_range`
+    through `SpeedAudioDrop.commit`, always with `keep_pitch`.
+    `-RCDevRetimeAccept YES` (dev only) presses Apply.
+  - The action and `validateRetimeAction` need an In–Out range and no
+    sheet, and are allowed inside a nest.
+  - The tool writes its own tail, not `editResult`'s. The crossing is read
+    on the baseline before the edit, then `created`, the landing and the
+    summary. Its catalog row is spliced in by `creatorTools()`.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -778,9 +792,14 @@ the key map behind it.
   core), the question's and the agent note's copy, and its one alert sheet
   (`ask`); every door that sets speed asks through it (#212, §11 #190), and
   `mayCross` takes a `set_action_end` naming `speed` (SR-21 (e)) and an
-  `add_speed_ramp` (SR-24). `commit` is the one door a person's speed edit
-  goes through — the Speed and Speed Ramp sheets' Apply and the inspector's
-  commit: `before` runs ahead of the edit (a sheet dismisses there),
+  `add_speed_ramp` (SR-24). It also takes a `retime_range` (Clip ▸ Retime
+  Range…, spec §11 CU-90 (c)). Its crossing is read on `baseline(for:on:)`:
+  the project with `split` at each such op's `from` and then its `to`, so a
+  split half taken past ×12 counts under the id the core mints. Every other
+  caller's baseline is the project. `answerFields(_:)` is the agent keys for
+  a crossing already read. `commit` is the one door a person's speed edit
+  goes through — the Speed, Speed Ramp and Retime Range sheets' Apply and
+  the inspector's commit: `before` runs ahead of the edit (a sheet dismisses there),
   `declined` on Cancel or the no-window beep (the inspector refreshes there),
   and it holds the undo pitfall's one comment (#359). `commit` plans
   `CaptionRetime` first and applies `ops + plan.ops` as one step named by
@@ -3389,7 +3408,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-four op tools is `opTool`'s** and carries no
+  **Every one of the sixty-five op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -3638,9 +3657,10 @@ free.
   (spec §11 CJ-8 (d)): `creatorHandlers` and `creatorOffMainTools`, merged
   by the frozen file's `withDevHandlers(withCreatorHandlers(productHandlers))`
   and its `offMainTools` union; a clash keeps the product handler. Its
-  tools: `get_media_analysis`, `split_at_shots`, `get_timeline_transcript`
-  and `new_project_from_range` (CJ5b); the catalog rows are
-  `analysisTools() + transcriptTools() + derivedTools()`.
+  tools: `get_media_analysis`, `split_at_shots`, `get_timeline_transcript`,
+  `new_project_from_range` (CJ5b) and `retime_range` (CU9a); the catalog
+  rows are `analysisTools() + transcriptTools() + derivedTools() +
+  retimeTools()`.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and

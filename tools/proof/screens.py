@@ -266,6 +266,11 @@ NOT_SHOWN = {
                            "honoured (spec §11 CJ-26); no screen launches with it",
     "RCDevCursorLoadHold": "a dev launch default that holds each cursor file's load "
                            "(CursorTracks.swift); no screen launches with it",
+    "RCDevDerivedHidden": "a dev launch default with which new_project_from_range opens its "
+                          "project without a window (spec §11 CJ-52); no screen launches with "
+                          "it",
+    "RCDevRetimeAccept": "a dev launch default with which the Retime Range sheet presses "
+                         "its own Apply (spec §11 CU-90 (d)); no screen launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

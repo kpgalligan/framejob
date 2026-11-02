@@ -412,7 +412,7 @@ governs a module now.
   `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-four op tools in the agent catalog,
+  reader is every one of the sixty-five op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -477,17 +477,41 @@ governs a module now.
   "creator-jobs" CJ0b's toll T4), reading its `DEFAULT_CLIP_DURATION`
   (`pub(crate)`).
 - `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
-  their speed bounds and clip-relative action rescaling; `AUDIO_SPEED_MAX`
-  (×12, spec §11 #190) and `speed_limits`, which `rc_speed_limits` publishes;
-  `set_speed` takes a `rate` or a `duration` (Fit to duration), exactly one.
-  On a ramped clip (SR-19 (a), (b)) both rate edits scale the WHOLE profile
-  by one factor (`profile_factors`, None on every constant clip):
-  `scaled_profile` scales the base, every end rate and every speed span
-  (`scaled_span`, snapped, never clamped, which `rescale_actions` also uses),
-  writes an unclamped rate as asked, holds the window, then re-clamps the
-  other actions into the held duration through `resnap_actions`.
-  `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
-  no head bound, saturating at 0); `trim_end` leaves `length` alone.
+  their speed bounds; `AUDIO_SPEED_MAX` (×12, spec §11 #190) and
+  `speed_limits`, which `rc_speed_limits` publishes; `set_speed` takes a
+  `rate` or a `duration` (Fit to duration), exactly one. On a ramped clip
+  (SR-19 (a), (b)) both rate edits scale the WHOLE profile by one factor
+  through `edit_speed_profile.rs`. `trim_start` advances a graphic's `in`
+  through `graphic_advanced` (no speed, no head bound, saturating at 0);
+  `trim_end` leaves `length` alone.
+- `edit_speed_profile.rs` — what a rate edit scales (SR-19 (a), (b)), a pure
+  move out of `edit_clip_timing.rs` (road map creator-jobs CU9a's toll), all
+  `pub(crate)`.
+  - `profile_factors` (None on every constant clip).
+  - `scaled_profile`: scales the base, every end rate and every speed span.
+    It uses `scaled_span`, snapped and never clamped, which `rescale_actions`
+    also uses. It writes an unclamped rate as asked, holds the window, then
+    re-clamps the other actions into the held duration through
+    `resnap_actions`.
+  - `rescale_actions`: actions keep their clip-relative fraction.
+  - Shared by `set_speed`, `rate_stretch` and `retime_range`.
+- `edit_retime.rs` — `retime_range` (road map creator-jobs CU9a, spec §11
+  CU-90).
+  - The range `[from, to)` is played at `rate` on every unlocked track.
+  - Both bounds are cut by `split_under_playhead`. The pieces (unlocked
+    clips wholly inside) are found before `shift_clips` moves everything at
+    or after `to` by `to′ − to`, partners included.
+  - Each piece starts at `f(s)` and lasts `f(e) − f(s)`, where
+    `f(t) = snapped(from + round((t − from) ÷ rate))`: a constant media
+    piece at speed × rate, held by `duration_resnapped`; a ramp by
+    `scaled_profile`; every other kind scaled, a graphic keeping its
+    `length`.
+  - Markers inside map through `f`; markers after move with the shift. Two
+    markers landing on one tick are refused, never dropped. A scoped view
+    has none.
+  - Errors, then refusals (1)–(7) in CU-90's order. A rate of 1 is an
+    identity once in range. AU-94's sentence comes through `edit_link.rs`'s
+    `linked_rate_sentence`.
 - `edit_detach.rs` — `detach_audio` and `set_enabled`, a clip's video and
   audio halves; a pure move out of `edit_clip.rs` (grading L3).
 - `edit_fit.rs` — `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
@@ -505,7 +529,8 @@ governs a module now.
   of one; `pair_split_halves` and `relink_copies` (`duplicate`, `paste` top
   level and nests, `unnest`); `carried_edge` (`trim_start`, `trim_end`,
   `roll`: the partner whose same edge coincided follows unless `alone`);
-  `linked_rate_refusal` (speed, direction and speed-naming actions refused);
+  `linked_rate_refusal` (speed, direction and speed-naming actions refused;
+  its sentence `linked_rate_sentence`, which `retime_range` shares);
   and the one op, `attach_audio`. The shift's half is `edit_time.rs`'s
   `shifted`.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
@@ -636,9 +661,10 @@ governs a module now.
   clip at or after the boundary and each one's linked partner;
   `shift_clips` moves exactly that set and answers a refusal, nothing moved,
   when a partner would start before 0), and `locked_track` — THE locked-track
-  refusal's sentence, written once here for its three callers
+  refusal's sentence, written once here for its four callers
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
-  rippled form), each passing the clause after the comma.
+  rippled form, `edit_retime.rs`'s `retime_range`), each passing the clause
+  after the comma.
 - `edit_keep_range.rs` — `keep_range` (road map "creator-jobs" CJ5a, spec
   §11 CJ-50): the project as `[from, to)` of its top-level timeline moved to
   0 — both bounds cut on every track, locks ignored, through `split_clip`

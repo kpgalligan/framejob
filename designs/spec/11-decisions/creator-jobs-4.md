@@ -276,3 +276,68 @@ and no core change: the recipe's `cutout` key (CO-21) is what the compositor rea
   a miss drawing transparent, the shadow's placeholder, CO-5 per range, step 0, the pivot), each
   once on Release. **JOB-61**: a cut-out 1080p camera over a 4K screen recording plays without
   stutter at Full and Half Preview Quality.
+
+CU-90 is CU9a's (Clip ▸ Retime Range… and `retime_range`), recorded before its code. The road map
+names no owner question for CU9a. Nothing here sends anything: no `ModelKeys` row (CJ-3). No FFI,
+header, format or persisted-field change. AU-94 is kept: a linked clip's rate is refused, in its
+own sentence.
+
+- **CU-90 — `retime_range {from, to, rate, keep_pitch?}`: one range played faster or slower on
+  every unlocked track, everything after it moved up or back, one undo step "Retime Range".**
+  - **(a) Semantics** (`core/src/edit_retime.rs`). `from` and `to` are snapped and clamped to 0;
+    `f(t) = snapped(from + round((t − from) ÷ rate))` and `to′ = f(to)`. Both bounds are cut by
+    `split_under_playhead` (`from`, then `to`), an identity there keeping the project as it is,
+    so a straddler splits exactly as `split` splits it. The PIECES are the clips on unlocked
+    tracks with start ≥ `from` and end ≤ `to`, found before the shift. Everything at or after
+    `to` moves by `to′ − to` through `shift_clips`, which carries each moved clip's linked
+    partner (AU-91); its refusal is the answer. Each piece starts at `f(s)` and lasts
+    `d′ = f(e) − f(s)`, so touching pieces still touch: a constant media piece plays at speed ×
+    `rate`, its duration then held to its media (`duration_resnapped`) and its actions rescaled
+    to keep their fraction (`rescale_actions`); a ramped piece is `scaled_profile` of it at
+    `f(s)` by `rate` into `d′` (SR-19); `keep_pitch`, when given, is set on every media piece's
+    `audio`, as `set_speed` sets it; a text, shape, still, image, graphic (its `length` kept,
+    G-9) or adjustment piece scales its start and duration and rescales its actions. Markers in
+    `[from, to)` go to `f(m)`, markers at or after `to` move by `to′ − to`. The exit is
+    `finish_placement` over the unlocked tracks. A `rate` of exactly 1 is an identity. Inside a
+    nest (the envelope's `scope`) the nest's tracks are retimed and no marker moves or is
+    checked: the view has none and the merge writes none back.
+  - **(b) Errors, then refusals, in this order; nothing changes when one fires.** Errors: "rate
+    must be a positive number, not {rate}"; `to` not after `from` once snapped, "retime_range's
+    to must be after its from (from {f}, to {t} ticks, on the frame grid)". Refusals: (1) "a
+    range can be retimed by ×0.1 to ×1000, not ×{rate}"; (2) "the range from {f} to {t} ticks is
+    shorter than two frames"; (3) the first locked track holding a clip that ends after `from`,
+    `locked_track(id, "its clips after the range's start would fall out of step with the
+    retimed range")`; (4) each unlocked clip overlapping `[from, to)`, in clip order: a nest
+    clip, "clip {c} is a nest, which has no speed; move the range off it, or retime inside the
+    nest"; a text clip with `words`, "clip {c} is a caption page with timed words, which a
+    retime cannot move; move the range off it" (SR-27's re-time is app-side, and
+    `CaptionRetime.mayRetime` does not learn `retime_range`); a linked clip, AU-94's sentence
+    (`linked_rate_sentence`, factored out of `linked_rate_refusal`); (5) an overlap on an
+    unlocked track that meets the closed range `[from, to]`, "clip {later} has a transition from
+    clip {earlier} from {os} to {oe} ticks, which touches the range; move the range off it or
+    remove the transition"; (6) unscoped only, the first marker in list order whose new time
+    equals an earlier marker's, "markers {a} and {b} would both be at {t} ticks after a retime
+    by ×{rate}, and two markers may not share a time; move one of them first" — refused as
+    `add_marker` and `set_marker` refuse a shared time, never dropped as `set_canvas` drops one,
+    because a silent drop is not fixable (`ripple_delete`'s doc); (7) after the cuts, each piece
+    named by its source clip (a piece not in the project before is the clip that straddled
+    `from` on its track): "clip {c} would play at ×{r}, past ×{limit}, the {fastest|slowest} a
+    clip can play" (`r` speed × `rate` on a constant piece, the peak or trough × `rate` when
+    `rate` lies outside a ramp's `profile_factors`), and `d′` under a frame, "clip {c} would last
+    under one frame at ×{rate}".
+  - **(c) The door's question.** `SpeedAudioDrop.mayCross` learns `retime_range`. Its crossing is
+    read on a BASELINE: the project with `split` at `from` and then at `to` applied for each
+    `retime_range` op (the project itself when none applies), diffed against the baseline with
+    the ops applied, so a split half taken past ×12 is counted under the id the core mints. No
+    rate is computed in Swift (D2-1); every other caller's baseline is the project.
+  - **(d) Clip ▸ Retime Range…** (after Close Gap, no key): a sheet with Rate (×2 to start, the
+    Speed sheet's field, presets and footnote) and Preserve pitch (on, or the first media clip
+    overlapping the range on an unlocked track's Keep pitch), and the hint "Every unlocked track
+    between In and Out plays faster or slower, and everything after Out moves to stay in step.
+    One undo step." Apply at ×1 closes the sheet; otherwise it commits through
+    `SpeedAudioDrop.commit("Retime Range", …)`, always sending `keep_pitch`. It needs an In–Out
+    range and no attached sheet, and is allowed inside a nest. `-RCDevRetimeAccept YES` (dev
+    only) presses Apply when the sheet appears, AU-128's precedent.
+  - **(e) The tool.** The op tool `retime_range` describes its four arguments and carries
+    SpeedAudioDrop's agent note; its answer adds `audio_left_out` and `audio_note` from the
+    baseline's crossing, read before the edit, beside `new_clips`.

@@ -9,7 +9,10 @@ and changes how much of the source it plays.
 All of these work on **media clips** only, meaning clips of a video or audio
 file. A still image, a freeze frame, text, a shape, a graphic, an adjustment
 clip and a nest have no source to speed up, so the speed commands are dimmed
-for them or leave them out.
+for them or leave them out. The one exception is
+[Retime a range](#retime-a-range), which speeds up or slows down a stretch of
+the whole timeline and stretches or squeezes the titles, shapes and stills in
+it too.
 
 ## Speed limits at a glance
 
@@ -324,6 +327,51 @@ rendered: …". A failed render is not tried again while Frame Job stays open:
 the clip stays silent and exports that need it keep failing until you change
 the clip's timing (which starts a new render) or quit and reopen Frame Job.
 
+## Retime a range
+
+**Clip ▸ Retime Range…** (right after Close Gap) plays the In–Out range faster
+or slower on **every unlocked track** at once, and moves everything after Out
+up or back so it stays in step. Use it to speed up a slow stretch of a screen
+recording with its microphone and camera together. It is one undo step,
+**Retime Range**.
+
+The item needs an In–Out range and works inside a nest too, where it retimes
+the nest's own tracks. The sheet has:
+
+- **Rate**, starting at ×2, with the Speed sheet's quick picks. ×2 makes the
+  range half as long, ×0.5 twice as long.
+- **Preserve pitch**, which starts as the first video or audio clip in the
+  range has it (on when there is none), and is set on every such clip.
+
+**Apply** at ×1 just closes the sheet. Otherwise:
+
+- A clip that crosses In or Out is cut there first, as Split cuts it.
+- Each video or audio clip inside plays at its own rate times the Rate, so a
+  ×2 clip retimed by ×2 plays at ×4. A speed ramp keeps its shape and every
+  rate in it scales.
+- Titles, shapes, stills, images, graphics and adjustment clips inside are
+  stretched or squeezed by the same amount. A graphic keeps its own length.
+- Actions keep their place in each clip.
+- Markers inside the range move with the picture, and markers after it move
+  with everything else. A detached sound linked to a moved clip moves with it.
+
+Nothing changes, and the reason appears at the foot of the inspector, when:
+
+- the Rate is outside ×0.1–×1000, or the range is under two frames;
+- a **locked** track has a clip after In (it would fall out of step);
+- the range holds a nest clip, a caption page with timed words, or half of a
+  detached pair (Attach Audio first);
+- a transition touches the range;
+- two markers would land on the same time;
+- a clip would play faster than ×1000 or slower than ×0.1 (the message names
+  the clip and the rate), or would be squeezed under one frame.
+
+Taking a clip with sound past ×12 asks first, as below.
+
+*Agents:* `retime_range {from, to, rate, keep_pitch?}` is the same edit. Its
+answer lists the cut pieces in `new_clips` and carries `audio_left_out` and
+`audio_note` when a clip crosses ×12.
+
 ## The ×12 question
 
 A clip's sound is left out of the mix whenever it plays faster than ×12. For a
@@ -343,7 +391,8 @@ by “Frame Job leaves a clip's audio out above ×12. The pictures still play.�
 - **Cancel** changes nothing and adds no undo step. The Speed sheet and the
   Speed Ramp… sheet stay open.
 
-The question comes from the Speed sheet, the Speed Ramp… sheet, the Speed
+The question comes from the Speed sheet, the Speed Ramp… sheet, the Retime
+Range sheet (which stays open on Cancel too), the Speed
 section (Rate, its quick picks, Keep pitch, Reset and Fit to) and the ⌥ rate
 stretch. A stretch is put back while the question is up, and Set Speed applies
 it again. A clip that was already above ×12, or whose sound is switched off,
@@ -351,7 +400,8 @@ is not asked about.
 
 *Agents:* no question is asked. The answer to any edit that takes a clip past
 ×12 carries `audio_left_out` (the clip ids) and `audio_note` (a sentence
-saying the clip is now silent in the preview and the export). `set_speed`,
+saying the clip is now silent in the preview and the export), `retime_range`
+included. `set_speed`,
 `rate_stretch`, `add_speed_ramp`, `set_action`, `set_action_end` with a
 `speed` and `remove_action` re-time captions as above, and their answer
 carries `captions_retimed` and `captions_removed` (caption clip ids), each

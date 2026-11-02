@@ -476,6 +476,7 @@ See [Editing](editing.md), [Canvas and layers](canvas-and-layers.md) and [Graphi
 | `lift_range` | *op* — cuts a range out and leaves the hole. |
 | `insert_time` | *op* — opens a gap of `length` at `at` on every unlocked track. |
 | `close_gap` | *op* — closes the gap on a track at `at` (**Clip ▸ Close Gap**, or double-click the gap). |
+| `retime_range` | *op* — plays `[from, to)` at `rate` on every unlocked track and moves what follows to stay in step, `keep_pitch` optional (**Clip ▸ Retime Range…**); answers `new_clips` and, past ×12, `audio_left_out` and `audio_note`. |
 | `duplicate` | *op* — copies clips just after the originals (⌘D). |
 | `paste` | *op* — pastes a Copy payload at `at`, the playhead by default (⌘V). |
 | `paste_attributes` | *op* — copies one clip's property groups onto others (**Edit ▸ Paste Attributes**, ⌥⌘V). Each group replaces the target's whole group. Without `groups` it copies each of video, audio, text and shape that both clips have; `graphic` copies only when named (**Edit ▸ Paste Graphic Properties**), onto clips drawn by the same graphic. |

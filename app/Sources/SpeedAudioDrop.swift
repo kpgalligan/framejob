@@ -13,6 +13,10 @@ import AppKit
 ///
 /// A clip that is new in the answer (a split's half, a duplicate, a detach)
 /// never counts, and one already above the ceiling is not asked about again.
+/// A `retime_range` (Clip ▸ Retime Range…, spec §11 CU-90 (c)) is read on a
+/// BASELINE instead of the project: the project with `split` at its `from`
+/// and then its `to` applied, so a half the retime takes past the ceiling is
+/// already in the "before" under the id the core will mint, and counts.
 /// A clip's rate here is its PEAK (`peakSpeed`): a speed ramp (spec §11
 /// SR-10) leaves the audio out when any rate it names is above the
 /// ceiling, as the core's plan does (SR-19 (d)).
@@ -31,12 +35,13 @@ enum SpeedAudioDrop {
     /// True when any op is one that can change a speed: `set_speed`,
     /// `rate_stretch`, or a `set_action_end` whose patch names `speed` — the
     /// Speed section's Rate inside an action (spec §11 SR-21 (e)) — or an
-    /// `add_speed_ramp`, Clip ▸ Speed Ramp… (SR-24 (e)).
+    /// `add_speed_ramp`, Clip ▸ Speed Ramp… (SR-24 (e)), or a `retime_range`,
+    /// Clip ▸ Retime Range… (CU-90 (c)).
     /// `set_action` and `remove_action` cannot raise the rate a clip names.
     static func mayCross(_ ops: [ReelOp]) -> Bool {
         ops.contains {
             $0.name == "set_speed" || $0.name == "rate_stretch"
-                || $0.name == "add_speed_ramp"
+                || $0.name == "add_speed_ramp" || $0.name == "retime_range"
                 || ($0.name == "set_action_end"
                     && ($0.args["patch"] as? [String: Any])?["speed"] != nil)
         }
@@ -81,12 +86,33 @@ enum SpeedAudioDrop {
 
     /// The crossing `ops` would make on `project`: [] unless the core answers
     /// `.applied` (an identity, a refusal and a throw all change nothing).
+    /// Read on `baseline(for:on:)`, which is `project` itself unless an op is
+    /// a `retime_range`.
     static func crossing(
         applying ops: [ReelOp], to project: ReelProject,
         limits: SpeedLimits = ReelSpeed.limits
     ) -> [Clip] {
-        guard case .applied(let after)? = try? project.applying(ops) else { return [] }
-        return crossing(from: project.snapshot, to: after.snapshot, limits: limits)
+        let base = baseline(for: ops, on: project)
+        guard case .applied(let after)? = try? base.applying(ops) else { return [] }
+        return crossing(from: base.snapshot, to: after.snapshot, limits: limits)
+    }
+
+    /// `project` with `split` (every unlocked clip, as `split_under_playhead`
+    /// cuts) at each `retime_range` op's `from` and then its `to`, in order,
+    /// on the op's own scope — the cuts the core makes first, so the halves
+    /// carry the ids it mints (CU-90 (c)). `project` itself when nothing
+    /// applies. No rate is computed here (D2-1).
+    static func baseline(for ops: [ReelOp], on project: ReelProject) -> ReelProject {
+        var base = project
+        for op in ops where op.name == "retime_range" {
+            for key in ["from", "to"] {
+                guard let at = (op.args[key] as? NSNumber)?.int64Value else { continue }
+                var split = ReelOp.split(clips: nil, at: at)
+                split.scope = op.scope
+                if case .applied(let next)? = try? base.applying(split) { base = next }
+            }
+        }
+        return base
     }
 
     /// "×12": the ceiling as the inspector's note spells it.
@@ -139,7 +165,14 @@ enum SpeedAudioDrop {
         from before: ProjectSnapshot, to after: ProjectSnapshot,
         limits: SpeedLimits = ReelSpeed.limits
     ) -> [String: Any] {
-        let clips = crossing(from: before, to: after, limits: limits)
+        answerFields(crossing(from: before, to: after, limits: limits), limits: limits)
+    }
+
+    /// The same keys for a crossing already read — `retime_range`'s tool
+    /// reads its own on the baseline before the edit (CU-90 (e)).
+    static func answerFields(
+        _ clips: [Clip], limits: SpeedLimits = ReelSpeed.limits
+    ) -> [String: Any] {
         guard !clips.isEmpty else { return [:] }
         return [
             "audio_left_out": clips.map { Int($0.id) },
@@ -166,8 +199,8 @@ enum SpeedAudioDrop {
         }
     }
 
-    /// The one door a person's speed edit goes through — the Speed and Speed
-    /// Ramp sheets' Apply and the inspector's commit. The captions the edit
+    /// The one door a person's speed edit goes through — the Speed, Speed
+    /// Ramp and Retime Range sheets' Apply and the inspector's commit. The captions the edit
     /// re-times ride in the same step, under its name "and Re-time Captions"
     /// (`CaptionRetime`, spec §11 SR-27). An edit that takes no
     /// clip with sound above the ceiling runs `before` and is applied at once;

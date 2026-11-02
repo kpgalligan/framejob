@@ -579,6 +579,19 @@ extension ReelOp {
         return ReelOp(name: "close_gap", args: a.values)
     }
 
+    /// Plays `[from, to)` at `rate` on every unlocked track and moves what
+    /// follows up or back to stay in step (spec §11 CU-90); `keepPitch`, when
+    /// given, is set on every media piece's audio.
+    static func retimeRange(from: Ticks, to: Ticks, rate: Double, keepPitch: Bool? = nil)
+        -> ReelOp {
+        var a = OpArgs()
+        a.put("from", from)
+        a.put("to", to)
+        a.put("rate", rate)
+        a.put("keep_pitch", keepPitch)
+        return ReelOp(name: "retime_range", args: a.values)
+    }
+
     /// Media sources only; actions keep their clip-relative fraction.
     ///
     /// Give a `rate` or a `duration`, exactly one: the core answers both or

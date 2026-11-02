@@ -146,6 +146,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
 | Speed Ramp… | | Puts a speed ramp preset on one selected media clip |
 | Close Gap | | Closes the gap under the playhead on the current track |
+| Retime Range… | | Plays the In–Out range faster or slower on every unlocked track and moves what follows to stay in step ([Speed](speed.md#retime-a-range)) |
 | Remove Silences… | | Finds silent stretches and removes them ([Remove Silences and Remove Filler Words](cleanup-tools.md)) |
 | Remove Filler Words… | | Finds "um"s and "uh"s and removes them |
 | Transition ▸ | | Sets the transition into the clip |
@@ -203,6 +204,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Speed… | The selection includes a clip that plays a media file |
 | Speed Ramp… | Exactly one clip is selected and it plays a media file |
 | Close Gap | There is a current track and the timeline has clips |
+| Retime Range… | There is an In–Out range and no sheet is open |
 | Remove Silences… | Some clip plays sound |
 | Remove Filler Words… | Some clip plays sound from a media file forwards, with its audio on, and either your AssemblyAI key is set or a file in scope has a transcript made with filler words; greyed for the key alone, it reads **Remove Filler Words… (needs your AssemblyAI key)** |
 | Transition ▸ items | A kind: a selected clip has room for a transition. **None**: something is selected |

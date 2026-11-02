@@ -27996,3 +27996,48 @@ RC_PROOF_APP=release python3 tools/proof/derived_proof.py [--mutant <name>]
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CJ5b record.
+
+## Road map "creator-jobs" CU9a — Clip ▸ Retime Range… and `retime_range` (`retime_proof.py` R1, R2, R4–R10, R8a, R8b, R9p, Z1 with `retime_probe.swift`; eight mutants; `core/tests/retime_range.rs`; spec §11 CU-90)
+
+**`retime_proof.py [SOCKET]`** runs R1 (`cd core && cargo test --release --test
+retime_range`), builds `retime_probe.swift` over `app/Sources` through
+`swift_build.build()` for R8a, R8b and R9p, and drives the app for the rest. Given a running
+instance's `<dir>/agent.sock` it runs R2, R4–R7 and R10 there and greps `<dir>/framejob.log`;
+without one it launches its own (`proof_app.binary()`, a scratch `CFFIXED_USER_HOME`). R9
+always launches its own instance with `-RCDevRetimeAccept YES`. Its media are made by ffmpeg
+under `tools/proof/work/retime-proof/media/`: a 20 s 640 × 360 30 fps screen (`testsrc`, no
+sound), a 20 s camera (`testsrc2`, a 440 Hz tone) and a 20 s microphone (660 Hz).
+
+| Row | What it holds |
+|---|---|
+| R1 | the core's black-box tests: every error and refusal in order, three tracks in sync after ×4 over 10 s and 7.5 s shorter, straddlers split as `split` splits, a ramp scaled as `set_speed` scales it, the other kinds scaled, markers, partners, `keep_pitch`, a nest through `scope` |
+| R2 | screen, microphone and camera at 0, ×4 over [5 s, 15 s): the project 7.5 s shorter; `prores_422` before and after decoded to rgb24, frame 225 after has frame 450's md5 before; `render_frame` at 7.5 s after byte-equal to 15 s before |
+| R4 | one `undo`, named "Retime Range", gives back `get_project`'s project exactly |
+| R5 | the camera's sound detached: a retime over it refused in AU-94's sentence naming both halves, the project unchanged |
+| R6 | the screen at ×300 (two frames) sped ×4: refused, "… would play at ×1200, past ×1000, the fastest a clip can play" |
+| R7 | the three clips nested and two markers a frame apart at 5 s: `scope` retimes the nest (three 2.5 s pieces at 5 s) and the markers stay |
+| R8a | (probe) the sheet over [5 s, 10 s) inside a ×4 clip with sound, at ×4: "“Alpha” will be silent at ×16." on the SHEET's window, nothing applied; Cancel keeps the handle, the sheet up, no step; Set Speed one step "Retime Range", the piece at ×16 |
+| R8b | (probe, control) ×2 over a ×1 clip asks nothing within 1 s; one step "Retime Range" |
+| R9p | (probe) Keep pitch off on the first clip and on on the second: Preserve pitch opens off, and Apply at ×2 gives the project `retime_range {rate: 2, keep_pitch: false}` gives (byte-equal JSON) |
+| R9 | `perform_menu_item` Clip ▸ Retime Range… with `-RCDevRetimeAccept YES` over the camera (Keep pitch off) and the microphone: one step "Retime Range" whose project equals the tool's `{rate: 2, keep_pitch: false}` after an undo |
+| R10 | the camera at ×4, the tool ×4 over [1 s, 3 s): `audio_left_out` is exactly the piece at 1 s, `audio_note` its one-clip sentence word for word |
+| Z1 | each instance's `grep "Frame Job: "` prints nothing |
+
+Mutants: five in the core, run by hand as edits under `cargo test --release --test
+retime_range` (the marker-collision refusal removed, a non-media piece not scaled, markers after
+`to` not moved, a linked clip accepted, an out-of-range product clamped); three in the app
+through `--mutant NAME` on a `tree_copy.py` copy — its probe rows built from the copy's
+`app/Sources`, its MCP rows on the copy's built app (CAUGHT exits 1, SURVIVED 0, a control not
+performed 2): `sheet-apply-edit` R8a (the sheet commits through `applyEdit`), `keep-pitch-dropped`
+R9p, R9, `no-baseline` R8a, R10 (`crossing(applying:)` reads the project, not the baseline).
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 111 and `OPS` 66,
+`op_catalog_proof.py`'s 66 ops; `screens.py`'s `NOT_SHOWN` names `RCDevRetimeAccept`.
+
+```sh
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/retime_proof.py <dir>/agent.sock [--only R2,R10]
+python3 tools/proof/retime_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU9a record.

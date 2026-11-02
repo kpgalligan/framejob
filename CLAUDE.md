@@ -258,7 +258,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and ten product tools (and the dev tools, road
+  stranger by name, for all one hundred and eleven product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -373,7 +373,9 @@ proof can time the stop, spec §11 CX-15 (6); and
 its own Import so a proof can see a package land (spec §11 G-47); and
 `-RCDevMatchAudioAccept YES`, with which the Match Audio sheet presses its own
 Match so a proof can drive Clip ▸ Match Audio… to its edit (spec §11 AU-128);
-and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
+and `-RCDevRetimeAccept YES`, with which the Retime Range sheet presses its
+own Apply so a proof can drive Clip ▸ Retime Range… to its edit (spec §11
+CU-90 (d)); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
 document with no window (`display: false`), so a proof can see the windowless
 door (spec §11 CJ-52); and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which

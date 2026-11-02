@@ -104,7 +104,7 @@
 //! grades what is behind it at the top level only, spec §11 GR-6), and
 //! `keep_range` (it keeps a range of the DOCUMENT's timeline, and is
 //! applied only to a derived document, spec §11 CJ-50).
-//! Everything else — all fifty-four — works
+//! Everything else — all fifty-five — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -136,6 +136,7 @@
 //! | `keep_range` | The project as `[from, to)` of its top-level timeline, moved to start at 0 (spec §11 CJ-50, `edit_keep_range.rs`): both bounds snapped and clamped to 0, `to` not after `from` an `Err`; every clip on every track, locked or not, cut at both bounds by `split`'s rules; at an edge inside a transition the piece beyond the edge is dropped and the incoming piece starting at `from` hard-starts (no `transition_in`), the incoming piece kept when both bounds lie in one overlap; clips not wholly inside removed, the rest and the markers inside moved by −`from`, markers outside removed; nests no kept clip reaches and media no kept clip plays, names in a look or converts through removed; tracks and canvas unchanged. Refused: a nest clip across an edge, nothing left to play, and a transition inside the range whose clip an edge cut too short for it. Document-level, with no tool: it is applied to a derived document only (CJ5b). |
 //! | `insert_time` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `close_gap` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. A linked partner of a moved clip moves too, and a partner the shift would take below 0 refuses (AU-91). |
+//! | `retime_range` | Plays `[from, to)` at `rate` on every unlocked track and moves everything after it up or back to stay in step, one undo step (spec §11 CU-90). Both bounds are snapped and clamped to 0; `f(t) = snapped(from + round((t − from) ÷ rate))`. Both bounds are cut by `split_under_playhead`; each piece wholly inside starts at `f(s)` and lasts `f(e) − f(s)`: a constant media piece plays at speed × `rate`, held to its media, a ramped one scales its whole profile by `rate` (SR-19), and a text, shape, still, image, graphic (its `length` kept) or adjustment piece scales its start and duration; actions keep their fraction; `keep_pitch`, when given, is set on each media piece's audio. Everything at or after `to` moves by `to′ − to` with its linked partners (AU-91); markers inside map through `f` and markers after move with the shift (none inside a nest). A `rate` of 1 is an identity. `Err` for a rate that is not a positive number and a `to` not after `from` on the grid. Refused, in this order: a rate past ×0.1–×1000; a range under two frames; a locked track holding a clip that ends after `from`; a nest clip, a caption page with timed words or a linked clip (AU-94) in the range; a transition touching `[from, to]`; two markers landing on one tick; a piece whose rate would pass the speed limits (naming the rate) or that would last under one frame. |
 //! | `set_speed` | Two arms, exactly one given: a `rate`, or a `duration` to fit, which is snapped, held to a frame and turned into `content length / duration` (the current duration keeps the current rate). Both or neither is an `Err`. Either rate is clamped to `SPEED_MIN`–`SPEED_MAX`; then `duration = content length / rate`, snapped NEAREST and held to what the file still holds AT THAT RATE, so the segment plays at exactly `rate` (spec §11, D4-3); actions keep their clip-relative fraction. Above `AUDIO_SPEED_MAX` (×12, both pitch modes) the plan leaves the clip's audio out (spec §11, #190). On a ramped clip one factor f (the clamped rate ÷ `speed`, or D ÷ d), clamped so no rate the clip names passes a limit, scales the base, every end rate and every speed action's span, unclamped into the clip, and the duration is held through S∞ (spec §11 SR-19 (a)–(c)). A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. Refused on a linked clip when its rate would change (AU-94). |
 //! | `set_reversed` | Plays the media back to front, or forward again. A FACT about the clip, not a plan change: Swift substitutes a pre-rendered reversed asset (spec §11). The in point is measured in the direction the clip plays, so reversing keeps `in` and therefore shows different frames. A non-media source is an `Err`, not a refusal. Refused on a linked clip (AU-94). |
 //! | `freeze_frame` | `split` at `at`, `insert_time(at, duration)` (2 s when absent), then a `still` of that source frame with the clip's video props evaluated at `at`. On a ramped clip the still holds `in + round(S(at − start))`, where the split's halves meet (SR-18 (f)). |
@@ -403,6 +404,13 @@ pub enum Op {
     CloseGap {
         track: u32,
         at: Ticks,
+    },
+    RetimeRange {
+        from: Ticks,
+        to: Ticks,
+        rate: f64,
+        #[serde(default)]
+        keep_pitch: Option<bool>,
     },
     SetSpeed {
         clip: u32,
@@ -872,6 +880,12 @@ impl Project {
             Op::KeepRange { from, to } => self.keep_range(*from, *to),
             Op::InsertTime { at, length } => self.insert_time(*at, *length),
             Op::CloseGap { track, at } => self.close_gap(*track, *at),
+            Op::RetimeRange {
+                from,
+                to,
+                rate,
+                keep_pitch,
+            } => self.retime_range(*from, *to, *rate, *keep_pitch),
             Op::SetSpeed {
                 clip,
                 rate,

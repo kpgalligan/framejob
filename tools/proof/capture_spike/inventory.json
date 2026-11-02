@@ -395,6 +395,14 @@
    ],
    "note": "an edit"
   },
+  "showRetimeSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+Retime.swift `@objc func showRetimeSheet(`",
+    "app/Sources/EditorViewController+Retime.swift:17"
+   ],
+   "note": "presentAsSheet(RetimeSheetController) over the In–Out range (CU-90 (d)); beeps with no range or a sheet up; Apply on a rate that takes a clip with sound above the audio ceiling asks first, an alert sheet on the Retime Range sheet (reached_after)"
+  },
   "renameClip:": {
    "verdict": "none",
    "code": [
@@ -1078,6 +1086,15 @@
    "reached_after": [],
    "other_caller": ""
   },
+  "app/Sources/EditorViewController+Retime.swift:17": {
+   "token": "presentAsSheet",
+   "func": "showRetimeSheet",
+   "reached_from": [
+    "showRetimeSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
   "app/Sources/EditorViewController+Export.swift:140": {
    "token": "presentAsSheet",
    "func": "offerRelinkIfNeeded",
@@ -1498,6 +1515,11 @@
      "selector": "showSpeedRampSheet:",
      "via": "app/Sources/SpeedRampSheetController.swift `SpeedAudioDrop.commit(`",
      "gate": "app/Sources/SpeedAudioDrop.swift `guard !crossing.isEmpty else {` — the preset takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
+    },
+    {
+     "selector": "showRetimeSheet:",
+     "via": "app/Sources/RetimeSheetController.swift `SpeedAudioDrop.commit(`",
+     "gate": "app/Sources/SpeedAudioDrop.swift `guard !crossing.isEmpty else {` — the retime takes a clip with sound from at or below the audio ceiling to above it (the sheet's Apply)"
     }
    ],
    "other_caller": "app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.commit(` — the inspector's Speed section (Rate, its presets, Keep pitch, Reset, Fit to) through inspector.onEdit; app/Sources/EditorViewController+SpeedAudio.swift `SpeedAudioDrop.ask(clips, on: window) { [weak document]` — the timeline's ⌥-drag rate stretch through timeline.onLiveEnd, the gesture already put back"

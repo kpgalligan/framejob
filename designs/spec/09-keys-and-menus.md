@@ -142,7 +142,11 @@ scales the ramp with it, §11 SR-19 (a), SR-21 (f)), Speed Ramp… (#340, §11 S
 speed ramp presets on the one selected media clip, over the in/out range when it lies inside the
 clip; enabled with exactly one such clip selected; no key equivalent; its mirror is
 `add_speed_ramp`),
-Close Gap, Remove
+Close Gap, Retime Range… (road map creator-jobs CU9a, §11 CU-90: a sheet with Rate,
+×2 to start, and Preserve pitch over the In–Out range; Apply is one `retime_range` step, undo
+"Retime Range", asking first through Set Speed's question when a clip with sound would pass the
+audio ceiling; enabled with an In–Out range and no sheet up, inside a nest too; no key
+equivalent; its mirror is `retime_range`), Remove
 Silences…, Remove Filler Words… (cut-by-transcript CT-3, §11 TR-10: a sheet over
 `detect_fillers`' answer whose Remove is one `ripple_delete_ranges` step, undo
 "Remove Filler Words", and whose rows' Transcribe is `transcribe_for_fillers`;

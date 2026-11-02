@@ -68,6 +68,7 @@ extension UIMenu {
         "attachAudio:": .plain,
         "addActionAtPlayhead:": .plain,
         "closeGapAtPlayhead:": .plain,
+        "showRetimeSheet:": .sheet,
         "renameClip:": .plain,
         "setClipLabel:": .plain,
         "nestClips:": .plain,

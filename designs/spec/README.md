@@ -8,7 +8,7 @@ through [`11-decisions/README.md`](11-decisions/README.md).
 **Never read the whole spec.** Read this index, then only the file for the section you need.
 For a decision, look its ID up in `11-decisions/README.md`, or grep this directory
 (`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
-lettered files that keep its number (§4.3 is `04.3a`, `04.3b`, `04.3c`, `04.3d` and `04.3e`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b` and `06c`, §7.5 is `07.5a` and `07.5b`, §7.3 is `07.3` and `07.3b`, §7.9 is `07.9a`, `07.9b`, `07.9c`, `07.9d`, `07.9e` and `07.9f`);
+lettered files that keep its number (§4.3 is `04.3a`, `04.3b`, `04.3c`, `04.3d` and `04.3e`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b`, `06c` and `06d`, §7.5 is `07.5a` and `07.5b`, §7.3 is `07.3` and `07.3b`, §7.9 is `07.9a`, `07.9b`, `07.9c`, `07.9d`, `07.9e` and `07.9f`);
 a citation of the bare number names them together, and this index gets their rows in the same
 change. Until #342 (2026-10-24) §4.3b was the Media, Document and Assistant tabs, now §4.3c; an older citation of §4.3b (in `archive/` or git history) means §4.3c.
 
@@ -38,8 +38,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
 | [`05.6-persistence.md`](05.6-persistence.md) | 322 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts, the analysis cache. |
 | **§6 — Edit operations: exact semantics** | | |
-| [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 109 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, a linked pair moving as one in time (format 28, AU-90…AU-96), how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eleven ops that are an error with a scope, the checks on the merged parent). |
-| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 497 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
+| [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 110 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, a linked pair moving as one in time (format 28, AU-90…AU-96), how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eleven ops that are an error with a scope, the checks on the merged parent). |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 455 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; `retime_range`. The transition ops are §6d. |
+| [`06d-edit-operations-transitions.md`](06d-edit-operations-transitions.md) | 69 | The transition ops, continuing §6b: `set_transition`, `set_transition_duration`, `add_transition` (handles and the ripple form) and `set_transition_style`. |
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 247 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
@@ -47,7 +48,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 315 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 406 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor and cutout keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 89 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 90 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 387 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 57 | What playback does after every edit: rebuild or refresh. |
@@ -59,11 +60,11 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9d-agent-recording.md`](07.9d-agent-recording.md) | 57 | `record_screen`, File ▸ New Recording…'s mirror: its arguments, the grants it reads and never asks, its refusal order, a paused recording's segments, the voice-over, a camera alone and a camera beside the screen, `enhance` (Enhance Voice after the landing), and its answer. |
 | [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 524 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, the media analysis (`get_media_analysis`) and Split at Shot Changes (`split_at_shots`), detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
 | [`07.9f-agent-transcript.md`](07.9f-agent-transcript.md) | 81 | The timeline transcript, `get_timeline_transcript`: what is read (the plan's audio segments, nested ones with `path` and `origin`), the answer (words with clip, track, editability, identity and the tab's `cut_start`/`cut_end`; `media`, `no_words`, `notes`), the window and `tracks`, paging at 2,000 words, and the whole-file fill (§11 TX-10…TX-14, TX-30, TX-33). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 138 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 140 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 243 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 247 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 18551 in 38 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 18617 in 38 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

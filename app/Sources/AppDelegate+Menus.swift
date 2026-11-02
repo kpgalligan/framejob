@@ -321,6 +321,11 @@ extension AppDelegate {
             item("Speed Ramp…", #selector(EditorViewController.showSpeedRampSheet(_:))))
         menu.addItem(
             item("Close Gap", #selector(EditorViewController.closeGapAtPlayhead(_:))))
+        // Road map "creator-jobs" CU9a (spec §11 CU-90 (d)), right after Close
+        // Gap: the UI path `retime_range` names. No key equivalent, for
+        // Remove Silences…' reason below.
+        menu.addItem(
+            item("Retime Range…", #selector(EditorViewController.showRetimeSheet(_:))))
         // Road map 2's phase 3a — a cutting command, so it sits with Close Gap
         // rather than in the identity group below the separator. No key
         // equivalent, deliberately: every bare letter belongs to the editor's

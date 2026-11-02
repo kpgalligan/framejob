@@ -92,11 +92,11 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 82, "optional inventory changed");
+    assert_eq!(seen.len(), 83, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }
-    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 74);
+    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 75);
 }
 
 #[test]

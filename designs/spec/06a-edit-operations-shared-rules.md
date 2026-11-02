@@ -34,7 +34,8 @@ partner on an UNLOCKED track with it — locks win over links everywhere:
   a partner keeps its own track, so a sound half dragged to a track of its own goes alone.
 - `delete` takes a picture's sound with it, but a linked SOUND half (its picture off) named alone
   is deleted alone and its picture stays, silent. `ripple_delete` takes both either way.
-- A timeline-wide shift — the ripples, `close_gap`, `insert_time`, `add_transition`'s ripple form —
+- A timeline-wide shift — the ripples, `close_gap`, `insert_time`, `retime_range`,
+  `add_transition`'s ripple form —
   moves each moved clip's partner too, whatever its own start, and refuses, nothing moved, when
   that would put a partner before 0: "clip S would start before 0: it leads its linked clip P by
   N ticks".

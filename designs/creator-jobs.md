@@ -461,7 +461,7 @@ by the first phase that must edit it, which names the seam in the history's "Nam
 | `core/src/container.rs` | 358 of 400 | the `audio()` builder (:295) → `container_audio.rs`, only if SW5 would pass 400 | SW5 |
 | `app/Sources/ContainerRewrapWriter.swift` | 539 | its audio input setup → `ContainerRewrapWriter+Audio.swift`, only if SW5 would pass 600 | SW5 |
 | `app/Sources/AudioDynamicsLevels.swift` | 393 of 400 | `// MARK: - The leveller's curves (AU-66 (e))` (257–393) → `AudioDynamicsLevels+Curves.swift`; the class's `private` members the extension reads (`lock`, `curveMemo`, `curveOrder`, `file(media:cache:url:)`) become internal, named in the record | SW3a (SW-35's guard), before SW4b re-keys it |
-| `core/src/edit_clip_timing.rs` | 412, over its 400 | `profile_factors` with its doc (42–54) and the `impl Project` helpers `rescale_actions`, `scaled_span`, `scaled_profile` with their docs (57–142) → `edit_speed_profile.rs` in an `impl Project` block, `pub(crate)` | SW7a (VR7a edits it after) |
+| `core/src/edit_clip_timing.rs` | 412, over its 400 | `profile_factors` with its doc (42–54) and the `impl Project` helpers `rescale_actions`, `scaled_span`, `scaled_profile` with their docs (57–142) → `edit_speed_profile.rs` in an `impl Project` block, `pub(crate)` | paid by CU9a (412 → 308, its own commit), which needed the helpers first; SW7a owes nothing here (VR7a edits it after) |
 | `app/Sources/CanvasSessions.swift` | 1,081, over | `// MARK: - Region drags` (891–1064) → `CanvasRegionDrag.swift`; no member in it is `private` | VR8 |
 | `app/Sources/AgentServer+Snapshot.swift` | 377 of 400 | `// MARK: - Main-thread reads` (211–326) → `AgentServer+SnapshotReads.swift`, its `private` funcs internal, only if FC7a's wiring would pass 400 | FC7a |
 | `app/Sources/ExportQueueController.swift` | 551 | `// MARK: - Stopping and tidying` (496–551) → `+Stopping.swift`, only if a phase must edit it (none plans to) | first editor |
@@ -6727,6 +6727,113 @@ face pass of its own (CJ2a, CJ2b, CJ3); it adds one kind, `subjects`. Nothing in
   (R8); the sheet's Keep pitch not passed (R9).
 - **Depends on:** CJ0b (T1). **Lane** B.
 
+#### CU9a's record (2026-11-02)
+
+**Landed.** Clip ▸ Retime Range… and `retime_range` (spec §11 CU-90, recorded and committed
+before the code, AU-94 kept) on lane B's branch, base `e18ef4b4`. No FFI, header, format or
+persisted-field change; `RC_FORMAT_VERSION` is unchanged. The road map names no owner question
+for CU9a. Every count below is a `wc -l` or a run's own output.
+
+- **Toll first, committed alone:** `edit_clip_timing.rs`'s `profile_factors` and the `impl
+  Project` helpers `rescale_actions`, `scaled_span`, `scaled_profile` with their docs → new
+  `edit_speed_profile.rs` (116 lines), made `pub(crate)`; `edit_clip_timing.rs` 412 → 308. The
+  moved lines differ from the base only in their four widened `fn` lines (a `diff` of the moved
+  ranges). Gated alone: `cargo fmt --check`, `cargo test --release` 1888 passed, 0 failed, `make
+  lint` clean. This was SW7a's toll; CU9a needed the helpers first, so SW7a owes nothing here.
+- **Core:** `edit_retime.rs` (new, 295 lines): `Project::retime_range`, its errors and seven
+  refusals in CU-90 (b)'s order (rate ×1 an identity once the rate is in range), the cuts by
+  `split_under_playhead`, the pieces found before `shift_clips`, each piece by `f`, markers, the
+  exit through `finish_placement`. `edit_link.rs`'s `linked_rate_sentence`, factored out of
+  `linked_rate_refusal` (335 → 339). `edit.rs` the enum row after `CloseGap`, the doc-table row
+  and the dispatch arm ("fifty-five" inside a nest); `op_rows.rs` the row after `close_gap`;
+  `OP_COUNT` 65 → 66; `scope.rs` the "everything else" arm; `lib.rs` both mods.
+  `core/tests/retime_range.rs` (new, 18 tests). The sweeps: `scope.rs`'s `every_op` row and its
+  op count 65 → 66, `edit_tests.rs`' coverage row (×2 over clip 20), `op_ticks.rs` 46 → 48 tick
+  arguments, 33 → 34 ops, 51 → 53 vectors, two vectors in `op_ticks_timeline.rs`,
+  `op_nullability.rs` 82 → 83 optional and 74 → 75 non-plain.
+- **Swift:** `ReelOps.retimeRange`; `SpeedAudioDrop.swift` (213 → 246): `mayCross` learns
+  `retime_range`, `baseline(for:on:)` (`split` at each op's `from` then `to`, on its scope, the
+  project when nothing applies), `crossing(applying:to:)` diffs the baseline,
+  `answerFields(_:)` (the old form now calls it), the type doc and `commit`'s doc;
+  `RetimeSheetController.swift` (new, 146), `EditorViewController+Retime.swift` (new, 29), one
+  validator line in `EditorViewController.swift`, the item after Close Gap in
+  `AppDelegate+Menus.swift` (480 → 485), `UIMenuTable.swift`'s `.sheet` row;
+  `AgentServer+Retime.swift` (new, 43) and `AgentCatalog+Retime.swift` (new, 47), joined through
+  `AgentServer+CreatorJobs.swift`; `retime_range` appended to `AssistantPrompt.swift`'s "cut and
+  time" topic, its words unchanged.
+- **Proofs:** `tools/proof/retime_proof.py` (new) and `retime_probe.swift` (new);
+  `op_argument_proof.py` `PRODUCT_TOOLS` 111, `OPS` 66; `op_catalog_proof.py` 66 ops;
+  `inventory.json` the `showRetimeSheet:` row, its `presentAsSheet` site and a `reached_after`
+  on `SpeedAudioDrop.swift`'s `beginSheetModal` site; `screens.py`'s `NOT_SHOWN` gains
+  `RCDevRetimeAccept` and `RCDevDerivedHidden` (CJ5b's key, missing: `screens.py --only
+  11c-transcript-tab` P2 failed on it, so it is fixed here).
+- **Documents:** spec §6b (the `retime_range` row; the transition ops moved whole to new §6d,
+  `06d-edit-operations-transitions.md`, so §6b is 455 lines), §6a (the shift list), §7.4 (the four
+  files' row), §7.10 (`edit_retime.rs`, `edit_speed_profile.rs`, `edit_clip_timing.rs`'s row
+  trimmed, `edit_link.rs`'s sentence), §9 (the Clip item), the spec README's 06d row, line 11 and
+  Lines cells, `11-decisions/` (18551 → 18617); `docs/guide/speed.md` (## Retime a range, and
+  the ×12 question's doors), `menus-and-shortcuts.md` (both Clip tables), `mcp.md` (the op row);
+  `tools/proof/README.md`'s CU9a section; this record, the toll table's row and SW7a's "Tolls
+  first".
+- **Checks in the loop:** `cargo test --release --test retime_range` 18 passed; the sweep tests;
+  `cargo test --release` 1906 passed, 0 failed; `make lint` clean; `make typecheck` exit 0, the
+  four baseline warnings; `swift_build.py typecheck retime_probe.swift` exit 0;
+  `inventory.py --check` 5/5; `spec_index_proof.py` 243/243; `assistant_prompt_proof.py --probe`
+  14/14; `v2_menu.py --only H` 5 pass, 0 fail; `make app-debug` BUILD SUCCEEDED; `retime_proof.py`
+  on Debug 12/12 rows, every row on its first run.
+- **`make gate`** once, on `bf55b962`: PASS 370 s — names 1 s, typecheck 7 s, fmt 3 s, lint 7 s,
+  test 200 s (207 result lines, 2076 passed, 0 failed), app 151 s. Again after the `NOT_SHOWN`
+  fix and this record: PASS 76 s (names 1 s, test 74 s, the other steps skipped as unchanged).
+- **Against Release** (after the gate's `make app`, one instance from `proof_app.py launch --app
+  release`, stopped by its pid): `retime_proof.py` 12/12 — R1 18 passed; R2 600 frames before,
+  375 after, frame 225 after equal to frame 450 before (rgb24 md5), the project 7.5 s shorter,
+  `render_frame` 7.5 s after equal to 15 s before (64568 bytes); R4 undo "Retime Range" and the
+  project back; R5 "clip 3 is linked to clip 5: …"; R6 "clip 3 would play at ×1200, past ×1000,
+  …"; R7 three 1500000-tick pieces at 5 s, the markers unmoved; R8a, R8b, R9p; R9 (its own
+  instance with `-RCDevRetimeAccept YES`) equal to the tool's answer; R10 `audio_left_out` [4]
+  and the exact note; Z1 nothing on either log. `op_argument_proof.py` 187/187 (111 product
+  tools, 66 ops), `op_catalog_proof.py` 23/23, and `grep "Frame Job: "` on its log printed
+  nothing. Then `speed_audio_probe.py` 20/20, `recording_probe.py --only catalog` 31/31,
+  `screens.py --only 11c-transcript-tab` 6/6 (after the `NOT_SHOWN` fix; 5/6 before it).
+- **Mutants** (eight, each CAUGHT): in the core, as edits under `cargo test --release --test
+  retime_range` — the marker-collision refusal removed (two tests failed), a non-media piece not
+  scaled (one), markers after `to` not moved (three), a linked clip accepted (one), an
+  out-of-range product clamped (one); in the app, `retime_proof.py --mutant` on Debug tree
+  copies — `sheet-apply-edit` (R8a: no question, the project changed), `keep-pitch-dropped` (R9p
+  9085 vs 9086 bytes; R9 the pieces' keep_pitch [false, true]), `no-baseline` (R8a no question;
+  R10 no `audio_left_out`); each copy built in 27–29 s.
+
+**Deviations.** A rate of exactly 1 is answered as an identity right after refusal (1), before
+the other refusals: CU-90 says only that ×1 is an identity, and an identity cannot need a
+refusal. R9's "the op's result on a copy" is the tool's result on the same document after one
+undo (which R9 checks gives back the project), the same oracle without a second document. The
+tool's `to ≤ from` is a `ToolError` after both times are snapped, as `ripple_delete_range`'s is.
+§7.4 has one row for the four new files, the file map's grouping, not four. The app mutants ran
+on Debug copies, not Release.
+
+**Review.** One review (`e18ef4b4..6ab91f72`, 46 files), verdict pass, one nit, left as it is:
+`edit_retime.rs`'s first cut takes `Outcome::Identity | Outcome::Refused(_)` as "no cut" and
+carries on, so a refused split at `from` would be skipped silently. No split can refuse today
+(`split_clips` → `finish` never does), so nothing is reachable; the reviewer's alternative, a
+comment or answering a split's refusal as the retime's own, is for whoever first lets a split
+refuse.
+
+**Integration.** Cherry-picked (`335d8b97…6ab91f72`) onto `worktree-creator-jobs` at CO2a2's
+`e18ef4b4`, the lane's own base: no conflict, nothing renumbered. The owed `CLAUDE.md` edits were
+applied. Root: the argument gate's "one hundred and eleven product tools" and
+`-RCDevRetimeAccept YES` among the dev-only launch defaults. `app/CLAUDE.md`: "sixty-five op
+tools" (twice), `SpeedAudioDrop.swift`'s entry (`retime_range`, `baseline(for:on:)`,
+`answerFields(_:)`, the Retime Range sheet among `commit`'s doors), the four files' entry after
+the derived document's, and `retime_range` with `retimeTools()` in `AgentServer+CreatorJobs.swift`'s
+bullet. `core/CLAUDE.md`: `edit_clip_timing.rs`'s entry trimmed, new `edit_speed_profile.rs` and
+`edit_retime.rs` entries, `linked_rate_sentence` in `edit_link.rs`'s, `locked_track`'s fourth
+caller in `edit_time.rs`'s, and "sixty-five op tools" in `op_table.rs`'s. `make gate` on the
+integrated tree, before this sentence: "gate: PASS 426s" (names 1 s, typecheck 7 s, fmt 3 s,
+lint 9 s, test 252 s with 207 result lines, 2076 passed, 0 failed, app 154 s). The Release proof
+is the lane's above; the integration changed no app input.
+
+**Owed.** Nothing person-only: no JOB row, no screen. Nothing to file.
+
 ### VR2b — framing composed into existing actions, and Clip ▸ Follow Subject…
 
 - **What a person gets:** select clips, choose Clip ▸ Follow Subject…, and each picture is framed on
@@ -8190,7 +8297,7 @@ rule by one named file (SW-43).
 - **What a person gets:** a picture and two or more sound clips move, cut, trim, slip and ripple as
   one, with the link glyph and echo ring on each, as a detached pair does today.
 - **Tolls first:** `edit_time.rs`'s `freeze_frame` (475–595) → `edit_freeze.rs`;
-  `edit_clip_timing.rs`'s speed-profile helpers (42–54, 57–142) → `edit_speed_profile.rs`; when
+  `edit_clip_timing.rs`'s speed-profile helpers → `edit_speed_profile.rs` (paid by CU9a); when
   `AgentCatalog+Clips.swift` stands at 580 or more, its edge rows → `AgentCatalog+ClipEdges.swift`.
   (`edit_clip.rs` and `ClipSnapshot.swift` were paid by CJ0b's T4 and CJ0d's T12.)
 - **Decisions (draft):**
