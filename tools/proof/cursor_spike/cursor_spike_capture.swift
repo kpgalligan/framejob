@@ -273,7 +273,11 @@ func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
         ? CGRect(x: display.minX + 160, y: display.minY + 120, width: 1001, height: 701)
         : CGRect(x: display.minX + 140, y: display.minY + 110, width: 900, height: 600)
     let startFrame = frame
-    let (window, view) = cursorSpikeWindow(frameTL: frame, level: .statusBar + 1, title: "Cursor Spike S2")
+    // The system picker cannot select a window above the normal level (the owner's JOB-29 run,
+    // 2026-11-02: the grey window fell behind the picker's and could not be chosen), so the
+    // picked row's window is a normal one, brought to the front before the picker shows.
+    let level: NSWindow.Level = source == "window-picked" ? .normal : .statusBar + 1
+    let (window, view) = cursorSpikeWindow(frameTL: frame, level: level, title: "Cursor Spike S2")
     let crosshair = cursorSpikeCrosshair()
     view.cursor = picture ? crosshair : nil
     let marker = CursorSpikeMarker(frame: NSRect(x: -100, y: -100, width: 24, height: 24))
