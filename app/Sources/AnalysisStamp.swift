@@ -13,6 +13,9 @@ enum AnalysisKind: String, Codable, CaseIterable {
     case shots
     /// Person masks (spec §11 CO-4, CO-10; road map CO1): `AnalysisMasks`.
     case masks
+    /// Every face per sample of source time (spec §11 CJ-30…CJ-34; road map
+    /// CJ3): `AnalysisFaces`, on its own sample grid (`grid(of:)`).
+    case faces
 
     /// The kind's version: a change to what it stores bumps it, and every
     /// marker of the old version is a miss (Vision request revisions go in
@@ -21,23 +24,26 @@ enum AnalysisKind: String, Codable, CaseIterable {
         switch self {
         case .shots: return 1
         case .masks: return 1
+        case .faces: return 1
         }
     }
 
     /// Whether the kind decodes sound (the sound queue) rather than pictures.
     var usesSoundQueue: Bool {
         switch self {
-        case .shots, .masks: return false
+        case .shots, .masks, .faces: return false
         }
     }
 
     /// The compute device the stamp records: `cpu` for `shots`, whose
     /// signature is integer arithmetic on the CPU; for `masks` the device a
-    /// pinned request reads back (spec §11 CO-11).
+    /// pinned request reads back (spec §11 CO-11); for `faces` each request's
+    /// (CJ-32).
     var device: String {
         switch self {
         case .shots: return "cpu"
         case .masks: return AnalysisMasks.device
+        case .faces: return AnalysisFaces.device
         }
     }
 
@@ -47,6 +53,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         switch self {
         case .shots: return AnalysisShots.parameters
         case .masks: return AnalysisMasks.parameters
+        case .faces: return AnalysisFaces.parameters
         }
     }
 
@@ -54,7 +61,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var margin: Int {
         switch self {
         case .shots: return AnalysisShots.margin
-        case .masks: return 0
+        case .masks, .faces: return 0
         }
     }
 
@@ -63,6 +70,27 @@ enum AnalysisKind: String, Codable, CaseIterable {
         switch self {
         case .shots: return [AnalysisShots.payloadName]
         case .masks: return [MaskPack.fileName]
+        case .faces: return [AnalysisFaces.payloadName]
+        }
+    }
+
+    /// A Vision kind's request, as its stamp records it; nil for `shots`.
+    var vision: AnalysisVisionStamp? {
+        switch self {
+        case .shots: return nil
+        case .masks: return AnalysisMasks.vision
+        case .faces: return AnalysisFaces.vision
+        }
+    }
+
+    /// The grid the kind's coverage and payload are indexed by: the media's
+    /// frames, but for `faces` its sample grid, `AnalysisFaces.rate` a second
+    /// (CJ-33).
+    func grid(of media: MediaSnapshot) -> AnalysisGrid {
+        switch self {
+        case .shots, .masks: return AnalysisGrid(media: media)
+        case .faces:
+            return AnalysisGrid(samplesPerSecond: AnalysisFaces.rate, duration: media.duration)
         }
     }
 }
@@ -113,8 +141,8 @@ struct AnalysisStamp: Codable, Equatable {
     /// The conversion, as a converted filmstrip's marker records it; non-nil
     /// iff `reader` is `converted`.
     let conversion: ConvertedThumbsStamp?
-    /// A Vision kind's request (`masks`); nil, and absent on disk, for
-    /// `shots`.
+    /// A Vision kind's request (`masks`, `faces`); nil, and absent on disk,
+    /// for `shots`.
     var vision: AnalysisVisionStamp? = nil
 
     /// The stamp of `kind` over `media` at `url`, read through `input` (nil:
@@ -135,7 +163,7 @@ struct AnalysisStamp: Codable, Equatable {
             source: source, kind: kind, version: kind.version,
             parameters: digest(kind.parameters), osBuild: osBuild, device: kind.device,
             reader: input == nil ? "raw" : "converted", conversion: conversion,
-            vision: kind == .masks ? AnalysisMasks.vision : nil)
+            vision: kind.vision)
     }
 
     /// Field by field, so no field can drop out of the comparison unseen

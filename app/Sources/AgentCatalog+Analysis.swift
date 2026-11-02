@@ -1,16 +1,19 @@
 import Foundation
 
 /// The catalog rows of `get_media_analysis` (spec §11 CJ-25; road map
-/// "creator-jobs" CJ2a) and `split_at_shots` (CJ-29, CJ2b), spliced in by
-/// `creatorTools()`.
+/// "creator-jobs" CJ2a; `masks` CO-14, `faces` CJ-34) and `split_at_shots`
+/// (CJ-29, CJ2b), spliced in by `creatorTools()`.
 extension AgentServer {
 
     func analysisTools() -> [[String: Any]] {
-        [
+        let rateText = AnalysisFaces.rateName
+        return [
             // It mirrors what the Analyzing sheet's command (CJ2b, Clip ▸ Split
             // at Shot Changes) reads: a media's analysis on this Mac,
             // made or reused. `get_transcript` is its counterpart for words.
-            // A read: no op, no `scope`, no undo step.
+            // A read: no op, no `scope`, no undo step. `masks` (CO1) and
+            // `faces` (CJ3) have no menu or pane of their own: a cut-out clip
+            // draws masks, and nothing in the app reads faces yet.
             tool(
                 "get_media_analysis",
                 "Answers an analysis of one media file, or of the part of it one clip plays, "
@@ -29,9 +32,25 @@ extension AgentServer {
                     + "0.5 % of the mask above half), count and runs [{from, to, subject_found, "
                     + "frames}] in SOURCE ticks — a run is consecutive analysed frames that "
                     + "agree on subject_found. No menu or pane reaches masks yet. A clip whose "
-                    + "set_video cutout is set draws them. With "
+                    + "set_video cutout is set draws them. kind \"faces\" finds every face "
+                    + "(Vision's face rectangles and landmarks, on the Mac) at \(rateText) "
+                    + "samples a second of source time and answers rate, count and samples "
+                    + "[{source, frame, faces: [{box: [x, y, w, h], confidence, roll, yaw, "
+                    + "mouth_gap, mouth_width}]}]: source the sample's instant in SOURCE ticks, "
+                    + "frame the presentation time of the frame it read (the first at or after "
+                    + "source, within one sample) or null; box 0…1 of the upright picture from "
+                    + "its top-left; roll and yaw in radians; mouth_gap the inner lips' height "
+                    + "and mouth_width the outer lips' width, each over the face box's height "
+                    + "(gap over width is how open the mouth is). Faces are ordered left to "
+                    + "right and carry no identity: follow one by its box from sample to "
+                    + "sample. Values are rounded to 4 decimals; null where Vision gave none. "
+                    + "A sample row with one face is about 176 bytes (221 with clip), so one "
+                    + "answer holds about 296 s of samples (236 s with clip), less when more "
+                    + "faces are in frame: read a longer media in from/to windows of at most "
+                    + "that, e.g. 2 minutes. With "
                     + "clip, from and to default to and are held inside "
-                    + "the clip's played window, and each cut also has clip_time (ticks from "
+                    + "the clip's played window, and each cut or sample also has clip_time "
+                    + "(ticks from "
                     + "the clip's start, in its playing direction — through its speed, ramp "
                     + "and reversal) and timeline (the clip's start plus clip_time). cached "
                     + "says whether the answer came from the cache alone; run "
@@ -40,8 +59,9 @@ extension AgentServer {
                     + "upright picture size; stamp what the cache was made with. A call waits "
                     + "at most \(Int(AnalysisLane.callWaitLimit)) s and then refuses naming "
                     + "how much of the window was covered — what was covered is kept, so call "
-                    + "again to continue; an answer over 512 KiB of cuts or runs is refused "
-                    + "naming the largest to that fits. It edits nothing and makes no undo step.",
+                    + "again to continue; an answer over 512 KiB of cuts, runs or samples is "
+                    + "refused naming the largest to that fits. It edits nothing and makes no "
+                    + "undo step.",
                 [
                     "media": [
                         "type": "integer",
@@ -56,7 +76,8 @@ extension AgentServer {
                     "kind": [
                         "type": "string", "enum": AnalysisKind.allCases.map(\.rawValue),
                         "description": "What to find: shots, the hard cuts; masks, a person's "
-                            + "masks' runs.",
+                            + "masks' runs; faces, every face per sample (box, roll, yaw, "
+                            + "mouth).",
                     ],
                     "from": [
                         "type": "integer",

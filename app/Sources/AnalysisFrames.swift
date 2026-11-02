@@ -38,6 +38,13 @@ struct AnalysisGrid: Equatable {
         duration = max(0, media.duration)
     }
 
+    /// A sample grid of `samplesPerSecond` (spec §11 CJ-33: `faces`).
+    init(samplesPerSecond: Double, duration: Ticks) {
+        num = samplesPerSecond
+        den = 1
+        self.duration = max(0, duration)
+    }
+
     /// Grid indices per tick.
     var rate: Double { num / (600_000 * den) }
 

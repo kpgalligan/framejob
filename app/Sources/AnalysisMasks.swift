@@ -28,14 +28,12 @@ import Vision
 enum AnalysisMasks {
     static let publishInterval: TimeInterval = 30
 
-    enum Device: String { case cpu, gpu, neuralEngine = "neural_engine" }
-
     /// CO-11: CJ-S2's rule 1 read for the mask request.
-    static let computeDevice: Device = .gpu
+    static let computeDevice: AnalysisVision.Device = .gpu
     /// CO-11: CO-S1's Standard rate on that device.
     static let rate = "every"
     /// The device a pinned request reads back, once (the stamp's `device`).
-    static let device: String = pin(makeRequest())
+    static let device: String = AnalysisVision.pin(makeRequest(), to: computeDevice)
 
     static let vision = AnalysisVisionStamp(
         request: "person_segmentation", quality: "balanced", revision: 1, rate: rate,
@@ -56,30 +54,6 @@ enum AnalysisMasks {
         request.revision = VNGeneratePersonSegmentationRequestRevision1
         request.outputPixelFormat = kCVPixelFormatType_OneComponent8
         return request
-    }
-
-    /// Sets `computeDevice` on every stage the request supports and answers
-    /// the devices it reads back (sorted, `+`-joined; `auto` for a stage
-    /// left unset).
-    static func pin(_ request: VNRequest) -> String {
-        guard let stages = try? request.supportedComputeStageDevices else { return "unavailable" }
-        var names = Set<String>()
-        for (stage, devices) in stages {
-            if let pick = devices.first(where: { name(of: $0) == computeDevice.rawValue }) {
-                request.setComputeDevice(pick, for: stage)
-            }
-            names.insert(request.computeDevice(for: stage).map(name(of:)) ?? "auto")
-        }
-        return names.isEmpty ? "auto" : names.sorted().joined(separator: "+")
-    }
-
-    private static func name(of device: MLComputeDevice) -> String {
-        switch device {
-        case .cpu: return Device.cpu.rawValue
-        case .gpu: return Device.gpu.rawValue
-        case .neuralEngine: return Device.neuralEngine.rawValue
-        @unknown default: return "unknown"
-        }
     }
 
     /// What a publish covers: all of `range` when `finished`; else through
@@ -283,7 +257,7 @@ enum AnalysisMasks {
             &wrapped) == kCVReturnSuccess, let wrapped
         else { throw AnalysisFrames.ReadError.reader("the frame could not be wrapped") }
         let request = makeRequest()
-        let named = pin(request)
+        let named = AnalysisVision.pin(request, to: computeDevice)
         guard named == device else { throw MaskError.device(named) }
         try VNImageRequestHandler(cvPixelBuffer: wrapped, options: [:]).perform([request])
         var bytes: [UInt8]

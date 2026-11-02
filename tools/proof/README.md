@@ -27498,6 +27498,52 @@ python3 tools/proof/co1_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind masks --socket <dir>/agent.sock   # CO-12, Release
 ```
 
+## Road map "creator-jobs" CJ3 — face samples on the Mac (`faces_proof.py` P1–P5, F1–F7, Z1; five mutants; `creator_spike/faces_spike.py`; `creator_spike/lane_spike.py --playback --kind faces`; spec §11 CJ-30…CJ-35)
+
+**`face_fixtures.py`** makes the face fixtures in `tools/proof/media/analysis/` (gitignored) and
+`faces.json` beside them. The pictures are read in place from Photos' FlexAudio covers
+(`/System/Library/Photos/Resources/FlexAudio/e5fc4933-….jpg`, the two-person cover, and a
+130-pixel square crop of its front man that Vision finds exactly one face in); a missing picture
+is a scored failure naming its path. The truth of a fixture at t is its overlay's corner at t plus
+the face box the spike probe's `image` mode finds on the picture, at the overlay's scale:
+- `faces_moving.mov` (the crop at 540 drifting over 1920 × 1080, 30 fps, 60 s, H.264, the moving
+  still's cosine drift) and `faces_moving_4k.mov` (the same at 3840 × 2160, HEVC);
+- `faces_small.mov` (the face box an eighth of the frame's height, 1080p30, 60 s);
+- `faces_two.mov` (the whole cover at 1080², still 5 s, then sliding UP at 60 px/s, 20 s: the back
+  man's face leaves through the top at 13.516 s while the front man's is whole until 14.3 s; the
+  two faces overlap in x, so a slide left could not take one out with the other whole);
+- `faces_portrait.mov` (1080 × 1920) and `faces_portrait_rot.mov` (its frames turned a quarter
+  anticlockwise, coded 1920 × 1080, `-display_rotation -90`), 20 s;
+- `faces_converting.mov` (`faces_moving`'s picture at 25 fps, 20 s; the proof sets
+  `set_media_color {log: slog3}` on it).
+
+**`creator_spike/faces_spike.py`** is spike CJ-S2: `faces_spike.swift` (built over
+`swift_build.app_sources()`, optimised; modes `image` and `run`) reads through the app's
+`AnalysisFrames.read`, makes a fresh request per analysed frame and reads each request's pin back
+per stage; `faces_deciders.py` holds rules 1–5 (stdlib, no I/O; `--selftest` runs 23 rows, one
+per branch, including a device dropped because its readback is not that device). Results in
+`tools/proof/work/creator_spike/CJ-S2/results.json`, one `VERDICT` line.
+
+**`faces_proof.py`** builds `faces_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS`
+through `swift_build.py`.
+- **P1–P5** are probe rows: `samples.bin`'s round trip, the merge in either order, a damaged
+  file written fresh; CJ-31's order and `topLeft`; the sample a frame serves (25 fps at 10 a
+  second, a gap); the stamp; `facesAnswer`'s 4 decimals, nulls, row bytes (printed for CJ-34)
+  and cap.
+- **F1–F7** are app rows over `get_media_analysis {kind: "faces"}` on one launch with a scratch
+  `CFFIXED_USER_HOME`, and Z1 its parity grep. F5 (S-TH1's mouth gap) is skipped by name and owed.
+
+```sh
+python3 tools/proof/face_fixtures.py
+python3 tools/proof/creator_spike/faces_spike.py --selftest
+python3 tools/proof/creator_spike/faces_spike.py                      # CJ-S2, on AC
+python3 tools/proof/faces_proof.py --only P1,P2,P3,P4,P5             # no app
+make app-debug && python3 tools/proof/faces_proof.py
+RC_PROOF_APP=release python3 tools/proof/faces_proof.py              # the recorded run
+python3 tools/proof/faces_proof.py --mutant <name>
+python3 tools/proof/creator_spike/lane_spike.py --playback --kind faces --socket <dir>/agent.sock   # CJ-35, Release
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

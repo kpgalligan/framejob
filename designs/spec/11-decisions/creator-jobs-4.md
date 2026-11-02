@@ -414,3 +414,105 @@ the status saying so, which is CO3's Background section. No format bump, no core
   - **(i) The proof** is `co2b_proof.py`: P1 (the need rule), P2 (the keep rule), W1–W9 with W3b
     and W4b, Z1, and eight mutants; JOB-62 is the person's check that a paused picture redraws
     cut without play.
+
+CJ-30…CJ-35 are CJ3's (face samples: the `faces` analysis kind), recorded before its code with
+spike CJ-S2's verdicts; CJ-35 was recorded after CJ-S3 (b)'s run with a `faces` job, which needs
+the built app, and CJ-34's measure after the probe's. The road map expected
+no owner question for CJ3, and the owner's answers of 2026-11-01 hold none. Nothing here sends
+anything: Vision runs on the Mac, so there is no `ModelKeys` row (CJ-3). No core, FFI or format
+change (CJ-20); no tool is added.
+
+- **CJ-30 — `faces`, the first machine-learning kind, at CJ-S2's rate, size and reader.** Per
+  sample of source time, every face Vision finds: its box, confidence, roll and yaw
+  (`VNDetectFaceRectanglesRequest` revision 3) and, from `VNDetectFaceLandmarksRequest` revision 3
+  with `constellation = .constellation76Points` over those observations, the mouth's inner-lip gap
+  and outer-lip width, each over the face box's height in picture pixels (CJ-33). Each request is
+  FRESH, on a fresh `VNImageRequestHandler`, per analysed frame; no request is stateful.
+  - **CJ-S2's run** (`faces_spike.py`, `rule_sha256` `c41417fb…95bb2b11`, matching; macOS 26.5.1
+    (25F80), Apple M2 Max, on AC power, three lanes on the machine). The inputs were the face
+    fixtures (`face_fixtures.py`); S-TH1…S-TH4 do not exist. `VERDICT rate=10 size=720
+    landmarks=yes rectangles=neural_engine(branch 1) landmarks_device=neural_engine(branch 1)
+    reader=converted compare=cross_run dropped=none realtime_1080=10.30 realtime_4k=8.88`.
+  - **Rule 3, the size.** On `faces_small.mov` (the face box an eighth of the frame's height),
+    recall was 1.0000 over 600 samples at 720, 1280, 1920 and native (1920), so the read's long
+    side is **720**, or the media's own when smaller.
+  - **Rule 2, the rate.** At 720 on rule 1's devices, decode + rectangles + landmarks ran at
+    10.29, 10.30 and 10.31× real time on 1080p30 (`faces_moving.mov`) and 8.87, 8.88 and 8.95×
+    on 4K30 (`faces_moving_4k.mov`), past 3× and 1.5×: **10 samples a second**.
+  - **Rule 4, landmarks.** At that rate on 1080p30 the landmarks' median Vision seconds were
+    1.51 against the rectangles' 4.02 (0.38×, under 2×): the mouth measures **stay in `faces`**,
+    and SW8 builds no `mouths` kind.
+  - **Rule 5, the reader.** No log or HLG sample exists, so face kinds read through the
+    **converted** reader for a converting media — `AnalysisFrames.read`'s standard arms, direct
+    or through `oneClip` and step 0 (CJ-23), not CO-7's third arm. The log and HLG rows are owed
+    with S-TH2…S-TH4.
+  - **Rule 6** (S-TH1's face share) and every S-TH row skip by name and are owed in CJ3's record.
+- **CJ-31 — No identity is stored.** Each sample's faces are stored as Vision found them, in a
+  fixed order: by box centre x, then centre y, both in CJ-22's top-left frame, compared as exact
+  `Float`s (`AnalysisFaces.ordered`). A consumer that needs a face followed links faces itself over
+  the window it reads (VR in the core, VR-21; SW by each sample's largest face, SW-81). No face is
+  named or compared across media. Values are raw; smoothing is a planner's.
+- **CJ-32 — Each request is pinned to its device, read back per job and recorded in the stamp.**
+  CJ-S2's rule 1 picks a device per request, and only among devices that EVERY stage of that
+  request reads back after the pin (`AnalysisVision.pin`): a device left `auto` or `unavailable`,
+  or read back as another, is dropped and listed. In the run both requests had one stage
+  (`VNComputeStageMain`), and every run on each of the three devices read back that device, so
+  none was dropped. Each device's three digests were identical, and the Neural Engine was the
+  fastest for both: rectangles 5.15…5.21 s over 600 samples at 1280 (the GPU 6.69…6.97, the CPU
+  13.90…13.99), landmarks 1.18…1.20 s (the GPU 2.76…5.79, the CPU 3.59…8.85). So **both requests
+  run on the Neural Engine** (branch 1). The stamp's `device` is
+  `rectangles:<readback>;landmarks:<readback>`, read once; a job re-pins every fresh request and
+  refuses to run when one reads back other than the stamp says (`FaceError.device`). Branch 1
+  means two runs on the pinned device write the same bytes, which `faces_proof.py`'s F2 checks
+  across runs; under branch 3 the proofs would compare against the cache only (E9's rule).
+- **CJ-33 — The sample grid and `samples.bin`.**
+  - **The grid** is `AnalysisGrid(samplesPerSecond: 10, duration:)` (`AnalysisKind.grid(of:)`):
+    the coverage and the payload are indexed by sample k, at `ticks(k) = round(k × 600000 / 10)`.
+  - **Sample k** takes the first kept frame whose pts lies in `[ticks(k), ticks(k) + one sample
+    interval)`; with none it holds pts −1 and no faces. A frame is tested against the kept frame
+    before it, so the choice is the same whatever the job's bounds, and a frame serving two
+    samples is analysed once (`AnalysisFaces.samples(at:after:grid:)`).
+  - **The read** covers the frame indices from `ticks(k0)` through one sample interval plus one
+    frame past `ticks(k1)`, clamped to the media, through `AnalysisFrames.read` with its pre-roll
+    (so the frame before the first is known), at CJ-30's size.
+  - **The mouth.** The gap is the vertical extent of `innerLips.pointsInImage`, the width the
+    horizontal extent of `outerLips.pointsInImage`, each divided by the face box's height in the
+    read picture's pixels; image axes, raw. NaN when Vision gives no lips.
+  - **The file** (`cache/analysis/faces/<id>/samples.bin`, little-endian): a 16-byte header —
+    ASCII `FJFS`, `UInt16` version 1, `UInt16` face record bytes (36, or 28 without landmarks),
+    `UInt32` sample count, `UInt32` face count; one 16-byte row per sample index from 0 — `Int64`
+    the frame's pts in ticks (−1: none), `UInt32` its first face, `UInt32` its face count; then
+    the face records — `Float32` x, y, width, height (0…1, top-left, display orientation),
+    confidence, roll, yaw (radians), mouth gap, mouth width (NaN: absent).
+  - **The publish.** A job publishes through `AnalysisStore.publishFile` every 30 s, through the
+    samples decided (a sample is decided once a frame past its interval, or the frame serving it,
+    has been read), and at each range's end. Its write decodes the on-disk file and replaces the
+    covered samples; a file that does not decode, or holds another sample count or record size,
+    is written fresh and answers false, so the marker keeps the job's coverage alone.
+- **CJ-34 — `get_media_analysis {kind: "faces"}`'s answer.** Beside the common fields (CJ-25):
+  `rate` (10), `count` and `samples`, one row per COVERED sample in the window:
+  `{source, frame, faces: [{box: [x, y, w, h], confidence, roll, yaw, mouth_gap, mouth_width}]}`,
+  `source` the sample's instant `ticks(k)`, `frame` the read frame's pts or null; with `clip` also
+  `clip_time` and `timeline` from `source` (`AnalysisClipTimes`). Every float is rounded to 4
+  decimals in the ANSWER only (`AgentServer.answerValue`; ≤ 0.4 px of a 4K frame's width), NaN
+  answering null; the cache stays raw. The rounded value is written as a decimal number
+  (`NSDecimalNumber` of its shortest spelling): `JSONSerialization` prints a `Double` to 17
+  significant figures, so a rounded `Double` alone came out as `0.43219999999999997` (P5's first
+  run). CJ-25's default window (the whole media, or the clip's played window) and its 512 KiB cap
+  stand: over the cap the call is refused naming as the largest `to` the `source` of the first row
+  that does not fit, as masks' runs are. **Measured** (`faces_probe.swift` P5, a one-face row at a
+  late source): 176 bytes without `clip` and 221 with it, so a default call holds 2,962 rows, 296 s
+  of samples (2,361, 236 s, with `clip`), less with more faces in frame. The catalog's prose and
+  spec §7.9e state that length and tell an agent to read a longer media in `from`/`to` windows of
+  at most that (the prose's example is 2 minutes).
+- **CJ-35 — CJ-S3 (b) with a `faces` job: no pause.** `lane_spike.py --playback --kind faces`
+  (`rule_sha256` `209c6f01…f0309ce830`, matching) on a Release instance: `play_preview`'s composed
+  frames over 20 s of a 1080p30 timeline, idle and then with a `faces` job wanted on another
+  document over the moving still, three of each. The recorded run, with the job over the whole
+  ten-minute still and running through every play: idle 600, 600, 600 and busy 600, 600, 600, a
+  0.0 % drop. Three earlier runs on the same instance: a 120 s window (597, 599, 600 against 598,
+  600, 600; each job landed in about 9 s, inside the play, so the window was widened); the whole
+  still with the job rows read wrongly (600, 599, 600 against 600, 600, 600); and once more (600,
+  599, 600 against 224, 600, 600, the 224 while the machine's load average was 32.85 with the other
+  lanes' builds; the median still 600). No run passed the 2 % rule, so **the picture queue does not
+  pause** for `faces`, and CJ-21 stands unamended.

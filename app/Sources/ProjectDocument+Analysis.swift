@@ -36,7 +36,7 @@ extension ProjectDocument {
         let urls = mediaURLs()
         guard let url = urls[media.id] else { throw AnalysisRequestError.missingFile(media.id) }
         guard let cacheDir = cacheDirectory else { throw AnalysisRequestError.noCache }
-        let grid = AnalysisGrid(media: media)
+        let grid = kind.grid(of: media)
         // No index in the window is no need: the stamp is still made first, so an unreadable
         // file throws as it always did.
         let need = grid.indices(from: window.lowerBound, to: window.upperBound)

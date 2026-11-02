@@ -6331,6 +6331,155 @@ in `tools/proof/media/creator/`.
   C.
 - **Questions:** none expected; CJ-S2 decides device, rate, size and reader.
 
+#### CJ3's record (2026-11-02)
+
+**Landed.** Lane B, base `e18ef4b4`. The commits, in order:
+- `b0917aae`: the toll, `AnalysisVision.swift` (36: the device enum, `pin` with the device a
+  parameter, `name(of:)`) out of `AnalysisMasks.swift` (313 → 287), a pure move; `co1_proof.py`'s
+  `device-unpinned` anchor re-pointed. It came first because the spike's probe reads each
+  request's pin back through `AnalysisVision.pin`.
+- `d73ff658`: the head. Spike CJ-S2 run, CJ-30…CJ-35 recorded (CJ-35 pending), the instruments.
+  That commit came before the app code.
+- `ebcdb2cb`: the app code, its documents and the proof; CJ-34's measure and CJ-35 recorded.
+- This record.
+
+No core, FFI or format change (CJ-20), and no tool added. An agent gets
+`get_media_analysis {kind: "faces"}`; a person sees nothing.
+
+- **New files** (`wc -l`): `AnalysisFaces.swift` 270, `AnalysisFaces+Samples.swift` 135,
+  `AgentServer+AnalysisFaces.swift` 101, `AnalysisVision.swift` 36.
+- **Changed:** `AnalysisStamp.swift` 206 → 234 (`faces` in every switch, `vision`,
+  `grid(of:)`), `AnalysisFrames.swift` 394 → 401 (the grid's `init(samplesPerSecond:duration:)`
+  only), `AnalysisLane.swift` 324 → 328 (the `.faces` arm), `AgentServer+Analysis.swift` 348 →
+  350, `AgentCatalog+Analysis.swift` 112 → 133, `ProjectDocument+Analysis.swift` 73 (one line:
+  `kind.grid(of:)`).
+- **Not touched:** `BackgroundRender.swift` and the picture queue's pause (CJ-S3 (b) did not
+  fire), and the generic callers of a kind (`AgentServer+AnalysisJob.swift`, `ShotSplit.swift`,
+  `CutoutMasks.swift`, `AnalyzingSheetController.swift`, `DerivedCarry.swift`).
+- **Instruments:** `face_fixtures.py` (327), `creator_spike/faces_spike.swift` (270),
+  `faces_deciders.py` (214, 23 selftest rows), `faces_spike.py` (217), `lane_spike.py --kind
+  faces`, `faces_probe.swift` (301) and `faces_proof.py` (520: P1–P5, F1–F7, Z1, five mutants).
+- **Documents:** spec §5.6 (322 → 333), §7.4 (row 50), §7.9e (524 → 540) and their index cells,
+  `creator-jobs-4.md` (278 → 380) with six index rows, `docs/guide/mcp.md`,
+  `projects-and-media.md`, and `tools/proof/README.md`.
+
+**The head.** macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset`: "Now drawing from 'AC
+Power'"), three lanes on the machine.
+- **CJ-S2** (`rule_sha256` `c41417fb…95bb2b11`, matching): `VERDICT rate=10 size=720
+  landmarks=yes rectangles=neural_engine(branch 1) landmarks_device=neural_engine(branch 1)
+  reader=converted compare=cross_run dropped=none realtime_1080=10.30 realtime_4k=8.88`.
+  - Rule 1, 600 samples of `faces_moving.mov` at 1280. Both requests have one stage
+    (`VNComputeStageMain`), and every run read back the device it was pinned to. Rectangles: CPU
+    13.99, 13.90 and 13.91 s; GPU 6.69, 6.84 and 6.97 s; Neural Engine 5.19, 5.21 and 5.15 s.
+    Landmarks: CPU 3.59, 5.55 and 8.85 s; GPU 5.79, 3.04 and 2.76 s; Neural Engine 1.20, 1.18
+    and 1.20 s. Each device's three digests were equal, and the devices' digests differed.
+  - Rule 3 on `faces_small.mov`: recall 1.0000 over 600 samples at 720, 1280, 1920 and native.
+  - Rule 2 at 720: 10.29, 10.30 and 10.31× on 1080p30; 8.87, 8.88 and 8.95× on 4K30.
+  - Rule 4: landmarks 1.51 s against rectangles 4.02 s (0.38×).
+  - Rule 5: no log or HLG sample, so converted. Rule 6 skipped.
+  - One-minute loads were 6.16…41.11 over the 24 runs of rules 1 and 2.
+- **CJ-S3 (b) with faces** (`rule_sha256` `209c6f01…f0309ce830`, matching; Release, PID 92365,
+  stopped after): four runs of three, described in CJ-35. The recorded one: idle 600, 600 and
+  600, busy 600, 600 and 600 with the job running through each play, a 0.0 % drop: no pause.
+- The results files are `tools/proof/work/creator_spike/CJ-S2/results.json` and
+  `CJ-S3-faces/results.json`, each with `rule_matches: true`.
+
+**Commands and results.**
+- `make typecheck` after the toll and after the app code: exit 0, the four baseline warnings.
+- `co1_proof.py --only P1,…,P10` after the toll: 10/10.
+- `faces_spike.py --selftest`: 23 rows, 0 failed.
+- `swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS tools/proof/faces_probe.swift`: exit 0.
+- `faces_proof.py --only P1,…,P5`: 3/5 at first. P2's box was symmetric about the flip (an
+  instrument fault). P5 found 18 decimals in the answer's bytes: `JSONSerialization` prints a
+  `Double` to 17 significant figures. Fixed (below), 5/5.
+- Debug (`make app-debug`), the whole proof: 11/12. F3 failed on its first measure, the largest
+  difference of any box value between the upright and rotated runs (0.0310 against 0.02). The
+  centres agreed (mean differences −0.0014, −0.0001, −0.0001, 0.0); the width moved between
+  the two lossy encodes. F3 now scores F1's measure, the centres' RMS against 2 % of the width:
+  `--only F3` 2/2 (4.16 px against 21.6). On Debug the rotated file reads about 3 frames a second
+  through `Upright`'s per-pixel loop, so F3 takes about 5 minutes there.
+- `make gate`: "gate: PASS 278s" (names, typecheck, fmt, lint, test and app ran). Over this
+  record, before this sentence: "gate: PASS 1s" (names alone ran).
+- `spec_index_proof.py` 240/240.
+- **Release** (`RC_PROOF_APP=release`, after the gate's `make app`), on the final instrument:
+  - `faces_proof.py`: **12/12**, F5 skipped by name. F1 RMS 5.87 px (5.77 on the trimmed
+    placement); F2 31,216 bytes twice, identical; F2b 0 of 200 samples off; F3 4.16 px; F4 84
+    samples with both whole, the sample at 13.6 s holding one; F6 recall 1.0000; F7 7.06 s per
+    minute of 1080p30 (10.21 on Debug).
+  - `analysis_proof.py --only A1,A2,A3,A9,A10,Z1`: 6/6.
+  - `co1_proof.py --only M2,M3,Z1`: 4/4 (M1 runs with M2).
+- Z1 printed nothing on every launch.
+- **Mutants** (five): each once, on the final instrument, CAUGHT:
+  - `device-unpinned` (P4): the stamp's device `rectangles:auto;landmarks:auto`.
+  - `y-not-flipped` (P2): (0.125, 0.125, 0.25, 0.5) stayed at y 0.125.
+  - `nearest-frame` (P3): sample 1 took frame 2, not 3.
+  - `orientation-ignored` (F3, the app built as Release in a tree copy in 158 s): every rotated
+    face's roll 1.5309, the centres 776.61 px apart.
+  - `source-in-clip-ticks` (F1, built in 155 s): all 300 trimmed rows off their window.
+  - The copy was removed after.
+
+**What the rows found.**
+- Every sample of the 60 s moving fixture held its one face; the path's RMS was 5.87 px of 1920.
+- A one-face row is 176 bytes of JSON, 221 with `clip`: a default call holds 296 s of samples
+  (236 s with `clip`), so a media longer than about four minutes is read in windows (CJ-34).
+
+**Deviations.**
+- **The toll came before the head**, not after it: the spike's probe calls `AnalysisVision.pin`.
+- **The answer writes each rounded value as an `NSDecimalNumber`** of its shortest spelling. The
+  spec assumed `JSONSerialization` prints a rounded `Double` in short form; it printed
+  `0.43219999999999997`. CJ-34 records it.
+- **`faces_two.mov` slides up, not left.** The two faces overlap in x (the back face spans
+  158…467 px of the 1080² cover and the front 312…677), so no slide left takes the back face out
+  while the front one is whole. Sliding up, the back face leaves at 13.516 s and the front is
+  whole until 14.3 s.
+- **F3 scores the face centres' RMS** against 2 % of the width (F1's measure), not every box
+  value within 0.02 (above).
+- **CJ-S3 (b)'s faces job covers the whole ten-minute still**, not 120 s: a 120 s faces job
+  landed in about 9 s, inside the 20 s play. `lane_spike.py` also now reads the LAST job row for
+  a media and project, since a re-run on one instance lists the earlier run's rows first.
+- **F6 passes at 98 % of CJ-S2's recall** (rule 3's floor). The spec only says to record it.
+- **The app mutants were built as Release** in their tree copies, as CO1's were.
+
+**Review.** One review (`e18ef4b4..7ce3df40`), verdict pass, every Files and Approach item
+done, three nits. Two applied at integration, one left as it stands:
+- `analysisAnswerCap`'s doc said it capped `cuts` and `runs`; it now names `samples` (CJ-34).
+- `facesAnswer` parsed each rounded value with `NSDecimalNumber(string:)` and no locale; it now
+  passes `en_US_POSIX`, so the "." of `String(Double)` is read the same on any Mac. `faces_proof.py
+  --only P5` after it: 1/1, the same 176 and 221 bytes.
+- Left: the landmarks results are matched to the rectangles' faces by position. Vision answers
+  one landmarks observation per input face, in input order; matching by `uuid` would change the
+  cache's semantics only if it ever did not, and would need the app rows run again.
+
+**Integration (2026-11-02).** Cherry-picked (`b0917aae…7ce3df40`) onto `worktree-creator-jobs`
+at CO2b's `acc4cbd7`, after CU9a and CO2b. Conflicts, each kept both sides:
+- `creator-jobs-4.md` holds CU9a's CU-90, CO2b's CO-22, then CJ-30…CJ-35 (518 lines; its index
+  row 518, the three summaries joined), and the decision index's rows in that order. CJ-30's
+  intro line's "the product tool count stays 107" became "no tool is added" (CU9a's
+  `retime_range` made it 111).
+- `ProjectDocument+Analysis.swift`: CO2b's form kept (the instance method builds the need, the
+  `nonisolated` static takes it); CJ3's one change moved to the instance method's grid,
+  `kind.grid(of: media)`. `CutoutWants` keeps `AnalysisGrid(media:)`, which is the masks grid.
+- `docs/guide/mcp.md`'s `get_media_analysis` row has CJ3's faces clause and CO2b's cutout
+  sentences; `projects-and-media.md`'s `cache/` row names faces beside the masks made for Remove
+  Background.
+- The spec indexes' cells recomputed: §7.9e 544, the `11-decisions/` folder 18799 in 38 files.
+No format, so nothing renumbered. The owed `app/CLAUDE.md` edits went in: the four files in the
+analysis entry's list and the `faces` paragraph after the masks one. `make typecheck`: 0 errors,
+the four baseline warnings; `spec_index_proof.py` 243/243. `make gate` on the integrated tree:
+PASS 318 s (names 1, typecheck 7, fmt and lint skipped, test 155, app 155). Then
+`RC_PROOF_APP=release faces_proof.py` on that Release build: 12/12, F5 skipped by name, every
+figure as the lane's but F7, 6.55 s per minute.
+
+**Owed.**
+- S-TH1: CJ-S2's rule 3 recall and rule 6 face share, and F5 (the mouth gap in speech against
+  pauses), with the owner's talking head.
+- S-TH2…S-TH4: CJ-S2's rule 5 rows on log and HLG samples (converted until then).
+- Filed after the commit (`ai-drafted`, `low-priority`): the analysis reader turns every decoded
+  frame upright (`Upright`), even the frames a sampled kind does not analyse. `faces` analyses one
+  frame in three at 30 fps, so on a rotated media two thirds of the copies are wasted.
+
+None is a STOP. No manual check.
+
 ### FC3 — sound events, heard on the Mac
 
 Bet 4 opens here. FC's phases run in lane A after TX and CJ5b. No phase bumps the format. The first

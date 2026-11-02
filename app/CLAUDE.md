@@ -475,9 +475,10 @@ detail there.
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `MaskPack.swift` ·
+  `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
   `AnalysisClipTimes.swift` ·
   `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
-  `AgentServer+AnalysisMasks.swift` ·
+  `AgentServer+AnalysisMasks.swift` · `AgentServer+AnalysisFaces.swift` ·
   `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
   `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
   `EditorViewController+ShotSplit.swift` · `ProjectDocument+Masks.swift` ·
@@ -517,6 +518,24 @@ detail there.
   clip's played window (a pure move, CO1's toll), and
   `AgentServer+AnalysisMasks` holds the answer's `mask_size`, `frames`,
   `subject_found` and `runs`, never pixels.
+  The `faces` kind (road map creator-jobs CJ3, spec §11 CJ-30…CJ-35):
+  `AnalysisFaces` reads at long side 720 through the standard arms
+  (direct, or converted for a converting media) and, per analysed frame,
+  makes a FRESH `VNDetectFaceRectanglesRequest` and a fresh
+  `VNDetectFaceLandmarksRequest` (revision 3, `.constellation76Points`),
+  each on a fresh handler and pinned to the Neural Engine; a job refuses a
+  request that reads back another device. `AnalysisVision` is the device
+  enum and `pin` both Vision kinds use (a pure move out of
+  `AnalysisMasks`). Its grid is a sample grid, 10 a second
+  (`AnalysisKind.grid(of:)`, `AnalysisGrid(samplesPerSecond:duration:)`):
+  sample k takes the first kept frame in `[ticks(k), ticks(k) + one
+  interval)`, else pts −1; faces are ordered by box centre x then y, with
+  no identity. `AnalysisFaces+Samples` is `samples.bin` (`FJFS`): its codec
+  and the publish's decode-and-merge write (an undecodable file is written
+  fresh). `AgentServer+AnalysisFaces` holds the answer's rows, every float
+  rounded to 4 decimals and written as an `NSDecimalNumber` read in
+  `en_US_POSIX` (`JSONSerialization` prints a `Double` to 17 significant
+  figures), and the cap's refusal.
   `get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`,
   off main) wait holding the agent lane's lock, at most
   `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and

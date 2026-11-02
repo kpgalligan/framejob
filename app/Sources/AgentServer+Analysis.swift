@@ -2,8 +2,9 @@ import Foundation
 
 /// `get_media_analysis` (spec §11 CJ-25; road map "creator-jobs" CJ2a): any
 /// analysis kind of one media or clip, made on this Mac or read from its
-/// cache — `shots`, the hard cuts, first, and `masks`, the person masks' runs
-/// (CO1, spec §11 CO-14, `AgentServer+AnalysisMasks.swift`).
+/// cache — `shots`, the hard cuts, first, `masks`, the person masks' runs
+/// (CO1, spec §11 CO-14, `AgentServer+AnalysisMasks.swift`), and `faces`, the
+/// face samples (CJ3, spec §11 CJ-34, `AgentServer+AnalysisFaces.swift`).
 /// `get_transcript`'s counterpart for pictures and sounds.
 ///
 /// An APP-STATE tool and a read: nothing is edited and no undo step is made.
@@ -146,7 +147,8 @@ extension AgentServer {
 
     // MARK: - The answer, from captured values
 
-    /// The answer's cap on its `cuts` and `runs` (CJ-25, CO-14).
+    /// The answer's cap on its `cuts`, `runs` and `samples` (CJ-25, CO-14,
+    /// CJ-34).
     static let analysisAnswerCap = 512 * 1024
 
     /// The common fields (`ok`, `kind`, `media`, `clip`, `from`, `to`,
@@ -163,6 +165,7 @@ extension AgentServer {
         switch call.kind {
         case .shots: result.merge(try shotsFields(call)) { _, kind in kind }
         case .masks: result.merge(try masksFields(call)) { _, kind in kind }
+        case .faces: result.merge(try facesFields(call)) { _, kind in kind }
         }
         if let clip = call.clip { result["clip"] = Int(clip.id) }
         if marker?.canned == true {
@@ -224,7 +227,7 @@ extension AgentServer {
     /// The bound's sentence: how much of the window is covered, and to call
     /// again (CJ-25).
     private static func timedOutSentence(_ call: AnalysisCall) -> String {
-        let grid = AnalysisGrid(media: call.media)
+        let grid = call.kind.grid(of: call.media)
         let window = grid.indices(from: call.from, to: call.to)
         var covered = 0
         if let window, let stamp = call.request?.stamp,

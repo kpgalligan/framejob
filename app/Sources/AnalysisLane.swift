@@ -320,6 +320,10 @@ final class AnalysisLane: @unchecked Sendable {
                 finished = try AnalysisMasks.run(
                     request, cancelled: cancelled,
                     progress: { [self] fraction in setProgress(fraction, of: request) })
+            case .faces:
+                finished = try AnalysisFaces.run(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
             }
             return finished ? .landed : .cancelled
         } catch {

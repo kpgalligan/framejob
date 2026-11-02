@@ -108,7 +108,8 @@ MASKS = "app/Sources/AnalysisMasks.swift"
 STORE = "app/Sources/AnalysisStore.swift"
 MUTANTS = {
     "device-unpinned": (["M3"], [(
-        MASKS, "                request.setComputeDevice(pick, for: stage)\n", "")]),
+        "app/Sources/AnalysisVision.swift", "                request.setComputeDevice(pick, for: stage)\n",
+        "")]),
     "fast-quality": (["M2"], [(
         MASKS, "        request.qualityLevel = .balanced\n", "        request.qualityLevel = .fast\n")]),
     "times-off-by-one": (["M1"], [(
