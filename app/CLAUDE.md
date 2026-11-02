@@ -184,7 +184,10 @@ detail there.
   `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required).
   `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21) holds
   `CutoutSubject`, `CutoutQuality`, `CutoutBackground`, `CutoutProps` (`VideoProps.cutout` and
-  `VideoPatch.cutout`; its `dictionary` writes all five keys), `RecipeCutoutMaskKind`,
+  `VideoPatch.cutout`; its `dictionary` writes all five keys), `CutoutPatch` (the sparse
+  write `VideoPatch.cutoutPart` carries — written under `cutout` only when `cutout` is nil,
+  never decoded — so a Background, Edge or Feather row writes its own key alone, CO3),
+  `RecipeCutoutMaskKind`,
   `RecipeCutoutMask` (`kind` and `media` required) and `RecipeCutout` (the recipe layer's
   `cutout`, `mask` required); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
   instruction, not the clip's props. `VideoProps.swift` (`VideoProps`),
@@ -482,7 +485,9 @@ detail there.
   `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
   `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
   `EditorViewController+ShotSplit.swift` · `ProjectDocument+Masks.swift` ·
-  `CutoutWants.swift` · `EditorViewController+Cutout.swift` —
+  `CutoutWants.swift` · `EditorViewController+Cutout.swift` ·
+  `CutoutStatus.swift` · `CutoutStatus+Memo.swift` · `VideoPane+Cutout.swift` ·
+  `AgentServer+Cutout.swift` · `AgentCatalog+Cutout.swift` —
   on-device analysis of the media (road map creator-jobs CJ2a, spec §11
   CJ-20…CJ-29): a cache made on demand in `cache/analysis/<kind>/`, never at
   import, never project state, never read by the plan or the recipe.
@@ -572,6 +577,33 @@ detail there.
   paused frame for a `masks` publish in its document's cache folder.
   `ProjectDocument.analysisRequest`'s static form (`…need:`, `nonisolated`)
   is what the wants call off main; `analysisInput` is `nonisolated` for it.
+  Remove Background in the inspector and the menus (road map creator-jobs
+  CO3, spec §11 CO-30, CO-31): `CutoutStatus.swift` (names no `rc_*`) is a
+  clip's status — `CutoutState`, `CutoutClipStatus` and the internal
+  `Detail` it was read from: its windows over `[project]` (with a nest open,
+  `[project, editedProject]`), the needed and stored indices for the
+  analysis's stamp (memoised per cache folder, media and URL, main only),
+  CO-26's subject over the clip's hull, then in order off → no picture →
+  ready or no person (before any failure) → failed (no file, no cache
+  folder, no stamp, or a `.failed` run of `maskOwner`'s requests meeting the
+  clip's needed, uncovered indices) → analysing with `progress`
+  `(C_out + f·R_in)/N` over the running request's ranges; it also holds
+  `words`, Clip ▸ Remove Background's `canCutOut`, `toggleOps` and
+  `menuState`, and `centroid` (any thread). `CutoutStatus+Memo.swift` is the
+  Background section's held Status (held through a live gesture and while
+  the handles and `ReverseSource` resolution are unchanged) and its 0.5 s
+  main-run-loop ticker while analysing or failed, which re-reads only the
+  lane's runs and progress and recomputes on a changed run or a `masks`
+  publish. `ProjectDocument+Masks.swift`'s `maskOwner` (main only) and
+  `analyzeMasksNow()` (`ensureMasks()`, then `AnalysisLane.retry(owner:)` on
+  `CutoutWants.queue`): `retry` clears a `.failed` or `.cancelled` outcome
+  of the owner's requests that are neither running nor queued, and
+  reconciles. `AgentServer+Cutout.swift` is `analyze_cutout` (off main: one
+  main hop that refuses and calls `analyzeMasksNow()`, then
+  `CutoutWants.queue.sync {}`, then polls every 0.25 s up to `wait` or Stop,
+  never a timeout refusal; the centroid is read off main);
+  `AgentCatalog+Cutout.swift` holds its row, spliced in last by
+  `creatorTools()`.
 - `ProjectDocument+Derived.swift` · `DerivedCarry.swift` ·
   `EditorViewController+NewFromRange.swift` · `AgentServer+Derived.swift` ·
   `AgentCatalog+Derived.swift` — File ▸ New Project from Range… and the
@@ -809,7 +841,13 @@ the key map behind it.
 - `EditorViewController+Cutout` refreshes the paused frame on
   `.analysisDidPublish` for a `masks` publish in its own document's cache
   folder (spec §11 CO-22 (d)); its observer is one statement in the frozen
-  file's `viewDidLoad`, beside `cursorTrackDidLand`'s.
+  file's `viewDidLoad`, beside `cursorTrackDidLand`'s. It also holds Clip ▸
+  Remove Background (`toggleRemoveBackground`, one undo step "Remove
+  Background", one base `set_video` per clip, `CutoutStatus.toggleOps`),
+  Analyze Now (`analyzeCutoutNow`, `document.analyzeMasksNow()`) and their
+  validator arm `validateCutoutAction` (the checkmark on, mixed or off,
+  `CutoutStatus.menuState`), one line in the frozen file after
+  `validateRetimeAction` (road map creator-jobs CO3, spec §11 CO-30).
 - `EditorViewController+Panes.swift` — `PaneSplitView`, whose
   `isDraggingDivider` is true only inside `mouseDown(with:)` (AppKit's divider
   drag), and `savePaneSize`: the timeline height and inspector width are saved
@@ -1256,8 +1294,9 @@ the key map behind it.
   spec §11 GR-13) · `InspectorBinding+Writes.swift` (a pure move: a write with
   an action selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a `filters` or `obscure` list of a different LENGTH, or
-  `motion`, to the BASE props (a curve never: every count animates, spec §11
-  GR-34), and `structural(audio:for:)` the one that sends pan, mono,
+  `motion`, or a `cutout`'s presence (a whole one or null, spec §11 CO-30 (b)),
+  to the BASE props (the sparse `cutoutPart` animates; a curve never: every
+  count animates, spec §11 GR-34), and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, the limiter (AU-21), voice isolation (AU-50),
   the gate and the de-esser (AU-46), the voice effect (AU-140), duck and
   keep-pitch there (CI-3);
@@ -1355,7 +1394,16 @@ the key map behind it.
   Import LUT…, which runs `add_media` and the look as ONE "Import LUT" edit,
   reusing a listed file, GR-8; Clip ▸ Look ▸'s LUT rows are filled when it opens
   by `LookMenuFiller` in `AppDelegate+ClipMenus.swift`; `-RCDevLookGalleryDump`
-  also writes `lut-<id>.png` and the manifest's `tiles`); +`Transition`,
+  also writes `lut-<id>.png` and the manifest's `tiles`); +`Cutout` — the
+  Picture sub-tab's Background section (road map creator-jobs CO3, spec §11
+  CO-30), registered right after Chroma Key in `ClipPane.makeSections()` when
+  every selected clip `allCutoutable` (`ClipPane.structureSignature` carries
+  it): Remove background (base `set_video` only, ⊘ inside an action: on gives
+  the clips without one the defaults, off writes null to all), Background,
+  Edge and Feather (enabled while `allCutOut`, each writing its own key
+  through `VideoPatch.cutoutPart`, which animates), Status read through the
+  pane's `cutoutMemo` (`CutoutStatus.Memo`, kept on `ClipPane`, whose
+  `onChange` refreshes the pane), and Analyze Now; +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
   inside an action Rate writes the selected action's `end.speed`

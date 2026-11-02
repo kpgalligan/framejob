@@ -516,3 +516,105 @@ change (CJ-20); no tool is added.
   599, 600 against 224, 600, 600, the 224 while the machine's load average was 32.85 with the other
   lanes' builds; the median still 600). No run passed the 2 % rule, so **the picture queue does not
   pause** for `faces`, and CJ-21 stands unamended.
+
+CO-30…CO-32 are CO3's (Remove Background in the inspector and the menus), recorded before its
+code. The owner's answer for CO3 (2026-11-01): Clip ▸ Remove Background has **no key
+equivalent**. No format bump, no core change, no `rc_*`: Swift, the documents and the proofs on
+top of CO2a1, CO2a2 and CO2b. Vision runs on the Mac, so nothing here is keyed (CJ-3).
+
+- **CO-30 — The Background section and Clip ▸ Remove Background.**
+  - **(a) The rows, in order.** The Picture sub-tab's **Background** section (`video.cutout`),
+    right after Chroma Key, shown when every selected clip can be cut out (a media or still clip
+    of a video file with pictures, `CutoutStatus.canCutOut`): "Remove background" (a checkbox);
+    Background (a popup, Remove / Keep); Edge (−1…1, two decimals, a slider, quick values −0.5,
+    −0.25, 0, 0.25, 0.5); Feather (0–100 %, quick 0, 10, 25, 50); Status (a read-out 170 pt wide,
+    its tooltip the full words); and a button row, Analyze Now. The road map's draft is set aside
+    twice: there is **no Quality row** (CO-S1 kept no Best and CO-20 refuses `best`; CO4 owes it)
+    and **no "Paused while playing"** (CO-12: a masks job does not pause). Background animates as
+    CO-20 says — it switches at an action's end — superseding the draft's "Background
+    base-only".
+  - **(b) Where each row writes.** The checkbox and the section's Reset write the clip's BASE
+    `set_video` only, so inside an action their gutter is ⊘: turning on writes a whole default
+    cutout (`{cutout: {}}`'s five defaults) only to the selected clips that have none, turning off
+    writes `cutout: null` to them all. `InspectorBinding.structural(video:for:)` sends `cutout`
+    (its presence, a whole one or null) to the base, always. Background, Edge and Feather are
+    enabled only when every selected video clip has a base cutout (`allCutOut`) and write a sparse
+    `VideoPatch.cutoutPart`, which animates: with an action selected an end gets only the row's
+    own key (`set_action_end {video: {cutout: {edge}}}`), never `subject`, `quality` or a null.
+  - **(c) The summary and the Status words.** The summary is "off" while no selected clip is cut
+    out; else the Status words for one clip, or "on". Status: no cutout "Off"; no frame to analyse
+    "No picture to analyze"; analysing "Analyzing N %" (N = ⌊progress × 100⌋, at most 99); every
+    needed frame covered "Ready", or "No person found" when no run of the clip's window found one
+    (CO-26); a failure "Failed: <why>" — "the media file is missing", "the media file cannot be
+    read", "no cache folder", or the lane's own sentence; several clips "—". Analyze Now is
+    enabled when a selected cut-out clip is analysing or failed; it runs
+    `ProjectDocument.analyzeMasksNow()`: `ensureMasks()` (CO-22 stays the one want path), then,
+    on `CutoutWants.queue` after that want, `AnalysisLane.retry(owner:)`, which clears the
+    `.failed` or `.cancelled` outcome of the owner's requests that are neither running nor queued
+    (as `want` does for a request wanted anew) and reconciles; a running or queued request is
+    untouched, and `want`'s reset rule and `wait` are unchanged.
+  - **(d) The read-out's life.** The pane holds its status (`CutoutStatus.Memo`) while the
+    document's handles and its `ReverseSource` resolution are unchanged, and through a live
+    gesture. While the held state is analysing or failed and the read-out is in a window, a 0.5 s
+    main-run-loop ticker re-reads only the lane — each of the owner's requests' runs (outcome and
+    `endedAt`) and the running job's progress; a changed run, or a `masks` `.analysisDidPublish`
+    for the document's cache folder, recomputes the status, refreshing the pane when the state
+    changed and the read-out alone otherwise. The pane's Analyze Now drops the held status.
+  - **(e) The menu.** Clip ▸ Remove Background, right after Look ▸, no key equivalent (the
+    owner's answer): enabled when the selection in the open scope holds a clip that can be cut
+    out; its checkmark is on when every such clip is cut out, mixed when some are, off when none
+    is; it toggles them (all on → all off; otherwise the off ones on, a cut-out clip's own values
+    kept) as one undo step, "Remove Background", one base `set_video` per clip as Clip ▸ Motion ▸
+    writes.
+- **CO-31 — `analyze_cutout` and the status rule.**
+  - **(a) The status of a clip** (`CutoutStatus.status`, main thread). Its windows are
+    `CutoutWants.windows` of the document's handles (`[project]`, with a nest open `[project,
+    editedProject]`) for that clip; `frames` is the count of their merged needs (CO-22 (a));
+    `covered` the needed indices the store covers for the stamp the analysis would make (the stamp
+    made once per cache folder, media and URL, on main); `subject_found` CO-26's, over the clip's
+    hull window. The order: no base cutout → off; `frames` 0 → no picture; `covered == frames` →
+    ready, or no person — before any failure check, so a clip whose masks are all stored is never
+    failed by another window's job; no file, no cache folder or no stamp → failed; a `.failed` run
+    among the document owner's (`maskOwner`) requests of the media whose ranges meet the clip's
+    needed, uncovered indices → failed with the lane's sentence; else analysing. **Progress** is
+    `(C_out + f · R_in) / N`: N the needed indices, R_in those inside the ranges of the owner's
+    running masks request of that media, C_out the covered needed indices outside them, f that
+    request's `AnalysisLane.progress` (0 before its first frame); with no running request R_in is
+    0 and C_out is every covered needed index. A running job's mid-job publishes count through f
+    alone, never twice.
+  - **(b) The tool.** `analyze_cutout {clips?, wait?}` is an app-state tool, off the main thread,
+    with no `scope`: it acts in the open scope and names its clips there. Refusals, in order:
+    `wait` that is not a number or lies outside 0…60 — "wait must be from 0 to 60 seconds."; a
+    named clip that does not exist (`optionalClipsArg`'s sentence); a named clip with no base
+    cutout — "Clip N has no Remove Background; set_video {cutout: {}} turns it on."; with none
+    named and no cut-out clip in the open scope — "No clip in the open scope has Remove Background
+    on; set_video {cutout: {}} turns it on.". Then one main hop runs `analyzeMasksNow()` (the
+    pane's Analyze Now), then `CutoutWants.queue.sync {}` off main, so the want and the retry have
+    run before the first read; then it reads the statuses every 0.25 s (main hops) until every
+    clip is ready, no person, failed or no picture, `wait` seconds pass (0 when absent: the status
+    now), or the assistant's Stop — never a timeout refusal.
+  - **(c) The answer.** `{ok, clips: [{clip, media, state, progress, quality, frames, covered,
+    ready, subject_found, centroid, error?}], project}`: `state` one of `analyzing`, `ready`,
+    `no_person`, `failed`, `no_picture`; `progress` to three decimals (`covered / frames` outside
+    analysing); `quality` the clip's; `ready` whether `covered == frames > 0`; `error` the tool's
+    sentence when failed, "Clip N's person masks could not be made: <why>." **`centroid`** is null
+    unless the clip is ready and a subject was found: the mean, over the needed and covered pack
+    frames whose mask is `found`, of each frame's value-weighted centroid `(Σ v·(x + 0.5) / Σ v,
+    Σ v·(y + 0.5) / Σ v)` in mask texels, scaled by the media's width over the mask's and its
+    height over the mask's — `{x, y}` in the media's upright display pixels, top-left origin, y
+    down — computed off main from values captured on it. CO7's `focus` reads it.
+- **CO-32 — CO3's proof.** `co3_proof.py`, its probe `co3_probe.swift`: I1 the section registered
+  after Chroma Key and its checkbox committing one `set_video {cutout: {five defaults}}` step; I2
+  Status reading "Analyzing 0 %" under `-RCDevAnalysisHold`, then "Ready" on the person fixture
+  and "No person found" on the screen recording, from `snapshot_ui`'s layout dump; I3 with an
+  action selected Edge writing `set_action_end {video: {cutout: {edge}}}` alone, Background
+  `{background}` alone, the checkbox ⊘ and its write the base `set_video`; I4 `analyze_cutout
+  {wait: 0}` under the hold answering analysing, not ready, `covered < frames`, centroid null, and
+  `{wait: 60}` without it ready with `covered == frames ==` `get_media_analysis`'s `frames`; I5
+  the menu item's state off, mixed and on, and a mixed toggle turning on only the off clip (the
+  other's edge kept) in one undo step; I6p and I6 the centroid against the probe's own reading of
+  the pack, within 1e-6 px; I7 a clip ready beside a clip of the same media failed by a read-only
+  masks folder, then, the folder restored, `analyze_cutout {wait: 0}` taking the failed clip's
+  Status out of "Failed" within 2 s and `{wait: 60}` answering ready; I8 the progress rule's three
+  cases; Z1 an empty parity log. Eight mutants, once, on Release. No JOB row: the screen catalog's
+  `05i-clip-background` is the section's look.

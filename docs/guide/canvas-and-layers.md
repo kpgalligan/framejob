@@ -166,6 +166,7 @@ Picture's sections, in order:
 |---|---|
 | Transform | every clip that draws |
 | Crop, Corner Radius, Chroma Key | video, image and still clips |
+| Background | clips of a video file, and freeze frames of one |
 | Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included |
 
 Each section folds open and shut and shows a one-line summary while closed.
@@ -247,6 +248,42 @@ Chroma Key removes a background colour, such as a green screen.
 | Tolerance | How far from the key colour still counts as background, 0–100 % | 20 % |
 | Softness | How gradual the edge of the key is, 0–100 % | 10 % |
 | Spill | How much of the key colour's spill is removed from the edges that remain, 0–100 % | 50 % |
+
+### Remove Background
+
+The Background section, right after Chroma Key, keeps the person in a clip of a
+video file and makes the rest transparent, so whatever is on the tracks behind
+shows through. No green screen is needed: the person is found in every frame
+on this Mac (Vision's person segmentation), with no upload and no key. **Clip ▸
+Remove Background** turns it on or off for the selected clips too.
+
+| Row | What it does | Default |
+|---|---|---|
+| Remove background | Turns it on. Turning it on gives each selected clip without it the defaults; turning it off removes it from all of them | off |
+| Background | **Remove** draws the person alone; **Keep** draws the whole picture | Remove |
+| Edge | Shrinks (below 0) or grows (above 0) the outline, −1 to 1 | 0 |
+| Feather | How soft the outline is, 0–100 % | 0 % |
+| Status | Where the person masks stand (below) | — |
+| Analyze Now | Makes the masks now; after a failure, tries again | — |
+
+Background, Edge and Feather are dimmed until every selected clip has Remove
+Background on. With an action selected they animate like any other row
+(Background switches at the action's end); the checkbox and **Reset** always
+change the clip itself, and their gutter shows ⊘.
+
+The masks are made as soon as Remove Background is on, for the frames the clip
+plays, and kept in the project's cache, so they are never made twice. Until a
+frame's mask is made, the preview draws that frame whole; an export waits for
+every mask it draws. Status reads:
+
+- **Analyzing N %** — the masks are being made.
+- **Ready** — every frame the clip plays has its mask.
+- **No person found** — every frame was looked at and no person is in the
+  clip, so it draws whole.
+- **Failed:** and the reason — the media file is missing, cannot be read, or
+  the masks could not be written. Fix the cause and press **Analyze Now**.
+- **No picture to analyze** — the clip plays no frame of its file.
+- **—** with several clips selected; the section's summary then reads "on".
 
 ### Shadow
 

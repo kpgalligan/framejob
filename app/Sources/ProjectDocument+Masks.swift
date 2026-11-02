@@ -74,6 +74,20 @@ extension ProjectDocument {
         }
     }
 
+    /// This document's lane owner; nil before its first want. Main only (road map creator-jobs
+    /// CO3: the Background section's Status and `analyze_cutout` read its runs).
+    var maskOwner: Int? { Self.maskWants[recipeKey]?.owner }
+
+    /// The Background section's Analyze Now and `analyze_cutout` (spec §11 CO-30 (c)): the
+    /// wants made again (`ensureMasks()`, the one want path), then — on `CutoutWants.queue`,
+    /// after that want — a failed or cancelled run of this document's owner runs again
+    /// (`AnalysisLane.retry`). Main thread.
+    func analyzeMasksNow() {
+        ensureMasks()
+        guard let owner = maskOwner else { return }
+        CutoutWants.queue.async { AnalysisLane.shared.retry(owner: owner) }
+    }
+
     /// A masks job this document wants landed or failed: the package's date re-read (the job
     /// may have created `cache/analysis/`), then the wants made again — what is still missing.
     /// The redraw is `.analysisDidPublish`'s (CO-22 (d)). Main thread.

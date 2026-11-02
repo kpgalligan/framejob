@@ -160,7 +160,12 @@ project's `.cube` LUTs in media-list order and a second separator when there
 are any, then None — §11 GR-8 [b]; a LUT item is named by its file less
 `.cube`; a checkmark on the kind or LUT every grading target carries, a dash
 on one only some carry; for the selected clips that take a grade, off when
-none do; no key equivalent; undo "Look"; §11 GR-7), Add Background ▸ (Solid Color · Image… — road map
+none do; no key equivalent; undo "Look"; §11 GR-7), Remove Background (road map
+creator-jobs CO3, §11 CO-30 (e): enabled when the selection in the open scope holds a media
+or still clip of a video file with pictures; checked when every such clip has Remove
+Background on, a dash when some do; all on turns every one off, otherwise the ones without
+it on, each clip's own values kept; one undo step "Remove Background"; no key equivalent, the
+owner's answer; its mirrors are `set_video`'s `cutout` and `analyze_cutout`), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a

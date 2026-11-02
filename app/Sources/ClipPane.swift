@@ -46,6 +46,9 @@ final class ClipPane: InspectorPaneView {
     /// The Curves section's channel, selected point and unwritten list (spec
     /// §11 GR-12), kept here so they outlive a rebuild; per window, never saved.
     let curveState = CurveEditorState()
+    /// The Background section's held Status (road map creator-jobs CO3, spec §11 CO-30 (d)),
+    /// kept here so it outlives a rebuild; its ticker refreshes the pane when the state moves.
+    let cutoutMemo = CutoutStatus.Memo()
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -54,6 +57,7 @@ final class ClipPane: InspectorPaneView {
         shapePane = ShapePane(inspector: inspector)
         graphicPane = GraphicPane(inspector: inspector)
         super.init(inspector: inspector)
+        cutoutMemo.onChange = { [weak self] in self?.refresh() }
     }
 
     @available(*, unavailable)
@@ -92,6 +96,8 @@ final class ClipPane: InspectorPaneView {
             matteNote == nil ? "-" : "matte",
             // Whether every clip has a look adds or removes Look's Amount row.
             videoPane.allLooked ? "look" : "-",
+            // Whether every clip can be cut out adds or removes Background (CO-30 (a)).
+            videoPane.allCutoutable ? "cutout" : "-",
             // A LUT look over a Camera Log file adds Look's warning row (GR-16).
             videoPane.lutOverCameraLog ? "twice" : "-",
             // A LUT look in an HLG project adds Look's other warning row (HD-13).
@@ -197,6 +203,8 @@ final class ClipPane: InspectorPaneView {
                 sections += [
                     videoPane.cropSection(), videoPane.cornerSection(), videoPane.chromaSection(),
                 ]
+                // Background right after Chroma Key (road map creator-jobs CO3, CO-30 (a)).
+                if videoPane.allCutoutable { sections.append(videoPane.cutoutSection(cutoutMemo)) }
             }
             // Shadow is shared by all three drawing kinds, so it is here once.
             sections += [

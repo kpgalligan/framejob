@@ -90,6 +90,10 @@ struct VideoPatch: Codable, Equatable {
     /// `cutout` (format 39, spec §11 CO-20): a `T??`, null removes it; a
     /// written cutout names all five keys (`CutoutProps.dictionary`).
     var cutout: CutoutProps??
+    /// The Background section's sparse write (road map creator-jobs CO3, spec §11 CO-30 (b)):
+    /// written under `cutout` only when `cutout` is nil, and never decoded — an app writer's
+    /// key, which animates inside an action where `cutout` itself goes to the base.
+    var cutoutPart: CutoutPatch?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -100,7 +104,7 @@ struct VideoPatch: Codable, Equatable {
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
         qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
-        cutout: CutoutProps?? = nil
+        cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil
     ) {
         self.x = x
         self.y = y
@@ -124,6 +128,7 @@ struct VideoPatch: Codable, Equatable {
         self.qualifier = qualifier
         self.cursor = cursor
         self.cutout = cutout
+        self.cutoutPart = cutoutPart
     }
 
     init(from decoder: Decoder) throws {
@@ -183,6 +188,9 @@ struct VideoPatch: Codable, Equatable {
         if let qualifier = qualifier, !qualifier.isEmpty { d["qualifier"] = qualifier.dictionary }
         d.putNullable("cursor", cursor) { $0.dictionary }
         d.putNullable("cutout", cutout) { $0.dictionary }
+        if cutout == nil, let cutoutPart, !cutoutPart.isEmpty {
+            d["cutout"] = cutoutPart.dictionary
+        }
         return d
     }
 

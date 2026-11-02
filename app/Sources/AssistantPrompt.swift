@@ -49,7 +49,7 @@ enum AssistantPrompt {
         ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",
-          "paste_attributes"]),
+          "paste_attributes", "analyze_cutout"]),
         ("nest clips together or take a nest apart", ["nest", "unnest"]),
         ("transitions between clips",
          ["set_transition", "set_transition_duration", "add_transition",

@@ -5645,6 +5645,98 @@ without play. Nothing to file.
 - **Question for the owner:** a key equivalent for Clip ▸ Remove Background? *Recommended: none in
   this phase*; §9 is crowded and the checkbox is one click.
 
+#### CO3's record (2026-11-02)
+
+**Landed.** Lane C, base `acc4cbd7` (I's HEAD, CO2b; the worktree was made at CO2a2's `e18ef4b4`
+and fast-forwarded to it first). The lane's commits — the decisions alone (`4be0cd40`, CO-30…CO-32
+with their index rows), the code (`8ee8351f`), the proof, the screen and the documents
+(`582463a9`), this record (`a2f8b274`) — landed on `worktree-creator-jobs` as one commit after
+CJ3 (`d9e762fa`). The merge kept both phases: CJ-30…CJ-35 then CO-30…CO-32 in
+`creator-jobs-4.md` and in `11-decisions/README.md` (its file row's summary carrying both);
+`get_media_analysis`'s catalog sentence and `mcp.md` row keep CJ3's `faces` text with CO3's
+masks sentence; §7.4 keeps CJ3's analysis row with CO3's new row; the spec index's folder total
+(18904) and §7.9e's Lines cell (560) set from `wc -l`. No format bump, no `rc_*`, no core change. The Picture sub-tab's Background section, after Chroma Key, turns Remove
+Background on and tunes it with its Status read live; Clip ▸ Remove Background toggles the
+selection (no key equivalent, the owner's answer); `analyze_cutout` is the mirror of Status and
+Analyze Now, with the mean centroid CO7 will read.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/CutoutStatus.swift` | 374 | `CutoutState`, `CutoutClipStatus`, `CutoutStatus` (`Detail`, `canCutOut`, the status rule, `words`, `toggleOps`, `menuState`, `progress`, `centroid`, the main-only stamp memo) |
+| `app/Sources/CutoutStatus+Memo.swift` | 161 | `CutoutStatus.Memo`: the held status and its 0.5 s ticker |
+| `app/Sources/VideoPane+Cutout.swift` | 133 | `allCutoutable`, `allCutOut`, `cutoutSection(_:)` |
+| `app/Sources/AgentServer+Cutout.swift` · `AgentCatalog+Cutout.swift` | 111 · 54 | `analyze_cutout` and its row |
+| `EditorViewController+Cutout.swift` · `EditorViewController.swift` · `AppDelegate+Menus.swift` · `UIMenuTable.swift` · `inventory.json` | 79 · 1087 (+1) · 490 | the command, Analyze Now and the validator arm; the frozen file's one line; the menu item; their rows |
+| `CutoutProps.swift` · `TypedPatches.swift` · `InspectorBinding+Writes.swift` · `ClipPane.swift` | 137 · 365 · 304 · 274 | `CutoutPatch`; `VideoPatch.cutoutPart`; the structural clause; the memo, the registration, the signature |
+| `ProjectDocument+Masks.swift` · `AnalysisLane.swift` | 98 · 369 | `maskOwner`, `analyzeMasksNow()`; `retry(owner:)` |
+| `AgentServer+CreatorJobs.swift` · `AgentCatalog+Analysis.swift` · `AssistantPrompt.swift` | — | the handler row, the off-main set and `cutoutTools()`; `get_media_analysis`'s sentence; the topic's tool list |
+| `tools/proof/co3_probe.swift` · `co3_proof.py` | 431 · 602 | the instrument |
+
+- **Deviations from the spec.**
+  - I4 compares `covered == frames` with `get_media_analysis {media, kind: masks}` over the clip's
+    NEED, not `{clip}`: CO-22's need holds the frame at the window's end its last tick can ask for
+    (61 frames for a 2 s window), one more than `get_media_analysis {clip}`'s window (60); the
+    first Debug run failed on exactly that.
+  - Mutant `M7-failure-first` breaks objection 4's two guards together (any failed run of the
+    media fails a clip, checked before `covered == frames`): with the meet-uncovered rule kept,
+    moving the order alone cannot fail clip A (it has no uncovered index), and dropping the rule
+    alone is masked by the order.
+  - `analyze_cutout`'s `wait` defaults to 0 (the status now), written into CO-31 (b); the spec
+    named no default.
+  - `CutoutStatus.Detail` (the needs, coverage, pack, owner and cache folder a status was read
+    from) is the internal record the ticker's progress and the tool's centroid read; `CutoutState`
+    carries `isSettled` and `sameKind(as:)`.
+  - I3's last press (the checkbox) is recorded but not applied in the probe: with mutant M2 the
+    wrong op put up an app-modal error and hung the probe to its 300 s bound; the row now fails on
+    its own check.
+  - `creator-jobs-4.md` is 620 lines after CO-30…CO-32 beside CJ3's CJ-30…CJ-35, past the ~500
+    split rule; the spec named it, so the split is the next phase's.
+
+**Measured.**
+
+- `make typecheck` exit 0 with the 4 baseline warnings; `swift_build.py typecheck --define
+  FRAMEJOB_DEV_TOOLS co3_probe.swift` exit 0; `inventory.py --check` 5/5; `spec_index_proof.py`
+  243/243; `name_residue.py` exit 0.
+- `co3_proof.py --only I1,I3,I5,I6p,I8` 5/5; on Debug (`make app-debug`) 10/10 after I4's fix
+  above. `screens.py --only 05i-clip-background` 6 pass of 6, 4 captures, 0 new problems.
+- `make gate`: PASS 406 s (names 1, typecheck 7, fmt and lint skipped, test 239, app 159).
+- `RC_PROOF_APP=release co3_proof.py` (the final instrument): 10/10 — I2 "Analyzing 0 %" held,
+  "Ready" 0.3 s after landing, the screen recording `no_person` and "No person found"; I4 held
+  `analyzing` with 0 of 61 covered, then `ready` 61 of 61 in one `{wait: 60}` call,
+  `get_media_analysis` 61 over the need; I6 (766.682…, 682.797…) over 42 found frames, |Δ| 0;
+  I7 B "Failed: the analysis could not be written: You don’t have permission to save the file
+  “2.json” in the folder “masks”" beside A ready, then "Analyzing 14 %" 0.31 s after the call,
+  then ready; Z1 both launches empty.
+- On one Release instance: `op_argument_proof.py` 188/188, `phase9_proof.py` 249/249,
+  `v2_menu.py --only H` 5/5, its parity log empty; `recording_probe.py --only catalog` 31/31;
+  `RC_PROOF_APP=release analysis_proof.py` 22/22; `RC_PROOF_APP=release co2b_proof.py --only
+  P1,P2,W1,W5` 5/5 (W1 landed in 11.6 s).
+- Mutants, each once on Release in a tree copy (the tree's mutated files' SHA-256 unchanged), all
+  eight CAUGHT, each app copy built in 154–156 s: `M1-unregistered` I1 (no `video.cutout`, no
+  commit); `M2-no-structural` I3 (the checkbox's gutter ◆ "at end", its commit a
+  `set_action_end` with `off: ["video.cutout"]`); `M3-early-answer` I4 (three `{wait: 60}`
+  calls answered `analyzing`, 0 of 61); `M4-no-mixed` I5 (some → on); `M5-unscaled` I6 ((204.4,
+  242.8) against (766.7, 682.8)); `M6-no-retry` I7 (Status still "Failed: …" after 2.38 s, B
+  failed after `{wait: 60}`); `M7-failure-first` I7 (A `failed`); `M8-progress-over` I8 (0.800
+  and 0.600).
+- At integration, on the merged tree with CJ3: `spec_index_proof.py` 243/243 after the two Lines
+  cells; `make gate` PASS 306 s (names 1, typecheck 7, fmt and lint skipped, test 149, app 148).
+
+**Review.** Against the spec, the notes and the checks: every Files and Approach item done, the
+deviations above accepted, verdict pass with three nits and no fix pass: (1) a progress-only tick
+refreshes the Status read-out but not the shut section's header summary, which keeps the first
+"Analyzing N %"; (2) the process-wide stamp memo also keeps a nil stamp, so a transient "Failed:
+the media file cannot be read" outlives Analyze Now; (3) `analyze_cutout`'s 0.25 s poll recomputes
+every clip's detail on main, settled ones included. All three are left in the code and filed as one
+issue naming this commit.
+
+**Owed.** No JOB row (the screen `05i-clip-background` is the section's look); the review's three
+nits as that issue. The `CLAUDE.md` edits were applied at integration: the root's parity paragraph
+counts one hundred and twelve product tools; `app/CLAUDE.md`'s analysis entry (the five new files,
+the status rule, the memo, `maskOwner`, `analyzeMasksNow()`, `retry`, `analyze_cutout`), the
+editor's `EditorViewController+Cutout` bullet, `VideoPane`'s +`Cutout` clause,
+`InspectorBinding+Writes`' cutout clause and `CutoutProps.swift`'s `CutoutPatch`.
+
 ### TX5 — cut words greyed, and Restore Words
 
 - **What a person gets:** the words a cut removed stay in the transcript, greyed, where they were. A

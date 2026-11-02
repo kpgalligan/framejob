@@ -138,6 +138,27 @@ final class AnalysisLane: @unchecked Sendable {
         condition.unlock()
     }
 
+    /// Runs again `owner`'s requests whose run ended `.failed` or `.cancelled` (road map
+    /// creator-jobs CO3, spec §11 CO-30 (c)): their outcome is cleared, as `want` clears a
+    /// request wanted anew, and the lane reconciles. A running or queued request is untouched.
+    /// Any thread.
+    func retry(owner: Int) {
+        condition.lock()
+        for request in owners[owner]?.requests ?? []
+        where running[request] == nil && !queued.contains(request) {
+            guard let run = runs[request] else { continue }
+            switch run.outcome {
+            case .failed?, .cancelled?:
+                runs[request] = AnalysisRun(
+                    queuedAt: run.queuedAt, startedAt: run.startedAt, endedAt: run.endedAt,
+                    outcome: nil)
+            default: continue
+            }
+        }
+        reconcileLocked()
+        condition.unlock()
+    }
+
     /// Drops everything `owner` wanted.
     func release(owner: Int) {
         condition.lock()

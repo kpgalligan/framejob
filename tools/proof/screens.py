@@ -104,7 +104,9 @@ LOOKS = ("light", "dark")
 APPEARANCE_KEY = "RCDevAppearance"
 # Every launch holds each analysis job (spec §11 CJ-21's dev hold) so the
 # Analyzing sheet stays up, its rows "Waiting", for 15f's capture (road map
-# "creator-jobs" CJ2b); no other screen runs an analysis. P2 counts it pinned.
+# "creator-jobs" CJ2b), and the `cutout` fixture's masks job waits too, so
+# 05i's Background Status reads "Analyzing 0 %" (CO3, spec §11 CO-30). P2
+# counts it pinned.
 ANALYSIS_HOLD = ("RCDevAnalysisHold", "600")
 WINDOWS = ("welcome", "settings", "editor", "sheet", "recorder")
 REGIONS = ("toolbar", "preview", "inspector", "timeline")
@@ -159,6 +161,7 @@ SECTIONS = {
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
     "video.wheels": False, "video.curves": False, "video.qualifier": False,
+    "video.cutout": False,
 }
 
 
@@ -312,6 +315,8 @@ FIXTURES = {
            "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
     "dynamics": {"path": os.path.join(FIXTURE_DIR, "Dynamics.framejob"),
                  "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
+    "cutout": {"path": os.path.join(FIXTURE_DIR, "Cutout.framejob"),
+               "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -475,6 +480,8 @@ def build_fixture(mcp, name):
             ids = _eq_ops(mcp, path)
         elif name == "dynamics":
             ids = _dynamics_ops(mcp, path)
+        elif name == "cutout":
+            ids = _cutout_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -677,6 +684,22 @@ def _ramp_ops(mcp, path):
         raise FixtureError(f"building ramp: add_action answered no new_actions: {added}")
     _call(mcp, "set_action_end", path, clip=ids["video"], action=actions[0],
           patch={"speed": 2})
+    return ids
+
+
+def _cutout_ops(mcp, path):
+    """Road map "creator-jobs" CO3 (spec §11 CO-30): one track, "Video",
+    holding `speech.mov` at 0 with Remove Background on (`set_video {cutout:
+    {}}`) — the Picture sub-tab's Background section, its rows and its Status,
+    which reads "Analyzing 0 %" under the launches' analysis hold (05i)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building cutout: the project holds {len(clips)} clips, not 1")
+    ids = {"video": clips[0]["id"]}
+    _call(mcp, "set_video", path, clips=[ids["video"]], patch={"cutout": {}})
     return ids
 
 

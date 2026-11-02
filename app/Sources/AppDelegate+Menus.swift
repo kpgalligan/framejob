@@ -348,6 +348,11 @@ extension AppDelegate {
         // half of the Color sub-tab's Look section. No key equivalent, for
         // Remove Silences…' reason above.
         menu.addItem(submenuItem(lookMenu()))
+        // Road map "creator-jobs" CO3 (spec §11 CO-30 (e)), right after Look ▸:
+        // the UI path `set_video`'s `cutout` and `analyze_cutout` name. No key
+        // equivalent (the owner's answer, 2026-11-01).
+        menu.addItem(
+            item("Remove Background", #selector(EditorViewController.toggleRemoveBackground(_:))))
         menu.addItem(.separator())
         // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
         // its own because neither item edits the selection: both put a clip on

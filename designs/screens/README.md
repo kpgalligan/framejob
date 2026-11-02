@@ -159,6 +159,11 @@ Built by `screens.py` on the first screen that names one, into
   with the gate and the de-esser at their defaults (`{gate: {}, de_esser:
   {}}`), so the Gate and De-esser sections show their rows and Status
   read-outs. Ready once `tone`'s peaks are cached.
+- `cutout` — `Cutout.framejob` (road map "creator-jobs" CO3, spec §11 CO-30):
+  one track, "Video", holding `video` — `media/speech.mov` at 0 — with Remove
+  Background on (`set_video {cutout: {}}`). Every launch holds each analysis
+  job, so its masks job waits and the Background section's Status reads
+  "Analyzing 0 %". Ready once `video`'s peaks are cached.
 
 ## Adding a screen
 

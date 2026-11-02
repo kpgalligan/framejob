@@ -69,6 +69,33 @@ struct CutoutProps: Codable, Equatable {
     }
 }
 
+/// A sparse cutout (road map creator-jobs CO3, spec §11 CO-30 (b)): only the keys set are
+/// written, so the Background section's Background, Edge and Feather rows each write their own
+/// key — on the base a merge, inside an action an end naming that key alone (never `subject`,
+/// `quality` or a null, which `set_action_end` refuses for a cutout).
+struct CutoutPatch: Codable, Equatable {
+    var background: CutoutBackground?
+    var edge: Double?
+    var feather: Double?
+
+    init(background: CutoutBackground? = nil, edge: Double? = nil, feather: Double? = nil) {
+        self.background = background
+        self.edge = edge
+        self.feather = feather
+    }
+
+    /// The set keys under the model's names.
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        if let background { d["background"] = background.rawValue }
+        if let edge { d["edge"] = edge }
+        if let feather { d["feather"] = feather }
+        return d
+    }
+
+    var isEmpty: Bool { background == nil && edge == nil && feather == nil }
+}
+
 /// Where a recipe cutout's masks come from: a media's pack (CO-3). CO10 adds
 /// `image`.
 enum RecipeCutoutMaskKind: String, Codable, CaseIterable {

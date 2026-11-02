@@ -538,6 +538,13 @@
    ],
    "note": "an edit"
   },
+  "toggleRemoveBackground:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Cutout.swift `func toggleRemoveBackground(`"
+   ],
+   "note": "an edit"
+  },
   "addSolidColorBackground:": {
    "verdict": "none",
    "code": [

@@ -93,6 +93,14 @@ extension InspectorBinding {
             base.motion = patch.motion
             animatable.motion = nil
         }
+        // A cutout's presence — a whole one or null — is the clip's (spec §11
+        // CO-20, CO-30 (b)): an end refuses `subject`, `quality` and a null
+        // cutout, so the Background section's checkbox and Reset land on the
+        // base. Its sparse `cutoutPart` (Background, Edge, Feather) animates.
+        if patch.cutout != nil {
+            base.cutout = patch.cutout
+            animatable.cutout = nil
+        }
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

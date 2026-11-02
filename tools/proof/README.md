@@ -28130,3 +28130,43 @@ python3 tools/proof/retime_proof.py --mutant <name>
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU9a record.
+
+## Road map "creator-jobs" CO3 — Remove Background in the inspector and the menus (`co3_proof.py` I1–I8 with I6p, Z1; eight mutants; spec §11 CO-30…CO-32)
+
+**`co3_proof.py`** builds `co3_probe.swift` from `app/Sources` with `swift_build.py`'s line (its
+`centroid <request.json>` mode is the probe's OWN centroid of a pack, `MaskPack` and its own
+integer arithmetic, never `CutoutStatus.centroid`), then drives the app over MCP on a scratch
+`CFFIXED_USER_HOME` in two launches, each with the Background section pinned open in the
+argument domain (`-FrameJobInspectorSection.video.cutout <false/>`, nothing persisted). The
+person rows use `co2a_proof.person_fixtures()`'s push-in (`media/cutout/push_1080.mov`) and
+screen recording (`media/cutout/screen_4k.mov`), each row in its own package, closed after it. A
+Status is read from `snapshot_ui`'s layout dump: the first `option.display` part after the
+"Status" label, polled for up to 10 s.
+
+| Row | What it holds |
+|---|---|
+| I1 | (probe) the Picture sub-tab holds `video.cutout` right after `video.chroma`; its checkbox commits one "Remove Background" edit of one `set_video {cutout: {five defaults}}` |
+| I3 | (probe) an action selected: Edge's quick 0.25 commits `set_action_end {video: {cutout: {edge: 0.25}}}` alone, no `off`; Background's Keep `{background: "keep"}` alone; the checkbox's gutter ⊘ and its commit the base `set_video {cutout: null}` |
+| I5 | (probe) Clip ▸ Remove Background after Look, no key; two clips: off, mixed, then on after the toggle, which cuts out only the bare clip (the other's edge 0.3 kept) as one undo step one undo takes back |
+| I6p | (probe) the probe's own centroid over a hand-made 4 × 2 pack is (3.0, 5.0) over 2 frames, and `CutoutStatus.centroid` agrees |
+| I8 | (probe) `CutoutStatus.progress`: running 0…999 at 0.4, running 200…999 at 0.25 and no running request, each 0.400 over need 0…999 with 0…399 covered |
+| I2 | launch H (`-RCDevAnalysisHold 3600`): Status "Analyzing 0 %"; launch N: "Ready" on the push-in, `no_person` and "No person found" on the screen recording |
+| I4 | launch H: `analyze_cutout {wait: 0}` analysing, not ready, `covered < frames`, centroid null; launch N: `{wait: 60}` ready with `covered == frames ==` `get_media_analysis {media, kind: masks}`'s frames over the clip's need (one frame more than `{clip}`'s window: the frame at its end the last tick can ask for) |
+| I6 | launch N: `analyze_cutout`'s centroid against the probe's over the need and the marker's coverage, within 1e-6 px |
+| I7 | launch N: clip A ready; `cache/analysis/masks/` read-only and clip B ([10 s, 12 s) of the same file) cut out: B `failed` with its sentence and Status "Failed: …", A `ready` with a centroid; restored, `{clips: [B], wait: 0}` takes Status out of "Failed" within 2 s, then `{wait: 60}` ready |
+| Z1 | each launch's `grep "Frame Job: "` empty |
+
+Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration, the probe from
+the copy's `app/Sources`; the tree's mutated files' SHA-256 read before and after):
+`M1-unregistered` (I1), `M2-no-structural` (I3), `M3-early-answer` (I4), `M4-no-mixed` (I5),
+`M5-unscaled` (I6), `M6-no-retry` (I7), `M7-failure-first` (I7: any failed run of the media
+fails a clip, checked before `covered == frames` — objection 4's two guards together, since
+either alone keeps clip A ready), `M8-progress-over` (I8).
+
+```sh
+python3 tools/proof/co3_proof.py --only I1,I3,I5,I6p,I8
+make app-debug && python3 tools/proof/co3_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co3_proof.py --mutant NAME
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO3 record.
