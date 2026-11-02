@@ -3342,7 +3342,8 @@ free.
   U2 —, +`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`, +`Camera`,
   +`CameraFinishing`, +`CameraPrepare`, +`CameraSession`, +`CameraBeside`,
-  +`CameraBesideFinishing`) · `ScreenFrameWatch.swift` · `CameraDevices.swift` · `CameraCapture.swift`
+  +`CameraBesideFinishing`, +`Cursor`) · `ScreenFrameWatch.swift` · `CursorCapture.swift` ·
+  `CameraDevices.swift` · `CameraCapture.swift`
   (+`WarmUp`) — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
@@ -3389,10 +3390,28 @@ free.
   `<movie stem> (Camera).mov` per segment, closed at a pause and opened at a
   resume with the screen's output, its arming and launch turn, writers and
   reports in `+CameraBeside`, each landed segment's camera half and offset in
-  `+CameraBesideFinishing`; `ScreenFrameWatch.swift` is the `.screen` stream
-  output that finds E2, on the stream only with a camera and removed and
-  re-added around a resume's new recording output. A camera failure is never
-  the recording's.
+  `+CameraBesideFinishing`. A camera failure is never the recording's.
+  `ScreenFrameWatch.swift` is the `.screen` stream output that finds E2 and
+  feeds the frames' geometry (spec §11 CU-13): on every screen recording
+  (`ScreenFrameWatchRule.attaches`, camera ‖ cursor), refusing the start only
+  with a camera (`failsStart`), else the loss kept as
+  `Session.cursorWatchLost`; removed and re-added around a resume's new
+  recording output, a failed re-add that segment's `cursorWatchProblem`.
+  **Every screen recording saves its cursor** (road map creator-jobs CU1b1,
+  spec §11 CU-11…CU-13, CU-18): `CursorCapture.swift` is `CursorSegments`
+  (pure: one `CursorCaptureBuffer` per segment, the poll's dedupe, each open
+  seeded with the last polled point and the last fed geometry) and
+  `CursorCapture` (a 120 Hz `DispatchSourceTimer` on its own
+  `.userInteractive` queue polling `CGEvent(source: nil)?.location`, NSEvent
+  global and local monitors for clicks and scrolls added and removed on main,
+  an event's time `cgEvent.timestamp / 1e9`); `+Cursor` the header and
+  opening geometry (`cursorStart`), `startCursorCapture` from `launchScreen`
+  before `startCapture`, and the walker's `saveCursor` after the camera's
+  step: the buffer closed with the movie's size and E1 (`Segment.screenHost`,
+  every did-start), `CursorFileWriter` on the capture queue,
+  `RecordingSegment.withCursor`; a cursor problem is the segment's
+  (`cursorProblem`, `RecordingResult.cursorSegmentsNote` in both doors'
+  notes), never the recording's.
 - `RecordingLanding.swift` (+`Placement`, +`Microphone`, +`Remainder`,
   +`Placing`, +`LeftOut`, +`VoiceOver`, +`Camera`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
@@ -3429,7 +3448,8 @@ free.
   `<stem>.fjcursor.partial` beside the movie, reads it back through `ReelCursor`, and
   `rename(2)`s it into place; a failure leaves neither path and answers the core's
   sentence as that segment's `cursorProblem`, never the recording's failure (CU-14).
-  The recorder's wiring is CU1b's. `CursorTracks` is the process-wide registry of
+  The recorder's wiring is CU1b1's (`CursorCapture.swift`, `ScreenRecorder+Cursor.swift`,
+  above). `CursorTracks` is the process-wide registry of
   loaded and prepared cursor tracks (CU-24, CU-26), `RampAudioRenders`' owner shape:
   keyed by path, size and modification second; each owner's latest `want` pinned
   until `release(owner:)` (`wait` wants its set first); caps of 8 paths and 4

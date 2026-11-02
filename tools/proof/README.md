@@ -27578,6 +27578,55 @@ python3 tools/proof/cursor_capture_probe.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CU1a record.
 
+## Road map "creator-jobs" CU1b1 — the recorder saves the cursor (`cursor_capture_probe.py` K0, K10–K14, K16; seven mutants; `cursor_proof.py` K4, K5, K7, K8, K15, Z1; the core's `mapping-m1`; spec §11 CU-11…CU-13, CU-18, CU-19)
+
+**Ungranted.** `cursor_capture_probe.py` gained CU1b1's rows over the same build (no app, no
+grant): the recorder's pure halves — `ScreenFrameWatchRule`, `CursorSegments`,
+`ScreenFrameWatch.geometry(from:)`, `CursorCapture.click(from:arrival:)` and `scroll`,
+`ScreenRecorder.cursorProblem`, and the answer's `segmentFields` and `resultNotes`.
+
+| Row | What it holds |
+|---|---|
+| K0 | `ScreenFrameWatchRule.attaches` is camera ‖ cursor over the four cases |
+| K10 | 120 polls over 12 positions give 12 moves (`anchor` e1, `cursor_image` none); a nil poll records nothing |
+| K11 | a segment opened after the pointer stopped has one move at t 0 at the last polled point, and its opening geometry is the last fed |
+| K12 | `segmentFields` writes `cursor_path`, `cursor_image` and `cursor_problem` (only the problem without a file, none for a bare segment); `cursorSegmentsNote` joins the problems in order; `resultNotes` carries it last |
+| K13 | `ScreenFrameWatch.geometry(from:)` reads `screenRect`, `contentRect`, `contentScale` and `scaleFactor`, and answers nil when one is missing |
+| K14 | an `NSEvent(cgEvent:)` mouse-down stamped 5e9 ns answers host 5.0, its point and click count; a scroll stamped 7e9 ns its point deltas and host 7.0 |
+| K16 | `failsStart` is true with a camera and false without; `cursorProblem` answers the writer's sentence, else CU-13's naming the movie and the reason, else nil |
+
+Mutants: `watch-camera-only` K0, `poll-every-sample` K10, `no-seed-at-open` K11,
+`cursor-note-dropped` K12, `event-clock-arrival` K14, `watch-failure-refuses` K16,
+`watch-lost-dropped` K16. The core's `mapping-m1` (`to_movie` on `pixels_per_point`) is caught
+by `core/tests/cursor_track.rs`'s `the_mapping_is_m2_scale_factor_not_pixels_per_point`, by
+hand. `camera_recording_probe.py`'s B4 reads the watch's add inside `start(`'s
+`if ScreenFrameWatchRule.attaches(` block.
+
+**Granted.** `cursor_proof.py` builds `cursor_proof.swift` from `app/Sources` and drives
+`ScreenRecorder.shared` in-process (recording_probe's granted pattern) into
+`tools/proof/work/cursor-proof/recordings/`; it WARPS THE POINTER and shows a grey 1001 × 701 pt
+window for a few seconds. Every row is skipped by name without Screen Recording or on a locked
+console; K5 also without `CGPreflightPostEventAccess`. ffprobe reads each movie's track size.
+
+| Row | What it holds |
+|---|---|
+| K4 | display recordings at Nominal and Best, each paused and resumed with three warps per segment: each segment's own `<stem>.fjcursor` beside its movie, accepted by `ReelCursor`, `source` display, `anchor` e1, `cursor_image` none, `movie_size` the track's, every warped point among its moves within 1 pt |
+| K5 | a posted mouse-down and mouse-up on the probe's window: clicks down [1, 0] at the posted point within 1 pt |
+| K7 | a directory at `<stem>.fjcursor.partial`: the movie lands, no cursor file, the writer's sentence as `cursorProblem` and in the note |
+| K8 | the probe's own 1001 × 701 pt window at Nominal: `source` window, `point_size` [100100, 70100], `movie_size` the track's |
+| K15 | over MCP on the app: `record_screen {seconds: 2, place: false, path}` into a scratch project answers `segments[0].cursor_path` beside its movie, on disk, `cursor_image` "none" |
+| Z1 | the launch's log holds no `Frame Job: ` line |
+
+```sh
+make rust
+python3 tools/proof/cursor_capture_probe.py [--only K0,K12]
+python3 tools/proof/cursor_capture_probe.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py [--only K4,K15]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU1b1 record. CU1b2 holds K1, K2, K3, K6
+and K9, against a burned-tip helper.
+
 ## Road map "creator-jobs" CU2 — the core evaluates a cursor file (`cursor_track_probe.py` T1–T5; two mutants; spec §11 CU-20…CU-26)
 
 **`cursor_track_probe.py`** builds `cursor_track_probe.swift` from `app/Sources` with

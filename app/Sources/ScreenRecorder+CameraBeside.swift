@@ -101,7 +101,8 @@ extension ScreenRecorder {
     }
 
     /// MAIN THREAD, `.arming`: the one launch turn (CAM-9 (2)) — the
-    /// microphone's file (when one was chosen), then the stream, then
+    /// microphone's file (when one was chosen), then the cursor's capture
+    /// with segment 0 open (spec §11 CU-11), then the stream, then
     /// segment 0's camera writer (none without a camera). `startCapture`'s
     /// completion is `captureStarted`'s, which leaves `.arming`.
     func launchScreen() {
@@ -110,6 +111,7 @@ extension ScreenRecorder {
             session?.segments[0].micRecordingCalledAt = Date()
             micOutput.startRecording(to: micURL, outputFileType: .m4a, recordingDelegate: self)
         }
+        startCursorCapture()
         let stream = current.stream
         stream.startCapture { [weak self] error in
             let at = Date()

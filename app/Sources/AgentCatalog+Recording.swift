@@ -17,7 +17,8 @@ import Foundation
 /// `recordingVoiceOverClause`), still hoisted for the type checker's budget;
 /// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, and CR3b's
 /// `recordingCameraBesideClause` (CAM-10) a sixth, and AP6 part 3's
-/// `recordingEnhanceClause` (AU-69) a seventh, for the same.
+/// `recordingEnhanceClause` (AU-69) a seventh, and CU1b1's `recordingCursorClause`
+/// (CU-18) an eighth, for the same.
 /// It is SPLICED back in where it left — LAST, after `cancel_export` — so the
 /// catalog's order, which `recording_probe.py` reads and `tools/list`
 /// publishes, and the description `recording_proof.py` section 0 reads, are
@@ -196,6 +197,16 @@ extension AgentServer {
             + "within 5 minutes); project is read after it. The landing itself is the same "
             + "either way. The recorder panel's Enhance the microphone when it lands box does "
             + "the same."
+        // CU1b1's cursor paragraph (spec §11 CU-18), hoisted for the same budget reason.
+        let recordingCursorClause: String =
+            " CURSOR: every display, window or picked recording also writes the pointer's "
+            + "path, clicks, scrolls and the frames' geometry beside each segment movie as "
+            + "<movie stem>.fjcursor (the pointer is still in the picture too). Each entry of "
+            + "segments then also carries cursor_path and cursor_image (\"none\": no cursor "
+            + "image is recorded) when that segment's cursor file was written, and "
+            + "cursor_problem when it was not or holds only the geometry the screen had when "
+            + "the segment began (also said in the note); a cursor problem never fails the "
+            + "recording."
         return [
             // MARK: Recording
             //
@@ -257,7 +268,7 @@ extension AgentServer {
                     + recordingPauseClause
                     + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
                     + recordingCameraClause + recordingCameraBesideClause
-                    + recordingEnhanceClause,
+                    + recordingEnhanceClause + recordingCursorClause,
                 recordScreenArguments(), required: ["seconds"]),
         ]
     }

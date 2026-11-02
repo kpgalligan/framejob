@@ -1,9 +1,20 @@
 import AVFoundation
 import ScreenCaptureKit
 
+/// When the frame watch is on the stream (road map creator-jobs CU1b1, spec §11
+/// CU-13, amending CAM-9 (3)): with a camera beside the screen, for E2, and
+/// with cursor capture, for the frames' geometry — which is every display,
+/// window or picked recording until CU3c and CU4 give a choice. A failed add
+/// refuses the start only when a camera needs E2; without one the recording
+/// goes on without the watch and its cursor files say so. PURE.
+enum ScreenFrameWatchRule {
+    static func attaches(camera: Bool, cursor: Bool) -> Bool { camera || cursor }
+    static func failsStart(camera: Bool) -> Bool { camera }
+}
+
 /// The screen's start by E2 (camera-recording CR3a, spec §11 CAM-9 (3)): an
-/// `SCStreamOutput` for `.screen` frames, on the stream only when a camera
-/// records beside the screen. CR0 chose E2 for camera + screen — the PTS of
+/// `SCStreamOutput` for `.screen` frames, on the stream whenever
+/// `ScreenFrameWatchRule.attaches` says so. CR0 chose E2 for camera + screen — the PTS of
 /// the first COMPLETE frame at or after the did-start's arrival on the host
 /// clock (E1) — because the did-start alone is stamped where a callback lands
 /// and the frame is what the file begins with (`archive/camera-recording.md`,
@@ -30,6 +41,11 @@ import ScreenCaptureKit
 /// main. Everything the two sides share is read and written under `lock`;
 /// an answer is hopped to main and delivered only when its question is still
 /// open there, so nothing answers after `drop(segment:)` or `stop()`.
+///
+/// **The geometry** (spec §11 CU-13): each complete frame's `SCStreamFrameInfo`
+/// geometry — `screenRect`, `contentRect`, `contentScale`, `scaleFactor` — is
+/// handed to `onGeometry` with the frame's PTS when it differs from the last
+/// one handed, on `queue`; a frame missing any of the four hands nothing.
 final class ScreenFrameWatch: NSObject, SCStreamOutput {
     /// Seconds of complete frames kept for a question that comes late.
     static let keptSeconds: Double = 2
@@ -58,10 +74,30 @@ final class ScreenFrameWatch: NSObject, SCStreamOutput {
     private var answering: [Int: Double] = [:]
     /// Under `lock`: `stop()` was called.
     private var stopped = false
+    /// The frames' geometry, with the PTS in seconds; called on `queue`.
+    private let onGeometry: ((CursorGeometry, Double) -> Void)?
+    /// On `queue` only: the geometry last handed to `onGeometry`.
+    private var lastGeometry: CursorGeometry?
 
-    init(bound: Double) {
+    init(bound: Double, onGeometry: ((CursorGeometry, Double) -> Void)? = nil) {
         self.bound = bound
+        self.onGeometry = onGeometry
         super.init()
+    }
+
+    /// A complete frame's geometry, read from its four keys (the rects as
+    /// `CGRect` dictionaries, the scales as numbers); nil when one is missing.
+    static func geometry(from info: [SCStreamFrameInfo: Any]) -> CursorGeometry? {
+        guard let screen = info[.screenRect] as? NSDictionary,
+            let screenRect = CGRect(dictionaryRepresentation: screen as CFDictionary),
+            let content = info[.contentRect] as? NSDictionary,
+            let contentRect = CGRect(dictionaryRepresentation: content as CFDictionary),
+            let contentScale = (info[.contentScale] as? NSNumber)?.doubleValue,
+            let scaleFactor = (info[.scaleFactor] as? NSNumber)?.doubleValue
+        else { return nil }
+        return CursorGeometry(
+            screenRect: screenRect, contentRect: contentRect, contentScale: contentScale,
+            scaleFactor: scaleFactor)
     }
 
     /// `queue`. A `.screen` frame: its PTS and whether it is complete
@@ -74,11 +110,16 @@ final class ScreenFrameWatch: NSObject, SCStreamOutput {
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         guard pts.isValid else { return }
         var complete = false
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(
-            sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
-            let raw = attachments.first?[.status] as? Int
-        {
+        let info = (CMSampleBufferGetSampleAttachmentsArray(
+            sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first
+        if let raw = info?[.status] as? Int {
             complete = SCFrameStatus(rawValue: raw) == .complete
+        }
+        if complete, let onGeometry, let info, let geometry = Self.geometry(from: info),
+            geometry != lastGeometry
+        {
+            lastGeometry = geometry
+            onGeometry(geometry, pts.seconds)
         }
         record(pts: pts.seconds, complete: complete)
     }

@@ -242,6 +242,9 @@ the rest):
   & Security ▸ Input Monitoring." plus "then relaunch Frame Job." only when CU-S1 says
   `relaunch=needed`, plus `launchClause`. Accessibility is never asked; Frame Job never posts an
   event; no Info.plist key or entitlement unless CU-S1 measures one is needed.
+  **Settled at CU0b** (2026-11-02, the owner's JOB-29 run): `grant_api=cg` (the CoreGraphics
+  pair), no prompt shown, not listed until added by hand (the panel's note says "Add Frame Job
+  with +", CU6), relaunch not needed (so the refusal never gains "then relaunch Frame Job.").
 - **CU-4 — The cursor is part of its clip's layer, not a clip of its own.** The layer stage
   composites the sprite and its ripples over the source texel inside `layerSample`
   (`Compositor.metal:800`), before `gradeSample`, so crop, placement, grade, filters, spotlight,
@@ -257,12 +260,21 @@ the rest):
   <command> plans only clips that play forward"), since mapping it would put a mirror in the core
   (D4-6).
 - **CU-6 — The spikes' rules are CJ0's**, each verdict recorded before the phase that depends on it.
-  **Settled at CU0b** (2026-11-01; `designs/creator-jobs.md`'s "CU0b's record", every rule's
+  **Settled at CU0b** (2026-11-01 and the owner's JOB-29 run of 2026-11-02;
+  `designs/creator-jobs.md`'s "CU0b's record" and "The owner's run (2026-11-02)", every rule's
   `rule_sha256` equal to CJ0a's): CU-S4 `body=json smoothing=whole-file` (CU-10's body is
-  columnar JSON, version 1, and smoothing is prepared over the whole file). Every CU-S1, CU-S2 and
-  CU-S3 field is `owed`. The console was locked and the terminal could not post, so those rows were
-  skipped by name, and the owner runs them with the person tier (`docs/manual-checks.md` JOB-29)
-  before CU1b and CU6. None is a STOP.
+  columnar JSON, version 1, and smoothing is prepared over the whole file). CU-S1, by the owner's
+  rulings on its verdict: `positions=poll`; `clicks=monitor` (NSEvent's global and local monitors,
+  no grant; the verdict's STOP overruled on its total); `keys=tap` (a CGEventTap under Input
+  Monitoring, 302 of 302 keys; the verdict's STOP overruled); `event_clock=ns`; `secure=withheld`;
+  `relaunch=not-needed`; `grant_api=cg`, no prompt shown and the app not listed until added by
+  hand (`listed=no`); `cursor_image=none`; `image_fallback=arrow`; `hidden=not-recorded`. CU-S2:
+  display mapping M2 (CU-20); the anchor E1 for display recordings (p95 2.5–6.3 ms on every
+  display row; CU-12); window mapping owed, because the picker offers no Share button for the
+  instrument's own window and the instrument is to own its grey window from a helper process
+  before CU3c; the window rows' anchor owed to a re-run on a quiet machine (if they still fail,
+  window recordings' cursor STOPs to the owner); `separate` owed. CU-S3 `dirty=not-stored`
+  (0/10 bursts).
 - **CU-7 — Keys are private by construction.** A key-down while ⌘ or ⌃ is held is a shortcut, stored
   with its spelled keys; every other key-down and every auto-repeat is a mark with a time and no
   identity; no character, key code or label of a typed key is ever stored, so none can reach a tool

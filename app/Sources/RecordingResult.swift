@@ -73,11 +73,22 @@ struct RecordingSegment {
     /// E1 because the frame watch could not go back on the stream at its
     /// resume (CAM-9 (6)), naming why.
     let cameraNote: String?
+    /// This segment's cursor file, `<stem>.fjcursor` beside its movie (spec
+    /// §11 CU-18); nil when none was written, and then `cursorProblem` says
+    /// why (a session with no cursor capture writes none and says nothing).
+    let cursorURL: URL?
+    /// Why this segment has no cursor file, or what its file lacks (CU-12,
+    /// CU-13, CU-14); never the recording's failure.
+    let cursorProblem: String?
+    /// The written file's `cursor_image` (`none` since CU-S1's verdict);
+    /// nil without a file.
+    let cursorImage: CursorImageMode?
 
     init(
         descriptor: MediaDescriptor, micDescriptor: MediaDescriptor?, micOffset: Ticks,
         startedAt: Date, micProblem: String? = nil, cameraDescriptor: MediaDescriptor? = nil,
-        cameraOffset: Ticks = 0, cameraProblem: String? = nil, cameraNote: String? = nil
+        cameraOffset: Ticks = 0, cameraProblem: String? = nil, cameraNote: String? = nil,
+        cursorURL: URL? = nil, cursorProblem: String? = nil, cursorImage: CursorImageMode? = nil
     ) {
         self.descriptor = descriptor
         self.micDescriptor = micDescriptor
@@ -88,6 +99,18 @@ struct RecordingSegment {
         self.cameraOffset = cameraOffset
         self.cameraProblem = cameraProblem
         self.cameraNote = cameraNote
+        self.cursorURL = cursorURL
+        self.cursorProblem = cursorProblem
+        self.cursorImage = cursorImage
+    }
+
+    /// This segment with its cursor fields set, every other field kept.
+    func withCursor(url: URL?, problem: String?, image: CursorImageMode?) -> RecordingSegment {
+        RecordingSegment(
+            descriptor: descriptor, micDescriptor: micDescriptor, micOffset: micOffset,
+            startedAt: startedAt, micProblem: micProblem, cameraDescriptor: cameraDescriptor,
+            cameraOffset: cameraOffset, cameraProblem: cameraProblem, cameraNote: cameraNote,
+            cursorURL: url, cursorProblem: problem, cursorImage: image)
     }
 }
 
@@ -227,6 +250,13 @@ struct RecordingResult {
     var cameraSegmentsNote: String? {
         let sentences = segments.flatMap { [$0.cameraProblem, $0.cameraNote].compactMap { $0 } }
         return sentences.isEmpty ? nil : sentences.joined(separator: " ")
+    }
+
+    /// Every segment's `cursorProblem` (spec §11 CU-18), in order, joined by a
+    /// space; nil when no segment has one.
+    var cursorSegmentsNote: String? {
+        let problems = segments.compactMap { $0.cursorProblem }
+        return problems.isEmpty ? nil : problems.joined(separator: " ")
     }
 
     init(

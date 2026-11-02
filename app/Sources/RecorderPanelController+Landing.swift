@@ -176,7 +176,8 @@ extension RecorderPanelController {
     private func landed(_ result: RecordingResult, asNewProject: Bool, notes placed: [String]) {
         phase = .idle
         rebuildDestinations()
-        let notes = [result.cameraSegmentsNote].compactMap { $0 } + placed
+        // Then every segment's cursor problem (spec §11 CU-18).
+        let notes = [result.cameraSegmentsNote, result.cursorSegmentsNote].compactMap { $0 } + placed
         let leftOut = [result.unreadableNote, result.leftOutVoiceNote].compactMap { $0 }
         setNote(
             Self.landingNote(
@@ -202,7 +203,7 @@ extension RecorderPanelController {
             + error.localizedDescription
         for sentence in [
             result.unreadableNote, result.micProblem, result.camera?.problem, result.camera?.note,
-            result.cameraSegmentsNote, resumeProblem,
+            result.cameraSegmentsNote, result.cursorSegmentsNote, resumeProblem,
         ].compactMap({ $0 })
         {
             note += " " + sentence

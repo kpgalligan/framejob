@@ -177,6 +177,7 @@ Recordings are saved in **`~/Movies/Frame Job Recordings/`**, which Frame Job cr
 | Its microphone | `Screen Recording 2026-09-10 at 14.03.22 (Microphone).m4a` | Mono 48 kHz AAC, beside the movie |
 | Voice-over | `Voice-over 2026-10-02 at 09.15.04.m4a` | Mono 48 kHz AAC |
 | Camera recording | `Camera Recording 2026-10-26 at 17.14.33.mov` | QuickTime movie at the camera's format, HEVC (H.264 where HEVC isn't available), no sound of its own; its microphone file sits beside it as for a screen recording |
+| Its cursor | `Screen Recording 2026-09-10 at 14.03.22.fjcursor` | Beside every screen recording's movie (a display, a window or a picked window), one per stretch between pauses: where the pointer was about 120 times a second, every click and scroll, and how the recorded area sat on the screen. The pointer is still drawn into the movie as well. If the file can't be written, the recording still lands and the panel's note says why |
 
 When a name is already taken, Frame Job adds ` (2)`, ` (3)` and so on.
 

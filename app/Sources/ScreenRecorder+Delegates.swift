@@ -93,6 +93,8 @@ extension ScreenRecorder: SCRecordingOutputDelegate {
                 segment.stoppedAt == nil
             else { return }
             self.session?.segments[index].screenStartedAt = at
+            // Every segment's E1, its cursor file's anchor (spec §11 CU-12).
+            self.session?.segments[index].screenHost = host
             if self.session?.frameWatch != nil { self.screenDidStart(at: index, host: host) }
         }
     }

@@ -11,14 +11,15 @@
 //! through `ticks_to_seconds` / `seconds_to_ticks` × 1e6 ([`ticks_to_us`],
 //! [`us_to_ticks`]) and nowhere else.
 //!
-//! **The mapping (CU-20, provisional M1).** A file position is global points
-//! × 100. Movie px = `(p − screen_rect.origin) × content_scale ×
-//! pixels_per_point + content_rect.origin × pixels_per_point`, every file
-//! value ÷ 100, through the geometry entry in force at the sample's time:
-//! the last entry with `t ≤` it, or the first before any. [`CursorTrack::to_movie`]
-//! is the one function; movie px are content px (CU-16). CU-S2's verdict is
-//! owed (JOB-29); the phase that records it amends this function if M2 or M3
-//! wins.
+//! **The mapping (CU-20, M2).** A file position is global points × 100.
+//! Movie px = `(p − screen_rect.origin) × content_scale × scale_factor +
+//! content_rect.origin × scale_factor`, every file value ÷ 100, through the
+//! geometry entry in force at the sample's time: the last entry with `t ≤`
+//! it, or the first before any; `scale_factor` is that entry's own, never the
+//! header's `pixels_per_point`. [`CursorTrack::to_movie`] is the one function;
+//! movie px are content px (CU-16). CU-S2 settled M2 for displays (the
+//! owner's JOB-29 run, 2026-11-02); for window and picked sources it stands
+//! provisionally until the picked row is measured.
 //!
 //! **The lock.** `prepared` holds every stored smoothing. A `state` holds it
 //! only to clone an `Arc`; a `prepare` builds outside it and stores under
@@ -139,18 +140,18 @@ impl CursorTrack {
         &g[after.saturating_sub(1)]
     }
 
-    /// Pixels per point at `t_us`: `content_scale × pixels_per_point`.
+    /// Pixels per point at `t_us`: `content_scale × scale_factor`.
     pub(crate) fn px_per_point(&self, t_us: f64) -> f64 {
-        self.geometry_at(t_us).content_scale * self.file.pixels_per_point
+        let g = self.geometry_at(t_us);
+        g.content_scale * g.scale_factor
     }
 
-    /// CU-20's M1: a position in the file's units at `t_us` to movie px.
+    /// CU-20's M2: a position in the file's units at `t_us` to movie px.
     pub(crate) fn to_movie(&self, t_us: f64, x: f64, y: f64) -> (f64, f64) {
         let g = self.geometry_at(t_us);
-        let ppp = self.file.pixels_per_point;
+        let sf = g.scale_factor;
         let map = |p: f64, screen: i64, content: i64| {
-            (p / 100.0 - screen as f64 / 100.0) * g.content_scale * ppp
-                + content as f64 / 100.0 * ppp
+            (p / 100.0 - screen as f64 / 100.0) * g.content_scale * sf + content as f64 / 100.0 * sf
         };
         (
             map(x, g.screen_rect[0], g.content_rect[0]),

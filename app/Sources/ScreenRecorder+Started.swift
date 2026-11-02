@@ -52,6 +52,9 @@ extension ScreenRecorder {
                 try? FileManager.default.removeItem(at: micURL)
             }
             tearDownCameraBeside(current)
+            // The cursor's poll and monitors, and its buffers (spec §11 CU-11).
+            current.cursor?.stop()
+            current.cursor?.discard()
         }
         session = nil
         state = .idle

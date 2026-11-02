@@ -225,3 +225,94 @@ tool, `rc_*` export, op-table argument or `ModelKeys` row — Vision is on-devic
   without the image clip, and the empty-set sentence; Z1 the log free of `Frame Job: `. Four
   mutants: M1 `foreground-on-media`, M2 `image-refused`, M3 `arm-no-subject` (each caught by
   `core/tests/cutout_image.rs`) and M4 `analyze-image` (caught by S5 on Debug).
+
+## CU1b1 — the recorder saves the cursor (2026-11-02)
+
+Recorded before the code. CU1b is split (road map "CU1b — the recorder saves the cursor"): CU1b1
+writes the file; CU1b2 holds the granted rows K1, K2, K3, K6 and K9 against a burned-tip helper.
+The owner's answer: the file sits beside the movie as `<stem>.fjcursor` (CU-2, CU-15).
+
+- **CU-11 — The capture (CU-S1's verdict as the owner ruled on it, CU-6).** `CursorCapture`
+  (`app/Sources/CursorCapture.swift`) owns one serial queue, `com.kgalligan.FrameJob.cursor` at
+  `.userInteractive`, and the only `CursorSegments` value, touched on that queue alone.
+  - **Positions:** a `DispatchSourceTimer` on that queue polls `CGEvent(source: nil)?.location`
+    every 1/120 s; a move is recorded only when the point differs from the last polled one, and a
+    nil records nothing. Each segment opened is seeded with the last polled point (a move at its
+    open, before its anchor, so CU-17 keeps it at t 0): a segment opened after the pointer stopped
+    still has its position. Its opening geometry is the last fed (CU-13), else the start's.
+  - **Clicks and scrolls:** `NSEvent` global and local monitors, added and removed on main, no
+    grant: left, right and other mouse-down and mouse-up, and `scrollWheel`. A click is
+    `buttonNumber` (0…31, else dropped), down or up, `cgEvent.location` and `clickCount` (at least
+    1). A scroll is `.scrollWheelEventPointDeltaAxis2` / `Axis1` as dx / dy at `cgEvent.location`.
+    An event without a `cgEvent` is dropped.
+  - **Time:** an event's host time is `cgEvent.timestamp / 1e9` seconds (`event_clock=ns`), else
+    its arrival on the host clock (`CMClockGetHostTimeClock`); a poll's is its own host time.
+  - **Not captured:** no image sampler (`cursor_image=none`: every file says `none` and the
+    arrow is drawn, `image_fallback=arrow`); no hidden spans (`hidden=not-recorded`); no dirty
+    boxes (CU-S3 `dirty=not-stored`, 0/10); keys wait for CU6 (`keys=tap`, under Input
+    Monitoring). `CursorCaptureBuffer` (CU-17) and `CursorFileWriter` (CU-15) are used as they
+    are: seeding and the poll's dedupe live in `CursorSegments`.
+- **CU-12 — The anchor is E1 for every source.** A segment's times count from its screen
+  did-start's host time (E1), stamped on every segment by the recording output's did-start. E2 is
+  never used for a cursor file: on CU-S2's display rows E2's p95 was 14.6–26.1 ms against E1's
+  2.5–6.3 ms. The window rows' re-run on a quiet machine is owed; if they still fail, window
+  recordings' cursor STOPs to the owner. A landed segment with no E1 gets no file, and its
+  `cursorProblem` is "The cursor file for <movie name> was not written: the screen never reported
+  its start, so its times have nothing to count from."
+- **CU-13 — The frame watch rides every screen recording (amends CAM-9 (3)).**
+  `ScreenFrameWatchRule.attaches(camera:cursor:)` is `camera || cursor`, and cursor is true for
+  every display, window or picked recording until CU3c and CU4 give a choice. The watch feeds
+  each complete frame's `SCStreamFrameInfo` geometry (`screenRect`, `contentRect`,
+  `contentScale`, `scaleFactor`; none fed when a key is missing) when it differs from the last,
+  timed by the frame's PTS, to `CursorCapture.geometry`.
+  - A failed watch add refuses the start only when a camera needs E2
+    (`ScreenFrameWatchRule.failsStart(camera:)`, the existing sentence "The screen's frames could
+    not be watched: …"). Without a camera the recording goes on without the watch, its reason
+    kept as `Session.cursorWatchLost`. A failed re-add at a resume is that segment's
+    `cursorWatchProblem`, camera or not (the camera's own `watchFailure` stays as it is).
+  - The file is still written, on the geometry known when the segment opened, and its
+    `cursorProblem` is "The cursor file for <movie name> has only the geometry the screen had
+    when it began: its frames could not be watched (<reason>), so a move or resize of what was
+    recorded after that is not in it." (CU-14: never the recording's failure.)
+  - **The opening geometry**, before any frame, is what CU-S2's frames reported:
+    `scale_factor = filter.pointPixelScale`; `content_scale = content_px_width / (scale_factor ×
+    point_width)`; `content_rect = (0, 0, point size × content_scale)`; `screen_rect =
+    source_frame` — `CGDisplayBounds` for a display, the CGWindow's `kCGWindowBounds` for a window
+    (the filter's `contentRect` when the window list has none), the filter's `contentRect` for a
+    picked source. The header's `pixels_per_point` is the configured pixel width ÷ the point
+    width; `content_size` the stream's configured size; `in_picture` true (the pointer is still
+    burned in until CU3c); `cursor_image` `none`.
+- **CU-18 — The result, the answer and the notes.** A landed segment carries `cursorURL`,
+  `cursorProblem` and `cursorImage` (`RecordingSegment.withCursor`), set by the walker's cursor
+  step after the camera's (movie → microphone → camera → cursor; a cursor failure never fails or
+  reorders a segment). The step closes the segment's buffer with `movieSize` the probed movie's
+  width × height and `CursorAnchor(kind: .e1, host: screenHost)`, then writes through
+  `CursorFileWriter` on the capture queue; the writer's sentence wins over CU-13's. A session
+  without a capture (a probe's hand-built one) passes the segment through unchanged.
+  `record_screen`'s `segments[k]` gains `cursor_path` and `cursor_image` (`"none"`) when the file
+  was written and `cursor_problem` when set. `RecordingResult.cursorSegmentsNote` (every
+  segment's `cursorProblem`, in order, space-joined) is appended to the tool's notes and the
+  panel's landing note (and its failed-landing note). The header's `cursor_image: none` gets no
+  landing note: every recording is written that way, so a note would be noise. This deviates from
+  the road map's CU1b, which named one. No new tool, op, `rc_*`, project format or cursor-file
+  version.
+- **CU-19 — CU1b1's proof.** Ungranted, `cursor_capture_probe.py` (with B0 and C1–C6): K0
+  `attaches` is `camera || cursor`; K10 120 polls over 12 positions give 12 moves and a nil none;
+  K11 a segment opened after the pointer stopped has one move at t 0 at the last point, and its
+  opening geometry is the last fed; K12 `segmentFields`' three keys, `cursorSegmentsNote` and
+  `resultNotes`; K13 `geometry(from:)` reads the four keys and answers nil when one is missing;
+  K14 an `NSEvent(cgEvent:)` click stamped 5e9 ns answers host 5.0, its point and count; K16
+  `failsStart` true with a camera and false without, and `cursorProblem`'s precedence. Seven
+  mutants: `watch-camera-only` (K0), `poll-every-sample` (K10), `no-seed-at-open` (K11),
+  `cursor-note-dropped` (K12), `event-clock-arrival` (K14), `watch-failure-refuses` and
+  `watch-lost-dropped` (K16); and the core's `mapping-m1` (`core/tests/cursor_track.rs`).
+  Granted, `cursor_proof.py` against Release (skipped by name without Screen Recording or on a
+  locked console): K4 display recordings at Nominal and Best, each paused and resumed with the
+  pointer warped in each segment, every segment its own file accepted by `ReelCursor` (`source`
+  display, `anchor` e1, `cursor_image` none, `movie_size` the track's, each warped point in the
+  moves within 1 pt); K5 clicks posted onto the probe's window (skipped by name without
+  `CGPreflightPostEventAccess`); K7 a directory at `<stem>.fjcursor.partial` lands the movie with
+  no cursor URL and the writer's sentence; K8 the probe's own 1001 × 701 pt window at Nominal,
+  `movie_size` the track's; K15 `record_screen {seconds: 2, place: false, path}` answers
+  `segments[0].cursor_path` beside its movie with `cursor_image` "none". JOB-20 is the person's
+  check of a real recording's clicks.

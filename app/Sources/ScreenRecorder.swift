@@ -25,7 +25,9 @@ import ScreenCaptureKit
 /// same machine with a camera where the stream was, in `+Camera.swift` and
 /// `+CameraFinishing.swift`, forwarded to on the same terms. A camera BESIDE
 /// the screen (spec §11 CAM-9) is this machine's: `+CameraBeside.swift`,
-/// `+CameraBesideFinishing.swift` and `ScreenFrameWatch.swift`.
+/// `+CameraBesideFinishing.swift` and `ScreenFrameWatch.swift`. Every screen
+/// recording's cursor file per segment (spec §11 CU-11…CU-13, CU-18) is
+/// `+Cursor.swift` and `CursorCapture.swift`.
 ///
 /// **A paused recording is a sequence of files over one stream** (decision
 /// 6). ScreenCaptureKit has no pause, so `pause()` REMOVES the segment's
@@ -263,18 +265,31 @@ final class ScreenRecorder: NSObject {
                     "The recording output could not be added: " + error.localizedDescription),
                 completion)
         }
+        // The cursor's capture and its segments' header (spec §11 CU-11, CU-13);
+        // nothing runs until `launchScreen`.
+        let cursor = CursorCapture()
+        let cursorStart = Self.cursorStart(filter: filter, choice: choice, stream: configs.stream)
+        // The frame watch rides every screen recording (CU-13): E2 for a
+        // camera, the geometry for the cursor. Only a camera's start needs it.
         var watch: ScreenFrameWatch?
-        if camera != nil {
-            let made = ScreenFrameWatch(bound: ScreenFrameWatch.bound(rate: choice.rate))
+        var watchLost: String?
+        if ScreenFrameWatchRule.attaches(camera: camera != nil, cursor: true) {
+            let made = ScreenFrameWatch(
+                bound: ScreenFrameWatch.bound(rate: choice.rate),
+                onGeometry: { [weak cursor] geometry, pts in cursor?.geometry(geometry, host: pts) })
             do {
                 try stream.addStreamOutput(made, type: .screen, sampleHandlerQueue: made.queue)
+                watch = made
             } catch {
-                return refuse(
-                    .startFailed(
-                        "The screen's frames could not be watched: " + error.localizedDescription),
-                    completion)
+                if ScreenFrameWatchRule.failsStart(camera: camera != nil) {
+                    return refuse(
+                        .startFailed(
+                            "The screen's frames could not be watched: " + error.localizedDescription),
+                        completion)
+                }
+                watch = nil
+                watchLost = error.localizedDescription
             }
-            watch = made
         }
         var mic: MicrophoneCapture?
         if let device = microphone {
@@ -308,7 +323,8 @@ final class ScreenRecorder: NSObject {
             onFinish: onFinish,
             segments: [
                 Segment(movieURL: movieURL, micURL: mic?.url, output: output, addedAt: calledAt)
-            ], cameraCapture: capture, camera: recorded, frameWatch: watch)
+            ], cameraCapture: capture, camera: recorded, frameWatch: watch, cursor: cursor,
+            cursorStart: cursorStart, cursorWatchLost: watchLost)
         state = .arming
         startCompletion = completion
         if let mic {

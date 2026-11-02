@@ -58,14 +58,17 @@ continues in `creator-jobs-3.md`.
   differs, a geometry entry only when it differs from the last. Under `cursor_image: none` image
   samples are dropped, and `current-system` with no image recorded writes `none`.
   `CursorAnchor.choose(e2:e1:)` picks E2 when given, else E1.
-- **CU-20 — The mapping, provisional: M1 (CU2).** Movie px = `(p − screen_rect.origin) ×
-  content_scale × pixels_per_point + content_rect.origin × pixels_per_point`, every file value
-  ÷ 100 to give points. The geometry entry used is the one in force at the sample's time: the last
+- **CU-20 — The mapping: M2 (CU2; amended at CU1b1).** Movie px = `(p − screen_rect.origin) ×
+  content_scale × scale_factor + content_rect.origin × scale_factor`, every file value ÷ 100 to
+  give points, `scale_factor` the geometry entry's own (M1 with `scale_factor` for
+  `pixels_per_point`). The geometry entry used is the one in force at the sample's time: the last
   with `t ≤` it, or the first entry before any. One function computes it, and movie px = content
-  px (CU-16). CU-S2's verdict is owed (JOB-29), so M1, the first candidate in its rule, stands for
-  every source kind; the phase that records CU-S2's verdict amends CU-20 and that function if M2
-  or M3 wins. `px_per_point` = `content_scale × pixels_per_point`. A source tick T and a file µs
-  convert through `time::ticks_to_seconds` / `seconds_to_ticks` × 1e6 (file t 0 is source tick 0).
+  px (CU-16). `px_per_point` = `content_scale × scale_factor`. **Settled for displays** by
+  CU-S2's verdict (`mapping_display=M2`, the owner's JOB-29 run, 2026-11-02); **provisional for
+  window and picked sources**: M1 measured failing on window-odd and M2 passing both measured
+  window rows, and the picked row is owed until the instrument's helper-owned window lets the
+  owner perform it (before CU3c). A source tick T and a file µs convert through
+  `time::ticks_to_seconds` / `seconds_to_ticks` × 1e6 (file t 0 is source tick 0).
 - **CU-21 — Smoothing (CU2).** `smoothing` runs 0…1. **The hold rule**, one implementation
   (`cursor_smooth::hold_end`): moves are recorded only when the position changes, so when moves i
   and i+1 are more than `HOLD_GAP_US` 25,000 µs apart the cursor holds move i until `t[i+1] −

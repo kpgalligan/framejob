@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Road map creator-jobs CU1a: the cursor file's capture buffer, anchor, writer and
 read-back, measured through the app's own sources on synthetic segments (spec §11 CU-10,
-CU-14…CU-17). No app, no grant, no media.
+CU-14…CU-17); and CU1b1's recorder rows K0, K10–K14 and K16 (spec §11 CU-11…CU-13, CU-18,
+CU-19). No app, no grant, no media.
 
     python3 tools/proof/cursor_capture_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -30,6 +31,21 @@ Rows:
       dropped, images interned and changes deduped, events sorted.
   C6  content 1001 × 701 with a 1002 × 702 movie: `movie_size` [1002, 702].
 
+CU1b1's rows (spec §11 CU-11…CU-13, CU-18, CU-19):
+  K0  `ScreenFrameWatchRule.attaches` is camera || cursor over the four cases.
+  K10 `CursorSegments`: 120 polls over 12 positions give 12 moves, and a nil records none.
+  K11 a segment opened after the pointer stopped has one move at t 0, at the last polled
+      point, and its opening geometry is the last fed.
+  K12 `AgentServer.segmentFields` writes `cursor_path`, `cursor_image` and `cursor_problem`
+      (only the problem without a file, none for a bare segment); `cursorSegmentsNote` joins
+      the problems in order; `resultNotes` carries it last.
+  K13 `ScreenFrameWatch.geometry(from:)` reads the four keys, and answers nil when one is
+      missing.
+  K14 an `NSEvent(cgEvent:)` click stamped 5e9 ns answers host 5.0, its point and count; a
+      scroll its point deltas and host.
+  K16 `failsStart` is true with a camera and false without; `cursorProblem` answers the
+      writer's sentence, else CU-13's naming the movie and the reason, else nil.
+
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row failed; a build
 failure is B0's FAIL there. A `--mutant` run exits 1 when every row the mutant names failed
 (caught), 0 when one passed (survived), and 2 when the control could not be performed: the
@@ -47,7 +63,7 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/cursor-capture-probe"
-ROWS = ["B0", "C1", "C2", "C3", "C4", "C5", "C6"]
+ROWS = ["B0", "C1", "C2", "C3", "C4", "C5", "C6", "K0", "K10", "K11", "K12", "K13", "K14", "K16"]
 WALL = 120
 
 # name: (the rows it must fail, [(file, before, after), ...])
@@ -67,6 +83,28 @@ MUTANTS = {
     "movie-size-from-content": (["C6"], [
         ("CursorCaptureBuffer.swift", "movieSize: [movieSize.width, movieSize.height]",
          "movieSize: [start.contentSize.width, start.contentSize.height]")]),
+    # CU1b1 (spec §11 CU-11…CU-13, CU-18).
+    "watch-camera-only": (["K0"], [
+        ("ScreenFrameWatch.swift",
+         "static func attaches(camera: Bool, cursor: Bool) -> Bool { camera || cursor }",
+         "static func attaches(camera: Bool, cursor: Bool) -> Bool { camera }")]),
+    "poll-every-sample": (["K10"], [
+        ("CursorCapture.swift", "guard let point, point != lastPoint else { return }",
+         "guard let point else { return }")]),
+    "no-seed-at-open": (["K11"], [
+        ("CursorCapture.swift",
+         "        if let lastPoint { buffer.move(to: lastPoint, host: host) }\n", "")]),
+    "cursor-note-dropped": (["K12"], [
+        ("AgentServer+RecordingResult.swift", "            result.cursorSegmentsNote,\n", "")]),
+    "event-clock-arrival": (["K14"], [
+        ("CursorCapture.swift", "event.timestamp > 0 ? Double(event.timestamp) / 1e9 : arrival",
+         "arrival")]),
+    "watch-failure-refuses": (["K16"], [
+        ("ScreenFrameWatch.swift", "static func failsStart(camera: Bool) -> Bool { camera }",
+         "static func failsStart(camera: Bool) -> Bool { true }")]),
+    "watch-lost-dropped": (["K16"], [
+        ("ScreenRecorder+Cursor.swift", "        guard let watchLost else { return nil }\n",
+         "        guard let watchLost = nil as String? else { return nil }\n")]),
 }
 
 

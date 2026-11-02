@@ -512,7 +512,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CU1a | CU | Nothing: the cursor file's format, the core's read-back, the writer | CU0b, CJ0d (T15) | B | — |
 | CO0 | CO | Nothing: CO-1…CO-9; CO-S1, CO-S2 (and CO-S3 if S-KEY1 exists) | CJ0a | C | — |
 | TX2b | TX | The tab's bar: Words from, Language, the fill's progress and Stop, the notes | TX2a | A | — |
-| CU1b | CU | Every screen recording saves its cursor file beside each movie | CU1a | B | — |
+| CU1b | CU | Every screen recording saves its cursor file beside each movie (split: CU1b1 the recorder's file and rows K0, K4, K5, K7, K8, K10–K16; CU1b2 K1, K2, K3, K6, K9) | CU1a | B | — |
 | CO1 | CO | Agents read person masks (`masks`) made on the Mac | CO0, CJ2a | C | — |
 | TX3a | TX | Select words and delete them on every unlocked track as one step (TX3 split by size) | TX2a; TX-S3 at its head | A | — |
 | TX3b | TX | The pause token: a selectable pause over 1 s, `pauses[]` in `get_timeline_transcript` (TX-34) | TX3a | A | — |
@@ -2921,8 +2921,9 @@ record: CU-S1 `9508e82d119466262ed5fa48b7b3a6502b12022fa65b63ac0a35badfee23886c`
 - All three are owed. They are put to the owner before CU1b and CU6. They are not STOPs.
 
 **Owed (JOB-29).** At the unlocked machine, the owner runs `python3
-tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`, then `--person`. A11 answered nothing,
-so CU-3 gains no "Settled at CU0b" line yet.
+tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`, then `--person`. The owner ran them on
+2026-11-02 ("The owner's run (2026-11-02)" below); A11 answered `grant_api=cg`, so CU-3 gains its
+"Settled at CU0b" line.
 
 **Instrument rows.**
 
@@ -2984,6 +2985,61 @@ each kept both sides: the decisions index's `creator-jobs.md` row keeps the CJ-2
 summary, its Lines cell 465 → 471, and the spec README's `11-decisions/` total 17205 → 17211 in 35
 files; `tools/proof/README.md` holds CJ2a's section and then this one. `spec_index_proof.py`
 222/222. No `CLAUDE.md` edit and no issue owed.
+
+#### The owner's run (2026-11-02)
+
+The owner ran JOB-29 at the unlocked machine on 2026-11-02. The VERDICT lines, from
+`tools/proof/work/cursor_spike/cu-s{1,2,3}/results.json` in the integration worktree:
+
+- CU-S1 — `VERDICT positions=poll clicks=STOP keys=STOP cursor_image=none hidden=not-recorded
+  image_fallback=arrow event_clock=ns secure=withheld relaunch=not-needed grant_api=cg listed=no`.
+- CU-S2 — `VERDICT mapping_display=M2 mapping_window=owed separate=owed anchor=none
+  e1_still_p95_ms=9.1`.
+- CU-S3 — `VERDICT dirty=not-stored bursts_within=0/10`.
+
+The owner's rulings on them (`~/.claude/litecode/framejob/cj-owner-answers.md`, "2026-11-02: CU0b
+spike rulings (the owner's run of JOB-29)"), verbatim:
+
+- **keys = tap.** The owner accepts the CGEventTap with Input Monitoring on its total: 302 of 302
+  keys delivered.
+  - The per-window STOP came from the person tier's clock-based split (10 s per window). The
+    switch came about 1 s late, so 168/158 were credited to own and 134/144 to the helper.
+- **clicks = monitor.** The owner accepts NSEvent's global and local monitors, with no grant.
+  - The own window's 851/891 lost drag events that left its edge (attributed by position). The
+    helper got 762/761.
+  - A no-grant tap saw 2 of 626 events in another app.
+- **Window picker:** the picked window was not the instrument's grey window (0 red pixels). The
+  owner is re-running `--only s2 --person` on 2026-11-02.
+- **Anchor:** E1 is used for display recordings now. Its p95 was 2.5–6.3 ms against a 16.7 ms
+  frame on every display row.
+  - The window rows (window-moved, and window-odd.separate) were 1.3–3.3 s off under every
+    anchor. They were measured at load average about 30, with three build lanes running.
+  - They are re-run on a quiet machine when the lanes are idle. If they still fail, the cursor of
+    window recordings STOPs to the owner.
+- **Recorded facts:**
+  - A11: grant_api = cg. CGRequestListenEventAccess showed no prompt, and the app was not listed
+    in Input Monitoring until the owner added it ("listed=no"). Relaunch not needed: a tap made
+    before the grant counted 152 keys after it.
+  - The Accessibility-only rows were skipped because Input Monitoring stayed on. No verdict
+    depends on them (CU-3: Accessibility is never asked).
+
+And, from "2026-11-02: round 4's STOPs and the picker", verbatim:
+
+- **CU-S2's picked window:** SCContentSharingPicker offers no Share button for a window owned by
+  the process that presents it. The instrument draws its grey window from that same process, so
+  the row cannot be performed as built.
+  - Fix the instrument: a separate helper process owns the grey window. Then the owner re-runs
+    `--only s2 --person` before CU3c. Until then, window mapping is owed.
+
+**What is settled.** Positions are polled; clicks come from NSEvent's monitors (no grant); keys
+from a CGEventTap under Input Monitoring (CU6); `event_clock=ns`, `secure=withheld`,
+`relaunch=not-needed`, `grant_api=cg` with no prompt shown and the app not listed until added by
+hand; `cursor_image=none`, `image_fallback=arrow`, hidden spans not recorded. Display mapping M2;
+the anchor E1 for display recordings. CU-S3: dirty rects not stored (0/10 bursts). **What is
+owed.** Window mapping: the picker cannot offer the instrument's own window, and the instrument is
+to be fixed with a helper-owned window before CU3c (JOB-29's picked-window step). The window rows'
+anchor, re-run on a quiet machine. CU-6's and CU-3's "Settled at CU0b" lines carry these, and
+CU-20 is amended to M2 (CU1b1).
 
 ### CJ2b — the Analyzing sheet and Split at Shot Changes
 
@@ -3981,6 +4037,10 @@ Rust changed), "gate: PASS 302s".
 
 ### CU1b — the recorder saves the cursor
 
+- **Split (2026-11-02).** CU1b1 now: CU0b's settled verdicts recorded, the recorder writing
+  `<stem>.fjcursor` beside each segment movie, CU-20 amended to M2, the ungranted rows K0, K10–K14,
+  K16 and the granted K4, K5, K7, K8, K15. CU1b2: K1, K2, K3, K6 and K9, against a burned-tip
+  helper.
 - **What a person gets:** every display, window or picked recording writes `<stem>.fjcursor` beside
   each segment movie: the cursor's path and images, every click and scroll, and the frames'
   geometry. The pointer is still burned in (CU3c flips it). `record_screen`'s answer names each
@@ -4025,6 +4085,107 @@ Rust changed), "gate: PASS 302s".
 - **Depends on:** CU1a, CU-S1, CU-S2. **Lane** B.
 - **Question for the owner:** the cursor file beside the movie or in a per-recording folder?
   *Recommended: beside, `<stem>.fjcursor`*, the microphone and camera files' convention.
+
+#### CU1b1's record (2026-11-02)
+
+**Landed.** Lane B, base `7d297a07`, in four commits: `285c0c3f` (CU0b's settled verdicts from
+the owner's JOB-29 run — "The owner's run (2026-11-02)" above — CU-3's and CU-6's "Settled at
+CU0b" lines, JOB-29's picked-window step marked owed, this section's split line and its Phases
+row); `66fbacbf` (CU-11, CU-12, CU-13, CU-18 and CU-19 in `11-decisions/creator-jobs-5.md`, and
+CU-20 amended to M2, before the code); `836301c5` (the core's M2); `54a3a7a1` (the recorder, the
+answer, the documents and the instruments). The owner's answer: `<stem>.fjcursor` beside the
+movie. No tool, op, `rc_*`, project format or cursor-file version is added.
+
+- **Core.** `cursor_track.rs` (283 → 284): `px_per_point` and `to_movie` read the geometry
+  entry's `scale_factor` (M2), the module doc says so; `core/tests/cursor_track.rs` gains
+  `the_mapping_is_m2_scale_factor_not_pixels_per_point` (nominal on 2×: ppp 1, content scale
+  0.5, scale factor 2 → px = p).
+- **New files** (`wc -l`): `CursorCapture.swift` 224 (`CursorSegments`, pure: the poll's
+  dedupe, the seed at open, the last fed geometry; `CursorCapture`: the 120 Hz
+  `DispatchSourceTimer` on `com.kgalligan.FrameJob.cursor`, the global and local `NSEvent`
+  monitors, `click(from:arrival:)`, `scroll(from:arrival:)`, `hostNow()`);
+  `ScreenRecorder+Cursor.swift` 155 (`cursorStart`, `cursorProblem`, the no-E1 sentence,
+  `startCursorCapture`, the walker's `saveCursor`).
+- **Wiring and growth:** `ScreenFrameWatch.swift` 173 → 214 (`ScreenFrameWatchRule`,
+  `geometry(from:)`, `onGeometry` fed on change); `ScreenRecorder.swift` 341 → 357 (the watch
+  under `attaches`, refusing only under `failsStart`, the capture and its start on the
+  session); `ScreenRecorder+Pause.swift` 330 → 355 (`Session.cursor`, `cursorStart`,
+  `cursorWatchLost`, `Segment.screenHost`, `cursorWatchProblem`; `pause()` ends the segment,
+  `resume()` opens the next and stores a failed re-add); `+Delegates` 207 → 209 (every
+  segment's E1); `+CameraBeside` 211 → 213 (`launchScreen` starts the capture before
+  `startCapture`); `+Started` 68 → 71; `+Finishing` 363 → 371 (`saveCursor` after
+  `probeCameraBeside`, the capture stopped at `settle` and discarded at `conclude`);
+  `RecordingResult.swift` 356 → 386 (`cursorURL`, `cursorProblem`, `cursorImage`,
+  `withCursor`, `cursorSegmentsNote`); `AgentServer+RecordingResult.swift` 336 → 344 (lines
+  added only); `AgentCatalog+Recording.swift` 264 → 275 (`recordingCursorClause`);
+  `RecorderPanelController+Landing.swift` 280 → 281.
+- **Documents:** spec §7.9d, §7.10's `cursor_track.rs` row, `docs/guide/screen-recording.md`'s
+  "Files and formats" row, `docs/manual-checks.md` JOB-20, `tools/proof/README.md`'s CU1b1
+  section.
+
+**Runs** (each printed by the run named; three lanes shared the machine):
+- `cd core && cargo test --release --test cursor_track`: 16 passed. The `mapping-m1` mutant
+  (`to_movie` on `pixels_per_point`, by hand): exit 101, the new test FAILED, 15 passed.
+- `make typecheck`: exit 0, the four baseline warnings.
+- `cursor_capture_probe.py`: `scores: 14/14` (B0, C1–C6, K0, K10–K14, K16). Its seven mutants
+  each exited 1, caught: `watch-camera-only` K0, `poll-every-sample` K10, `no-seed-at-open` K11,
+  `cursor-note-dropped` K12, `event-clock-arrival` K14, `watch-failure-refuses` K16,
+  `watch-lost-dropped` K16.
+- `camera_recording_probe.py --only beside`: `scores: 8/8`; `--mutant resume-keeps-watch`:
+  caught (B4, G16); `--mutant no-frame-watch`: caught (B4).
+- `spec_index_proof.py`: 249/249.
+- `make gate`: "gate: PASS 483s" (names 1 s, typecheck 7 s, fmt 3 s, lint 17 s, test 267 s,
+  app 187 s).
+- `recording_probe.py`: 1220/1222, exit 1. The two failures are section 15g's granted
+  voice-over rows G1 ("each segment an on-disk .m4a … 0.6–1.6 s": the files measured 550 and 0
+  ticks) and G3 (G1's result placed no clip), with the default input a Bluetooth headset
+  (AirPods Max, G0's fact). The voice-over's machine (`voiceSession`) runs none of
+  this phase's code — `pause()` and `resume()` forward to it before any line CU1b1 added — so
+  this is read as the host's microphone, the README's known Bluetooth case, and not re-run.
+  Section 9's granted screen recordings, which now write cursor files, passed.
+- `RC_PROOF_APP=release cursor_proof.py`: `scores: 5/5; skipped ['K5']` (host: preflight
+  True, post False, unlocked, main display 2056 × 1329 pt). K4: Nominal 2 segments, each file
+  beside its movie, accepted, display, e1, none, `movie_size` [2056, 1330] = the track, 3 warped
+  points among 4 moves; Best the same at [4112, 2658]. K7: the movie landed, "The cursor file
+  Screen Recording 2026-11-02 at 13.27.19.fjcursor could not be written: The file … .partial
+  couldn't be saved in the folder "recordings"." K8: window, `point_size` [100100, 70100],
+  `movie_size` [1002, 702] = the track. K15: `segments[0].cursor_path` beside its movie,
+  `cursor_image` "none", no problem. Z1: 0 lines. K5 skipped by name:
+  `CGPreflightPostEventAccess()` false.
+- At integration (`make gate` PASS 570 s: names 1, typecheck 18, fmt 6, lint 13, test 288,
+  app 242), the five commits (`285c0c3f`…`c8c3395b`) cherry-picked onto
+  `7d297a07` with no conflict and no cell to reset; the integrated tree differs from the lane's
+  tip only by the review's two comment nits and the `CLAUDE.md` entries, so the Release
+  `cursor_proof.py` run above (which warps the pointer) was not repeated.
+
+**Review.** One round (`7d297a07..c8c3395b`): every Files and Approach item done, pass, with two
+nits, both resolved at integration. (1) `pause()`'s and `resume()`'s reflowed doc comments ran
+past the file's ~100 columns — rewrapped (`ScreenRecorder+Pause.swift` 355 → 356). (2)
+`cursorStart`'s fallback for a window the window list lacks takes the filter's `contentRect`,
+whose origin may be window-local — its doc comment now says so, and that the first frame's
+geometry replaces it (`ScreenRecorder+Cursor.swift` 155 → 157). The review read the relayed
+report that the picker's grey window offers no Share button as JOB-29's step already marked
+owed (the helper-owned window, out of this phase). The `CLAUDE.md` edits the notes owed
+(`app/CLAUDE.md` **Recording.**: `+Cursor`, `CursorCapture.swift`, the watch on every screen
+recording and the cursor's capture; the cursor bullet's "wiring is CU1b1's"; `core/CLAUDE.md`'s
+`cursor_track.rs` entry M1 → M2) were applied at integration.
+
+**Deviations.**
+- CU-18: no landing note for `cursor_image: none` (the road map's CU1b named one); every file is
+  written that way, so the note would be noise.
+- `saveCursor` names two sentences the spec did not: a buffer that answers no body ("The cursor
+  file for <movie> was not written: no cursor was captured for it.", which every opened segment
+  avoids) and a throw that is not a `CursorFileProblem` ("… was not written: <reason>").
+- `cursorStart` answers 1 for a non-finite or non-positive scale, and caps the content size at
+  16384, so a header always passes the core's check.
+- K14 also scores a scroll (`Axis2`/`Axis1` deltas and its host time).
+
+**Owed.** CU1b2: K1, K2, K3, K6 and K9 against a burned-tip helper. Window mapping (CU-20
+provisional for window and picked sources) until the instrument's helper-owned window lets the
+owner perform the picked row, before CU3c; the window rows' anchor re-run on a quiet machine.
+JOB-20 (a person's real clicks). K5 at a terminal that may post input. Filed after this lands:
+A10 not built (CU-S1's IoU ≥ 0.9 in 7 of 10 trials — arrow 0.968 ×4, hand 0.922 ×3, I-beam
+0.869 ×3 — short of the 9 its rule needs), so Frame Job's arrow stands for every recorded cursor.
 
 ### CO1 — person masks on the Mac
 

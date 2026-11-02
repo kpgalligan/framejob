@@ -96,6 +96,7 @@ extension ScreenRecorder {
             session?.segments[current.lastIndex].stoppedAt = Date()
             current.micOutput?.stopRecording()
             current.frameWatch?.drop(segment: current.lastIndex)
+            current.cursor?.endSegment(current.lastIndex)
             closeCameraBeside(at: current.lastIndex)
         }
         NotificationCenter.default.post(name: Self.finishingDidBeginNotification, object: self)
@@ -126,9 +127,11 @@ extension ScreenRecorder {
         settle()
     }
 
-    /// Stops the microphone session, a camera's capture and the frame watch,
-    /// and probes segment by segment — each movie, then its microphone file,
-    /// then a camera's beside it (`+CameraBesideFinishing.swift`) — and
+    /// Stops the microphone session, a camera's capture, the frame watch and
+    /// the cursor's capture, and probes segment by segment — each movie, then
+    /// its microphone file, then a camera's beside it
+    /// (`+CameraBesideFinishing.swift`), then its cursor file is written
+    /// (`+Cursor.swift`, spec §11 CU-18) — and
     /// answers ONE result. Once, per
     /// session. The recorder stays `.finishing` until the answer is
     /// delivered, so a second start cannot overwrite the first's hook.
@@ -140,6 +143,7 @@ extension ScreenRecorder {
         done.micSession?.stopRunning()
         done.cameraCapture?.stop()
         done.frameWatch?.stop()
+        done.cursor?.stop()
         meter.publish(.silent, from: ObjectIdentifier(self))
         if let failure = done.screenFailure { return conclude(done, .failure(failure)) }
         probeSegment(done, at: 0, landed: [], skipped: [])
@@ -192,8 +196,10 @@ extension ScreenRecorder {
             case .success(let descriptor):
                 self.probeMicrophone(done, at: index, movie: descriptor) { [weak self] segment in
                     self?.probeCameraBeside(done, at: index, segment) { [weak self] segment in
-                        self?.probeSegment(
-                            done, at: index + 1, landed: landed + [segment], skipped: skipped)
+                        self?.saveCursor(done, at: index, segment) { [weak self] segment in
+                            self?.probeSegment(
+                                done, at: index + 1, landed: landed + [segment], skipped: skipped)
+                        }
                     }
                 }
             }
@@ -291,6 +297,8 @@ extension ScreenRecorder {
         }
         done.cameraCapture?.stop()
         done.frameWatch?.stop()
+        done.cursor?.stop()
+        done.cursor?.discard()
         session = nil
         state = .idle
         microphoneProblem = nil

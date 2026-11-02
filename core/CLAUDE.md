@@ -181,8 +181,8 @@ governs a module now.
   `rc_cursor_free` and `rc_cursor_query` (road map creator-jobs CU2, spec §11 CU-25).
   `cursor_track.rs` — `CursorTrack`, the handle: the parsed file and its prepared
   paths under a `Mutex` (a `state` holds it only to clone an `Arc`, a poisoned lock
-  taken with `into_inner`), ticks ↔ µs through `time.rs`, CU-20's M1 mapping per
-  geometry entry (`to_movie`, the one function), the raw path, idle opacity (CU-22),
+  taken with `into_inner`), ticks ↔ µs through `time.rs`, CU-20's M2 mapping per
+  geometry entry (`scale_factor`, not `pixels_per_point`; `to_movie`, the one function), the raw path, idle opacity (CU-22),
   the image in force and ripples (CU-23). `cursor_smooth.rs` — `hold_end`, the one
   hold rule, and `SmoothPath` (pins, RDP, centripetal Catmull–Rom; CU-21).
   `cursor_query.rs` — the request vocabulary (its module doc) and `query`.

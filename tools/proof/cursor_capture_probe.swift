@@ -12,6 +12,7 @@
 // `{"rows": [...]}`, each row `{"id", "pass", "detail"}`; `cursor_capture_probe.py` prints
 // and scores them.
 import AppKit
+import ScreenCaptureKit
 
 guard CommandLine.arguments.count == 2 else {
     FileHandle.standardError.write(Data("usage: cursor_capture_probe <work dir>\n".utf8))
@@ -362,6 +363,190 @@ do {
     expect(&problems, "movie_size", ints(file, "movie_size"), [1002, 702])
     expect(&problems, "content_size", ints(file, "content_size"), [1001, 701])
     row("C6", problems, "content_size [1001, 701], movie_size [1002, 702]")
+}
+
+// MARK: - CU1b1 (spec §11 CU-11…CU-13, CU-18): the recorder's cursor
+
+// K0: the frame watch rides every screen recording — `attaches` is camera || cursor.
+do {
+    var problems: [String] = []
+    for (camera, cursor, want) in [(false, false, false), (true, false, true),
+                                   (false, true, true), (true, true, true)] {
+        let got = ScreenFrameWatchRule.attaches(camera: camera, cursor: cursor)
+        if got != want { problems.append("attaches(camera: \(camera), cursor: \(cursor)) \(got)") }
+    }
+    row("K0", problems, "attaches: camera || cursor over the four cases")
+}
+
+// K10: 120 polls over 12 positions give 12 moves; a nil poll records nothing.
+do {
+    var problems: [String] = []
+    var segments = CursorSegments()
+    segments.open(0, start: start(geometry(0), image: .none), host: 0.0)
+    for i in 0..<120 {
+        let at = CGPoint(x: Double(i / 10) * 10, y: 20)
+        segments.poll(at, host: 1.0 + Double(i) / 120)
+        if i == 60 { segments.poll(nil, host: 1.0 + (Double(i) + 0.5) / 120) }
+    }
+    let (file, why) = written(segments.close(0, movieSize: movie,
+                                             anchor: CursorAnchor(kind: .e1, host: 0.5)), "K10")
+    if let why { problems.append(why) }
+    expect(&problems, "moves", count(file, "moves.t"), 12)
+    expect(&problems, "moves.x", ints(file, "moves.x"), (0..<12).map { $0 * 1000 })
+    expect(&problems, "anchor", (file?["anchor"] as? String) ?? "", "e1")
+    expect(&problems, "cursor_image", (file?["cursor_image"] as? String) ?? "", "none")
+    row("K10", problems, "12 moves from 120 polls over 12 positions and a nil")
+}
+
+// K11: a segment opened after the pointer stopped has one move at t 0, at the last point, and
+// its opening geometry is the last fed.
+do {
+    var problems: [String] = []
+    var segments = CursorSegments()
+    segments.open(0, start: start(geometry(0), image: .none), host: 10.0)
+    segments.poll(CGPoint(x: 40, y: 50), host: 10.5)
+    segments.poll(CGPoint(x: 41, y: 52), host: 10.6)
+    segments.geometry(geometry(500), host: 10.7)
+    segments.end(0)
+    let first = segments.close(0, movieSize: movie, anchor: CursorAnchor(kind: .e1, host: 10.1))
+    let (a, whyA) = written(first, "K11-segment-1")
+    segments.open(1, start: start(geometry(0), image: .none), host: 20.0)
+    segments.poll(CGPoint(x: 41, y: 52), host: 20.5)
+    let second = segments.close(1, movieSize: movie, anchor: CursorAnchor(kind: .e1, host: 20.1))
+    let (b, whyB) = written(second, "K11-segment-2")
+    problems += [whyA, whyB].compactMap { $0 }
+    expect(&problems, "segment 1 moves.t", ints(a, "moves.t"), [400_000, 500_000])
+    expect(&problems, "segment 2 moves.t", ints(b, "moves.t"), [0])
+    expect(&problems, "segment 2 moves.x", ints(b, "moves.x"), [4100])
+    expect(&problems, "segment 2 moves.y", ints(b, "moves.y"), [5200])
+    let entries = geometries(b)
+    expect(&problems, "segment 2 geometry entries", entries.count, 1)
+    expect(&problems, "segment 2 opening screen_rect", rectOf(entries.first),
+           [50000, 0, 151200, 98200])
+    row("K11", problems, "the resumed segment holds one move at t 0 at (41, 52) and geometry x 500")
+}
+
+// K12: the answer's cursor keys, `cursorSegmentsNote` and `resultNotes`.
+do {
+    var problems: [String] = []
+    let picture = MediaDescriptor(path: "/probe/Screen Recording.mov", duration: 600_000,
+                                  width: 1512, height: 982, hasVideo: true)
+    let written = RecordingSegment(descriptor: picture, micDescriptor: nil, micOffset: 0,
+                                   startedAt: Date(timeIntervalSince1970: 0))
+        .withCursor(url: URL(fileURLWithPath: "/probe/Screen Recording.fjcursor"),
+                    problem: "Geometry only.", image: CursorImageMode.none)
+    let refused = RecordingSegment(descriptor: picture, micDescriptor: nil, micOffset: 0,
+                                   startedAt: Date(timeIntervalSince1970: 1))
+        .withCursor(url: nil, problem: "Not written.", image: nil)
+    let bare = RecordingSegment(descriptor: picture, micDescriptor: nil, micOffset: 0,
+                                startedAt: Date(timeIntervalSince1970: 2))
+    let one = AgentServer.segmentFields(written)
+    expect(&problems, "cursor_path", (one["cursor_path"] as? String) ?? "-",
+           "/probe/Screen Recording.fjcursor")
+    expect(&problems, "cursor_image", (one["cursor_image"] as? String) ?? "-", "none")
+    expect(&problems, "cursor_problem", (one["cursor_problem"] as? String) ?? "-",
+           "Geometry only.")
+    let two = AgentServer.segmentFields(refused)
+    expect(&problems, "refused keys", two.keys.filter { $0.hasPrefix("cursor_") }.sorted(),
+           ["cursor_problem"])
+    let three = AgentServer.segmentFields(bare)
+    expect(&problems, "bare keys", three.keys.filter { $0.hasPrefix("cursor_") }.count, 0)
+    let result = RecordingResult(segments: [written, bare, refused], choice: RecordingChoice(),
+                                 stoppedBy: .stopped, pauses: 2)
+    expect(&problems, "cursorSegmentsNote", result.cursorSegmentsNote ?? "-",
+           "Geometry only. Not written.")
+    expect(&problems, "resultNotes", AgentServer.resultNotes(result),
+           ["Geometry only. Not written."])
+    let clean = RecordingResult(segments: [bare], choice: RecordingChoice(), stoppedBy: .stopped,
+                                pauses: 0)
+    expect(&problems, "clean note", clean.cursorSegmentsNote ?? "nil", "nil")
+    row("K12", problems, "cursor_path, cursor_image and cursor_problem; the note in order, last")
+}
+
+// K13: `geometry(from:)` reads the four keys, and nil when one is missing.
+do {
+    var problems: [String] = []
+    let screen = CGRect(x: 100, y: 200, width: 1001, height: 701)
+    let content = CGRect(x: 0, y: 0, width: 500.5, height: 350.5)
+    let full: [SCStreamFrameInfo: Any] = [
+        .screenRect: screen.dictionaryRepresentation, .contentRect: content.dictionaryRepresentation,
+        .contentScale: NSNumber(value: 0.5), .scaleFactor: NSNumber(value: 2.0),
+        .status: NSNumber(value: SCFrameStatus.complete.rawValue),
+    ]
+    let want = CursorGeometry(screenRect: screen, contentRect: content, contentScale: 0.5,
+                              scaleFactor: 2)
+    if ScreenFrameWatch.geometry(from: full) != want {
+        problems.append("full frame info: \(String(describing: ScreenFrameWatch.geometry(from: full)))")
+    }
+    for key in [SCStreamFrameInfo.screenRect, .contentRect, .contentScale, .scaleFactor] {
+        var missing = full
+        missing[key] = nil
+        if let got = ScreenFrameWatch.geometry(from: missing) {
+            problems.append("without \(key.rawValue): \(got)")
+        }
+    }
+    row("K13", problems, "the four keys read; each one missing answers nil")
+}
+
+// K14: an `NSEvent(cgEvent:)` click stamped 5e9 ns answers host 5.0, its point and count.
+do {
+    var problems: [String] = []
+    if let cg = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
+                        mouseCursorPosition: CGPoint(x: 123, y: 456), mouseButton: .left) {
+        cg.timestamp = 5_000_000_000
+        cg.setIntegerValueField(.mouseEventClickState, value: 2)
+        if let event = NSEvent(cgEvent: cg),
+           let click = CursorCapture.click(from: event, arrival: 99) {
+            expect(&problems, "host", click.host, 5.0)
+            expect(&problems, "at", "\(click.at.x),\(click.at.y)", "123.0,456.0")
+            expect(&problems, "count", click.count, 2)
+            expect(&problems, "button", click.button, 0)
+            expect(&problems, "down", click.down, true)
+        } else {
+            problems.append("the event answered no click")
+        }
+    } else {
+        problems.append("no CGEvent")
+    }
+    if let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0,
+                        wheel2: 0, wheel3: 0) {
+        cg.timestamp = 7_000_000_000
+        cg.location = CGPoint(x: 10, y: 20)
+        cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: -3)
+        cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: 4)
+        if let event = NSEvent(cgEvent: cg),
+           let scroll = CursorCapture.scroll(from: event, arrival: 99) {
+            expect(&problems, "scroll host", scroll.host, 7.0)
+            expect(&problems, "scroll dx, dy", "\(scroll.dx),\(scroll.dy)", "4.0,-3.0")
+        } else {
+            problems.append("the scroll answered nothing")
+        }
+    } else {
+        problems.append("no scroll CGEvent")
+    }
+    row("K14", problems, "a click at 5e9 ns is host 5.0 at (123, 456), count 2; a scroll at 7.0")
+}
+
+// K16: `failsStart` only with a camera; `cursorProblem`'s writer, then CU-13's sentence.
+do {
+    var problems: [String] = []
+    expect(&problems, "failsStart(camera: true)", ScreenFrameWatchRule.failsStart(camera: true),
+           true)
+    expect(&problems, "failsStart(camera: false)", ScreenFrameWatchRule.failsStart(camera: false),
+           false)
+    expect(&problems, "writer wins",
+           ScreenRecorder.cursorProblem(writer: "W.", watchLost: "R", movieName: "M.mov") ?? "nil",
+           "W.")
+    expect(&problems, "watch lost",
+           ScreenRecorder.cursorProblem(writer: nil, watchLost: "the output refused",
+                                        movieName: "Screen Recording.mov") ?? "nil",
+           "The cursor file for Screen Recording.mov has only the geometry the screen had when "
+               + "it began: its frames could not be watched (the output refused), so a move or "
+               + "resize of what was recorded after that is not in it.")
+    expect(&problems, "neither",
+           ScreenRecorder.cursorProblem(writer: nil, watchLost: nil, movieName: "M.mov") ?? "nil",
+           "nil")
+    row("K16", problems, "failsStart is the camera; cursorProblem: writer, then the lost watch")
 }
 
 let answer = (try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]))

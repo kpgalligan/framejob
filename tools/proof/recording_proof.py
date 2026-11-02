@@ -507,6 +507,8 @@ STARTED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 SEGMENT_KEYS = {
     "path", "duration", "width", "height", "fps", "started_at", "mic_offset", "mic_path",
     "mic_duration", "mic_problem", "media", "clip", "mic_media", "mic_clip",
+    # CU1b1 (spec §11 CU-18): the segment's cursor file beside its movie.
+    "cursor_path", "cursor_image", "cursor_problem",
 }
 # What `undo` answers with nothing on the stack (`AgentServer+History.swift`).
 NOTHING_TO_UNDO = "There is nothing to undo."
@@ -1696,7 +1698,7 @@ def detection_rows(mcp, answer, document, asked):
           f"the segment carries its own width, height and fps, the top level's for one "
           f"segment: {segment.get('width')}×{segment.get('height')} at {segment.get('fps')}")
     check(set(segment) <= SEGMENT_KEYS,
-          f"its keys are among the fourteen the description names: "
+          f"its keys are among the seventeen the description names: "
           f"{sorted(set(segment) - SEGMENT_KEYS)} unexpected")
 
 

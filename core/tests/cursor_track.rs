@@ -2,7 +2,7 @@
 //! `rc_cursor_open` and `rc_cursor_query` as `ReelCore+Cursor.swift` calls
 //! them. Every fixture is written here and every answer computed by hand
 //! from the decisions' rules, never read back from the code: the mapping
-//! (M1, the geometry in force, the first entry before any), the raw path and
+//! (M2, the geometry in force, the first entry before any), the raw path and
 //! the hold rule, the pins (first and last moves, clicks, holds) and RDP's
 //! scaled tolerance, `state` at an unprepared smoothing answering raw, idle
 //! hide's fade and lead and hidden spans, ripples, the image in force and
@@ -179,6 +179,34 @@ fn the_mapping_reads_the_geometry_in_force_and_the_first_entry_before_any() {
     let second = track.state(ticks(600_000), json!({}));
     xy(&second, 600.0, 800.0, 1e-9);
     close(&second["px_per_point"], 2.0, 1e-12);
+}
+
+#[test]
+fn the_mapping_is_m2_scale_factor_not_pixels_per_point() {
+    // A display recorded at Nominal on a 2× panel (CU-S2's `mapping_display=M2`): the stream is
+    // the point size, so pixels per point 1, content scale 0.5 and scale factor 2. M2 maps a
+    // point p to (p − origin) × 0.5 × 2 = p px; M1 (pixels per point for scale factor) would
+    // answer p × 0.5 × 1 = p / 2.
+    let mut v = with_moves(&[0], &[30000], &[40000]);
+    v["pixels_per_point"] = json!(1.0);
+    v["content_size"] = json!([1512, 982]);
+    v["movie_size"] = json!([1512, 982]);
+    v["geometry"] = json!([
+        {"t": 0, "screen_rect": [0, 0, 151200, 98200], "content_rect": [0, 0, 75600, 49100],
+         "content_scale": 0.5, "scale_factor": 2.0}
+    ]);
+    let track = Track::open(&v);
+    let state = track.state(0, json!({}));
+    xy(&state, 300.0, 400.0, 1e-9);
+    close(&state["px_per_point"], 1.0, 1e-12);
+    // A content rect's origin is in points and lands at × scale factor: (300 − 100) × 0.5 × 2
+    // + 10 × 2 = 220.
+    v["geometry"] = json!([
+        {"t": 0, "screen_rect": [10000, 20000, 151200, 98200],
+         "content_rect": [1000, 2000, 75600, 49100], "content_scale": 0.5, "scale_factor": 2.0}
+    ]);
+    let moved = Track::open(&v);
+    xy(&moved.state(0, json!({})), 220.0, 240.0, 1e-9);
 }
 
 #[test]

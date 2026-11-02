@@ -222,7 +222,7 @@ Sections and rows:
            session: no camera as before, a camera writer unfinished false, finished true. B4
            (Python, comment-stripped): `start(` reads `screenRecordingGranted` before
            `cameraStatus` and `cameraStatus` before `takeCameraCapture(`; `addStreamOutput(` is
-           in app/Sources exactly twice, inside `start(`'s `if camera != nil {` block and in
+           in app/Sources exactly twice, inside `start(`'s `if ScreenFrameWatchRule.attaches(` block (CU1b1) and in
            `resume(` (ScreenRecorder+Pause.swift); `resume(`'s order `removeStreamOutput(` →
            `addRecordingOutput(` → `addStreamOutput(`, and `pause(` removes nothing;
            `launchScreen(`'s order `startRecording(` → `startCapture` → `openCameraBeside(`;
@@ -1061,7 +1061,9 @@ def beside_source_row(sources):
         count = uncommented(path).count("addStreamOutput(")
         if count:
             holders[path.name] = count
-    branch = body_of(start[start.find("if camera != nil {"):], "if camera != nil {") or ""
+    # CU1b1 (spec §11 CU-13): the watch rides every screen recording, its branch the rule's.
+    branch = body_of(start[start.find("if ScreenFrameWatchRule.attaches("):],
+                     "if ScreenFrameWatchRule.attaches(") or ""
     paused = uncommented(sources / "ScreenRecorder+Pause.swift")
     resume = body_of(paused, "func resume(") or ""
     checks.append((f"addStreamOutput( in {holders}, inside start('s camera branch "

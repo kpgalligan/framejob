@@ -179,6 +179,12 @@ extension AgentServer {
         if let note = segment.cameraNote { fields["camera_note"] = note }
         if let id = ids?.cameraMedia { fields["camera_media"] = Int(id) }
         if let id = ids?.cameraClip { fields["camera_clip"] = Int(id) }
+        // The segment's cursor file beside its movie (spec §11 CU-18).
+        if let url = segment.cursorURL { fields["cursor_path"] = url.path }
+        if segment.cursorURL != nil, let image = segment.cursorImage {
+            fields["cursor_image"] = image.rawValue
+        }
+        if let problem = segment.cursorProblem { fields["cursor_problem"] = problem }
         fields.merge(idFields(ids)) { _, new in new }
         return fields
     }
@@ -237,6 +243,8 @@ extension AgentServer {
             result.unreadableNote, result.leftOutVoiceNote, microphoneNote(result),
             result.camera?.problem, result.camera?.note,
             result.cameraSegmentsNote,
+            // Every segment's cursor problem (spec §11 CU-18), last.
+            result.cursorSegmentsNote,
         ].compactMap { $0 }
     }
 
