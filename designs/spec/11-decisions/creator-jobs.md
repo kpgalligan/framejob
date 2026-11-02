@@ -9,7 +9,8 @@ and the recorder (CU), the camera cutout and layouts (CO), vertical versions and
 finding clips (FC) and switching between cameras and audio tracks (SW), with the shared work (CJ).
 Its IDs follow CJ-7: phase XXn records XX-n0…XX-n9, a zero phase XX-1…XX-9, and a bet with no zero
 phase records its scope-level decisions here under its own prefix. Each was recorded before its
-code. The series continues in `creator-jobs-2.md` past about 500 lines.
+code. The series continues in `creator-jobs-2.md` past about 500 lines, and that file in
+`creator-jobs-3.md` past the same.
 
 - **CJ-1 — Every exclusion spec §1 and §2 name is lifted; lifting makes a thing allowed, not
   scheduled (owner, 2026-11-01: "Remove all explicit non-goals").** Lifted: multicam; grading beyond
@@ -392,6 +393,9 @@ CJ-20…CJ-27 are CJ2a's (the analysis lane, its store and reader, `shots`, the 
   the media's display orientation, origin top-left, and every answer carries the display size;
   times are forward-media source ticks, so any clip, speed, ramp or reversal reuses them through
   `SourceMap` and `ReverseMirror`.
+  **Amended by CO-4 (CO0):** masks keep one payload file per media in the media's folder, the pack
+  `masks.pack` (CO-S2's verdict; the draft's one movie per chunk, and its mirrored twin, were not
+  kept).
 - **CJ-23 — The frame reader.** `AnalysisFrames.swift` has a direct reader
   (`AVAssetReaderTrackOutput` over the first video track, 32BGRA, scaled to the kind's long side,
   turned upright from the track's `preferredTransform`) and a converted reader
@@ -408,6 +412,9 @@ CJ-20…CJ-27 are CJ2a's (the analysis lane, its store and reader, `shots`, the 
   first index and, while fewer than two kept frames precede that index, restarts from twice as far
   back, until two do or the media's start is reached; only indices inside requested ranges are
   stored. CO-7 adds a third arm for masks (CO1).
+  **Amended by CO-7 (CO0):** the masks' third arm reads with `AVAssetReaderTrackOutput`, every
+  frame's presentation time kept, and converts a converting media's frames through step 0's own
+  `InputPass` on the GPU, never through the one-clip composition.
 - **CJ-24 — `shots`: hard cuts from a deterministic picture difference, no ML.** **Spike CJ-S4
   (2026-11-01, `rule_sha256` `eea6c190…46f9d1`, matching CJ0a's table; S-TH1 missing, so the
   no-cut input is ten minutes of the moving still and S-TH1 is owed):** the signature is a 4 × 4 × 4

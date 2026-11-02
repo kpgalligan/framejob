@@ -6,8 +6,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 The IDs continue the series of [`creator-jobs.md`](creator-jobs.md) (CJ-, VR-, TX-, SW- and CU-),
 so a citation never has to say which file; that file says what the road map builds and how its
 IDs are made (CJ-7). This file is new because `creator-jobs.md` passed the road map's ~500-line
-split rule with CU1a's entries (2026-11-01), which moved here; each phase's decisions are
-appended here from now on, before its code.
+split rule with CU1a's entries (2026-11-01), which moved here; each phase's decisions were
+appended here, before its code, until it passed the same rule with CO0's entries, and the series
+continues in `creator-jobs-3.md`.
 
 - **CU-10 — Cursor file format v1, owned by `cursor_file.rs` (CU1a; CU-S4 `body=json`).** One UTF-8
   JSON object; `RC_CURSOR_FILE_VERSION` (1) is in the header. The header keys: `format`
@@ -221,6 +222,9 @@ CJ2a took CJ-27 for `analysis_job`.
   `.landed`, `.failed` at the first failure; Stop calls nothing. A tool call shows no sheet and
   waits. While the sheet is attached every editor action validates false. The words are the menu's
   American verbs ("Analyzing"). CO-6 amends this for a render-substituted kind.
+  **Amended by CO-6 (CO0):** pending, cancelled and failed mask chunks draw the clip uncut; a
+  render-substituted kind (`masks`) shows no Analyzing sheet; and a command that plans from masks
+  reads only what is cached.
 - **CJ-29 — Clip ▸ Split at Shot Changes and `split_at_shots {clips?}`.** A target is a media clip
   whose media is a video (`kind` `video`, `hasVideo`) and whose `enabled.video` is true; any other
   clip in the selection or `clips` is skipped (answered under `skipped`). The menu item validates on

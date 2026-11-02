@@ -6,8 +6,8 @@ owner's answers below as CJ-1…CJ-9 with the bets' scope-level decisions, rewro
 and made the two spec splits (CJ0a's record). The brief is `designs/creator-survey.md`: its "The
 bets" (lines 173–356) and the market sections they cite. The worktree is
 `.claude/worktrees/creator-jobs`, branch `worktree-creator-jobs`, cut from main at `d0661e5d`.
-Decisions go in a new `designs/spec/11-decisions/creator-jobs.md` (one series,
-continued in `creator-jobs-2.md` past about 500 lines), each with its row in
+Decisions go in a new `designs/spec/11-decisions/creator-jobs.md` (one series, continued in
+`creator-jobs-2.md`, then `creator-jobs-3.md`, each past about 500 lines), each with its row in
 `11-decisions/README.md` and that file's Lines cell. This file holds the plan and, as phases land,
 each phase's record. Line counts and line numbers are `wc -l` and `grep -n` at `d0661e5d` (main,
 2026-11-01); a phase re-reads them at its start.
@@ -3395,47 +3395,50 @@ on) run in lane B after CU. Nothing in this bet needs a key: person segmentation
 Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `ModelKeys.keyed`.
 
 - **What a person gets:** nothing visible; the CO record opened.
-- **Decisions (CO-1…CO-9, draft):**
+- **Decisions (CO-1…CO-9, recorded at CO0, now in `creator-jobs-3.md`):**
   - **CO-1 — Remove Background uses Vision on the Mac.** Video uses
     `VNGeneratePersonSegmentationRequest`, a FRESH request per frame, on the device CJ-S2's rule 1
     picks for it (CO1 re-runs rule 1), never `.fast` (stateful). Pictures may use
     `VNGenerateForegroundInstanceMaskRequest` (CO10); video never does (it flickers). This adopts
     #124's D5. A matting model, shipped or downloaded, is allowed by CJ-1 and not built here; it is
     filed as a candidate only if JOB-60's verdict asks for it, and Frame Job being Apache-2.0, a
-    GPL-3.0 or AGPL model (Robust Video Matting, Concat's) cannot ship in it.
+    GPL-3.0 or AGPL model (Robust Video Matting, Concat's) cannot ship in it. CO-S1 (speed only,
+    S-KEY1 owed): Standard is person `.balanced` at every frame, 1.81× realtime at 1080p30, its mask
+    512 × 384; the numbers are in CO0's record.
   - **CO-2 — The cutout is a property of the clip's own layer, not a matte track.** `video.cutout`
     on a media or still clip. A luma matte track holding a rendered mask has no link to the camera
     clip, so a trim, split, slip, speed change, ramp or reverse would slide the outline off it
     (MT-2); a per-layer mask is fetched the way the picture is and follows every edit. Closed
     vocabulary; R5-1 and G-1 stand.
-  - **CO-3 — The mask reaches the compositor as a second composition track (provisional on CO-S2).**
-    The plan gives each cut-out instance a MASK track whose segments copy its picture segments;
-    Swift fills it from the cached chunks. Each mask frame's presentation time is chosen so
-    AVFoundation's hold shows, at every source frame, the mask of the NEAREST analysed source frame
-    (ties to the earlier): exact at every-frame analysis, nearest at a capped rate. A segment
-    crossing a chunk boundary is cut there in source ticks, each part placed by the picture
-    segment's own linear map in ticks, converted once (`fill`'s cursor rule). Mask track ids start
-    at 2001, so a project with no cutout has a byte-identical plan; they count toward the
-    eight-decoder warning. Swift mints extra audio-family track ids from `firstExtraTrackID`
-    (`CompositionBuilder+AudioTracks.swift:57–60`: past the placeholder and every plan video and
-    audio id), which does not see mask tracks, and `makeTrack` throws on a duplicate
-    `preferredTrackID` (`CompositionBuilder.swift:262–276`); so CO2a2 adds the mask track ids to
-    `firstExtraTrackID`'s plan ids, and with any mask track the extras start past the last one. If
-    CO-S2 fails, a per-media mask pack looked up through the picture track's own segment mapping
-    replaces this entry before CO2a.
-  - **CO-4 — Masks are an analysis kind on CJ2a's lane and store.** Kinds `masks` (Standard) and
-    `masks_best` (Best, only if CO-S1 keeps it). The store is CJ-22's: `cache/analysis/masks/<media
-    id>.json` with the stamp (no path; the kind's version, the request digest and revision, rate,
-    read size, OS build, device). The grid is fixed CHUNKS of L seconds of source from 0 (L from
-    CO-S2; 10 s until it reports), each a hit or miss on its own, each recording `subject_found`. A
-    chunk's payload is its mask movie `cache/analysis/masks/<media id>/<k>.mov`, samples at
-    chunk-relative source times in the source track's timescale. A reversed clip's mask is the
-    forward masks mirrored, never a second analysis: `r<k>.mov` is chunk k read backwards with each
-    time mirrored through `ReverseMirror` (D4-6), made without Vision and published beside it. Masks
-    are in DISPLAY orientation. `get_media_analysis {media, kind: "masks"}` answers runs (`from`,
-    `to`, `subject_found`, frame count) and the stamp, never pixels. The package carries the folder.
-    Clarifies CJ-22 (one payload file per run, in the media's folder); amends CJ5b's CJ-51
-    (`cache/analysis/` copied whole, masks and mirrored chunks included).
+  - **CO-3 — The mask reaches the compositor from a per-media mask pack, looked up through the
+    picture's own segment (rewritten at CO0: CO-S2 failed the mask track and kept the pack).** A
+    cutout adds no composition track: the plan, the composition,
+    `CompositionBuilder.firstExtraTrackID` and the eight-decoder warning are what they are without
+    it. For each request, the compositor maps the composition time through the covering picture
+    segment's linear map in ticks to the source time the picture shows there (a reversed clip's in
+    the reversed stream it reads), takes the source frame shown at that time (the last at or before
+    it, as AVFoundation holds a frame), and draws the mask of the NEAREST analysed source frame,
+    ties to the earlier, in the stream the segment reads: exact at every-frame analysis, nearest at
+    a capped rate. A reversed clip's analysed times are mirrored by `T − end`, `ReverseMirror`'s
+    CMTime convention, never `T − pts`. The mask's bytes go from the pack to the compositor as
+    stored and never pass AVFoundation's colour path. CO-S2's numbers are in CO0's record.
+  - **CO-4 — Masks are an analysis kind on CJ2a's lane and store, one pack per media (rewritten at
+    CO0 to CO-S2's pack).** Kinds `masks` (Standard) and `masks_best` (Best, only if CO-S1 keeps
+    it). The store is CJ-22's: `cache/analysis/masks/<media id>.json` with the stamp (no path; the
+    kind's version, the request digest and revision, rate, read size, OS build, device), and one
+    payload file, the pack `cache/analysis/masks/<media id>/masks.pack`: a frame table (each source
+    frame's time and the slot of its nearest analysed mask), an offset table (each distinct analysed
+    mask's time, offset and length) and each distinct analysed mask once, 8-bit at Vision's own
+    size, compressed with `NSData.compressed(using: .lzfse)`. The grid is CJ-23's analysed frames;
+    CJ-22's coverage holds the analysed ranges, each run recording `subject_found`, and a publish
+    rewrites the pack whole through CJ-22's `.partial` and rename. A reversed clip reads the same
+    pack, mirrored at lookup (CO-3), never a second analysis and no mirrored file (D4-6). Masks are
+    in DISPLAY orientation. `get_media_analysis {media, kind: "masks"}` answers runs (`from`, `to`,
+    `subject_found`, frame count) and the stamp, never pixels. The package carries the folder.
+    Clarifies CJ-22 (one payload file per media, in the media's folder); amends CJ5b's CJ-51
+    (`cache/analysis/` copied whole, the packs included). Where CO-5 and CO-6 say "chunks", read the
+    analysed ranges a run covers. The pack measured 62.32 MB a minute on CO-S1's masks (no rule; a
+    risk in CO0's record).
   - **CO-5 — "No person found" is decided per clip window.** A clip whose analysed chunks found no
     subject (no mask with ≥ 0.5 % of its pixels above 127) draws uncut, its status "No person
     found"; once any chunk of its window finds one, every analysed frame honours its mask, so a
@@ -3456,9 +3459,11 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
     one-clip composition, whose frames lose the source's times. The mask is a coverage 0…1
     multiplied in at step 7 like the corner radius and the matte, the same in SDR, HLG and
     linear-light projects; it never passes step 0 (mask track ids never reach `InputStage`; a mask
-    buffer is wrapped raw). Which compositor class a composition with a mask track uses is CO-S2
-    (2)'s verdict. Any edge refinement reads the picture as the chroma key reads it (`KeyReading`,
-    HD-13 (h), HD-20).
+    buffer is wrapped raw). CO-S2 chose no class for masks: the pack's masks never become a
+    composition track, so they never pass AVFoundation or step 0, and a composition with a cutout
+    is built with the class it would have without one; read "mask track ids" as the pack's bytes,
+    uploaded as stored. Any edge refinement reads the picture as the chroma key reads it
+    (`KeyReading`, HD-13 (h), HD-20).
   - **CO-8 — Where it is drawn.** The mask binds at `texture(4)` (CJ-8 (b)) on every layer,
     shadow-silhouette, reflection and matte draw, a 1×1 white placeholder when the layer has no
     cutout; sampled at the same DISPLAY-space coordinate as the picture (after the spotlight lens
@@ -3487,6 +3492,176 @@ Mac and hide-while-silent reads Silero's spans; no CO control or tool is in `Mod
 - **Acceptance:** the verdicts recorded; CO-3 and CO-4 rewritten if CO-S2 chose the fallback; CJ-23
   amended if CO-S1 (f) stopped. **Proof rows, mutants, manual checks:** none.
 - **Depends on:** CJ0a. **Lane** C. **Questions:** none beyond the samples (S-KEY1).
+
+#### CO0's record (2026-11-01)
+
+**Landed.** Lane C, base `0210dfe7`. The worktree began at `eb350b86` and was fast-forwarded to
+the integration head before any edit, because this phase's spec cites CJ2b's CJ-28. CO-1…CO-9, the
+CJ-22, CJ-23 and CJ-28 amendments and their index rows were committed alone first (`d7422ca0`),
+before the instruments. Then came the instruments `tools/proof/cutout_spike/`: the runner
+`cutout_spike.py`, the pure `deciders.py`, the probes `mask_speed.swift` and `mask_track_probe.swift`
+with `mask_track_writer.swift`, and its README. Also the proof README's section, the verdicts in
+CO-1, CO-3, CO-4 and CO-7, CO-3 and CO-4 rewritten to the mask pack (here and in §11), and this
+record. Nothing in `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/` changed. The lane filed
+no issue; its one draft is filed at integration (**Owed**).
+
+**The host.** macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset` first: "Now drawing from
+'AC Power'"). Two other lanes ran throughout. The one-minute load average, read at each row, ran
+from 2.8 to 52.0 across CO-S1's rows, and from 5.7 to 56.0 across CO-S2's (70.8 at its start).
+CO-S1's rows are medians of three runs; CO-S2's playback rows medians of three interleaved runs,
+its build rows medians of ten interleaved.
+
+**Rule hashes (R0).** Each run recomputed CJ-7's hash of its entry, and each matched CJ0a's
+record: CO-S1 `035665d178e29749cf6ae5d14e12bb462768b969d84b39bbbd7290f49c9fd05a`, CO-S2
+`577a8f392efc3bd086165af2e1f9be01ca480f08cf6c54deca498bad30709eee`. Each `results.json`
+(`tools/proof/work/creator_spike/CO-S1/`, `CO-S2/`) stores its value. CO-S3 did not run (S-KEY1).
+
+**Fixtures** (`tools/proof/media/cutout/`, untracked; `cutout_spike/README.md` has how each is
+made):
+- `push_1080.mov` (H.264) and `push_4k.mov` (HEVC 8-bit): E9's push-in over Photos' FlexAudio cover
+  `AAE4E824-DD67-4DB0-933F-AD2D619E4EF6.jpg` (SHA-256 `1f232b43…f0c7bc1b`), padded to 16:9 as E9's
+  `person_hero`.
+- `screen_4k.mov`: `testsrc2` 3840 × 2160, HEVC.
+- `barcode.mov`, `barcode_rev.mov` and `long_60m.mov`: the writer's bar code, 1080p H.264.
+- `hlg_vfr.mov`: barcode's first 40 s less frames 119, 270 and 899, HEVC Main 10 HLG. The runner
+  read its frame times back as barcode's less those three.
+
+**The verdicts.**
+
+- **CO-S1** (speed only) — `VERDICT standard=person-balanced rate=every realtime_1080=1.81
+  realtime_4k=1.62@source,2.10@1920 mask=512x384 first_call_ms=123.8 read_size=owed best=owed
+  flicker=owed rotation=owed`. Every request ran fresh, pinned to the Neural Engine
+  (`ane(16 cores)`, revision 1 for all three candidates). Median realtime factors:
+
+  | Candidate | Rate | 1080p, source | 4K, source | 4K, long side 1920 | Mask |
+  |---|---|---|---|---|---|
+  | person `.balanced` | every | 1.81× | 1.62× | 2.10× | 512 × 384 |
+  | person `.balanced` | 15 | 4.09× | 3.12× | 4.75× | 512 × 384 |
+  | person `.balanced` | 10 | 5.41× | 4.77× | 6.32× | 512 × 384 |
+  | person `.accurate` | every | 0.48× | 0.57× | 0.68× | 2016 × 1512 |
+  | person `.accurate` | 15 | 1.26× | 1.25× | 1.34× | 2016 × 1512 |
+  | person `.accurate` | 10 | 1.20× | 1.94× | 2.06× | 2016 × 1512 |
+  | instance, scaled | every | 0.70× | 0.71× | 0.89× | the read size |
+  | instance, scaled | 15 | 1.46× | 1.40× | 1.21× | the read size |
+  | instance, scaled | 10 | 2.26× | 2.06× | 1.70× | the read size |
+
+  A fresh process's first request took 123.8 ms (`.balanced`), 147.9 ms (`.accurate`) and 415.0 ms
+  (the instance mask). `.accurate` at 10 a second below 15 at 1080p, and the instance mask slower
+  at 1920 than at the source size on the 4K file, are the shared machine's noise: no rule reads
+  them without S-KEY1.
+- **CO-S2** — `VERDICT route=mask-pack encoding=none chunk_s=none class=none registration=22/22
+  colour_max=0 iou=none edge_mad=none mb_per_min=none playback=100.00 build_ms=+1.7
+  fixed_pct=none`. The mask track failed (3) at both encodings, so the pack was measured and kept:
+
+  | Encoding, L | (1) | (2) levels | (3) mean IoU (pooled), edge | (4) MB/min | (5) | (6) ms | fixed |
+  |---|---|---|---|---|---|---|---|
+  | HEVC, 5 s | 22/22 | 0.062 | 0.9829 (0.9915), 1.14 | 5.86 | 601/601 | +604.1 | 0.92 % |
+  | HEVC, 10 s | 22/22 | 0.062 | 0.9829 (0.9915), 1.14 | 5.85 | 601/601 | +170.1 | 0.46 % |
+  | HEVC, 30 s | 22/22 | 0.062 | 0.9829 (0.9915), 1.14 | 5.85 | 601/601 | +47.6 | 0.15 % |
+  | ProRes Proxy, 5 s | 22/22 | 24.4 | 0.9802 (0.9897), 1.54 | 15.16 | 601/601 | +457.7 | 2.32 % |
+  | ProRes Proxy, 10 s | 22/22 | 24.4 | 0.9802 (0.9897), 1.54 | 15.16 | 601/601 | +202.7 | 1.16 % |
+  | ProRes Proxy, 30 s | 22/22 | 24.4 | 0.9802 (0.9897), 1.54 | 15.15 | 601/601 | +59.1 | 0.39 % |
+
+  - L would have been 30 s for both encodings, the shortest passing (5) and (6), with one chunk's
+    fixed cost 25.3 ms (HEVC) and 64.1 ms (ProRes).
+  - (2) is the same with the plain class in SDR and the converting class in SDR and HLG.
+  - (3)'s worst frame was 0.565 (HEVC) and 0.682 (ProRes).
+  - The pack: (1) 22/22, (2) 0 levels over 120 masks (the stored bytes read back outside any
+    composition, so it holds by construction: they never pass AVFoundation), (5) 601 of 601
+    frames with its lookup and LZFSE decompression in every request, (6) +1.7 ms (7.05 against
+    5.38 ms, reading `long_60m`'s tables, 3,456,020 bytes).
+  - Each registration row is eleven cases × every frame and 15 a second, all straddling a chunk
+    boundary. At every frame the reverse case read mask index = picture index, as `reversed_time`
+    requires.
+
+**What each verdict feeds.**
+- CO-S1 → CO-1 and CO1: Standard is person `.balanced` at every frame. Its realtime factor (1.81×)
+  is the one CO-S2's fixed-cost percentage used. The read size (e) is owed; the rule's fallback is
+  the source size. Best (d) is owed, and with it CO3's Quality control and CO4's Best.
+- CO-S2 → CO-3 and CO-4 rewritten to the pack, and CO-7 (no class is chosen for masks: the pack's
+  bytes never pass AVFoundation). The CO1, CO2a1 and CO2a2 sections, and the Phases table's CO2a1
+  row ("the plan carries mask tracks"), were written for the track: chunk movies in CO-S2's
+  encoding, CO-10's encoding and chunk length, and M10's mirrored chunk. Those phases read CO-3 and
+  CO-4 as rewritten. With the pack, the plan carries no mask track. The recipe's `cutout` key, CO-8's
+  `texture(4)` and CO-6's waits stand.
+- The owner's pre-approved fallback (CO0's answer) was not needed: the pack passed.
+
+**Owed.**
+- S-KEY1: CO-S1's J, B, flicker and rules (a), (b), (d), (e) and (f), then CO-S3 at CO4's head.
+- S-TH1: CO-S1's speed rows.
+- S-TH4: CO-S2 (1)'s HLG VFR row on the owner's own file (an `ffmpeg` fixture stood in).
+- CO1's head: the CO1, CO2a1 and CO2a2 sections, CO10's "the mask movie" and the Phases table's
+  CO2a1 row ("the plan carries mask tracks") still describe the mask track, its chunk movies and
+  mirrored chunks; they are rewritten to CO-3 and CO-4's pack before CO1's spec is fixed.
+- To file: the pack's storage, 62.32 MB a minute lossless (below), with the candidates delta or
+  run-length coding between masks, a lower stored resolution, a lossless video codec in the pack
+  and a quantised soft edge, each needing (1), (2) and (3)-like checks and a new size row; filed
+  after the integration commit (`ai-drafted`, `low-priority`).
+
+None is a STOP. No manual check.
+
+**A risk the rule does not read.** The pack is lossless. Over CO-S1's 1080p Standard masks (600
+masks of 512 × 384, every frame), it took 20,772,076 bytes, 62.32 MB a minute, against the HEVC
+track's 5.85. CO-S2's rule judges the pack on (1), (2), (5) and (6) only, so this does not change
+the verdict. It is recorded for CO1, whose cache will hold it.
+
+**Instrument rows.**
+- `--selftest` 20/20.
+- `--build-only` exit 0, both probes through `swift_build.build`.
+- `--only s1` and `--only s2` each exit 0, each with `rule_matches: true` and its VERDICT line.
+- `spec_index_proof.py` 225/225 and `name_residue.py` exit 0.
+- The gate: `make gate` once, after the instruments and the documents, before this line was
+  written: "gate: PASS 259s" (names 1 s and test 257 s ran; typecheck, fmt, lint and app were
+  skipped, their inputs unchanged). `name_residue.py` was re-run over the record, exit 0.
+- The road map names no proof rows, mutants or manual checks for CO0.
+
+**Deviations.**
+- The push-ins use the FlexAudio cover first, MUSE only as the fallback (the spec has the
+  reverse). A 1080p still of MUSE's back view gave a person `.balanced` mask of at most 45 levels
+  with no pixel above 127. The cover gave 246, with 4.25 % above 127. (3) needs a person's edge.
+- (3) and (4) read the dump's decoded frame times (`all_pts`). Compressed sample times from
+  `push_1080.mov` (with B-frames) had dropped two frames from a chunk in a smoke run, fixed before
+  the recorded runs.
+- Each timed build runs in its own autorelease pool. Without one, the with-masks times grew over
+  the ten runs of a smoke run (154 → 402 ms).
+- (6)'s chunk files: chunk 0 written, the rest APFS clones of it. The build opens each file and
+  reads its track, and decodes nothing.
+- (3)'s IoU is the mean over frames, as CO-S1's J is. The pooled IoU is recorded beside it, and
+  both fail.
+- ProRes 422 Proxy carries the mask's full-range values in `422YpCbCr8`, a video-range format, as
+  the spec set. That is (2)'s 24.4 levels.
+- (5)'s canvas is 3840 × 2160 (the spec names none). The pack's VERDICT prints `none` for the
+  track's fields. The pack's size row (`pack … size`) has no rule.
+- CO-S2 ran twice. Run 1 came before the size row was added and gave the same verdict, with the
+  same (1)–(5). Its (6) was +570.5, +140.4 and +46.7 ms (HEVC) and +514.2, +118.4 and +63.7 ms
+  (ProRes), and the pack +2.6 ms. The numbers above are run 2's, on the final instrument.
+
+**Review.** One review, verdict pass, four nits, none fixed in the lane; all four resolved at
+integration:
+- The pack's (2) is the LZFSE round trip of the stored bytes outside any composition, so it
+  cannot fail. CO-3, CO-7 and this record now say so beside "0 levels over 120 masks".
+- The road map's CO-1 and CO-7 bullets lacked the verdicts §11 carries. CO-1 gains CO-S1's
+  Standard, CO-7 CO-S2's "no class is chosen".
+- The later sections still describe the mask track: owed to CO1's head (**Owed**).
+- `registration_score` took a reversed source's pivot and last end from the frame count, wrong for
+  a source with dropped frames (`hlg_vfr`'s 1,197 frames end at 1,200), though no reversed case
+  reads one. It now takes the last frame plus one. Re-scoring the lane's four registration files
+  (HEVC at 5, 10 and 30 s, and the pack) with it gave 22/22 each, two reversed rows each, all on
+  `barcode`; `--selftest` 20/20.
+
+**Integration.** Cherry-picked (`d7422ca0…fe4ea23f`) onto `worktree-creator-jobs` after CU3a1 and
+TX1. Conflicts only in the indexes and the decision file, each kept both sides:
+`creator-jobs-2.md` held CU3a1's and TX1's blocks and then CO0's, the index's TX-10…TX-14 rows
+come before CO-1…CO-9, and its `creator-jobs-2.md` summary kept TX1's clause. That put
+`creator-jobs-2.md` at 560 lines, past the series' ~500-line rule (spec §11 `creator-jobs.md`'s
+head), so CO0's paragraph and CO-1…CO-9 moved to a new `11-decisions/creator-jobs-3.md` (146
+lines): the nine index rows link it, it has its own row, `creator-jobs-2.md` (426) says the series
+goes on there, and `creator-jobs.md` (478), this file's head and `cutout_spike/README.md` cite
+it. The spec README's `11-decisions/` total is 17837 in 37 files (`spec_index_proof.py`
+231/231; `name_residue.py` exit 0). No `CLAUDE.md` edit was owed. `make gate` on the integrated
+tree, before this sentence: "gate: PASS 80s" (names 1 s, test 79 s; typecheck, fmt, lint and app
+skipped, their inputs unchanged). No Release proof: the road map names none for CO0, and nothing
+the app builds from changed.
 
 ### TX2b — the tab's bar
 

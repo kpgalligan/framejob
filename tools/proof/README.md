@@ -27451,6 +27451,27 @@ python3 tools/proof/cursor_spike/cursor_spike.py --only s4                     #
 python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         # the person tier, merged in (JOB-29)
 ```
 
+## Road map "creator-jobs" CO0 — the cutout spikes (`cutout_spike/`)
+
+The spikes behind Remove Background:
+- **CO-S1:** which segmentation, at what rate and read size, and how fast. Run for speed only, since S-KEY1 (the keyed truth) does not exist yet.
+- **CO-S2:** how the mask reaches the compositor. Either a second composition track filled from mask chunks, measured on registration, colour, codec loss, size, playback and build, or the per-media mask pack.
+- **CO-S3** (edge refinement) is owed to CO4's head, because it needs S-KEY1.
+
+Each is judged by its own entry under the road map's "Every spike, with its rule". R0 refuses a rule whose CJ-7 hash is not CJ0a's (`RULE CHANGED <id>`, exit 1), through `creator_spike/rule.py`. `tools/proof/cutout_spike/README.md` has the fixtures, the exit codes and the instruments. **The answers are in `designs/creator-jobs.md`'s "CO0's record"** and in spec §11 CO-1, CO-3, CO-4 and CO-7.
+
+Where things run:
+- `mask_speed` builds through `swift_build.build` from its own file alone (Vision, no `app/Sources`).
+- `mask_track_probe` builds from `app/Sources` with `mask_track_writer.swift`, with `Blank.mp4` and a `default.metallib` beside it (`lane_spike.resources`).
+- Fixtures go to `tools/proof/media/cutout/`, chunks, packs and builds to `tools/proof/work/cutout_spike/`, and results to `tools/proof/work/creator_spike/CO-S1/` and `CO-S2/`.
+- Frame Job itself is never launched.
+
+```sh
+python3 tools/proof/cutout_spike/cutout_spike.py --selftest           # deciders.py's rows
+python3 tools/proof/cutout_spike/cutout_spike.py --only s1            # then --only s2 (it reads CO-S1's results)
+python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack     # the mask pack measured whatever the track answers
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with
