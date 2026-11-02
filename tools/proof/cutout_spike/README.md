@@ -3,7 +3,7 @@
 What the road map measures before any cutout code is written:
 - **CO-S1:** which segmentation, at what rate and read size, and how fast. Run here for speed only: S-KEY1 (the keyed truth) does not exist yet.
 - **CO-S2:** how the mask reaches the compositor — a second composition track filled from mask chunks, or, when that fails, a per-media mask pack.
-- **CO-S3** (the edge refinement) is not run: it needs S-KEY1. The runner prints `CO-S3 owed: S-KEY1 missing (runs at CO4's head)`.
+- **CO-S3** (the edge refinement) is not run: it needs S-KEY1. The runner prints `CO-S3 owed: S-KEY1 missing (CO4 shipped r0, spec §11 CO-40; runs when S-KEY1 exists)`.
 - **CJ-S2 rule 1 for the mask request** (road map CO1's head, `--only device`): which device the `masks` kind is pinned to. Three runs of every frame of `push_1080.mov` on each of the CPU, the GPU and the Neural Engine, each run's SHA-256 over all its masks' bytes and its realtime factor; `deciders.device_rule` picks. A pick other than the Neural Engine re-measures Standard on it (`--only s1 --device <pick>`). The answer is in "CO1's record" and spec §11 CO-1 and CO-11.
 
 **The answers are not here.** They are in `designs/creator-jobs.md`'s "CO0's record" (the VERDICT lines and the rows) and in spec §11 CO-1, CO-3, CO-4 and CO-7 (`designs/spec/11-decisions/creator-jobs-3.md`). Each rule is the road map's own entry under "Every spike, with its rule", fixed at CJ0a. R0 recomputes CJ-7's hash of the entry through `creator_spike/rule.py` and refuses a changed rule (`RULE CHANGED <id>`, exit 1, nothing written). Each `results.json` (`tools/proof/work/creator_spike/CO-S1/`, `CO-S2/`) stores its value as `rule_sha256`.

@@ -648,7 +648,7 @@ def main(argv=None):
         return 1
     if args.build_only:
         return 0
-    log("CO-S3 owed: S-KEY1 missing (runs at CO4's head)")
+    log("CO-S3 owed: S-KEY1 missing (CO4 shipped r0, spec §11 CO-40; runs when S-KEY1 exists)")
     lines, status = [], 0
     try:
         if "s1" in only:

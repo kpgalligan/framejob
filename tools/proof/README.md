@@ -27458,7 +27458,7 @@ python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         #
 The spikes behind Remove Background:
 - **CO-S1:** which segmentation, at what rate and read size, and how fast. Run for speed only, since S-KEY1 (the keyed truth) does not exist yet.
 - **CO-S2:** how the mask reaches the compositor. Either a second composition track filled from mask chunks, measured on registration, colour, codec loss, size, playback and build, or the per-media mask pack.
-- **CO-S3** (edge refinement) is owed to CO4's head, because it needs S-KEY1.
+- **CO-S3** (edge refinement) is owed until S-KEY1 exists, because it needs it; CO4 shipped r0 (spec §11 CO-40).
 
 Each is judged by its own entry under the road map's "Every spike, with its rule". R0 refuses a rule whose CJ-7 hash is not CJ0a's (`RULE CHANGED <id>`, exit 1), through `creator_spike/rule.py`. `tools/proof/cutout_spike/README.md` has the fixtures, the exit codes and the instruments. **The answers are in `designs/creator-jobs.md`'s "CO0's record"** and in spec §11 CO-1, CO-3, CO-4 and CO-7.
 
@@ -28170,3 +28170,34 @@ RC_PROOF_APP=release python3 tools/proof/co3_proof.py --mutant NAME
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO3 record.
+
+## Road map "creator-jobs" CO4 — edges (`co4_proof.py` B0, E1–E3 skipped, E4, E4r, Z1; two mutants; spec §11 CO-40…CO-42)
+
+S-KEY1 does not exist, so CO-S3 has not run and r0 — CO-27's smoothstep remap in `cutoutCover`
+— is the shipped edge (CO-40). **`co4_proof.py`** builds `co2a_probe.swift` exactly as
+`co2a_proof.probe_rows` does (its `pack` mode's `ramp` kind is CO4's: every mask 512 × 288,
+column i `round(255·clamp((i − 240)/32, 0, 1))`), points `co2a_proof`'s `PROBE` and `WORK` at
+its own (`tools/proof/work/co4`) and reuses `install_pack`, `barcode_fixtures`,
+`person_fixtures`, `decode_png`, `close` and `Doc`; its launches, `check` and Z1 are its own.
+Both app rows draw on a 1920 × 1080, 30 fps transparent canvas at clip scale 1, Feather 0, and
+read the alpha of `render_frame`'s PNG.
+
+| Row | What it holds |
+|---|---|
+| B0 | the probe builds (a failure fails every app row too) |
+| E1, E2, E3 | `SKIP` by name while `tools/proof/media/creator/S-KEY1/` is absent (B on S-KEY1's composites, the same in HLG, CO-S3's cost bound); a scored FAIL once it exists, until CO-S1's owed rows and CO-S3 have run |
+| E4 | the canned launch (`-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`): `barcode.mov` over a canned `ramp` pack, `render_frame` at 1 s at Edge −1, −0.5, 0, 0.5 and 1; on rows 100, 540 and 980 the contour where alpha crosses 127.5 (linear between pixel centres) within 1 px of `3.75·(240.5 + 32·m½(e))`, and X(0) − X(1) and X(−1) − X(0) each 45 ± 1 px |
+| E4r | the second launch, no flags: `push_1080.mov`'s masks made by `get_media_analysis` over 0–2 s, `render_frame` at 1.5 s at Edge −1, 0 and +1: alpha never falls by more than one level as Edge rises, and the count of alpha ≥ 128 strictly increases (the three counts printed) |
+| Z1 | each launch's `grep "Frame Job: "` empty |
+
+Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration; the tree's
+mutated file's SHA-256 read before and after): `edge-sign` (E4, E4r: `c = 0.5 + 0.5·edge`),
+`no-clamp` (E4: `lo` and `hi` unclamped).
+
+```sh
+python3 tools/proof/co4_proof.py --only B0
+make app-debug && python3 tools/proof/co4_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co4_proof.py --mutant NAME
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO4 record.

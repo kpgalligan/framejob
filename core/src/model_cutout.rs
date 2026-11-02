@@ -26,8 +26,8 @@ pub enum CutoutSubject {
     Person,
 }
 
-/// Which masks: Standard, or Best (CO4's). A file's `best` reads; the ops
-/// refuse it until Best masks are made (CO-20).
+/// Which masks: Standard, or Best, which waits for S-KEY1's CO-S1 (d) (CO-41).
+/// A file's `best` reads; the ops refuse it until Best masks are made (CO-20).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CutoutQuality {

@@ -118,6 +118,11 @@ the same way.
 - **Expect:** each drag plays the speech under the playhead in short pieces, words recognisable at a slow drag, with no clicks or pops between pieces; the music under it is heard as well. Dragging left plays each piece forwards. On the hold, the sound stops within about a tenth of a second and stays silent; nothing plays after the mouse-up. A single click plays one short piece. With the track muted the speech is not heard; at 25 % it is quieter. The level meter does not move while scrubbing. Play, the arrow keys and the marker click play no scrub sound (playback plays as before).
 - **Source:** road map "audio" AP13 (spec §11 AU-130…AU-136; `scrub_audio_probe.py` scores the scheduler, the window, the reader and the queue, never the sound on the Mac's output).
 
+**JOB-60 — Remove Background's edges**
+- **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
+- **Expect:** the outline stays on the person; Edge moves it in and out.
+- **Source:** road map creator-jobs CO4, spec §11 CO-40; the verdict decides whether a matting-model candidate is filed (CO-1). Best is not checked: none exists (CO-41).
+
 **JOB-61 — Remove Background plays smoothly**
 - **Do:** Place a 1080p camera clip of yourself above a 4K screen recording. Set `video.cutout` on it (`set_video {cutout: {}}`) and wait for its person masks to be made. Play 30 s from several points, at Full and at Half Preview Quality; then turn the cutout off (`set_video {cutout: null}`) and play the same stretches.
 - **Expect:** no stutter or dropped frames beyond what the same timeline shows with the cutout off; the person's edge stays on the person as they move.

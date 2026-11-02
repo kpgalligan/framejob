@@ -12,8 +12,10 @@
 //   `frames` (pts k × 20,000, grid index k), `rate` (`every` or a capped rate r: the first frame
 //   at or after each k / r s, CJ-23) and `kind` — `barcode` (512 × 288: rows 35–65 % 255, the
 //   picture's own bar-code band; rows 75–95 % the analysed frame's index as a bar code, white
-//   255 and black 0; the rest 0) or `zero` (every mask 0, no subject). Each frame's slot is its
-//   nearest analysed mask, ties to the earlier (`AnalysisMasks.nearest`).
+//   255 and black 0; the rest 0), `zero` (every mask 0, no subject) or `ramp` (CO4's E4, spec
+//   §11 CO-42: column i `round(255 · clamp((i − 240) / 32, 0, 1))` in every row — 0 left of 240,
+//   255 from 272). Each frame's slot is its nearest analysed mask, ties to the earlier
+//   (`AnalysisMasks.nearest`).
 // - `co2a-probe mask <pack> <slot> <out>`: slot's mask decompressed, its bytes written raw;
 //   prints `{"width", "height"}`.
 //
@@ -89,6 +91,16 @@ func writePack(
         onDisk: nil, partial: url, width: width, height: height, frames: rows, masks: masks)
 }
 
+/// CO4's ramp mask (512 × 288): column i `round(255 · clamp((i − 240) / 32, 0, 1))` in every
+/// row, the same for every analysed frame.
+func rampPackMask() -> [UInt8] {
+    let w = 512, h = 288
+    let row = (0..<w).map { i -> UInt8 in
+        UInt8((255 * min(max(Double(i - 240) / 32, 0), 1)).rounded())
+    }
+    return [UInt8]((0..<h).map { _ in row }.joined())
+}
+
 /// The canned bar-code mask of analysed frame `index` (512 × 288).
 func barcodePackMask(_ index: Int) -> [UInt8] {
     let w = 512, h = 288
@@ -131,7 +143,11 @@ case "pack":
         try writePack(
             URL(fileURLWithPath: out), frames: frames, rate: rate, width: 512, height: 288
         ) { index in
-            kind == "zero" ? [UInt8](repeating: 0, count: 512 * 288) : barcodePackMask(index)
+            switch kind {
+            case "zero": return [UInt8](repeating: 0, count: 512 * 288)
+            case "ramp": return rampPackMask()
+            default: return barcodePackMask(index)
+            }
         }
         jsonOut(["ok": true, "analysed": analysedFrames(frames, rate: rate)])
     } catch {

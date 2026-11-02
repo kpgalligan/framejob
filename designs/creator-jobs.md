@@ -5851,6 +5851,71 @@ editor's `EditorViewController+Cutout` bullet, `VideoPane`'s +`Cutout` clause,
 - **Question for the owner:** Best as the default on a short clip? *Recommended: Standard always,
   Best chosen per clip.*
 
+#### CO4's record (2026-11-02)
+
+**Landed.** Lane C, base `af9473be` (I's HEAD, CO3; the worktree was made at CO2a2's `e18ef4b4`
+and fast-forwarded to it first). The lane's commits — the decisions alone (`1f1a2362`,
+CO-40…CO-42 in the new `creator-jobs-5.md` with their index rows, `creator-jobs-4.md` having
+passed the ~500-line split rule at 620 lines with CO3), then the doc comments, the probe's kind,
+the proof and the documents with this record (`04de5014`) — landed on `worktree-creator-jobs` as
+one commit straight on CO3, with nothing to merge. **S-KEY1 does not exist, so CO-S3 did not run and
+r0 ships**: CO-27's smoothstep remap in `cutoutCover` is the edge, and no refinement, `KeyReading`
+read, uniform, core constant, `masks_best` kind, Quality row, format bump, `rc_*` or tool was
+added. The owner's answer (2026-11-01) — Best is not the default on a short clip: Standard
+always, Best per clip — is recorded as CO-41 for when Best exists. Edge's documented amount
+(CO-40): at Feather 0 the outline lies at the mask value m½(e) (0.875, 0.75, 0.5, 0.25, 0.125 at
+e = −1, −0.5, 0, 0.5, 1), so Edge ±1 moves it 3R/8 across a mask edge R display pixels wide.
+
+| File | Lines | What |
+|---|---|---|
+| `designs/spec/11-decisions/creator-jobs-5.md` | 58 | CO-40…CO-42 |
+| `tools/proof/co4_proof.py` | 422 | the instrument: B0, E1–E3 skipped by name, E4, E4r, Z1; two mutants |
+| `tools/proof/co2a_probe.swift` | 423 | `pack`'s `ramp` kind (`rampPackMask`); `barcode` and `zero` unchanged |
+| `core/src/model_cutout.rs` · `app/Sources/CutoutProps.swift` | 76 · 138 | `CutoutQuality`'s doc comments: Best waits for S-KEY1's CO-S1 (d) (CO-41); no code |
+| spec §7.5b · `canvas-and-layers.md` · `manual-checks.md` | 396 · — · — | r0 the shipped edge and the contour rule; the Edge row and its paragraph; JOB-60 |
+| `tools/proof/README.md` · `cutout_spike/README.md` · `cutout_spike.py` | — | CO4's section; CO-S3 owed until S-KEY1 exists (the log string only) |
+
+- **Deviations from the spec.** None in substance. `co4_proof.py` adds B0 and Z1 to the selection
+  whenever an app row is selected (a mutant's run included), since the canned packs are the
+  probe's; Z1 is never a mutant's caught row. The 11-decisions README's `creator-jobs.md` Lines
+  cell moved too (478 → 479), its chain sentence having taken a line.
+
+**Measured.**
+
+- `spec_index_proof.py` 246/246; `name_residue.py` exit 0; `make typecheck` exit 0 with the 4
+  baseline warnings; `cd core && cargo test --release --test cutout` 10 passed, `cargo fmt
+  --check` and `make lint` clean; `cutout_spike.py --selftest` 25/25.
+- `co2a_proof.py --only B0,D13p,D1p` 3/3 (the probe with the `ramp` kind; D1p 3060 rows over 20
+  case × rate pairs).
+- `co4_proof.py` on Debug (`make app-debug`): 4/4, E1–E3 SKIP.
+- `make gate`: PASS 409 s (names 1, typecheck 7, fmt 3, lint 1, test 240, app 157).
+- `RC_PROOF_APP=release co4_proof.py` (the final instrument): 4/4, E1, E2, E3 printed SKIP by
+  name. E4's contour, the same on rows 100, 540 and 980: Edge −1 1006.923 (expected 1006.875),
+  −0.5 992.0 (991.875), 0 961.6 (961.875), 0.5 931.75 (931.875), 1 916.846 (916.875); X(0) − X(1)
+  44.754 and X(−1) − X(0) 45.323 against 45 ± 1. E4r on `push_1080.mov` (60 frames of masks,
+  512 × 384): no pixel's alpha fell by more than one level from Edge −1 to 0 or 0 to +1; pixels
+  with alpha ≥ 128: 77591, 126019, 234972. Z1 both launches empty.
+- Mutants, each once on Release in a tree copy (the tree's shader's SHA-256 unchanged), both
+  CAUGHT: `edge-sign` (app built in 158 s) E4 (Edge −1's contour at 916.846, the shifts −45.323
+  and −44.754) and E4r (290815 and 157807 pixels fell; counts 234972, 126019, 77591);
+  `no-clamp` (157 s) E4 (Edge −1 at 1022.333, Edge +1 no crossing — the whole row covered, X(−1)
+  − X(0) 60.733).
+- At integration, the phase cherry-picked onto CO3 with no conflict and no cell to reset: `make
+  gate` PASS 353 s (names 1, typecheck 7, fmt 3, lint 8, test 189, app 145).
+
+**Review.** Against the spec, the notes and the checks, with r0's half point re-derived by hand
+(0.375 − 0.25e and 0.625 − 0.25e at the clamps; 3.75 · 32 · 0.375 = 45 px): every Files and
+Approach item done, no shader, Swift or Rust line changed but the two doc comments, verdict pass
+with three nits and no fix pass: (1) this record said the residue was filed before it was — it is
+filed at integration, after this commit, as one `ai-drafted` issue naming it; (2) `co4_proof.py
+--only E1,E2,E3` with S-KEY1 absent scores no row and exits 1 after printing three SKIPs; (3)
+`contour`'s docstring says "first rises through 127.5" where the code takes any one crossing. (2)
+and (3) are left in the instrument.
+
+**Owed.** E1–E3 and CO-S3 (with CO-S1's S-KEY1 rows: Best, read size, flicker, rotation) until
+S-KEY1 exists — one issue, filed after this commit names it; JOB-60, the person's look at real
+edges. No `CLAUDE.md` edit.
+
 ### TX6 — the review pass: long pauses and fillers
 
 - **What a person gets:** Review, in the tab's bar, strikes long pauses (over 1 s, keeping 0.2 s at

@@ -261,10 +261,18 @@ Remove Background** turns it on or off for the selected clips too.
 |---|---|---|
 | Remove background | Turns it on. Turning it on gives each selected clip without it the defaults; turning it off removes it from all of them | off |
 | Background | **Remove** draws the person alone; **Keep** draws the whole picture | Remove |
-| Edge | Shrinks (below 0) or grows (above 0) the outline, −1 to 1 | 0 |
+| Edge | Pulls the outline in (below 0) or pushes it out (above 0), −1 to 1 | 0 |
 | Feather | How soft the outline is, 0–100 % | 0 % |
 | Status | Where the person masks stand (below) | — |
 | Analyze Now | Makes the masks now; after a failure, tries again | — |
+
+Edge works on how sure the person mask is at each point. With Feather at 0,
+Edge 0 draws the outline where the mask is half sure it is the person; −1 pulls
+it in to where the mask is 7/8 sure, and +1 pushes it out to where it is only
+1/8 sure. Between −0.5 and 0.5 the outline sits where the mask is 1/2 − Edge/2
+sure. Where the mask fades from background to person across a band of pixels,
+Edge +1 or −1 moves the outline about three eighths of that band's width, and
+raising Edge never removes anything a lower Edge kept.
 
 Background, Edge and Feather are dimmed until every selected clip has Remove
 Background on. With an action selected they animate like any other row

@@ -8,7 +8,8 @@ The IDs continue the series of [`creator-jobs.md`](creator-jobs.md),
 TX-, SW-, CU- and CO-), so a citation never has to say which file; `creator-jobs.md` says what the
 road map builds and how its IDs are made (CJ-7). This file is new because `creator-jobs-3.md`
 passed the road map's ~500-line split rule with TX3a's entries (2026-11-02), which moved here;
-each phase's decisions are appended here from now on, before its code.
+each phase's decisions were appended here, before its code, until it passed the same rule with
+CO3's entries, and the series continues in `creator-jobs-5.md`.
 
 TX-30…TX-33 are TX3a's (delete words; road map TX3 split by size, the pause token is TX3b's
 TX-34), recorded before its code but for `TranscriptCut.swift`, written first because TX-S3

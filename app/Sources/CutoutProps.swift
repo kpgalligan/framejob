@@ -16,7 +16,8 @@ enum CutoutSubject: String, Codable, CaseIterable {
 }
 
 /// Which masks (`video.cutout.quality`): `best` is read from a file and
-/// refused by the ops until Best masks are made (CO4).
+/// refused by the ops until Best masks are made, which waits for S-KEY1's
+/// CO-S1 (d) (CO-41).
 enum CutoutQuality: String, Codable, CaseIterable {
     case standard, best
 }
