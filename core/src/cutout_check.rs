@@ -1,8 +1,9 @@
 //! The cutout's rules on the model (format 39, spec §11 CO-20): the range
 //! and quality checks `props_check.rs`'s `check_video` runs on
-//! `video.cutout` ([`check_cutout`]); the clip-kind refusal
-//! `edit_props.rs`'s `settle_video` runs, where the clip is known
-//! ([`check_cutout_clip`]); the evaluator's clamp `actions_clamp.rs`'s
+//! `video.cutout` ([`check_cutout`]); the clip-kind refusal and, since
+//! format 41 (spec §11 CO-100), the foreground subject's refusal on a media
+//! or still clip, both run by `edit_props.rs`'s `settle_video`, where the
+//! clip is known ([`check_cutout_clip`]); the evaluator's clamp `actions_clamp.rs`'s
 //! `clamp_video` runs on an action's end ([`clamp_cutout`], which never
 //! fails, so the video group always decodes); and [`restore_base_cutout`],
 //! `actions.rs`'s statement that the key's presence, `subject` and `quality`
@@ -15,8 +16,8 @@ use serde_json::{Map, Value};
 use crate::actions_clamp::bounded;
 use crate::evaluate::json;
 use crate::model::{
-    Clip, Cutout, CutoutQuality, Source, VideoProps, CUTOUT_EDGE_MAX, CUTOUT_EDGE_MIN,
-    CUTOUT_FEATHER_MAX,
+    Clip, Cutout, CutoutQuality, CutoutSubject, Source, VideoProps, CUTOUT_EDGE_MAX,
+    CUTOUT_EDGE_MIN, CUTOUT_FEATHER_MAX,
 };
 use crate::props_check::in_range;
 
@@ -47,20 +48,24 @@ pub(crate) fn check_cutout(cutout: &Option<Cutout>) -> Result<(), String> {
     Ok(())
 }
 
-/// A cutout on a clip whose picture is not a media's frames, refused naming
-/// what the clip is (CO-20): only a `media` or `still` clip takes one
-/// (images until CO10). Fires only when `props` carries a cutout.
+/// A cutout on a clip that cannot take it, refused naming what the clip is
+/// (CO-20): a `media`, `still` or `image` clip takes one (CO-100). Then the
+/// subject: `foreground` is an image clip's only, and on a `media` or
+/// `still` clip it is refused in its own sentence, checked after the kind
+/// refusals so every other kind keeps its sentence. Fires only when `props`
+/// carries a cutout.
 pub(crate) fn check_cutout_clip(clip: &Clip, props: &VideoProps) -> Result<(), String> {
-    if props.cutout.is_none() {
+    let Some(cutout) = props.cutout else {
         return Ok(());
-    }
+    };
     let what = match clip.source {
-        Source::Media { .. } | Source::Still { .. } => return Ok(()),
-        Source::Text => "a text clip",
-        Source::Shape => "a shape clip",
-        Source::Graphic => "a graphic clip",
-        Source::Adjustment => "an adjustment clip",
-        Source::Image { .. } => "an image clip",
+        Source::Image { .. } => return Ok(()),
+        Source::Media { .. } => "a media clip",
+        Source::Still { .. } => "a still clip",
+        Source::Text => return Err(cannot_take(clip, "a text clip")),
+        Source::Shape => return Err(cannot_take(clip, "a shape clip")),
+        Source::Graphic => return Err(cannot_take(clip, "a graphic clip")),
+        Source::Adjustment => return Err(cannot_take(clip, "an adjustment clip")),
         Source::Nest { .. } => {
             return Err(format!(
                 "clip {} shows a nest and cannot take a cutout",
@@ -68,10 +73,18 @@ pub(crate) fn check_cutout_clip(clip: &Clip, props: &VideoProps) -> Result<(), S
             ))
         }
     };
-    Err(format!(
-        "clip {} is {what} and cannot take a cutout",
-        clip.id
-    ))
+    if cutout.subject == CutoutSubject::Foreground {
+        return Err(format!(
+            "clip {} is {what} and cannot take a foreground cutout: only an image clip can",
+            clip.id
+        ));
+    }
+    Ok(())
+}
+
+/// CO-20's kind refusal, naming what the clip is.
+fn cannot_take(clip: &Clip, what: &str) -> String {
+    format!("clip {} is {what} and cannot take a cutout", clip.id)
 }
 
 /// `video.behind_subject` on a clip that cannot be cut by a subject,

@@ -535,7 +535,8 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CO5 | CO | Insert ▸ Text Behind Subject; the Behind Subject section | CO2b, CO4 | C | p |
 | TX7 | TX | Retakes, restarts and repeats struck by comparison; the hand-off to the Assistant | TX6, CJ1; TX-S4 at its head | A | — |
 | CU5 | CU | Cursor files travel (Consolidate, the Media tab); `get_cursor_events` | CU3b | B | — |
-| CO10 | CO | Remove Background and Behind Subject on stills and pictures | CO4 | C | p |
+| CO10a | CO | Agents set `foreground` on an image clip's `video.cutout`; the recipe's image arm; an image's cutout drawn uncut; `analyze_cutout` leaves pictures out | CO4 | C | p |
+| CO10b | CO | Remove Background and Behind Subject on pictures: the masks made and drawn, the section's Subject pop-up | CO10a | C | — |
 | TX8 | trial | CJ-5's closing run; no code | TX7 | beside A | — |
 | CJ5b | CJ | File ▸ New Project from Range…; the derived document VR and FC open | CJ5a, CJ0c (T5, T7, T8) | A | — |
 | CU6 | CU | Record shortcuts, under Input Monitoring | CU1b | B | — |
@@ -6259,6 +6260,23 @@ against the tree's core — one issue, filed after this commit names it.
 
 ### CO10 — cutout on stills and pictures
 
+**Split by size (2026-11-02):** CO10a builds the model, the recipe and the mirror (CO-100…CO-104,
+its record below): `CutoutSubject::Foreground` (format 41, provisional), an image clip taking a
+cutout with either subject and a media or still clip refusing `foreground` in its own sentence,
+the recipe's image arm `{kind: "image", media, subject, quality}`, the Swift mirrors, `set_video`'s
+description, `analyze_cutout` refusing a named image clip and leaving image clips out of its
+default set, and an image's cutout drawn uncut. CO10b builds the rest, in its own pipeline after
+CO10a lands: the masks (one per image, a run at tick 0, grid index 0, read as
+`LayerRenderers.image` decodes it, person `.balanced` rev 1 or
+`VNGenerateForegroundInstanceMaskRequest` by subject); the store (foreground masks an analysis kind
+of their own); the wants (image clips windowed apart from the plan's segments in `CutoutWants`
+and `Exporter+Masks`); the draw (`CutoutMasks.pack` keyed by kind, `Compositor+Cutout.swift`'s
+`.image` branch at `texture(4)`); the UI (`CutoutStatus`, `analyze_cutout` on images with CO-103
+lifted and S5 rewritten, `BehindSubjectPlan` on images, the Background section's Subject pop-up
+for pictures); and the text (`set_video`'s "not drawn yet" removed, `canvas-and-layers.md`,
+`mcp.md`, JOB-65, proof S1 and a screen). The decisions below are the drafts; spec §11 holds
+CO-100…CO-104 as recorded.
+
 - **What a person gets:** Remove Background and Behind Subject on a photo, which may cut its
   foreground object, not only a person. (A freeze frame already cuts through its video's masks,
   CO2a's D11.)
@@ -6279,6 +6297,62 @@ against the tree's core — one issue, filed after this commit names it.
 - **Depends on:** CO4. **Lane** C.
 - **Question for the owner:** build pictures in this road map? *Recommended: yes, last*; it can be
   filed instead without touching CO0–CO9.
+
+#### CO10a's record (2026-11-02)
+
+**Landed.** Lane C, base `34891b34` (I's HEAD, CO5). CO-100…CO-104 are appended to
+`creator-jobs-5.md` with their index rows, in their own commit before the code; CO-100 amends
+CO-20 ("images until CO10") and CO-101 CO-21 ("CO10 adds `{kind: "image", media}`") in their own
+text. The owner's answer (2026-11-01) — pictures in this road map, built last in CO — is recorded
+in CO-102. Format 41 is provisional (CJ-8 (b)); no new op, tool, `rc_*`, op-table argument or
+`ModelKeys` row (CJ-3).
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/model_cutout.rs` · `cutout_check.rs` | 78 · 141 | `CutoutSubject::Foreground`; `check_cutout_clip` takes an image clip and refuses `foreground` on a media or still clip after the kind refusals |
+| `core/src/recipe_layer.rs` | 212 | `layer_cutout`'s image arm `{kind: "image", media, subject, quality}`; the media arm unchanged |
+| `core/src/format.rs` · `format_history.rs` · the header | — · 393 · — | format 41 (no toll needed: `format_history.rs` stays under 400) |
+| `core/tests/cutout_image.rs` · `schema_v41.rs` · `cutout.rs` | 246 · 119 · — | 7 and 4 tests; `cutout.rs` loses its image refusal row |
+| `app/Sources/CutoutProps.swift` | 148 | `CutoutSubject.foreground`, `RecipeCutoutMaskKind.image`, `RecipeCutoutMask.subject` (lenient, `person`) |
+| `app/Sources/AgentServer+Cutout.swift` · `AgentCatalog+Cutout.swift` · `AgentCatalog+VideoPatch.swift` | 128 · 56 · 235 | `analyze_cutout`'s two image sentences (CO-103) and its description; `set_video`'s `cutout` clause |
+| `tools/proof/co10_proof.py` | 357 | the instrument: S2–S5, Z1 |
+
+- **Deviations from the spec.** One: `analyze_cutout`'s `clips` argument description also says
+  an image clip is left out of the default set, beside the refusal list the spec named.
+
+**Measured.**
+
+- `cargo test --release --test cutout_image --test cutout --test schema_v41 --test schema_v40
+  --test schema_v3 --test behind_subject --test recipe`: 7, 10, 4, 5, 9, 14 and 15 passed; `cargo
+  fmt --check` and `make lint` clean; `make typecheck` exit 0 with the 4 baseline warnings;
+  `spec_index_proof.py` 249/249; `name_residue.py` exit 0.
+- `co10_proof.py` on Debug 5/5.
+- `make gate`: PASS 432 s (names 1, typecheck 7, fmt 3, lint 7, test 251, app 163).
+- `RC_PROOF_APP=release co10_proof.py` (the final instrument): 5/5. S4's four `render_frame`
+  calls took 0.01–0.02 s each; Z1 empty.
+- Mutants, each once, all CAUGHT, each file restored byte-identical by SHA-256: M1
+  `foreground-on-media` (`cutout_image`: the media-and-still and the paste tests failed), M2
+  `image-refused` (`cutout_image`: the store test failed), M3 `arm-no-subject` (`cutout_image`:
+  the recipe test failed), M4 `analyze-image` on Debug (`co10_proof.py --only S5`: rows for
+  [4, 6] and no error for the empty set).
+- At integration, the phase's three commits (`5a97cf4d`, `6b5609b1`, `27a409a0`) cherry-picked
+  onto CO5 with no conflict and no cell to reset; format 41 stood. `make gate` PASS 383 s (names
+  1, typecheck 7, fmt 3, lint 8, test 214, app 150); `RC_PROOF_APP=release co10_proof.py` 5/5
+  again on the integrated tree (S4's calls 0.01–0.02 s, Z1 empty).
+
+**Review.** One round (`34891b34..27a409a0`): every Files and Approach item done, pass, with three
+nits. (1) This record said "None." over the one deviation it named — corrected at integration.
+(2) `set_video`'s `cutout` clause opened "the clip drawn as the person in it", too narrow with
+`foreground` — it reads "the clip drawn as its subject" since integration. (3) `layer_cutout`
+picks the image arm by comparing `kind == "image"` where the `match` on `clip.source` already
+knows it — optional, left for CO10b, which rewrites that arm. The `CLAUDE.md` edits the notes
+owed (`core/CLAUDE.md`'s `model_cutout.rs` · `cutout_check.rs` entry: `foreground`,
+`check_cutout_clip`'s image clip and foreground refusal, `layer_cutout`'s image arm;
+`app/CLAUDE.md`'s `CutoutProps.swift` mirrors and `analyze_cutout`'s CO-103 refusal) were applied
+at integration.
+
+**Owed.** CO10b (CO-102), in its own pipeline after this lands. Nothing filed: CO10b is planned
+work, not residue.
 
 ### TX8 — CJ-5's closing trial run
 

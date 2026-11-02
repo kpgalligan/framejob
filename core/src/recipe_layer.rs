@@ -60,8 +60,10 @@ pub(crate) struct RecipeLayer<'a> {
     /// §11 CU-32). The burn-in's is `null`.
     pub cursor: Value,
     /// `null`, or the clip's Remove Background — `{mask, background, edge,
-    /// feather}` ([`Project::layer_cutout`], spec §11 CO-21). The burn-in's
-    /// is `null`.
+    /// feather}`, the mask a media's `{kind: "media", media, quality}` or an
+    /// image's `{kind: "image", media, subject, quality}`
+    /// ([`Project::layer_cutout`], spec §11 CO-21, CO-101). The burn-in's is
+    /// `null`.
     pub cutout: Value,
     /// `null`, or what step 0 converts the source with — its media's Camera
     /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
@@ -169,17 +171,22 @@ impl RecipeLayer<'_> {
 
 impl Project {
     /// The `cutout` key of `clip`'s layer, given its evaluated video props
-    /// (spec §7.3, §11 CO-21): `null` unless the clip's source is a `media`
-    /// or a `still`, its media is in the project and the evaluated cutout is
-    /// set; otherwise `{mask: {kind: "media", media, quality}, background,
-    /// edge, feather}`, `media` the clip's OWN source media — a nested
-    /// clip's inner one, a still's — whose pack holds the masks (CO-3). The
-    /// picture segment gives the time, so the key carries none. The
-    /// evaluator has already held the presence and `quality` to the base and
-    /// clamped `edge` and `feather`.
+    /// (spec §7.3, §11 CO-21): `null` unless the clip's source is a `media`,
+    /// a `still` or an `image`, its media is in the project and the
+    /// evaluated cutout is set; otherwise `{mask: {kind: "media", media,
+    /// quality}, background, edge, feather}`, `media` the clip's OWN source
+    /// media — a nested clip's inner one, a still's — whose pack holds the
+    /// masks (CO-3). The picture segment gives the time, so the key carries
+    /// none. An image clip's mask is `{kind: "image", media, subject,
+    /// quality}` (CO-101): one picture's person and foreground masks differ,
+    /// so the arm names the subject; the media arm has no `subject` key, so a
+    /// video recipe is the text it was. The evaluator has already held the
+    /// presence, `subject` and `quality` to the base and clamped `edge` and
+    /// `feather`.
     pub(crate) fn layer_cutout(&self, clip: &Clip, evaluated: &VideoProps) -> Value {
-        let media = match clip.source {
-            Source::Media { media, .. } | Source::Still { media, .. } => media,
+        let (kind, media) = match clip.source {
+            Source::Media { media, .. } | Source::Still { media, .. } => ("media", media),
+            Source::Image { media } => ("image", media),
             _ => return Value::Null,
         };
         let Some(cutout) = evaluated.cutout else {
@@ -189,8 +196,11 @@ impl Project {
             return Value::Null;
         }
         let mut mask = Map::new();
-        mask.insert("kind".to_string(), Value::from("media"));
+        mask.insert("kind".to_string(), Value::from(kind));
         mask.insert("media".to_string(), Value::from(media));
+        if kind == "image" {
+            mask.insert("subject".to_string(), json(&cutout.subject));
+        }
         mask.insert("quality".to_string(), json(&cutout.quality));
         let mut out = Map::new();
         out.insert("mask".to_string(), Value::Object(mask));

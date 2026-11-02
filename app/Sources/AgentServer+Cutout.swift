@@ -30,6 +30,12 @@ extension AgentServer {
             let document = try target(a)
             let snapshot = document.editedProject.snapshot
             let cutOut = { (id: UInt32) in snapshot.clip(id)?.video?.cutout != nil }
+            // An image clip's cutout is kept but not analysed until CO10b, which lifts both
+            // refusals below (spec §11 CO-103): `CutoutStatus` would answer it `no_picture`.
+            let isImage = { (clip: ClipSnapshot) -> Bool in
+                if case .image = clip.source { return true }
+                return false
+            }
             let clips: [UInt32]
             if let named = try optionalClipsArg(a, "clips", document) {
                 if let bare = named.first(where: { !cutOut($0) }) {
@@ -37,11 +43,22 @@ extension AgentServer {
                         message: "Clip \(bare) has no Remove Background; set_video "
                             + "{cutout: {}} turns it on.")
                 }
+                if let image = named.first(where: { snapshot.clip($0).map(isImage) == true }) {
+                    throw ToolError(
+                        message: "Clip \(image) is an image clip; an image clip's Remove "
+                            + "Background is kept but not analysed yet.")
+                }
                 clips = named
             } else {
-                clips = snapshot.clips.filter { $0.video?.cutout != nil }
+                let cut = snapshot.clips.filter { $0.video?.cutout != nil }
+                clips = cut.filter { !isImage($0) }
                     .sorted { ($0.start, $0.id) < ($1.start, $1.id) }.map(\.id)
                 guard !clips.isEmpty else {
+                    if cut.contains(where: isImage) {
+                        throw ToolError(
+                            message: "No video or still clip in the open scope has Remove "
+                                + "Background on; an image clip's is kept but not analysed yet.")
+                    }
                     throw ToolError(
                         message: "No clip in the open scope has Remove Background on; "
                             + "set_video {cutout: {}} turns it on.")

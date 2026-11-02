@@ -18,12 +18,14 @@ pub const CUTOUT_EDGE_MAX: f64 = 1.0;
 /// `video.cutout.feather`'s upper bound; its lower is 0 (CO-20).
 pub const CUTOUT_FEATHER_MAX: f64 = 1.0;
 
-/// What the mask finds: a person (CO-1). CO10 appends `foreground`.
+/// What the mask finds: a person (CO-1), or, on an image clip only, its
+/// foreground (CO10a, format 41, spec §11 CO-100).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CutoutSubject {
     #[default]
     Person,
+    Foreground,
 }
 
 /// Which masks: Standard, or Best, which waits for S-KEY1's CO-S1 (d) (CO-41).

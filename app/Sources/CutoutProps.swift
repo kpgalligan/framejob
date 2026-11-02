@@ -3,16 +3,18 @@ import Foundation
 // MARK: - The cutout in the model and the recipe
 
 // The read-only mirror of `core/src/model_cutout.rs` (format 39, spec §11
-// CO-20) and of the recipe layer's `cutout` key (CO-21). Nothing here draws:
+// CO-20; `foreground` format 41, CO-100) and of the recipe layer's `cutout`
+// key (CO-21, its image arm CO-101). Nothing here draws:
 // the compositor draws `RecipeCutout` through `Compositor+Cutout.swift` since
 // road map creator-jobs CO2a2 (spec §11 CO-24…CO-27).
 // Every decode is lenient, the core's defaults standing in for a key that
 // does not read, as the other snapshot types do, but for the mask's `kind`
 // and `media`, without which there is no mask to look up.
 
-/// What the mask finds (`video.cutout.subject`); CO10 adds `foreground`.
+/// What the mask finds (`video.cutout.subject`): a person, or, on an image
+/// clip only, its foreground (format 41, spec §11 CO-100).
 enum CutoutSubject: String, Codable, CaseIterable {
-    case person
+    case person, foreground
 }
 
 /// Which masks (`video.cutout.quality`): `best` is read from a file and
@@ -97,24 +99,28 @@ struct CutoutPatch: Codable, Equatable {
     var isEmpty: Bool { background == nil && edge == nil && feather == nil }
 }
 
-/// Where a recipe cutout's masks come from: a media's pack (CO-3). CO10 adds
-/// `image`.
+/// Where a recipe cutout's masks come from: a media's pack (CO-3), or an
+/// image clip's picture (CO-101), whose masks CO10b makes; until then an
+/// `image` mask draws uncut (CO-102).
 enum RecipeCutoutMaskKind: String, Codable, CaseIterable {
-    case media
+    case media, image
 }
 
 /// A recipe cutout's `mask` (CO-21): the media whose pack holds the masks —
 /// the clip's own source media — and which masks. `kind` and `media` are
-/// required; `quality` is lenient.
+/// required; `subject` (an image's arm only, CO-101; `person` when absent,
+/// as the media arm writes none) and `quality` are lenient.
 struct RecipeCutoutMask: Codable, Equatable {
     let kind: RecipeCutoutMaskKind
     let media: UInt32
+    let subject: CutoutSubject
     let quality: CutoutQuality
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = try c.decode(RecipeCutoutMaskKind.self, forKey: .kind)
         media = try c.decode(UInt32.self, forKey: .media)
+        subject = c.lenient(.subject, CutoutSubject.person)
         quality = c.lenient(.quality, CutoutQuality.standard)
     }
 }

@@ -34,14 +34,16 @@ extension AgentServer {
                     + "mean centre over those frames in the media's upright pixels (origin top "
                     + "left, y down), null unless ready; error, when failed, the sentence "
                     + "saying why. Refused, nothing done: wait outside 0–60, a clip that does "
-                    + "not exist, a named clip with no cutout, and, with clips left out, no "
-                    + "cut-out clip in the scope set_scope has open. It edits nothing and makes "
-                    + "no undo step.",
+                    + "not exist, a named clip with no cutout, a named image clip (an image "
+                    + "clip's Remove Background is kept but not analysed yet), and, with clips "
+                    + "left out, no cut-out video or still clip in the scope set_scope has open "
+                    + "(image clips are left out). It edits nothing and makes no undo step.",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"],
                         "description": "The cut-out clips to answer for; every cut-out clip in "
-                            + "the open scope, in timeline order, when left out.",
+                            + "the open scope but an image clip, in timeline order, when left "
+                            + "out.",
                     ],
                     "wait": [
                         "type": "number",

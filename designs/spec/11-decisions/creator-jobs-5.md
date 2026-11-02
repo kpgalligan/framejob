@@ -168,3 +168,60 @@ core).
   empty). Seven mutants: front-subjects (B2), copy-shadow (B5), three-steps (B8), miss-whole (B9),
   copy-partner (B10), one-matte-skip (P1) and listed-uncut (`behind_subject.rs`'s b6). **JOB-63**:
   a person's look, on S-TH1, at the halo where the soft edge meets the letters.
+
+CO-100…CO-104 are CO10a's (a picture's cutout in the model and the recipe), recorded before its
+code. CO10 is split by size: CO10a ships the model, the recipe and the mirror, and CO10b the masks,
+their store, their wants, the draw and the UI (CO-102). The owner's answer of 2026-11-01 for CO10:
+pictures are in this road map, built last in CO. Format 41 is provisional (CJ-8 (b)); no new op,
+tool, `rc_*` export, op-table argument or `ModelKeys` row — Vision is on-device (CJ-3).
+
+- **CO-100 — A picture takes a cutout, and only a picture a foreground subject (format 41).** The
+  road map's draft, as built. `CutoutSubject::Foreground` is appended (JSON `foreground`), so
+  `video.cutout.subject` is `person` (the default) or `foreground`, and `{}` still reads as
+  `person`. An image clip takes a cutout with either subject; a media or still clip takes only
+  `person`, and `foreground` on one is refused in its own sentence — "clip N is a media clip and
+  cannot take a foreground cutout: only an image clip can", "clip N is a still clip and cannot
+  take a foreground cutout: only an image clip can" — checked in `cutout_check.rs`'s
+  `check_cutout_clip` after the existing kind refusals (so a text, shape, graphic, adjustment or
+  nest clip keeps its sentence), which `edit_props.rs`'s `settle_video` runs, so `set_video`,
+  `paste` and `paste_attributes` all meet it. A freeze frame already cuts through its video's
+  person masks (CO2a's D11), so a still never needs `foreground`. Pictures' foreground masks are
+  `VNGenerateForegroundInstanceMaskRequest`'s (CO-1), made from CO10b. `subject` stays base-only
+  (CO-20). Amends CO-20, which refused a cutout on an image clip "until CO10".
+- **CO-101 — The recipe's image arm carries the subject.** For an image clip whose media is in the
+  project and whose evaluated cutout is set, the layer's `cutout` is `{mask: {kind: "image",
+  media, subject, quality}, background, edge, feather}`, `media` the clip's image; otherwise
+  `null`, as the media arm. One image's person mask and foreground mask differ and the compositor
+  reads only the recipe, so the arm names the subject; CO-21 allows it ("at least"). The media
+  arm stays `{kind: "media", media, quality}` with no `subject` key, so every video recipe is the
+  text it was. Amends CO-21's "CO10 adds `{kind: "image", media}`".
+- **CO-102 — The split.** CO10a: the subject, the clip rule, the image arm, format 41, the Swift
+  mirrors (`CutoutSubject.foreground`, `RecipeCutoutMaskKind.image`, `RecipeCutoutMask.subject`,
+  read leniently with `person` the default), `set_video`'s description and `analyze_cutout`'s
+  refusal (CO-103). An image clip's cutout is kept but drawn uncut, as CO-23 drew video until
+  CO2a2: the compositor's guard (`mask.kind == .media`) and `CutoutWants` leave an image layer
+  uncut and un-waited, and a cut image is a subject to Behind Subject (CO-50) whose copy draws
+  nothing without a mask (CO-51), so a behind title stays whole. CO10b holds the rest of CO10:
+  one mask per image (a run at tick 0, grid index 0, person `.balanced` rev 1 or
+  `VNGenerateForegroundInstanceMaskRequest` by subject, on the picture as `LayerRenderers.image`
+  decodes it), foreground masks in an analysis kind of their own, the image wants windowed apart
+  from the plan's segments, the `.image` draw at `texture(4)`, `CutoutStatus`, the Background
+  section's Subject pop-up and `BehindSubjectPlan` on pictures, `analyze_cutout` on pictures,
+  the guide's pages and JOB-65.
+- **CO-103 — `analyze_cutout` leaves pictures out until CO10b.** It decides by `cutout != nil`
+  alone, and an image clip would answer `no_picture` (`CutoutStatus`'s detail). So a named image
+  clip, after the existing no-cutout check, is refused: "Clip N is an image clip; an image clip's
+  Remove Background is kept but not analysed yet."; with `clips` left out the default set is
+  every cut clip whose source is not an image, and when that set is empty but an image clip has a
+  cutout: "No video or still clip in the open scope has Remove Background on; an image clip's is
+  kept but not analysed yet." With no cutout at all the existing sentence stands. CO10b lifts
+  both.
+- **CO-104 — CO10a's proof.** `co10_proof.py` (one Debug or Release launch on a scratch
+  `CFFIXED_USER_HOME`, `media/A.mov` and a 64×48 RGB PNG the script writes): S2 `foreground` on a
+  media clip and on a `freeze_frame` still each answers its sentence exactly, the project
+  unchanged; S3 an image clip's `{subject: "foreground"}` reads back all five keys, `{edge: 0.25}`
+  merges, `null` removes; S4 `render_frame` at two times with the image's cutout on equals it
+  off, byte for byte, each call under 10 s; S5 `analyze_cutout`'s image sentence, its default set
+  without the image clip, and the empty-set sentence; Z1 the log free of `Frame Job: `. Four
+  mutants: M1 `foreground-on-media`, M2 `image-refused`, M3 `arm-no-subject` (each caught by
+  `core/tests/cutout_image.rs`) and M4 `analyze-image` (caught by S5 on Debug).

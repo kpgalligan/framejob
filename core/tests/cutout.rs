@@ -173,7 +173,6 @@ fn every_value_and_clip_refusal_is_its_own_sentence() {
         (ids[1], "a shape clip"),
         (ids[2], "an adjustment clip"),
         (12, "a graphic clip"),
-        (13, "an image clip"),
     ] {
         assert_eq!(
             nested.errors(&set(id, json!({}))),

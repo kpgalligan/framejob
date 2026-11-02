@@ -206,18 +206,21 @@ governs a module now.
 - `model_cutout.rs` · `cutout_check.rs` — the cutout in the model (format 39, road map
   "creator-jobs" CO2a1, spec §11 CO-20, CO-21, CO-23): `model_cutout.rs` `Cutout`
   (`video.cutout`, after `cursor`, written only when set, every field written, `{}` the
-  defaults) with `CutoutSubject`, `CutoutQuality`, `CutoutBackground` and the `CUTOUT_*` ranges,
+  defaults) with `CutoutSubject` (`person`, and `foreground`, format 41, road map creator-jobs
+  CO10a, spec §11 CO-100), `CutoutQuality`, `CutoutBackground` and the `CUTOUT_*` ranges,
   re-exported through `model_props.rs`; `cutout_check.rs` `check_cutout` (one line in
   `props_check.rs`'s `check_video`: edge, feather, then `best` refused), `check_cutout_clip` (one
-  line in `edit_props.rs`'s `settle_video`: a text, shape, graphic, adjustment, image or nest clip
-  refused naming what it is), `check_behind_subject_clip` (one line in `settle_video` after it:
+  line in `edit_props.rs`'s `settle_video`: a media, still or image clip takes one, a text, shape,
+  graphic, adjustment or nest clip refused naming what it is, then `foreground` refused on a media
+  or still clip in its own sentence, CO-100), `check_behind_subject_clip` (one line in `settle_video` after it:
   `video.behind_subject`, format 40, spec §11 CO-52, refused on an adjustment or nest clip),
   `clamp_cutout` (one line in `actions_clamp.rs`'s `clamp_video`; it
   never fails) and `restore_base_cutout` (one line in `actions.rs`'s `evaluate_clip`, beside
   motion's restore: the presence, `subject` and `quality` the base's). The recipe's `cutout` key
-  is `recipe_layer.rs`'s `Project::layer_cutout`: `null` unless a media or still clip's media is
-  in the project and the evaluated cutout is set, else `{mask: {kind: "media", media, quality},
-  background, edge, feather}`, `media` the clip's own source media. `add_blurred_background`'s
+  is `recipe_layer.rs`'s `Project::layer_cutout`: `null` unless a media, still or image clip's media
+  is in the project and the evaluated cutout is set, else `{mask: {kind: "media", media, quality},
+  background, edge, feather}`, `media` the clip's own source media; an image clip's mask is
+  `{kind: "image", media, subject, quality}` (CO-101), drawn uncut until CO10b. `add_blurred_background`'s
   copy drops it. `VideoProps.behind_subject` (format 40, after `cutout`, written only when true)
   is `model_props.rs`'s; the copy drops it too.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,

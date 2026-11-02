@@ -385,4 +385,9 @@
 //! boolean after `cutout`, written only when true; no migration. The bump
 //! is so an older build refuses a file with the flag instead of drawing the
 //! title uncut and dropping the key on save.
-//! Every number from 41 up, 1014 included, is newer than this build.
+//!
+//! Version 41 is a picture's cutout (spec §11 CO-100): `video.cutout.subject`
+//! may be `foreground`, an image clip's only; no new key, no migration. The
+//! bump is so an older build refuses the file instead of failing to read
+//! the subject.
+//! Every number from 42 up, 1014 included, is newer than this build.

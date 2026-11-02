@@ -28243,3 +28243,35 @@ RC_PROOF_APP=release python3 tools/proof/co5_proof.py --mutant NAME
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO5 record.
+
+## Road map "creator-jobs" CO10a — a picture's cutout in the model and the recipe (`co10_proof.py` S2–S5, Z1; four mutants by hand; `core/tests/cutout_image.rs`, `schema_v41.rs`; spec §11 CO-100…CO-104)
+
+**`co10_proof.py`** drives the app `proof_app` chooses (or `--app PATH`) in one launch on a
+scratch `CFFIXED_USER_HOME` (`tools/proof/work/co10`), with `-RCDevAnalysisHold 3600` so a cut
+media clip's wanted masks (CO-22) are never made: no row reads a mask. Its media are a copy of
+`media/A.mov` and a 64 × 48 RGB PNG the script writes with `zlib` and `struct`, on a 640 × 360,
+30 fps canvas. Nothing draws an image's mask until CO10b (CO-102); its docstring is the full row
+list.
+
+| Row | What it holds |
+|---|---|
+| S2 | `set_video {cutout: {subject: "foreground"}}` on a media clip and on a `freeze_frame` still: each answers `set_video: ` and its sentence exactly, `get_project` unchanged |
+| S3 | an image clip's `{subject: "foreground"}` reads back all five keys, `{edge: 0.25}` merges, `null` removes the key |
+| S4 | `render_frame` at 0.5 s and 2 s with the image clip's cutout on byte-identical to it off, each call under 10 s (no 30 s mask wait) |
+| S5 | a cut image clip and a cut media clip: `analyze_cutout {clips: [image], wait: 0}` answers CO-103's image sentence exactly, `analyze_cutout {wait: 0}` rows for the media clip only, and with the media clip's cutout removed the empty-set sentence exactly |
+| Z1 | no `Frame Job: ` line in the launch's log |
+
+The four mutants are run by hand (each anchor replaced once, the file restored byte-identical by
+SHA-256): M1 `foreground-on-media` (`check_cutout_clip`'s foreground refusal removed), M2
+`image-refused` (`Source::Image` refused again) and M3 `arm-no-subject` (`layer_cutout`'s image
+arm without `subject`), each caught by `cargo test --release --test cutout_image`; M4
+`analyze-image` (`AgentServer+Cutout.swift`'s default-set filter removed), caught by `make
+app-debug && python3 tools/proof/co10_proof.py --only S5`.
+
+```sh
+cd core && cargo test --release --test cutout_image --test schema_v41
+make app-debug && python3 tools/proof/co10_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co10_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO10a record.

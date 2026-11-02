@@ -419,9 +419,12 @@ the transition ops are §6d.
   spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded
   unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is
   normalised to `null` before the range checks run, so one clip has one spelling of "no motion".
-  `video.cutout` (format 39, §11 CO-20) merges too and `null` removes it; only a `media` or `still`
-  clip takes one (a text, shape, graphic, adjustment, image or nest clip is an **error** naming
-  what it is), and `quality: "best"` is an error until Best masks are made.
+  `video.cutout` (format 39, §11 CO-20) merges too and `null` removes it; a `media`, `still` or
+  `image` clip takes one (a text, shape, graphic, adjustment or nest clip is an **error** naming
+  what it is), and `quality: "best"` is an error until Best masks are made. `subject:
+  "foreground"` (format 41, §11 CO-100) is an image clip's only: on a `media` or `still` clip it
+  is an **error** (`clip 3 is a media clip and cannot take a foreground cutout: only an image clip
+  can`), from `set_video`, `paste` and `paste_attributes` alike.
   `video.behind_subject` (format 40, §11 CO-52) is a boolean: any drawing clip takes it but an
   adjustment or a nest clip, each an **error** naming what it is (`clip 4 is an adjustment clip and
   cannot be put behind a subject`), from `set_video`, `paste` and `paste_attributes` alike.

@@ -182,13 +182,15 @@ detail there.
   `VideoPatch.cursor`; its `dictionary` writes all eight keys, `NSNull` for a nil `hideIdle`),
   `MediaCursor` (`MediaSnapshot.cursor`, `MediaDescriptor.cursor`, kept by `probeDictionary`) and
   `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required).
-  `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21) holds
-  `CutoutSubject`, `CutoutQuality`, `CutoutBackground`, `CutoutProps` (`VideoProps.cutout` and
+  `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21;
+  `foreground` and the image arm format 41, CO10a, CO-100, CO-101) holds `CutoutSubject`
+  (`person`, `foreground`), `CutoutQuality`, `CutoutBackground`, `CutoutProps` (`VideoProps.cutout` and
   `VideoPatch.cutout`; its `dictionary` writes all five keys), `CutoutPatch` (the sparse
   write `VideoPatch.cutoutPart` carries — written under `cutout` only when `cutout` is nil,
   never decoded — so a Background, Edge or Feather row writes its own key alone, CO3),
-  `RecipeCutoutMaskKind`,
-  `RecipeCutoutMask` (`kind` and `media` required) and `RecipeCutout` (the recipe layer's
+  `RecipeCutoutMaskKind` (`media`, and `image`, which nothing draws until CO10b),
+  `RecipeCutoutMask` (`kind` and `media` required; `subject` lenient,
+  `person` when absent, CO-101) and `RecipeCutout` (the recipe layer's
   `cutout`, `mask` required; `subjectCopy`, CO-51); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
   instruction, not the clip's props. `VideoProps.swift` (`VideoProps`),
   `ClipSnapshot.swift` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`,
@@ -599,7 +601,8 @@ detail there.
   `CutoutWants.queue`): `retry` clears a `.failed` or `.cancelled` outcome
   of the owner's requests that are neither running nor queued, and
   reconciles. `AgentServer+Cutout.swift` is `analyze_cutout` (off main: one
-  main hop that refuses and calls `analyzeMasksNow()`, then
+  main hop that refuses — a named image clip too, and image clips are left out of the default
+  set until CO10b, spec §11 CO-103 — and calls `analyzeMasksNow()`, then
   `CutoutWants.queue.sync {}`, then polls every 0.25 s up to `wait` or Stop,
   never a timeout refusal; the centroid is read off main);
   `AgentCatalog+Cutout.swift` holds its row, spliced in by
