@@ -35,7 +35,9 @@ continues in `creator-jobs-3.md`.
   base64 that does not decode or bytes without the PNG signature, a hot spot outside its image,
   images under `cursor_image: none`, a word outside its vocabulary, a float not finite and above
   0, and CU-7's rules: a `typed` entry with any key but `t`, and a shortcut whose `+`-joined
-  tokens are empty, hold whitespace, or hold neither `cmd` nor `ctrl`. The core does no file I/O
+  tokens are empty, hold whitespace, or hold neither `cmd` nor `ctrl` (**amended by CU-60**:
+  nor `opt` with its last token one of `left`, `right`, `up`, `down`, `delete`, `forwarddelete`,
+  `return`, `enter`, `tab` or `esc`). The core does no file I/O
   and checks a PNG by its signature only.
 - **CU-14 — A cursor file that fails to write or read back is that segment's `cursorProblem` and
   the landing's note, never the recording's failure.**

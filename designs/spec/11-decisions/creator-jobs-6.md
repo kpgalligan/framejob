@@ -284,3 +284,88 @@ no owner question at this phase.
   re-anchor not run (M2); Q without the crop (M4); `SetMediaCursor` out of `refused_inside` (M6);
   the reversed refusal removed (M7); the page cap not applied (M8); the tool's attach check
   removed (M9). No person check: the road map names none.
+
+## CU6 — record shortcuts (2026-11-02)
+
+Recorded before the code. CU-60…CU-63 are CU6's: a **Record shortcuts** box in the recorder
+panel (off by default) makes a display, window or picked recording write each shortcut, spelled,
+and a time-only mark for every other key-down into each segment's cursor file, through a
+listen-only CGEventTap under Input Monitoring (CU-S1 `keys=tap`, `grant_api=cg`). No FFI, op,
+format (41 stands) or cursor-file version change: `keys` was defined in v1 and empty in every file
+until now, so the core's one change, CU-60's ⌥ arm in the shortcut check, refuses nothing a
+written file held. Nothing here sends anything anywhere, so nothing is keyed (CJ-3). The owner's
+answers (2026-11-01): "The indicator is a keyboard mark plus a menu row." and, minor (taken as
+recommended), "⌥ with arrows, delete, return, tab or escape counts as a shortcut."
+
+- **CU-60 — Which key-down is a shortcut, and how it is spelled.** It amends CU-7 (the ⌥ arm) and
+  CU-10's shortcut check. `CursorKeyFilter.swift` (pure) decides each key-down, in this order:
+  (a) secure input held by any process (`IsSecureEventInputEnabled()`, read at delivery) →
+  nothing, not even a time; (b) an auto-repeat → a typed mark; (c) ⌘ or ⌃ held, or ⌥ held with
+  the key code one of ← → ↓ ↑ (123–126), Delete (51), Forward Delete (117), Return (36), keypad
+  Enter (76), Tab (48) or Esc (53) → a shortcut; (d) every other key-down → a typed mark. ⇧ alone
+  never makes a shortcut, and neither does ⌥ with any other key (⌥E types é). **Spelling:** the
+  held modifiers in the order `cmd`, `ctrl`, `opt`, `shift`, then the key: a named key by its
+  virtual key code (`return`, `enter`, `tab`, `space`, `delete`, `forwarddelete`, `esc`, `left`,
+  `right`, `down`, `up`, `home`, `end`, `pageup`, `pagedown`, `help`, `f1`…`f20` by their kVK
+  codes), else the layout's character with no modifier applied
+  (`NSEvent(cgEvent:)?.characters(byApplyingModifiers: [])`) lowercased, `+` spelled `plus`, and
+  an empty, whitespace or control character `key<code>`; joined by `+`. `code` is the virtual key
+  code. **A typed key's character is never read**: the tap asks for a character only for a
+  key-down that is a shortcut and not under secure input, and a typed mark is its time alone.
+  A key-down while the recording is paused (no open segment) is dropped. **The core's check**
+  (`cursor_file_check.rs`) accepts a shortcut holding `cmd` or `ctrl`, or holding `opt` with its
+  LAST token one of `OPTION_SHORTCUT_KEYS` (`left`, `right`, `up`, `down`, `delete`,
+  `forwarddelete`, `return`, `enter`, `tab`, `esc`); otherwise "it holds neither cmd nor ctrl, nor
+  opt with left, right, up, down, delete, forwarddelete, return, enter, tab or esc". A `typed`
+  entry with any key but `t` is still refused (`check_typed`).
+- **CU-61 — The indicator (owner: a keyboard mark plus a menu row).** While a recording's key tap
+  exists (`ScreenRecorder.recordsKeys`), its status item's title is the dot or ❚❚, then a space and
+  `⌨︎` (U+2328 with the text presentation selector) in the menu bar's own colour, then the time; its
+  menu's first row is a disabled "Recording keyboard shortcuts" and a separator, recording or
+  paused. The item's length is fixed per item for the marks it shows (`itemLength(keys:)`, the
+  widest title at 9:59:59 for either mark, plus the insets), so a recording without shortcuts keeps
+  today's length, title and menu exactly. Both constructions — the panel's and the tool's chrome —
+  pass `keys:` from `recordsKeys`. It amends the voice-over bullet's status item (spec §9 row 39).
+- **CU-62 — The grant: when it is read, asked and refused.** Input Monitoring is read by
+  `CGPreflightListenEventAccess()` and asked by `CGRequestListenEventAccess()`. **The panel** reads it
+  only when Record shortcuts is on with a screen source (the box is greyed, and `keys` is `off`,
+  for Microphone Only and Camera); a press's order is Screen Recording → Input Monitoring → Camera
+  (beside the screen) → Microphone. Its step is `screenStep`'s table (granted goes on; a shell
+  launch always asks; a launchd launch asks once, remembered in `FrameJobInputMonitoringAsked`, then
+  opens the pane). Because CU0b measured that no prompt shows and Frame Job is not listed until
+  added by hand, an ask ALSO opens System Settings at `Privacy_ListenEvent`; the note is "Input
+  Monitoring is not granted to Frame Job. Turn it on in System Settings ▸ Privacy & Security ▸
+  Input Monitoring. If Frame Job is not in its list, add it with +." plus " System Settings is open
+  at that pane." when it opened, plus `launchClause`. No "then relaunch" (CU0b: not needed). The
+  panel steps aside for System UI before asking or opening, as for Screen Recording. **The tool**:
+  `record_screen` takes `keys` (`off`, the default, or `shortcuts`; an enum so a later mode needs no
+  rename), read with the caller's own mistakes after `include_framejob_windows`, an unknown value
+  refused with the vocabulary; refused by name with `source` `voice_over` and `camera` (the
+  screen-only lists); the grant read right after the Microphone grant and before `project`,
+  refused with `inputMonitoringRefusal` (the pane sentence plus `launchClause`); never requested,
+  and System Settings never opened (decision 4). **The recorder** (`ScreenRecorder.start`) refuses a
+  `shortcuts` choice with the same sentence when the grant is absent (after the microphone's
+  grant) or when the tap cannot be made (after the cursor capture is made); it never requests or
+  opens anything. It amends CU-3 (the pane opens on the first press too).
+- **CU-63 — CU6's proof.** `cursor_keys_probe.py` (no grant, no app): B0 the build; Y1
+  `inputMonitoringStep` equals `screenStep` over all eight inputs, the pane URL ends
+  `Privacy_ListenEvent`, the refusal starts with CU-3's sentence, the notes; Y2 the status item's
+  titles with and without keys (the keyless title the old string), `menuTitles(paused:keys: true)`,
+  `itemLength(keys:)` against every keyed title at W1's times and its formula; Y6 `CursorKeyFilter`
+  over at least 40 synthetic events; Y7 `CursorSegments` fed shortcuts and typed marks into a body
+  `ReelCursor(data:)` accepts, a key between `end` and `open` dropped, `.none` writing nothing;
+  Y8 the panel under a spy (the box and its note under Show Clicks, persistence, `keys` and the
+  greying, the press order, the launchd, second and shell presses, granted, box off); Y9 both
+  status-item constructions pass `keys:` from `recordsKeys`. `cursor_keys_proof.py`: Y5 over MCP
+  (`keys` without the grant refused with CU-3's sentence, a note by name when the grant is held;
+  with `voice_over` and `camera` refused by name; `keys: "all"` the vocabulary sentence; the
+  schema's enum), and the granted tier in-process — Y3 a posted ⌘⇧F19 and five letters give one
+  `cmd+shift+f19` (code 80) and five typed marks, Y4 five letters under
+  `EnableSecureEventInput()` give no mark in that span and two after it — skipped by name without
+  Screen Recording, Input Monitoring, post access or an unlocked console; Z1 no `Frame Job: ` log
+  line. Mutants: `secure-ignored`, `typed-with-identity`, `shift-modifier`, `option-rule-dropped`,
+  `indicator-omitted`, `press-skips-input-monitoring` (`cursor_keys_probe.py --mutant`),
+  `tool-asks-input-monitoring` (`recording_probe.py`'s 10f), and the core's ⌥ arm removed by hand
+  (`cargo test --release --test cursor_file`). `FrameJobRecordingKeys` is the recorder's twelfth
+  `FrameJobRecording…` key, pinned off by the harness and `screens.py`. Person checks JOB-23 (the
+  grant from a Finder launch) and JOB-24 (a real session).

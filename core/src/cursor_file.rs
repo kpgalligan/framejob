@@ -41,12 +41,16 @@
 //!   scale_factor}]`, at least one entry, every CU-S2 candidate's inputs.
 //! - `keys`: `{shortcut {t, keys, code}, typed {t}}`. A shortcut's `keys`
 //!   is its spelled keys joined by `+` (`+` itself spelled `plus`), every
-//!   token non-empty, without whitespace, holding `cmd` or `ctrl`; `code` the
-//!   layout-independent key code. A typed key is its time and nothing else
-//!   (CU-7): no character, label or code of one can be stored.
+//!   token non-empty, without whitespace, holding `cmd` or `ctrl`, or holding
+//!   `opt` with its last token one of `OPTION_SHORTCUT_KEYS` (`left`,
+//!   `right`, `up`, `down`, `delete`, `forwarddelete`, `return`, `enter`,
+//!   `tab`, `esc`; spec §11 CU-60); `code` the layout-independent key code. A
+//!   typed key is its time and nothing else (CU-7): no character, label or
+//!   code of one can be stored.
 //!
-//! `hidden` and `dirty` stay empty until CU-S1 and CU-S3 pass; `keys` until
-//! CU6. Floats (`pixels_per_point`, `content_scale`, `scale_factor`) must be
+//! `hidden` and `dirty` stay empty until CU-S1 and CU-S3 pass. `keys` is
+//! written from CU6 on, when a recording's Record shortcuts is on (CU-60);
+//! every earlier file holds it empty. Floats (`pixels_per_point`, `content_scale`, `scale_factor`) must be
 //! finite and above 0. The caps: [`MAX_MOVES`], [`MAX_SCROLLS`] and
 //! [`MAX_DIRTY`] 1,728,000 each (4 h at 120 Hz); [`MAX_CLICKS`] 200,000;
 //! [`MAX_IMAGES`] 1,024; one PNG [`MAX_IMAGE_BYTES`] 1 MiB;
@@ -98,7 +102,10 @@
 //! - "clicks.button[i] is N; a button is 0…31"; "clicks.down[i] is N; down
 //!   is 0 or 1"; "clicks.count[i] is N; a click count is at least 1"
 //! - "geometry holds no entry; a cursor file has at least one"
-//! - "keys.shortcut.keys[i] \"…\" is not a shortcut: <why> (spec §11 CU-7)"
+//! - "keys.shortcut.keys[i] \"…\" is not a shortcut: <why> (spec §11 CU-7)",
+//!   `<why>` "a token is empty", "a token holds whitespace" or "it holds
+//!   neither cmd nor ctrl, nor opt with left, right, up, down, delete,
+//!   forwarddelete, return, enter, tab or esc" (CU-60)
 //! - `check_typed`'s "keys.typed holds a typed key's time only; \"<key>\"
 //!   is refused (spec §11 CU-7)", run by the parse before its strict read.
 //!

@@ -551,7 +551,11 @@ structural over the comment-stripped source: `CGRequestScreenCaptureAccess(`,
 `requestAccess(` and `NSWorkspace` in no `AgentServer+Recording*` or
 `ScreenRecorder*` file; `x-apple.systempreferences` only in
 `RecordingGrant.swift`; `CGRequestScreenCaptureAccess(` only in
-`+Grants.swift`.
+`+Grants.swift`. Road map "creator-jobs" CU6 (spec §11 CU-62):
+`CGRequestListenEventAccess(` joins the tool-side tokens and lives only in
+`+Grants.swift` too; its mutant `tool-asks-input-monitoring` puts the call
+in `ScreenRecorder.start`'s refusal and is caught by both reads
+(`--mutant tool-asks-input-monitoring --only grants`).
 
 Section 11 (`unreadable`, issue batch B17, #97) runs in its own process
 with `RCFFmpegImport` merged into the volatile argument domain as `never`
@@ -606,7 +610,9 @@ again resumes it. F5: both idle → nothing changes. W0 prints the widths of
 and 35 999 s, both marks, fits: ceil(width) + 2 × `titleInset` ≤
 `itemLength`. W2: `itemLength` is that formula at `widestElapsed`, whose
 label is 9:59:59. W3, structural: `show()`'s comment-stripped body holds
-`statusItem(withLength: Self.itemLength)` and the file's code never says
+`statusItem(withLength: Self.itemLength(keys: keys))` (the length for the
+item's marks since road map "creator-jobs" CU6, spec §11 CU-61; `itemLength`
+itself is `itemLength(keys: false)`) and the file's code never says
 `variableLength` — the probe never puts the item up. **Issue batch B27
 (#181 item 4)**: F6 — a counting observer of
 `ScreenRecorder.pauseDidChangeNotification` (object `ScreenRecorder.shared`)
@@ -919,7 +925,7 @@ running). Three of them put back the code before the batch:
                     F2's idle, arming and finishing rows.
   pause-route-recorder  the action's two panel arms deleted
                     (AppDelegate+Recording.swift) — 33/34: F3's pause row.
-  status-variable-length  `Self.itemLength` → `NSStatusItem.variableLength`
+  status-variable-length  `Self.itemLength(keys: keys)` → `NSStatusItem.variableLength`
                     (RecorderStatusItem.swift) — 32/34: W3's two reads.
   width-short-label     `widestElapsed` → 0 (RecorderStatusItem.swift) —
                     27/34: W1's six titles from 59:59 up, W2's label row.
@@ -1086,7 +1092,7 @@ Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1),
 screens + 4; D2 choosing it greys System
 Audio, Show Clicks and Size with their values kept, Microphone, Rate and
 Record Into live, the size note `voiceOverSizeNote`; D3 the display key
-(a sentinel) and the set of eleven `FrameJobRecording…` keys unchanged, the row
+(a sentinel) and the set of twelve `FrameJobRecording…` keys unchanged, the row
 kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
 brings the three back; D5 Microphone Off refuses with
 `microphoneOffSentence`, no screen read, no microphone request; D6 a
@@ -1101,7 +1107,8 @@ voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
 rows at Microphone Only (screens + 4 since CR1c's Camera row, whose key makes
 5d's eight, CR2a's Format popup's key its nine, and camera-recording CR3c's "Record the camera
 too" key its ten, spec §11 CAM-11; road map "audio" AP6 part 3's "Enhance the microphone
-when it lands" key its eleven, spec §11 AU-69), 7c's arguments gain `source` (and,
+when it lands" key its eleven, spec §11 AU-69; road map "creator-jobs" CU6's Record
+shortcuts key its twelve, spec §11 CU-62), 7c's arguments gain `source` (and,
 with camera-recording CR1b, spec §11 CAM-4, `camera`, and CR2a's `camera_format`; D10's vocabulary
 sentence lists `screen, voice_over, camera` since) and 7d's
 phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
@@ -3733,14 +3740,15 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
                     "topKept": abs(grown.maxY - before.maxY) < 0.5,
                     "back": abs(back.height - before.height) < 0.5,
                     "noteShown": noteShownWhileSet, "noteHiddenAfter": panel.noteLabel.isHidden]
-    // The eleven keys the harness pins are the panel's own, by name.
+    // The twelve keys the harness pins are the panel's own, by name.
     out["keys"] = [RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
                    RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
                    RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
                    RecorderPanelController.includeFrameJobWindowsKey,
                    RecorderPanelController.cameraKey, RecorderPanelController.cameraFormatKey,
                    RecorderPanelController.cameraBesideKey,
-                   RecorderPanelController.enhanceMicrophoneKey]
+                   RecorderPanelController.enhanceMicrophoneKey,
+                   RecorderPanelController.keysKey]
 
     // AccentButton stores its fill.
     let plain = AccentButton(title: "x", symbol: nil, fallback: "", tooltip: "", action: nil)
@@ -5540,7 +5548,7 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
 
 /// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
 /// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
-/// and `AgentServer.shared`'s argument reader. The eleven `FrameJobRecording…`
+/// and `AgentServer.shared`'s argument reader. The twelve `FrameJobRecording…`
 /// values are put back as they were at the end, so the probe's own defaults
 /// domain is left as it was found.
 func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
@@ -5552,7 +5560,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
         RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
-        RecorderPanelController.enhanceMicrophoneKey,
+        RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -7699,8 +7707,8 @@ def section_chrome(binary, sources):
     check("5d: … and setNote(\"\") hides it and shrinks the window back",
           rf.get("back") is True and rf.get("noteHiddenAfter") is True, f"{rf}")
     keys = answer.get("keys") or []
-    check("5d: eleven distinct FrameJobRecording… keys",
-          len(set(keys)) == 11 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
+    check("5d: twelve distinct FrameJobRecording… keys",
+          len(set(keys)) == 12 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
     harness = open(HARNESS_MAIN).read()
     # The pins are spelled as string LITERALS in the harness, not as
     # `RecorderPanelController.<key>`, so that a tree from before the recorder
@@ -7708,7 +7716,7 @@ def section_chrome(binary, sources):
     # (the phase-5 cross-build); the probe reads the constants' VALUES off the
     # app and looks for each of those strings in the harness's text.
     check("5d: the harness pins every one of them by VALUE",
-          len(keys) == 11 and all(f'"{k}"' in harness for k in keys), f"{keys}")
+          len(keys) == 12 and all(f'"{k}"' in harness for k in keys), f"{keys}")
     print("  5e — AccentButton(fill:) and RecorderStatusItem.label")
     a = answer.get("accent") or {}
     check("5e: AccentButton's default fill is DS.accent", a.get("defaultIsAccent") is True, f"{a}")
@@ -8267,8 +8275,9 @@ def section_file_pause(binary, sources):
           f"{answer.get('widestElapsed')}, {answer.get('widestLabel')!r}")
     code = read_code(sources, "RecorderStatusItem.swift") or ""
     show = "\n".join(function_body(code.splitlines(), "func show()") or [])
-    check("W3: show() puts the item up at statusItem(withLength: Self.itemLength) "
-          "(status-variable-length)", "statusItem(withLength: Self.itemLength)" in show, show)
+    check("W3: show() puts the item up at statusItem(withLength: Self.itemLength(keys: keys)) "
+          "(status-variable-length)",
+          "statusItem(withLength: Self.itemLength(keys: keys))" in show, show)
     check("W3: … and RecorderStatusItem.swift's CODE never says variableLength",
           bool(code) and "variableLength" not in code)
 
@@ -9260,7 +9269,8 @@ def section_grants(binary, sources):
                  if n.startswith("AgentServer+Recording") or n.startswith("ScreenRecorder")]
     check("10f: the tool's side has files to read", len(tool_side) >= 4, f"{tool_side}")
     codes = {name: read_code(sources, name) or "" for name in names}
-    for token in ["CGRequestScreenCaptureAccess(", "requestAccess(", "NSWorkspace"]:
+    for token in ["CGRequestScreenCaptureAccess(", "requestAccess(", "NSWorkspace",
+                  "CGRequestListenEventAccess("]:
         holders = [name for name in tool_side if token in codes[name]]
         check(f"10f: `{token}` in no AgentServer+Recording*/ScreenRecorder* file", holders == [],
               f"{holders}")
@@ -9269,6 +9279,10 @@ def section_grants(binary, sources):
           holders == ["RecordingGrant.swift"], f"{holders}")
     holders = [name for name in names if "CGRequestScreenCaptureAccess(" in codes[name]]
     check("10f: `CGRequestScreenCaptureAccess(` only in RecorderPanelController+Grants.swift",
+          holders == ["RecorderPanelController+Grants.swift"], f"{holders}")
+    holders = [name for name in names if "CGRequestListenEventAccess(" in codes[name]]
+    check("10f: `CGRequestListenEventAccess(` only in RecorderPanelController+Grants.swift "
+          "(spec §11 CU-62; tool-asks-input-monitoring)",
           holders == ["RecorderPanelController+Grants.swift"], f"{holders}")
 
 
@@ -9818,7 +9832,7 @@ def section_voiceover_doors(binary, sources):
     check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
           "FrameJobRecording… keys is unchanged — session only",
           d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
-          and len(d3.get("keysAfter") or []) == 11, f"{d3}")
+          and len(d3.get("keysAfter") or []) == 12, f"{d3}")
     check("D3: rebuildSources() + restoreChoices() keep the row",
           d3.get("kept") is True and d3.get("keptSource") is True, f"{d3}")
 
@@ -10491,7 +10505,7 @@ MUTANTS = {
         "File ▸ Pause Recording pauses the panel's own recording behind the panel's back"),
     "status-variable-length": (
         "RecorderStatusItem.swift",
-        "        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength)\n",
+        "        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength(keys: keys))\n",
         "        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)\n",
         "the status item back at variableLength — it resizes as the time and the mark change "
         "(the code before B17)"),
@@ -10701,6 +10715,13 @@ MUTANTS = {
         "        let strangers = Self.voiceOverScreenOnlyArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }\n",
         "        let strangers = [String]()\n",
         "record_screen takes the screen-only arguments with source voice_over and ignores them"),
+    # Road map "creator-jobs" CU6 (spec §11 CU-62): the recorder asks for Input Monitoring.
+    "tool-asks-input-monitoring": (
+        "ScreenRecorder.swift",
+        "        if choice.keys == .shortcuts, !RecordingGrant.inputMonitoringGranted {\n",
+        "        if choice.keys == .shortcuts, !RecordingGrant.inputMonitoringGranted {\n"
+        "            _ = CGRequestListenEventAccess()\n",
+        "the recorder (the tool's side) asks for Input Monitoring before refusing"),
 }
 
 

@@ -7,7 +7,7 @@ import Foundation
 // swift_build. Argument: a scratch folder. Prints one "ok"/"FAIL" line per
 // check, the row's name first (P1–P5), for audio_ap6c_probe.py to score.
 // The panel is `RecorderPanelController.shared`, never shown, under grant
-// doors that read and ask nothing; the eleven `FrameJobRecording…` values are
+// doors that read and ask nothing; the twelve `FrameJobRecording…` values are
 // put back as they were at the end.
 
 final class ProbeDocumentController: NSDocumentController {
@@ -28,7 +28,7 @@ let panelKeys = [
     RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
     RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
     RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
-    RecorderPanelController.enhanceMicrophoneKey,
+    RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
 ]
 let originals = panelKeys.map { UserDefaults.standard.object(forKey: $0) }
 func putBack() {

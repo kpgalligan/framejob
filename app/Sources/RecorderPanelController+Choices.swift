@@ -36,6 +36,10 @@ extension RecorderPanelController {
         choice.enhanceMicrophone = enhanceMicrophoneCheckbox.state == .on && choice.microphone != nil
         choice.systemAudio = systemAudioSwitch.state == .on
         choice.showClicks = showClicksSwitch.state == .on
+        // CU-62: shortcuts only with a screen source; off for Microphone Only and Camera.
+        choice.keys =
+            recordShortcutsCheckbox.state == .on && !voiceOverSelected && !cameraSelected
+            ? .shortcuts : .off
         choice.rate = Self.rates.contains(ratePopup.selectedTag()) ? ratePopup.selectedTag() : 60
         choice.resolution =
             RecordingResolution(rawValue: sizePopup.selectedItem?.representedObject as? String ?? "")
@@ -73,6 +77,7 @@ extension RecorderPanelController {
             includeFrameJobCheckbox.state == .on, forKey: Self.includeFrameJobWindowsKey)
         defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)
         defaults.set(enhanceMicrophoneCheckbox.state == .on, forKey: Self.enhanceMicrophoneKey)
+        defaults.set(recordShortcutsCheckbox.state == .on, forKey: Self.keysKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
     }
@@ -103,6 +108,7 @@ extension RecorderPanelController {
         cameraBesideCheckbox.state = defaults.bool(forKey: Self.cameraBesideKey) ? .on : .off
         enhanceMicrophoneCheckbox.state =
             defaults.bool(forKey: Self.enhanceMicrophoneKey) ? .on : .off
+        recordShortcutsCheckbox.state = defaults.bool(forKey: Self.keysKey) ? .on : .off
         let rate = defaults.integer(forKey: Self.rateKey)
         _ = ratePopup.selectItem(withTag: Self.rates.contains(rate) ? rate : RecordingChoice().rate)
         let size = defaults.string(forKey: Self.sizeKey) ?? ""

@@ -133,7 +133,7 @@ Sections and rows:
            and `finishTimeoutSentence(movies: [movie], camera: true)` spells 105 s with no camera
            clause.
   panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
-           `grantDoors` before `shared` exists, the eleven `FrameJobRecording…` keys put back; fake
+           `grantDoors` before `shared` exists, the twelve `FrameJobRecording…` keys put back; fake
            rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
            Source rows end Window… (1), Camera (3), Microphone Only (2), screens + 4, and the
            Camera popup is `connected()`'s `popupTitle`s (or "None connected"); P2 Camera via
@@ -141,7 +141,7 @@ Sections and rows:
            Size, Include Frame Job windows, Rate) disabled with their values kept, Camera,
            Microphone, Record Into and Source live, the size note `cameraSizeNote(nil)`; a
            display row → the five back, Camera disabled, `camera` nil; P3 session only: the
-           display key's 777 kept, the camera key `probe-camera`, eleven keys (ten before AP6 part 3, nine before CR3c), the row and camera
+           display key's 777 kept, the camera key `probe-camera`, twelve keys (eleven before CU6, ten before AP6 part 3, nine before CR3c), the row and camera
            kept through `rebuildSources()` + `restoreChoices()`; P4 `cameraStep` over four
            statuses, `cameraPaneURL`, `cameraOpenedNote(.denied)` exact; P5 the press (no camera,
            `notDetermined` and its held answer on the hidden panel, denied and restricted, the
@@ -196,7 +196,7 @@ Sections and rows:
            windows and before Camera; a display row with the box off — Camera and Format
            disabled, `camera` nil; ticked via `controlChanged` — Camera and Format live, the five
            live with their values kept, `currentChoice()` `.display` with `probe-camera` and the
-           Format popup's spelling, the size note the screen's, the key true, eleven keys; unticked
+           Format popup's spelling, the size note the screen's, the key true, twelve keys; unticked
            — the key false, `camera` nil; under Camera and under Microphone Only the box
            disabled with its state kept; `restoreChoices()` sets it from the key. P21 the press
            with the box ticked: "None connected" → the note, 0 screen and 0 camera reads;
@@ -722,8 +722,8 @@ MUTANTS = {
          "")]),
     "beside-camera-grant-skipped": (["P21"], [
         ("RecorderPanelController+Recording.swift",
-         "        guard checkScreenRecordingGrant(), !cameraBesideSelected || checkCameraGrant(),\n",
-         "        guard checkScreenRecordingGrant(),\n")]),
+         "            !cameraBesideSelected || checkCameraGrant(), checkMicrophoneGrant()\n",
+         "            checkMicrophoneGrant()\n")]),
     "beside-no-camera-unchecked": (["P21"], [
         ("RecorderPanelController+Recording.swift",
          "        if cameraBesideSelected, selectedCameraID == nil {\n"

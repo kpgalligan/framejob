@@ -38,7 +38,10 @@ extension RecorderPanelController {
             toggle.target = self
             toggle.action = #selector(controlChanged(_:))
         }
-        for box in [includeFrameJobCheckbox, cameraBesideCheckbox, enhanceMicrophoneCheckbox] {
+        for box in [
+            includeFrameJobCheckbox, cameraBesideCheckbox, enhanceMicrophoneCheckbox,
+            recordShortcutsCheckbox,
+        ] {
             box.font = DS.sans(13)
             box.target = self
             box.action = #selector(controlChanged(_:))
@@ -68,6 +71,11 @@ extension RecorderPanelController {
 
         sizeNote.font = DS.mono(11)
         sizeNote.textColor = DS.textFaint
+        // Record shortcuts' note (spec §11 CU-62): sans 11, faint, wrapping at the control column.
+        recordShortcutsNote.stringValue = Self.recordShortcutsSentence
+        recordShortcutsNote.font = DS.sans(11)
+        recordShortcutsNote.textColor = DS.textFaint
+        recordShortcutsNote.preferredMaxLayoutWidth = Self.controlWidth
 
         let grid = makeSheetGrid([
             [fieldLabel("Source:"), sourcePopup],
@@ -80,6 +88,8 @@ extension RecorderPanelController {
             [NSGridCell.emptyContentView, enhanceMicrophoneCheckbox],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
+            [NSGridCell.emptyContentView, recordShortcutsCheckbox],
+            [NSGridCell.emptyContentView, recordShortcutsNote],
             [fieldLabel("Rate:"), ratePopup],
             [fieldLabel("Size:"), sizePopup],
             [NSGridCell.emptyContentView, sizeNote],

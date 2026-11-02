@@ -3406,8 +3406,8 @@ free.
 **Recording.**
 - `RecordingSetup.swift` (+`Camera`) · `RecordingGrant.swift` · `RecordingResult.swift` — the
   half a probe can call: choices, file naming, `RecordingConfiguration.make` (PURE), the result
-  types; `RecordingGrant.swift` the grant reads, the step a press takes and the pane URLs (a
-  pure move out of `RecordingSetup.swift`, road map creator-jobs CU0a's U1; the one file a
+  types; `RecordingGrant.swift` the grant reads, the step a press takes and the pane URLs,
+  Input Monitoring's among them (CU-62) (a pure move out of `RecordingSetup.swift`, road map creator-jobs CU0a's U1; the one file a
   System Settings URL is spelled in); nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Started` — `captureStarted` and `failStart`, a pure move, CU0a's
   U2 —, +`Stop`, +`Pause`, +`Delegates`, +`Microphone`,
@@ -3475,7 +3475,11 @@ free.
   `CursorCapture` (a 120 Hz `DispatchSourceTimer` on its own
   `.userInteractive` queue polling `CGEvent(source: nil)?.location`, NSEvent
   global and local monitors for clicks and scrolls added and removed on main,
-  an event's time `cgEvent.timestamp / 1e9`); `+Cursor` the header and
+  an event's time `cgEvent.timestamp / 1e9`). **Shortcuts** (CU6, spec §11
+  CU-60…CU-62): `CursorKeyFilter.swift` (PURE, CU-60's rule and spelling) and
+  `CursorCapture+Keys.swift` (`CursorKeyTap`, a listen-only session tap for
+  key-downs made at `ScreenRecorder.start` when `choice.keys` is `shortcuts`,
+  enabled with the poll; a typed key's character is never read). `+Cursor` the header and
   opening geometry (`cursorStart`), `startCursorCapture` from `launchScreen`
   before `startCapture`, and the walker's `saveCursor` after the camera's
   step: the buffer closed with the movie's size and E1 (`Segment.screenHost`,

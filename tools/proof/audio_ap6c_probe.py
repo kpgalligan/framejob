@@ -4,7 +4,7 @@ spec §11 AU-68, AU-69).
 `audio_ap6c_probe.swift` compiled with app/Sources through swift_build, with
 `app/Resources/Models` copied beside the binary (speech_cache_probe.py's copy),
 over `RecorderPanelController.shared` never shown, under grant doors that read
-and ask nothing, the eleven `FrameJobRecording…` values put back at the end:
+and ask nothing, the twelve `FrameJobRecording…` values put back at the end:
 
   P1  the panel's box: its title and key, its row directly under Microphone
       with no label, its tooltip naming the step; an absent key restores off;

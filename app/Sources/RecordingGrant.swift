@@ -156,4 +156,42 @@ enum RecordingGrant {
             + "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then relaunch."
             + paneOpenedSentence + launchClause
     }
+
+    // MARK: Input Monitoring (road map creator-jobs CU6, spec §11 CU-3, CU-62)
+
+    /// `CGPreflightListenEventAccess()` — whether this process may listen to key-downs (CU-S1
+    /// `grant_api=cg`). A shell launch reads the terminal's grant, as Screen Recording does.
+    static var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
+
+    /// CU-3's sentence: no "then relaunch" (CU0b measured none is needed).
+    static let inputMonitoringPaneSentence =
+        "Input Monitoring is not granted to Frame Job. Turn it on in System Settings ▸ "
+        + "Privacy & Security ▸ Input Monitoring."
+
+    /// `record_screen`'s and the recorder's refusal: the pane sentence, then `launchClause`.
+    static var inputMonitoringRefusal: String { inputMonitoringPaneSentence + launchClause }
+
+    /// What the panel's note adds: no prompt shows and Frame Job is not listed until a person
+    /// adds it (CU0b, the owner's JOB-29 run).
+    static let inputMonitoringAddSentence = " If Frame Job is not in its list, add it with +."
+
+    /// The panel's note after a press: the pane sentence, the add sentence, the opened sentence
+    /// when System Settings opened, then `launchClause`.
+    static func inputMonitoringNote(opened: Bool) -> String {
+        inputMonitoringPaneSentence + inputMonitoringAddSentence
+            + (opened ? paneOpenedSentence : "") + launchClause
+    }
+
+    /// Input Monitoring: `screenStep`'s table — granted goes on; a shell launch always asks; a
+    /// launchd-owned press that has asked before opens the pane; else ask (CU-62).
+    static func inputMonitoringStep(granted: Bool, asked: Bool, launchedByLaunchd: Bool) -> Step {
+        if granted { return .proceed }
+        if !launchedByLaunchd { return .ask }
+        if asked { return .openPane }
+        return .ask
+    }
+
+    /// System Settings ▸ Privacy & Security ▸ Input Monitoring.
+    static let inputMonitoringPaneURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
 }

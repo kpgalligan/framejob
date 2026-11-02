@@ -114,12 +114,13 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all eleven on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all twelve on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
 /// session only (the camera itself is remembered, the row is not). "Record
-/// the camera too" (CAM-11) is remembered across launches.
+/// the camera too" (CAM-11) is remembered across launches, and so is Record
+/// shortcuts (road map creator-jobs CU6, spec §11 CU-62), off by default.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -138,6 +139,8 @@ final class RecorderPanelController: NSWindowController {
     static let cameraBesideKey = "FrameJobRecordingCameraBeside"
     /// "Enhance the microphone when it lands" (spec §11 AU-69); an absent key reads as off.
     static let enhanceMicrophoneKey = "FrameJobRecordingEnhanceMicrophone"
+    /// Record shortcuts (spec §11 CU-62); an absent key reads as off.
+    static let keysKey = "FrameJobRecordingKeys"
 
     // MARK: - Metrics and vocabulary
 
@@ -150,6 +153,11 @@ final class RecorderPanelController: NSWindowController {
     static let windowTag = 1
     static let countdownSeconds = 3
     static let rates = [30, 60]
+    /// The note under Record shortcuts (spec §11 CU-60, CU-62).
+    static let recordShortcutsSentence =
+        "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete, Return, Tab "
+        + "or Esc, and when you type, never what you type. Nothing is recorded while an app "
+        + "holds secure input."
 
     /// Where the panel is in a recording's life. `syncPhase()` draws it.
     enum Phase: Equatable {
@@ -183,6 +191,9 @@ final class RecorderPanelController: NSWindowController {
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
     let showClicksSwitch = NSSwitch()
+    let recordShortcutsCheckbox = NSButton(
+        checkboxWithTitle: "Record shortcuts", target: nil, action: nil)
+    let recordShortcutsNote = NSTextField(wrappingLabelWithString: "")
     let ratePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let sizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let sizeNote = NSTextField(labelWithString: "")

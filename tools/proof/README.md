@@ -28496,3 +28496,53 @@ python3 tools/proof/transcript_cut_proof.py --mutant pause-no-extend
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s TX3b record.
+
+## Road map "creator-jobs" CU6 — record shortcuts (`cursor_keys_probe.py` B0, Y1, Y2, Y6–Y9; six mutants; `cursor_keys_proof.py` Y5, Y3, Y4, Z1; `recording_probe.py`'s 10f and `tool-asks-input-monitoring`; the core's ⌥ arm; spec §11 CU-60…CU-63)
+
+**Ungranted.** `cursor_keys_probe.py` builds `cursor_keys_probe.swift` from `app/Sources` (no app,
+no grant, no prompt) on `cursor_capture_probe.py`'s shape and exit rule R; Y9 and the order half
+of Y8 are read from the sources by the script itself. The panel is `RecorderPanelController.shared`,
+never shown, under a spy's grant doors, and the twelve `FrameJobRecording…` values and
+`FrameJobInputMonitoringAsked` are put back as they were.
+
+| Row | What it holds |
+|---|---|
+| Y1 | `inputMonitoringStep` equals `screenStep` over all eight inputs; the pane URL ends `Privacy_ListenEvent`; the refusal is CU-3's sentence plus `launchClause`, with no "relaunch"; `inputMonitoringNote(opened:)` with and without the opened sentence |
+| Y2 | the status item's titles with and without `⌨︎` (the keyless one the old title, the glyph in no colour of its own), `menuTitles(paused:keys: true)`, `itemLength(keys:)` against every keyed title at W1's seven times and its formula, `itemLength` the keyless one |
+| Y6 | `CursorKeyFilter` over 74 synthetic key-downs (37, each again with `secure: true`): the shortcuts spelled, ⌥ with the ten keys, `plus` and `key<code>`; ⇧A, ⌥E, bare letters, Return, F5 alone and three auto-repeats typed; `isShortcut` only for the shortcuts; the flags' four modifiers; `keyEvent(from:)` on a real key-down, its character nil |
+| Y7 | `CursorSegments` fed through the filter: segment 0's body accepted by `ReelCursor(data:)` with exactly two shortcuts (⌥← among them) and three typed marks holding `t` alone; the secure key, `.none` and two keys between `end` and `open` wrote nothing |
+| Y8 | the box "Record shortcuts" off by default and its 11 pt note in the grid rows directly under Show Clicks; `keys` follows the box, persisted and restored under `FrameJobRecordingKeys`; `.off` and greyed (value kept) for Microphone Only and Camera; presses — granted reads Screen Recording → Input Monitoring → Microphone and counts down, a launchd first press asks once, remembers, opens `Privacy_ListenEvent` with `inputMonitoringNote(opened: true)`, the second asks no more, a shell asks every press and never remembers, no Screen Recording never reads Input Monitoring, the box off never reads it; `beginIfGranted`'s guard in the order Screen Recording, Input Monitoring, Camera, Microphone |
+| Y9 | both `RecorderStatusItem` constructions pass `keys: recorder.recordsKeys`, and `ScreenRecorder.recordsKeys` is the session capture's |
+
+Mutants (each exits 1): `secure-ignored`, `shift-modifier`, `option-rule-dropped` (Y6);
+`typed-with-identity` (Y6, and Y7 through the core's refusal); `indicator-omitted` (Y2);
+`press-skips-input-monitoring` (Y8). `recording_probe.py`'s 10f reads `CGRequestListenEventAccess(`
+among the tool-side tokens and in `RecorderPanelController+Grants.swift` alone; its
+`tool-asks-input-monitoring` puts the call in `ScreenRecorder.start` (`--only grants`). The core's ⌥
+arm removed (`if !command && !option` with the option arm false) fails
+`cargo test --release --test cursor_file`, by hand.
+
+**Over MCP and granted.** `cursor_keys_proof.py` launches the app (`proof_app.binary()`,
+`RC_PROOF_APP`, or `--app`) for Y5 and Z1, and builds `cursor_keys_proof.swift` for Y3 and Y4,
+which record the main display in-process with `keys` `shortcuts` and POST keys into the probe's own
+key window (never while another application is active). Y3 and Y4 are skipped by name without
+Screen Recording, Input Monitoring or post access for the terminal's process, on a locked console,
+or when the probe cannot be the active application.
+
+| Row | What it holds |
+|---|---|
+| Y5 | `record_screen` refusals: `keys: "shortcuts"` with a `project` naming nothing refused with CU-3's sentence (the grant read before `project`; when the project's sentence answers, the app holding the grant, a printed note by name and Y5 still scored on the rest); `keys` with `voice_over` and with `camera` refused by name; `keys: "all"` the vocabulary sentence; the schema's `enum` ["off", "shortcuts"] |
+| Y3 | a posted ⌘⇧F19 and five letters: one `cmd+shift+f19` code 80 and five typed marks in that span |
+| Y4 | five letters under `EnableSecureEventInput()`: no mark in that span, two after it |
+| Z1 | the launch's log holds no `Frame Job: ` line |
+
+```sh
+make rust
+python3 tools/proof/cursor_keys_probe.py [--only Y6,Y8]
+python3 tools/proof/cursor_keys_probe.py --mutant <name>
+python3 tools/proof/recording_probe.py --mutant tool-asks-input-monitoring --only grants
+make app && RC_PROOF_APP=release python3 tools/proof/cursor_keys_proof.py [--only Y5,Z1]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU6 record. JOB-23 and JOB-24 are the person
+checks.

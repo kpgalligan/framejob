@@ -12,7 +12,8 @@ import CoreMedia
 /// The seed: a segment opened is fed the last polled point as a move at its open, before its
 /// anchor, so the buffer keeps it at t 0 and a segment opened after the pointer stopped still
 /// has its position. Its opening geometry is the last one fed, else the start's. A segment
-/// `end`ed is fed nothing more and keeps its samples until `close`.
+/// `end`ed is fed nothing more and keeps its samples until `close`; a key fed between a pause's
+/// `end` and the resume's `open` is dropped (spec §11 CU-60).
 struct CursorSegments {
     /// The segment samples go to; nil between a pause's `end` and the resume's `open`.
     private(set) var current: Int?
@@ -53,6 +54,20 @@ struct CursorSegments {
         buffers[current]?.scroll(dx: dx, dy: dy, at: point, host: host)
     }
 
+    /// A key-down's entry (`CursorKeyFilter`, spec §11 CU-60): a shortcut with its spelled keys
+    /// and code, or a typed mark with its time alone; `.none` writes nothing.
+    mutating func key(_ entry: CursorKeyEntry, host: Double) {
+        guard let current else { return }
+        switch entry {
+        case .shortcut(let keys, let code):
+            buffers[current]?.shortcut(keys: keys, keyCode: code, host: host)
+        case .typed:
+            buffers[current]?.typed(host: host)
+        case .none:
+            break
+        }
+    }
+
     /// The frames' geometry at `host`, remembered for the next segment's open.
     mutating func geometry(_ geometry: CursorGeometry, host: Double) {
         lastGeometry = geometry
@@ -78,7 +93,9 @@ struct CursorSegments {
 /// no grant (CU-S1, the owner's `clicks=monitor`). Monitors are added and removed on MAIN; the
 /// segments are touched on `queue` ALONE. An event's time is its `cgEvent.timestamp` in host
 /// seconds (`event_clock=ns`), else its arrival. No image sampler, hidden spans or dirty boxes
-/// (CU-6); keys are CU6's.
+/// (CU-6). Keys (road map creator-jobs CU6, spec §11 CU-60) come from `keyTap`, a listen-only
+/// session tap made by `makeKeyTap()` (`CursorCapture+Keys.swift`) only when the recording's
+/// Record shortcuts is on; `start` enables it and `stop` and `deinit` invalidate it.
 final class CursorCapture {
     /// 120 Hz (CU-S1 `positions=poll`; the core's `POLL_US` is its µs).
     static let pollInterval: Double = 1.0 / 120
@@ -90,6 +107,10 @@ final class CursorCapture {
     /// Main only.
     private var timer: DispatchSourceTimer?
     private var monitors: [Any] = []
+    /// Main only. The key tap, made by `makeKeyTap()`; nil when shortcuts are not recorded.
+    var keyTap: CursorKeyTap?
+    /// Main only. Whether this capture records keys (CU-61's indicator reads it).
+    var recordsKeys: Bool { keyTap != nil }
 
     /// `position` is the poll's source, `CGEvent(source: nil)?.location` (global points, top
     /// left) unless a probe passes its own.
@@ -100,12 +121,14 @@ final class CursorCapture {
     deinit {
         timer?.cancel()
         monitors.forEach { NSEvent.removeMonitor($0) }
+        keyTap?.invalidate()
     }
 
     /// The host clock's now, in seconds: the frames' PTS and E1 are on it (CR0).
     static func hostNow() -> Double { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
 
-    /// MAIN. The poll and the monitors; a second call does nothing.
+    /// MAIN. The poll, the monitors and the key tap when there is one; a second call does
+    /// nothing.
     func start() {
         guard timer == nil else { return }
         let poll = DispatchSource.makeTimerSource(queue: queue)
@@ -136,14 +159,17 @@ final class CursorCapture {
         {
             monitors.append(local)
         }
+        keyTap?.enable()
     }
 
-    /// MAIN. The poll and the monitors gone; the segments are kept for their close.
+    /// MAIN. The poll, the monitors and the key tap gone; the segments are kept for their close.
+    /// `keyTap` stays set (invalidated), so `recordsKeys` still answers for the item.
     func stop() {
         timer?.cancel()
         timer = nil
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors = []
+        keyTap?.invalidate()
     }
 
     /// MAIN. Segment `index` opens now, onto `queue`.
@@ -168,6 +194,11 @@ final class CursorCapture {
         then: @escaping (Data?) -> Void
     ) {
         queue.async { then(self.segments.close(index, movieSize: movieSize, anchor: anchor)) }
+    }
+
+    /// MAIN, from the key tap: an entry at `host` onto `queue` (spec §11 CU-60).
+    func record(_ entry: CursorKeyEntry, host: Double) {
+        queue.async { self.segments.key(entry, host: host) }
     }
 
     /// Every segment let go, onto `queue`.
@@ -218,7 +249,7 @@ final class CursorCapture {
     }
 
     /// `event_clock=ns`: the timestamp's nanoseconds as host seconds; the arrival without one.
-    private static func host(of event: CGEvent, _ arrival: Double) -> Double {
+    static func host(of event: CGEvent, _ arrival: Double) -> Double {
         event.timestamp > 0 ? Double(event.timestamp) / 1e9 : arrival
     }
 }

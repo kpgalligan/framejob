@@ -129,8 +129,8 @@ extension RecorderPanelController {
             setNote(CameraDevices.noCameraSentence)
             return
         }
-        guard checkScreenRecordingGrant(), !cameraBesideSelected || checkCameraGrant(),
-            checkMicrophoneGrant()
+        guard checkScreenRecordingGrant(), checkInputMonitoringGrant(),
+            !cameraBesideSelected || checkCameraGrant(), checkMicrophoneGrant()
         else { return }
         setNote("")
         beginCountdown()
@@ -299,6 +299,7 @@ extension RecorderPanelController {
         resumeProblem = nil
         setNote("")
         let item = RecorderStatusItem(
+            keys: recorder.recordsKeys,
             onPause: { [weak self] in self?.pauseRecording() },
             onResume: { [weak self] in self?.resumeRecording() },
             onStop: { [weak self] in self?.stopRecording() })

@@ -1,16 +1,22 @@
 import AVFoundation
 import AppKit
 
-/// The nine calls a press of Record makes about the three grants, as values
-/// a probe can replace: the reads, the three system prompts, the remembered
-/// "asked" flag and the one opener of System Settings. `live` is the app's;
+/// The calls a press of Record makes about the four grants, as values a
+/// probe can replace: the reads, the four system prompts, the two remembered
+/// "asked" flags and the one opener of System Settings. `live` is the app's;
 /// `tools/proof/recording_probe.py` puts a sealed spy in
 /// `RecorderPanelController.grantDoors` before any mode runs, so no probe
-/// can prompt, open Settings or touch the key.
+/// can prompt, open Settings or touch the key. Input Monitoring's four
+/// (road map creator-jobs CU6, spec §11 CU-62) come last and default INERT —
+/// never granted, never asking, never remembering — so a probe that fills
+/// only the first ten compiles unchanged and can never prompt.
 struct RecorderGrantDoors {
     /// Whether the panel has put up the Screen Recording prompt once
     /// (spec §11 recording). Written only by a launchd-owned press.
     static let screenRecordingAskedKey = "FrameJobScreenRecordingAsked"
+    /// Whether the panel has asked for Input Monitoring once (spec §11 CU-3,
+    /// CU-62). Written only by a launchd-owned press.
+    static let inputMonitoringAskedKey = "FrameJobInputMonitoringAsked"
 
     var screenGranted: () -> Bool
     var launchedByLaunchd: () -> Bool
@@ -23,6 +29,11 @@ struct RecorderGrantDoors {
     /// The Camera grant (CR1c, spec §11 CAM-5), asked only for Source Camera.
     var cameraStatus: () -> AVAuthorizationStatus
     var requestCamera: (@escaping () -> Void) -> Void
+    /// Input Monitoring (CU-62), read only with Record shortcuts on.
+    var inputMonitoringGranted: () -> Bool = { false }
+    var requestInputMonitoring: () -> Void = {}
+    var inputMonitoringAsked: () -> Bool = { false }
+    var rememberInputMonitoringAsked: () -> Void = {}
 
     static var live: RecorderGrantDoors {
         RecorderGrantDoors(
@@ -46,6 +57,12 @@ struct RecorderGrantDoors {
                 AVCaptureDevice.requestAccess(for: .video) { _ in
                     DispatchQueue.main.async { answered() }
                 }
+            },
+            inputMonitoringGranted: { RecordingGrant.inputMonitoringGranted },
+            requestInputMonitoring: { _ = CGRequestListenEventAccess() },
+            inputMonitoringAsked: { UserDefaults.standard.bool(forKey: inputMonitoringAskedKey) },
+            rememberInputMonitoringAsked: {
+                UserDefaults.standard.set(true, forKey: inputMonitoringAskedKey)
             })
     }
 }
@@ -83,7 +100,14 @@ struct RecorderGrantDoors {
 /// CAM-5) is the third, read only for Source Camera, whose press never reads
 /// Screen Recording: the microphone's steps, through its own pane
 /// (`Privacy_Camera`), and its prompt's answer RE-READS the grant before the
-/// microphone and the countdown, so a refused prompt stops there.
+/// microphone and the countdown, so a refused prompt stops there. **Input
+/// Monitoring** (road map creator-jobs CU6, spec §11 CU-3, CU-62) is the
+/// fourth, read only when Record shortcuts is on with a screen source, after
+/// Screen Recording and before the Camera and the Microphone. Its step is
+/// Screen Recording's table, remembered in `FrameJobInputMonitoringAsked`;
+/// because no prompt shows and Frame Job is not listed until a person adds
+/// it (CU0b), an ask ALSO opens the Input Monitoring pane, and the note says
+/// to add Frame Job with + (`inputMonitoringNote(opened:)`).
 extension RecorderPanelController {
     /// The doors every grant call goes through; a probe replaces it.
     static var grantDoors = RecorderGrantDoors.live
@@ -120,6 +144,35 @@ extension RecorderPanelController {
             let opened = RecordingGrant.screenRecordingPaneURL.map(doors.openSettings) ?? false
             setNote(
                 opened ? RecordingGrant.screenRecordingOpenedNote : RecordingGrant.screenRecordingRefusal)
+            return false
+        }
+    }
+
+    /// Input Monitoring, for a press (CU-62): true to go on — Record shortcuts
+    /// off (it is `.off` for a voice-over and a camera) or granted; false with
+    /// the note set, and the press ends. `inputMonitoringStep` decides.
+    func checkInputMonitoringGrant() -> Bool {
+        guard currentChoice().keys == .shortcuts else { return true }
+        floatAgain()
+        let doors = Self.grantDoors
+        let owned = doors.launchedByLaunchd()
+        let step = RecordingGrant.inputMonitoringStep(
+            granted: doors.inputMonitoringGranted(), asked: doors.inputMonitoringAsked(),
+            launchedByLaunchd: owned)
+        switch step {
+        case .proceed:
+            return true
+        case .ask:
+            if owned { doors.rememberInputMonitoringAsked() }
+            stepAsideForSystemUI()
+            doors.requestInputMonitoring()
+            let opened = RecordingGrant.inputMonitoringPaneURL.map(doors.openSettings) ?? false
+            setNote(RecordingGrant.inputMonitoringNote(opened: opened))
+            return false
+        case .openPane:
+            stepAsideForSystemUI()
+            let opened = RecordingGrant.inputMonitoringPaneURL.map(doors.openSettings) ?? false
+            setNote(RecordingGrant.inputMonitoringNote(opened: opened))
             return false
         }
     }

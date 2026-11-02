@@ -44,20 +44,22 @@ extension RecorderPanelController {
     /// not for a voice-over or a camera, which film nothing on screen.
     static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver && source != .camera }
 
-    /// Every control unlocked only while idle; the four screen-only ones
-    /// (Include Frame Job windows among them, set only here) greyed besides
+    /// Every control unlocked only while idle; the five screen-only ones
+    /// (Include Frame Job windows among them, set only here, and Record
+    /// shortcuts, spec §11 CU-62) greyed besides
     /// while Microphone Only is chosen, their values kept; then the camera's
     /// locks (`syncCameraControls`), last.
     func syncControlsEnabled() {
         let idle = phase == .idle
         let controls: [NSControl] = [
             sourcePopup, microphonePopup, ratePopup, sizePopup, destinationPopup,
-            systemAudioSwitch, showClicksSwitch,
+            systemAudioSwitch, showClicksSwitch, recordShortcutsCheckbox,
         ]
         for control in controls { control.isEnabled = idle }
         let screenOnly = idle && !voiceOverSelected
         let screenControls: [NSControl] = [
             systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox,
+            recordShortcutsCheckbox,
         ]
         for control in screenControls {
             control.isEnabled = screenOnly

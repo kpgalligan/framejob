@@ -69,21 +69,44 @@ import AppKit
 /// glyph takes NO colour of its own — the coral dot means "capturing", and
 /// a paused recording is not — so it is drawn in whatever the menu bar
 /// draws its text in, light or dark.
+///
+/// **While shortcuts record** (road map creator-jobs CU6, spec §11 CU-61; the
+/// owner: a keyboard mark plus a menu row) — `keys`, from the recorder's
+/// `recordsKeys` at construction — the title carries `keysGlyph` after the
+/// dot or the pause glyph, in the menu bar's own colour, and the menu's first
+/// row is a disabled `keysRow` and a separator, paused or not. The length is
+/// fixed per item for the marks it shows (`itemLength(keys:)`), so an item
+/// without shortcuts keeps the one length, title and menu it always had.
 final class RecorderStatusItem: NSObject {
     /// Two heavy vertical bars (U+275A). The panel's footnote spells a pause
     /// with the same glyph, from here, so the two never drift apart.
     static let pauseGlyph = "❚❚"
+    /// The keyboard (U+2328) with the text presentation selector, so the menu bar draws it in
+    /// its own ink and never as an emoji (CU-61).
+    static let keysGlyph = "⌨\u{FE0E}"
+    /// The menu's first, disabled row while shortcuts record (CU-61).
+    static let keysRow = "Recording keyboard shortcuts"
     /// The longest time the item is sized for (the type doc).
     static let widestElapsed: TimeInterval = 35_999
     /// Room each side of the title inside the item.
     static let titleInset: CGFloat = 6
     /// The item's one length: the wider of the two marks' titles at
     /// `widestElapsed`, rounded up, plus the insets (the type doc).
-    static let itemLength: CGFloat = [false, true].map { paused in
-        ceil(RecorderStatusItem.title(elapsed: widestElapsed, paused: paused).size().width)
-            + 2 * titleInset
-    }.reduce(0, max)
+    static let itemLength: CGFloat = RecorderStatusItem.itemLength(keys: false)
 
+    /// The length for an item that shows the keyboard mark or not: the wider of the two marks'
+    /// titles at `widestElapsed`, rounded up, plus the insets (CU-61).
+    static func itemLength(keys: Bool) -> CGFloat {
+        [false, true].map { paused in
+            ceil(
+                RecorderStatusItem.title(elapsed: widestElapsed, paused: paused, keys: keys)
+                    .size().width)
+                + 2 * titleInset
+        }.reduce(0, max)
+    }
+
+    /// Whether this item shows the keyboard mark and row: the recording records shortcuts.
+    let keys: Bool
     private let onPause: () -> Void
     private let onResume: () -> Void
     private let onStop: () -> Void
@@ -96,9 +119,10 @@ final class RecorderStatusItem: NSObject {
     private var frozen = false
 
     init(
-        onPause: @escaping () -> Void, onResume: @escaping () -> Void,
+        keys: Bool = false, onPause: @escaping () -> Void, onResume: @escaping () -> Void,
         onStop: @escaping () -> Void
     ) {
+        self.keys = keys
         self.onPause = onPause
         self.onResume = onResume
         self.onStop = onStop
@@ -116,10 +140,10 @@ final class RecorderStatusItem: NSObject {
     var isShowing: Bool { item != nil }
 
     /// Puts the item up, at 0:00 with the RECORDING menu and its one fixed
-    /// length. A second call while showing is a no-op.
+    /// length for its marks. A second call while showing is a no-op.
     func show() {
         guard item == nil else { return }
-        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength)
+        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength(keys: keys))
         item.menu = NSMenu(title: "Recording")
         self.item = item
         menuShowsPaused = false
@@ -137,7 +161,7 @@ final class RecorderStatusItem: NSObject {
     func update(elapsed: TimeInterval, paused: Bool) {
         guard let item else { return }
         let paused = frozen ? menuShowsPaused : paused
-        item.button?.attributedTitle = Self.title(elapsed: elapsed, paused: paused)
+        item.button?.attributedTitle = Self.title(elapsed: elapsed, paused: paused, keys: keys)
         guard paused != menuShowsPaused else { return }
         menuShowsPaused = paused
         rebuildMenu(paused: paused)
@@ -167,10 +191,17 @@ final class RecorderStatusItem: NSObject {
     }
 
     /// The rows of the menu the item already has, replaced in place: the
-    /// first is Pause or Resume by `paused`, the second is always Stop.
+    /// first is Pause or Resume by `paused`, the second is always Stop; while
+    /// shortcuts record, a disabled `keysRow` and a separator come first.
     private func rebuildMenu(paused: Bool) {
         guard let menu = item?.menu else { return }
         menu.removeAllItems()
+        if keys {
+            let row = NSMenuItem(title: Self.keysRow, action: nil, keyEquivalent: "")
+            row.isEnabled = false
+            menu.addItem(row)
+            menu.addItem(.separator())
+        }
         let actions = [
             paused ? #selector(resumeClicked(_:)) : #selector(pauseClicked(_:)),
             #selector(stopClicked(_:)),
@@ -196,9 +227,10 @@ final class RecorderStatusItem: NSObject {
 
     // MARK: - The vocabulary, pure
 
-    /// The two rows, in order. Pure, so a probe can pin both menus.
-    static func menuTitles(paused: Bool) -> [String] {
-        [paused ? "Resume Recording" : "Pause Recording", "Stop Recording"]
+    /// The rows, in order, the separator aside: `keysRow` first while shortcuts record. Pure, so
+    /// a probe can pin every menu.
+    static func menuTitles(paused: Bool, keys: Bool = false) -> [String] {
+        (keys ? [keysRow] : []) + [paused ? "Resume Recording" : "Pause Recording", "Stop Recording"]
     }
 
     /// The button's tooltip, which says which of the two states the item
@@ -218,13 +250,21 @@ final class RecorderStatusItem: NSObject {
     }
 
     /// The dot in `DS.meterClip` while recording, or the pause glyph in the
-    /// menu bar's own colour while paused (the type doc), then the time in
-    /// the menu bar's own face with monospaced digits.
-    static func title(elapsed: TimeInterval, paused: Bool) -> NSAttributedString {
+    /// menu bar's own colour while paused (the type doc), then, while
+    /// shortcuts record, a space and `keysGlyph` in the menu bar's own colour,
+    /// then the time in the menu bar's own face with monospaced digits.
+    static func title(elapsed: TimeInterval, paused: Bool, keys: Bool = false)
+        -> NSAttributedString
+    {
         let size = NSFont.systemFontSize
         var mark: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: size)]
         if !paused { mark[.foregroundColor] = DS.meterClip }
         let title = NSMutableAttributedString(string: paused ? pauseGlyph : "●", attributes: mark)
+        if keys {
+            title.append(
+                NSAttributedString(
+                    string: " " + keysGlyph, attributes: [.font: NSFont.systemFont(ofSize: size)]))
+        }
         title.append(
             NSAttributedString(
                 string: " " + label(for: elapsed),

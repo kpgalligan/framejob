@@ -74,6 +74,15 @@ enum RecordingDestination: Equatable {
     case document(recipeKey: Int)
 }
 
+/// Which keys a screen recording writes into its cursor files (road map creator-jobs CU6,
+/// spec §11 CU-60, CU-62): none, or each shortcut spelled and a time-only mark for every other
+/// key-down, under Input Monitoring. An enum so a later mode needs no rename; `record_screen`'s
+/// `keys` spells it.
+enum RecordingKeys: String, CaseIterable {
+    case off
+    case shortcuts
+}
+
 /// Every control of the recorder panel and every argument of
 /// `record_screen`, as one value. `microphone` is an
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60 (a camera
@@ -96,6 +105,8 @@ struct RecordingChoice: Equatable {
     var cameraFormat: String? = nil
     /// Enhance Voice on the voice's clips after the landing; only with a microphone (AU-68, AU-69).
     var enhanceMicrophone: Bool = false
+    /// Record shortcuts (spec §11 CU-62): only with a display, window or picked source.
+    var keys: RecordingKeys = .off
 }
 
 // MARK: - Where the files go

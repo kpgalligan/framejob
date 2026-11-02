@@ -303,9 +303,15 @@ fn a_typed_key_is_its_time_only() {
 
 #[test]
 fn a_shortcut_holds_cmd_or_ctrl_and_clean_tokens() {
+    const NEITHER: &str = "it holds neither cmd nor ctrl, nor opt with left, right, up, down, \
+                           delete, forwarddelete, return, enter, tab or esc";
     for (keys, why) in [
-        ("shift+k", "it holds neither cmd nor ctrl"),
-        ("k", "it holds neither cmd nor ctrl"),
+        ("shift+k", NEITHER),
+        ("k", NEITHER),
+        ("opt+e", NEITHER),
+        ("left+opt", NEITHER),
+        ("opt+shift+e", NEITHER),
+        ("left", NEITHER),
         ("cmd+", "a token is empty"),
         ("", "a token is empty"),
         ("cmd++k", "a token is empty"),
@@ -318,6 +324,26 @@ fn a_shortcut_holds_cmd_or_ctrl_and_clean_tokens() {
             refused(&v),
             format!("keys.shortcut.keys[0] \"{keys}\" is not a shortcut: {why} (spec §11 CU-7)")
         );
+    }
+    // CU-60: ⌥ with an arrow, Delete, Forward Delete, Return, Enter, Tab or Esc is a
+    // shortcut, its key the last token; cmd or ctrl still make one with any key.
+    for keys in [
+        "opt+left",
+        "opt+shift+tab",
+        "cmd+opt+e",
+        "opt+right",
+        "opt+up",
+        "opt+down",
+        "opt+delete",
+        "opt+forwarddelete",
+        "opt+return",
+        "opt+enter",
+        "opt+esc",
+        "ctrl+opt+k",
+    ] {
+        let mut v = minimal();
+        v["keys"]["shortcut"] = json!({"t": [5], "keys": [keys], "code": [1]});
+        assert_eq!(open(&v), Ok(()), "{keys}");
     }
 }
 

@@ -245,6 +245,8 @@ the rest):
   **Settled at CU0b** (2026-11-02, the owner's JOB-29 run): `grant_api=cg` (the CoreGraphics
   pair), no prompt shown, not listed until added by hand (the panel's note says "Add Frame Job
   with +", CU6), relaunch not needed (so the refusal never gains "then relaunch Frame Job.").
+  **Amended by CU-60** (CU6's decisions, `creator-jobs-6.md`): CU-62 opens `Privacy_ListenEvent`
+  on the first press too, beside the ask, because no prompt shows and the app is not listed.
 - **CU-4 — The cursor is part of its clip's layer, not a clip of its own.** The layer stage
   composites the sprite and its ripples over the source texel inside `layerSample`
   (`Compositor.metal:800`), before `gradeSample`, so crop, placement, grade, filters, spotlight,
@@ -282,7 +284,9 @@ the rest):
   holds secure input (`IsSecureEventInputEnabled()`); a password field that does not turn secure
   input on (a Terminal `sudo` prompt without Secure Keyboard Entry) is recorded as time-only marks.
   No "all keys" mode (it would put typed text, passwords included, into the project). The status
-  item shows a mark while shortcuts record (CU-61).
+  item shows a mark while shortcuts record (CU-61). **Amended by CU-60** (owner, 2026-11-01): a
+  key-down with ⌥ held and the key ←, →, ↓, ↑, Delete, Forward Delete, Return, Enter, Tab or Esc
+  is a shortcut too; ⇧ alone, and ⌥ with any other key, never makes one.
 - **CU-8 — No recorder's code is carried over.** Cap is AGPL-3.0 (the Concat rule applies);
   OpenScreen (MIT) and the rest are not carried either; algorithms are written from their stated
   rules.

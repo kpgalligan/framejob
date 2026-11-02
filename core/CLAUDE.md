@@ -175,7 +175,8 @@ governs a module now.
   reads the object, `format`, `version` and CU-7's `typed` keys loosely BEFORE the
   strict `deny_unknown_fields` read through `serde_path_to_error`, so a newer file is
   refused by its version and a project by its format. `cursor_file_check.rs` — its
-  check (`check`, `check_typed`) and the base64 decoder, a module of its own because
+  check (`check`, `check_typed`; a shortcut holds `cmd` or `ctrl`, or `opt` with
+  `OPTION_SHORTCUT_KEYS`, CU-60) and the base64 decoder, a module of its own because
   the two together pass the 400-line cap for a new file. `ffi_cursor.rs` —
   `rc_cursor_open` (parse and check; an open is the recorder's read-back, CU-15),
   `rc_cursor_free` and `rc_cursor_query` (road map creator-jobs CU2, spec §11 CU-25).

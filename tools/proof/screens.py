@@ -203,6 +203,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobRecordingCameraFormat", ""),
     ("FrameJobRecordingCameraBeside", False),
     ("FrameJobRecordingEnhanceMicrophone", False),
+    ("FrameJobRecordingKeys", False),
     ("FrameJobCaptionEngine", "apple"),
     ("FrameJobAssemblyAIRegion", "us"),
     ("FrameJobCaptionStyle", "subtitles"),
@@ -243,6 +244,9 @@ NOT_SHOWN = {
                            "a proof can act while it is pending; no screen launches with it",
     "FrameJobScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
                                    "once; read only by a press of Record, which no screen makes",
+    "FrameJobInputMonitoringAsked": "whether the panel has asked for Input Monitoring once "
+                                    "(spec §11 CU-62); read only by a press of Record with Record "
+                                    "shortcuts on, which no screen makes",
     "RC_AGENT_SOCKET": "an environment variable, the agent server's socket path; each launch "
                        "here sets it to a scratch socket, and nothing on screen shows it",
     "RCWriteCatalog": "an argument-domain build step that writes the catalog snapshot and "

@@ -49,6 +49,7 @@ final class RecordingToolChrome {
         guard !ended, item == nil, recorder.state == .recording || recorder.state == .paused
         else { return }
         let item = RecorderStatusItem(
+            keys: recorder.recordsKeys,
             onPause: {
                 _ = try? ScreenRecorder.shared.pause()
             },

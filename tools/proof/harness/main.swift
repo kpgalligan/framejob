@@ -404,6 +404,7 @@ enum Harness {
             "FrameJobRecordingCameraFormat": "",
             "FrameJobRecordingCameraBeside": false,
             "FrameJobRecordingEnhanceMicrophone": false,
+            "FrameJobRecordingKeys": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5

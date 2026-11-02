@@ -334,8 +334,26 @@ fn hidden_spans(from: &[i64], to: &[i64]) -> Result<(), String> {
     Ok(())
 }
 
-/// CU-7: `+`-joined tokens, none empty, none holding whitespace, `cmd` or
-/// `ctrl` among them.
+/// The keys a shortcut held with `opt` alone may end in (spec §11 CU-60): the
+/// arrows, Delete, Forward Delete, Return, Enter, Tab and Esc, spelled as
+/// the recorder spells them. ⌥ with any other key types a character (⌥E is
+/// é), so it is a typed mark and never a shortcut.
+pub(crate) const OPTION_SHORTCUT_KEYS: [&str; 10] = [
+    "left",
+    "right",
+    "up",
+    "down",
+    "delete",
+    "forwarddelete",
+    "return",
+    "enter",
+    "tab",
+    "esc",
+];
+
+/// CU-7 as CU-60 amends it: `+`-joined tokens, none empty, none holding
+/// whitespace, `cmd` or `ctrl` among them, or `opt` among them with the last
+/// token one of [`OPTION_SHORTCUT_KEYS`].
 fn shortcut(keys: &str) -> Result<(), &'static str> {
     let tokens: Vec<&str> = keys.split('+').collect();
     if tokens.iter().any(|token| token.is_empty()) {
@@ -347,11 +365,18 @@ fn shortcut(keys: &str) -> Result<(), &'static str> {
     {
         return Err("a token holds whitespace");
     }
-    if !tokens
+    let command = tokens
         .iter()
-        .any(|token| *token == "cmd" || *token == "ctrl")
-    {
-        return Err("it holds neither cmd nor ctrl");
+        .any(|token| *token == "cmd" || *token == "ctrl");
+    let option = tokens.contains(&"opt")
+        && tokens
+            .last()
+            .is_some_and(|last| OPTION_SHORTCUT_KEYS.contains(last));
+    if !command && !option {
+        return Err(
+            "it holds neither cmd nor ctrl, nor opt with left, right, up, down, \
+                    delete, forwarddelete, return, enter, tab or esc",
+        );
     }
     Ok(())
 }

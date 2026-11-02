@@ -169,6 +169,7 @@ extension RecorderPanelController {
         guard cameraSelected else { return }
         let screenAndRate: [NSControl] = [
             systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox, ratePopup,
+            recordShortcutsCheckbox,
         ]
         for control in screenAndRate { control.isEnabled = false }
     }

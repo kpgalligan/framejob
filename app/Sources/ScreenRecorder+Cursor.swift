@@ -12,8 +12,14 @@ import ScreenCaptureKit
 /// that could not go on the stream (at the start, with no camera, or at the segment's resume)
 /// leaves the file only its opening geometry, and the segment says so. **A cursor failure never
 /// fails or reorders a segment** (CU-14): the walker's order is movie → microphone → camera →
-/// cursor, and this step always hands its segment on.
+/// cursor, and this step always hands its segment on. **Keys** (road map creator-jobs CU6, spec
+/// §11 CU-60, CU-61): with Record shortcuts on, the capture's key tap writes each shortcut and
+/// a time-only typed mark into the open segment; `recordsKeys` is what the status item's
+/// keyboard mark reads.
 extension ScreenRecorder {
+    /// MAIN. Whether the running session's cursor capture has a key tap (spec §11 CU-61).
+    var recordsKeys: Bool { session?.cursor?.recordsKeys ?? false }
+
     /// The header and opening geometry every segment's file starts from (CU-13), before any
     /// frame: `scale_factor` the filter's `pointPixelScale`; `content_scale` the stream's
     /// configured pixel width ÷ (scale factor × point width); `content_rect` (0, 0, the point

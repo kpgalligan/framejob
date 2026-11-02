@@ -22,11 +22,14 @@ import ScreenCaptureKit
 /// **The refusal ORDER is the contract** (`transcribe`'s rule): the caller's
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
 /// missing or outside 1…600, then `source` (its value; for `voice_over`
-/// the screen-only arguments given, then `microphone: false`), `display`
-/// with `window`, a `rate` or `size` outside the vocabulary, `enhance: true`
-/// without a microphone and then with `place: false` (spec §11 AU-69),
+/// the screen-only arguments given, `keys` among them, then `microphone:
+/// false`), `display` with `window`, a `rate` or `size` outside the
+/// vocabulary, a `keys` outside its vocabulary (spec §11 CU-62), `enhance:
+/// true` without a microphone and then with `place: false` (spec §11 AU-69),
 /// `microphone: true` (implied by a voice-over) with the Microphone grant
-/// absent (the status WORD in the sentence), and a `project` naming nothing
+/// absent (the status WORD in the sentence), `keys: "shortcuts"` with the
+/// Input Monitoring grant absent (CU-3's sentence, read and never
+/// requested), and a `project` naming nothing
 /// open, answered by `target(_:)`'s own sentence and never turned into a
 /// fresh document. A voice-over stops there: it reads no other grant and
 /// looks nothing up (spec §11 recording, "A voice-over is a recording with
@@ -121,6 +124,9 @@ extension AgentServer {
         let showClicks = !screen ? false : try boolArg(a, "show_clicks") ?? false
         let includeFrameJob =
             !screen ? false : try boolArg(a, "include_framejob_windows") ?? false
+        // CU-62: refused by name with voice_over and camera (the screen-only lists).
+        let keys =
+            !screen ? RecordingKeys.off : try enumArg(a, "keys", RecordingKeys.self) ?? .off
         let place = try boolArg(a, "place") ?? true
         // AU-69 (d): after `place`, before any grant.
         let enhance = try recordingEnhance(a, microphone: microphone, place: place)
@@ -130,6 +136,9 @@ extension AgentServer {
             guard status == .authorized else {
                 throw ToolError(message: RecordingGrant.microphoneRefusal(status))
             }
+        }
+        if keys == .shortcuts, !RecordingGrant.inputMonitoringGranted {
+            throw ToolError(message: RecordingGrant.inputMonitoringRefusal)
         }
         // A misspelt `project` is the caller's mistake too — answered above
         // the grant, where `transcribe` answers its own id refusals.
@@ -184,7 +193,8 @@ extension AgentServer {
             microphone: microphoneID, systemAudio: systemAudio,
             showClicks: showClicks, rate: rate, resolution: resolution,
             destination: destination, folder: folder ?? RecordingFiles.folder(),
-            camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance)
+            camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance,
+            keys: keys)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(

@@ -7292,6 +7292,102 @@ in `tools/proof/media/creator/`.
   sized per recording.* (2) ⌥ with arrows, delete, return, tab or escape as a shortcut?
   *Recommended: yes.*
 
+#### CU6's record (2026-11-02)
+
+**Built.** Lane B, base `f8b260d2` (I's HEAD, CU5). The decisions first (`d73d673f`: CU-60…CU-63
+with their index rows, appended to `creator-jobs-6.md`, 286 → 371 lines; CU-3, CU-7 and CU-10
+amended), then the core's ⌥ arm, the Swift, the instruments and their pins, and the documents.
+The owner's answers (2026-11-01): the indicator is a keyboard mark plus a menu row, and ⌥ with
+an arrow, delete, return, tab or escape counts as a shortcut. CU-S1's key verdict was the owner's
+`keys=tap` (CU-6). No format (41 stands), cursor-file version, FFI, `rc_*`, op or tool change but
+`record_screen`'s `keys`; nothing keyed (CJ-3). No toll: every file stayed under its cap.
+
+- **The rule** is `CursorKeyFilter.swift` (pure, CU-60); `CursorCapture+Keys.swift` is the tap
+  (`CGEvent.tapCreate` at the session, head-insert, listen-only, key-downs; its run-loop source on
+  main in `.commonModes` at `enable()`, re-enabled on either disable) and `takeKey`, which reads
+  `IsSecureEventInputEnabled()` at delivery and a character only for a shortcut. `CursorCapture`
+  makes it at `ScreenRecorder.start` when `choice.keys` is `shortcuts`, enables it with the poll
+  and invalidates it at `stop` and `deinit`; `CursorSegments.key` drops a key with no open
+  segment.
+- **The core** accepts `opt` with its last token in `OPTION_SHORTCUT_KEYS`; `check_typed` is
+  unchanged.
+- **The grant** (CU-62): `RecordingGrant`'s Input Monitoring read, step (`screenStep`'s table),
+  URL and sentences; four `RecorderGrantDoors` members appended with inert defaults;
+  `checkInputMonitoringGrant()` second in `beginIfGranted`'s guard; the recorder refuses without
+  the grant or a tap; the tool reads it after the Microphone grant.
+- **The panel**: the box and its note under Show Clicks, `FrameJobRecordingKeys` (the twelfth
+  `FrameJobRecording…` key), greyed for Microphone Only and Camera with `keys` `.off`.
+- **The indicator** (CU-61): `RecorderStatusItem(keys:)`, `keysGlyph`, `keysRow`,
+  `itemLength(keys:)`; `itemLength`, `menuTitles(paused:)`, the keyless title and
+  `rebuildMenu(paused: paused)` unchanged.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/CursorKeyFilter.swift` · `CursorCapture+Keys.swift` | 113 · 103 | new: the rule and spelling; the tap and `takeKey` |
+| `app/Sources/CursorCapture.swift` | 255 | `CursorSegments.key`, `keyTap`, `recordsKeys`, `record`, `host(of:)` internal |
+| `app/Sources/RecordingGrant.swift` · `RecorderPanelController+Grants.swift` | 197 · 267 | Input Monitoring's read, step, URL, sentences; the doors and the check |
+| `app/Sources/RecorderStatusItem.swift` | 274 | the mark, the row, the length per item |
+| `app/Sources/ScreenRecorder.swift` · `ScreenRecorder+Cursor.swift` | 367 · 171 | the start's two refusals; `recordsKeys` |
+| `app/Sources/AgentServer+Recording.swift` · `AgentCatalog+RecordingArguments.swift` | 325 · 153 | `keys`, its grant and its row |
+| `core/src/cursor_file_check.rs` · `core/tests/cursor_file.rs` | 382 · 667 | the ⌥ arm and its sentence |
+| `tools/proof/cursor_keys_probe.py` · `.swift` | 253 · 534 | new: B0, Y1, Y2, Y6–Y9, six mutants |
+| `tools/proof/cursor_keys_proof.py` · `.swift` | 249 · 206 | new: Y5, Y3, Y4, Z1 |
+
+**Deviations.** (1) CU-3's amendment line says "Amended by CU-60" as the spec asked, naming
+CU-62 as the decision that opens the pane on the first press. (2) `camera_recording_probe.py`'s
+`beside-camera-grant-skipped` anchor re-aimed at the guard's new second line (the guard took
+`checkInputMonitoringGrant()` on its first line). (3) Y8 drives the press order Screen Recording
+→ Input Monitoring → Microphone; the Camera's place between them is read from
+`beginIfGranted`'s source (a camera beside the screen needs a connected camera). (4) Y5a, Y5b–Y5e
+and Z1 are one row Y5 with its sub-checks named. (5) `RecorderPanelController+VoiceOver.swift`'s
+`syncControlsEnabled` doc says five screen-only controls. Nothing outside the Files list.
+
+**Measured.**
+
+- `cargo test --release --test cursor_file` 12 passed; `cargo fmt`. The core's ⌥ arm removed by
+  hand (`if !command && !(option && false)`): exit 101,
+  `a_shortcut_holds_cmd_or_ctrl_and_clean_tokens` failed; restored.
+- `make typecheck`: exit 0, 0 errors and the 4 baseline warnings.
+- `cursor_keys_probe.py` 7/7 (Y6 74 events; Y2 `itemLength(keys:)` 76.0 / 88.0) after one fix (Y8
+  compared the note's 11.0 pt with `11`; Y7 failed once on a staticlib older than the ⌥ arm,
+  `make rust` then). Mutants, six, each exit 1, CAUGHT: `secure-ignored` (Y6),
+  `typed-with-identity` (Y6, Y7), `shift-modifier` (Y6), `option-rule-dropped` (Y6),
+  `indicator-omitted` (Y2), `press-skips-input-monitoring` (Y8).
+- `recording_probe.py --only chrome,file_pause,grants,voiceover_doors` 264/264;
+  `--mutant tool-asks-input-monitoring --only grants` 67/69, exit 1 (10f's two reads).
+  `camera_recording_probe.py --only panel` 28/28; `audio_ap6c_probe.py` 5/5;
+  `spec_index_proof.py` 252/252.
+- Debug: `cursor_keys_proof.py` 2/2 (Y5, Z1), Y3 and Y4 skipped by name ("the console is
+  locked"; this terminal also holds neither Input Monitoring nor post access).
+- `make gate`: "gate: PASS 458s" (names 1, typecheck 7, fmt 3, lint 16, test 264, app 166).
+- Release (the gate's app): `RC_PROOF_APP=release cursor_keys_proof.py` 2/2, exit 0, Y3 and Y4
+  skipped by name as on Debug; Z1's `grep "Frame Job: "` empty.
+
+**Review.** One review, verdict pass, every Files and Approach item done and every constraint
+held (FFI and format unchanged; `CGRequestListenEventAccess(` only in `+Grants.swift`; the first
+ten doors in order; the keyless titles unchanged; every touched app file ≤ 400, the largest
+`RecorderPanelController.swift` 377). Two nits, none fixed in the lane, both resolved at
+integration:
+- `camera_recording_probe.py`'s re-anchored `beside-camera-grant-skipped` had not been run: run
+  once on the integrated tree, `--mutant beside-camera-grant-skipped --only panel` 27/28, exit 1,
+  caught (P21).
+- `cursor_keys_proof.py` scored Y5 as both a skip and a row when Y5a's project sentence answers:
+  that case is now a printed note naming why, Y5 still scored on Y5b–Y5e; its docstring, the
+  proof README's Y5 row and CU-63's text say so.
+
+**Integration** (2026-11-02, onto `worktree-creator-jobs` at `f8b260d2`, CU5): `d73d673f…c5648323`
+cherry-picked with no conflict (no phase landed between). The CLAUDE.md edits the lane listed were
+applied: `app/CLAUDE.md`'s Recording entry (the **Shortcuts** sentence after `CursorCapture`'s;
+`RecordingGrant.swift`'s pane URLs, Input Monitoring's among them) and `core/CLAUDE.md`'s
+`cursor_file_check.rs` (a shortcut holds `cmd` or `ctrl`, or `opt` with `OPTION_SHORTCUT_KEYS`).
+`make gate` after the picks, the nits and these edits: names 1 s, typecheck 8 s (the 4 baseline
+warnings), fmt 3, lint 9, test 211, app 166, "gate: PASS 399s". Then `RC_PROOF_APP=release
+cursor_keys_proof.py` on the integrated tree: 2/2 (Y5's five checks, Z1 empty), exit 0, Y3 and Y4
+skipped by name ("the console is locked").
+
+**Owed.** Y3 and Y4 (a granted terminal on an unlocked console); JOB-23 and JOB-24. The CU-S2
+picker instrument's helper-owned grey window stays owed before CU3c. Nothing filed.
+
 ### CJ3 — face samples
 
 - **What a person gets:** nothing visible; agents get `kind: "faces"` from `get_media_analysis`. VR

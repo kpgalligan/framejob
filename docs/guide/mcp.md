@@ -133,7 +133,8 @@ normally ask you something, the call answers instead:
 
 - An import that would offer to convert an unsupported file with ffmpeg
   treats the offer as declined and answers with the reason.
-- `record_screen` never asks for the Screen Recording, Microphone or Camera grant.
+- `record_screen` never asks for the Screen Recording, Microphone, Camera or Input
+  Monitoring grant.
   A missing grant is refused, naming the System Settings pane. A Frame Job
   started from a terminal runs under the terminal's grants, not the app's.
 - `close_project` refuses a project with unsaved changes unless it is
@@ -623,7 +624,7 @@ See [Export](export.md).
 
 | Tool | What it does |
 |---|---|
-| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format); with `source: "screen"` and `camera`, records that camera beside the screen on a Camera track in front, in the bottom-right corner. `enhance: true` then runs `enhance_voice` on the microphone's clips as its own undo step once their sound is analysed, answering `enhance` or `enhance_error`. |
+| `record_screen` | Records a display or window for 1–600 `seconds` and lands it as media (**File ▸ New Recording…**), records the microphone alone with `source: "voice_over"`, or a camera alone with `source: "camera"` (and `camera` to choose one, `camera_format` its format); with `source: "screen"` and `camera`, records that camera beside the screen on a Camera track in front, in the bottom-right corner. `enhance: true` then runs `enhance_voice` on the microphone's clips as its own undo step once their sound is analysed, answering `enhance` or `enhance_error`. `keys: "shortcuts"` (the panel's **Record shortcuts**) writes each shortcut, spelled, and a time-only typing mark for every other key into the cursor files; it needs the Input Monitoring grant and is refused with `voice_over` and `camera`. |
 
 See [Screen recording](screen-recording.md).
 

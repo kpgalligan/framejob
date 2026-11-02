@@ -89,7 +89,10 @@ import ScreenCaptureKit
 /// `CGRequestScreenCaptureAccess` or `AVCaptureDevice.requestAccess`. It
 /// reads `RecordingGrant.screenRecordingGranted` before building the stream
 /// and the microphone status before constructing an `AVCaptureDeviceInput`
-/// (whose initializer auto-prompts on `.notDetermined`), and refuses by name.
+/// (whose initializer auto-prompts on `.notDetermined`), and refuses by name;
+/// with `choice.keys` `shortcuts`, Input Monitoring is read after the
+/// microphone and a choice whose key tap cannot be made is refused with the
+/// same sentence (spec §11 CU-62) — never `CGRequestListenEventAccess`.
 final class ScreenRecorder: NSObject {
     static let shared = ScreenRecorder()
 
@@ -238,6 +241,9 @@ final class ScreenRecorder: NSObject {
             }
             microphone = device
         }
+        if choice.keys == .shortcuts, !RecordingGrant.inputMonitoringGranted {
+            return refuse(.startFailed(RecordingGrant.inputMonitoringRefusal), completion)
+        }
         do {
             try RecordingFiles.create(choice.folder)
         } catch {
@@ -268,6 +274,10 @@ final class ScreenRecorder: NSObject {
         // The cursor's capture and its segments' header (spec §11 CU-11, CU-13);
         // nothing runs until `launchScreen`.
         let cursor = CursorCapture()
+        // Record shortcuts (CU-62): the key tap is made now, enabled with the poll.
+        if choice.keys == .shortcuts, !cursor.makeKeyTap() {
+            return refuse(.startFailed(RecordingGrant.inputMonitoringRefusal), completion)
+        }
         let cursorStart = Self.cursorStart(filter: filter, choice: choice, stream: configs.stream)
         // The frame watch rides every screen recording (CU-13): E2 for a
         // camera, the geometry for the cursor. Only a camera's start needs it.

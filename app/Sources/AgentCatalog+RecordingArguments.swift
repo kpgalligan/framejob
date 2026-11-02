@@ -24,9 +24,9 @@ extension AgentServer {
                     + "alone (see camera; with screen, camera records one beside the "
                     + "screen). With voice_over, "
                     + "display, window, system_audio, show_clicks, size, "
-                    + "include_framejob_windows and microphone: false are refused "
+                    + "include_framejob_windows, keys and microphone: false are refused "
                     + "by name; with camera, display, window, system_audio, "
-                    + "show_clicks, size, include_framejob_windows and rate are; "
+                    + "show_clicks, size, include_framejob_windows, keys and rate are; "
                     + "camera and camera_format are refused with voice_over.",
             ],
             "camera": [
@@ -95,6 +95,18 @@ extension AgentServer {
                     + "in a DISPLAY recording (default false, which leaves them out). "
                     + "Frame Job's own sound stays out either way, and with window it "
                     + "changes nothing: that window is recorded on its own.",
+            ],
+            // The recorder panel's Record shortcuts checkbox (spec §11 CU-60, CU-62).
+            "keys": [
+                "type": "string", "enum": RecordingKeys.allCases.map(\.rawValue),
+                "description": "Which keys go into the recording's cursor files: off "
+                    + "(default) or shortcuts — each shortcut pressed with cmd or ctrl, or "
+                    + "with opt and an arrow, delete, forward delete, return, enter, tab or "
+                    + "esc, spelled (cmd+shift+4), and a time-only mark for every other "
+                    + "key, never which key was typed; nothing while an app holds secure "
+                    + "input. Needs the Input Monitoring grant, which only the panel can "
+                    + "ask for; without it the call is refused naming the System Settings "
+                    + "pane. Refused with source voice_over and camera.",
             ],
             "rate": [
                 "type": "integer", "enum": [30, 60],
