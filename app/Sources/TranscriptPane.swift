@@ -8,9 +8,12 @@ protocol TranscriptHost: AnyObject {
 }
 
 /// The inspector's fifth tab (road map "creator-jobs" TX2a, spec §11 TX-20):
-/// the timeline's words in paragraphs (`TranscriptView`), with a stack of
-/// notes above them — the status, the same-speech notes and one "clip N —
-/// reason" row per clip with no words — which collapses when empty.
+/// the timeline's words in paragraphs (`TranscriptView`), under the tab's bar
+/// (`TranscriptBar`, TX2b, spec §11 TX-24) — Words from, Language, the status
+/// with Stop or Read, the same-speech notes and the clips with no words. The
+/// bar is built once in `init` and is the pane's one `makeHeader()` instance,
+/// so the controller pins it above the scroll view, as it does the Clip tab's
+/// header, and it never scrolls with the text.
 ///
 /// `AssistantPane`'s shape: the view is built ONCE in `init`, never in
 /// `makeSections()`, and the pane is exactly the visible height (`== 0` at
@@ -24,11 +27,10 @@ protocol TranscriptHost: AnyObject {
 final class TranscriptPane: InspectorPaneView {
     let transcriptView = TranscriptView(frame: NSRect(x: 0, y: 0, width: 280, height: 400))
     private(set) var source: TranscriptTabSource!
-    private let notes = NSStackView()
+    private(set) var bar: TranscriptBar!
     private let scroll = NSScrollView()
     private weak var lastProject: ReelProject?
     private var shownRebuilds = -1
-    private var noteTexts: [String] = []
 
     /// The pane each inspector made, weak to weak.
     private static let table = NSMapTable<InspectorViewController, TranscriptPane>.weakToWeakObjects()
@@ -46,13 +48,9 @@ final class TranscriptPane: InspectorPaneView {
         source = TranscriptTabSource(document: inspector.document) { [weak self] in
             self?.sourceChanged()
         }
+        bar = TranscriptBar(source: source)
         Self.table.setObject(self, forKey: inspector)
 
-        notes.orientation = .vertical
-        notes.alignment = .leading
-        notes.spacing = 4
-        notes.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(notes)
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
@@ -64,10 +62,7 @@ final class TranscriptPane: InspectorPaneView {
         let collapse = heightAnchor.constraint(equalToConstant: 0)
         collapse.priority = NSLayoutConstraint.Priority(1)
         NSLayoutConstraint.activate([
-            notes.topAnchor.constraint(equalTo: topAnchor),
-            notes.leadingAnchor.constraint(equalTo: leadingAnchor),
-            notes.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: notes.bottomAnchor),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -83,6 +78,9 @@ final class TranscriptPane: InspectorPaneView {
     }
 
     private var host: TranscriptHost? { inspector?.parent as? TranscriptHost }
+
+    /// The bar, the same instance every build, pinned above the scroll view.
+    override func makeHeader() -> (any OptionControl)? { bar }
 
     // MARK: - Shown or not
 
@@ -152,53 +150,12 @@ final class TranscriptPane: InspectorPaneView {
     // MARK: - The source's changes
 
     private func sourceChanged() {
-        refreshNotes()
+        bar.refresh()
         guard source.rebuilds != shownRebuilds, let document = inspector?.document else { return }
         shownRebuilds = source.rebuilds
         let canvas = document.editedProject.snapshot.canvas
         transcriptView.show(source.model, fps: canvas.fps, timecodeFrames: canvas.timecodeFrames)
         transcriptView.setHighlight(source.model.highlight(at: document.playhead), follow: false)
-    }
-
-    /// The status, the notes and the clips with no words, one wrapping note
-    /// each; rebuilt only when their text changes.
-    private func refreshNotes() {
-        var texts: [String] = []
-        if let status = Self.statusText(source.status) { texts.append(contentsOf: status) }
-        texts.append(contentsOf: source.notes)
-        texts.append(contentsOf: source.noWords.map { "\($0.tag) — \($0.reason)" })
-        guard texts != noteTexts else { return }
-        noteTexts = texts
-        for view in notes.arrangedSubviews { view.removeFromSuperview() }
-        for text in texts {
-            let label = InspectorNoteLabel(wraps: true) { text }
-            notes.addArrangedSubview(label)
-            label.widthAnchor.constraint(
-                equalTo: notes.widthAnchor, constant: -2 * InspectorMetrics.inset
-            ).isActive = true
-        }
-        notes.edgeInsets =
-            texts.isEmpty
-            ? NSEdgeInsetsZero
-            : NSEdgeInsets(
-                top: 8, left: InspectorMetrics.inset, bottom: 6, right: InspectorMetrics.inset)
-    }
-
-    /// The status line's sentences (TX-22).
-    static func statusText(_ status: TranscriptTabSource.Status) -> [String]? {
-        switch status {
-        case .idle, .loading:
-            return nil
-        case .reading(let name, let fraction, let index, let of):
-            return ["Reading “\(name)” on this Mac… \(Int((fraction * 100).rounded(.down))) % (\(index) of \(of))"]
-        case .noModel:
-            return [
-                "This Mac has no speech model installed. Choose File ▸ Generate Captions…, pick "
-                    + "a language and press Download."
-            ]
-        case .failed(let sentences):
-            return sentences
-        }
     }
 
     // MARK: - Seeking

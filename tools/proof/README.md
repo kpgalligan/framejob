@@ -27747,3 +27747,38 @@ Mutants: `highlight-containment`, `follow-pause-ignored`, `space-consumed`,
 `paragraph-1.0s`, `live-rebuild` and `clip-picked-switches` rebuild the probe
 over a copy of `app/Sources`; `one-wait` builds the app in a tree copy
 (`work/transcript_tab/mutant-app-one-wait/`) and runs T12.
+
+### TX2b — the tab's bar (`transcript_tab_proof.py` B1–B4; two mutants; spec §11 TX-24…TX-27)
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py --only Z0,B1,B2,B3,B4
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py --mutant words-from-ignored
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py --mutant stop-cancels-all
+```
+
+The road map's T8–T11 are named B1–B4 here: T8–T11 are TX2a's probe rows.
+The app rows run in TX2a's one instance, after T12, each in a session of its
+own, through `transcript_view`'s bar arguments (TX-27); Z0 now wants its
+nine properties. B1 (a) A on track 1 and B on track 2: `words_from: t2`'s
+tokens (less index, paragraph and struck) against `get_timeline_transcript
+{tracks: [t2]}`'s words, then `words_from: null` against the unfiltered
+call; (b) A on t1 and `speech_engine_proof`'s `ten.wav` on t2, the tab
+shown and at once `words_from: t1, wait: 60`: no token of ten's and no
+`cache/device-transcripts/<ten>-*.json`. B2 a second installed language
+(fewer than two is a named host SKIP): `language: L2, wait: 60` keeps both
+`<A>-<L1>.json` and `<A>-<L2>.json`. B3 (a) `stop_after: 3` while the tab
+reads `ten.wav`, then `get_timeline_transcript` waits on the same run: the
+call lands ten's words after more than 3 s, the tab reads `stopped` with no
+want, and `read: true` shows ten's tokens; (b) ten and `long_fixture`'s WAV
+queued behind it, `stop_after: 1`, then `transcript_view` every 0.25 s for
+4 s after the press: always `stopped`, no want, never the long media in
+`fill`, "2 files not read", and no `<long>-*.json`. B4 runs `screens.py
+--only 11c-transcript-tab` (the new screen, `designs/screens/11c-transcript-tab.md`)
+on the app `proof_app` chooses: rc 0 and "new problems: 0".
+
+Mutants, both building the app in a tree copy (`work/transcript_tab/mutant-app-<name>/`):
+`words-from-ignored` removes the track filter at the fill and at the words
+(`TranscriptTabSource.swift`'s two `wordsFrom == nil || $0.track == wordsFrom`
+lines) and runs B1; `stop-cancels-all` makes `TranscriptFill`'s `drop()`
+internal and has the line ending `// Stop: the tab's want only (TX-26)` call
+it, and runs B3.

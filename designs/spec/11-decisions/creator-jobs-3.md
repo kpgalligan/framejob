@@ -229,6 +229,8 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   press Download." Notes are the same-speech notes only. Risk accepted: a cloud transcript made
   while the tab shows appears the next time the tab is shown. (TX2b's bar — Words from, a
   per-window track filter, and Language — is not this phase's.)
+  **Amended 2026-11-02, by TX-24:** the status, the same-speech notes and the clips with no words
+  live in the tab's bar, pinned above the text, not in a stack scrolled with it.
 - **TX-23 — `transcript_view` is a dev tool** (Debug and Release, never Distribution), off main
   with every step through `onMain`: `transcript_view {project?, focus?: boolean, select?: [integer,
   integer] | null, click?: integer, wait?: number}`. It applies `focus` (the view made first
@@ -241,3 +243,63 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   selection, first_responder, fill: {media, fraction} | null, owns_want, status, no_words: [{clip,
   nest_path, tag, reason}], notes, rebuilds, last_rebuild_ms, top_token, project}`. TX2b's buttons
   are not in it.
+  **Amended 2026-11-02, by TX-27:** it also takes `words_from`, `language`, `stop_after` and
+  `read`, answers `bar`, and its `status` may be `stopped`.
+
+TX-24…TX-27 are TX2b's (the Transcript tab's bar), recorded before its code. No owner question
+was asked: the road map names none for TX2b, and TX2a's answers of 2026-11-01 stand.
+
+- **TX-24 — The bar.** It is pinned above the transcript's text and is the pane's ONE
+  `makeHeader()` instance, built once in the pane's `init`, so the controller hosts it above the
+  scroll view as it hosts the Clip tab's header (`ClipHeaderBlock`'s shape); it does not scroll.
+  It has two rows in `InspectorMetrics` — an `InspectorRowLabel` at `labelWidth`, then an
+  `OptionPopupControl` spanning the rest of the row — "Words from" and "Language". Below them is
+  the status row: its sentence wraps, and at its right is Stop (shown while the tab's waiter
+  reads) or Read (shown when stopped). Then come the wrapping notes: the same-speech notes, then
+  at most 3 rows of "clip N — reason", then "…and N more clips with no words.", whose tooltip
+  lists the rest. Everything collapses when empty. A popup is rebuilt only when its titles change.
+  Amends TX-22: TX-22's status, notes and no-words rows live in the bar.
+- **TX-25 — Words from and Language are per-window view state**, never saved, kept for the pane's
+  life whether the tab is hidden or shown. **Words from** lists "All tracks", then each track of
+  the edited container by name, in snapshot order; one choice. A chosen track that leaves the
+  container falls back to All tracks. With a track chosen, the fill wants only the media with an
+  instance on that track (`Instance.track`); the words are built from every instance with the
+  media loaded, then kept where `word.track` matches, so the tokens and their ids equal
+  `get_timeline_transcript {tracks: [id]}`'s. The same-speech notes come from the shown words;
+  `no_words` is unfiltered, as in the tool. **Language** lists "Automatic (<the default's
+  identifier>)" (its name, "Automatic (English (United States))", runs past the popup's chevron
+  at 280 pt), then `Transcriber.languages()` by name, read once per show on the load queue; with none
+  installed the popup is disabled. A choice drops the `.apple` words, their pause sets, the misses
+  and the failures, and the waiter's want (as a hide does), then runs `update()`; device words are
+  then read in that language (`<media>-<lang>.json`). A cloud transcript still wins (TR-11), as
+  with the tool's `language`. The load queue resolves the choice by
+  `Transcriber.language(matching:in:)`, else the default.
+- **TX-26 — Stop withdraws only the tab's want** (`fill.release(owner:)`, on a line ending `//
+  Stop: the tab's want only (TX-26)`); it never cancels another owner's run, so a waiting
+  `get_timeline_transcript` call's run goes on. After Stop the status reads "Stopped. N file(s)
+  not read on this Mac.", with Read. Stop holds through edits and through Words from or Language
+  changes; only Read or the tab's next show resumes. **The order inside `stop()`:** set
+  `stopped`; then, under `lock`, set `pending = []`, `pendingTotal = 0`, `waiting = []` (so a Read
+  before the waiter wakes pends its media again, as a hide does) and `wanting = false`, then the
+  anchored `fill.release(owner:)`, then unlock. `generation` is not bumped, so a run that stores
+  as Stop lands is still loaded. The waiter, woken with `.cancelled` (or `.stored`), finds
+  `pending` empty and exits without wanting the next media. With `stopped` set, nothing is
+  pended; with no misses left the status is idle.
+- **TX-27 — `transcript_view`'s bar arguments. Amends TX-23.** `transcript_view {…,
+  words_from?: integer | null, language?: string | null, stop_after?: number (0…60), read?:
+  boolean}` applies, in order, `words_from`, `language`, `read`, `focus`, `select`, `click`, then
+  schedules `stop_after` (pressed on main that many seconds after the answer, through the bar's
+  own Stop path), then `wait`. Refused before anything moves: a track not in the container,
+  "words_from names track N; Words from lists a, b, c."; `language` through
+  `AgentServer.checkSpelling` and then `transcriptionLanguage`; `select` or `click` together with
+  `words_from` or `language`, "select and click name tokens of the view as it is; set words_from
+  or language in a call of their own."; `read` together with `words_from` or `language`, "read
+  presses the bar as it is; set words_from or language in a call of their own." (a new track or
+  language empties the misses, so Read would be checked against a bar about to change, then not
+  pressed); `stop_after` while Stop is not shown, "Stop is not shown:
+  the tab is not reading on this Mac."; `read` while Read is not shown, "Read is not shown: the
+  tab's reading was not stopped." The answer adds `bar: {words_from, tracks: [{id, name}],
+  language, languages: [{identifier, name}], stop_shown, read_shown, stop_after: "pending" |
+  "pressed" | "not shown" | null}`, and `status` gains `stopped`. The press is scheduled because
+  every tool call holds `AgentLane`'s one lock, so no call can press Stop while
+  `get_timeline_transcript` waits.

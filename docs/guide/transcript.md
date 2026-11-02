@@ -29,15 +29,37 @@ a later version, and these are the words where a cut would break something:
 words inside a nest (open the nest to work on them), words under a transition,
 and words on a locked track. Hold the pointer over a faint word to read why.
 
-Above the text, short notes say what the tab is doing and anything it could
-not read:
+## The bar
+
+A bar sits above the text and stays put while the text scrolls.
+
+- **Words from** chooses whose words to show: **All tracks**, or one track by
+  name. With one track chosen, the tab shows only the words on it, and reads
+  only the files with a clip on it. If that track goes away, the tab goes
+  back to All tracks.
+- **Language** chooses the language files are read in on this Mac:
+  **Automatic** (your Mac's language, shown in brackets as a code such as
+  en-US) or any language your Mac has a speech model for. Choosing one reads
+  the files again in that language; the earlier reading is kept too, so
+  switching back is immediate. A file with an AssemblyAI transcript keeps
+  showing that transcript whichever you choose.
+
+Both choices belong to the window: they stay while it is open, whichever tab
+you look at, and are not saved with the project.
+
+Under the two popups, short notes say what the tab is doing and anything it
+could not read:
 
 - **Reading “name” on this Mac… 40 % (1 of 2)** while a file is being
-  transcribed.
-- A clip with no words is listed with the reason, such as "clip 12 — its audio
-  is switched off" or a clip that plays in reverse.
+  transcribed, with a **Stop** button beside it.
+- **Stopped. 2 files not read on this Mac.** after you press Stop, with a
+  **Read** button that carries on.
 - When two tracks carry the same speech, a note names the two clips, so you
   can mute one.
+- A clip with no words is listed with the reason, such as "clip 12 — its audio
+  is switched off" or a clip that plays in reverse. The first three are
+  listed; "…and 4 more clips with no words." stands for the rest, and holding
+  the pointer over it lists them.
 
 ## Where the words come from
 
@@ -51,6 +73,11 @@ hour of speech, and sends nothing anywhere.
 Files are read one at a time, starting with the one under the playhead, and
 each file's words appear as soon as it is done. If you switch to another tab,
 the reading stops; it picks up when you come back.
+
+**Stop** stops the tab's own reading and leaves the rest of the files unread
+until you press **Read** or come back to the tab; editing the timeline or
+changing Words from or Language does not start it again. If an agent is
+waiting for the same file's words at that moment, its reading goes on.
 
 If your Mac has no speech model installed, the tab says so. Choose **File ▸
 Generate Captions…**, pick a language and press **Download**, then come back.

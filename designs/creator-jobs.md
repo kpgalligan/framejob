@@ -3867,6 +3867,115 @@ the app builds from changed.
 - **Mutants** (2): Words from ignored; the bar's Stop cancelling every want.
 - **Manual checks:** none beyond JOB-10. **Depends on:** TX2a. **Lane** A. **Questions:** none.
 
+#### TX2b's record (2026-11-02)
+
+**Landed.** Lane A, on the lane's branch from base `c5934664` (the lane's worktree was made at
+`eb350b86`, before TX2a; it was fast-forwarded to the integration head `c5934664` before any
+work). No owner question: the road map names none for TX2b, and TX2a's answers of 2026-11-01
+stand. Two lane commits: the bar (`c7b3f25a`) and fix pass 1 (`5a44129c`). TX-24…TX-27 were
+appended to `11-decisions/creator-jobs-3.md` (243 → 302, 305 after fix pass 1) with four index
+rows, and TX-22 and TX-23 got their "Amended 2026-11-02" lines, before the code. No core, FFI,
+op or format change, and no product tool. A person gets the bar above the Transcript tab's text:
+Words from, Language, the status with Stop or Read, the same-speech notes and at most three
+no-words rows; an agent gets nothing new (`get_timeline_transcript {tracks, language}` is
+already its Words from and Language), a proof `transcript_view`'s bar arguments.
+
+**What changed.**
+- Swift (`wc -l`): `TranscriptBar.swift` new, 290 (the bar; `statusText` moved here from the
+  pane); `TranscriptPane.swift` 215 → 172 (gave up its notes stack, `refreshNotes()` and
+  `statusText`; builds the one bar in `init` and returns it from `makeHeader()`, the scroll view
+  pinned to the pane's top); `TranscriptTabSource.swift` 399 → 514 (Words from, Language, the
+  tracks and the installed languages, Stop, Read and `.stopped`; a TX2a file, so the 600 cap,
+  and TX2a's anchors `let take = 1` and both `isLiveEditing` blocks byte-identical);
+  `AgentServer+TranscriptView.swift` 183 → 309, 314 after fix pass 1 (`words_from`, `language`,
+  `stop_after`, `read`, `bar`, `stopped`). Not touched: `TranscriptFill.swift`, `AgentServer+TimelineTranscript.swift`,
+  `TimelineTranscript*.swift`, `InspectorViewController.swift`, `transcript_tab_probe.swift`, core.
+- Instruments: `transcript_tab_proof.py` (B1–B3 app rows, B4 other row, Z0's nine properties,
+  the mutants `words-from-ignored` and `stop-cancels-all`); `screens.py`'s `NOT_SHOWN` gained
+  `RCDevCursorLoadHold` (below); the new screen `designs/screens/11c-transcript-tab.md`.
+- Documents: spec `04.3e` (the bar, Words from, Language, Stop and Read; 62 → 92), `07.9c`
+  (`transcript_view`'s arguments, `bar`, `stopped`; 427 → 441), `07.4` (the row gains
+  `TranscriptBar.swift`), the spec index's Lines cells and the §11 total (18,060 in 37 files,
+  18,063 after fix pass 1);
+  §11 TX-24…TX-27 and their index rows; `docs/guide/transcript.md` (the bar, Stop and Read);
+  `docs/developing.md` (`transcript_view`); `tools/proof/README.md`'s TX2b section.
+
+**Commands and results** (three lanes shared the machine).
+- `make typecheck`: exit 0 after each Swift change, the four baseline warnings, tsc silent.
+- `python3 tools/proof/swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS
+  tools/proof/transcript_tab_probe.swift`: exit 0.
+- Probe rows `--only T1,T3p,T4p,T5,T7,T8,T9,T10,T13p`: 10/10.
+- Debug (`make app-debug`), `--only Z0,M1,T2,T12,B1,B2,B3,B4`: first 7/8. B4 failed twice over:
+  `screens.py`'s P2 refused `RCDevCursorLoadHold` (CU3a2's dev launch default, neither pinned nor
+  in `NOT_SHOWN`; added to `NOT_SHOWN`), and the window capture in dark held two new layout
+  problems, the status label 4 pt wide and Stop at the bar's origin: the 0.25 s poll had shown the
+  status row between `snapshot_ui`'s last pass and its layout report. The bar now lays its window
+  out when a row comes or goes, and the capture then showed two more faults, fixed: the status
+  sentence squeezed to its minimum beside Stop (the row is now `.fill`, the sentence hugging at
+  1), and "Automatic (English (United States))" drawn past the popup's chevron at 304 pt (the
+  title is now "Automatic (en-US)", TX-25 says so). Then B4 passed: 6 pass of 6, "new problems: 0".
+- `python3 tools/proof/spec_index_proof.py`: 234/234.
+- `make gate`: "gate: PASS 457s" (names 1 s, typecheck 6 s, fmt and lint skipped, test 243 s,
+  app 207 s).
+- `RC_PROOF_APP=release env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py`:
+  **22/22**. B1: All tracks 38 tokens, `words_from` the second track 17, equal to
+  `get_timeline_transcript {tracks}`'s 17; null equal to the unfiltered call; (b) settled, 21
+  tokens, none of ten's, no ten cache file. B2: nine installed languages; A read in en-US, then
+  `language: en-AU` kept `2-en-AU.json` beside `2-en-US.json`. B3: (a) the tool call took 6.6 s
+  and answered 1,242 words of ten; after it `stop_after` "pressed", status `stopped` ("Stopped. 1
+  file not read on this Mac."), `owns_want` false; Read showed 1,242 tokens, idle; (b) 17 answers
+  after the press, none wrong, the last "Stopped. 2 files not read on this Mac.", no cache file for
+  the 3,625 s WAV. B4 6 pass of 6, no new problem. TX2a's rows unchanged (T6's median 23.9 ms).
+- `env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_tab_proof.py --mutant words-from-ignored`
+  (a tree copy): **caught**, B1 failed: `words_from` showed all 38 tokens against the tool's 17, and (b)
+  read ten (1,242 of 1,263 tokens, `3-en-US.json` kept). `--mutant stop-cancels-all` (a tree copy):
+  **caught**, B3 failed: the tool call answered "The transcription was cancelled." after 3.1 s. TX2a's
+  seven mutants were not re-run: no anchor line they edit changed.
+- `python3 tools/proof/proof_app.py launch --app release`: `grep "Frame Job: "` on its log printed
+  nothing; the instance was stopped by its pid.
+
+**Deviations.**
+- **The base.** The worktree was made at `eb350b86`; it was fast-forwarded to the integration
+  head `c5934664` (TX2a's) before any work.
+- **The rows are B1–B4**, not the road map's T8–T11, which are TX2a's probe rows.
+- **"Automatic (<identifier>)"**, not the default's name: the name runs past the popup's chevron
+  at the inspector's width (`OptionPopupControl` is not forked and draws without truncation).
+- **`screens.py`'s `NOT_SHOWN` gained `RCDevCursorLoadHold`**, a file outside the spec's list:
+  P2 failed on it for every `screens.py` run since CU3a2, so B4 could not pass without it.
+- **The bar lays its window out when a row comes or goes** (`layoutSubtreeIfNeeded` on the
+  window's content view), so a layout read between passes never sees a re-attached view at a zero
+  frame.
+- **"N files" is pluralised** ("1 file", "2 files") where TX-26 writes "N file(s)".
+
+**Fix pass 1 (`5a44129c`, review 1's should-fix).** `checkBar` checked `read` against
+`readShown` before `words_from` or `language` were applied, and a new track or language empties
+the misses, so `{language: X, read: true}` on a stopped tab answered ok without pressing Read. The
+server thread now refuses `read` together with `words_from` or `language` (an explicit null
+included) before any `onMain` hop: "read presses the bar as it is; set words_from or language in a
+call of their own."; TX-27, §7.9c and the tool's description name it. Run: `make typecheck` the
+four baseline warnings; `spec_index_proof.py` 234/234 (233/234 first, the §11 total 18,060 against
+`wc -l` 18,063, fixed); `make gate` "gate: PASS 424s"; Release `--only Z0,B2,B3` 3/3 (B3's call
+6.3 s); on the fixer's Release instance `{read: true, language: null}` and `{read: true,
+words_from: 1}` answered the refusal, `{read: true}` alone passed it, and `grep -c "Frame Job: "`
+printed 0. The rest of the proof and both mutants were not re-run: no row passes `read` with
+`words_from` or `language`, and the mutants' anchors are untouched.
+
+**Reviews.** Review 1 (`c5934664..c7b3f25a`): one should-fix (fix pass 1) and two nits, left as
+they stand: `stop_after` is scheduled in the final hop, after `wait`, where TX-27 and the
+description put it before; `stopAfters` is never cleared, so `bar.stop_after` reads the last
+press's outcome. Review 2 (`c5934664..5a44129c`): pass, with two nits: this record's figures and
+its missing review paragraph (done at integration), and no proof row exercising a TX-27 refusal
+(only the fixer's hand check covers the `read` one), left as it stands.
+
+**Integration (2026-11-02).** Cherry-picked onto the integration branch at `c5934664` with no
+conflict and no format change. The `CLAUDE.md` edit owed went in: `app/CLAUDE.md`'s
+Transcript-tab entry gained `TranscriptBar.swift` and the sentence on the bar (the pane's one
+`makeHeader()` instance; Words from and Language on the source; Stop the tab's want only, or Read;
+the notes and at most three no-words rows). `make gate` on the merged tree: names, typecheck, test and app `pass` (fmt and lint skipped, no
+Rust changed), "gate: PASS 302s".
+
+**Owed.** JOB-10 (a person) covers the tab; nothing new for a person. Nothing filed.
+
 ### CU1b — the recorder saves the cursor
 
 - **What a person gets:** every display, window or picked recording writes `<stem>.fjcursor` beside

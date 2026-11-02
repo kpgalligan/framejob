@@ -264,6 +264,8 @@ NOT_SHOWN = {
                              "its own Match (spec §11 AU-128); no screen launches with it",
     "RCDevAnalysisCanned": "a dev launch default with which a canned analysis marker is "
                            "honoured (spec §11 CJ-26); no screen launches with it",
+    "RCDevCursorLoadHold": "a dev launch default that holds each cursor file's load "
+                           "(CursorTracks.swift); no screen launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

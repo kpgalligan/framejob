@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Road map "creator-jobs" TX2a (spec §11 TX-20…TX-23): the Transcript tab,
-its view, its fill and the dev tool `transcript_view`.
+"""Road map "creator-jobs" TX2a and TX2b (spec §11 TX-20…TX-27): the
+Transcript tab, its view, its fill, its bar and the dev tool `transcript_view`.
 
     python3 tools/proof/transcript_tab_proof.py [--only IDS]
     python3 tools/proof/transcript_tab_proof.py --mutant NAME
@@ -21,7 +21,7 @@ as its header says; T4p a click while playing keeps playing.
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, focus,
-      project, select and wait.
+      language, project, read, select, stop_after, wait and words_from.
   M1  `perform_menu_item ["View","Transcript"]` shows the tab with the view
       first responder; a hidden tab is refused by its sentence; and
       `select_inspector_tab {tab: "transcript"}` reaches it.
@@ -44,6 +44,27 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
       the tab wanting it), so hiding released the want and the run was
       cancelled; hidden and shown again at once, it is wanted anew too.
 
+TX2b's rows (spec §11 TX-24…TX-27; the road map's T8–T11, renamed because
+T8–T11 are TX2a's probe rows):
+  B1  (a) A on track 1, B on track 2: `words_from: t2` shows tokens equal to
+      `get_timeline_transcript {tracks: [t2]}`'s words, all on t2, fewer than
+      All tracks'; `words_from: null` equals the unfiltered call. (b) A on t1
+      and `ten.wav` on t2, shown and at once `words_from: t1, wait: 60`:
+      settled, no token of ten's and no `<ten>-*.json` in the package.
+  B2  a second installed language (a named host SKIP with fewer than two):
+      `language: L2, wait: 60` reads A again, and both `<A>-<L1>.json` and
+      `<A>-<L2>.json` are kept.
+  B3  (a) Stop during the tab's read of `ten.wav` while
+      `get_timeline_transcript` waits on it (`stop_after: 3`): the call lands
+      ten's words after more than 3 s; the tab reads stopped with no want;
+      Read shows ten's tokens, idle. (b) ten and the long WAV queued behind
+      it: after `stop_after: 1`, every answer for 4 s is stopped with no want,
+      never the long media in `fill`, "2 files not read", and no
+      `<long>-*.json`.
+
+Other rows: T11 above; B4 `screens.py --only 11c-transcript-tab` on the
+app `proof_app` chooses, rc 0 and "new problems: 0".
+
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once;
 a mutant is caught when every row it names fails.
   highlight-containment  the highlight by containment (T3p)
@@ -55,6 +76,10 @@ a mutant is caught when every row it names fails.
   clip-picked-switches   a click on a clip switches to Clip (T10)
   one-wait               every miss wanted at once under a single wait (T12;
                          an app built from a tree copy)
+  words-from-ignored     Words from's track filter removed at the fill and at
+                         the words (B1; a tree copy)
+  stop-cancels-all       the bar's Stop drops every owner's want
+                         (`TranscriptFill.drop()`) (B3; a tree copy)
 
 Exit: 0 iff every row passed or was a named host SKIP (a mutant run: 0 when
 caught, 1 when it survived, 2 when the control could not be performed).
@@ -83,8 +108,8 @@ WORK = ROOT / "tools/proof/work/transcript_tab"
 PROBE = ROOT / "tools/proof/transcript_tab_probe.swift"
 FONTS = ROOT / "app/Resources/Fonts"
 PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p"]
-APP_ROWS = ["Z0", "M1", "T2", "T3", "T4", "T6", "T12"]
-OTHER_ROWS = ["T11"]
+APP_ROWS = ["Z0", "M1", "T2", "T3", "T4", "T6", "T12", "B1", "B2", "B3"]
+OTHER_ROWS = ["T11", "B4"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
 SEC = 600_000
 KEY = "proof-key"
@@ -95,6 +120,7 @@ TT = "TranscriptTokens.swift"
 TH = "TranscriptView+Highlight.swift"
 TK = "TranscriptView+Keys.swift"
 TS = "TranscriptTabSource.swift"
+TF = "TranscriptFill.swift"
 IV = "InspectorViewController.swift"
 MUTANTS = {
     "highlight-containment": ("probe", ["T3p"], [
@@ -117,6 +143,15 @@ MUTANTS = {
         (IV, "        if tab == .transcript { (pane(for: .transcript) as? TranscriptPane)?"
              ".reveal(selectedClips); return }\n", "")]),
     "one-wait": ("app", ["T12"], [(TS, "let take = 1\n", "let take = pending.count\n")]),
+    "words-from-ignored": ("app", ["B1"], [
+        (TS, "        let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }\n",
+         "        let instances = read.instances\n"),
+        (TS, "            let shown = all.filter { wordsFrom == nil || $0.track == wordsFrom }\n",
+         "            let shown = all\n")]),
+    "stop-cancels-all": ("app", ["B3"], [
+        (TF, "    private func drop() {\n", "    func drop() {\n"),
+        (TS, "        fill.release(owner: owner)  // Stop: the tab's want only (TX-26)\n",
+         "        fill.drop()  // Stop: the tab's want only (TX-26)\n")]),
 }
 
 
@@ -321,7 +356,8 @@ def app_rows(results, wanted, app_path, files):
                 complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
                 schema = app.mcp.schemas().get(TOOL, {}).get("inputSchema", {})
                 keys = sorted(schema.get("properties", {}))
-                return (not complaints and keys == ["click", "focus", "project", "select", "wait"],
+                return (not complaints and keys == ["click", "focus", "language", "project", "read",
+                                                    "select", "stop_after", "wait", "words_from"],
                         f"parity lines {complaints[:3]}; properties {keys}")
             run("Z0", z0)
 
@@ -501,11 +537,199 @@ def app_rows(results, wanted, app_path, files):
                 finally:
                     close(s)
             run("T12", t12)
+
+            def bare(shown):
+                return [{k: v for k, v in t.items() if k not in ("index", "paragraph", "struck")}
+                        for t in shown.get("tokens", [])]
+
+            def media_files(session, media):
+                folder = ttp.device_dir(session)
+                names = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+                return [n for n in names if n.startswith(f"{media}-") and n.endswith(".json")]
+
+            def reading(session, media, bound=180):
+                # The tab reads `media` on this Mac and owns its want.
+                deadline = time.time() + bound
+                shown = {}
+                while time.time() < deadline:
+                    shown = view(session)
+                    fill = shown.get("fill") or {}
+                    if fill.get("media") == media and fill.get("fraction", 0) >= 0.01 \
+                            and shown.get("owns_want") is True and shown["bar"]["stop_shown"]:
+                        return shown, None
+                    time.sleep(0.25)
+                return None, f"the tab never read media {media}: last {shown.get('fill')}, " \
+                             f"status {shown.get('status')}"
+
+            def b1():
+                s = session_of("b1")
+                try:
+                    a, b = s.media_of(str(files["A"])), s.media_of(str(files["B"]))
+                    t1 = tracks(s)[0]
+                    t2_ = s.op("add_track") and tracks(s)[-1]
+                    s.add(a, at=0, track=t1)
+                    s.add(b, at=SEC, track=t2_)
+                    s.op("select_inspector_tab", tab="transcript")
+                    every = view(s, wait=60)
+                    narrowed = view(s, words_from=t2_, wait=60)
+                    read = s.op("get_timeline_transcript", tracks=[t2_])
+                    shown = bare(narrowed)
+                    again = view(s, words_from=None, wait=60)
+                    whole = s.op("get_timeline_transcript")
+                    first = (shown == read.get("words") and shown
+                             and all(t["track"] == t2_ for t in shown)
+                             and len(shown) < len(every.get("tokens", []))
+                             and narrowed["bar"]["words_from"] == t2_
+                             and bare(again) == whole.get("words")
+                             and again["bar"]["words_from"] is None)
+                finally:
+                    close(s)
+                detail = (f"(a) all tracks {len(every.get('tokens', []))} tokens; words_from {t2_}: "
+                          f"{len(shown)} tokens, equal to the tool's {len(read.get('words', []))} "
+                          f"{shown == read.get('words')}; null: equal {bare(again) == whole.get('words')}")
+                import speech_engine_proof
+                _, ten, _, _ = speech_engine_proof.make_fixtures()
+                s = session_of("b1b")
+                try:
+                    a = s.media_of(str(files["A"]))
+                    tenth = s.media_of(ten)
+                    t1 = tracks(s)[0]
+                    t2_ = s.op("add_track") and tracks(s)[-1]
+                    s.add(a, at=0, track=t1)
+                    s.add(tenth, at=0, track=t2_)
+                    s.op("set_playhead", t=0)
+                    s.op("select_inspector_tab", tab="transcript")
+                    narrowed = view(s, words_from=t1, wait=60)
+                    stray = [t for t in narrowed.get("tokens", []) if t["media"] == tenth]
+                    files_ten = media_files(s, tenth)
+                    second = (narrowed.get("settled") is True and narrowed.get("tokens")
+                              and not stray and not files_ten)
+                finally:
+                    close(s)
+                detail += (f"; (b) settled {narrowed.get('settled')}, "
+                           f"{len(narrowed.get('tokens', []))} tokens, {len(stray)} of ten's, "
+                           f"ten's cache files {files_ten}")
+                return bool(first) and bool(second), detail
+            run("B1", b1)
+
+            def b2():
+                s = session_of("b2")
+                try:
+                    a = s.media_of(str(files["A"]))
+                    s.add(a, at=0)
+                    s.op("select_inspector_tab", tab="transcript")
+                    first = view(s, wait=60)
+                    languages = [l["identifier"] for l in first["bar"]["languages"]]
+                    if len(languages) < 2:
+                        return None, f"this Mac has {len(languages)} installed recognition " \
+                                     f"language(s) ({languages}); B2 needs two"
+                    before = media_files(s, a)
+                    l1 = before[0][len(f"{a}-"):-len(".json")] if before else None
+                    l2 = next(l for l in languages if l != l1)
+                    shown = view(s, language=l2, wait=60)
+                    after = media_files(s, a)
+                    return (shown.get("settled") is True and shown["bar"]["language"] == l2
+                            and l1 is not None and f"{a}-{l1}.json" in after
+                            and f"{a}-{l2}.json" in after and shown.get("tokens"),
+                            f"languages {languages}; first read {before}; language {l2}: "
+                            f"settled {shown.get('settled')}, bar {shown['bar']['language']}, "
+                            f"{len(shown.get('tokens', []))} tokens, files {after}")
+                finally:
+                    close(s)
+            run("B2", b2)
+
+            def b3():
+                import speech_engine_proof
+                _, ten, _, _ = speech_engine_proof.make_fixtures()
+                s = session_of("b3")
+                try:
+                    tenth = s.media_of(ten)
+                    s.add(tenth, at=0)
+                    s.op("set_playhead", t=0)
+                    s.op("select_inspector_tab", tab="transcript")
+                    early, why = reading(s, tenth)
+                    if early is None:
+                        return False, f"(a) {why}"
+                    scheduled = view(s, stop_after=3)
+                    started = time.time()
+                    try:
+                        call = s.op("get_timeline_transcript")
+                    except Exception as problem:  # noqa: BLE001 — the call's refusal is the answer
+                        call = {"error": str(problem)}
+                    took = time.time() - started
+                    after = view(s)
+                    heard = [w for w in call.get("words", []) if w["media"] == tenth]
+                    resumed = view(s, read=True, wait=30)
+                    ok_a = (call.get("ok") is True and heard and took > 3
+                            and scheduled["bar"]["stop_after"] == "pending"
+                            and after["bar"]["stop_after"] == "pressed"
+                            and after.get("status") == "stopped" and after.get("owns_want") is False
+                            and after["bar"]["read_shown"] is True
+                            and [t for t in resumed.get("tokens", []) if t["media"] == tenth]
+                            and resumed.get("status") == "idle")
+                    detail = (f"(a) the call took {took:.1f} s, ok {call.get('ok')}, {len(heard)} words "
+                              f"of ten {call.get('error', '')}; after: stop_after "
+                              f"{after['bar']['stop_after']}, status {after.get('status')} "
+                              f"{after.get('status_text')}, owns_want {after.get('owns_want')}; "
+                              f"Read: {len(resumed.get('tokens', []))} tokens, status "
+                              f"{resumed.get('status')}")
+                finally:
+                    close(s)
+                long, seconds = sp.long_fixture(ten)
+                s = session_of("b3b")
+                try:
+                    tenth = s.media_of(ten)
+                    big = s.media_of(long)
+                    first = s.add(tenth, at=0)
+                    s.add(big, at=s.clip(first)["duration"] + SEC)
+                    s.op("set_playhead", t=0)
+                    s.op("select_inspector_tab", tab="transcript")
+                    early, why = reading(s, tenth)
+                    if early is None:
+                        return False, detail + f"; (b) {why}"
+                    view(s, stop_after=1)
+                    answers, pressed_at = [], None
+                    deadline = time.time() + 30
+                    while time.time() < deadline:
+                        shown = view(s)
+                        if shown["bar"]["stop_after"] == "pressed":
+                            pressed_at = pressed_at or time.time()
+                            answers.append(shown)
+                        if pressed_at and time.time() - pressed_at >= 4:
+                            break
+                        time.sleep(0.25)
+                    wrong = [a for a in answers
+                             if a.get("status") != "stopped" or a.get("owns_want") is not False
+                             or (a.get("fill") or {}).get("media") == big
+                             or not any("2 files not read" in t for t in a.get("status_text", []))]
+                    big_files = media_files(s, big)
+                    ok_b = bool(answers) and not wrong and not big_files
+                    detail += (f"; (b) a {seconds:.0f} s WAV queued: {len(answers)} answers after the "
+                               f"press, {len(wrong)} wrong "
+                               f"{[(w.get('status'), w.get('fill'), w.get('status_text')) for w in wrong[:2]]}"
+                               f"; last {answers[-1].get('status_text') if answers else None}; "
+                               f"the long media's cache files {big_files}")
+                finally:
+                    close(s)
+                return bool(ok_a) and ok_b, detail
+            run("B3", b3)
         finally:
             if app is not None:
                 app.stop()
             if stand_in is not None:
                 stand_in.stop()
+
+
+def screen_row(results):
+    """B4: the screen `11c-transcript-tab` captured light and dark with no new
+    layout problem, on the app `proof_app` chooses."""
+    import proof_app
+    ran = bounded.run([sys.executable, str(ROOT / "tools/proof/screens.py"), "--only",
+                       "11c-transcript-tab", "--app", str(proof_app.bundle())], 900, cwd=str(ROOT))
+    lines = [l for l in ran["stdout"].splitlines() if l.strip()]
+    news = [l for l in lines if l.startswith("new problems:")]
+    results.score("B4", ran["rc"] == 0 and news == ["new problems: 0"],
+                  f"screens.py --only 11c-transcript-tab rc {ran['rc']}: {lines[-4:]}")
 
 
 def build_mutant_app(name):
@@ -536,6 +760,8 @@ def run_rows(wanted, mutant=None):
             return None, why
     if "T11" in wanted:
         spike_row(results)
+    if "B4" in wanted:
+        screen_row(results)
     if app_wanted:
         import proof_app
         if kind == "app":

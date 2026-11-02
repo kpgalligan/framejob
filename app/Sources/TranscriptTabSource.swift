@@ -17,10 +17,15 @@ import Foundation
 /// first) and the waiter's state are guarded by `lock`; `update()` replaces
 /// `pending`, and releases the want when the media the waiter waits on is no
 /// longer needed, which `wait` answers as `.cancelled`.
+///
+/// The bar's view state (TX2b, spec §11 TX-25, TX-26) is here too: Words from
+/// (one track, or all), Language (an installed one, or the Mac's default),
+/// and Stop, which withdraws only the tab's want, and Read.
 final class TranscriptTabSource {
     enum Status: Equatable {
         case idle, loading, reading(name: String, fraction: Double, index: Int, of: Int), noModel
         case failed([String])
+        case stopped(remaining: Int)
     }
 
     private weak var document: ProjectDocument?
@@ -31,6 +36,23 @@ final class TranscriptTabSource {
     private(set) var status: Status = .idle
     private(set) var rebuilds = 0
     private(set) var lastRebuildMilliseconds: Double = 0
+
+    /// Words from: nil is All tracks (TX-25).
+    private(set) var wordsFrom: UInt32?
+    /// Language: a BCP-47 identifier; nil is Automatic, the Mac's default.
+    private(set) var language: String?
+    /// The edited container's tracks, from the last read, in snapshot order.
+    private(set) var tracks: [TrackSnapshot] = []
+    /// The installed languages; nil until read off main.
+    private(set) var languages: [Transcriber.Language]?
+    /// Stop was pressed and neither Read nor a show has come since (TX-26).
+    private(set) var stopped = false
+
+    /// Whether Stop applies: the tab's waiter reads on this Mac.
+    var canStop: Bool {
+        if case .reading = status { return true }
+        return false
+    }
 
     /// Whether the tab's owner wants a media of the fill now.
     var ownsWant: Bool {
@@ -97,6 +119,8 @@ final class TranscriptTabSource {
         if shown {
             failures = [:]
             noModel = false
+            stopped = false
+            loadLanguages()
             update()
             poll = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 self?.polled()
@@ -132,6 +156,8 @@ final class TranscriptTabSource {
         dirty = false
         let started = DispatchTime.now().uptimeNanoseconds
         read = TimelineTranscript.read(document: document)
+        tracks = read?.snapshot.tracks ?? []
+        if let chosen = wordsFrom, !tracks.contains(where: { $0.id == chosen }) { wordsFrom = nil }
         rebuild(started: started)
         refreshPending()
         loadMisses()
@@ -139,6 +165,87 @@ final class TranscriptTabSource {
 
     /// Whether a rebuild was put off by a live gesture.
     var isDirty: Bool { dirty }
+
+    // MARK: - The bar's choices (TX-25, TX-26)
+
+    /// Words from: one track of the edited container, or nil for all.
+    func setWordsFrom(_ track: UInt32?) {
+        guard track != wordsFrom else { return }
+        wordsFrom = track
+        update()
+    }
+
+    /// Language: drops this Mac's words, their misses and failures, and the
+    /// waiter's want, as a hide does, then reads again in the new language.
+    func setLanguage(_ identifier: String?) {
+        guard identifier != language else { return }
+        language = identifier
+        lock.lock()
+        generation += 1
+        pending = []
+        pendingTotal = 0
+        waiting = []
+        wanting = false
+        fill.release(owner: owner)
+        lock.unlock()
+        for (media, heard) in words where heard.engine == .apple {
+            words[media] = nil
+            pauseSets[media] = nil
+        }
+        missItems = [:]
+        failures = [:]
+        loading = []
+        noModel = false
+        update()
+    }
+
+    /// Stop: the tab's want only, the waiter's queue emptied first, so a
+    /// tool call's run of the same media goes on (TX-26).
+    func stop() {
+        guard shown else { return }
+        stopped = true
+        lock.lock()
+        pending = []
+        pendingTotal = 0
+        waiting = []  // so a Read before the waiter wakes pends its media again
+        wanting = false
+        fill.release(owner: owner)  // Stop: the tab's want only (TX-26)
+        lock.unlock()
+        refreshPending()
+        onChange()
+    }
+
+    /// Read: the misses wanted again.
+    func resume() {
+        guard stopped else { return }
+        stopped = false
+        update()
+        onChange()
+    }
+
+    /// The installed languages, read once per show on the load queue.
+    private func loadLanguages() {
+        lock.lock()
+        inFlight += 1
+        lock.unlock()
+        loadQueue.async { [weak self] in
+            let list = Transcriber.languages()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.end()
+                self.languages = list
+                self.onChange()
+            }
+        }
+    }
+
+    /// The chosen language among `list`, else the Mac's default. Any thread.
+    private static func resolve(
+        _ wanted: String?, in list: [Transcriber.Language]
+    ) -> Transcriber.Language? {
+        wanted.flatMap { Transcriber.language(matching: $0, in: list) }
+            ?? Transcriber.defaultLanguage(in: list)
+    }
 
     /// Words and pause sets given whole, then `update()` — for
     /// `transcript_tab_probe.swift` only.
@@ -152,9 +259,12 @@ final class TranscriptTabSource {
 
     // MARK: - The model
 
+    /// The media the shown words need; with a track chosen, only those with
+    /// an instance on it (TX-25).
     private var needed: [UInt32] {
         guard let read else { return [] }
-        return TimelineTranscript.neededMedia(read.instances, window: nil, playhead: read.playhead)
+        let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }
+        return TimelineTranscript.neededMedia(instances, window: nil, playhead: read.playhead)
     }
 
     private func rebuild(started: UInt64 = DispatchTime.now().uptimeNanoseconds) {
@@ -164,9 +274,10 @@ final class TranscriptTabSource {
         }
         if let read {
             let all = TimelineTranscript.words(read.instances, media: words, snapshot: read.snapshot)
-            model = TranscriptTokens.build(all, pauses: pauseSets)
+            let shown = all.filter { wordsFrom == nil || $0.track == wordsFrom }
+            model = TranscriptTokens.build(shown, pauses: pauseSets)
             noWords = read.noWords
-            notes = TimelineTranscript.sameSpeech(all, instances: read.instances)
+            notes = TimelineTranscript.sameSpeech(shown, instances: read.instances)
         } else {
             model = .empty
             noWords = []
@@ -200,6 +311,7 @@ final class TranscriptTabSource {
         }
         loading.formUnion(toLoad)
         let generation = begin()
+        let wanted = self.language
         loadQueue.async { [weak self] in
             var found: [UInt32: (TimelineTranscript.MediaWords, Set<Ticks>)] = [:]
             var missed: [UInt32: TranscriptFill.Item] = [:]
@@ -211,7 +323,7 @@ final class TranscriptTabSource {
                     found[record.id] = (cloud, Self.pauses(cloud, cacheDir: cacheDir))
                     continue
                 }
-                if language == nil { language = Transcriber.defaultLanguage(in: Transcriber.languages()) }
+                if language == nil { language = Self.resolve(wanted, in: Transcriber.languages()) }
                 guard let chosen = language ?? nil else {
                     modelMissing = true
                     continue
@@ -278,7 +390,7 @@ final class TranscriptTabSource {
     /// list; the want released when what the waiter waits on is not needed.
     private func refreshPending() {
         let order = needed
-        let items = order.compactMap { media in
+        let items = stopped ? [] : order.compactMap { media in
             words[media] == nil && failures[media] == nil ? missItems[media] : nil
         }
         lock.lock()
@@ -377,12 +489,15 @@ final class TranscriptTabSource {
         let remaining = pending.count
         let total = pendingTotal
         lock.unlock()
+        let unread = stopped ? needed.filter { words[$0] == nil && missItems[$0] != nil }.count : 0
         if let running {
             let progress = fill.progress()
             let fraction = progress?.media == running.media ? progress?.fraction ?? 0 : 0
             let of = max(total, 1)
             status = .reading(
                 name: running.name, fraction: fraction, index: min(max(total - remaining, 1), of), of: of)
+        } else if unread > 0 {
+            status = .stopped(remaining: unread)
         } else if !failures.isEmpty {
             status = .failed(failures.keys.sorted().compactMap { failures[$0] })
         } else if noModel {

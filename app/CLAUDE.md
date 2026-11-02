@@ -1411,14 +1411,17 @@ the key map behind it.
   `shared-undo` and `tall-placeholder` mutants edit its `.newline` arm,
   `insertTab`'s body, the override and `placeholderRect`'s height, each
   exactly once.
-- `TranscriptPane.swift` · `TranscriptTabSource.swift` · `TranscriptTokens.swift` ·
-  `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) · `TimelineTranscript+Document.swift`
-  · `EditorViewController+Transcript.swift` · `AgentServer+TranscriptView.swift` — the
-  Transcript tab (road map creator-jobs TX2a, spec §11 TX-20…TX-23, §4.3e). The pane is
-  `AssistantPane`'s shape (one view built in `init`, exactly the visible height, its own
-  `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
+- `TranscriptPane.swift` · `TranscriptBar.swift` · `TranscriptTabSource.swift` ·
+  `TranscriptTokens.swift` · `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) ·
+  `TimelineTranscript+Document.swift` · `EditorViewController+Transcript.swift` ·
+  `AgentServer+TranscriptView.swift` — the Transcript tab (road map creator-jobs TX2a, spec
+  §11 TX-20…TX-23, §4.3e). The pane is `AssistantPane`'s shape (one view built in `init`,
+  exactly the visible height, its own `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
   finds itself through a static weak table keyed by the inspector (`TranscriptPane.pane(in:)`);
-  shown follows its superview, window and hidden state. `TranscriptTabSource` (main) reads
+  shown follows its superview, window and hidden state. `TranscriptBar` (TX2b, spec §11
+  TX-24…TX-27) is the pane's one `makeHeader()` instance, pinned above the text: Words from and
+  Language (view state on the source), the status with Stop (the tab's want only) or Read, the
+  same-speech notes and at most three no-words rows. `TranscriptTabSource` (main) reads
   `TimelineTranscript.read(document:)`, rebuilds from a per-media words cache (never while
   `isLiveEditing`), loads misses on a serial `.utility` LOAD queue (cloud first, then the stored
   run, then `TranscriptTokens.pauses`) and runs ONE waiter on a second serial `.utility` queue
