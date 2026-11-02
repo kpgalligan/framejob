@@ -27843,8 +27843,11 @@ The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.
 ## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 beside CO2a1's rows; nine mutants; spec §11 CO-24…CO-29)
 
 The same script, its probe built with `cutout_spike/mask_track_writer.swift` (CO-S2's bar code)
-beside `app/Sources`; the app is launched with `-RCDevAnalysisCanned YES`, so a canned `masks`
-marker (CJ-26) answers. The probe has three modes beside its rows: `barcode <out> <frames>` writes
+beside `app/Sources`. Since CO2b it runs two launches: the canned rows' with
+`-RCDevAnalysisCanned YES`, so a canned `masks` marker (CJ-26) answers, and `-RCDevAnalysisHold
+3600`, because a cut-out clip now wants its masks at once (CO-22) and any publish deletes a canned
+marker — so a missing frame there (D14, D3's two misses) waits 30 s and draws uncut; and D2 and D4,
+which make real masks, in a second launch with neither flag. Z1 reads each launch's log. The probe has three modes beside its rows: `barcode <out> <frames>` writes
 the bar-code movie, `pack <spec>` a canned `masks.pack` (the picture's band 255, the analysed frame's
 index as a bar code below it; every frame or a capped rate), and `mask <pack> <slot> <out>` one
 mask's bytes. Fixtures: `media/cutout/co2a/barcode.mov` (300 frames, 1920 × 1080, frame k carrying
@@ -27879,6 +27882,46 @@ RC_PROOF_APP=release python3 tools/proof/co2a_proof.py --mutant NAME
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO2a2 record.
+
+## Road map "creator-jobs" CO2b — masks made on demand, and files that wait (`co2b_proof.py` P1, P2, W1–W9 with W3b and W4b, Z1; eight mutants; spec §11 CO-22)
+
+**`co2b_proof.py`** builds `co2b_probe.swift` from `app/Sources` with `swift_build.py`'s line (its
+`mask <pack> <slot> <out>` mode writes one mask's bytes for W6), then drives the app over MCP on a
+scratch `CFFIXED_USER_HOME` in two launches. The person rows use `co2a_proof.person_fixtures()`'s
+push-in (`media/cutout/push_1080.mov`, 20 s), imported into each row's own package; W8 and W9 a
+75 s 1080p `testsrc2` movie made once at `media/cutout/co2b/testsrc_75.mov`. A row reads the
+lane through the dev tool `analysis_job`'s `mask_wants` (each want's role, owner, ranges, whether
+it is wanted now, and its run), and the store through the package's marker and pack.
+
+| Row | What it holds |
+|---|---|
+| P1 | (probe) the windows and the need rule: forward, ×0.5, reversed, a `freeze_frame` hold (one source frame), a zero-length window and one at the media's end, by hand; every query CO-24's lookup makes inside the need |
+| P2 | (probe) the keep rule over five open requests (running meeting, ended, running outside, queued inside, queued overlapping) and the new request `requests` builds beside the kept ones |
+| W1 | launch A (`-RCDevAnalysisHold 3`): `set_video {cutout: {}}` → the marker's coverage is the window's need exactly, within 120 s |
+| W2 | `trim_start` widening it → the next document request holds only the new indices; the pack's earlier blobs keep their offsets and bytes |
+| W3b | `render_frame` right after the cutout: the cut picture (equal to a later render, not to cutout off), no uncut sentence |
+| W4 · W7 | a `prores_4444` export started while the marker misses the window: alpha within 1/255 of `render_frame`'s at three frames, colour (premultiplied) within ProRes's 3 levels; then its `mask_wants` rows are `wanted: false` |
+| W4b | a second project, the marker asserted uncovered just before an `apng` export: frames within 1/255 of `render_frame`'s |
+| W5 | `cache/analysis/masks/` read-only: the export fails `cutoutFailed` naming the clip, no file |
+| W6 | a reversed clip: coverage is the mirrored window's need; its frame at 1 s is drawn with the forward mask shown at `T − s − 1` (all-0 neighbourhoods hidden, all-≥ 192 uncut) |
+| W8 | a 75 s clip: `opacity` changed after the first mid-job publish; the job lands, no document row cancelled, coverage the need |
+| W9 | a fresh 75 s clip: an export after the first mid-job publish wants the document's running request, one run analyses the clip's frames, the export completes |
+| W3 | launch B (`-RCDevAnalysisHold 3600`): `render_frame` returns in 30–45 s (a 90 s client bound), byte-identical to cutout off, naming the clip |
+| Z1 | each launch's `grep "Frame Job: "` empty |
+
+Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration, the probe from
+the copy's `app/Sources`; the tree's mutated files' SHA-256 read before and after):
+`M1-no-export-wait` (W4), `M2-wait-after-guard` (W4b), `M3-open-only` (`ensureMasks()` only at
+the open, W2), `M4-unbounded-frame` (W3), `M5-no-release` (W7), `M6-kept-empty` (P2, W8),
+`M7-export-previous-empty` (W9), `M8-queued-as-running` (P2).
+
+```sh
+python3 tools/proof/co2b_proof.py --only P1,P2
+make app-debug && python3 tools/proof/co2b_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co2b_proof.py --mutant NAME
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO2b record.
 
 ## Road map "creator-jobs" TX3a — delete words (`transcript_cut_proof.py` U0–U6, Z0, C1–C9, C4b; ten mutants; `transcript_spike/` TX-S3; spec §11 TX-30…TX-33)
 

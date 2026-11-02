@@ -24,8 +24,13 @@ app):
   and the slot's mask frame equals `deciders.expected_mask` of the frame shown
   there (a reversed clip's at `T − s − 1`, mirrored by `deciders.ends`).
 
-**App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`, or `--app`), one
-launch on a scratch `CFFIXED_USER_HOME` with `-RCDevAnalysisCanned YES`:
+**App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`, or `--app`) on a scratch
+`CFFIXED_USER_HOME`, in two launches. The canned rows' launch adds `-RCDevAnalysisHold 3600`
+to `-RCDevAnalysisCanned YES`: since CO2b (spec §11 CO-22) a cut-out clip's document wants its
+masks at once, and any publish deletes a canned marker, so no job may land there; a frame whose
+masks are missing (D14, D3's two misses) therefore waits 30 s before drawing uncut. D2 and D4,
+which make real masks through `get_media_analysis`, run in a second launch with neither flag.
+The canned launch's rows:
 - D8 each refusal in CO-20's sentence, `get_project` unchanged after each: a
   cutout on a text clip; an action end naming `video.cutout.subject`, then
   `.quality`; `off: ["video.cutout"]`; `edge: 2`.
@@ -49,7 +54,7 @@ launch on a scratch `CFFIXED_USER_HOME` with `-RCDevAnalysisCanned YES`:
   it), and the incoming's codes are scored after the overlap.
 - D11 the freeze case's frames (a still of frame k draws k's mask), D16 the
   reverse case's (frame k draws the forward mask at `T − end`), from D1's.
-- D2 `push_1080.mov` (`cutout_spike.fixtures()`), masks made by
+- D2 (the second launch) `push_1080.mov` (`cutout_spike.fixtures()`), masks made by
   `get_media_analysis` over 0–2 s, at 3 `render_frame`s on an opaque canvas:
   every pixel whose 3 × 3 mask-texel neighbourhood is all 0 equals the frame
   with the clip hidden (opacity 0), and all ≥ 192 (where r0's remap is exactly
@@ -59,7 +64,7 @@ launch on a scratch `CFFIXED_USER_HOME` with `-RCDevAnalysisCanned YES`:
 - D3 a canned pack whose coverage [200, 299] misses frame 60, and a stamped
   marker of another stamp, each draw byte-identical to cutout off (control:
   frame 250 draws its mask).
-- D4 `screen_4k.mov`'s real masks over 0–2 s (no person): 3 frames with the
+- D4 (the second launch) `screen_4k.mov`'s real masks over 0–2 s (no person): 3 frames with the
   cutout equal those with none, byte for byte (CO-5).
 - D6 a blur-0 shadow 20 px down: where the layer's alpha is 0, the shadow's
   alpha is the layer's 20 px above, within 1/255.
@@ -138,6 +143,8 @@ D15_TIMES = [SEC // 4, SEC, 3 * SEC // 2]
 # The integration HEAD CO2a2 was built on: D15's base app.
 BASE = "f82c5b202e4d517abb20a85882cfc61bf99a7377"
 CANNED = ["-RCDevAnalysisCanned", "YES"]
+# No job may land beside a canned marker (CO-22: a cut-out clip wants its masks at once).
+HELD = ["-RCDevAnalysisHold", "3600"]
 PROBE = None
 
 LOOKUP = "app/Sources/CutoutLookup.swift"
@@ -1134,8 +1141,45 @@ def d15(ours):
           f"{len(theirs[1])}, {'equal' if ours[1] == theirs[1] else 'different'}")
 
 
+def launch_rows(binary, arguments, log, bodies):
+    """`bodies` in one instance launched with `arguments`; Z1 over its log."""
+    launched = mcp.launch(str(binary), arguments,
+                          env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                          log_path=str(log), timeout=CALL_BOUND)
+    ours = None
+    try:
+        if launched.client is None:
+            for names, _ in bodies:
+                for row in names & selected:
+                    check(row, False, "the app did not listen")
+            return None
+        print(f"  instance PID {launched.child.pid} ({' '.join(arguments) or 'no flags'})",
+              flush=True)
+        for names, body in bodies:
+            if not names & selected:
+                continue
+            try:
+                body(launched.client)
+            except Exception as error:  # noqa: BLE001 — a row's failure, never the run's
+                for name in names & selected:
+                    check(name, False, f"{type(error).__name__}: {error}")
+        if "D15" in selected and any("D15" in names for names, _ in bodies):
+            try:
+                ours = d15_outputs(launched.client, "ours")
+            except Exception as error:  # noqa: BLE001
+                check("D15", False, f"this build's outputs: {type(error).__name__}: {error}")
+    finally:
+        launched.stop()
+        try:
+            lines = [line.strip() for line in open(log, errors="replace")
+                     if "Frame Job: " in line]
+        except OSError:
+            lines = [f"{log} could not be read"]
+        check("Z1", not lines, f"{log.name}: grep 'Frame Job: ' printed {lines[:3] or 'nothing'}")
+    return ours
+
+
 def app_rows(binary):
-    log = WORK / "instance.log"
     ours = None
     try:
         if selected & {"D1", "D11", "D16", "D12"}:
@@ -1145,42 +1189,19 @@ def app_rows(binary):
     except Exception as error:  # noqa: BLE001 — the fixture's failure is the rows'
         for name in selected & {"D1", "D11", "D16", "D12", "D3", "D6", "D7"}:
             check(name, False, f"the bar-code fixtures: {error}")
-    launched = mcp.launch(str(binary), CANNED,
-                          env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
-                          log_path=str(log), timeout=CALL_BOUND)
-    try:
-        if launched.client is None:
-            for row in selected & set(APP_ROWS):
-                check(row, False, "the app did not listen")
-            return
-        print(f"  instance PID {launched.child.pid}", flush=True)
-        for names, body in [({"D8"}, d8), ({"D10"}, d10), ({"D13", "D14"}, d13_d14),
-                            ({"D1", "D11", "D16"}, d1), ({"D2"}, d2), ({"D3"}, d3),
-                            ({"D4"}, d4), ({"D6"}, d6), ({"D7"}, d7), ({"D12"}, d12)]:
-            if not names & selected:
-                continue
-            try:
-                body(launched.client)
-            except Exception as error:  # noqa: BLE001 — a row's failure, never the run's
-                for name in names & selected:
-                    check(name, False, f"{type(error).__name__}: {error}")
-        if "D15" in selected:
-            try:
-                ours = d15_outputs(launched.client, "ours")
-            except Exception as error:  # noqa: BLE001
-                check("D15", False, f"this build's outputs: {type(error).__name__}: {error}")
-    finally:
-        launched.stop()
+    canned = [({"D8"}, d8), ({"D10"}, d10), ({"D13", "D14"}, d13_d14),
+              ({"D1", "D11", "D16"}, d1), ({"D3"}, d3), ({"D6"}, d6), ({"D7"}, d7),
+              ({"D12"}, d12), ({"D15"}, lambda client: None)]
+    real = [({"D2"}, d2), ({"D4"}, d4)]
+    if any(names & selected for names, _ in canned):
+        ours = launch_rows(binary, CANNED + HELD, WORK / "instance.log", canned)
+    if any(names & selected for names, _ in real):
+        launch_rows(binary, [], WORK / "instance-real.log", real)
     if ours is not None:
         try:
             d15(ours)
         except Exception as error:  # noqa: BLE001
             check("D15", False, f"{type(error).__name__}: {error}")
-    try:
-        lines = [line.strip() for line in open(log, errors="replace") if "Frame Job: " in line]
-    except OSError:
-        lines = [f"{log} could not be read"]
-    check("Z1", not lines, f"grep 'Frame Job: ' printed {lines[:3] or 'nothing'}")
 
 
 def main():

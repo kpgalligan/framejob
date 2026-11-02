@@ -480,7 +480,8 @@ detail there.
   `AgentServer+AnalysisMasks.swift` ·
   `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
   `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
-  `EditorViewController+ShotSplit.swift` —
+  `EditorViewController+ShotSplit.swift` · `ProjectDocument+Masks.swift` ·
+  `CutoutWants.swift` · `EditorViewController+Cutout.swift` —
   on-device analysis of the media (road map creator-jobs CJ2a, spec §11
   CJ-20…CJ-29): a cache made on demand in `cache/analysis/<kind>/`, never at
   import, never project state, never read by the plan or the recipe.
@@ -531,6 +532,27 @@ detail there.
   dismisses, its one owner released in `viewDidDisappear`);
   `EditorViewController+ShotSplit` the menu door, its stale test and
   `validateShotSplitAction`.
+  Masks made when a clip asks (road map creator-jobs CO2b, spec §11 CO-22):
+  `ensureMasks()` (`ProjectDocument+Masks.swift`, the last line of
+  `ensureRampAudio()`, never in a live gesture) wants the analysed ranges
+  every plan video segment of a base cut-out clip needs, in `project` and
+  with a nest open `editedProject`, under one lane owner per document (a
+  main-only table keyed by `recipeKey`; alive while the `RecipeSource` slot
+  holds a project), built and wanted on `CutoutWants.queue`;
+  `masksDidSettle()` re-reads the package date and wants again.
+  `CutoutWants.swift` (names no `rc_*`) is the windows (forward, or mirrored
+  about the pivot), the need rule (`⌊lower·rate + 1e-9⌋ … index(of:
+  max(lower, upper − 1))`), the keep rule over
+  `AnalysisLane.openRequests(kind:cacheDir:)` — every owner's queued and
+  running requests: a running one meeting the need kept, a queued one only
+  when wholly inside it, an ended one never — the requests (kept plus one
+  remainder per media with a miss), and the dev log `analysis_job`'s
+  `mask_wants` reads. `AnalysisStore.publishFile` posts
+  `.analysisDidPublish` (`kind`, `media`, the standardized `cacheDir`) on
+  main after each publish; `EditorViewController+Cutout.swift` refreshes the
+  paused frame for a `masks` publish in its document's cache folder.
+  `ProjectDocument.analysisRequest`'s static form (`…need:`, `nonisolated`)
+  is what the wants call off main; `analysisInput` is `nonisolated` for it.
 - `ProjectDocument+Derived.swift` · `DerivedCarry.swift` ·
   `EditorViewController+NewFromRange.swift` · `AgentServer+Derived.swift` ·
   `AgentCatalog+Derived.swift` — File ▸ New Project from Range… and the
@@ -765,6 +787,10 @@ the key map behind it.
 **The editor.**
 - `EditorViewController+Graphics` refreshes the paused frame on
   `.projectGraphicsDidChange` for its own document.
+- `EditorViewController+Cutout` refreshes the paused frame on
+  `.analysisDidPublish` for a `masks` publish in its own document's cache
+  folder (spec §11 CO-22 (d)); its observer is one statement in the frozen
+  file's `viewDidLoad`, beside `cursorTrackDidLand`'s.
 - `EditorViewController+Panes.swift` — `PaneSplitView`, whose
   `isDraggingDivider` is true only inside `mouseDown(with:)` (AppKit's divider
   drag), and `savePaneSize`: the timeline height and inspector width are saved
@@ -883,8 +909,12 @@ the key map behind it.
   conversation with a note on a Settings key or model change;
   the frozen file stores `assistantTranscript` and a weak `assistantView`),
   `+Export` (the
-  dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
-  no burn-in), `+PreviewQuality`, `+Eyedropper`, `+Qualifier` (Pick from Canvas,
+  dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue` through
+  `renderFrameReported` with `frameCutoutWait`, and after a successful save
+  with a cut-out clip drawn whole shows the informational "Saved without
+  Remove Background" sheet, spec §11 CO-22 (f); passes no burn-in; its save
+  panel's accessory view is `SaveFrameOptions.swift`, a pure move, road map
+  creator-jobs CO2b's toll), `+PreviewQuality`, `+Eyedropper`, `+Qualifier` (Pick from Canvas,
   spec §11 GR-13) and `+ZoomRegion`.
 - The three modal canvas modes (`+Eyedropper` and `+Qualifier` on
   `CanvasPickOverlay`, `+ZoomRegion` on `CanvasRegionView`) install a bare view
@@ -1657,9 +1687,13 @@ the key map behind it.
   isolation is wanted once that lands, AU-143) and
   `.reversedMediaDidChange`, so the frozen editor rebuilds with no change
   and the Voice Isolation and Voice Effect statuses read again.
+  `ensureRampAudio()` ends with `ensureMasks()` (`ProjectDocument+Masks.swift`,
+  spec §11 CO-22 (b)), so every caller of it wants the cut-out clips' masks
+  too.
   `Exporter+RampAudio.swift` — the export's wait for every ramp render it
   needs and every isolated window (`isolationFailed`), then a second wait
-  for every voiced window (`voiceFailed`, AU-147), before the build (a
+  for every voiced window (`voiceFailed`, AU-147), before the build, after
+  the person masks' wait (`waitForMasks`, CO-22 (e)) (a
   ramp's failure fails the export as `rampAudioFailed`; it never writes a
   placeholder), its wants released by `Exporter.releaseRecipeKey`, and
   `waitForLevels`, the wait for a gated or de-essed clip's loudness still
@@ -2253,6 +2287,13 @@ the key map behind it.
   CU3a2's toll; it carries the `copyCGImage` warning) · `Exporter+Cursor.swift`
   (`ExportCursorWarning`, `waitForCursors`: an export waits for every clip's cursor
   track, a frame for its own, a failed file one warning per media, spec §11 CU-37) ·
+  `Exporter+Masks.swift` (road map creator-jobs CO2b, spec §11 CO-22 (e), (f): `waitForMasks`,
+  the export's wait for every person mask its range draws, called by `withRampAudio` BEFORE its
+  image-sequence guard so GIF and APNG wait too, under a lane owner per export key released by
+  `releaseMasks` inside `releaseRecipeKey`'s `ramp` deferral — `AnalysisLane.wait` asks
+  `cancelled()` under the lane's lock — failing `cutoutFailed`; `waitForFrameMasks`,
+  `renderFrameReported`'s when `cutoutWait` is positive, `frameCutoutWait` 30 s for
+  `render_frame` and Save Frame, answering `RenderedFrame.uncut`; `cutoutSentences`) ·
   `ExportAV1Encoder.swift` · `ExportVideoEncoder.swift` (the `ExportVideoEncoder` protocol,
   `ExportEncodedPacket`, `ExportRateTable`, spec §11 CX-16) · `ExportVP9Encoder.swift`
   (`VP9Encoder`, libvpx through `app/Bridging/FrameJobVPX.h`'s two `static inline` shims for

@@ -188,6 +188,30 @@ final class AnalysisLane: @unchecked Sendable {
         return fractions[request]
     }
 
+    /// What `owner` wants now (spec §11 CO-22 (h)). Any thread; no poll.
+    func requests(of owner: Int) -> [AnalysisRequest] {
+        condition.lock()
+        defer { condition.unlock() }
+        return owners[owner]?.requests ?? []
+    }
+
+    /// Every owner's running and queued requests of `kind` for `cacheDir` (compared
+    /// standardized), running first — the jobs a cutout's want may share (spec §11 CO-22 (c)).
+    /// Any thread; no poll.
+    func openRequests(kind: AnalysisKind, cacheDir: URL) -> [AnalysisRequest] {
+        let folder = cacheDir.standardizedFileURL
+        condition.lock()
+        defer { condition.unlock() }
+        let mine = { (request: AnalysisRequest) in
+            request.kind == kind && request.cacheDir.standardizedFileURL == folder
+        }
+        let started = running.keys.filter(mine).sorted {
+            ($0.media.id, $0.ranges.first?.lowerBound ?? 0)
+                < ($1.media.id, $1.ranges.first?.lowerBound ?? 0)
+        }
+        return started + queued.filter(mine)
+    }
+
     // MARK: - The queue
 
     private func wantedLocked(_ request: AnalysisRequest) -> Bool {

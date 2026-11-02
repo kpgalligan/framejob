@@ -99,6 +99,10 @@ extension AgentServer {
     /// where the clip is not on the frame. An id naming no adjustment clip of
     /// the edited project is refused, naming `selection`.
     ///
+    /// **A cut-out clip waits for its masks** (spec §11 CO-22 (f)): up to
+    /// `Exporter.frameCutoutWait` (30 s), then drawn uncut and named, one
+    /// sentence per clip just before the last.
+    ///
     /// **A graphic that warned or failed is named** (G-8, G3c): one sentence
     /// per report the frame's pin held, before the last. The set is the
     /// DOCUMENT's (`recipeKey`), not the scoped handle's: a nest draws the
@@ -166,7 +170,8 @@ extension AgentServer {
         // through the reader (spec §11 PR-9, PR-12); Save Frame passes the same.
         let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
-            graphics: graphics, keepsDepth: format.carriesDepth)
+            graphics: graphics, keepsDepth: format.carriesDepth,
+            cutoutWait: Exporter.frameCutoutWait)
         guard let image = rendered.image else {
             throw ToolError(
                 message: "No frame at \(time). Either the time is past the end of the timeline, "
@@ -218,6 +223,10 @@ extension AgentServer {
             let signal = ScopeSignal(output: output, dynamicRange: options.dynamicRange)
             text += " " + (try Self.writeScopes(
                 scopes, vectorscopeZoom: vectorscopeZoom, signal: signal, of: image, beside: url))
+        }
+        // A cut-out clip whose masks were not ready within the wait (spec §11 CO-22 (f)).
+        for sentence in Exporter.cutoutSentences(rendered.uncut) {
+            text += " " + sentence
         }
         text += " Written to \(url.path)."
         return try callResult(

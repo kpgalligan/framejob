@@ -61,17 +61,22 @@ extension Exporter {
     /// `renderFrame`, with what the frame's graphics reported while it was
     /// drawn — read off the key's pin before it is dropped — and each cursor
     /// file it could not draw. It waits first for the cursor tracks the
-    /// recipe at `t` names (spec §11 CU-37 (b), `waitForCursors`).
+    /// recipe at `t` names (spec §11 CU-37 (b), `waitForCursors`), then, when
+    /// `cutoutWait` is positive (`render_frame` and Save Frame pass
+    /// `frameCutoutWait`), up to that long for the person masks it draws
+    /// (spec §11 CO-22 (f), `waitForFrameMasks`), and reports in `uncut` the
+    /// clips drawn without theirs.
     static func renderFrameReported(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions, graphics: GraphicSet?, keepsDepth: Bool = false
+        options: RecipeOptions, graphics: GraphicSet?, keepsDepth: Bool = false,
+        cutoutWait: TimeInterval = 0
     ) -> RenderedFrame {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
         // so the recipe can still drive every frame. Only a genuinely empty
         // timeline has nothing to render.
         guard let plan = project.plan, plan.duration > 0 else {
-            return RenderedFrame(image: nil, graphics: [], cursorWarnings: [])
+            return RenderedFrame(image: nil, graphics: [], cursorWarnings: [], uncut: [])
         }
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
@@ -89,6 +94,11 @@ extension Exporter {
         // taken.
         let cursorWarnings = (try? waitForCursors(
             project: project, key: key, at: max(0, t), options: options, cancelled: { false })) ?? []
+        let uncut = cutoutWait > 0
+            ? waitForFrameMasks(
+                project: project, urls: urls, key: key, at: max(0, t), options: options,
+                limit: cutoutWait)
+            : []
 
         let built: BuiltComposition
         do {
@@ -97,12 +107,13 @@ extension Exporter {
         } catch {
             return RenderedFrame(
                 image: nil, graphics: GraphicRegistry.shared.reports(for: key),
-                cursorWarnings: cursorWarnings)
+                cursorWarnings: cursorWarnings, uncut: uncut)
         }
         if DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth) {
             return RenderedFrame(
                 image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
-                graphics: GraphicRegistry.shared.reports(for: key), cursorWarnings: cursorWarnings)
+                graphics: GraphicRegistry.shared.reports(for: key), cursorWarnings: cursorWarnings,
+                uncut: uncut)
         }
 
         let generator = AVAssetImageGenerator(asset: built.composition)
@@ -120,7 +131,7 @@ extension Exporter {
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
         return RenderedFrame(
             image: image, graphics: GraphicRegistry.shared.reports(for: key),
-            cursorWarnings: cursorWarnings)
+            cursorWarnings: cursorWarnings, uncut: uncut)
     }
 
     /// `size` capped to `maxWidth`, aspect kept, never upscaled and never

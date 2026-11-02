@@ -22,7 +22,8 @@ import Foundation
 /// alone, sorted keys, `.atomic`. A throw removes the `.partial` and leaves
 /// marker and payload as they were. Two jobs of one media therefore merge
 /// rather than overwrite one another (P8). `publish(…merge:)` is the same
-/// door for a kind that edits its payload's bytes in memory (`shots`).
+/// door for a kind that edits its payload's bytes in memory (`shots`). Each
+/// publish that lands posts `.analysisDidPublish` on main (spec §11 CO-22 (d)).
 enum AnalysisStore {
 
     enum StoreError: LocalizedError {
@@ -204,6 +205,13 @@ enum AnalysisStore {
         let published = MediaImporter.CacheLedger.shared.publish(in: cacheDir, for: nil) { body() }
         guard published else { throw StoreError.saveInFlight }
         if let failure { throw failure }
+        // A paused preview redraws with what just landed (spec §11 CO-22 (d)).
+        let name = kind.rawValue, folder = cacheDir.standardizedFileURL.path
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .analysisDidPublish, object: nil,
+                userInfo: ["kind": name, "media": mediaID, "cacheDir": folder])
+        }
     }
 
     /// The publish's body; the per-media lock and the ledger are held.
@@ -255,4 +263,10 @@ enum AnalysisStore {
             throw StoreError.write(error.localizedDescription)
         }
     }
+}
+
+extension Notification.Name {
+    /// A publish landed (spec §11 CO-22 (d)): `userInfo` `kind` (the raw value), `media`
+    /// (`UInt32`) and `cacheDir` (the standardized path); posted on main, object nil.
+    static let analysisDidPublish = Notification.Name("FrameJobAnalysisDidPublish")
 }

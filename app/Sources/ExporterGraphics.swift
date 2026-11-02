@@ -23,11 +23,14 @@ extension Exporter {
 
     /// One offline frame and what its graphics reported while it was drawn:
     /// the failure first, then the warnings (`GraphicRegistry.reports`); and
-    /// each cursor file the frame could not draw (spec §11 CU-37 (c)).
+    /// each cursor file the frame could not draw (spec §11 CU-37 (c)); and
+    /// each cut-out clip drawn uncut because its masks were not ready within
+    /// the frame's wait, ascending (spec §11 CO-22 (f)).
     struct RenderedFrame {
         let image: CGImage?
         let graphics: [GraphicReport]
         let cursorWarnings: [ExportCursorWarning]
+        let uncut: [UInt32]
     }
 
     /// `.graphicsNotCompiled` when a graphic clip the export will draw has a

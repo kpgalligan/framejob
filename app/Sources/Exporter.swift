@@ -460,7 +460,10 @@ final class Exporter {
         RecipeSource.shared.unregister(key)
         GraphicPrefetch.shared.stop(key)
         GraphicRegistry.shared.unpin(key)
-        ramp { RampAudioRenders.shared.release(owner: key) }
+        ramp {
+            RampAudioRenders.shared.release(owner: key)
+            Exporter.releaseMasks(key: key)
+        }
         recipeKey = nil
     }
 

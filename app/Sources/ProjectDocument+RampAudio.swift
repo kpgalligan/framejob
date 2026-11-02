@@ -61,6 +61,7 @@ extension ProjectDocument {
         RampAudioRenders.shared.want(requests, owner: recipeKey) { [weak self] in
             self?.rampAudioDidSettle()
         }
+        ensureMasks()
     }
 
     /// A render this document wants landed or failed (SR-12 (f), AU-52,

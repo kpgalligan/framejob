@@ -131,6 +131,29 @@ extension AgentServer {
             }
             return row
         }
+        // Every want a cutout made (spec §11 CO-22 (h)): the document's, an export's, a frame's.
+        result["mask_wants"] = CutoutWants.logged.map { entry -> [String: Any] in
+            let request = entry.request
+            var row: [String: Any] = [
+                "role": entry.role.rawValue, "owner": entry.owner, "media": Int(request.media.id),
+                "ranges": request.ranges.map { [$0.lowerBound, $0.upperBound] },
+                "wanted": lane.requests(of: entry.owner).contains(request),
+            ]
+            if let run = lane.run(of: request) {
+                row["queued_at"] = run.queuedAt
+                if let started = run.startedAt { row["started_at"] = started }
+                if let ended = run.endedAt { row["ended_at"] = ended }
+                switch run.outcome {
+                case .landed?: row["outcome"] = "landed"
+                case .failed(let why)?:
+                    row["outcome"] = "failed"
+                    row["error"] = why
+                case .cancelled?: row["outcome"] = "cancelled"
+                case .timedOut?, nil: break
+                }
+            }
+            return row
+        }
         return try jsonResult(result)
     }
 
@@ -147,8 +170,11 @@ extension AgentServer {
                 + "\(Int(AnalysisLane.callWaitLimit))) it then waits until every job a dev "
                 + "owner wanted has ended. Answers {ok, now (process uptime), wanted: "
                 + "{project, media, hit}, jobs: [{project, media, kind, ranges, queued_at, "
-                + "started_at, ended_at, outcome}]}: every job a dev owner wanted since launch. "
-                + "Without media it targets no document.",
+                + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, ranges, "
+                + "wanted, outcome, error, queued_at, started_at, ended_at}]}: every job a dev "
+                + "owner wanted since launch, and every want a cutout made (role document, "
+                + "export or frame; wanted while that owner wants it now). Without media it "
+                + "targets no document.",
             [
                 "media": [
                     "type": "integer", "description": "The media whose window to want.",

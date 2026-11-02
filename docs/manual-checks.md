@@ -119,9 +119,14 @@ the same way.
 - **Source:** road map "audio" AP13 (spec §11 AU-130…AU-136; `scrub_audio_probe.py` scores the scheduler, the window, the reader and the queue, never the sound on the Mac's output).
 
 **JOB-61 — Remove Background plays smoothly**
-- **Do:** Place a 1080p camera clip of yourself above a 4K screen recording. Make its person masks with `get_media_analysis {media, kind: "masks"}` over the whole clip, then set `video.cutout` on it (`set_video {cutout: {}}`). Play 30 s from several points, at Full and at Half Preview Quality; then turn the cutout off (`set_video {cutout: null}`) and play the same stretches.
+- **Do:** Place a 1080p camera clip of yourself above a 4K screen recording. Set `video.cutout` on it (`set_video {cutout: {}}`) and wait for its person masks to be made. Play 30 s from several points, at Full and at Half Preview Quality; then turn the cutout off (`set_video {cutout: null}`) and play the same stretches.
 - **Expect:** no stutter or dropped frames beyond what the same timeline shows with the cutout off; the person's edge stays on the person as they move.
 - **Source:** road map creator-jobs CO2a2, spec §11 CO-27.
+
+**JOB-62 — A paused picture is cut out without pressing play**
+- **Do:** Pause on a 1080p camera clip of yourself, set its cutout over MCP (`set_video {cutout: {}}`) and watch the preview without touching anything.
+- **Expect:** the paused picture shows the clip whole first, then cut to the person — without pressing play — within the analysis time (about the clip's own length).
+- **Source:** road map creator-jobs CO2b, spec §11 CO-22 (d).
 
 ## Timeline, canvas and keys
 

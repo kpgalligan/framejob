@@ -341,3 +341,76 @@ own sentence.
   - **(e) The tool.** The op tool `retime_range` describes its four arguments and carries
     SpeedAudioDrop's agent note; its answer adds `audio_left_out` and `audio_note` from the
     baseline's crossing, read before the edit, beside `new_clips`.
+
+CO-22 is CO2b's (masks made on demand, and files that wait), recorded before its code; the number
+was reserved by CO0 for this phase. The owner's answers it builds on: analysis at once (CO-15, the
+CO1 answer of 2026-11-01), and for CO2b a pending cutout drawn uncut in the preview — **yes**, with
+the status saying so, which is CO3's Background section. No format bump, no core change, no `rc_*`.
+
+- **CO-22 — Masks are made when a clip asks; a file waits for them.**
+  - **(a) What is wanted.** Every plan video segment (duration > 0) of a clip — top level or inside
+    a nest — whose BASE `video.cutout` is set (any `background`), from the document's `project`
+    and, with a nest open, its `editedProject`; a media with no file (a slate) is not wanted. A
+    window is in FORWARD source ticks: forward `[sourceTick(a), sourceTick(b))`, reversed (its
+    pivot T from `ReverseMirror.pivot`) `[T − sourceTick(b), T − sourceTick(a))`, where `[a, b)` is
+    the segment clipped to the range asked (none: the whole segment) and `sourceTick` is
+    `CutoutLookup.sourceTick`. **The need rule** — what CO-24's lookup can ask of a window — is
+    `⌊lower·rate + 1e-9⌋ … grid.index(of: max(lower, upper − 1))`, clamped to the grid: at most one
+    frame past a frame-aligned window, so a ×0.5 clip's last frame is not a miss. One request per
+    media, holding its merged missing ranges (`AnalysisStore.lookup` per need range).
+  - **(b) When.** `ensureMasks()` is the last line of `ensureRampAudio()`, so it runs after every
+    edit, at the open, when a reverse lands and when a ramp settles — never inside a live gesture —
+    and at once (CO-15). Main reads the handles, `mediaURLs()` and `cacheDirectory` (only when a
+    cut-out clip exists; with none it releases a want it made before); `CutoutWants.queue`, one
+    serial `.utility` queue for every document, builds the requests and wants them. One lane owner
+    per document (`AnalysisLane.newOwner()`), alive while `RecipeSource.shared.project(for:
+    recipeKey)` is not nil; a settle calls `masksDidSettle()` on main:
+    `packageContentsDidChangeOnDisk()`, then `ensureMasks()`.
+  - **(c) The keep rule, for every role (document, export, frame).** The candidates are
+    `AnalysisLane.openRequests(kind: .masks, cacheDir:)` — every owner's queued and running masks
+    requests for that cache folder — so an export or a frame shares the document's job rather than
+    queueing a second one behind it (`pictureWidth` 1). Of these, a **running** request (started,
+    not ended) whose ranges meet its media's need is kept; a **queued** one only when every range
+    of it lies inside its media's need, so a queued job never analyses frames nobody wants; an
+    ended one never. Only a media with a miss is wanted at all. The caller wants the kept requests
+    plus, per media, a new request holding only the needed, uncovered indices outside the kept
+    requests' ranges. An edit never restarts a running job that has published.
+  - **(d) A publish redraws.** `AnalysisStore.publishFile` posts `.analysisDidPublish` on main after
+    each successful publish (`kind`, `media`, the standardized `cacheDir`); the editor of the
+    document whose `intendedCacheDirectory` matches, for `masks`, calls
+    `playback.refreshPausedFrame()` (CU3a2's path). No rebuild: the plan did not change and the
+    compositor re-reads the pack on the marker's stat (CO-25). This replaces the road map's
+    `.reversedMediaDidChange` line.
+  - **(e) An export waits** in `Exporter.withRampAudio`, before its image-sequence guard, so a GIF
+    or an APNG waits too, for `windows(plan:, range: start ..< start + duration)` of its settings,
+    under a lane owner of its own (alive always, made at its first want, kept per export recipe key
+    and released by `Exporter.releaseMasks(key:)` inside `releaseRecipeKey`'s `ramp` deferral).
+    No cache folder, an unreadable media or a failed job fails it `cutoutFailed` — "Clip N's person
+    masks could not be made: <why>." — naming the first window's clip of that media, the reason
+    "the project has no cache folder to keep the analysis in", the request error's sentence, or
+    the job's own. It wants and `AnalysisLane.wait`s on (c)'s kept requests plus the remainder,
+    with no deadline but the export's `cancelled`; after `.landed` the store is read again, and a
+    media still missing after a second landing fails it ("its masks do not cover the frames it
+    plays").
+  - **(f) A frame waits** only when asked (`cutoutWait > 0`): `render_frame` and File ▸ Save
+    Frame… pass 30 s (`Exporter.frameCutoutWait`); the eyedropper, the look gallery, the qualifier
+    pick, `snapshot_ui`, thumbnails and an image sequence's frames pass none (CO-6). Its windows are
+    the recipe layers at t with `cutout.background == remove`, `mask.kind == media` and a `.track`
+    source, through `CutoutPlan.covering`, over `[t, t + 1)`. It wants (c)'s requests under a
+    fresh owner, polls the store every `AnalysisLane.pollInterval` until every need is covered, one
+    of its requests failed, or the limit, then releases the owner. Drawn uncut, and named: those
+    layers' clips still uncovered (an unreadable media at once; with no cache folder, every one).
+    `render_frame` says "Clip N is drawn uncut: its person masks were not ready within 30 s." once
+    per clip, ascending, before its last sentence; Save Frame, after a successful save, shows an
+    informational sheet "Saved without Remove Background" — "<file names> drawn whole: the person
+    masks were not ready within 30 seconds." A clip covered with no person found (CO-5) is not
+    named.
+  - **(g) The preview** draws a pending, cancelled or failed cutout uncut (CO-6, the owner's CO2b
+    answer); the status saying so is CO3's Background section.
+  - **(h) The dev log.** In a dev build every want of the three roles is logged once per (role,
+    owner, request), the last 512 kept; `analysis_job` answers them as `mask_wants: [{role, owner,
+    media, ranges, wanted, outcome?, error?, queued_at?, started_at?, ended_at?}]`, `wanted` true
+    while that owner wants it now, always present.
+  - **(i) The proof** is `co2b_proof.py`: P1 (the need rule), P2 (the keep rule), W1–W9 with W3b
+    and W4b, Z1, and eight mutants; JOB-62 is the person's check that a paused picture redraws
+    cut without play.

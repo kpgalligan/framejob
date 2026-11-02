@@ -1239,8 +1239,21 @@
    "reached_after": [
     {
      "selector": "saveFrame:",
-     "via": "app/Sources/EditorViewController+SaveFrame.swift `DispatchQueue.main.async { self?.frameSaved(result, in: window) }`",
-     "gate": "app/Sources/EditorViewController+SaveFrame.swift `guard case .failure(let error) = result else { return }` — the render or the write failed"
+     "via": "app/Sources/EditorViewController+SaveFrame.swift `DispatchQueue.main.async { self?.frameSaved(result, in: window, uncut: uncut) }`",
+     "gate": "app/Sources/EditorViewController+SaveFrame.swift `guard case .failure(let error) = result else {` — the render or the write failed"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+SaveFrame.swift:239": {
+   "token": "beginSheetModal",
+   "func": "showUncutFrameNote",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "saveFrame:",
+     "via": "app/Sources/EditorViewController+SaveFrame.swift `DispatchQueue.main.async { self?.frameSaved(result, in: window, uncut: uncut) }`",
+     "gate": "app/Sources/EditorViewController+SaveFrame.swift `if !uncut.isEmpty { showUncutFrameNote(uncut, in: window) }` — the save succeeded and uncut is not empty (a cut-out clip's masks were not ready within 30 s, spec §11 CO-22 (f))"
     }
    ],
    "other_caller": ""

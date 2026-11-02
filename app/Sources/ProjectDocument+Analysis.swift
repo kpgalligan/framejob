@@ -36,29 +36,46 @@ extension ProjectDocument {
         let urls = mediaURLs()
         guard let url = urls[media.id] else { throw AnalysisRequestError.missingFile(media.id) }
         guard let cacheDir = cacheDirectory else { throw AnalysisRequestError.noCache }
-        let (input, fullRange) = Self.analysisInput(media: media, url: url, urls: urls)
+        let grid = AnalysisGrid(media: media)
+        // No index in the window is no need: the stamp is still made first, so an unreadable
+        // file throws as it always did.
+        let need = grid.indices(from: window.lowerBound, to: window.upperBound)
+            .map { [grid.need($0, margin: kind.margin)] } ?? []
+        return try Self.analysisRequest(
+            kind: kind, media: media, url: url, urls: urls, cacheDir: cacheDir, need: need)
+    }
+
+    /// The request `kind` needs over the grid indices `need` of `media` at `url` (road map
+    /// creator-jobs CO2b, spec §11 CO-22): nil when every range is a hit; else one request
+    /// holding the merged missing ranges. Throws `.unreadable` when the stamp cannot be made.
+    /// Any thread: a cutout's wants build here off main.
+    nonisolated static func analysisRequest(
+        kind: AnalysisKind, media: MediaSnapshot, url: URL, urls: [UInt32: URL],
+        cacheDir: URL, need: [ClosedRange<Int>]
+    ) throws -> AnalysisRequest? {
+        let (input, fullRange) = analysisInput(media: media, url: url, urls: urls)
         guard
             let stamp = AnalysisStamp.make(
                 kind: kind, media: media, url: url, input: input, fullRange: fullRange)
         else { throw AnalysisRequestError.unreadable(media.id) }
-        let grid = AnalysisGrid(media: media)
-        guard let indices = grid.indices(from: window.lowerBound, to: window.upperBound) else {
-            return nil
+        var missing: [ClosedRange<Int>] = []
+        for range in need {
+            switch AnalysisStore.lookup(kind, media: media.id, stamp: stamp, need: range, in: cacheDir)
+            {
+            case .hit: continue
+            case .miss(let ranges): missing += ranges
+            }
         }
-        let need = grid.need(indices, margin: kind.margin)
-        switch AnalysisStore.lookup(kind, media: media.id, stamp: stamp, need: need, in: cacheDir) {
-        case .hit: return nil
-        case .miss(let ranges):
-            return AnalysisRequest(
-                kind: kind, cacheDir: cacheDir, media: media, url: url, stamp: stamp,
-                input: input, ranges: ranges)
-        }
+        guard !missing.isEmpty else { return nil }
+        return AnalysisRequest(
+            kind: kind, cacheDir: cacheDir, media: media, url: url, stamp: stamp,
+            input: input, ranges: AnalysisStore.merged(missing))
     }
 
     /// The converted reader's input (CJ-23, CJ-S3 (c)): the media's converting
     /// Camera Log or PQ peak, else its track's HLG or PQ transfer; nil reads
     /// direct. `fullRange` as a converted filmstrip records it.
-    static func analysisInput(
+    nonisolated static func analysisInput(
         media: MediaSnapshot, url: URL, urls: [UInt32: URL]
     ) -> (input: ThumbnailInput?, fullRange: Bool) {
         var assets: [UInt32: AVURLAsset] = [:]

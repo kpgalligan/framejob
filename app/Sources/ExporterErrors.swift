@@ -87,6 +87,10 @@ extension Exporter {
         /// A clip's voice effect (spec §11 AU-147) could not be rendered: the
         /// export waits for it as for its isolation, and stops naming the clip.
         case voiceFailed(clip: UInt32, message: String)
+        /// A cut-out clip's person masks (spec §11 CO-6, CO-22 (e)) could not be
+        /// made: the export waits for every mask it draws, and stops naming the
+        /// clip rather than writing it uncut.
+        case cutoutFailed(clip: UInt32, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -128,6 +132,8 @@ extension Exporter {
                     + "show the clip's loudness, then export again."
             case .voiceFailed(let clip, let message):
                 return "Clip \(clip)'s voice effect could not be rendered: \(message)."
+            case .cutoutFailed(let clip, let message):
+                return "Clip \(clip)'s person masks could not be made: \(message)."
             }
         }
     }

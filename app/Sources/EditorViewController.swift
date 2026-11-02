@@ -292,6 +292,8 @@ final class EditorViewController: NSViewController {
             name: .projectGraphicsDidChange, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(cursorTrackDidLand(_:)), name: .cursorTrackDidLand, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(analysisDidPublish(_:)), name: .analysisDidPublish, object: nil)
         installCanvas()
         installTimeline()
         // Last: it registers the two views above as drop targets for a media

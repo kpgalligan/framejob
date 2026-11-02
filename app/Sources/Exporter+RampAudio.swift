@@ -24,6 +24,8 @@ extension Exporter {
         plan: CompositionPlan, urls: [UInt32: URL], settings: ExportSettings, key: Int,
         cancelled: @escaping () -> Bool, then build: () throws -> T
     ) throws -> T {
+        // Every mask the range draws first (spec §11 CO-22 (e)): a GIF or APNG waits too.
+        try waitForMasks(plan: plan, urls: urls, settings: settings, key: key, cancelled: cancelled)
         guard !settings.isImageSequence else { return try build() }
         return try withOfflineAudio(
             plan: plan, urls: urls, key: key, cancelled: cancelled, then: build)

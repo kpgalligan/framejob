@@ -5396,6 +5396,108 @@ now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant
 - **Question for the owner:** the preview draws a pending cutout uncut (CO-6)? *Recommended: uncut,
   with the Background status saying so* — a blank camera reads as a bug.
 
+#### CO2b's record (2026-11-02)
+
+**Landed.** Lane C, base `e18ef4b4` (I's HEAD, CO2a2). Commits: the toll alone
+(`SaveFrameOptions.swift`, a pure move gated by `make typecheck`), then the decision with its
+index row and the code, the proof and the documents, then this record. No format bump, no `rc_*`,
+no core change. A clip whose base `video.cutout` is set now makes its own person masks: the
+document wants its windows' missing ranges after every edit, sharing a running job that still
+meets the need; a publish redraws the paused frame; an export waits for every mask it draws
+(GIF and APNG too) and fails `cutoutFailed` when one cannot be made; `render_frame` and File ▸
+Save Frame… wait up to 30 s and then name the clips drawn uncut.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/SaveFrameOptions.swift` | 125 | the toll: Save Frame's accessory view, moved whole (`private` dropped) |
+| `app/Sources/CutoutWants.swift` | 232 | `CutoutWindow`, the windows, the need rule, the keep rule, the requests, `CutoutWants.queue`, the dev log |
+| `app/Sources/ProjectDocument+Masks.swift` | 84 | `ensureMasks()` (one owner per document, keyed by `recipeKey`) and `masksDidSettle()` |
+| `app/Sources/Exporter+Masks.swift` | 173 | `waitForMasks`, `waitForFrameMasks`, `releaseMasks`, `cutoutSentences`, `frameCutoutWait` |
+| `app/Sources/EditorViewController+Cutout.swift` | 19 | `analysisDidPublish(_:)`: a masks publish in this document's cache folder refreshes the paused frame |
+| `AnalysisLane.swift` · `AnalysisStore.swift` · `ProjectDocument+Analysis.swift` | 348 · 272 · 90 | `requests(of:)`, `openRequests(kind:cacheDir:)`; `.analysisDidPublish`; the static `analysisRequest(…need:)` |
+| `Exporter+Frame.swift` · `ExporterGraphics.swift` · `ExporterErrors.swift` · `Exporter+RampAudio.swift` · `Exporter.swift` | 147 · — · — · — · 491 | `cutoutWait`, `RenderedFrame.uncut`, `cutoutFailed`, the wait before the image-sequence guard, the release in `releaseRecipeKey`'s `ramp` |
+| `AgentServer+Render.swift` · `AgentCatalog+Render.swift` · `AgentServer+AnalysisJob.swift` · `EditorViewController+SaveFrame.swift` | 330 · 438 · 201 · 308 | `render_frame`'s wait and sentence, its description, `mask_wants`, Save Frame's wait and sheet |
+
+- **Deviations from the spec.**
+  - `ProjectDocument.analysisInput` is marked `nonisolated` beside the new static
+    `analysisRequest`: calling it from the nonisolated static was a fifth typecheck warning.
+  - The editor refreshes only on a `masks` publish (`userInfo["kind"]`), not a `shots` one, which
+    draws nothing.
+  - `mask_wants` rows also carry `queued_at`, `started_at` and `ended_at`: W9 counts its runs from
+    them, since `analysis_job`'s `jobs` lists only the dev owner's wants.
+  - P1's freeze case is `freeze_frame`'s hold, which is one source frame (`[1,200,000,
+    1,220,000)`, need 60…61), not zero-length; the zero-length window is P1's direct case
+    (`[1,210,000, 1,210,000)`, need 60…61).
+  - W4 holds the alpha to 1/255 and the colour as seen (each channel times its alpha) to 3
+    levels: ProRes 4444's colour is lossy (the first run's worst was 1.98 levels; its alpha 1).
+    W4b's APNG is held to 1/255 on every channel.
+  - W9's export bound is 2,400 s (`LONG_EXPORT_BOUND`): a Debug run under three lanes' load
+    passed 900 s (the rest of the 75 s analysis, then 75 s of ProRes 4444).
+
+**Measured.**
+
+- `make typecheck` exit 0 with the 4 baseline warnings after the toll and after the code;
+  `swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS co2b_probe.swift` exit 0;
+  `inventory.py --check` 5/5 (the Save Frame sheet's new site and the `frameSaved` anchors);
+  `spec_index_proof.py` 240/240.
+- `co2b_proof.py --only P1,P2` 2/2. On Debug (`make app-debug`): every row passed across three
+  runs; W9 first failed its 900 s export bound and passed with the 2,400 s bound. W8's 75 s
+  analysis took about 7 minutes on Debug under three lanes' load.
+- `co2a_proof.py --only D2,D3,D4,D14` on Debug: 5/5 over the two launches.
+- `make gate`: PASS 407 s (names 1, typecheck 7, fmt and lint skipped, test 244, app 154).
+- `RC_PROOF_APP=release co2b_proof.py`: 14/14 — W1 coverage [[30, 90]] landed in 4.7 s; W2 the
+  next document request [[15, 29]], coverage [[15, 90]], the 61 earlier blobs unmoved (76 now);
+  W3b equal to the landed render and unlike cutout off, no sentence; W4 60 frames, (frame, worst
+  premultiplied, worst alpha) (10, 1, 1), (30, 1.37, 1), (50, 1.98, 1), 207,128 pixels cut;
+  W7 one export row, `wanted` false; W4b 50 APNG frames, worst 0 at frames 5, 25, 45; W5
+  "Clip 3's person masks could not be made: the analysis could not be written: …", no file; W6
+  forward window [10,800,000, 12,000,000), coverage [[540, 599]], 166,376 pixels hidden and
+  5,165 uncut where the mask says, none differing; W8 the first mid-job publish at [[0, 1561]],
+  the job [[0, 2249]] landed, coverage [[0, 2249]]; W9 the export's row is the document's
+  running request [[0, 2249]], one run, the export done; W3 30.3 s, byte-identical, the sentence
+  present; Z1 both launches empty.
+- `RC_PROOF_APP=release co2a_proof.py`: 18/18 over the two launches (canned and held: D14's three
+  frames and D3's two misses waited 30 s each and drew uncut; D2 and D4 in the second).
+- `RC_PROOF_APP=release analysis_proof.py`: 22/22.
+- Mutants, each once on Release in a tree copy (the tree's mutated files' SHA-256 unchanged):
+  all eight CAUGHT, each app copy built in 153–202 s (M8's rows are the probe's, so it built
+  no app). `M1-no-export-wait` W4 (worst 255 at the three frames: the export drawn uncut);
+  `M2-wait-after-guard` W4b (worst 255 at frames 5, 25, 45); `M3-open-only` W2 (no document want
+  after the cutout was set); `M4-unbounded-frame` W3 (`render_frame` past the 90 s bound);
+  `M5-no-release` W7 (the export's row still `wanted`); `M6-kept-empty` P2 (the running and the
+  queued-inside requests dropped) and W8 (the job [[0, 2249]] `cancelled` after the edit, a second
+  one [[1394, 2249]] run); `M7-export-previous-empty` W9 (the export's own [[1391, 2249]] run beside
+  the document's: two runs); `M8-queued-as-running` P2 (the queued 80…100 kept, the new request
+  stopping at 79).
+
+**Review.** One review (`e18ef4b4..e1bfb141`, three commits), verdict pass, every Files and
+Approach item done, three nits, left as they stand:
+- After a `.landed` wait that still leaves a media uncovered, the export wants the same request
+  again under the same owner, and `AnalysisLane.want` resets an ended run only for a request not
+  already in that owner's set. So CO-22 (e)'s second landing answers at once: it is a re-read of
+  the store, not a second run, and the export then fails `cutoutFailed` ("its masks do not cover
+  the frames it plays"). It fails safe.
+- `ProjectDocument+Masks.swift`'s main-only table keyed by `recipeKey` keeps a closed document's
+  small entry for the rest of the session, one per document opened.
+- A failed document job is not retried until the clip's need changes: the re-want after
+  `masksDidSettle()` equals the failed request, so the lane keeps its `.failed` outcome and the
+  preview draws the clip uncut (CO-6) until an edit moves the window or the project reopens (once
+  W5's folder is writable again, say). An export wants it under its own owner, so it runs again.
+
+**Integration (2026-11-02).** Cherry-picked (`b9d63117…e1bfb141`) onto `worktree-creator-jobs`
+at CU9a's `a99bf646`. Conflicts only in the decision file and the two indexes, each kept both
+sides: `creator-jobs-4.md` holds CU9a's CU-90 block and then CO-22 (416 lines; its index row
+416, both summaries), the `11-decisions/` folder cell 18691 in 38 files; no format, so nothing
+renumbered. The owed `app/CLAUDE.md` edits went in: `Exporter+Masks.swift` in the Exporter
+entry; `ensureRampAudio()` ending with `ensureMasks()` and the masks' wait before the build in
+the RampAudio entry; the three files and the masks paragraph in the analysis entry; `+Cutout`
+among the editor's extensions; `+SaveFrame`'s wait, its sheet and `SaveFrameOptions.swift`.
+`spec_index_proof.py` 243/243; `inventory.py --check` 5/5; `make gate` PASS 316 s (names 1,
+typecheck 7, fmt and lint skipped, test 154, app 152).
+
+**Owed.** JOB-62 (`docs/manual-checks.md`): the owner's check that a paused picture redraws cut
+without play. Nothing to file.
+
 ### TX4 — cuts the core can list and put back
 
 - **What a person gets:** an agent can put back any cut a ripple made, or any part of one, as one
