@@ -180,6 +180,9 @@ detail there.
   creator-jobs CU3a1, spec §11 CU-30, CU-39) holds `CursorStyle`, `CursorClicks` (`off` is the
   core's `none`: a case named `none` warns), `CursorProps` (`VideoProps.cursor` and
   `VideoPatch.cursor`; its `dictionary` writes all eight keys, `NSNull` for a nil `hideIdle`),
+  `CursorPatch` (the sparse write `VideoPatch.cursorPart` carries — written under `cursor` only
+  when `cursor` is nil, never decoded, `cutoutPart`'s shape — so the Cursor section's Show
+  cursor writes `{cursor: {show}}` alone, CU3b, spec §11 CU-38 (b)),
   `MediaCursor` (`MediaSnapshot.cursor`, `MediaDescriptor.cursor`, kept by `probeDictionary`) and
   `RecipeCursor` (the recipe layer's `cursor`, `media` and `at` required).
   `CutoutProps.swift` (format 39, road map creator-jobs CO2a1, spec §11 CO-20, CO-21;
@@ -355,7 +358,15 @@ detail there.
   the analysis reader's converted arm builds too; +`Thumbnails`: the
   await-free halves of `thumbnails`, the image branch, the publish and `writeTiles`, one landed
   frame's tiles, `nil` once the pass is superseded so the frames loop's labelled break stays in
-  `thumbnails`, CJ0d's T16) ·
+  `thumbnails`, CJ0d's T16; +`Cursor`: the cursor file at import and relink (road map
+  creator-jobs CU3b, spec §11 CU-34, CU-38) — `cursorAttachment(at:to:)` opens the file through
+  `ReelCursor` and attaches `{path, bookmark, in_picture}` only to a video with pictures whose
+  width × height equal its `movie_size`; `withCursorBeside` is `probeAllowingRewrap`'s direct
+  probe's one call (every import door and the recorder's settle probe; silent; never beside a
+  rewrapped copy); `relinkProbe(_:current:)` the three probed relinks' rule (Relink…'s
+  `relinkNext`, `relink_media`, the re-copy on open: the file beside the new movie, else the
+  stored cursor when its file exists and the sizes match, else none); await-free, names no
+  `rc_*`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `MediaImporter+Loudness.swift` · `LoudnessBlocks.swift` ·
   `MediaCacheLane.swift` ·
@@ -1428,7 +1439,14 @@ the key map behind it.
   Edge and Feather (enabled while `allCutOut`, each writing its own key
   through `VideoPatch.cutoutPart`, which animates), Status read through the
   pane's `cutoutMemo` (`CutoutStatus.Memo`, kept on `ClipPane`, whose
-  `onChange` refreshes the pane), and Analyze Now; +`Transition`,
+  `onChange` refreshes the pane), and Analyze Now; +`Cursor` — the Picture sub-tab's Cursor
+  section (road map creator-jobs CU3b, spec §11 CU-38 (b)), registered after the
+  `allSourcePixels` block (after Background) and before Shadow when `allCursored` (every
+  selected clip a media or still clip whose media has `cursor` with `in_picture` false;
+  `ClipPane.structureSignature` carries it, so a relink, an undo or a landing that changes the
+  media's `cursor` adds or removes it): Show cursor, a sparse `{cursor: {show}}` through
+  `VideoPatch.cursorPart` (an end inside an action), "Show Cursor", Reset writing true;
+  +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
   inside an action Rate writes the selected action's `end.speed`
@@ -2390,7 +2408,11 @@ the key map behind it.
   `renderFrameReported`, a pure move out of `Exporter.swift`, road map creator-jobs
   CU3a2's toll; it carries the `copyCGImage` warning) · `Exporter+Cursor.swift`
   (`ExportCursorWarning`, `waitForCursors`: an export waits for every clip's cursor
-  track, a frame for its own, a failed file one warning per media, spec §11 CU-37) ·
+  track, a frame for its own, a failed file one warning per media, spec §11 CU-37;
+  `cursorWarningSuffix` — " 1 cursor warning" / " N cursor warnings", then " (hover for
+  details)." or "." — and `cursorWarningDetails`, the sentences one a line, which the Export
+  Queue row's message and tooltip and the progress sheet's line and tooltip show after the
+  graphic count, CU3b, spec §11 CU-38 (c)) ·
   `Exporter+Masks.swift` (road map creator-jobs CO2b, spec §11 CO-22 (e), (f): `waitForMasks`,
   the export's wait for every person mask its range draws, called by `withRampAudio` BEFORE its
   image-sequence guard so GIF and APNG wait too, under a lane owner per export key released by
@@ -3476,7 +3498,11 @@ free.
   `CursorFile` (a media's cursor URL through `cursorURL(for:)`, its pivot and frame) and
   the requests a project's clips make at their base smoothing, top level and every nest.
   `EditorViewController+Cursor.swift`: `cursorTrackDidLand`, a paused frame refreshed
-  when one of its document's cursor files lands.
+  when one of its document's cursor files lands. Since CU3b (spec §11 CU-34 (c))
+  `ScreenRecorder+Cursor.swift`'s `saveCursor` attaches each file it wrote to its segment's
+  media (`MediaImporter.cursorAttachment` on the capture queue,
+  `RecordingSegment.withCursor(…, attached:)`), because the settle probe ran before the file
+  existed; a failed attach leaves the segment as CU-18 left it.
 - `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
   AU-68): the recording's voice paths and clips, readiness and busy, the
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
@@ -3485,7 +3511,11 @@ free.
   `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`.
 - `AgentServer+LandRecording.swift` — the dev tool `land_recording` (spec §11
   AU-69 (e)): fixture files landed as a finished recording through the
-  panel's `recordingEnded` or `record_screen`'s landing.
+  panel's `recordingEnded` or `record_screen`'s landing; its `cursor` (road map
+  creator-jobs CU3b, spec §11 CU-34 (d)), only with `movie`, attaches a fixture cursor
+  file to the screen segment's media through `MediaImporter.cursorAttachment` and
+  `RecordingSegment.withCursor(…, attached:)`, refused by name without `movie` or when the
+  file does not attach.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`

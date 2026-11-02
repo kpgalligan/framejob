@@ -109,7 +109,10 @@ extension ProjectDocument {
             guard let self = self else { return }
             var collected = ops
             switch result {
-            case .success(let descriptor):
+            case .success(let probed):
+                // The cursor file beside the new movie, else the one kept (spec §11 CU-38 (a)).
+                let descriptor = MediaImporter.relinkProbe(
+                    probed, current: self.project.snapshot.media(choice.media))
                 collected.append(
                     .relinkMedia(
                         media: choice.media, path: descriptor.path,

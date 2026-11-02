@@ -207,7 +207,7 @@ extension MediaImporter {
         _ url: URL, mayAsk: Bool, watch: RewrapWatch?
     ) throws -> MediaDescriptor {
         do {
-            return try waitForProbe(url)
+            return withCursorBeside(try waitForProbe(url), movie: url)  // spec §11 CU-34 (a)
         } catch let failure as ImportError where failure.invitesFFmpeg && !isImage(url) {
             // Images are excluded because ImageIO's refusal means the picture
             // is corrupt, not that the container is exotic — and a PNG is not

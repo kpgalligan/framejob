@@ -56,8 +56,9 @@ extension ProjectDocument {
             guard let source = originalURL(for: media), ContainerRewrap.isMatroska(source) else {
                 continue
             }
-            guard let descriptor = try? MediaImporter.probeBuiltInCopy(of: source, watch: shown)
+            guard let copied = try? MediaImporter.probeBuiltInCopy(of: source, watch: shown)
             else { continue }
+            let descriptor = MediaImporter.relinkProbe(copied, current: media)  // CU-38 (a)
             ops.append(
                 .relinkMedia(
                     media: media.id, path: descriptor.path, bookmark: descriptor.bookmark,

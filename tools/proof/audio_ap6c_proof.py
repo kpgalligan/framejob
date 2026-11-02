@@ -35,7 +35,7 @@ is phase5_proof's BS.1770 on an exported WAV.
       undo's top "Add Recording"; the panel door with follow_wait 30:
       enhance_pending false, the clip untouched.
   V8  record_screen declares enhance (boolean, described); land_recording's
-      seven arguments; follow_wait with door "tool" refused by name; the parity
+      eight arguments (CU3b's cursor the eighth); follow_wait with door "tool" refused by name; the parity
       log clean.
 """
 
@@ -509,9 +509,10 @@ def catalog_rows(m):
           f"V8 record_screen declares enhance, boolean and described: {enhance.get('type')}")
     land = (schemas.get("land_recording") or {}).get("inputSchema", {})
     names = sorted(land.get("properties") or {})
-    want = sorted(["voice", "movie", "door", "enhance", "place", "project", "follow_wait"])
+    want = sorted(["voice", "movie", "door", "enhance", "place", "project", "follow_wait",
+                   "cursor"])
     check(names == want and land.get("required") == ["voice"],
-          f"V8 land_recording's seven arguments: {names}, required {land.get('required')}")
+          f"V8 land_recording's eight arguments: {names}, required {land.get('required')}")
     try:
         m.call("land_recording", voice=[os.path.join(FIX, "silent.m4a")], follow_wait=5)
         got = "(no refusal)"

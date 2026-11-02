@@ -80,6 +80,27 @@ struct CursorProps: Codable, Equatable {
     }
 }
 
+/// A sparse cursor (road map creator-jobs CU3b, spec §11 CU-38 (b)): only the keys set are
+/// written, so the Cursor section's Show cursor writes `{cursor: {show}}` alone — on the base a
+/// merge, inside an action an end naming `show`, which switches at the end (CU-30). CU4 adds the
+/// section's other keys.
+struct CursorPatch: Codable, Equatable {
+    var show: Bool?
+
+    init(show: Bool? = nil) {
+        self.show = show
+    }
+
+    /// The set keys under the model's names.
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        if let show { d["show"] = show }
+        return d
+    }
+
+    var isEmpty: Bool { show == nil }
+}
+
 /// A media's `media.cursor` (CU-39): its cursor file, the app's bookmark for
 /// it, and whether the movie's own picture already shows the pointer.
 struct MediaCursor: Codable, Equatable {

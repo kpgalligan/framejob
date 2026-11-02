@@ -388,3 +388,81 @@ on-device starts always early (−109.6 to −1,185.6 ms), and TX3b measured "Pa
   TX-S3's real-speech rows are skipped by name and owed, and JOB-11 stays the judge. TX3b keeps its
   no-sliver clamp (its option (a)), per the owner's answer of 2026-11-02; it holds once starts sit
   on their sound.
+
+## CU3b — import and relink attach a cursor file (2026-11-02)
+
+Recorded before the code. CU-34 and CU-38 are CU3b's: a movie's `<stem>.fjcursor` reaches its
+media at every import door, at a recording's landing and through Relink, and a clip whose media
+has a cursor not in the picture gets a Cursor section with one row. No format bump, no `rc_*`, no
+op, no product tool and no core change: `media.cursor` (CU-39) already travels in a probe, and a
+probed relink already replaces it (`core/src/edit_relink.rs`). The cursor file is read on the
+Mac, so nothing here is keyed (CJ-3).
+
+- **CU-34 — A cursor file is attached only when it opens and its `movie_size` is the movie's.**
+  `MediaImporter.cursorAttachment(at:to:)` (`app/Sources/MediaImporter+Cursor.swift`) opens the
+  file through `ReelCursor(data:)` (the open is the check, CU-15), then decodes the header's
+  `in_picture`, `movie_size` and `cursor_image`, and attaches it only to a descriptor of kind
+  video with pictures whose `width` × `height` — the probe's display size — equal `movie_size`.
+  Every recording's written track has no rotation, so the two sizes are the same for it; a
+  rotated movie's file is not attached.
+  - **(a) Every import door.** `probeAllowingRewrap`'s direct probe — the funnel of Add Media…,
+    a drop, a document's open, `import_media` and the recorder's settle probe — passes its
+    descriptor through `withCursorBeside`, which looks for `CursorFileWriter.url(forMovie:)`
+    beside the movie. A missing file, or one that fails the check, attaches nothing and says
+    nothing (an import is never refused for its cursor file). A rewrapped copy (a WebM or
+    Matroska copy, an ffmpeg conversion) is not looked beside.
+  - **(b) What is stored.** `media.cursor = {path: the file's path, bookmark:
+    bookmarkString(file), in_picture: the header's}`.
+  - **(c) A recording's landing.** The settle probe runs before the cursor file is written (the
+    walker's order movie → microphone → camera → cursor, CU-18), so `saveCursor` attaches each
+    file it wrote to its segment's descriptor itself, on the capture queue after the write
+    (`RecordingSegment.withCursor(url:problem:image:attached:)`); a failed attach leaves the
+    segment as CU-18 left it. Until CU3c every recording writes `in_picture: true`, so nothing
+    is drawn and no Cursor section shows.
+  - **(d) `land_recording {cursor}`** (a dev tool): a cursor file path, only with `movie`,
+    attached to the one screen segment through `cursorAttachment` and `withCursor(…, attached:)`
+    before either door. Refused by name: `cursor` without `movie`, and a file that does not
+    attach (its sentence prefixed "land_recording: ").
+  - **The sentences** of a file that does not attach: "The cursor file <name> could not be read:
+    <reason>." · "The cursor file <name> was not attached: <the core's sentence>" · "The cursor
+    file <name> was not attached: its movie_size is W × H and the movie is W2 × H2." · "The
+    cursor file <name> was not attached: <movie> has no picture."
+- **CU-38 — Relink, the Cursor section, and the export's cursor warnings.**
+  - **(a) Relink.** Every probed relink — Relink…, the Media tab, `relink_media` and the
+    re-copy on open — goes through `MediaImporter.relinkProbe(_:current:)`: the probe's own
+    cursor (the file beside the new movie, CU-34 (a)) when it has one; else the current
+    `media.cursor` kept verbatim when its file still exists (`cursorURL(for:)`) AND the new
+    probe is a video with pictures whose `width` × `height` equal the stored media's — the sizes
+    CU-34 matched at attach, since a cursor's positions are absolute movie pixels; else none,
+    which clears it (CU-39's replace rule, unchanged in the core). No parse: sizes and a
+    file-exists check, so it may run on main. `MediaConsolidator` and the relink without a probe
+    keep the cursor as CU-39 says.
+  - **(b) The Cursor section.** Id `video.cursor`, title "Cursor", in the Picture sub-tab after
+    the source-pixels block (after Background) and before Shadow, shown only when every selected
+    clip is a media or still clip whose media has `cursor` with `in_picture` false
+    (`VideoPane.allCursored`). One checkbox, "Show cursor", reading `video.cursor.show`
+    (true without a cursor), mixed over a selection that disagrees, writing a sparse `{cursor:
+    {show}}` (`VideoPatch.cursorPart`, `CursorPatch`) — an action's end inside one, where `show`
+    switches at the end (CU-30); undo name "Show Cursor"; Reset writes `show: true`; the summary
+    "on" or "off"; closed by default. `ClipPane.structureSignature` carries `allCursored`, so the
+    section appears or goes when a relink, an undo or a landing changes a media's `cursor` under
+    a fixed selection. CU4 adds the section's other rows.
+  - **(c) A finished export's cursor warnings** (CU-37 (c)): " 1 cursor warning" or " N cursor
+    warnings" after the graphic count on the Export Queue row's message (no hover text) and on
+    the progress sheet's line (with " (hover for details)."); each tooltip lists
+    `Exporter.cursorSentences`, one per line (`cursorWarningSuffix`, `cursorWarningDetails`).
+  - **(d) The proof.** `cursor_layer_proof.py`: I1 import attaches a matching file and not one
+    whose `movie_size` differs; I2 relink keeps a resolvable cursor, clears a missing one,
+    replaces it with the file beside the new movie, and clears it for a movie of another size;
+    I3 `land_recording {cursor}` lands a clip that draws its cursor where the file says, and
+    `cursor` without `movie` is refused; I4 (probe) the section's place, its gate, the signature
+    under a fixed selection and its one write; I6 (probe) the suffixes, the details and the
+    queue row's tooltip; I5 — the road map's granted L1, the overlay against a burned tip — owed
+    to CU1b2, whose burned-tip helper it needs, and skipped by name. `cursor_proof.py` K17
+    (granted, Release, skipped by name without Screen Recording): `record_screen {seconds: 2,
+    place: true}` lands media whose `cursor` is `{path: segments[0].cursor_path, in_picture:
+    true}`. Nine mutants: the size check removed (I1); `relinkProbe` not keeping a resolvable
+    cursor, and its size test removed (I2); `land_recording`'s `attached:` dropped (I3);
+    `allCursored` without its `media.cursor` test, and without its `in_picture` test, the
+    `makeSections()` line removed and the `structureSignature` entry removed (I4); the queue
+    tooltip's cursor details dropped (I6).

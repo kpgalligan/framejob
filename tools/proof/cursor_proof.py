@@ -27,6 +27,10 @@ Rows:
   K15 over MCP on the app (`proof_app.binary()`, `RC_PROOF_APP`, or `--app`):
       `record_screen {seconds: 2, place: false, path: <scratch>}` into a scratch project answers
       `segments[0].cursor_path` beside its movie, the file on disk, with `cursor_image` "none".
+  K17 (road map creator-jobs CU3b, spec §11 CU-34 (c)) in the same launch:
+      `record_screen {seconds: 2, place: true, path: <scratch>}` into a new project: the landed
+      media (the one whose path is `segments[0].path`) has `cursor` with `path`
+      `segments[0].cursor_path` and `in_picture` true — `saveCursor` attached the file it wrote.
   Z1  the launch's log holds no `Frame Job: ` line.
 
 Prints `scores: P/N` over the rows scored and each skip with its reason; exits 0 iff every
@@ -47,7 +51,7 @@ import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/cursor-proof"
-ROWS = ["K4", "K5", "K7", "K8", "K15", "Z1"]
+ROWS = ["K4", "K5", "K7", "K8", "K15", "K17", "Z1"]
 WALL = 600
 
 results = {}
@@ -207,15 +211,51 @@ def k8(answer):
                   f"point_size {body.get('point_size')} (1001 × 701 pt × 100)")
 
 
+def k17(client, folder):
+    """A placed recording's media carries the cursor file its landing wrote (CU-34 (c))."""
+    project = WORK / "k17.framejob"
+    if project.exists():
+        shutil.rmtree(project)
+    client.call("new_project", path=str(project))
+    try:
+        try:
+            answer = client.call_with("record_screen", {
+                "project": str(project), "seconds": 2, "place": True, "path": str(folder)})
+        except mcp.ToolError as error:
+            if "Screen Recording" in str(error):
+                skip("K17", f"the app holds no Screen Recording grant: {error}")
+            else:
+                check("K17", False, f"record_screen refused: {error}")
+            return
+        segment = (answer.get("segments") or [{}])[0]
+        media = [m for m in client.call("get_project", project=str(project))["project"]["media"]
+                 if m.get("path") == segment.get("path")]
+        cursor = (media[0].get("cursor") if media else None) or {}
+        check("K17", bool(segment.get("cursor_path")) and cursor.get("path") ==
+              segment.get("cursor_path") and cursor.get("in_picture") is True,
+              f"the landed media's cursor {cursor}, segments[0].cursor_path "
+              f"{segment.get('cursor_path')!r}")
+    finally:
+        try:
+            client.call("close_project", project=str(project), discard=True)
+        except mcp.ToolError:
+            pass
+
+
 def k15(binary):
     folder = WORK / "k15"
     folder.mkdir(parents=True, exist_ok=True)
     started = mcp.launch(binary, ["-RCRecordingFolder", str(folder)], seconds=60, timeout=300)
     try:
         if started.client is None:
-            check("K15", False, f"the app did not bind its socket — {started.log_path}")
+            for row in ("K15", "K17"):
+                check(row, False, f"the app did not bind its socket — {started.log_path}")
             return
         client = started.client
+        if "K17" in selected:
+            k17(client, folder)
+        if "K15" not in selected:
+            return
         project = WORK / "k15.framejob"
         if project.exists():
             shutil.rmtree(project)
@@ -278,7 +318,7 @@ def main():
                "CGPreflightScreenCaptureAccess() is false under this process's grant")
     in_process = [r for r in ("K4", "K5", "K7", "K8") if r in selected]
     if blocked:
-        for row in in_process + [r for r in ("K15", "Z1") if r in selected]:
+        for row in in_process + [r for r in ("K15", "K17", "Z1") if r in selected]:
             skip(row, blocked)
     else:
         if in_process:
@@ -297,7 +337,7 @@ def main():
                     k7(answer)
                 if "K8" in selected:
                     k8(answer)
-        if "K15" in selected or "Z1" in selected:
+        if selected & {"K15", "K17", "Z1"}:
             app = Path(args.app) if args.app else proof_app.binary()
             if app.suffix == ".app":
                 app = proof_app.executable(app)

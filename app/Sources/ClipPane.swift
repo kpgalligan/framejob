@@ -101,6 +101,8 @@ final class ClipPane: InspectorPaneView {
             // Whether the selection can be put behind a subject adds or removes Behind Subject
             // (CO-55).
             videoPane.allBehindable ? "behind" : "-",
+            // Whether every media has a cursor not in the picture adds or removes Cursor (CU-38).
+            videoPane.allCursored ? "cursor" : "-",
             // A LUT look over a Camera Log file adds Look's warning row (GR-16).
             videoPane.lutOverCameraLog ? "twice" : "-",
             // A LUT look in an HLG project adds Look's other warning row (HD-13).
@@ -211,6 +213,8 @@ final class ClipPane: InspectorPaneView {
                 // Background right after Chroma Key (road map creator-jobs CO3, CO-30 (a)).
                 if videoPane.allCutoutable { sections.append(videoPane.cutoutSection(cutoutMemo)) }
             }
+            // Cursor after Background, before Shadow (road map creator-jobs CU3b, CU-38 (b)).
+            if videoPane.allCursored { sections.append(videoPane.cursorSection()) }
             // Shadow is shared by all three drawing kinds, so it is here once.
             sections += [
                 inspectorShadowSection(binding), videoPane.filtersSection(),

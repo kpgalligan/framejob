@@ -130,11 +130,19 @@ extension ScreenRecorder {
             }
             let problem = Self.cursorProblem(
                 writer: writer, watchLost: watchLost, movieName: name)
+            // The written file attached to the segment's media (spec §11 CU-34 (c)): the settle
+            // probe ran before it existed. A failed attach leaves the segment as CU-18 left it.
+            var attached: MediaCursor?
+            if let url, case .success(let attachment) = MediaImporter.cursorAttachment(
+                at: url, to: landed.descriptor)
+            {
+                attached = attachment.cursor
+            }
             DispatchQueue.main.async {
                 then(
                     landed.withCursor(
                         url: url, problem: problem,
-                        image: url == nil ? nil : CursorImageMode.none))
+                        image: url == nil ? nil : CursorImageMode.none, attached: attached))
             }
         }
     }

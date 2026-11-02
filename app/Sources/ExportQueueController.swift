@@ -457,7 +457,8 @@ final class ExportQueueController {
                 // The count BEFORE the loudness figures: the row truncates
                 // its tail (`ExportQueueRowView`).
                 jobs[index].message = "Exported “\(url.lastPathComponent)”\(ExportStemsPipeline.summary(jobs[index].settings))."
-                    + Exporter.graphicWarningSuffix(warnings, hover: false) + measured
+                    + Exporter.graphicWarningSuffix(warnings, hover: false)
+                    + Exporter.cursorWarningSuffix(cursorWarnings, hover: false) + measured
             case .failure(let error):
                 if case Exporter.ExportError.cancelled = error {
                     // A cancelled job leaves nothing behind, and this line is

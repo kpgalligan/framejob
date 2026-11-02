@@ -157,13 +157,20 @@ final class ExportProgressSheetController: NSViewController {
             // measured its own mix on the way through, so the numbers are a
             // report rather than a promise.
             let measured = exporter.loudnessReport.map { " \($0.summary)." } ?? ""
-            // What the graphics warned while the file was drawn: a count on
-            // the line, the list in its tooltip (G-24 (c)).
+            // What the graphics and the cursors warned while the file was
+            // drawn: a count on the line, the list in its tooltip (G-24 (c),
+            // CU-38 (c)).
             let warnings = exporter.graphicWarnings
+            let cursorWarnings = exporter.cursorWarnings
             statusLabel.stringValue = "Exported “\(url.lastPathComponent)”"
                 + "\(ExportStemsPipeline.summary(settings)).\(measured)"
                 + Exporter.graphicWarningSuffix(warnings)
-            statusLabel.toolTip = Exporter.graphicWarningDetails(warnings)
+                + Exporter.cursorWarningSuffix(cursorWarnings)
+            let details = [
+                Exporter.graphicWarningDetails(warnings),
+                Exporter.cursorWarningDetails(cursorWarnings),
+            ].compactMap { $0 }
+            statusLabel.toolTip = details.isEmpty ? nil : details.joined(separator: "\n")
             statusLabel.textColor = DS.textStrong
             stopButton.title = "Close"
             revealButton.isHidden = false

@@ -27156,7 +27156,7 @@ those parts while iterating; a recorded run sets nothing.
 | V5 | a movie and its microphone: only `mic_clip` enhanced, the movie clip's sound untouched |
 | V6 | `record_screen`'s refusals, exact, the project byte-identical: `enhance` "yes"; true on a screen with no microphone; `voice_over` with `place: false`; `seconds` 0 and `rate` 24 first; `source` camera |
 | V7 | a silent file: `enhance_error` "Nothing could be enhanced. …−70 LUFS…", undo's top "Add Recording"; the panel door with `follow_wait` 30: `enhance_pending` false, the clip untouched |
-| V8 | `record_screen` declares `enhance` (boolean, described); `land_recording`'s seven arguments; `follow_wait` with door `tool` refused by name; the parity log clean |
+| V8 | `record_screen` declares `enhance` (boolean, described); `land_recording`'s eight arguments (CU3b's `cursor` the eighth); `follow_wait` with door `tool` refused by name; the parity log clean |
 
 ```sh
 python3 tools/proof/audio_ap6c_probe.py             # P1–P5
@@ -27615,6 +27615,7 @@ console; K5 also without `CGPreflightPostEventAccess`. ffprobe reads each movie'
 | K7 | a directory at `<stem>.fjcursor.partial`: the movie lands, no cursor file, the writer's sentence as `cursorProblem` and in the note |
 | K8 | the probe's own 1001 × 701 pt window at Nominal: `source` window, `point_size` [100100, 70100], `movie_size` the track's |
 | K15 | over MCP on the app: `record_screen {seconds: 2, place: false, path}` into a scratch project answers `segments[0].cursor_path` beside its movie, on disk, `cursor_image` "none" |
+| K17 | (CU3b, spec §11 CU-34 (c)) in the same launch: `record_screen {seconds: 2, place: true, path}` into a new project: the landed media's `cursor` is `{path: segments[0].cursor_path, in_picture: true}` |
 | Z1 | the launch's log holds no `Frame Job: ` line |
 
 ```sh
@@ -27765,6 +27766,39 @@ make app-debug && python3 tools/proof/cursor_layer_proof.py --only B0,L2,L4,L5,L
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU3a2 record.
+
+### CU3b — import, relink and a landing attach a cursor file; Show cursor (`cursor_layer_proof.py` I1–I4, I6, I5 skipped; `cursor_proof.py` K17; nine mutants by hand; spec §11 CU-34, CU-38)
+
+The probe's `cursor_dir` also writes `cursor_wide.fjcursor` (`cursor.fjcursor` with `movie_size`
+[1280, 720]); the app rows copy `clean.mov` into `work/cursor-layer/i/`, a cursor file beside a
+copy when the row needs one, and make a 320 × 180 copy and a 4 s silent `.m4a` with ffmpeg. I4
+builds the app's own `ClipPane` over a `ProjectDocument` with no window, as `co3_probe.swift`
+does (the request's `i4: true`), and refreshes it by the inspector's own rule: rebuilt only when
+`structureSignature` changed.
+
+| Row | What it holds |
+|---|---|
+| I1 | `import_media` of a copy with `cursor.fjcursor` beside it as `<stem>.fjcursor`: `media.cursor` `{path, in_picture: false}`; a copy with `cursor_wide.fjcursor` beside it: no `cursor` |
+| I2 | `relink_media` to a copy with no file, the old file there: `cursor` unchanged; the old file removed, to another bare copy: none; to a copy with its own file: that path; with that file there, to a bare 320 × 180 copy: none |
+| I3 | `land_recording {voice, movie, cursor}`: the landed media's `cursor`, and the located tip at two frames on the file's point through the clip's placement, ≤ 1 px; `cursor` without `movie` refused by name |
+| I4 | (probe) `video.cursor` right after `video.cutout` for media with `cursor {in_picture: false}`, absent without one and with `in_picture: true`; under a fixed selection a relink that sets then clears the media's `cursor` makes it appear then go; its checkbox commits one "Show Cursor" `set_video` of exactly `{cursor: {show: false}}` |
+| I5 | SKIPPED by name: the road map's granted L1 (the drawn tip against a burned tip on a real In-the-picture recording) needs CU1b2's burned-tip helper |
+| I6 | (probe) `cursorWarningSuffix`'s three strings, `cursorWarningDetails`, and a completed queue job's `ExportQueueRowView.toolTip(for:)` ending with its cursor sentence |
+
+The nine mutants are run by hand, each once on Debug and restored byte-identical (SHA-256): the
+size check removed (I1); `relinkProbe` not keeping a resolvable cursor, and its size test
+removed (I2); `land_recording`'s `attached:` dropped (I3); `allCursored` without its
+`media.cursor` test and without its `in_picture` test, the `makeSections()` line removed, the
+`structureSignature` entry removed (I4); the queue tooltip's cursor details dropped (I6).
+`saveCursor`'s attach is K17's, granted and extra coverage only.
+
+```sh
+python3 tools/proof/cursor_layer_proof.py --only B0,I4,I6
+make app-debug && python3 tools/proof/cursor_layer_proof.py --only I1,I2,I3,I5,Z1
+make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py --only K17
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU3b record.
 
 ## Road map "creator-jobs" TX1 — the timeline transcript (`timeline_transcript_proof.py` T1–T11, G0–G1, P1–P13, C1; eight mutants; `transcript_spike/` TX-S1; `core/tests/plan_instances.rs`; spec §11 TX-10…TX-14)
 

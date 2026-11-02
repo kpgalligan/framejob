@@ -87,6 +87,9 @@ struct VideoPatch: Codable, Equatable {
     /// `cursor` (format 38, spec §11 CU-30): a `T??`, null removes it; a
     /// written cursor names all eight keys (`CursorProps.dictionary`).
     var cursor: CursorProps??
+    /// The Cursor section's sparse write (road map creator-jobs CU3b, spec §11 CU-38 (b)):
+    /// written under `cursor` only when `cursor` is nil, and never decoded — `cutoutPart`'s shape.
+    var cursorPart: CursorPatch?
     /// `cutout` (format 39, spec §11 CO-20): a `T??`, null removes it; a
     /// written cutout names all five keys (`CutoutProps.dictionary`).
     var cutout: CutoutProps??
@@ -107,7 +110,7 @@ struct VideoPatch: Codable, Equatable {
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
         qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
-        cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil,
+        cursorPart: CursorPatch? = nil, cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil,
         behindSubject: Bool? = nil
     ) {
         self.x = x
@@ -131,6 +134,7 @@ struct VideoPatch: Codable, Equatable {
         self.curves = curves
         self.qualifier = qualifier
         self.cursor = cursor
+        self.cursorPart = cursorPart
         self.cutout = cutout
         self.cutoutPart = cutoutPart
         self.behindSubject = behindSubject
@@ -193,6 +197,9 @@ struct VideoPatch: Codable, Equatable {
         if let curves = curves, !curves.isEmpty { d["curves"] = curves.dictionary }
         if let qualifier = qualifier, !qualifier.isEmpty { d["qualifier"] = qualifier.dictionary }
         d.putNullable("cursor", cursor) { $0.dictionary }
+        if cursor == nil, let cursorPart, !cursorPart.isEmpty {
+            d["cursor"] = cursorPart.dictionary
+        }
         d.putNullable("cutout", cutout) { $0.dictionary }
         if cutout == nil, let cutoutPart, !cutoutPart.isEmpty {
             d["cutout"] = cutoutPart.dictionary

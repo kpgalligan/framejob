@@ -187,6 +187,18 @@ The microphone is always a separate file from system audio, so you can set the l
 
 macOS delivers a new frame only when something on screen changes, so a mostly still screen gives a file with a low, uneven frame rate. That rate comes from the file itself and isn't a fault. The **Rate** setting is the most frames per second the file can hold. A new project uses that setting as its frame rate, while the media entry keeps the file's real rate. Where the picture stops changing before the sound ends, the last frame is held to the end of the clip.
 
+## The cursor
+
+A recording's cursor file (`<name>.fjcursor`, beside its movie) travels with the movie into your project:
+
+- **When a recording lands**, each stretch's movie gets its own cursor file.
+- **When you import a movie**, by **File ▸ Add Media…**, a drop, opening it, or an agent's `import_media`, Frame Job looks beside it for a file with the same name ending in `.fjcursor`. It takes the file only when the file reads as a cursor file and was made for a movie of exactly this movie's size. A file that is missing, damaged or made for another size is left alone, and the movie imports without it. A copy Frame Job makes of a WebM or Matroska file is not looked beside.
+- **When you relink a movie** (**Relink…**, the Media tab, or an agent's `relink_media`), Frame Job takes the cursor file beside the new movie. If there is none, it keeps the cursor file the media already had, as long as that file is still there and the new movie is the same size. Otherwise the media has no cursor file after the relink.
+
+**Show cursor.** A clip whose movie has a cursor file the picture doesn't already show gets a **Cursor** section on the Clip tab's **Picture** sub-tab, after **Background**. Its one checkbox, **Show cursor**, draws the pointer from the file over the clip, on by default. With an action selected it switches at the action's end. Selecting clips that disagree shows the checkbox mixed. **Reset** turns it back on.
+
+The recorder still draws the pointer into the movie itself, so its cursor files say the pointer is already in the picture. A recording therefore shows no **Cursor** section yet, and nothing is drawn twice.
+
 ## Voice-overs (Microphone Only)
 
 To record narration over your edit, choose **Microphone Only** in **Source**:

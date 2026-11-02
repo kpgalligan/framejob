@@ -86,7 +86,35 @@ weights a centroid, less the sprite's centroid offset × the drawn scale.
   `prores_4444` at once: every one of the 120 frames shows the sprite at the
   file's position.
 
-Prints `scores: P/N`; exits 0 iff every scored row passed.
+**CU3b's rows** (road map creator-jobs CU3b, spec §11 CU-34, CU-38): the probe's
+`cursor_dir` also writes `cursor_wide.fjcursor`, `cursor.fjcursor` with `movie_size`
+[1280, 720]. Copies of `clean.mov` live in `work/cursor-layer/i/`.
+- I1 `import_media` of a copy of `clean.mov` with `cursor.fjcursor` copied beside it as
+  `<stem>.fjcursor` → `media.cursor` `{path: that file, in_picture: false}`; a second copy with
+  `cursor_wide.fjcursor` beside it → no `cursor`.
+- I2 `relink_media` (the media imported with its file) to a copy with no file while the old
+  file exists → `cursor` unchanged; the old file removed, relink to another bare copy → no
+  `cursor`; relink to a copy with its own file → that file's path; with that file present,
+  relink to a bare copy of another size (320 × 180, a 2× downscale by ffmpeg) → no `cursor`.
+- I3 `land_recording {voice: [a 4 s silent .m4a made by ffmpeg], movie: a bare clean copy,
+  cursor: cursor.fjcursor}` into a project → the landed media's `cursor` `{path: that file,
+  in_picture: false}`; the tip located (`tip_from`, with and without `show`) at two frames
+  within `SPRITE_TOLERANCE` of the file's position mapped through the landed clip's placement
+  read from `get_project` (its start, its source in, the canvas centre and its scale, x and
+  y); `cursor` without `movie` refused by name.
+- I4 (probe) the Cursor section: `video.cursor` right after `video.cutout` for a clip whose
+  media has `cursor {in_picture: false}`, absent without `cursor` and with `in_picture: true`;
+  under a fixed selection, the media's `cursor` set then cleared by `relink_media` with a probe
+  makes the section appear then go after the pane's refresh (the inspector's own rule: rebuilt
+  only on a changed `structureSignature`); its checkbox pressed commits one "Show Cursor"
+  `set_video` whose patch is exactly `{cursor: {show: false}}`.
+- I5 SKIPPED by name, owed to CU1b2: the road map's granted L1 — the drawn tip against a burned
+  tip on a real In-the-picture recording — needs CU1b2's burned-tip helper.
+- I6 (probe) `cursorWarningSuffix`'s three strings, `cursorWarningDetails`, and
+  `ExportQueueRowView.toolTip(for:)` of a completed job holding one cursor warning, which ends
+  with its sentence.
+
+Prints `scores: P/N` and each skip with its reason; exits 0 iff every scored row passed.
 """
 
 import argparse
@@ -114,15 +142,17 @@ HEADER = ROOT / "core/include/framejob_core.h"
 MOVIE = ROOT / "tools/proof/media/A.mov"
 CALL_BOUND = 300
 SEC = 600_000
-PROBE_ROWS = ["B0", "L1d", "L3r", "L9", "L7"]
+PROBE_ROWS = ["B0", "L1d", "L3r", "L9", "L7", "I4", "I6"]
 DRAWING_ROWS = ["L2", "L4", "L5", "L6", "L8", "L8r", "L10", "L11"]
-APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ["Z1"]
+ATTACH_ROWS = ["I1", "I2", "I3", "I5"]
+APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + ["Z1"]
 ROWS = PROBE_ROWS + APP_ROWS
 RENDER_TIMES = [SEC // 2, 2 * SEC, 4 * SEC]
 SCALE_SENTENCE = "video.cursor.scale must be between 0.25 and 8, not 9"
 COLOR_SENTENCE = 'video.cursor.click_color must be a CSS colour (spec §11 G-12), not "#ffg"'
 
 results = {}
+skips = {}
 selected = set(ROWS)
 
 
@@ -131,6 +161,13 @@ def check(name, ok, detail=""):
         return
     results.setdefault(name, []).append((bool(ok), detail))
     print(f"  {'ok  ' if ok else 'FAIL'} {name} {detail}", flush=True)
+
+
+def skip(name, why):
+    """A row not scored, by name and reason (never a pass or a failure)."""
+    if name in selected:
+        skips[name] = why
+        print(f"  skip {name} — {why}", flush=True)
 
 
 def format_version():
@@ -208,7 +245,7 @@ def probe_rows():
     shutil.copyfile(ROOT / "app/Resources/Blank.mp4", out / "Blank.mp4")
     check("B0", True, f"built {binary.name} and its default.metallib")
     request = out / "request.json"
-    asked = {"fixture": json.dumps(fixture()), "cursor_dir": str(CU)}
+    asked = {"fixture": json.dumps(fixture()), "cursor_dir": str(CU), "i4": "I4" in selected}
     if "L7" in selected:
         asked["l7"] = {"movie": str(CLEAN), "cursor": str(CU / "cursor.fjcursor"), "runs": 3}
     request.write_text(json.dumps(asked))
@@ -814,6 +851,142 @@ def l11(client, path):
         close(client, path)
 
 
+# ---- CU3b: import, relink and a landing attach a cursor file -------------------
+
+ATTACH = WORK / "i"
+WIDE = CU / "cursor_wide.fjcursor"
+SMALL = ATTACH / "small.mov"
+
+
+def clean_copy(name, beside=None):
+    """A copy of `clean.mov` as `<ATTACH>/<name>.mov`, with `beside` copied to its
+    `<name>.fjcursor` when given; the movie's path."""
+    ATTACH.mkdir(parents=True, exist_ok=True)
+    copy = ATTACH / f"{name}.mov"
+    shutil.copyfile(CLEAN, copy)
+    file = copy.with_suffix(".fjcursor")
+    if file.exists():
+        file.unlink()
+    if beside is not None:
+        shutil.copyfile(beside, file)
+    return copy
+
+
+def attached(media):
+    """A media's `cursor` as the rows compare it: path and `in_picture` (the bookmark is the
+    app's), or None."""
+    cursor = media.get("cursor")
+    return None if cursor is None else {"path": cursor.get("path"),
+                                        "in_picture": cursor.get("in_picture")}
+
+
+def i1(client):
+    doc = new_doc(client, "i1")
+    try:
+        movie = clean_copy("i1-match", Path(FIXTURE["cursor"]))
+        media = doc.call("import_media", path=str(movie))["media"]
+        got = attached(next(m for m in doc.project()["media"] if m["id"] == media))
+        want = {"path": str(movie.with_suffix(".fjcursor")), "in_picture": False}
+        check("I1", got == want, f"import_media of a movie with its file beside: cursor {got}")
+        wide = clean_copy("i1-wide", WIDE)
+        other = doc.call("import_media", path=str(wide))["media"]
+        got = next(m for m in doc.project()["media"] if m["id"] == other).get("cursor")
+        check("I1", got is None, f"a file whose movie_size is 1280 × 720 beside a 640 × 360 "
+              f"movie: cursor {got}")
+    finally:
+        close(client, doc.path)
+
+
+def i2(client):
+    doc = new_doc(client, "i2")
+    try:
+        first = clean_copy("i2-first", Path(FIXTURE["cursor"]))
+        media = doc.call("import_media", path=str(first))["media"]
+
+        def cursor():
+            return attached(next(m for m in doc.project()["media"] if m["id"] == media))
+
+        before = cursor()
+        check("I2", before == {"path": str(first.with_suffix(".fjcursor")), "in_picture": False},
+              f"imported with its file: {before}")
+        doc.call("relink_media", media=media, path=str(clean_copy("i2-bare")))
+        got = cursor()
+        check("I2", got == before, f"relinked to a copy with no file, the old file there: {got}")
+        first.with_suffix(".fjcursor").unlink()
+        doc.call("relink_media", media=media, path=str(clean_copy("i2-bare2")))
+        got = cursor()
+        check("I2", got is None, f"the old file removed, relinked to another bare copy: {got}")
+        own = clean_copy("i2-own", Path(FIXTURE["cursor"]))
+        doc.call("relink_media", media=media, path=str(own))
+        got = cursor()
+        check("I2", got == {"path": str(own.with_suffix(".fjcursor")), "in_picture": False},
+              f"relinked to a copy with its own file: {got}")
+        if not SMALL.exists():
+            ffmpeg(["-i", str(CLEAN), "-vf", "scale=320:180", "-c:v", "rawvideo", "-pix_fmt",
+                    "argb", "-tag:v", "raw ", str(SMALL)])
+        doc.call("relink_media", media=media, path=str(SMALL))
+        got = cursor()
+        sized = next(m for m in doc.project()["media"] if m["id"] == media)
+        check("I2", got is None and (sized["width"], sized["height"]) == (320, 180),
+              f"that file there, relinked to a bare {sized['width']} × {sized['height']} copy: "
+              f"{got}")
+    finally:
+        close(client, doc.path)
+
+
+def i3(client):
+    doc = new_doc(client, "i3")
+    try:
+        # The movie's own size, so a render decodes as `tip_from` reads one (640 × 360).
+        doc.call("set_canvas", width=640, height=360, fps=[30, 1])
+        silent = ATTACH / "silent.m4a"
+        ATTACH.mkdir(parents=True, exist_ok=True)
+        ffmpeg(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "4", "-c:a", "aac",
+                str(silent)])
+        movie = clean_copy("i3-landed")
+        cursor_file = FIXTURE["cursor"]
+        answer = doc.call("land_recording", voice=[str(silent)], movie=str(movie),
+                          cursor=cursor_file)
+        project = doc.project()
+        media = next((m for m in project["media"] if m.get("path") == str(movie)), {})
+        got = attached(media) if media else None
+        check("I3", got == {"path": cursor_file, "in_picture": False},
+              f"land_recording with cursor: the landed media's cursor {got}")
+        clip = next((c for c in project["clips"] if c["id"] == answer.get("clip")), None)
+        if clip is None:
+            check("I3", False, f"no landed clip: {sorted(answer)}")
+        else:
+            canvas = project["canvas"]
+            video = clip.get("video") or {}
+            scale = float(video.get("scale", 1.0))
+            cx, cy = canvas["width"] / 2 + float(video.get("x", 0.0)), \
+                canvas["height"] / 2 + float(video.get("y", 0.0))
+            source_in = (clip.get("source") or {}).get("in", 0)
+            for k in (36, 84):
+                t = clip["start"] + k * FRAME - source_in
+                drawn = Drawn.__new__(Drawn)
+                drawn.client, drawn.name, drawn.path, drawn.clip = client, "i3", doc.path, \
+                    clip["id"]
+                tip = drawn.tip(t, f"k{k}", scale=scale)
+                px, py = FIXTURE["moves"][k][1], FIXTURE["moves"][k][2]
+                want = (cx + scale * (px - 320), cy + scale * (py - 180))
+                check("I3", near(tip, want, SPRITE_TOLERANCE),
+                      f"frame {k} at {t} ticks: the tip {show(tip)}, the file's ({px}, {py}) "
+                      f"through the clip's placement (canvas {canvas['width']} × "
+                      f"{canvas['height']}, scale {scale}) {show(want)}")
+        message = error_of(lambda: doc.call("land_recording", voice=[str(silent)],
+                                            cursor=cursor_file)) or ""
+        check("I3", "cursor" in message and "movie" in message,
+              f"cursor without movie: {message[:200] or 'no refusal'}")
+    finally:
+        close(client, doc.path)
+
+
+def i5(_client):
+    skip("I5", "owed to CU1b2: the drawn tip against a burned tip on a real In-the-picture "
+         "recording needs CU1b2's burned-tip helper (the road map's granted L1)")
+
+
 def app_rows(binary):
     log = WORK / "instance.log"
     launched = mcp.launch(str(binary), [],
@@ -828,12 +1001,13 @@ def app_rows(binary):
         drawing = [(name, body) for name, body in
                    [("L2", l2), ("L4", l4), ("L5", l5), ("L6", l6), ("L8", l8), ("L8r", l8r),
                     ("L10", l10)]]
-        bodies = [("L1", l1), ("L3", l3)] + drawing
+        attaching = [("I1", i1), ("I2", i2), ("I3", i3), ("I5", i5)]
+        bodies = [("L1", l1), ("L3", l3)] + drawing + attaching
         held = None
         for name, body in bodies:
             if name not in selected:
                 continue
-            if name in DRAWING_ROWS and not FIXTURE.get("cursor"):
+            if name in DRAWING_ROWS + ["I1", "I2", "I3"] and not FIXTURE.get("cursor"):
                 check(name, False, f"no fixture: {FIXTURE.get('problems') or 'the probe wrote none'}")
                 continue
             try:
@@ -885,15 +1059,15 @@ def main():
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
-        if selected & ({"L1", "L3"} | set(DRAWING_ROWS)):
+        if selected & ({"L1", "L3"} | set(DRAWING_ROWS) | set(ATTACH_ROWS)):
             selected.add("Z1")
-        if selected & (set(DRAWING_ROWS) | {"L7"}):
+        if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | {"L7", "I4", "I6"}):
             selected.add("B0")
     remove_work()
     HOME.mkdir(parents=True)
-    print(f"CU3a1 and CU3a2 — the cursor in the model and the recipe, then drawn "
-          f"({proof_app.config()} build)", flush=True)
-    if selected & (set(DRAWING_ROWS) | {"L7"}):
+    print(f"CU3a1, CU3a2 and CU3b — the cursor in the model and the recipe, drawn, then "
+          f"attached ({proof_app.config()} build)", flush=True)
+    if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | {"L7"}):
         try:
             make_clean()
         except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
@@ -911,7 +1085,8 @@ def main():
         app_rows(binary)
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]
-    print(f"\nscores: {len(passed)}/{len(results)}" + (f"; failed {failed}" if failed else ""))
+    print(f"\nscores: {len(passed)}/{len(results)}" + (f"; failed {failed}" if failed else "")
+          + (f"; skipped {sorted(skips)}" if skips else ""))
     return 0 if not failed and results else 1
 
 

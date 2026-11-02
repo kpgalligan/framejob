@@ -20,9 +20,10 @@
 //   1, strictly between 1 and 3 twice, then 3; `recipe(at:)` decodes the same.
 //
 // CU3a2 (spec §11 CU-33, CU-37), when the request names them:
-// - `cursor_dir`: the drawing rows' fixture written there — `sprite.png` and
+// - `cursor_dir`: the drawing rows' fixture written there — `sprite.png`,
 //   `cursor.fjcursor` (format v1 through `CursorFileBody`, read back through
-//   `ReelCursor`) — and answered beside the rows as `fixture` (the paths, the
+//   `ReelCursor`) and CU3b's `cursor_wide.fjcursor` (the same but `movie_size`
+//   [1280, 720]) — and answered beside the rows as `fixture` (the paths, the
 //   sprite's centroid offset from its hot spot, its colour and that colour's
 //   `InputConversions.liftSDR`, the moves).
 // - `l7` (`movie`, `cursor`, `runs`): L7, the compositor's own per-frame
@@ -31,8 +32,23 @@
 //   1920×1080, 3840×2160 and 5120×2880; and `CursorSprites.uploads` over 120
 //   `cursorSprite` calls on a `MetalRenderer` of its own (the proof puts a
 //   `default.metallib` of the tree's shader beside the binary).
+//
+// CU3b (spec §11 CU-38 (b), (c)):
+// - I4, when the request says `i4: true`: the app's own `ClipPane` over a `ProjectDocument` (as
+//   `co3_probe.swift` builds them, with no window): `video.cursor` right after `video.cutout`
+//   for a clip whose media has `cursor {in_picture: false}`, titled "Cursor", and its checkbox,
+//   pressed, commits one "Show Cursor" `set_video` whose patch is exactly `{cursor: {show:
+//   false}}`; absent without a cursor and with `in_picture: true`; under a fixed selection, the
+//   media's `cursor` set then cleared by `relink_media` with a probe makes the section appear
+//   then go, the pane refreshed by the inspector's own rule (rebuilt only when its
+//   `structureSignature` changed).
+// - I6: `Exporter.cursorWarningSuffix` ("", " 1 cursor warning.", " 2 cursor warnings (hover
+//   for details)."), `cursorWarningDetails` (the sentences, one a line; nil for none) and
+//   `ExportQueueRowView.toolTip(for:)` of a completed job holding one cursor warning, which
+//   ends with its sentence.
 
 import AVFoundation
+import AppKit
 import Foundation
 import ImageIO
 
@@ -305,12 +321,13 @@ func spritePNG() -> Data? {
 
 /// The v1 cursor file through the app's own encoder (`CursorFileBody`): identity geometry
 /// (640 × 360 points at 1 px a point, the screen at the origin), the moves, the clicks, the
-/// one image from t 0.
-func cursorBody(png: Data) -> CursorFileBody {
+/// one image from t 0. `movieSize` is the header's `movie_size` (CU3b's `cursor_wide.fjcursor`
+/// names 1280 × 720, a size the clean movie does not have).
+func cursorBody(png: Data, movieSize: [Int] = [640, 360]) -> CursorFileBody {
     var b = CursorFileBody(
         version: ReelCursor.fileVersion, inPicture: false, source: .display, displayID: 1,
         sourceFrame: [0, 0, 64000, 36000], pointSize: [64000, 36000], pixelsPerPoint: 1,
-        contentSize: [640, 360], movieSize: [640, 360], anchor: .e2, anchorHostUs: 0,
+        contentSize: [640, 360], movieSize: movieSize, anchor: .e2, anchorHostUs: 0,
         cursorImage: .currentSystem)
     b.geometry = [.init(t: 0, screenRect: [0, 0, 64000, 36000],
                         contentRect: [0, 0, 64000, 36000], contentScale: 1, scaleFactor: 1)]
@@ -345,10 +362,13 @@ if let dir = request["cursor_dir"] as? String {
         let spriteURL = folder.appendingPathComponent("sprite.png")
         let cursorURL = folder.appendingPathComponent("cursor.fjcursor")
         let bytes = cursorBody(png: png).encoded()
+        let wide = cursorBody(png: png, movieSize: [1280, 720]).encoded()
         do {
             try png.write(to: spriteURL)
             try bytes.write(to: cursorURL)
             _ = try ReelCursor(data: bytes)
+            try wide.write(to: folder.appendingPathComponent("cursor_wide.fjcursor"))
+            _ = try ReelCursor(data: wide)
         } catch {
             problems.append("the fixture did not write or read back: \(error)")
         }
@@ -512,6 +532,201 @@ if let l7 = request["l7"] as? [String: Any], let movie = l7["movie"] as? String,
     }
     if !worst.isEmpty { problems.append("over the limit: " + worst.joined(separator: "; ")) }
     row("L7", problems.isEmpty, (problems + lines).joined(separator: "; "))
+}
+
+// ---- CU3b: I4 the Cursor section, I6 the cursor warnings ---------------------------------
+
+/// The probe's own document controller, as `co3_probe.swift` makes one, so a `ProjectDocument`
+/// opens without the app's.
+final class ProbeDocumentController: NSDocumentController {
+    override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
+}
+
+if request["i4"] as? Bool == true {
+    _ = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    let delegate = AppDelegate()
+    delegate.applicationWillFinishLaunching(
+        Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
+    var documents: [ProjectDocument] = []
+    var kept: [AnyObject] = []
+    var sent: [(name: String, ops: [ReelOp])] = []
+    let moviePath = "/proof/cu3b/movie.mov"
+    func descriptor(_ cursor: MediaCursor?, path: String = moviePath) -> MediaDescriptor {
+        MediaDescriptor(
+            path: path, kind: .video, duration: 4 * second, width: 640, height: 360,
+            fps: .thirty, hasVideo: true, hasAudio: false, cursor: cursor)
+    }
+    /// A document holding one 640 × 360 video media with `cursor` and one clip of it.
+    func makeDocument(_ cursor: MediaCursor?) -> (ProjectDocument, UInt32, UInt32)? {
+        let document = ProjectDocument()
+        documents.append(document)
+        document.performGroupedEdit("Media", [.addMedia(descriptor: descriptor(cursor))])
+        guard let media = document.project.snapshot.media.first?.id else { return nil }
+        if document.project.snapshot.tracks.isEmpty {
+            document.performGroupedEdit("Track", [.addTrack(index: 0)])
+        }
+        guard let track = document.project.snapshot.tracks.first?.id else { return nil }
+        document.performGroupedEdit("Clip", [.addClip(track: track, media: media, at: 0)])
+        guard let clip = document.project.snapshot.clips.first?.id else { return nil }
+        return (document, media, clip)
+    }
+    /// A Clip pane on the Picture sub-tab over `document` with `clip` selected and no window;
+    /// every commit recorded in `sent` and applied.
+    func clipPane(_ document: ProjectDocument, _ clip: UInt32) -> ClipPane {
+        let inspector = InspectorViewController()
+        inspector.document = document
+        inspector.onEdit = { [weak document] name, ops in
+            sent.append((name, ops))
+            document?.applyEdit(name, ops)
+        }
+        document.selection = [clip]
+        inspector.binding.invalidate()
+        let pane = ClipPane(inspector: inspector)
+        kept += [inspector, pane]
+        pane.binding.invalidate()
+        pane.choose(.picture)
+        pane.rebuild()
+        pane.refresh()
+        return pane
+    }
+    /// The inspector's own rule (`InspectorViewController.refresh`): rebuilt only when the
+    /// pane's `structureSignature` changed, refreshed always.
+    func inspectorRefresh(_ pane: ClipPane, _ last: inout String) {
+        pane.binding.invalidate()
+        let signature = pane.structureSignature
+        if signature != last {
+            last = signature
+            pane.rebuild()
+        }
+        pane.refresh()
+    }
+    func walkViews(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walkViews) }
+
+    var problems: [String] = []
+    var notes: [String] = []
+    let separate = MediaCursor(path: "/proof/cu3b/movie.fjcursor", inPicture: false)
+    // The section's place, after Background's slot, for a media with a separate cursor.
+    if let (document, _, clip) = makeDocument(separate) {
+        let pane = clipPane(document, clip)
+        let order = pane.sections.map(\.id)
+        let cutout = order.firstIndex(of: "video.cutout")
+        let cursor = order.firstIndex(of: "video.cursor")
+        notes.append("with a cursor: \(order)")
+        if cutout == nil || cursor != cutout.map({ $0 + 1 }) {
+            problems.append("video.cursor not right after video.cutout: \(order)")
+        }
+        let section = pane.sections.first { $0.id == "video.cursor" }
+        if section?.title != "Cursor" { problems.append("title \(section?.title ?? "none")") }
+        // Its checkbox, pressed: one "Show Cursor" whose patch is exactly {cursor: {show: false}}.
+        let check = section.flatMap {
+            walkViews($0).lazy.compactMap { $0 as? OptionCheckboxControl }.first
+        }
+        sent = []
+        if let event = NSEvent.mouseEvent(
+            with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1),
+            let check
+        {
+            check.mouseDown(with: event)
+        } else {
+            problems.append("no checkbox")
+        }
+        let op = sent.count == 1 && sent[0].ops.count == 1
+            ? (try? JSONSerialization.jsonObject(with: Data(sent[0].ops[0].json.utf8)))
+                as? [String: Any] ?? [:]
+            : [:]
+        let patch = op["patch"] as? [String: Any] ?? [:]
+        let written = patch["cursor"] as? [String: Any] ?? [:]
+        let stored = document.project.snapshot.clip(clip)?.video?.cursor?.show
+        notes.append("commits \(sent.map { ($0.name, $0.ops.map(\.json)) }); stored show "
+            + "\(String(describing: stored))")
+        if !(sent.count == 1 && sent[0].name == "Show Cursor"
+            && op["op"] as? String == "set_video" && patch.count == 1 && written.count == 1
+            && written["show"] as? Bool == false && stored == false)
+        {
+            problems.append("the press did not commit one Show Cursor {cursor: {show: false}}")
+        }
+    } else {
+        problems.append("the separate-cursor fixture could not be made")
+    }
+    // Absent without a cursor, and with one in the picture.
+    for (label, cursor) in [
+        ("no cursor", nil), ("in_picture: true", MediaCursor(path: "/proof/x.fjcursor", inPicture: true)),
+    ] as [(String, MediaCursor?)] {
+        guard let (document, _, clip) = makeDocument(cursor) else {
+            problems.append("the \(label) fixture could not be made")
+            continue
+        }
+        let order = clipPane(document, clip).sections.map(\.id)
+        if order.contains("video.cursor") { problems.append("video.cursor with \(label)") }
+        notes.append("\(label): \(order.contains("video.cutout") ? "cutout, " : "")"
+            + (order.contains("video.cursor") ? "Cursor" : "no Cursor"))
+    }
+    // A fixed selection: the media's cursor set, then cleared, through the document by a
+    // relink-shaped edit (`relink_media` with a probe), the pane refreshed as the inspector does.
+    if let (document, media, clip) = makeDocument(nil) {
+        let pane = clipPane(document, clip)
+        var last = pane.structureSignature
+        var seen: [Bool] = [pane.sections.contains { $0.id == "video.cursor" }]
+        for cursor in [separate, nil] as [MediaCursor?] {
+            document.performGroupedEdit("Relink Media", [
+                .relinkMedia(
+                    media: media, path: moviePath, probe: descriptor(cursor))
+            ])
+            let has = document.project.snapshot.media(media)?.cursor == cursor
+            if !has { problems.append("the relink left cursor \(String(describing: document.project.snapshot.media(media)?.cursor))") }
+            inspectorRefresh(pane, &last)
+            seen.append(pane.sections.contains { $0.id == "video.cursor" })
+        }
+        notes.append("under a fixed selection, the section shown \(seen)")
+        if seen != [false, true, false] {
+            problems.append("the section under a fixed selection \(seen), not [false, true, false]")
+        }
+    } else {
+        problems.append("the relink fixture could not be made")
+    }
+    row("I4", problems.isEmpty, (problems + notes).joined(separator: "; "))
+    for document in documents { document.removeTemporaryCacheDirectory() }
+}
+
+do {
+    var problems: [String] = []
+    let one = [ExportCursorWarning(media: 3, path: "/p/a.fjcursor", message: "it is not JSON")]
+    let two = one + [ExportCursorWarning(media: 4, path: "/p/b.fjcursor", message: "gone")]
+    let suffixes = [
+        Exporter.cursorWarningSuffix([]), Exporter.cursorWarningSuffix(one, hover: false),
+        Exporter.cursorWarningSuffix(two),
+    ]
+    let wanted = ["", " 1 cursor warning.", " 2 cursor warnings (hover for details)."]
+    if suffixes != wanted { problems.append("suffixes \(suffixes)") }
+    let sentence = "The cursor of media 3 is not drawn: it is not JSON."
+    let details = Exporter.cursorWarningDetails(two)
+    if Exporter.cursorWarningDetails([]) != nil
+        || details != sentence + "\nThe cursor of media 4 is not drawn: gone."
+    {
+        problems.append("details \(String(describing: details))")
+    }
+    var tip = ""
+    if let project = try? ReelProject.from(json: fixtureText),
+        let settings = try? ReelExport.settings(project, preset: "h264")
+    {
+        var job = ExportQueueController.Job(
+            id: 1, project: project, urls: [:], reverse: .none, settings: settings,
+            destination: URL(fileURLWithPath: "/proof/cu3b/out.mp4"), options: .none,
+            graphics: nil)
+        job.state = .completed
+        job.cursorWarnings = one
+        tip = ExportQueueRowView.toolTip(for: job)
+        if !tip.hasSuffix("\n" + sentence) { problems.append("the queue row's tooltip \(tip)") }
+    } else {
+        problems.append("no job could be made")
+    }
+    row("I6", problems.isEmpty, problems.isEmpty
+        ? "suffixes \(suffixes); the details two lines; the queue row's tooltip ends with "
+            + "\"\(sentence)\""
+        : problems.joined(separator: "; "))
 }
 
 finish()

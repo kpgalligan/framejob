@@ -36,6 +36,12 @@ extension AgentServer {
         let enhance = try boolArg(a, "enhance") ?? false
         let place = try boolArg(a, "place")
         let followWait = try doubleArg(a, "follow_wait")
+        let cursor = try stringArg(a, "cursor")
+        if cursor != nil, movie == nil {
+            throw ToolError(
+                message: "cursor cannot be given without movie — a cursor file belongs to the "
+                    + "screen segment's movie.")
+        }
         if movie != nil, voice.count != 1 {
             throw ToolError(
                 message: "With movie, voice must name exactly one file — the movie's microphone "
@@ -67,8 +73,14 @@ extension AgentServer {
         choice.enhanceMicrophone = enhance
         let now = Date()
         let segments =
-            picture.map {
-                [RecordingSegment(descriptor: $0, micDescriptor: voices[0], micOffset: 0, startedAt: now)]
+            try picture.map {
+                [
+                    try landRecordingCursor(
+                        cursor,
+                        RecordingSegment(
+                            descriptor: $0, micDescriptor: voices[0], micOffset: 0,
+                            startedAt: now))
+                ]
             }
             ?? voices.map {
                 RecordingSegment(descriptor: $0, micDescriptor: nil, micOffset: 0, startedAt: now)
@@ -106,6 +118,25 @@ extension AgentServer {
         } catch {
             throw ToolError(
                 message: "land_recording: \(path) will not probe: \(error.localizedDescription)")
+        }
+    }
+
+    /// The screen segment with `cursor`'s file attached (spec §11 CU-34 (d)), as a recording's
+    /// landing attaches the file it wrote; `segment` unchanged without `cursor`. A file that does
+    /// not attach is refused in `cursorAttachment`'s sentence.
+    private func landRecordingCursor(
+        _ cursor: String?, _ segment: RecordingSegment
+    ) throws -> RecordingSegment {
+        guard let cursor else { return segment }
+        let file = URL(
+            fileURLWithPath: (cursor.trimmingCharacters(in: .whitespacesAndNewlines) as NSString)
+                .expandingTildeInPath)
+        switch MediaImporter.cursorAttachment(at: file, to: segment.descriptor) {
+        case .success(let attachment):
+            return segment.withCursor(
+                url: file, problem: nil, image: attachment.image, attached: attachment.cursor)
+        case .failure(let problem):
+            throw ToolError(message: "land_recording: " + problem.message)
         }
     }
 
@@ -173,7 +204,9 @@ extension AgentServer {
                 + "for proving Enhance the microphone when it lands (spec AU-68, AU-69) without "
                 + "a microphone grant or a voice. Without movie, a voice-over of the voice "
                 + "files, one segment each; with movie, one screen segment whose microphone file "
-                + "is voice's one file (mic_offset 0). Each file is probed as a recording's are. "
+                + "is voice's one file (mic_offset 0), and cursor, when given, a cursor file "
+                + "attached to that segment's media as a recording's landing attaches the file it "
+                + "wrote (spec CU-34). Each file is probed as a recording's are. "
                 + "door tool (default) waits out a drag and lands as record_screen does, "
                 + "answering what record_screen would, enhance or enhance_error included; door "
                 + "panel hands the result to the recorder panel's recordingEnded, waits up to "
@@ -182,7 +215,9 @@ extension AgentServer {
                 + "(the panel's), project, enhance_pending (read last)}. Refused by name: a "
                 + "path that will not probe, movie with other than one voice file, place with "
                 + "door panel, door panel while the recorder or the panel is not idle, "
-                + "follow_wait with door tool or outside 0…330.",
+                + "follow_wait with door tool or outside 0…330, cursor without movie, a cursor "
+                + "file that does not attach (it will not open, or its movie_size is not the "
+                + "movie's).",
             [
                 "voice": [
                     "type": "array", "items": ["type": "string"],
@@ -193,6 +228,11 @@ extension AgentServer {
                     "type": "string",
                     "description": "A movie to land as the screen recording's picture, its "
                         + "microphone voice's one file.",
+                ],
+                "cursor": [
+                    "type": "string",
+                    "description": "with movie only: a cursor file (.fjcursor) attached to the "
+                        + "screen segment's media; its movie_size must be the movie's.",
                 ],
                 "door": [
                     "type": "string", "enum": LandRecordingDoor.allCases.map(\.rawValue),

@@ -66,4 +66,21 @@ extension Exporter {
     static func cursorSentences(_ warnings: [ExportCursorWarning]) -> [String] {
         warnings.map { "The cursor of media \($0.media) is not drawn: \($0.message)." }
     }
+
+    /// A finished export's cursor count (spec §11 CU-38 (c)), after the graphic count:
+    /// " 1 cursor warning" or " N cursor warnings", then " (hover for details)." or "."; "" for
+    /// none.
+    static func cursorWarningSuffix(
+        _ warnings: [ExportCursorWarning], hover: Bool = true
+    ) -> String {
+        guard !warnings.isEmpty else { return "" }
+        let count = warnings.count == 1 ? "1 cursor warning" : "\(warnings.count) cursor warnings"
+        return " " + count + (hover ? " (hover for details)." : ".")
+    }
+
+    /// The tooltip's list (CU-38 (c)): `cursorSentences`, one per line; nil for none.
+    static func cursorWarningDetails(_ warnings: [ExportCursorWarning]) -> String? {
+        guard !warnings.isEmpty else { return nil }
+        return cursorSentences(warnings).joined(separator: "\n")
+    }
 }

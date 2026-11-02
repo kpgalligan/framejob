@@ -445,7 +445,7 @@ extension AgentServer {
             throw ToolError(message: "No file at \(url.path)")
         }
         let given = try stringArg(a, "bookmark")
-        let descriptor = try probe(url)
+        let descriptor = MediaImporter.relinkProbe(try probe(url), current: media)  // CU-38 (a)
         let bookmark = descriptor.path == url.path ? given ?? descriptor.bookmark
             : descriptor.bookmark
         var fields: [String: Any] = [

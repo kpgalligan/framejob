@@ -104,10 +104,15 @@ struct RecordingSegment {
         self.cursorImage = cursorImage
     }
 
-    /// This segment with its cursor fields set, every other field kept.
-    func withCursor(url: URL?, problem: String?, image: CursorImageMode?) -> RecordingSegment {
-        RecordingSegment(
-            descriptor: descriptor, micDescriptor: micDescriptor, micOffset: micOffset,
+    /// This segment with its cursor fields set, every other field kept; `attached`, when given,
+    /// is its descriptor's `cursor` (spec §11 CU-34 (c), (d)).
+    func withCursor(
+        url: URL?, problem: String?, image: CursorImageMode?, attached: MediaCursor? = nil
+    ) -> RecordingSegment {
+        var described = descriptor
+        if let attached { described.cursor = attached }
+        return RecordingSegment(
+            descriptor: described, micDescriptor: micDescriptor, micOffset: micOffset,
             startedAt: startedAt, micProblem: micProblem, cameraDescriptor: cameraDescriptor,
             cameraOffset: cameraOffset, cameraProblem: cameraProblem, cameraNote: cameraNote,
             cursorURL: url, cursorProblem: problem, cursorImage: image)

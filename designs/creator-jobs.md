@@ -5929,6 +5929,100 @@ without play. Nothing to file.
 - **Acceptance:** the proof rows against Release; `make gate`.
 - **Depends on:** CU3a; CU1b (for L1). **Lane** B.
 
+#### CU3b's record (2026-11-02)
+
+**Landed.** Lane B, base `c7a4c0e3` (I's HEAD, CU1b1's cursor-file commit). Two commits: the
+decisions (`65417515`: CU-34, CU-38 with their index rows, `creator-jobs-5.md` 318 → 396 lines),
+then the code, the proof and the documents. No core, FFI, op, format or product-tool change:
+`media.cursor` (CU-39) already travels in a probe and a probed relink already replaces it. No
+toll: every file stayed under its cap (`RecordingResult.swift` 386 → 391, `AgentServer+Media.swift`
+552 net 0, `ExportQueueController.swift` 554 → 555, `TypedPatches.swift` 372 → 379).
+
+- **Import.** `probeAllowingRewrap`'s direct probe passes its descriptor through
+  `MediaImporter.withCursorBeside` (one line), so Add Media…, a drop, a document's open,
+  `import_media` and the recorder's settle probe all look for `<stem>.fjcursor`; a rewrapped copy
+  is not looked beside. `cursorAttachment(at:to:)` opens the file through `ReelCursor`, decodes
+  the header's `in_picture`, `movie_size` and `cursor_image`, and attaches it only to a video with
+  pictures of that width × height, with CU-34's four sentences.
+- **Relink.** `relinkProbe(_:current:)` at the three probed sites (`relinkNext`, `relink_media`,
+  the re-copy on open): the probe's own cursor, else the stored one when its file exists and the
+  sizes match, else none.
+- **A landing.** `saveCursor` attaches each written file on the capture queue
+  (`RecordingSegment.withCursor(…, attached:)`); `land_recording {cursor}` attaches a fixture's,
+  refusing `cursor` without `movie` and a file that does not attach.
+- **Show cursor.** `CursorPatch` and `VideoPatch.cursorPart` (`cutoutPart`'s shape), the Cursor
+  section in `VideoPane+Cursor.swift` registered after the source-pixels block, and `allCursored`
+  in `ClipPane.structureSignature`.
+- **Cursor warnings.** `Exporter.cursorWarningSuffix` and `cursorWarningDetails`, on the queue
+  row's message and tooltip and the progress sheet's line and tooltip.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/MediaImporter+Cursor.swift` | 110 | new: `CursorFileHeader`, `CursorAttachment`, `cursorAttachment`, `withCursorBeside`, `relinkProbe` |
+| `app/Sources/VideoPane+Cursor.swift` | 46 | new: `allCursored`, `cursorSection()` |
+| `app/Sources/AgentServer+LandRecording.swift` | 259 | `cursor`, `landRecordingCursor`, the catalog's prose and schema entry |
+| `app/Sources/Exporter+Cursor.swift` | 86 | the two helpers |
+| `app/Sources/CursorProps.swift` · `TypedPatches.swift` | — · 379 | `CursorPatch`; `VideoPatch.cursorPart` |
+| `app/Sources/ClipPane.swift` | 283 | the `makeSections()` line and the signature entry |
+| `app/Sources/ScreenRecorder+Cursor.swift` · `RecordingResult.swift` | 165 · 391 | the landing's attach; `withCursor(…, attached:)` |
+| `MediaImporter+Probe.swift` · `ProjectDocument+Import.swift` · `AgentServer+Media.swift` · `ProjectDocument+MissingCopies.swift` | — | one call each |
+| `ExportQueueController.swift` · `ExportQueueWindowController.swift` · `ExportProgressSheetController.swift` | 555 · — · — | the warnings shown |
+| `tools/proof/cursor_layer_proof.py` · `cursor_layer_probe.swift` · `cursor_proof.py` | 1,094 · 732 · 354 | I1–I4, I6, I5 skipped; K17 |
+
+**Deviations.** `ExportQueueController.swift`'s message takes two lines for one (the cursor
+suffix on its own line, 554 → 555), not one changed line. `land_recording`'s attach is a private
+`landRecordingCursor` helper in the same file. I4 builds its pane with the probe's own
+`ProbeDocumentController` and `AppDelegate.applicationWillFinishLaunching`, only when the request
+says `i4: true`, so the other probe rows run as before. I3 sets its document's canvas to 640 × 360
+before the landing, so its renders decode at the size `tip_from` reads. Outside the Files list:
+none.
+
+**Measured.**
+
+- `make typecheck` after each Swift step: 0 errors and the 4 baseline warnings.
+  `swift_build.py typecheck tools/proof/cursor_layer_probe.swift`: exit 0.
+- Debug: `cursor_layer_proof.py --only B0,I4,I6` 3/3; `--only I1,I2,I3,I5,Z1` 4/5 at first (I3:
+  the tip not located, the landing's document at 1280 × 720 against `tip_from`'s 640 × 360
+  decode; the canvas set, then a missing folder for the silent `.m4a`), then `--only I3,Z1` 3/3;
+  `cursor_capture_probe.py` 14/14 (K12, `withCursor`'s callers); `AP6C_ONLY=v8
+  audio_ap6c_proof.py` 4/4 on an instance of its own; `spec_index_proof.py` 249/249; Z1 and every
+  launch's `grep "Frame Job: "` printed nothing.
+- Mutants, nine, each once on Debug and restored byte-identical (SHA-256), all caught: the size
+  check removed (I1: the 1280 × 720 file attached); `relinkProbe` not keeping (I2: the cursor
+  cleared with the old file there); its size test removed (I2: the cursor kept on the 320 × 180
+  copy); `land_recording`'s `attached:` dropped (I3: no cursor, no tip at either frame);
+  `allCursored` without its `media.cursor` test (I4: the section with no cursor, [true, true,
+  true] under the fixed selection); without its `in_picture` test (I4: the section with
+  `in_picture: true`); the `makeSections()` line removed (I4: no section, no checkbox); the
+  `structureSignature` entry removed (I4: [false, false, false]); the queue tooltip's cursor
+  details dropped (I6: the tooltip ends with the path).
+- `make gate`: PASS 509 s (names 1, typecheck 10, fmt and lint skipped as unchanged, test 275,
+  app 222).
+- `RC_PROOF_APP=release cursor_layer_proof.py`, whole: **21/21**, I5 skipped by name — L7 0.115 /
+  0.249 / 0.258 ms at 1920×1080 / 3840×2160 / 5120×2880 (`uploads` [1, 1]); I1–I4, I6 as above;
+  I3's tips (168.00, 86.00) and (312.00, 134.00) on the file's points; Z1 nothing in either launch.
+- `audio_ap6c_proof.py` against a Release instance: 33/34 first (V4 launches its own instance and
+  refused the stale Debug app without `RC_PROOF_APP=release`), then with `RC_PROOF_APP=release`
+  **39/39**; `grep "Frame Job: "` printed nothing.
+- `RC_PROOF_APP=release cursor_proof.py`: **6/6**, K5 skipped by name (no
+  `CGPreflightPostEventAccess`); K17 the landed media's `cursor` `{path: segments[0].cursor_path,
+  in_picture: true}`.
+
+**Review.** Verdict pass, no findings (range `c7a4c0e3..f9e9e5a4`): `relinkProbe` keeps only
+for a same-size video with an existing file, `allCursored` is in the signature, `cursorPart` is
+written only when `cursor` is nil, the queue reads `cursorWarnings` before `exporter = nil`, and
+the frozen files are untouched. The relayed report of the picked-window grey window with no
+Share button stays outside this phase (JOB-29's step, owed in CU1b1's record). No fix pass.
+
+**Integration.** Onto TX1b (`5688017f`): the decisions file and both spec indexes conflicted,
+resolved keeping both — `creator-jobs-5.md` holds TX1b's section then CU3b's (468 lines), its
+index row carries both clauses, and the `11-decisions/` cell is 19434 in 39 files
+(`spec_index_proof.py` 249/249). The code applied cleanly.
+
+**Owed.** I5 (the road map's granted L1) to CU1b2, which builds the burned-tip helper. No manual
+check: the Cursor section shows only for a media whose file says the pointer is not in the
+picture, which no recording writes until CU3c.
+
 ### CO3 — Remove Background in the inspector and the menus
 
 - **What a person gets:** a **Background** section in the Picture sub-tab after Chroma Key: Remove
