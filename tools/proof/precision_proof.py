@@ -495,8 +495,8 @@ MUTANTS = {
          "    static let sourcePixelFormat: OSType = kCVPixelFormatType_64RGBAHalf\n",
          "    static let sourcePixelFormat: OSType = kCVPixelFormatType_32BGRA\n")]},
     "no-source-clamp": {"mode": "rows", "rows": ["C1"], "anchors": [
-        ("app/Resources/Shaders/Compositor.metal", "    float4 texel = saturate(source.sample(\n",
-         "    float4 texel = (source.sample(\n")]},
+        ("app/Resources/Shaders/Compositor.metal", "        : saturate(source.sample(samp, coded));\n",
+         "        : (source.sample(samp, coded));\n")]},
     # PR3.
     "hevc10-main": {"mode": "rows", "rows": ["T1"], "anchors": [
         (SETTINGS, "            compression[AVVideoProfileLevelKey] = "

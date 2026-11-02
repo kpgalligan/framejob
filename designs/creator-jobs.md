@@ -451,7 +451,7 @@ by the first phase that must edit it, which names the seam in the history's "Nam
 | `core/src/evaluate.rs` | 559 | `Segment` and its `impl` with `to_json` (127–204; 206–208 are `CompTrack`'s doc and derive and stay) → `plan_segment.rs` | the first of CO2a1 (only if `mask_of` would pass ~590), SW3a, SW2c |
 | `core/src/format_history.rs` | 371 of 400 | versions 2–24 → `format_history_early.rs` | the bump whose paragraph would pass 400 |
 | `app/Sources/AgentCatalog+Properties.swift` | 410, over its 400 | the video patch's clauses and `videoPatchDescription` (23–191) → `AgentCatalog+VideoPatch.swift`, `private` widened | CO2a1 |
-| `app/Sources/Exporter.swift` | 598 | `// MARK: - Offline single frame` (478–598) → `Exporter+Frame.swift`, carrying the `copyCGImage` deprecation (:583): its `TYPECHECK_BASELINE` row and root `CLAUDE.md`'s "1 in `Exporter.swift`" move with it | CO2b |
+| `app/Sources/Exporter.swift` | 598 | `// MARK: - Offline single frame` (478–598) → `Exporter+Frame.swift`, carrying the `copyCGImage` deprecation (:583): its `TYPECHECK_BASELINE` row and root `CLAUDE.md`'s "1 in `Exporter.swift`" move with it | paid by CU3a2 (CO2b does not repeat it) |
 | `app/Sources/EditorViewController+SaveFrame.swift` | 399 of 400 | `// MARK: - The save panel's options` (277–399) → `SaveFrameOptions.swift` | CO2b |
 | `app/Sources/CaptionLayout.swift` | 581 | `// MARK: - Words into cues` (420–581) → `CaptionCues.swift` | VR4 |
 | `app/Sources/Playback.swift` | 592 | named: `setPreviewQuality` and `recompose()` → `Playback+PreviewQuality.swift` | SW0 |
@@ -4429,6 +4429,145 @@ past 38 and its layer key past the twenty-seventh, and does not repeat the `+Pro
   lift skipped (L5); the export not waiting (L11).
 - **Manual checks:** none here (they need Separate recordings, CU3c).
 - **Depends on:** CU3a1, CJ0d (T14). **Lane** B.
+
+#### CU3a2's record (2026-11-01)
+
+**Landed.** Lane B, base `0ff76ec2` (I's HEAD, CU3a1; the harness made the worktree at
+`eb350b86` and it was fast-forwarded to `0ff76ec2` before any edit, nothing of its own on it).
+Three commits: the decisions (`e06c1592`: CU-33, CU-37 with their index rows), the toll
+(`c33db189`), then the code, the proof and the documents (`8ca1b326`); landed on
+`worktree-creator-jobs` as one commit after TX1 and CO0. No core, FFI or format change. The
+uniform block's size (156 floats, 624 bytes) stands: CO2a2's group had not landed, so CO2a2
+appends after the cursor group and re-pins the sizes (CJ-8 (b)).
+
+- **The toll paid here, CO2b's by schedule:** `Exporter.swift`'s `// MARK: - Offline single
+  frame` (478–597, `renderFrame`, `renderFrameReported`, `scaledSize`) to `Exporter+Frame.swift`,
+  a pure move gated alone (`make typecheck`: 0 errors, the 4 baseline warnings, the
+  `copyCGImage` one now in `Exporter+Frame.swift`; the moved block and the rest of the file
+  diffed line-identical against the base), `gate.py`'s `TYPECHECK_BASELINE` row moved with it;
+  598 → 477 lines. CO2b does not repeat it. `designs/adr/app-file-history.md`'s "`renderFrame`
+  stays in `Exporter.swift`" now says where it is.
+- **One refinement of CU-33 (b), found by L8 and written into the decision.** Composited per
+  SAMPLE as first built, the clean movie with its file against the burned movie differed by up to
+  10/255 at the sprite's edge once a blur was on (every pixel over 2/255 within the blur's reach
+  of the sprite): a tap between texels read bilinear(background) with bilinear(sprite) over it,
+  where a burned pointer gives bilinear(background with the sprite in it). The composite is now
+  made PER SOURCE TEXEL for a sample within 2 px of the sprite or a ripple (`cursorFootprint`:
+  the bilinear footprint's four texels, each read at its centre with the cursor laid over it,
+  weighted as the sampler weights them); every other sample is the one hardware sample it was.
+  L8 then measured 1/255. The footprint's loop is kept from unrolling (`#pragma nounroll`): with
+  four inlined composites every fragment paid for them (L7 at 5120×2880 measured 1.196 ms, then
+  0.963 ms with the near test unrolled by hand, then 0.346 ms twice with the pragma).
+- **Deviations.** `ExportQueueController.swift` takes three lines, not two (the property, the read
+  before the exporter is dropped, the copy). `RecipeSource.setMediaURLs` re-resolves a key's
+  cursor files when a cursor media's record, duration or rate changed, not its record alone,
+  because `CursorFile` carries the pivot and the frame. `tools/proof/lut_probe.swift`'s call of
+  `setMediaURLs` passes a project (the signature gained it), and `precision_proof.py`'s
+  `no-source-clamp` mutant is re-aimed at the clamp's new line in `layerSample`. The probe's L7
+  compose timing is behind `FRAMEJOB_DEV_TOOLS` (the proof builds with it), so `swift_build.py
+  typecheck` of the probe passes without the define. L8's grade is exposure +1 AND saturation
+  −0.5: exposure is step 4c, after `layerSample`, so it alone cannot tell a composite before
+  `gradeSample` from one after it; saturation is in `gradeSample`. Outside the Files list, each
+  a sentence or an anchor this phase made stale: `CursorTracks.swift`'s header (its owners'
+  wiring), `designs/adr/app-file-history.md` (where `renderFrame` lives), `hdr_proof.py`'s
+  `relabel-in-renderframe` mutant (re-aimed at `Exporter+Frame.swift`), and `phase8_chrome.py`'s
+  View-menu list (below).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/Exporter+Frame.swift` | 134 | the toll's 120 lines; `renderFrameReported` waits for its frame's cursor tracks and returns their warnings |
+| `app/Sources/Exporter+Cursor.swift` | 69 | `ExportCursorWarning`, `waitForCursors`, `cursorSentences` |
+| `app/Sources/CursorFiles.swift` | 48 | `CursorFile`, `CursorFiles.files(of:)`, `requests(of:files:)` |
+| `app/Sources/Compositor+Cursor.swift` | 99 | `MetalRenderer.cursorSprite`, `cursorTime`, `rippleColour` |
+| `app/Sources/CursorSprites.swift` | 82 | the sprite textures, an LRU of 64, `uploads` |
+| `app/Sources/EditorViewController+Cursor.swift` | 16 | `cursorTrackDidLand` |
+| `app/Sources/RecipeSource.swift` | 247 | cursor files per key, `setMediaURLs(_:project:for:)`, the asynchronous release |
+| `app/Sources/Exporter.swift` | 488 | `cursorWarnings`, the wait before `withRampAudio` |
+| `app/Sources/EditorViewController.swift` | 1,082 | one observer (wiring, 1,080 before) |
+| `app/Sources/Playback.swift` | 592 | line 241 only, net 0 |
+| `app/Resources/Shaders/Compositor.metal` | — | the 24 fields, `compositeCursor`, `nearCursor`, `cursorFootprint`, `displayUV`, `texture(5)` on both layer fragments |
+| `tools/proof/cursor_layer_proof.py` · `cursor_layer_probe.swift` | 919 · 504 | L7 (probe), L2, L4, L5, L6, L8, L8r, L10, L11 (app) |
+
+**Measured.**
+
+- `make typecheck`: 0 errors and the 4 baseline warnings, the `copyCGImage` one at
+  `Exporter+Frame.swift` (after the toll, and again after the code). `swift_build.py typecheck
+  tools/proof/cursor_layer_probe.swift`: exit 0. The shader compiled by `xcrun metal` with only
+  its two old unused-constant warnings.
+- The size pins at 624 bytes: `tone_proof.py --only P3`, `wheels_proof.py --only P3`,
+  `look_proof.py --only L3`, `curves_proof.py --only P13`, `hdr_proof.py --only P9`, each exit 0.
+- `cursor_layer_proof.py` on Debug, whole: 16/16 after the per-texel composite, and L8 3/3
+  again once its obscure region was put over frame 50's pointer (it had missed the pointer). The
+  first drawing-rows run, per sample, was 7/11: L8 106/255 from the burned movie's own one-frame
+  offset (ffmpeg `overlay`'s `n` measured to start at 1; frames now counted from `t`), then
+  10/255 from the composite, above; L4 a misspelt ramp shape; L7 no `default.metallib` beside
+  the probe.
+- Mutants, six, each run once on Debug and restored byte-identical (SHA-256), all caught: the
+  reverse not mirrored (L4: the reversed tips at (105, 65), (195, 95), (330, 140) against (372,
+  154), (282, 124), (147, 79)); the reversed time without its one-frame offset (L8r: the drawn tip
+  3 px right and 1 px down of the burned pointer at all three frames); the composite after
+  `gradeSample` (L8: 36/255 at frames 20 and 90); the HLG lift skipped (L5: 20.233/255); the
+  export not waiting (L11: 42 of 120 frames with the sprite, frame 0 without); a failed track
+  failing the export (L10: no sentence, and `export: Cancelled.`).
+- `make gate`: PASS 437 s (names 1, typecheck 6, fmt 3, lint 15, test 230, app 181).
+- `RC_PROOF_APP=release cursor_layer_proof.py`: 15/16 at load average 61 (three lanes building;
+  L7 alone over: 0.371 ms at 1920×1080, 1.047 ms at 5120×2880), then `--only B0,L7` 0.125 /
+  0.231 / 0.377 ms, then the whole proof again against Release: **16/16** — L7 0.130 ms at
+  1920×1080, 0.186 ms at 3840×2160, 0.359 ms at 5120×2880 (medians of 120 frames, 3 runs each,
+  the probe built `-Onone`), `uploads` 1 after the first frame and the last; L2 the tip within
+  0.03 px of (★) at three frames of a 2× zoom; L4 exact at three ramp frames and three reversed
+  ones; L5 0.057/255 from `liftSDR`; L6 1/255 at three frames, two with a ripple; L8 1/255, 0/255,
+  1/255; L8r within 0.43, 0.31 and 0.77 px; L10 the sentence, the byte-identical frame and one
+  `cursor_warnings` entry; L11 120 of 120 frames; Z1 nothing in either launch's log. L7 across the
+  session, at 1920×1080 / 3840×2160 / 5120×2880 (ms): 0.071 / 0.169 / 0.127 (per sample);
+  −0.051 / 0.089 / 1.196 (per texel, unrolled); 0.053 / 0.245 / 0.963; 0.041 / 0.317 / 0.346;
+  0.011 / 0.033 / 0.346 (the pragma, Debug's whole run); 0.371 / 0.435 / 1.047 (load 61); 0.125 /
+  0.231 / 0.377; 0.130 / 0.186 / 0.359 — eight runs; the owner's Mac is the figure the road map
+  names.
+- `phase8_chrome.py`: 149/150, the `LayerUniforms` 624-byte pin passing and View's last group
+  failing on its own stale list (road map "audio" AP7 put Loudness Meter after Scopes; a check
+  this phase did not change); the list fixed, 150/150.
+
+**Review.** One review, verdict pass, three nits, none fixed in the lane; all three resolved at
+integration. It accepted the per-texel composite as a reading of CU-33 (inside `layerSample`,
+before `gradeSample`, behind `cursorEnabled`; a layer with no cursor keeps the one hardware
+sample, so CU-33 (h) holds, as L3 and L10 show byte for byte), and checked the deadlock fix (the
+release on a utility queue, `RecipeSource`'s lock dropped before `CursorTracks.want`, the two
+locks never nested) and that `waitForCursors`' failure loop always removes the failed path.
+- `nearCursor`'s 2 px margin covers `cursorFootprint`'s ±1 texel only while a texel is at most
+  2 display px: its doc in `Compositor.metal` now states that assumption (true while the bound
+  texture is the source's display size, as every source is today).
+- `exportResult`'s `cursorWarnings` lost its `= []` default, so a future caller cannot drop the
+  warnings silently (the one caller already passes them).
+- `renderFrameReported`'s `try? waitForCursors(…)`: its comment now says `.cancelled`, the only
+  throw, cannot happen with `cancelled: { false }`.
+
+**Integration.** Cherry-picked (`e06c1592…8ca1b326`) onto `worktree-creator-jobs` after TX1 and
+CO0. Conflicts only in the indexes, the decision file and the proof README, each kept both sides:
+`creator-jobs-2.md` holds TX1's block and then CU3a2's (475 lines, its index row 475, its summary
+TX1's clause then CU-33, CU-37's before "the series continues"); the spec README's §7.9e cell
+503 and `11-decisions/` 17888 in 37 files (`spec_index_proof.py` 231/231); `tools/proof/README.md`
+puts CU3a2's subsection under CU3a1's and TX1's section after it. `setMediaURLs`' callers, every
+`RenderedFrame` and `exportResult` site and the `LayerUniforms` size pins were re-read on the
+merged tree: TX1 and CO0 added none. The CLAUDE.md edits the lane listed were applied: root
+`CLAUDE.md`'s baseline note (1 in `Exporter+Frame.swift`); `app/CLAUDE.md`'s `ReverseMirror`
+(four readers), the uniform block (156 floats, 624 bytes, the HLG and cursor groups) and
+`texture(5)`, the compositor list (`Compositor+Cursor.swift`, `CursorSprites.swift`), the cursor
+entry (`CursorFiles.swift`, `EditorViewController+Cursor.swift`, the wiring), `RecipeSource`'s
+cursor files, `cursorURL(for:)`, the Exporter list (`Exporter+Frame.swift`,
+`Exporter+Cursor.swift`) and `RecipeLayer.cursor` drawn. `make gate` after the picks, the nits and
+these edits: names 1 s, typecheck 13 s (the 4 baseline warnings), fmt 5, lint 2, test 171, app 178,
+"gate: PASS 370s". Then `RC_PROOF_APP=release cursor_layer_proof.py` on the integrated tree at
+load average 32: **16/16**, L7 0.117 / 0.075 / 0.726 ms at 1920×1080 / 3840×2160 / 5120×2880,
+`uploads` [1, 1], every other row's figures as the lane's, Z1 nothing in either launch's log.
+
+**Owed.** No manual check (they need Separate recordings, CU3c). Cursor warnings on the Export
+Queue row and the progress sheet are CU3b's (no person can attach a cursor file before it). L7's
+figures are this Mac's under three lanes; the road map's limits are the owner's Mac's. Filed at
+integration (`ai-drafted`, `low-priority`), found while checking every proof anchor in the files
+this phase changed, not this phase's code: `qualifier_proof.py`'s `SHOWN` mutant anchor (`return
+float4(float3(saturate(selected * coverage)), 1.0);`) is in no line of `Compositor.metal`, which
+now spells `float3 grey = float3(saturate(selected * coverage));`, so the mutant cannot apply.
 
 ### CO2b — masks made on demand, and files that wait
 

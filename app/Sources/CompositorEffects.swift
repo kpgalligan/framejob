@@ -397,6 +397,12 @@ extension MetalRenderer {
             // an error. Nothing to draw.
             return nil
         }
+        // The cursor (spec §11 CU-33): read in the source's own pixels, so after
+        // the switch above; never on a slate, which draws no source.
+        let cursor = uniforms.slate > 0.5
+            ? placeholder
+            : cursorSprite(
+                for: layer, instruction: instruction, output: canvas.output, uniforms: &uniforms)
         // The chroma key's reading in an HLG project (spec §11 HD-19 (c)), asked
         // only of a keyed layer: 0 (HD-13 (h)'s un-lift) in every other block.
         if canvas.output == .hlg, layer.chroma != nil {
@@ -419,7 +425,8 @@ extension MetalRenderer {
             uniforms.hueCurvesEnabled = 0
         }
         return PreparedLayer(
-            uniforms: uniforms, texture: texture, look: look ?? looks.placeholder, curves: curves)
+            uniforms: uniforms, texture: texture, look: look ?? looks.placeholder, curves: curves,
+            cursor: cursor)
     }
 
     /// True only when the buffer's `kCVImageBufferAlphaChannelModeKey`
@@ -436,13 +443,14 @@ extension MetalRenderer {
 }
 
 /// What `MetalRenderer.prepare` hands `render`: a layer's uniform block,
-/// the texture it samples, its look's lattice and its curves' strip (each
-/// the placeholder for none).
+/// the texture it samples, its look's lattice, its curves' strip and its
+/// cursor's sprite (each the placeholder for none).
 struct PreparedLayer {
     var uniforms: LayerUniforms
     let texture: MTLTexture
     let look: MTLTexture
     let curves: MTLTexture
+    let cursor: MTLTexture
 }
 
 /// `value` into 0…1 as a `Float`. Spelled out once because the effect block

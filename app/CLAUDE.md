@@ -85,7 +85,9 @@ detail there.
   `ReelCore+MediaFiles.swift`'s `ReelAV1`, whose `rc_av1_*` calls stay there), `GraphicDiagnostic.list(json:)`,
   `GraphicFailure.checkSides`, `SpeedLimits.decoded` and the free `withBytes`.
   `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
-  `revealURL(for:)` (the original, else the copy), `isTrashed` and
+  `revealURL(for:)` (the original, else the copy), `cursorURL(for:)` (the
+  cursor file: its bookmark when it resolves, else the stored path, existing or
+  not), `isTrashed` and
   `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element
   minus its id, and the media-file resolvers; they call no `rc_*`.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
@@ -647,8 +649,10 @@ detail there.
   `voiced` is computed, `isolated`'s sibling `cache/voiced/` (AU-144), so
   it needs no line of its own.
 - `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
-  its pivot (spec §11, D4-6), in the three units its readers hold it in:
-  `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
+  its pivot (spec §11, D4-6), in the units its four readers hold it in:
+  `MediaPeaks.window`, `TimelineView.sourceTime`, `ReverseRenderer` and,
+  since road map creator-jobs CU3a2, the cursor (`Compositor+Cursor.swift`,
+  spec §11 CU-33 (f): a reversed clip's file read at `pivot − at − frame`). The
   core keeps no mirror on purpose; `CompositionBuilder` needs none because it
   swaps the asset.
 - `SourceMap.swift` — a media clip's source map (speed ramps SR-20): the
@@ -1640,7 +1644,11 @@ the key map behind it.
   document's key also holds the media URLs `Playback.update` publishes, which
   `lookURLs(for:)` answers so the preview finds a LUT added or relinked after
   its composition was built (an export or `render_frame` key falls back to its
-  instruction's own map).
+  instruction's own map). Since CU3a2 (spec §11 CU-37) each key's cursor files
+  too: `setMediaURLs(_:project:for:)` publishes the document's and wants its
+  clips' tracks of `CursorTracks` (owner the key), `setCursorFiles` an export's
+  or a frame's, `cursorFiles(for:)` what the compositor reads; `unregister`
+  releases the owner on a utility queue, never on the caller's thread (CU-37 (e)).
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -1719,8 +1727,8 @@ the key map behind it.
   (`passActivity`, `endPassActivity`; the owner's choice, G-38).
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve` and `cursor` — CU-32's key, decoded,
-  not drawn until CU3a2) and `FrameRecipe` (with
+  `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve` and `cursor` — CU-32's key, drawn
+  by `Compositor+Cursor.swift` since CU3a2) and `FrameRecipe` (with
   `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
   `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
   `RecipeMatteGroup`, a pure move out of it (road map creator-jobs CJ0d, T14).
@@ -1820,6 +1828,12 @@ the key map behind it.
   `Compositor+Dissolve.swift` · `Compositor+Adjustment.swift` ·
   `Compositor+Selection.swift` (the blurred qualifier's selection map, spec §11
   GR-35) ·
+  `Compositor+Cursor.swift` (`MetalRenderer.cursorSprite`: the uniform block's
+  cursor group from `CursorTracks.ready` and the core's `state`, a reversed clip
+  read at `pivot − at − frame`, and the sprite for `texture(5)`, the placeholder
+  when none; spec §11 CU-33) · `CursorSprites.swift` (a cursor image's texture
+  made once, lifted in an HLG project, an LRU of 64; `uploads` the probe's
+  count) ·
   `DestinationPass.swift` (the destination render pass as a value a shadow
   or a routed dissolve suspends and resumes) ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
@@ -1835,12 +1849,15 @@ the key map behind it.
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
   0…1 where the shader samples it. The uniform block's field ORDER is a contract
   with the shader checked only by reading both, so change them in one edit; it
-  is 128 floats (512 bytes): the tone group (spec §11 GR-2: the nine tone
+  is 156 floats (624 bytes): the tone group (spec §11 GR-2: the nine tone
   values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
   then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
   each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, `hueCurvesEnabled`,
-  spec §11 GR-32); a next
-  field adds a group of four. A layer's look is a baked 33³ `rgba16Float`
+  spec §11 GR-32), the HLG group (`hlgOutput`, `liftedWhite`, `linearLight`,
+  `keyReading`) and the cursor group (spec §11 CU-33: the sprite's rect, four
+  ripples, the ripple colour, `cursorEnabled`, `cursorOpacity`, `rippleCount`,
+  `rippleRadius`; provisional by landing order, CJ-8 (b)); a next field adds a
+  group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
   definition from the recipe, a 2³ identity placeholder for no look or a failed
@@ -1856,7 +1873,12 @@ the key map behind it.
   An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
   (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
   `rc_cube_*`, cached by path and modification date, nothing bound — the clip
-  drawn ungraded — when the file is missing). **Nine pipelines from seven
+  drawn ungraded — when the file is missing). A layer's cursor sprite is
+  `texture(5)` on every draw through the two layer fragments (a layer, its
+  reflection, its shadow's mask pass), the 1×1 placeholder when none;
+  `layerSample` composites the cursor per source texel near it, before
+  `gradeSample` (`Compositor+Cursor.swift`, `CursorSprites.swift`, spec §11
+  CU-33). **Nine pipelines from seven
   fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
   adjustment clip's full-frame pass reading the destination, blending off, its
   weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a
@@ -2084,6 +2106,11 @@ the key map behind it.
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
+  `Exporter+Frame.swift` (the offline single frame, `renderFrame` /
+  `renderFrameReported`, a pure move out of `Exporter.swift`, road map creator-jobs
+  CU3a2's toll; it carries the `copyCGImage` warning) · `Exporter+Cursor.swift`
+  (`ExportCursorWarning`, `waitForCursors`: an export waits for every clip's cursor
+  track, a frame for its own, a failed file one warning per media, spec §11 CU-37) ·
   `ExportAV1Encoder.swift` · `ExportVideoEncoder.swift` (the `ExportVideoEncoder` protocol,
   `ExportEncodedPacket`, `ExportRateTable`, spec §11 CX-16) · `ExportVP9Encoder.swift`
   (`VP9Encoder`, libvpx through `app/Bridging/FrameJobVPX.h`'s two `static inline` shims for
@@ -3113,7 +3140,8 @@ free.
   shared `headTrimmed`, then put in the bottom-right corner by one
   `set_video`, read back.
 - `CursorValues.swift` · `CursorCaptureBuffer.swift` · `CursorFileWriter.swift` ·
-  `CursorTracks.swift` — the cursor file's Swift side (road map creator-jobs CU1a, CU2,
+  `CursorTracks.swift` · `CursorFiles.swift` · `EditorViewController+Cursor.swift` — the
+  cursor file's Swift side (road map creator-jobs CU1a, CU2,
   spec §11 CU-10, CU-14…CU-17, CU-24…CU-26), naming no `rc_*`. `CursorValues` the
   typed header (`CursorSegmentStart` with its opening `geometry`, `CursorGeometry`,
   `CursorPixelSize`), the v1 body `CursorFileBody`, `CursorAnchor.choose(e2:e1:)` (E2
@@ -3136,8 +3164,12 @@ free.
   ones, the `ready` entry removed and the `unprepare` queued in one lock hold; one serial `.utility` queue loads, opens, prepares
   and unprepares; `ready` a locked read that never waits; one `.cursorTrackDidLand`
   per landing on main; a failed key not retried until the file changes;
-  `-RCDevCursorLoadHold <s>` (dev only). Wired to `RecipeSource.set` /
-  `Playback.update` by CU3a2.
+  `-RCDevCursorLoadHold <s>` (dev only). Wired to `RecipeSource.setMediaURLs` and
+  `Exporter.waitForCursors` (CU3a2). `CursorFiles.swift` (CU3a2, spec §11 CU-37):
+  `CursorFile` (a media's cursor URL through `cursorURL(for:)`, its pivot and frame) and
+  the requests a project's clips make at their base smoothing, top level and every nest.
+  `EditorViewController+Cursor.swift`: `cursorTrackDidLand`, a paused frame refreshed
+  when one of its document's cursor files lands.
 - `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
   AU-68): the recording's voice paths and clips, readiness and busy, the
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per

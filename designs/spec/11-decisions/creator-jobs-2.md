@@ -424,3 +424,52 @@ taken as recommended).
   only with the key; the Fillers box is disabled only on CJ-12's condition; the hand-off is keyed
   as CJ-12's Assistant row. `get_timeline_transcript` sends nothing, so it has no `ModelKeys.keyed`
   row.
+
+CU-33 and CU-37 are CU3a2's (the cursor drawn in its clip's layer, and files that wait for it),
+recorded before its code. No core, FFI or format change; the `LayerUniforms` block's size is
+provisional by landing order (CJ-8 (b)), the integrator renumbering it when CO2a2's group lands
+first.
+
+- **CU-33 — The cursor composited inside `layerSample`, before the grade, at `texture(5)`
+  (CU3a2).** (a) Order: texel, un-premultiply, ripples (oldest first), sprite, then `gradeSample`;
+  all behind `cursorEnabled > 0.5`; never on a slate. (b) Space: source display px, `uv ×
+  (sourceWidth, sourceHeight)`, before `orientedUV`; `state`'s movie px are taken unrotated (a
+  cursor file belongs to a screen recording). Rect = (x − hot_x, y − hot_y, w, h) from `state` (px
+  at `scale`), sampled with the layer's sampler; outside it nothing. **Per source texel** (found
+  while building, CU3a2): a sample within 2 px of the sprite's rect or a ripple's ring reads its
+  bilinear footprint's four texels, each at its centre with the cursor laid over it there, and
+  weights them as the sampler does, so a sample between texels — a zoom, a blur's tap, a region's
+  re-sample — reads what it would read from a pointer burned into the picture; every other sample
+  is the one sample it was. Composited per sample instead, a blurred clip differed from a burned
+  pointer by up to 10/255 at the sprite's edge (L8's first run). (c) Sprite: premultiplied, ×
+  `opacity` (o): a′ = s.a·o + a(1 − s.a·o), rgb′ = (s.rgb·o + rgb·a(1 − s.a·o)) / max(a′, 1e-4).
+  Drawn when `props.show`, `visible`, `image` non-null and `style == recorded`; `arrow` and a null
+  image draw no sprite until CU4 (CU-41). (d) Ripples: `state.ripples` (≤ 4, only under `clicks:
+  ripple`); R = 24 pt × `click_size` × `px_per_point`; radius R·(1 − (1 − phase)²), ring width
+  R/8, 1-px antialias (coverage `saturate(R/16 + 0.5 − |d − r|)`), alpha `click_color.a × (1 −
+  phase)`; colour the recipe's normalised `#rrggbb[aa]`, an unreadable one `#ffffffcc`. (e) HLG:
+  sprite through `MetalRenderer.lifted` (`LayerLift`), ripple RGB through
+  `InputConversions.liftSDR`; SDR untouched. (f) `at`: `RecipeCursor.at` forward; when `reversed`,
+  the forward stamp of the frame shown: `max(0, ReverseMirror.mirrored(at, about: pivot) −
+  frame)` (`CursorFile.pivot`, `.frame`), pivot the media's model duration. (`ReverseRenderer`
+  writes the frame shown from p until p′ at T − p′, so plain `pivot − at` is the next frame's time
+  at every frame time; less one frame lands on p for a constant-rate source, and on a
+  variable-rate one within a frame, as forward playback already is.) (g) Texture 5 is bound on
+  every draw through the layer fragments (`drawLayer` with its reflection, `shadowSilhouette`),
+  `placeholder` when no sprite; a sprite is made once per image, never per frame. (h) A layer with
+  no cursor draws byte-identically to before (CU-35).
+- **CU-37 — A track not ready yet, and a file that fails (CU3a2).** (a) The preview's key
+  publishes its cursor files and wants their tracks at each clip's base smoothing
+  (`RecipeSource.setMediaURLs`); the compositor draws only a `ready` track and otherwise draws
+  without; `.cursorTrackDidLand` refreshes a paused editor frame. (b) An export waits before its
+  build for every clip's tracks (whole project); `renderFrameReported` (`render_frame`, Save
+  Frame, the eyedropper, image sequences, look thumbnails) waits for the tracks its frame's recipe
+  names. (c) A failed track — the core's sentence, or `CursorTracks`' "the cursor file P could not
+  be read" — is one `ExportCursorWarning` per media; the clip draws without a cursor and nothing
+  fails. `export_status`'s `done` answer carries them as `cursor_warnings [{media, path,
+  message}]`, absent when none (G-24 (c)'s shape), and `render_frame` adds "The cursor of media M
+  is not drawn: \<message\>." per warning. (d) A key that never publishes cursor files
+  (thumbnails, analysis, processed loudness) draws no cursor. (e) `RecipeSource.unregister`
+  releases the key's `CursorTracks` owner on `DispatchQueue.global(qos: .utility)`, never on the
+  caller's thread, because `Exporter.deinit` can run inside `CursorTracks.wait`'s `cancelled()`
+  under the registry's lock; keys are never reused, so a late release drops no newer want.

@@ -302,7 +302,8 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
   the encoded one printed beside C0's 0.21 ms (REASONED).
 - **P9** (hdr H-6): `hdr_probe.swift`'s `RecipeCanvas.blended` against IEC 61966-2-1's
   EOTF and HLG's inverse OETF, `uniforms(for:)` over output × blending × range, the
-  Blending popup's items, and `LayerUniforms` 528, `QualifierUniforms` 80, `MatteUniforms`
+  Blending popup's items, and `LayerUniforms` 624 (528 until creator-jobs CU3a2),
+  `QualifierUniforms` 80, `MatteUniforms`
   16 and `OutputUniforms` 16 bytes.
 - **H7w, DA, P10, P11** (clean-up batch 2, #316, #315, #317, spec §11 HD-18). H7w: the
   ramp as VP9 Profile 2 `-lossless 1` WebMs (libvpx-vp9, the tags on the input and output),
@@ -823,11 +824,11 @@ MUTANTS = {
     # B102 (spec §11 PR-11): the BT.709 label applied inside `Exporter.renderFrame`
     # instead of at the write, so the eyedropper reads a relabelled frame. Run
     # with `--control` a capture made after PR-11 (B102's `hdr-after`).
-    "relabel-in-renderframe": ([("app/Sources/Exporter.swift",
-                                 "        return RenderedFrame(image: image, graphics: "
-                                 "GraphicRegistry.shared.reports(for: key))\n",
-                                 "        return RenderedFrame(image: image.map(FrameWriter.labelled), "
-                                 "graphics: GraphicRegistry.shared.reports(for: key))\n")],
+    "relabel-in-renderframe": ([("app/Sources/Exporter+Frame.swift",
+                                 "            image: image, graphics: "
+                                 "GraphicRegistry.shared.reports(for: key),\n",
+                                 "            image: image.map(FrameWriter.labelled), "
+                                 "graphics: GraphicRegistry.shared.reports(for: key),\n")],
                                ["H1"]),
     # hdr H-1 (#281, spec §11 HD-12): each run with `--only <its rows>,Z1` and `--control`
     # the capture of H7i made on the tree before the phase's code.

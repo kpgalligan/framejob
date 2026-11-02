@@ -51,6 +51,8 @@ final class MetalRenderer {
     let inputs: InputStage
     /// An HLG project's lift of every layer Frame Job draws (spec §11 HD-13 (f)).
     private let lift: LayerLift
+    /// The cursor's sprites, made once per image (spec §11 CU-33, `Compositor+Cursor.swift`).
+    let cursorSprites: CursorSprites
     let sampler: MTLSamplerState
     let textureCache: CVMetalTextureCache
     /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
@@ -209,6 +211,7 @@ final class MetalRenderer {
         self.looks = looks
         self.inputs = inputs
         self.lift = lift
+        self.cursorSprites = CursorSprites(device: device)
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder

@@ -238,7 +238,7 @@ final class Playback {
     /// player.
     func update(project: ReelProject, urls: [UInt32: URL], isLive: Bool) {
         RecipeSource.shared.set(project, for: recipeKey)
-        RecipeSource.shared.setMediaURLs(urls, for: recipeKey)  // LUT looks read these (GR-8)
+        RecipeSource.shared.setMediaURLs(urls, project: project, for: recipeKey)  // LUTs, cursors
         let audioDSP = AudioDSPParameters.measured(project: project, cache: ReverseSource.shared.resolution(for: recipeKey).cache)
         AudioDSPSource.shared.publish(audioDSP, for: recipeKey)
         drawsGraphics = Self.drawsGraphics(project.snapshot)

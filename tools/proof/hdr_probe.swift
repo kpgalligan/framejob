@@ -1087,7 +1087,7 @@ do {
     if names != ["Encoded", "Linear light"] { misses.append("the popup's items \(names)") }
     // (d) the four blocks' sizes: the renamed floats added nothing.
     let sizes = [
-        ("LayerUniforms", MemoryLayout<LayerUniforms>.stride, 528),
+        ("LayerUniforms", MemoryLayout<LayerUniforms>.stride, 624),
         ("QualifierUniforms", MemoryLayout<QualifierUniforms>.stride, 80),
         ("MatteUniforms", MemoryLayout<MatteUniforms>.stride, 16),
         ("OutputUniforms", MemoryLayout<OutputUniforms>.stride, 16),
@@ -1100,7 +1100,7 @@ do {
             + "HLG's inverse OETF (HLG) when linear, ±2e-6; uniforms(for:) over output × "
             + "blending × range (encoded H-3's, linear mode 0/1/2 with linearLight 1 and "
             + "hlgOutput the canvas's); the popup's items Encoded and Linear light; "
-            + "LayerUniforms 528, QualifierUniforms 80, MatteUniforms "
+            + "LayerUniforms 624, QualifierUniforms 80, MatteUniforms "
             + "16 and OutputUniforms 16 bytes",
         misses.isEmpty,
         (misses.isEmpty ? "as wanted" : misses.prefix(12).joined(separator: "; "))

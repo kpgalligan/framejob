@@ -34,8 +34,9 @@ extension Notification.Name {
 /// **Work.** One serial `.utility` queue loads (the dev hold first), opens, prepares and
 /// unprepares; `ready` reads a locked dictionary and nothing else, so the compositor never
 /// waits on a load. Each (path, smoothing) landing posts `.cursorTrackDidLand` once on main;
-/// nothing else here touches main. `RecipeSource.set` and `Playback.update` want their cursor
-/// media from CU3a2, when the recipe carries them.
+/// nothing else here touches main. The owners are `RecipeSource` keys: a document's wants through
+/// `RecipeSource.setMediaURLs`, an export's and an offline frame's through
+/// `Exporter.waitForCursors` (CU3a2, spec §11 CU-37).
 final class CursorTracks: @unchecked Sendable {
     static let shared = CursorTracks()
     /// The dev-only launch default that holds each load that many seconds, so a proof can act

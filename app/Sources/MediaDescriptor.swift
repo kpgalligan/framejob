@@ -174,6 +174,24 @@ func originalURL(for media: MediaSnapshot) -> URL? {
     return URL(fileURLWithPath: original.path)
 }
 
+/// The media's cursor file (spec §11 CU-37): nil without `media.cursor`; its
+/// bookmark when it resolves to a file that exists; else the stored path's
+/// URL, existing or not, so a missing file reaches `CursorTracks` and is
+/// warned rather than silently not drawn.
+func cursorURL(for media: MediaSnapshot) -> URL? {
+    guard let cursor = media.cursor else { return nil }
+    if let bookmark = cursor.bookmark, let data = Data(base64Encoded: bookmark) {
+        var stale = false
+        if let url = try? URL(
+            resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil,
+            bookmarkDataIsStale: &stale),
+            FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+    }
+    return URL(fileURLWithPath: cursor.path)
+}
+
 /// What Reveal in Finder shows: the original, or the copy when the original
 /// is gone (spec §11 #228-O, O11).
 func revealURL(for media: MediaSnapshot) -> URL? {

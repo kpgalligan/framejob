@@ -199,7 +199,8 @@ do {
     }
     let built = instruction(published, [:])
     let before = source.lookURLs(for: built)
-    source.setMediaURLs([3: a], for: published)
+    source.setMediaURLs(
+        [3: a], project: ReelProject.new(width: 64, height: 64, fps: .thirty)!, for: published)
     let after = source.lookURLs(for: built)
     let fallback = source.lookURLs(for: instruction(unpublished, [4: b]))
     let none = source.lookURLs(for: nil)

@@ -80,7 +80,7 @@ TOOLS = (["xcrun", "swiftc", "--version"], ["xcodebuild", "-version"],
 # `make typecheck`'s warnings at HEAD 0b380d2, verbatim (CLAUDE.md: "0 errors and 4 warnings",
 # deliberate, spec §11 W-8): (file basename, message). A fifth, or one gone, fails the step.
 TYPECHECK_BASELINE = (
-    ("Exporter.swift", "'copyCGImage(at:actualTime:)' was deprecated in macOS 15.0: Use "
+    ("Exporter+Frame.swift", "'copyCGImage(at:actualTime:)' was deprecated in macOS 15.0: Use "
      "generateCGImageAsynchronouslyForTime:completionHandler: instead [#DeprecatedDeclaration]"),
     ("CompositionBuilder.swift", "'tracks(withMediaType:)' was deprecated in macOS 13.0: Use "
      "loadTracks(withMediaType:) instead [#DeprecatedDeclaration]"),

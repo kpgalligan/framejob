@@ -213,8 +213,10 @@ lenient-decoding rule.
 
 ### Export and still frames
 
-- **`renderFrame` stays in `Exporter.swift`.** It holds the app's only `copyCGImage` call, and the
-  root `CLAUDE.md`'s warning baseline names that warning by file.
+- **`renderFrame` is `Exporter+Frame.swift`'s** (road map "creator-jobs" CU3a2's toll, a pure
+  move: `Exporter.swift` 598 → 477 lines before CU3a2 added to it). It holds the app's only
+  `copyCGImage` call, and the warning baseline (`gate.py`'s `TYPECHECK_BASELINE`, root
+  `CLAUDE.md`) names that warning by file, so its row moved with it.
 - **The alpha guard tests the fit itself, not a ratio.** Measured: padding inverts alpha (the
   picture comes out at alpha 0 and the bars at 255), while a pure scale is clean both up and down.
   The guard asks `encodedSize`, because the round-down to even let a 1001 × 667 transparent

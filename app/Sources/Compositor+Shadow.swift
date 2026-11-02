@@ -92,7 +92,7 @@ extension MetalRenderer {
     /// and inherits the blend — `encodeReflection` says why.)
     func encodeShadow(
         _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture,
-        look: MTLTexture, curves: MTLTexture, canvas: RecipeCanvas,
+        look: MTLTexture, curves: MTLTexture, cursor: MTLTexture, canvas: RecipeCanvas,
         maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) {
         func component(_ index: Int) -> Float {
@@ -118,7 +118,7 @@ extension MetalRenderer {
         guard
             let silhouette = shadowSilhouette(
                 uniforms: uniforms, texture: texture, matte: matte, look: look, curves: curves,
-                sigma: sigma, canvas: canvas, maskState: maskState, pass: &pass),
+                cursor: cursor, sigma: sigma, canvas: canvas, maskState: maskState, pass: &pass),
             let encoder = pass.open()
         else { return }
 
@@ -182,7 +182,8 @@ extension MetalRenderer {
     /// the reason `DestinationPass` exists.
     private func shadowSilhouette(
         uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture, look: MTLTexture,
-        curves: MTLTexture, sigma: Float, canvas: RecipeCanvas, maskState: MTLRenderPipelineState,
+        curves: MTLTexture, cursor: MTLTexture, sigma: Float, canvas: RecipeCanvas,
+        maskState: MTLRenderPipelineState,
         pass: inout DestinationPass
     ) -> MTLTexture? {
         let width = max(1, canvas.width)
@@ -228,6 +229,9 @@ extension MetalRenderer {
         // and `texture(3)`.
         encoder.setFragmentTexture(look, index: 2)
         encoder.setFragmentTexture(curves, index: 3)
+        // The cursor's sprite (spec §11 CU-33 (g)): part of the layer's picture,
+        // so of its silhouette too.
+        encoder.setFragmentTexture(cursor, index: 5)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
 

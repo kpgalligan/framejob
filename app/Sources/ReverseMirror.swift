@@ -28,6 +28,12 @@ import Foundation
 /// `ReverseRenderer.walkBackwards` mirrors the presentation stamps it writes.
 /// Nothing asserted that the three matched, and `TimelineView` in fact did not
 /// mirror at all until road map 7 §10's phase C.
+/// A fourth reader came with the cursor (`Compositor+Cursor.swift`, spec §11
+/// CU-33 (f)): a reversed clip's recipe `cursor.at` is a tick of the played
+/// stream, and the cursor file is read at the forward stamp of the frame
+/// shown there, `mirrored(at, about: pivot)` less one frame of the media,
+/// because the renderer writes the frame shown from `p` until `p′` at
+/// `T − p′`.
 /// `CompositionBuilder` deliberately has no mirror and needs none: it
 /// substitutes the pre-rendered reversed asset, whose times already run in the
 /// played direction.

@@ -95,6 +95,8 @@ private struct AgentExportRecord {
     var destination: URL
     var loudness: ExportLoudness?
     var graphicWarnings: [ExportGraphicWarning]
+    /// The media whose cursor file was not drawn (spec §11 CU-37 (c)).
+    var cursorWarnings: [ExportCursorWarning]
     /// `systemUptime` at the first terminal sight, nil until then.
     var finished: TimeInterval?
     /// The file's size as read at that finish.
@@ -108,6 +110,7 @@ private struct AgentExportRecord {
         destination = job.destination
         loudness = job.loudness
         graphicWarnings = job.graphicWarnings
+        cursorWarnings = job.cursorWarnings
         guard job.state.isFinished, finished == nil else { return }
         finished = ProcessInfo.processInfo.systemUptime
         bytes =
@@ -148,7 +151,7 @@ final class AgentExports {
             settings: settings, burnInTimecode: burnInTimecode, started: started,
             state: job.state, progress: job.progress, phase: job.phase, message: job.message,
             destination: job.destination, loudness: job.loudness,
-            graphicWarnings: job.graphicWarnings)
+            graphicWarnings: job.graphicWarnings, cursorWarnings: job.cursorWarnings)
         record.copy(job)
         records[id] = record
     }
@@ -167,7 +170,7 @@ final class AgentExports {
             answer = AgentServer.exportResult(
                 settings: record.settings, burnInTimecode: record.burnInTimecode,
                 path: record.destination.path, bytes: record.bytes, loudness: record.loudness,
-                graphicWarnings: record.graphicWarnings)
+                graphicWarnings: record.graphicWarnings, cursorWarnings: record.cursorWarnings)
         case .failed, .cancelled:
             answer["reason"] = record.message ?? ""
         case .waiting:

@@ -73,9 +73,9 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 132 fields in one
-    // list (104 to here, the tone group's twelve, the wheels' twelve and the
-    // HLG group's four at the end).
+    // checking it against `Compositor.metal` has to see all 156 fields in one
+    // list (104 to here, the tone group's twelve, the wheels' twelve, the HLG
+    // group's four and the cursor's twenty-four at the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -248,6 +248,40 @@ struct LayerUniforms {
     var liftedWhite: Float = 0
     var linearLight: Float = 0
     var keyReading: Float = 0
+    // The cursor (spec §11 CU-33, road map creator-jobs CU3a2), composited
+    // inside `layerSample` before the grade; filled by
+    // `MetalRenderer.cursorSprite` (`Compositor+Cursor.swift`). The sprite's
+    // rect in SOURCE display pixels, top-left origin; then up to four
+    // ripples, each its centre in source px and its phase 0…1, oldest first;
+    // the ripple colour (straight RGBA, lifted in an HLG project); then
+    // `cursorEnabled` (the one gate: 0 draws exactly what was drawn before),
+    // `cursorOpacity` (the sprite's, 0 when no sprite is drawn),
+    // `rippleCount` (0…4) and `rippleRadius` (R in source px). The sprite is
+    // the texture at `texture(5)`. 132 + 24 = 156 floats = 624 bytes, 39 × 16.
+    var cursorX: Float = 0
+    var cursorY: Float = 0
+    var cursorW: Float = 0
+    var cursorH: Float = 0
+    var ripple0X: Float = 0
+    var ripple0Y: Float = 0
+    var ripple0Phase: Float = 0
+    var ripple1X: Float = 0
+    var ripple1Y: Float = 0
+    var ripple1Phase: Float = 0
+    var ripple2X: Float = 0
+    var ripple2Y: Float = 0
+    var ripple2Phase: Float = 0
+    var ripple3X: Float = 0
+    var ripple3Y: Float = 0
+    var ripple3Phase: Float = 0
+    var rippleR: Float = 0
+    var rippleG: Float = 0
+    var rippleB: Float = 0
+    var rippleA: Float = 0
+    var cursorEnabled: Float = 0
+    var cursorOpacity: Float = 0
+    var rippleCount: Float = 0
+    var rippleRadius: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

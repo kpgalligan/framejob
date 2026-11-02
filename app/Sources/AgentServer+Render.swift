@@ -208,6 +208,10 @@ extension AgentServer {
         for report in rendered.graphics {
             text += " " + Self.graphicSentence(report)
         }
+        // A cursor file the frame could not draw (spec §11 CU-37 (c)).
+        for sentence in Exporter.cursorSentences(rendered.cursorWarnings) {
+            text += " " + sentence
+        }
         if !scopes.isEmpty {
             // The scopes read the frame drawn (spec §11 HD-15 (a), (b)): an HLG
             // project's own picture as HLG, its SDR version (and a JPEG) as SDR.

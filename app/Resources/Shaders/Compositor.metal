@@ -383,6 +383,37 @@ struct LayerUniforms {
     float liftedWhite;
     float linearLight;
     float keyReading;
+    // ── The cursor (spec §11 CU-33): composited inside `layerSample`, before
+    // the grade. The sprite's rect in source display px, top-left origin;
+    // four ripples, each its centre in source px and its phase, oldest
+    // first; the ripple colour (straight, lifted in an HLG project); then the
+    // one gate `cursorEnabled`, the sprite's `cursorOpacity` (0 for none),
+    // `rippleCount` (0…4) and `rippleRadius` (R, source px). The sprite is
+    // `texture(5)`. 132 + 24 = 156 floats = 624 bytes, 39 × 16.
+    float cursorX;
+    float cursorY;
+    float cursorW;
+    float cursorH;
+    float ripple0X;
+    float ripple0Y;
+    float ripple0Phase;
+    float ripple1X;
+    float ripple1Y;
+    float ripple1Phase;
+    float ripple2X;
+    float ripple2Y;
+    float ripple2Phase;
+    float ripple3X;
+    float ripple3Y;
+    float ripple3Phase;
+    float rippleR;
+    float rippleG;
+    float rippleB;
+    float rippleA;
+    float cursorEnabled;
+    float cursorOpacity;
+    float rippleCount;
+    float rippleRadius;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -797,12 +828,132 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
     return out;
 }
 
+/// One straight colour `c` at alpha `ca` over straight `rgb` at `alpha`, in place:
+/// a′ = ca + a(1 − ca), rgb′ = (c·ca + rgb·a(1 − ca)) / max(a′, 1e-4).
+static inline void cursorOver(thread float3 &rgb, thread float &alpha, float3 c, float ca) {
+    float a = ca + alpha * (1.0 - ca);
+    rgb = (c * ca + rgb * alpha * (1.0 - ca)) / max(a, 1e-4);
+    alpha = a;
+}
+
+/// The recorded cursor and its click ripples over one source texel (spec §11
+/// CU-33), at `px` in SOURCE display pixels — `uv × (sourceWidth,
+/// sourceHeight)`, before `orientedUV`, so a cursor file's movie pixels are
+/// read unrotated. Ripples first, oldest first: a ring of radius
+/// R·(1 − (1 − phase)²), width R/8, a 1-px antialiased edge, alpha
+/// `rippleA × (1 − phase)`. Then the sprite, PREMULTIPLIED, × `cursorOpacity`,
+/// sampled with the layer's sampler inside its rect and nothing outside it.
+static inline void compositeCursor(thread float3 &rgb, thread float &alpha, float2 px,
+                                   texture2d<float> cursor, sampler samp,
+                                   constant LayerUniforms &u) {
+    int count = int(u.rippleCount + 0.5);
+    float radius = u.rippleRadius;
+    float3 ring = float3(u.rippleR, u.rippleG, u.rippleB);
+    float3 ripples[4] = {
+        float3(u.ripple0X, u.ripple0Y, u.ripple0Phase),
+        float3(u.ripple1X, u.ripple1Y, u.ripple1Phase),
+        float3(u.ripple2X, u.ripple2Y, u.ripple2Phase),
+        float3(u.ripple3X, u.ripple3Y, u.ripple3Phase)
+    };
+    for (int i = 0; i < 4; ++i) {
+        if (i >= count) { break; }
+        float phase = saturate(ripples[i].z);
+        float r = radius * (1.0 - (1.0 - phase) * (1.0 - phase));
+        float d = distance(px, ripples[i].xy);
+        float cover = saturate(radius / 16.0 + 0.5 - abs(d - r));
+        float ca = u.rippleA * (1.0 - phase) * cover;
+        if (ca > 0.0) { cursorOver(rgb, alpha, ring, ca); }
+    }
+    if (u.cursorOpacity > 0.0 && u.cursorW > 0.0 && u.cursorH > 0.0) {
+        float2 local = (px - float2(u.cursorX, u.cursorY)) / float2(u.cursorW, u.cursorH);
+        if (all(local >= 0.0) && all(local < 1.0)) {
+            float4 s = saturate(cursor.sample(samp, local));
+            float sa = s.a * u.cursorOpacity;
+            float a = sa + alpha * (1.0 - sa);
+            rgb = (s.rgb * u.cursorOpacity + rgb * alpha * (1.0 - sa)) / max(a, 1e-4);
+            alpha = a;
+        }
+    }
+}
+
+/// A coded-texture uv back to display uv: `orientedUV`'s inverse.
+static inline float2 displayUV(float2 t, float quarterTurns, float mirrored) {
+    float2 s = t;
+    if (mirrored > 0.5) {
+        s.x = 1.0 - s.x;
+    }
+    int q = int(quarterTurns + 0.5);
+    if (q == 1) {
+        return float2(1.0 - s.y, s.x);
+    } else if (q == 2) {
+        return float2(1.0 - s.x, 1.0 - s.y);
+    } else if (q == 3) {
+        return float2(s.y, 1.0 - s.x);
+    }
+    return s;
+}
+
+/// Whether a sample at display px `px` can read a texel the cursor covers: within 2 px of the
+/// sprite's rect or of a ripple's ring. The 2 px margin covers `cursorFootprint`'s reach of
+/// ±1 texel only while one texel is at most 2 display px, which holds while the bound texture
+/// is the source's display size (`sourceWidth` × `sourceHeight`), as every source is today; a
+/// texture bound smaller than that would need the margin scaled by the ratio.
+static inline bool nearCursor(float2 px, constant LayerUniforms &u) {
+    if (u.cursorOpacity > 0.0 && px.x > u.cursorX - 2.0 && px.y > u.cursorY - 2.0
+        && px.x < u.cursorX + u.cursorW + 2.0 && px.y < u.cursorY + u.cursorH + 2.0) {
+        return true;
+    }
+    if (u.rippleCount < 0.5) {
+        return false;
+    }
+    float reach = u.rippleRadius * (1.0 + 1.0 / 16.0) + 2.0;
+    return distance(px, float2(u.ripple0X, u.ripple0Y)) < reach
+        || (u.rippleCount > 1.5 && distance(px, float2(u.ripple1X, u.ripple1Y)) < reach)
+        || (u.rippleCount > 2.5 && distance(px, float2(u.ripple2X, u.ripple2Y)) < reach)
+        || (u.rippleCount > 3.5 && distance(px, float2(u.ripple3X, u.ripple3Y)) < reach);
+}
+
+/// The cursor composited per source texel over the bilinear footprint of coded uv `coded`
+/// (see `layerSample`): the four texels, each read at its centre with the cursor laid over
+/// it there, weighted as the sampler weights them; in the texture's own representation.
+static inline float4 cursorFootprint(texture2d<float> source, sampler samp, float2 coded,
+                                     constant LayerUniforms &u, texture2d<float> cursor) {
+    float2 srcPx = float2(u.sourceWidth, u.sourceHeight);
+    float2 size = float2(source.get_width(), source.get_height());
+    float2 tc = coded * size - 0.5;
+    float2 base = floor(tc);
+    float2 f = tc - base;
+    float4 sum = float4(0.0);
+    #pragma nounroll  // one copy of the composite, not four: every fragment carries this code
+    for (int i = 0; i < 4; ++i) {
+        float2 corner = float2(i & 1, i >> 1);
+        float2 centre = (base + corner + 0.5) / size;
+        float4 t = saturate(source.sample(samp, centre));
+        float3 c = u.premultiplied > 0.5 ? t.rgb / max(t.a, 1e-4) : t.rgb;
+        float a = t.a;
+        compositeCursor(c, a, displayUV(centre, u.sourceQuarterTurns, u.sourceMirrored) * srcPx,
+                        cursor, samp, u);
+        float2 w2 = mix(1.0 - f, f, corner);
+        sum += (w2.x * w2.y) * (u.premultiplied > 0.5 ? float4(c * a, a) : float4(c, a));
+    }
+    return sum;
+}
+
 static inline LayerSample layerSample(texture2d<float> source, sampler samp,
-                                      float2 uv, constant LayerUniforms &u) {
+                                      float2 uv, constant LayerUniforms &u,
+                                      texture2d<float> cursor) {
+    float2 coded = orientedUV(uv, u.sourceQuarterTurns, u.sourceMirrored);
     // Clamped to [0, 1]: a 16-bit-float source can arrive outside it, and
     // every stage below assumes encoded values (spec §11 PR-1).
-    float4 texel = saturate(source.sample(
-        samp, orientedUV(uv, u.sourceQuarterTurns, u.sourceMirrored)));
+    // The cursor is part of the picture the grade reads (spec §11 CU-33),
+    // composited PER SOURCE TEXEL (`cursorFootprint`) for a sample near it,
+    // so a sample between texels (a zoom, a blur's tap, a region's
+    // re-sample) reads what it would read from a pointer burned into the
+    // picture. Away from the cursor the one sample is that same read.
+    float4 texel = u.cursorEnabled > 0.5
+            && nearCursor(uv * float2(u.sourceWidth, u.sourceHeight), u)
+        ? cursorFootprint(source, samp, coded, u, cursor)
+        : saturate(source.sample(samp, coded));
     // Text, shape and image textures arrive PREMULTIPLIED (that is what
     // LayerRenderers hands over, and what this stage outputs); a video frame
     // is premultiplied only when its buffer is labelled so, and straight
@@ -898,11 +1049,11 @@ constant float2 kBlurRing[12] = {
 
 static inline LayerSample gatherBlur(texture2d<float> source, sampler samp,
                                      float2 uv, float2 srcSize, float radius,
-                                     constant LayerUniforms &u) {
+                                     constant LayerUniforms &u, texture2d<float> cursor) {
     // Weights: 4 at the centre, 2 on the inner ring, 1 on the outer — a
     // coarse radial Gaussian summing to 22.
     float2 reach = radius / srcSize;
-    LayerSample centre = layerSample(source, samp, uv, u);
+    LayerSample centre = layerSample(source, samp, uv, u, cursor);
     // Accumulated PREMULTIPLIED and divided back out at the end. That is the
     // only way to average across an alpha edge: the straight colour of a
     // fully transparent texel is meaningless (it was divided by nothing), and
@@ -911,7 +1062,7 @@ static inline LayerSample gatherBlur(texture2d<float> source, sampler samp,
     float alpha = centre.alpha * 4.0;
     for (int i = 0; i < 12; ++i) {
         float weight = i < 6 ? 2.0 : 1.0;
-        LayerSample tap = layerSample(source, samp, uv + kBlurRing[i] * reach, u);
+        LayerSample tap = layerSample(source, samp, uv + kBlurRing[i] * reach, u, cursor);
         rgb += tap.rgb * tap.alpha * weight;
         alpha += tap.alpha * weight;
     }
@@ -1345,7 +1496,9 @@ static inline float3 gradeSteps(float3 rgb, constant LayerUniforms &u, texture2d
 //   1. spotlight zoom remap    moves the sampling coordinate, so it can only
 //                              run BEFORE the sample
 //   2. pixelate                quantizes that same coordinate
-//   3. sample, or the slate    `layerSample` — un-premultiply, chroma key
+//   3. sample, or the slate    `layerSample` — un-premultiply, the cursor
+//                              and its ripples (spec §11 CU-33, `texture(5)`;
+//                              never on a slate), chroma key
 //                              and spill, brightness/contrast/saturation/hue
 //                              (the hue by `gradeHueShift`, spec §11 GR-33)
 //   4. blur, then sharpen      gather neighbours, each one through (3)
@@ -1498,7 +1651,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
                                              sampler samp,
                                              texture2d<float> matte,
                                              texture3d<float> look,
-                                             texture2d<float> curves) {
+                                             texture2d<float> curves,
+                                             texture2d<float> cursor) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1586,9 +1740,9 @@ static inline float4 layerColorPremultiplied(Varyings in,
     if (u.slate > 0.5) {
         base = gradeSample(slateColor(localPx), 1.0, u);
     } else if (kGatherFilters && plan.blurRadius > 0.0) {
-        base = gatherBlur(source, samp, uv, srcSize, plan.blurRadius, u);
+        base = gatherBlur(source, samp, uv, srcSize, plan.blurRadius, u, cursor);
     } else {
-        base = layerSample(source, samp, uv, u);
+        base = layerSample(source, samp, uv, u, cursor);
     }
     float3 rgb = base.rgb;
     float alpha = base.alpha;
@@ -1617,11 +1771,11 @@ static inline float4 layerColorPremultiplied(Varyings in,
             // bright halo round every glyph of a text layer.
             float2 reach = kSharpenRadius / srcSize;
             float3 sharpCentre =
-                plan.blurRadius > 0.0 ? layerSample(source, samp, uv, u).rgb : rgb;
-            float3 lo = (layerSample(source, samp, uv + float2(reach.x, 0.0), u).rgb
-                         + layerSample(source, samp, uv - float2(reach.x, 0.0), u).rgb
-                         + layerSample(source, samp, uv + float2(0.0, reach.y), u).rgb
-                         + layerSample(source, samp, uv - float2(0.0, reach.y), u).rgb)
+                plan.blurRadius > 0.0 ? layerSample(source, samp, uv, u, cursor).rgb : rgb;
+            float3 lo = (layerSample(source, samp, uv + float2(reach.x, 0.0), u, cursor).rgb
+                         + layerSample(source, samp, uv - float2(reach.x, 0.0), u, cursor).rgb
+                         + layerSample(source, samp, uv + float2(0.0, reach.y), u, cursor).rgb
+                         + layerSample(source, samp, uv - float2(0.0, reach.y), u, cursor).rgb)
                         * 0.25;
             rgb += plan.sharpen * (sharpCentre - lo);
         }
@@ -1688,12 +1842,12 @@ static inline float4 layerColorPremultiplied(Varyings in,
                 // surroundings would advertise exactly what it was hiding.
                 float r = sqrt(plan.blurRadius * plan.blurRadius
                                + hide.blurRadius * hide.blurRadius);
-                rgb = mix(rgb, gatherBlur(source, samp, uv, srcSize, r, u).rgb,
+                rgb = mix(rgb, gatherBlur(source, samp, uv, srcSize, r, u, cursor).rgb,
                           hide.blurCover);
             } else if (hidePixel > 0.0) {
                 float2 px = uv * srcSize;
                 float2 snapped = ((floor(px / hide.block) + 0.5) * hide.block) / srcSize;
-                rgb = mix(rgb, layerSample(source, samp, snapped, u).rgb, hide.pixelCover);
+                rgb = mix(rgb, layerSample(source, samp, snapped, u, cursor).rgb, hide.pixelCover);
             }
         }
 
@@ -1903,8 +2057,9 @@ fragment float4 framejob_layer_fragment(Varyings in [[stage_in]],
                                        sampler samp [[sampler(0)]],
                                        texture2d<float> matte [[texture(1)]],
                                        texture3d<float> look [[texture(2)]],
-                                       texture2d<float> curves [[texture(3)]]) {
-    return layerColorPremultiplied(in, u, source, samp, matte, look, curves);
+                                       texture2d<float> curves [[texture(3)]],
+                                       texture2d<float> cursor [[texture(5)]]) {
+    return layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor);
 }
 
 /// Step 11: one layer's colour combined with the destination under a
@@ -2027,8 +2182,9 @@ fragment float4 framejob_layer_blend_fragment(Varyings in [[stage_in]],
                                              float4 dst [[color(0)]],
                                              texture2d<float> matte [[texture(1)]],
                                              texture3d<float> look [[texture(2)]],
-                                             texture2d<float> curves [[texture(3)]]) {
-    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look, curves);
+                                             texture2d<float> curves [[texture(3)]],
+                                             texture2d<float> cursor [[texture(5)]]) {
+    float4 src = layerColorPremultiplied(in, u, source, samp, matte, look, curves, cursor);
     // Clamped, because the 16-bit-float canvas keeps whatever is returned
     // and a blend can step past 1 or below 0 (spec §11 PR-1).
     return saturate(blendPremultiplied(int(u.blendMode + 0.5), src, dst));

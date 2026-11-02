@@ -27585,8 +27585,8 @@ over a copy of `app/Sources`; app mutants (`present-ignores-environment`,
 `swift_build.py`'s line and `FRAMEJOB_DEV_TOOLS` (it links `libframejob_core.a`, so `make rust`
 first) for its probe rows, then drives the app `proof_app` chooses (or `--app PATH`) on a scratch
 `CFFIXED_USER_HOME` for its app rows. Its fixture is a version-37 project over a copy of
-`media/A.mov`: one clip and one zoom action. Nothing is drawn yet (CU3a2), so every row is a
-read-back; its docstring is the full row list.
+`media/A.mov`: one clip and one zoom action. CU3a1's rows are read-backs; CU3a2's drawing
+rows follow below; its docstring is the full row list.
 
 | Row | What it holds |
 |---|---|
@@ -27610,6 +27610,40 @@ make app-debug && python3 tools/proof/cursor_layer_proof.py [--only IDS] [--app 
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU3a1 record.
+
+### CU3a2 — the cursor drawn, and files that wait for it (`cursor_layer_proof.py` L7, L2, L4, L5, L6, L8, L8r, L10, L11; six mutants by hand; spec §11 CU-33, CU-37)
+
+The drawing rows ask the probe for the fixture first: `cursor.fjcursor` (format v1 through
+`CursorFileBody`, read back through `ReelCursor`; 1 px a point, identity geometry, a move every
+frame, two down clicks) and its `sprite.png` (a 12 × 16 triangle with transparent pixels); the
+script makes `clean.mov` (ffmpeg's `testsrc2`, uncompressed ARGB, which AVFoundation decodes
+byte-exact) and `burned.mov` (the sprite burned in by ffmpeg's `overlay` at the file's
+positions). A tip is located by each pixel's coverage against the same render with `show:
+false`, so no colour of the background is mistaken for the sprite. L11 is a second launch with
+`-RCDevCursorLoadHold 2`, and Z1 reads both launches' logs.
+
+| Row | What it holds |
+|---|---|
+| L7 | (probe) the compositor's own per-frame seconds (`PlaybackTrials`) over 120 frames, the cursor drawn with ripples minus none, 3 runs: the median difference ≤ 0.3 ms at 1920×1080, ≤ 1 ms at 3840×2160 and 5120×2880; `CursorSprites.uploads` 1 after the first frame and the last |
+| L2 | a 2× zoom: the located tip at three frames equals (★) of the file's point, ≤ 1 px |
+| L4 | a linear Ramp Up: the tip at the file's point at S(clip time), ≤ 1 px; a reversed clip: at `pivot − at − frame` |
+| L5 | an HLG canvas: an interior sprite pixel = `liftSDR` of the sprite's colour, ≤ 1/255 |
+| L6 | a `prores_4444` export with ripples against `render_frame` at three frames, ≤ 2/255 |
+| L8 | the clean movie with its file against the burned movie, both blurred, a pixelated region over the pointer, exposure +1 and saturation −0.5: ≤ 2/255 |
+| L8r | both reversed through `ReverseRenderer`: the drawn tip on the burned pointer's, ≤ 1 px |
+| L10 | a cursor file that is not JSON: `render_frame`'s sentence, its PNG byte-identical to `show: false` with no ripples, and `export_status`'s `cursor_warnings` naming it |
+| L11 | every load held 2 s: an export started at once shows the sprite in all 120 frames |
+
+The six mutants are run by hand, each once and restored byte-identical: the reverse not
+mirrored (L4), the reversed time without its one-frame offset (L8r), the composite after
+`gradeSample` (L8), the HLG lift skipped (L5), the export not waiting (L11), a failed track
+failing the export instead of warning (L10).
+
+```sh
+make app-debug && python3 tools/proof/cursor_layer_proof.py --only B0,L2,L4,L5,L6,L7,L8,L8r,L10,L11
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU3a2 record.
 
 ## Road map "creator-jobs" TX1 — the timeline transcript (`timeline_transcript_proof.py` T1–T11, G0–G1, P1–P13, C1; eight mutants; `transcript_spike/` TX-S1; `core/tests/plan_instances.rs`; spec §11 TX-10…TX-14)
 

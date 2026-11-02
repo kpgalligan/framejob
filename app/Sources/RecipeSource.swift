@@ -44,7 +44,26 @@ final class RecipeSource {
     /// frame's fresh one — falls back to its instruction's map, which was
     /// built from the project that key renders.
     private var mediaURLs: [Int: [UInt32: URL]] = [:]
+    /// Media id → cursor file, as each key last published it (spec §11 CU-37): a document's
+    /// from `setMediaURLs`, an export's or an offline frame's from `Exporter.waitForCursors`.
+    /// A key that never publishes any — a thumbnail's, an analysis' — draws no cursor.
+    private var cursorFiles: [Int: [UInt32: CursorFile]] = [:]
+    /// What `cursorFiles` was resolved from, per key: each cursor media's record, duration and
+    /// rate. The files are resolved again (bookmarks read) only when this changes.
+    private var cursorSources: [Int: [UInt32: CursorSource]] = [:]
+    /// The tracks each key last wanted of `CursorTracks`, so an edit that changes none wants
+    /// nothing again.
+    private var cursorWants: [Int: [CursorTrackRequest]] = [:]
+    /// The keys that ever wanted a track: the owners `unregister` releases.
+    private var cursorOwners = Set<Int>()
     private var nextKey = 1
+
+    /// What a key's cursor files are resolved from (`cursorSources`).
+    private struct CursorSource: Equatable {
+        let cursor: MediaCursor
+        let duration: Ticks
+        let fps: Fps
+    }
 
     private init() {}
 
@@ -70,6 +89,15 @@ final class RecipeSource {
         // right now is still the same ask.
         options.removeValue(forKey: key)
         mediaURLs.removeValue(forKey: key)
+        cursorFiles.removeValue(forKey: key)
+        cursorSources.removeValue(forKey: key)
+        cursorWants.removeValue(forKey: key)
+        // Released off this thread, never under the lock (CU-37 (e)): `Exporter.deinit` can
+        // run inside `CursorTracks.wait`'s `cancelled()`, which holds the registry's lock that
+        // `release` takes. Keys are never reused, so a late release drops no newer want.
+        if cursorOwners.remove(key) != nil {
+            DispatchQueue.global(qos: .utility).async { CursorTracks.shared.release(owner: key) }
+        }
     }
 
     /// Publishes the project the compositor should read from now. Called on
@@ -106,11 +134,65 @@ final class RecipeSource {
     }
 
     /// Publishes a document's media URLs under `key` (main thread, beside
-    /// `set`, from `Playback.update`).
-    func setMediaURLs(_ urls: [UInt32: URL], for key: Int) {
+    /// `set`, from `Playback.update`), and its cursor files with them: the
+    /// files are resolved again only when a cursor media's record, duration
+    /// or rate changed, and the key wants its clips' tracks of `CursorTracks`
+    /// only when what they want changed (spec §11 CU-37 (a)).
+    func setMediaURLs(_ urls: [UInt32: URL], project: ReelProject, for key: Int) {
+        let snapshot = project.snapshot
+        var sources: [UInt32: CursorSource] = [:]
+        for media in snapshot.media {
+            guard let cursor = media.cursor, !cursor.inPicture else { continue }
+            sources[media.id] = CursorSource(
+                cursor: cursor, duration: media.duration, fps: media.fps)
+        }
+        lock.lock()
+        mediaURLs[key] = urls
+        let known = cursorSources[key] ?? [:]
+        let stored = cursorFiles[key] ?? [:]
+        lock.unlock()
+        let files = sources == known ? stored : CursorFiles.files(of: snapshot)
+        setCursorFiles(files, sources: sources, for: key)
+        let requests = CursorFiles.requests(of: snapshot, files: files)
+        lock.lock()
+        let changed = (cursorWants[key] ?? []) != requests
+        if changed {
+            cursorWants[key] = requests
+            if !requests.isEmpty { cursorOwners.insert(key) }
+        }
+        lock.unlock()
+        if changed { CursorTracks.shared.want(requests, owner: key) }
+    }
+
+    /// Publishes `key`'s cursor files (`Exporter.waitForCursors`, before it
+    /// waits): what `cursorFiles(for:)` answers the compositor.
+    func setCursorFiles(_ files: [UInt32: CursorFile], for key: Int) {
+        setCursorFiles(files, sources: nil, for: key)
+    }
+
+    private func setCursorFiles(
+        _ files: [UInt32: CursorFile], sources: [UInt32: CursorSource]?, for key: Int
+    ) {
         lock.lock()
         defer { lock.unlock() }
-        mediaURLs[key] = urls
+        cursorFiles[key] = files.isEmpty ? nil : files
+        cursorSources[key] = sources
+        // `waitForCursors` wants under this key through `CursorTracks.wait`.
+        if sources == nil, !files.isEmpty { cursorOwners.insert(key) }
+    }
+
+    /// The cursor files published under `key`; `[:]` for one that published none.
+    func cursorFiles(for key: Int) -> [UInt32: CursorFile] {
+        lock.lock()
+        defer { lock.unlock() }
+        return cursorFiles[key] ?? [:]
+    }
+
+    /// The cursor files a layer under `instruction` reads: those published
+    /// under its `recipeKey`; `[:]` for nil or a key that published none (CU-37 (d)).
+    func cursorFiles(for instruction: RecipeInstruction?) -> [UInt32: CursorFile] {
+        guard let instruction = instruction else { return [:] }
+        return cursorFiles(for: instruction.recipeKey)
     }
 
     /// The media URLs a LUT look under `instruction` reads: the map published

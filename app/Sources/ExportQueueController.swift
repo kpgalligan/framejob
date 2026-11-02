@@ -195,6 +195,7 @@ final class ExportQueueController {
         /// What the graphics warned while a COMPLETED job's file was drawn
         /// (G-24 (c)): the row's count and its tooltip's list.
         var graphicWarnings: [ExportGraphicWarning] = []
+        var cursorWarnings: [ExportCursorWarning] = []  // spec §11 CU-37 (c)
         /// What a COMPLETED job's sound measured, read off its exporter at the
         /// finish — the figures the row's message summarises, kept whole for
         /// `export_status`'s `loudness` (spec §11 #326). nil otherwise.
@@ -433,6 +434,7 @@ final class ExportQueueController {
         let report = exporter?.loudnessReport
         let measured = report.map { " \($0.summary)." } ?? ""
         let warnings = exporter?.graphicWarnings ?? []
+        let cursorWarnings = exporter?.cursorWarnings ?? []
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
         // from the job, so that releasing it cannot depend on the job still
@@ -450,6 +452,7 @@ final class ExportQueueController {
                 jobs[index].state = .completed
                 jobs[index].progress = 1
                 jobs[index].graphicWarnings = warnings
+                jobs[index].cursorWarnings = cursorWarnings
                 jobs[index].loudness = report
                 // The count BEFORE the loudness figures: the row truncates
                 // its tail (`ExportQueueRowView`).

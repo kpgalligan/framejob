@@ -11,7 +11,8 @@ extension AgentServer {
     /// blocked to the file. `bytes` is the file's size as read at the finish.
     static func exportResult(
         settings: ExportSettings, burnInTimecode: Bool, path: String, bytes: Int,
-        loudness: ExportLoudness?, graphicWarnings: [ExportGraphicWarning]
+        loudness: ExportLoudness?, graphicWarnings: [ExportGraphicWarning],
+        cursorWarnings: [ExportCursorWarning]
     ) -> [String: Any] {
         var result: [String: Any] = [
             "ok": true,
@@ -66,6 +67,9 @@ extension AgentServer {
         }
         if let warned = graphicWarningsResult(graphicWarnings) {
             result["graphic_warnings"] = warned
+        }
+        if let warned = cursorWarningsResult(cursorWarnings) {
+            result["cursor_warnings"] = warned
         }
         return result
     }
@@ -133,6 +137,16 @@ extension AgentServer {
         guard !warnings.isEmpty else { return nil }
         return warnings.map {
             ["name": $0.name, "frame": $0.frame ?? NSNull(), "message": $0.message] as [String: Any]
+        }
+    }
+
+    /// Each media whose cursor file the export could not draw (spec §11
+    /// CU-37 (c)), `[{media, path, message}]`, or nil, and then the key is
+    /// absent, when there was none — `graphicWarningsResult`'s shape (G-24 (c)).
+    static func cursorWarningsResult(_ warnings: [ExportCursorWarning]) -> [[String: Any]]? {
+        guard !warnings.isEmpty else { return nil }
+        return warnings.map {
+            ["media": $0.media, "path": $0.path, "message": $0.message] as [String: Any]
         }
     }
 }
