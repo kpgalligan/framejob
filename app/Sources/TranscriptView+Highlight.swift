@@ -39,6 +39,7 @@ extension TranscriptView {
         }
         selectionAnchor = valid?.lowerBound
         setSelection(valid)
+        onSelect?(valid)
     }
 
     /// Marks the rects of `tokens` dirty.

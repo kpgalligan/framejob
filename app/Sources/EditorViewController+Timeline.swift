@@ -229,6 +229,8 @@ extension EditorViewController {
     /// between the two keys is only whether the hole closes.
     func deleteSelection() {
         guard let document = document else { return }
+        // Words selected in the Transcript tab ripple out (spec §11 TX-31).
+        if transcriptHoldsWords { return deleteTranscriptWords() }
         // With an action selected ⌫ removes IT, not its clip (spec §9).
         if document.selectedActionSnapshot != nil {
             removeSelectedActionCommand()
@@ -249,6 +251,7 @@ extension EditorViewController {
     /// (spec §9).
     func rippleDeleteSelection() {
         guard let document = document else { return }
+        if transcriptHoldsWords { return deleteTranscriptWords() }
         if document.selection.isEmpty {
             guard let range = document.inOutRange, range.end > range.start else {
                 NSSound.beep()
@@ -455,6 +458,7 @@ extension EditorViewController {
             if (view.window?.firstResponder as? CurveEditorView)?.holdsDeleteKey == true {
                 return false
             }
+            if transcriptHoldsWords { return true }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
         case #selector(showSpeedSheet(_:)):
             // `set_speed` is an ERROR on a non-media source (spec §6), so the
@@ -471,6 +475,7 @@ extension EditorViewController {
             // the start of the line", not a ripple delete of the selection —
             // and the selected clip is the one whose rename field is open.
             if view.window?.firstResponder is NSText { return false }
+            if transcriptHoldsWords { return true }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
         case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)),
             #selector(freezeFrame(_:)):

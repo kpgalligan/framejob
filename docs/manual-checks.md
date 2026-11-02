@@ -210,6 +210,11 @@ the same way.
 - **Expect:** the highlighted word keeps time with the voice and the scrolling is calm, never jumping more than it needs to keep the word in sight; after your own scroll the text stays put for about three seconds, then follows again; a click moves the playhead to the word (or the paragraph) and playback goes on.
 - **Source:** road map "creator-jobs" TX2a, spec §11 TX-22.
 
+**JOB-11 — Word cuts sound natural**
+- **Do:** With S-TH1 placed (a long talking head, once it exists), open View ▸ Transcript (⌃⌘T). Delete a dozen single words and a few runs of words from the middle, some just before a pause and some in fast speech: select, listen to the shaded range with Loop, press ⌫, then play across each cut.
+- **Expect:** no kept word's start is clipped; no audible fragment of a deleted word is left; the pause after each cut sounds natural (no gasp, no doubled pause); in fast speech the end of the word before the cut is not eaten (TX-S3 chose the transcript's own edges, E0, which put 13 of 20 edges on its fixture inside the word before — note each one you hear, with its time).
+- **Source:** road map "creator-jobs" TX3a, spec §11 TX-30.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).

@@ -1,10 +1,17 @@
 import AppKit
 
 /// What the Transcript tab asks of the editor (spec §11 TX-22): whether the
-/// transport plays, and a seek that leaves playback as it was.
+/// transport plays, and a seek that leaves playback as it was; since TX3a
+/// (TX-31, TX-32) the document's in/out range, read and set through
+/// `set_range`'s door, the cut as one "Delete Words" step (true when it
+/// applied), and a refusal's beep and sentence.
 protocol TranscriptHost: AnyObject {
     var transcriptIsPlaying: Bool { get }
     func transcriptSeek(to time: Ticks)
+    var transcriptRange: TranscriptCut.Range? { get }
+    func transcriptSetRange(_ range: TranscriptCut.Range?)
+    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range) -> Bool
+    func transcriptRefuse(_ sentence: String)
 }
 
 /// The inspector's fifth tab (road map "creator-jobs" TX2a, spec §11 TX-20):
@@ -31,6 +38,8 @@ final class TranscriptPane: InspectorPaneView {
     private let scroll = NSScrollView()
     private weak var lastProject: ReelProject?
     private var shownRebuilds = -1
+    /// The range the selection last set (TX-31); nil after a clear or a cut.
+    private var rangeSet: TranscriptCut.Range?
 
     /// The pane each inspector made, weak to weak.
     private static let table = NSMapTable<InspectorViewController, TranscriptPane>.weakToWeakObjects()
@@ -70,6 +79,8 @@ final class TranscriptPane: InspectorPaneView {
         ])
         transcriptView.onActivate = { [weak self] index in self?.seek(token: index) }
         transcriptView.onParagraph = { [weak self] index in self?.seek(paragraph: index) }
+        transcriptView.onSelect = { [weak self] selection in self?.selectionChanged(selection) }
+        transcriptView.onDelete = { [weak self] in self?.deleteWords() }
     }
 
     @available(*, unavailable)
@@ -156,6 +167,60 @@ final class TranscriptPane: InspectorPaneView {
         let canvas = document.editedProject.snapshot.canvas
         transcriptView.show(source.model, fps: canvas.fps, timecodeFrames: canvas.timecodeFrames)
         transcriptView.setHighlight(source.model.highlight(at: document.playhead), follow: false)
+        // The selection was re-mapped by identity: while the document's range
+        // is still the one it set, the range follows it (TX-31).
+        if rangeSet != nil, host?.transcriptRange == rangeSet {
+            selectionChanged(transcriptView.selection)
+        }
+    }
+
+    // MARK: - Selecting and deleting words (TX-31, TX-32)
+
+    /// The plan of `selection` against the edited container.
+    private func plan(_ selection: ClosedRange<Int>) -> TranscriptCut.Plan? {
+        guard let document = inspector?.document else { return nil }
+        let container = document.editedProject.snapshot
+        return TranscriptCut.plan(
+            selection, table: source.cutTable(), container: container,
+            total: ShotSplit.clipCount(document.project.snapshot), fps: container.canvas.fps)
+    }
+
+    /// A person's selection: widened, adopted, and its snapped cut made the
+    /// in/out range. A cleared selection clears the range only while it is
+    /// still the one the selection set.
+    func selectionChanged(_ selection: ClosedRange<Int>?) {
+        guard let host else { return }
+        guard let selection, let plan = plan(selection) else {
+            if rangeSet != nil, host.transcriptRange == rangeSet { host.transcriptSetRange(nil) }
+            rangeSet = nil
+            return
+        }
+        transcriptView.adopt(plan.selection)
+        let range = plan.range.end > plan.range.start ? plan.range : nil
+        host.transcriptSetRange(range)
+        rangeSet = range
+    }
+
+    /// ⌫, ⌦, Edit ▸ Delete or Edit ▸ Ripple Delete with words selected:
+    /// planned again, refused in TX-32's order, else one "Delete Words".
+    func deleteWords() {
+        guard let host, let selection = transcriptView.selection, let plan = plan(selection) else {
+            NSSound.beep()
+            return
+        }
+        transcriptView.adopt(plan.selection)
+        if let refusal = plan.refusal {
+            host.transcriptRefuse(refusal.sentence)
+            return
+        }
+        guard plan.range.end > plan.range.start else {
+            NSSound.beep()
+            return
+        }
+        // Cleared first, so the rebuild the cut causes does not re-plan.
+        let held = rangeSet
+        rangeSet = nil
+        if !host.transcriptDelete(plan.range) { rangeSet = held }
     }
 
     // MARK: - Seeking

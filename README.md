@@ -130,7 +130,8 @@ and shows what each turn cost.
 **The Transcript.** Everything said on the timeline as text in the inspector,
 in paragraphs with timecodes, read on this Mac or from an AssemblyAI
 transcript; the spoken word lights up and the text follows it as the video
-plays, and a click on a word moves the playhead there.
+plays, and a click on a word moves the playhead there. Select words and press
+⌫ to cut them out of every track at once.
 → [The Transcript](docs/guide/transcript.md)
 
 **Agents over MCP.** The whole editor as MCP tools — one per edit plus open,

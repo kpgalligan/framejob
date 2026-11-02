@@ -21,6 +21,11 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     var onActivate: ((Int) -> Void)?
     /// A paragraph's timecode clicked.
     var onParagraph: ((Int) -> Void)?
+    /// A person's selection changed: a click, an arrow, a drag, ⇧, ⌘A or Esc
+    /// (spec §11 TX-31). Never a rebuild's re-mapping, nor `adopt`.
+    var onSelect: ((ClosedRange<Int>?) -> Void)?
+    /// ⌫ or ⌦ with words selected (spec §11 TX-31).
+    var onDelete: (() -> Void)?
     /// The clock the 3 s follow pause reads (TX-22). Internal: a probe sets it.
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 

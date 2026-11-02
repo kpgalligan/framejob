@@ -7,8 +7,9 @@ The IDs continue the series of [`creator-jobs.md`](creator-jobs.md) and
 [`creator-jobs-2.md`](creator-jobs-2.md) (CJ-, VR-, TX-, SW-, CU- and CO-), so a citation never has
 to say which file; `creator-jobs.md` says what the road map builds and how its IDs are made (CJ-7).
 This file is new because `creator-jobs-2.md` passed the road map's ~500-line split rule with CO0's
-entries (2026-11-01), which moved here; each phase's decisions are appended here from now on,
-before its code.
+entries (2026-11-01), which moved here; each phase's decisions were appended here, before its
+code, until it passed the same rule with TX3a's entries, and the series continues in
+`creator-jobs-4.md`.
 
 CO-1…CO-9 are CO0's (bet 6's scope: Remove Background and the layouts), recorded before its code
 and before its spikes ran; the spikes' verdicts were appended after the runs, and CO-S2's rewrote
@@ -251,6 +252,10 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   are not in it.
   **Amended 2026-11-02, by TX-27:** it also takes `words_from`, `language`, `stop_after` and
   `read`, answers `bar`, and its `status` may be `stopped`.
+  **Amended 2026-11-02, by TX-31:** its `select` is a person's selection (planned, widened,
+  the range set), each token also carries `cut_start` and `cut_end` (TX-30's `wordCut` over the
+  tab's own table), and it answers `cut`: null with no selection, else `{selection, start, end,
+  clips_after, clips_peak, refusal}`, the selection's TX-32 plan.
 
 TX-24…TX-27 are TX2b's (the Transcript tab's bar), recorded before its code. No owner question
 was asked: the road map names none for TX2b, and TX2a's answers of 2026-11-01 stand.

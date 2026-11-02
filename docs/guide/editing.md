@@ -119,6 +119,7 @@ The two delete keys pair up. Each acts on the selection, or on the in/out range 
 
 - Each hole closes with one shift of everything after it, so clips that touched before still touch. A clip past several holes moves by their combined length. Clips on other tracks that span the hole stay where they are. **Markers don't move** in a ripple delete.
 - With an animation action selected, ⌫ removes that action instead of its clip. See [Motion and transitions](motion-and-transitions.md).
+- With words selected in the Transcript tab, ⌫ (and ⌘⌫) deletes those words and **closes** the gap, as deleting text does, while ⌫ on the timeline leaves one. See [The Transcript](transcript.md#cutting-by-deleting-words).
 - Both items are greyed out while you are typing in a text field, so ⌫ and ⌘⌫ still edit text there. They are also greyed out when nothing is selected and no range is set.
 - **Clip ▸ Remove Silences…** and **Clip ▸ Remove Filler Words…** each make many ripple cuts as a single undo step. See [Remove Silences and Remove Filler Words](cleanup-tools.md).
 

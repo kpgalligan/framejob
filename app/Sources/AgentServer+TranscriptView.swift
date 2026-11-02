@@ -8,7 +8,9 @@ import AppKit
 /// TX2b (TX-27) it also sets the bar's Words from and Language and presses
 /// its Read, and presses its Stop LATER (`stop_after`): every tool call holds
 /// `AgentLane`'s one lock, so no call could press Stop while
-/// `get_timeline_transcript` waits.
+/// `get_timeline_transcript` waits. Since TX3a (TX-23 amended by TX-31) each
+/// token carries the tab's `cut_start`/`cut_end` (`TranscriptCut.wordCut`
+/// over the tab's `cutTable()`), and `cut` is the selection's plan.
 ///
 /// **It runs on the SERVER thread** (`devOffMainTools`) so `wait` may poll
 /// the tab's source until it is settled; every step is an `onMain` hop.
@@ -179,7 +181,19 @@ extension AgentServer {
         let source = pane.source!
         let view = pane.transcriptView
         let model = source.model
-        let canvas = document.editedProject.snapshot.canvas
+        let container = document.editedProject.snapshot
+        let canvas = container.canvas
+        let table = source.cutTable()
+        let cut: Any = view.selection.map { selection -> [String: Any] in
+            let plan = TranscriptCut.plan(
+                selection, table: table, container: container,
+                total: ShotSplit.clipCount(document.project.snapshot), fps: canvas.fps)
+            return [
+                "selection": [plan.selection.lowerBound, plan.selection.upperBound],
+                "start": plan.range.start, "end": plan.range.end, "clips_after": plan.clipsAfter,
+                "clips_peak": plan.clipsPeak, "refusal": plan.refusal?.sentence ?? NSNull(),
+            ]
+        } ?? NSNull()
         let fill: Any = source.fillProgress.map {
             ["media": Int($0.media), "fraction": $0.fraction] as [String: Any]
         } ?? NSNull()
@@ -196,7 +210,10 @@ extension AgentServer {
             "ok": true,
             "settled": source.settled,
             "tokens": model.tokens.map { token -> [String: Any] in
-                var row = Self.wordRow(token.word)
+                var row = Self.wordRow(
+                    token.word,
+                    cut: TranscriptCut.wordCut(
+                        token.index, table: table, container: container, fps: canvas.fps))
                 row["index"] = token.index
                 row["paragraph"] = token.paragraph
                 row["struck"] = token.struck
@@ -212,6 +229,7 @@ extension AgentServer {
             "playhead": document.playhead,
             "playing": editor(document)?.playback.isPlaying ?? false,
             "selection": view.selection.map { [$0.lowerBound, $0.upperBound] } ?? NSNull(),
+            "cut": cut,
             "first_responder": view.window?.firstResponder === view,
             "fill": fill,
             "owns_want": source.ownsWant,
@@ -254,9 +272,12 @@ extension AgentServer {
                 + "focus, then select, then click; schedules stop_after's press of the bar's Stop "
                 + "that many seconds after the answer; then waits up to wait seconds for the "
                 + "tab's source to settle (no load, fill or pending media left). Answers settled, "
-                + "tokens (get_timeline_transcript's word rows plus index, paragraph and struck), "
-                + "paragraphs {index, start, timecode, first_token}, highlight, playhead, playing, "
-                + "selection, first_responder, fill {media, fraction} or null, owns_want, status "
+                + "tokens (get_timeline_transcript's word rows, cut_start and cut_end the tab's "
+                + "own, plus index, paragraph and struck), paragraphs {index, start, timecode, "
+                + "first_token}, highlight, playhead, playing, selection, cut (null with no "
+                + "selection, else the selection's plan: {selection [first, last] widened, start, "
+                + "end, clips_after, clips_peak, refusal: the sentence Delete would refuse with, "
+                + "or null}), first_responder, fill {media, fraction} or null, owns_want, status "
                 + "(idle, loading, reading, no_model, failed or stopped) with status_text, "
                 + "no_words, notes, rebuilds, last_rebuild_ms, top_token, bar {words_from, "
                 + "tracks [{id, name}], language, languages [{identifier, name}], stop_shown, "
@@ -275,8 +296,9 @@ extension AgentServer {
                 "select": [
                     "type": ["array", "null"], "items": ["type": "integer"],
                     "minItems": 2, "maxItems": 2,
-                    "description": "[first, last] token indices, inclusive, to select; null "
-                        + "clears the selection.",
+                    "description": "[first, last] token indices, inclusive, to select as a "
+                        + "person does (the selection widened, its cut made the in/out range); "
+                        + "null clears the selection.",
                 ],
                 "click": [
                     "type": "integer", "minimum": 0,

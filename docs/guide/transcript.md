@@ -24,10 +24,10 @@ starts when:
 - there are 1.5 seconds or more between two clips' words on one track, or
 - the speaker pauses for 1.5 seconds or more inside a clip.
 
-Some words are shown faint. You will be able to cut words by deleting them in
-a later version, and these are the words where a cut would break something:
-words inside a nest (open the nest to work on them), words under a transition,
-and words on a locked track. Hold the pointer over a faint word to read why.
+Some words are shown faint. These are the words a cut would break something
+at, so they can't be deleted: words inside a nest (open the nest to work on
+them), words under a transition, and words on a locked track. Hold the
+pointer over a faint word to read why.
 
 ## The bar
 
@@ -98,6 +98,53 @@ you put it for three seconds before it follows again.
 Editing the timeline updates the text right away, and the words you were
 reading stay where they were.
 
+## Cutting by deleting words
+
+Select words, then press ⌫ (or ⌦, **Edit ▸ Delete** or **Edit ▸ Ripple
+Delete**): the words and the sound under them come out of every unlocked
+track and the gap closes, as one undo step, **Delete Words**. On the timeline
+⌫ leaves a gap; in the transcript it closes it, the way deleting text does.
+
+- **Selecting.** Click a word to select it, drag across words to select a
+  run, or ⇧-click and ⇧ with the arrows to extend. ⌘A selects every word.
+- **The range.** Whatever you select becomes the timeline's in/out range, so
+  the timeline shades exactly what will go, and Loop plays it. ⎋ clears the
+  selection and the range with it. If you set the range another way (I, O, or
+  an agent), the transcript leaves it alone.
+- **Where the cut falls.** From where the first word starts to where the next
+  word you keep starts, so the pause before the cut stays and the pause after
+  it goes, but never more than one second past the last deleted word: a long
+  pause after it keeps the rest. Both ends land on whole frames, never past
+  the start of a word that stays.
+- **Other tracks.** If a word on another track starts before your selection
+  and runs into it (two people talking at once), the tab adds it to the
+  selection first, so you see everything the cut takes before you press ⌫. A
+  word on another track that starts inside your last selected word is not
+  added: it is the next word you keep, so the cut ends at its start, and the
+  rest of the deleted word after that point can stay in.
+- **After the cut** the range clears and the playhead lands where the cut
+  was. Deleting words one at a time gives the same result as deleting them
+  together, unless a pause of more than a second lies between them.
+
+The tab will not cut, and says why at the foot of the inspector, when:
+
+- a selected word can't be cut (a faint word, as above);
+- a locked track has words inside the cut: "Track Music is locked and has
+  words in this cut: unlock it to cut here." (a locked track never moves, so
+  its words would fall out of step);
+- the cut would pass the project's limit of 4096 clips while it is being made:
+  "This cut would make 4097 clips; a project holds at most 4096. Lock a track
+  that needs no cut, such as a music bed, or cut less."
+
+The word edges come from the transcript itself, so in fast speech a cut can
+take the very end of the word before it, or leave a sliver of the word you
+deleted. Play the cut back (Loop plays the shaded range before you delete) and
+undo if it sounds wrong.
+
+An agent cuts words the same way: each word it reads carries the range the
+tab would cut it by, and it deletes a run of words with one ripple delete.
+See [Driving Frame Job from an AI agent](mcp.md).
+
 ## Keys
 
 With the transcript text active:
@@ -109,11 +156,11 @@ With the transcript text active:
 | ⇧ with an arrow | Extend the selection without moving the playhead |
 | ⌘A | Select every word |
 | ⎋ | Clear the selection |
+| ⌫ or ⌦ | Delete the selected words and close the gap |
 
 Every other key works as it does on the timeline: Space plays and pauses, J,
 K and L shuttle, I and O set the range, and M adds a marker.
 
 ## Not yet
 
-Find (⌘F) does not search the transcript yet. Cutting by deleting words comes
-in a later version.
+Find (⌘F) does not search the transcript yet.

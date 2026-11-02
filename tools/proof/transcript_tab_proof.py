@@ -32,7 +32,7 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
       answered `playhead`.
   T4  `click: i` puts the playhead at word i's frame-snapped start; paused
       stays paused (the playing half is the probe's T4p: no MCP door starts
-      playback).
+      playback); the selection is TX-31's plan of word i (TX3a), i inside it.
   T6  a 3,600 s silent AAC with 27,000 words in 900 paragraphs (1.6 s gaps)
       served by the fake through `transcribe {engine: assemblyai, place:
       false}`: 900 paragraphs, and over 5 `split`s the median
@@ -431,10 +431,15 @@ def app_rows(results, wanted, app_path, files):
                 shown = view(s, click=7)
                 token = shown["tokens"][7]
                 want = snap(token["start"], fps)
-                return (shown.get("playhead") == want and shown.get("selection") == [7, 7]
+                # Since TX3a (TX-31) a click's one word is planned: the selection
+                # is the plan's, widened over a word of the other track it cuts into.
+                selection = shown.get("selection") or [None, None]
+                planned = (shown.get("cut") or {}).get("selection")
+                return (shown.get("playhead") == want and selection == planned
+                        and selection[0] <= 7 <= selection[1]
                         and shown.get("playing") is False,
                         f"playhead {shown.get('playhead')} (want {want}); selection "
-                        f"{shown.get('selection')}; playing {shown.get('playing')}")
+                        f"{selection} (the plan's {planned}); playing {shown.get('playing')}")
             run("T4", t4)
             if state.get("t2") is not None:
                 close(state["t2"])

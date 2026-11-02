@@ -27839,3 +27839,72 @@ make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.
+
+## Road map "creator-jobs" TX3a — delete words (`transcript_cut_proof.py` U0–U6, Z0, C1–C9, C4b; ten mutants; `transcript_spike/` TX-S3; spec §11 TX-30…TX-33)
+
+```sh
+python3 tools/proof/transcript_spike/cut_spike.py
+python3 tools/proof/transcript_cut_proof.py --only U1,U2,U3,U4,U5,U6
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_cut_proof.py [--only IDS]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_cut_proof.py --mutant NAME | --mutants
+```
+
+**TX-S3** (`transcript_spike/cut_spike.py` and `cut_spike.swift`, built
+through `swift_build.build()`): fixture (1) is 21 of `fill_spike`'s `say`
+phrases joined by 60, 120, 250, 500 and 1,000 ms of zero samples, four of
+each, under `work/transcript_spike/cut/` — each phrase's true onset its offset
+plus its own file's first sample over −40 dBFS; (2) is the owner's o2
+(`media/filler-sample/test-recording.aifc`); (3) S-TH1 and S-RT1 under
+`media/creator/<id>/`, skipped by name and owed while absent. One instance of
+the app `proof_app` chooses (`make app-debug` first) imports each fixture into
+a scratch project, places it at 0 and reads `get_timeline_transcript`; the
+probe reads the package's voice cache and peaks through
+`MediaImporter.loadSpeech`/`loadPeaks` and runs `TranscriptCut.sourceOnsets`
+under E0, E1 and E2 at G 0, 32, 64 and 96 ms. A boundary's word is found by
+its spelling within 1 s of the true onset (its start corrected by the
+on-device lead): on-device words tile the audio, so position alone picks the
+previous phrase's last word. It writes `work/creator_spike/TX-S3/results.json`
+through `creator_spike/rule.py` (`rule_sha256` checked first), with the verdict
+by the road map's rule. Its run of 2026-11-02 chose E0 (spec §11 TX-30).
+
+**Probe rows** (`transcript_cut_probe.swift`, through `swift_build.build()`
+with `-D FRAMEJOB_DEV_TOOLS`, no app): synthetic projects through the core,
+words and voice caches written on the page. U1 onsets under each rule, the
+clamps and a run that begins before the window, and the shipped rule E0; U2
+the next onset, the 1 s cap, an unread clip's start, no next word; U3
+crosstalk widening (a locked track's word never added) and `wordCut(i) ==
+plan(i...i).range`; U4 the refusal order and the locked sentence; U5 a talking
+head's counts (after N + 2, peak N + 4) and the ceiling on the peak; U6 the
+snap: nearest frame, but a start never past the cut word's start and an end
+never past the next word's start (their frame floors).
+
+**App rows**, one instance (`assistant_session_proof.App`, TX1's fake and
+dummy key), every session's tab shown through `select_inspector_tab`, every
+Delete as a person makes it (`transcript_view {focus: true, select}`, then
+`perform_menu_item ["Edit", "Delete"]`): Z0 the parity grep, every word's cut
+keys, the tab's tokens equal to the tool's words; C1 the joined fixture, every
+boundary's word with `cut_start` at or before the true onset (the edges inside
+the previous phrase reported, not scored: E0 does not claim the silence); C2
+three of A's words deleted one at a time (last first) and as one selection,
+placements per track (start, in, duration, media; ids aside) equal; C3 A, a
+20 s silent WAV, then C: A's last word's `cut_end` is its end + 1 s, snapped,
+and its Delete leaves the WAV starting that far into its source; C4 A on
+track 1 and B on track 2 from A's end − 1 s, a track-1 word X a track-2 word Y
+runs into: the selection widens over Y and neither id is left; C4b the same
+layout fresh, `ripple_delete_ranges` of X's own cut keys equals C4's Delete;
+C5 track 2 locked: `cut.refusal` the locked sentence, Delete changes nothing;
+C6 written packages of `RC_MAX_CLIPS − 1` and `− 2` clips (A on one track,
+one-frame text clips on another): a mid word refused at peak 4,097 with N =
+4,097 and no step, then applied at peak 4,096 with `get_project`'s count equal
+to `clips_after`; C7 the Delete is one step `undo` names "Delete Words", and
+its placements equal `ripple_delete_ranges` of the read's range; C8 the two
+WAV exports (`audio_wav`) decoded by ffmpeg to s32le are byte-equal; C9 words
+after a clip B: the range is the tab's `cut`, follows the re-mapped selection
+when B is ripple-deleted, and stays put after `set_range` and a further edit.
+
+Mutants: nine are probe mutants on a copy of `app/Sources`
+(`work/transcript_cut/mutant-<name>/`): `guard-0` and `fallback-no-lead`
+(U1), `no-cap` (U2), `no-widening` (U3), `no-locked-refusal` (U4),
+`no-ceiling`, `after-no-spanning` and `ceiling-on-after` (U5), `snap-apart`
+(U6). `no-replan` builds the app in a tree copy
+(`work/transcript_cut/mutant-app-no-replan/`) and runs C9.

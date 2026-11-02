@@ -107,12 +107,13 @@ enum AssistantPrompt {
             + "or `transcribe`. Write or restyle a caption only when the person asks you to. "
             + "Graphics are modules: `write_graphic` writes one, `add_graphic_clip` places it, "
             + "and `graphic_reference` documents what a module can draw.",
-        "Cutting words: `detect_fillers` answers the filler words (um, uh) as ranges for "
-            + "`ripple_delete_ranges`. A false start, words the speaker abandoned or said again, "
-            + "is a judgement of meaning, so cut one only when the person asks: read the clip's "
-            + "words and their times with `get_transcript`, say which words you will cut, then "
-            + "cut them in one `ripple_delete_ranges` call, each range from the first cut "
-            + "word's start to the last cut word's end.",
+        "Cutting words: `get_timeline_transcript` answers the timeline's words in order, each "
+            + "with the `cut_start` and `cut_end` the Transcript tab cuts it by; cut a run of "
+            + "words with one `ripple_delete_ranges` range from its first word's `cut_start` to "
+            + "its last word's `cut_end`. `detect_fillers` answers the filler words as ranges. A "
+            + "false start that repeats no words is a judgement of meaning, so cut one only when "
+            + "the person asks: say which words you will cut, then cut them in one "
+            + "`ripple_delete_ranges` call.",
         "`render_frame` renders one frame of the finished timeline through the compositor an "
             + "export uses, at the playhead unless you pass `t`, and answers the image and the "
             + "PNG's path. Look before and after a visual edit, and pass `max_width` to keep "

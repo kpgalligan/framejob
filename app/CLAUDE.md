@@ -554,7 +554,9 @@ detail there.
   its `CancelToken`; one cancelled by a release and wanted again before it
   unwound records no outcome, so it runs afresh. `get_timeline_transcript`
   runs off main (`creatorOffMainTools`) with one main hop, and the
-  assistant's Stop releases only its own want.
+  assistant's Stop releases only its own want. `get_timeline_transcript`'s
+  rows carry `cut_start`/`cut_end` (`TranscriptCut.wordCut`, TX-30, TX-33),
+  each needed media's voice cache read on the server thread.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
@@ -738,9 +740,13 @@ the key map behind it.
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
   with a range and nothing selected, which LIFTS, and ⌫ with an action
-  selected, which removes the action. `+Actions` selects an action (the
-  playhead to its end FIRST, then `document.selectAction`), leaves the mode
-  (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
+  selected, which removes the action. With a Transcript view first
+  responder holding words, `deleteSelection` and `rippleDeleteSelection`
+  forward to the pane first (`transcriptHoldsWords`, `deleteTranscriptWords`
+  in `+Transcript`) and both validator arms answer true (spec §11 TX-31).
+  `+Actions` selects an action (the playhead to its end FIRST, then
+  `document.selectAction`), leaves the mode (esc, `case 27` in
+  `handleEditorKey`, false when nothing was selected),
   removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
   Back just added. `+InspectorCommands` holds the two commands the
   inspector made real (Add Action at the playhead, Clip ▸ Transition ▸, the
@@ -1442,7 +1448,8 @@ the key map behind it.
 - `TranscriptPane.swift` · `TranscriptBar.swift` · `TranscriptTabSource.swift` ·
   `TranscriptTokens.swift` · `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) ·
   `TimelineTranscript+Document.swift` · `EditorViewController+Transcript.swift` ·
-  `AgentServer+TranscriptView.swift` — the Transcript tab (road map creator-jobs TX2a, spec
+  `AgentServer+TranscriptView.swift` · `TranscriptCut.swift` (+`Plan`) ·
+  `TranscriptView+Delete.swift` — the Transcript tab (road map creator-jobs TX2a, spec
   §11 TX-20…TX-23, §4.3e). The pane is `AssistantPane`'s shape (one view built in `init`,
   exactly the visible height, its own `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
   finds itself through a static weak table keyed by the inspector (`TranscriptPane.pane(in:)`);
@@ -1464,6 +1471,19 @@ the key map behind it.
   its selection, highlight and ⇧ anchor by `Identity` across a rebuild, and passes every key it
   does not take to `super.keyDown`. `TimelineTranscript+Document` is `get_timeline_transcript`'s
   document read, shared with the tab. `transcript_view` is the dev tool (off main).
+  Since TX3a (spec §11 TX-30…TX-33): `TranscriptCut` is pure — E0/E1/E2 onsets in source ticks
+  per instance (TX-S3 chose E0, `shipped`), the shown-word `Table` and a run's cut, onset to the
+  next shown word's onset, capped 1 s past the run's end and walled at an unread clip; `+Plan`
+  widens over unlocked words whose `[onset, end)` meets the unsnapped cut, refuses (not
+  editable, a locked track's words in the snapped range, the PEAK clip count past
+  `RC_MAX_CLIPS`), and snaps each bound to its nearest frame but never past a word start it must
+  keep (`wordCut` is a token's widened run of one). `TranscriptHost` also reads and sets the
+  in/out range (`set_range`'s door), applies the cut as one "Delete Words"
+  `ripple_delete_ranges` and shows a refusal; the pane plans every person selection
+  (`onSelect`), adopts it and sets the range, keeps `rangeSet`, and re-plans after a rebuild
+  while the document's range is still `rangeSet`. `TranscriptTabSource` keeps each media's voice
+  cache and `allWords`, and builds `cutTable()` once per rebuild. `+Delete` is the drag,
+  `deleteKey()` and `adopt`.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·

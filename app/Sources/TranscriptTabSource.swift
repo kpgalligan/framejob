@@ -21,6 +21,10 @@ import Foundation
 /// The bar's view state (TX2b, spec §11 TX-25, TX-26) is here too: Words from
 /// (one track, or all), Language (an installed one, or the Mac's default),
 /// and Stop, which withdraws only the tab's want, and Read.
+///
+/// Since TX3a (spec §11 TX-30) each media's voice cache is kept beside its
+/// pause set, every read word (`allWords`, before Words from) beside the
+/// model, and `cutTable()` is the cut's table, made once per rebuild.
 final class TranscriptTabSource {
     enum Status: Equatable {
         case idle, loading, reading(name: String, fraction: Double, index: Int, of: Int), noModel
@@ -35,6 +39,8 @@ final class TranscriptTabSource {
     private(set) var notes: [String] = []
     private(set) var status: Status = .idle
     private(set) var rebuilds = 0
+    /// Every read word of the edited container, before Words from (TX-32).
+    private(set) var allWords: [TimelineTranscript.Word] = []
     private(set) var lastRebuildMilliseconds: Double = 0
 
     /// Words from: nil is All tracks (TX-25).
@@ -73,6 +79,8 @@ final class TranscriptTabSource {
     private var read: TimelineTranscript.DocumentRead?
     private var words: [UInt32: TimelineTranscript.MediaWords] = [:]
     private var pauseSets: [UInt32: Set<Ticks>] = [:]
+    private var speech: [UInt32: [Float]] = [:]
+    private var table: TranscriptCut.Table?
     private var missItems: [UInt32: TranscriptFill.Item] = [:]
     private var failures: [UInt32: String] = [:]
     private var loading: Set<UInt32> = []
@@ -139,6 +147,7 @@ final class TranscriptTabSource {
         lock.unlock()
         words = [:]
         pauseSets = [:]
+        speech = [:]
         missItems = [:]
         loading = []
         status = .idle
@@ -191,6 +200,7 @@ final class TranscriptTabSource {
         for (media, heard) in words where heard.engine == .apple {
             words[media] = nil
             pauseSets[media] = nil
+            speech[media] = nil
         }
         missItems = [:]
         failures = [:]
@@ -247,14 +257,36 @@ final class TranscriptTabSource {
             ?? Transcriber.defaultLanguage(in: list)
     }
 
-    /// Words and pause sets given whole, then `update()` — for
-    /// `transcript_tab_probe.swift` only.
+    /// Words, pause sets and voice caches given whole, then `update()` — for
+    /// the probes only.
     func preload(
-        _ words: [UInt32: TimelineTranscript.MediaWords], pauses: [UInt32: Set<Ticks>]
+        _ words: [UInt32: TimelineTranscript.MediaWords], pauses: [UInt32: Set<Ticks>],
+        speech: [UInt32: [Float]] = [:]
     ) {
         self.words.merge(words) { _, new in new }
         pauseSets.merge(pauses) { _, new in new }
+        self.speech.merge(speech) { _, new in new }
         update()
+    }
+
+    /// The cut's table over the last rebuild's words (TX-30), made once per
+    /// rebuild. A media read before its voice cache landed has it read here
+    /// (main; one small file), so the tab cuts as `get_timeline_transcript`
+    /// answers.
+    func cutTable() -> TranscriptCut.Table {
+        if let table { return table }
+        var context = speech
+        if let cacheDir = read?.cacheDir {
+            for media in words.keys where context[media] == nil {
+                context[media] = MediaImporter.loadSpeech(for: media, in: cacheDir)
+            }
+        }
+        speech = context
+        let made = TranscriptCut.Table(
+            all: allWords, tracks: wordsFrom.map { [$0] },
+            context: TranscriptCut.Context(instances: read?.instances ?? [], media: words, speech: context))
+        table = made
+        return made
     }
 
     // MARK: - The model
@@ -276,13 +308,16 @@ final class TranscriptTabSource {
             let all = TimelineTranscript.words(read.instances, media: words, snapshot: read.snapshot)
             let shown = all.filter { wordsFrom == nil || $0.track == wordsFrom }
             model = TranscriptTokens.build(shown, pauses: pauseSets)
+            allWords = all
             noWords = read.noWords
             notes = TimelineTranscript.sameSpeech(shown, instances: read.instances)
         } else {
             model = .empty
+            allWords = []
             noWords = []
             notes = []
         }
+        table = nil
         rebuilds += 1
         refreshStatus()
         onChange()
@@ -313,7 +348,7 @@ final class TranscriptTabSource {
         let generation = begin()
         let wanted = self.language
         loadQueue.async { [weak self] in
-            var found: [UInt32: (TimelineTranscript.MediaWords, Set<Ticks>)] = [:]
+            var found: [UInt32: (TimelineTranscript.MediaWords, (Set<Ticks>, [Float]?))] = [:]
             var missed: [UInt32: TranscriptFill.Item] = [:]
             var unreadable: [UInt32: String] = [:]
             var modelMissing = false
@@ -348,7 +383,8 @@ final class TranscriptTabSource {
                 guard self.isCurrent(generation) else { return }
                 for (media, pair) in found {
                     self.words[media] = pair.0
-                    self.pauseSets[media] = pair.1
+                    self.pauseSets[media] = pair.1.0
+                    self.speech[media] = pair.1.1
                 }
                 self.missItems.merge(missed) { _, new in new }
                 self.failures.merge(unreadable) { _, new in new }
@@ -359,10 +395,15 @@ final class TranscriptTabSource {
         }
     }
 
-    private static func pauses(_ words: TimelineTranscript.MediaWords, cacheDir: URL) -> Set<Ticks> {
-        TranscriptTokens.pauses(
-            words.words, speech: MediaImporter.loadSpeech(for: words.media, in: cacheDir),
-            confidence: Float(SilenceDetector.Settings.defaultVoiceConfidence))
+    /// A media's pause set, and the voice cache it was read from (TX-30).
+    private static func pauses(
+        _ words: TimelineTranscript.MediaWords, cacheDir: URL
+    ) -> (Set<Ticks>, [Float]?) {
+        let speech = MediaImporter.loadSpeech(for: words.media, in: cacheDir)
+        return (
+            TranscriptTokens.pauses(
+                words.words, speech: speech,
+                confidence: Float(SilenceDetector.Settings.defaultVoiceConfidence)), speech)
     }
 
     private func begin() -> Int {
@@ -468,7 +509,8 @@ final class TranscriptTabSource {
                 self.end()
                 guard self.isCurrent(generation), let words, let pauses else { return }
                 self.words[item.media] = words
-                self.pauseSets[item.media] = pauses
+                self.pauseSets[item.media] = pauses.0
+                self.speech[item.media] = pauses.1
                 self.missItems[item.media] = nil
                 self.rebuild()
             }

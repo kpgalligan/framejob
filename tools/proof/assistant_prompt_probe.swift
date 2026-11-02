@@ -518,6 +518,15 @@ try? FileManager.default.createDirectory(atPath: work, withIntermediateDirectori
 buildFixture()
 argumentNames(catalog, into: &vocabulary)
 keys(fixture, into: &vocabulary)
+// The keys of one `get_timeline_transcript` word row (road map creator-jobs
+// TX3a, spec §11 TX-33): `cut_start` and `cut_end` are names the prompt cites.
+keys(
+    AgentServer.wordRow(
+        TimelineTranscript.Word(
+            text: "w", start: 0, end: 1, clip: 1, track: 1, media: 1, engine: .apple,
+            filler: false, speaker: nil, editable: true, why: nil,
+            id: TimelineTranscript.Identity(nestPath: [], media: 1, source: 0, k: 0)),
+        cut: TranscriptCut.Range(start: 0, end: 1)), into: &vocabulary)
 
 let texts: Texts = (AssistantPrompt.system, AssistantPrompt.searchGuide,
                     AssistantPrompt.compactionInstructions)

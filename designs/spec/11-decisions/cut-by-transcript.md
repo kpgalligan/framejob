@@ -252,6 +252,8 @@ TR-11.
     `ripple_delete_ranges` call, each range from the first cut word's start to the last cut
     word's end." Its search guide's captions row reads "captions: import, transcribe speech, read
     a clip's timed words, export a caption file" and gains `get_transcript` after `transcribe`.
+    **Amended 2026-11-02, by TX-33:** the paragraph is replaced by TX-33's, which cuts a run of
+    words from `get_timeline_transcript`'s `cut_start` to its `cut_end`.
   - Risk accepted: a long clip's answer is large (every word, no window; a `from`/`to` window is
     CT-5's residue to file), and an on-device answer is recognised again on every call.
   - **Amended 2026-10-23, by TR-13:** the missing window is `get_transcript`'s `from`/`to`

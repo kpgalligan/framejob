@@ -23,4 +23,56 @@ extension EditorViewController: TranscriptHost {
     func transcriptSeek(to time: Ticks) {
         setPlayhead(time)
     }
+
+    // MARK: - Deleting words (road map "creator-jobs" TX3a, spec §11 TX-31)
+
+    /// The document's in/out range.
+    var transcriptRange: TranscriptCut.Range? {
+        document?.inOutRange.map { TranscriptCut.Range(start: $0.start, end: $0.end) }
+    }
+
+    /// A word selection's range, or nil to clear it: `set_range`'s door
+    /// (`AgentServer+Project.swift`), so the timeline shades it and Loop
+    /// plays it.
+    func transcriptSetRange(_ range: TranscriptCut.Range?) {
+        guard let document else { return }
+        document.inOutRange = range.flatMap { $0.end > $0.start ? ($0.start, $0.end) : nil }
+        viewStateDidChange()
+        applyLoopRange()
+    }
+
+    /// One `ripple_delete_ranges` as the step "Delete Words"; applied, the
+    /// range clears and the playhead lands at the cut.
+    @discardableResult func transcriptDelete(_ range: TranscriptCut.Range) -> Bool {
+        guard let document else { return false }
+        let before = document.project
+        document.applyEdit("Delete Words", .rippleDeleteRanges(ranges: [(range.start, range.end)]))
+        guard document.project !== before else { return false }
+        document.inOutRange = nil
+        setPlayhead(range.start)
+        viewStateDidChange()
+        applyLoopRange()
+        return true
+    }
+
+    /// TX-32's refusal: a beep and the sentence at the inspector's foot.
+    func transcriptRefuse(_ sentence: String) {
+        NSSound.beep()
+        inspector?.showRefusal(ReelRefusal(op: "ripple_delete_ranges", reason: sentence))
+    }
+
+    /// The window's first responder is a Transcript view with words
+    /// selected: the delete family forwards to it (`+Timeline`).
+    var transcriptHoldsWords: Bool {
+        (view.window?.firstResponder as? TranscriptView)?.selection != nil
+    }
+
+    /// The delete family's forward: the Transcript pane deletes its words.
+    func deleteTranscriptWords() {
+        guard let inspector, let pane = TranscriptPane.pane(in: inspector) else {
+            NSSound.beep()
+            return
+        }
+        pane.deleteWords()
+    }
 }

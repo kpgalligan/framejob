@@ -7,10 +7,10 @@ and made the two spec splits (CJ0a's record). The brief is `designs/creator-surv
 bets" (lines 173–356) and the market sections they cite. The worktree is
 `.claude/worktrees/creator-jobs`, branch `worktree-creator-jobs`, cut from main at `d0661e5d`.
 Decisions go in a new `designs/spec/11-decisions/creator-jobs.md` (one series, continued in
-`creator-jobs-2.md`, then `creator-jobs-3.md`, each past about 500 lines), each with its row in
-`11-decisions/README.md` and that file's Lines cell. This file holds the plan and, as phases land,
-each phase's record. Line counts and line numbers are `wc -l` and `grep -n` at `d0661e5d` (main,
-2026-11-01); a phase re-reads them at its start.
+`creator-jobs-2.md`, then `creator-jobs-3.md`, then `creator-jobs-4.md`, each past about 500
+lines), each with its row in `11-decisions/README.md` and that file's Lines cell. This file holds
+the plan and, as phases land, each phase's record. Line counts and line numbers are `wc -l` and
+`grep -n` at `d0661e5d` (main, 2026-11-01); a phase re-reads them at its start.
 
 ## Goal
 
@@ -514,7 +514,8 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | TX2b | TX | The tab's bar: Words from, Language, the fill's progress and Stop, the notes | TX2a | A | — |
 | CU1b | CU | Every screen recording saves its cursor file beside each movie | CU1a | B | — |
 | CO1 | CO | Agents read person masks (`masks`) made on the Mac | CO0, CJ2a | C | — |
-| TX3 | TX | Select words and delete them on every unlocked track as one step | TX2a; TX-S3 at its head | A | — |
+| TX3a | TX | Select words and delete them on every unlocked track as one step (TX3 split by size) | TX2a; TX-S3 at its head | A | — |
+| TX3b | TX | The pause token: a selectable pause over 1 s, `pauses[]` in `get_timeline_transcript` (TX-34) | TX3a | A | — |
 | CU2 | CU | Nothing: the core evaluates a cursor file (mapping, smoothing, idle hide, ripples, path) | CU1a | B | — |
 | CO2a1 | CO | Agents set `video.cutout`; the recipe carries a `cutout` key (the plan is unchanged); nothing drawn yet | CO0, CJ0b (T3), CJ0d (T11, T14) | C | p |
 | CO2a2 | CO | Remove Background drawn from cached masks in the preview, `render_frame` and every export | CO2a1, CO1, CJ0c (T6) | C | — |
@@ -4263,6 +4264,12 @@ lane's byte for byte (TX2a and TX2b touched none of them), and the lane's Releas
 
 ### TX3 — delete words
 
+**Split by size (2026-11-02):** TX3a builds everything below but the pause token (TX-30…TX-33, its
+record below); TX3b builds the pause token — a selectable token for a voice-cache pause over 1 s,
+cutting `[end of the speech before + 0.2 s, next onset − 0.2 s)`, and `pauses[]` with their
+ranges in `get_timeline_transcript` — as TX-34, in its own pipeline after TX3a lands and before
+CP1. The decisions below are the drafts; spec §11 holds TX-30…TX-33 as recorded.
+
 - **What a person gets:** select words by drag, ⇧-click or ⇧-arrows; the timeline shades the cut as
   the in/out range. ⌫, Edit ▸ Delete or Edit ▸ Ripple Delete takes them out on every unlocked track
   as one step "Delete Words", from the first word's onset to the next kept word's onset, so the
@@ -4345,6 +4352,143 @@ lane's byte for byte (TX2a and TX2b touched none of them), and the lane's Releas
 - **Questions for the owner:** (1) ⌫ ripples in the transcript and lifts on the timeline: right?
   *Recommended: yes* (lifting words would leave black holes). (2) A word selection sets the
   timeline's in/out range? *Recommended: yes.*
+
+#### TX3a's record (2026-11-02)
+
+**Landed.** Lane A, base `ef2ccde5` (I's HEAD with TX2b; the lane worktree was made at `eb350b86`
+and fast-forwarded to it before any edit). One commit with the code, the spike, the probe, the
+proof, the decisions and the documents, landed on `worktree-creator-jobs` as one commit. The
+pause token is TX3b's (TX-34), split off by size. No core, FFI, op, format, product tool or key
+change: the parity check is untouched; `get_timeline_transcript` gains two keys per word and the
+dev tool `transcript_view` its tokens' keys and `cut`. Nothing here sends anything (CJ-3).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/TranscriptCut.swift` | 279 | pure: E0/E1/E2, `sourceOnsets`, `latestRunEnd`, `edges`, the shown-word `Table` and a run's `cut` (TX-30) |
+| `app/Sources/TranscriptCut+Plan.swift` | 186 | pure: widening, the refusals and their sentences, the counts after and at the peak, the snapping, `plan`, `wordCut` (TX-30, TX-32) |
+| `app/Sources/TranscriptView+Delete.swift` | 39 | the drag selection, `deleteKey()`, `adopt` |
+| `app/Sources/TranscriptView.swift` · `+Highlight` · `+Keys` | 361 · 83 · 110 | `onSelect`, `onDelete`; `select` tells `onSelect`; ⌫ (U+007F) and ⌦ → `deleteKey()`; the ⇧ branch tells `onSelect` |
+| `app/Sources/TranscriptPane.swift` | 237 | `TranscriptHost`'s four new members; `selectionChanged`, `deleteWords`, `rangeSet`, the re-plan after a rebuild |
+| `app/Sources/TranscriptTabSource.swift` | 556 | each media's voice cache beside its pause set, `allWords`, `cutTable()` once per rebuild (every TX2a/TX2b mutant anchor byte-identical) |
+| `app/Sources/EditorViewController+Transcript.swift` · `+Timeline.swift` | 78 · 494 | the host's members, `transcriptHoldsWords`, the delete family's forward and its two validator arms |
+| `app/Sources/AgentServer+TimelineTranscript.swift` · `+TranscriptView.swift` · `AgentCatalog+Transcript.swift` | 265 · 336 · 79 | `cut_start`/`cut_end` (`wordCut`), the voice caches read on the server thread, `wordRow(_:cut:)`, `transcript_view`'s `cut`, the descriptions |
+| `app/Sources/AssistantPrompt.swift` | — | TX-33's paragraph in place of TR-11's |
+| `tools/proof/transcript_spike/cut_spike.py` · `.swift` | 264 · 82 | TX-S3 |
+| `tools/proof/transcript_cut_probe.swift` · `transcript_cut_proof.py` | 356 · 748 | U0–U6, Z0, C1–C9, C4b, ten mutants |
+| `tools/proof/transcript_tab_proof.py` · `transcript_proof.py` · `assistant_prompt_probe.swift` | — | T4 wants TX-31's planned click; `FALSE_START` is TX-33's paragraph; F1's vocabulary takes a word row's keys |
+
+**TX-S3** ran once on the Debug app (Apple M2 Max, OS build 25F80, on AC; `rule_sha256`
+`bede33d2…c5a0` matched): **E0**. On fixture (1), 20 boundaries, clipped onsets E0 0, E1 3, E2
+at G 0/32/64/96 ms 10/3/3/3 (the clamp to the previous word's corrected end put three onsets
+46–100 ms late whatever G); on o2 E2 placed only 4 of 58 edges from a run, 75 % of them in
+non-speech at G ≥ 32 ms, under the rule's 95 %. E0 put 13 of the 20 edges inside the previous
+phrase's audio, by 24–316 ms: recorded in TX-30 and JOB-11, and owed as an issue (the notes' "To file"). S-TH1 and S-RT1 do not
+exist yet: skipped by name; TX-S3 re-runs when they land. Two runs before the recorded one
+matched each boundary's word wrongly (by position, then by end): words tile the audio, so the
+run that counts finds it by spelling (the spike's header says why).
+
+**Measured.**
+
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings; `swift_build.py typecheck
+  --define FRAMEJOB_DEV_TOOLS tools/proof/transcript_cut_probe.swift`: exit 0.
+- `assistant_prompt_proof.py --probe`: 14/14 (F6: system 3219/6000).
+- `spec_index_proof.py`: 234/234.
+- `transcript_cut_proof.py` on Debug, then once on Release after the gate: "scores: 18/18"
+  (U0–U6, Z0, C1–C9, C4b). C1: 20/20 boundaries, no clipped onset, 13 edges inside the previous
+  phrase reported (−51 to −343 ms, snapped); C2 the three words one at a time and together both
+  `[(0, 0, 1680000), (1680000, 2540000, 1380000)]`; C6 peak 4,097 refused with that N and 4,095
+  clips kept, then peak 4,096 applied to 4,095 clips = `clips_after`; C7 `undo` named "Delete
+  Words"; C8 2,163,200 bytes of PCM equal.
+- The gate: `make gate` once, after the code and the documents: "gate: PASS 401s" — names 1 s,
+  typecheck 6 s, fmt and lint skipped (no Rust), test 238 s, app 155 s; once more after T4's
+  update and this record: "gate: PASS 87s" (names and test ran, the rest skipped).
+  `name_residue.py` was re-run over this line.
+- On Release after the gate, the proofs the change can move: `transcript_tab_proof.py` 21/22 on
+  its first run — T4 wanted a click's selection to be `[7, 7]`, and TX-31 now plans a click,
+  here widened to `[6, 7]` over the other track's word 6 it cuts into; the row was updated to
+  want the plan's selection with 7 inside (TX-31), and T2 and T4 re-run: 2/2 (T2 compares the
+  tab's tokens, cut keys included, with the tool's words: equal). `timeline_transcript_proof.py`
+  33/33; `transcript_proof.py` 23/23 (A2: TX-33's paragraph verbatim). A Release instance
+  launched by `proof_app.py launch --app release`: `grep "Frame Job: "` printed nothing.
+- The ten mutants, once, on Release (`--mutants`): every one caught — `guard-0` and
+  `fallback-no-lead` (U1), `no-cap` (U2), `snap-apart` (U6), `no-widening` (U3),
+  `no-locked-refusal` (U4), `no-ceiling`, `after-no-spanning` and `ceiling-on-after` (U5), and
+  `no-replan` (C9: the range stayed at the old cut after B's ripple delete; its tree copy built
+  by `make app` in 182 s).
+
+**Deviations, each recorded in TX-30…TX-33.**
+
+- **TX-S3's verdict E0**, not E2, so `TranscriptCut.shipped` is `.e0`; E1 and E2 stay in the
+  code for the spike's re-run on S-TH1 and S-RT1, and the probe drives them (U1).
+- **Snapping keeps word starts on their side** (TX-30's new bullet): nearest frame, but a start
+  never past the first cut word's start and an end never past the next shown word's start (their
+  frame floors). The spec had the core's nearest snap alone; C2 failed with it on real words —
+  a start rounded past "gulls" left a 4,000-tick sliver of it in the transcript, and the next
+  Delete left a one-frame clip — because TX-10 places a word in the clip holding its start.
+- **Widening reads a word's onset, not its corrected start**, against the unsnapped cut (TX-32):
+  under E2 the clamp makes the next word's onset its start or later, so a corrected-start extent
+  would add it and then every word after it.
+- **The probe catches mutants 1–9** (U1–U6), not C6: the same functions C1–C6 drive, without
+  three Release builds of a tree copy; `no-replan` builds one and runs C9.
+- C1 scores the verdict's own claim (no clipped onset); "every edge in the silence" is false
+  under E0 by TX-S3's numbers, so C1 reports those edges and does not score them.
+- `TranscriptCut.swift` came before the decisions (TX2a's precedent), since TX-S3 measures it.
+
+**What CP1 needs from the owner** (after TX3b lands, in the build with both):
+
+1. Copy the T1 recording (S-TH1, the GH5 talking head and its RØDE file) and the retake read
+   (S-RT1) to `tools/proof/media/creator/S-TH1/` and `S-RT1/`, so TX-S3 and JOB-11 can run on
+   real speech.
+2. Open T1 in a new project, choose View ▸ Transcript (⌃⌘T) and wait for the words.
+3. Cut T1 to a state you would publish by deleting words in the tab: select (click, drag,
+   ⇧-click), listen to the shaded range with Loop, press ⌫; undo what sounds wrong.
+4. Note, in CJ-5's form: each time you left for another tool or gave up, and why; each slow
+   step; each cut that sounded wrong, with its time (a clipped start, a fragment left, an
+   unnatural pause, the end of the word before eaten — TX-S3's E0 risk); and what you want
+   from TX4–TX7 that the plan does not give.
+5. Run JOB-11 (`docs/manual-checks.md`) on the same recording.
+
+TX4 does not start until that record is in.
+
+**Reviews.** Review 1 (`ef2ccde5..92535447`, fix-required): one should-fix and two nits. The
+should-fix: `docs/guide/transcript.md`'s "Other tracks" bullet said a word on another track that
+overlaps the selection is always added, false when that word starts inside the last selected
+word — it is then the next shown token, so `Table.cut` ends at its onset and the rest of the
+deleted word can stay. Fix pass 1 (`338e6163`, documents only) wrote the bullet from `widen` and
+`Table.cut`; `make gate` "gate: PASS 300s" (names and test ran, the rest skipped); no code or
+instrument changed, so the Release proofs and the mutants were not re-run. Review 2
+(`ef2ccde5..338e6163`): pass, with review 1's two nits left as they stand: a widened drag
+re-plans and calls `transcriptSetRange` on every `mouseDragged` event even when the range has not
+changed (`TranscriptView+Delete.swift`); and `get_timeline_transcript` and `cutTable()` read each
+media's voice cache, which the shipped rule E0 never uses.
+
+**Integration (2026-11-02).** Cherry-picked (`92535447`, `338e6163`) onto the integration branch
+after CO1 and CO2a1 (format 39), with no format change of its own. Conflicts only in the indexes,
+the decision file and two documents, each kept both. `creator-jobs-3.md` held CO1's and CO2a1's
+blocks at 485 lines, so TX3a's paragraph and TX-30…TX-33 would have made it 595, past the series'
+~500-line rule: they moved to a new `11-decisions/creator-jobs-4.md` (121 lines), which its own
+index row and the four TX-30…TX-33 rows link; TX-23's Amended line by TX-31 stays with TX-23 in
+`creator-jobs-3.md` (490), whose head and Holds cell now say the series goes on in
+`creator-jobs-4.md`, as do `creator-jobs.md`'s head and this file's. `docs/guide/mcp.md` keeps
+TX3a's `get_timeline_transcript` row and CO1's `get_media_analysis` row; `tools/proof/README.md`
+keeps CO2a1's section and then TX3a's; the spec README's 07.9f row is TX3a's and its
+`11-decisions/` total is 18385 in 38 files (`spec_index_proof.py` 240/240). Every `app/Sources`
+file and instrument TX3a changed is the lane's byte for byte (CO1 and CO2a1 touched none of
+them), so the lane's Release runs stand: cut 18/18, mutants 10/10, tab 21/22 then T2/T4 2/2, TX1
+33/33, transcript 23/23, and the empty parity grep. The `CLAUDE.md` edits owed went in:
+`app/CLAUDE.md`'s Transcript-tab entry names `TranscriptCut.swift` (+`Plan`) and
+`TranscriptView+Delete.swift` and gains TX3a's paragraph (the pure cut and plan, `TranscriptHost`'s
+range and Delete Words, the pane's planning and `rangeSet`, `cutTable()`); the editor entry says
+`+Timeline`'s delete family forwards to the pane first and both validator arms answer true; the
+`TimelineTranscript.swift` entry says the tool's rows carry `cut_start`/`cut_end`. `make gate` on
+the merged tree: names, typecheck (the four baseline warnings), test and app `pass` (fmt and lint
+skipped, no Rust changed), "gate: PASS 291s"; a Release instance of that build launched by
+`proof_app.py launch --app release`: `grep "Frame Job: "` printed nothing.
+
+**Owed.** JOB-11 (a person, `docs/manual-checks.md`) on S-TH1, and TX-S3's re-run on S-TH1 and
+S-RT1 once they are copied (CP1's step 1 above); TX3b, the pause token (TX-34), is the next
+pipeline, not an issue. Filed after the commit: "TX-S3: E0's cut edges fall inside the previous
+word on the `say` fixture (13 of 20)".
 
 ### CU2 — the core evaluates a cursor file
 

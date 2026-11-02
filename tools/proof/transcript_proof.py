@@ -249,12 +249,14 @@ MUTANTS = {
 }
 APP_MUTANT = "no-transcript-stop"
 
-FALSE_START = ("Cutting words: `detect_fillers` answers the filler words (um, uh) as ranges for "
-               "`ripple_delete_ranges`. A false start, words the speaker abandoned or said again, "
-               "is a judgement of meaning, so cut one only when the person asks: read the clip's "
-               "words and their times with `get_transcript`, say which words you will cut, then "
-               "cut them in one `ripple_delete_ranges` call, each range from the first cut "
-               "word's start to the last cut word's end.")
+# Road map creator-jobs TX3a replaced TR-11's paragraph with TX-33's.
+FALSE_START = ("Cutting words: `get_timeline_transcript` answers the timeline's words in order, "
+               "each with the `cut_start` and `cut_end` the Transcript tab cuts it by; cut a run "
+               "of words with one `ripple_delete_ranges` range from its first word's `cut_start` "
+               "to its last word's `cut_end`. `detect_fillers` answers the filler words as "
+               "ranges. A false start that repeats no words is a judgement of meaning, so cut one "
+               "only when the person asks: say which words you will cut, then cut them in one "
+               "`ripple_delete_ranges` call.")
 FILLER_NOTE = ("These words were not transcribed with filler words, so a filler missing here "
                "may still be in the audio.")
 CANCELLED = "The transcription was cancelled."

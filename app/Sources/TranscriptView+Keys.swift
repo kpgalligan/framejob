@@ -4,12 +4,15 @@ import AppKit
 /// (one word, selected and sought, through `onActivate`), ↑ and ↓ (the word
 /// nearest in x on the adjacent laid-out line, the same), ⇧ with any of them
 /// (extend the selection, no seek), ⌘A (`selectAll(_:)`, which the nil-target
-/// Edit ▸ Select All reaches first), and Esc (clear the selection, or pass the
-/// key up when there is none). ⌫, ⌦ and Return pass up unchanged until TX3
-/// and TX5. Every other key goes to `super.keyDown`, so J, K, L, I, O and M
-/// reach `handleEditorKey` as from the timeline; Space never arrives here
-/// (`SpaceKey.route` takes it at the window). A click makes the view first
-/// responder.
+/// Edit ▸ Select All reaches first), Esc (clear the selection, or pass the key
+/// up when there is none), and ⌫ and ⌦ with words selected (`deleteKey()`,
+/// TX3a, spec §11 TX-31: one "Delete Words"; Edit ▸ Delete's bare ⌫ reaches
+/// the editor's forward first). With nothing selected they pass up, and
+/// Return passes up unchanged until TX5. Every other key goes to
+/// `super.keyDown`, so J, K, L, I, O and M reach `handleEditorKey` as from the
+/// timeline; Space never arrives here (`SpaceKey.route` takes it at the
+/// window). A click makes the view first responder; a drag selects
+/// (`+Delete`). Every selection a person makes is told through `onSelect`.
 extension TranscriptView {
 
     override func keyDown(with event: NSEvent) {
@@ -27,6 +30,9 @@ extension TranscriptView {
         case UInt32(NSUpArrowFunctionKey): line(up: true, extend: extend)
         case UInt32(NSDownArrowFunctionKey): line(up: false, extend: extend)
         case 27 where !extend && selection != nil: select(nil)
+        case 0x7F where !extend && selection != nil,
+            UInt32(NSDeleteFunctionKey) where !extend && selection != nil:
+            deleteKey()
         default: super.keyDown(with: event)
         }
     }
@@ -69,6 +75,7 @@ extension TranscriptView {
             let anchor = min(max(selectionAnchor ?? caret ?? index, 0), tokenStarts.count - 1)
             setSelection(min(anchor, index)...max(anchor, index))
             selectionAnchor = anchor
+            onSelect?(selection)
         } else {
             select(index...index)
             onActivate?(index)

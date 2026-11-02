@@ -9,8 +9,8 @@ and the recorder (CU), the camera cutout and layouts (CO), vertical versions and
 finding clips (FC) and switching between cameras and audio tracks (SW), with the shared work (CJ).
 Its IDs follow CJ-7: phase XXn records XX-n0…XX-n9, a zero phase XX-1…XX-9, and a bet with no zero
 phase records its scope-level decisions here under its own prefix. Each was recorded before its
-code. The series continues in `creator-jobs-2.md` past about 500 lines, and that file in
-`creator-jobs-3.md` past the same.
+code. The series continues in `creator-jobs-2.md` past about 500 lines, that file in
+`creator-jobs-3.md` past the same, and that one in `creator-jobs-4.md`.
 
 - **CJ-1 — Every exclusion spec §1 and §2 name is lifted; lifting makes a thing allowed, not
   scheduled (owner, 2026-11-01: "Remove all explicit non-goals").** Lifted: multicam; grading beyond
