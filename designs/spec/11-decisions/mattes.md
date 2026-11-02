@@ -24,6 +24,8 @@ it.
   model's first `skip_serializing_if`, so every older file and every ordinary track round-trips
   byte for byte and the reader's default is the same answer. `RC_FORMAT_VERSION` 14, no migrate
   step. The video half of #240 is #251 and nothing here decides it.
+  **Amended (CO5, spec §11 CO-50):** a matte group can also be a clip's SUBJECT: drawn by a copy
+  of a cut-out layer, never by a track; only a track makes a clip a matte.
 - **MT-2 — What a matte cuts, and when it cuts nothing.** Its target is the track directly behind
   it in its own container (the timeline, or one nest's own tracks) when that track is not itself
   a matte track. With no such track (the back-most track, or a matte behind it) a matte cuts
@@ -33,6 +35,8 @@ it.
   delete, paste, nest and undo cannot break a link; `add_track`, `move_track` and `remove_track`
   change which track is behind, visibly. A matte track's clips sound as on any track, and Mute
   Audio silences them (owner, 2026-10-08, O1): a matte is a picture rule, like Hide Video.
+  **Amended (CO5, spec §11 CO-50):** a clip with `video.behind_subject` is cut by the subjects
+  behind it as well as by any matte in front of its track; the cuts multiply.
 - **MT-3 — The four modes, and where the cut is applied.** At a pixel the matte's composite —
   premultiplied, in encoded sRGB like every stage of the compositor (§7.5) — gives: `alpha` its
   alpha a; `alpha_inverted` 1 − a; `luma` the Rec. 709 luma (0.2126, 0.7152, 0.0722, the weights
@@ -54,6 +58,8 @@ it.
   deliberate override of model values after a transition's `normal` (§7.3). The inspector shows
   the model's values and says they are not drawn (MT-7). Amends G-10's "blend … apply" for a
   graphic on a matte track.
+  **Amended (CO5, spec §11 CO-51):** a subject copy is the third deliberate override: emitted
+  with `background: remove`, `blend: normal`, `shadow: null`, `reflection: null`.
 - **MT-5 — Mattes in nests.** The rule holds in every container. Walking from a layer's own track
   outward through the nest clips it is inside, the first level whose track is a matte track makes
   the layer draw into that matte (or nowhere, when the matte has no target or cuts no layer at

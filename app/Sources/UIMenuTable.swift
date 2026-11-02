@@ -59,6 +59,7 @@ extension UIMenu {
         "selectAfterPlayhead:": .plain,
         "insertAdjustmentClip:": .plain,
         "showGraphicBrowser:": .sheet,
+        "insertTextBehindSubject:": .plain,
         "splitAtPlayhead:": .plain,
         "splitAtShotChanges:": .sheet,
         "trimStartToPlayhead:": .plain,

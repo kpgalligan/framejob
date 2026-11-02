@@ -243,9 +243,12 @@ extern "C" {
  * migration step.
  *
  * Version 39 is the cutout (spec §11 CO-20): `video.cutout`, after `cursor`,
- * written only when set; no migration step. 40 and above, 1014 included, are
- * newer. */
-#define RC_FORMAT_VERSION 39
+ * written only when set; no migration step.
+ *
+ * Version 40 is Behind Subject (spec §11 CO-52): `video.behind_subject`,
+ * after `cutout`, written only when true; no migration step. 41 and above,
+ * 1014 included, are newer. */
+#define RC_FORMAT_VERSION 40
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

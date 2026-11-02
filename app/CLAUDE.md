@@ -189,7 +189,7 @@ detail there.
   never decoded — so a Background, Edge or Feather row writes its own key alone, CO3),
   `RecipeCutoutMaskKind`,
   `RecipeCutoutMask` (`kind` and `media` required) and `RecipeCutout` (the recipe layer's
-  `cutout`, `mask` required); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
+  `cutout`, `mask` required; `subjectCopy`, CO-51); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
   instruction, not the clip's props. `VideoProps.swift` (`VideoProps`),
   `ClipSnapshot.swift` (`ClipSource` with its nested `CodingKeys`, `ClipSnapshot`,
   `TransitionSnapshot`) and `TrackSnapshot.swift` (`TrackSnapshot`) are pure moves out of
@@ -602,8 +602,28 @@ detail there.
   main hop that refuses and calls `analyzeMasksNow()`, then
   `CutoutWants.queue.sync {}`, then polls every 0.25 s up to `wait` or Stop,
   never a timeout refusal; the centroid is read off main);
-  `AgentCatalog+Cutout.swift` holds its row, spliced in last by
-  `creatorTools()`.
+  `AgentCatalog+Cutout.swift` holds its row, spliced in by
+  `creatorTools()` after the retime rows, before Text Behind Subject's.
+- `BehindSubjectPlan.swift` · `EditorViewController+BehindSubject.swift` ·
+  `VideoPane+BehindSubject.swift` · `AgentServer+BehindSubject.swift` ·
+  `AgentCatalog+BehindSubject.swift` — Text Behind Subject (road map
+  creator-jobs CO5, spec §11 CO-50…CO-55). `BehindSubjectPlan.swift` (names
+  no `rc_*`) is the pure planner both doors run — the candidates at a time,
+  the pick order, the new "Behind Subject" track's index above the run of
+  matte tracks in front of the clip's track, min(4 s, the rest), three or
+  four ops, the three refusal sentences, and `isCutBySubject`.
+  `EditorViewController+BehindSubject.swift` is Insert ▸ Text Behind Subject
+  (`applyEdit`, then `selectClips(addedSince:)`), with its validator arm
+  `validateBehindSubjectAction` one line in the frozen file after
+  `validateCutoutAction`. `VideoPane+BehindSubject.swift` is the Behind
+  Subject section, registered after Transform when `allBehindable`
+  (`structureSignature` carries `behind`). `AgentServer+BehindSubject.swift`
+  is `text_behind_subject` (main thread, `performGroupedEdit`, the selection
+  untouched), and `AgentCatalog+BehindSubject.swift` holds its row, spliced
+  in last by `creatorTools()`, after `analyze_cutout`. `VideoProps.behindSubject`,
+  `VideoPatch.behindSubject` and `RecipeCutout.subjectCopy` mirror the core.
+  `CompositorEffects.prepare` draws a subject copy only with its mask drawn
+  and looks up no partner for it (CO-51).
 - `ProjectDocument+Derived.swift` · `DerivedCarry.swift` ·
   `EditorViewController+NewFromRange.swift` · `AgentServer+Derived.swift` ·
   `AgentCatalog+Derived.swift` — File ▸ New Project from Range… and the

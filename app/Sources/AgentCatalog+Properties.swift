@@ -201,8 +201,9 @@ extension AgentServer {
                     + "clip only color, wheels, curves, look, the point filters and opacity (the "
                     + "grade's strength) do anything, the qualifier narrows which pixels they "
                     + "reach, and blur, sharpen, pixelate or a blend mode is an error. cutout "
-                    + "(Remove Background) is taken by media and still clips only, and nothing "
-                    + "draws it yet: it is stored and read back.",
+                    + "(Remove Background) is taken by media and still clips only, and "
+                    + "behind_subject (Text Behind Subject) by any drawing clip but an "
+                    + "adjustment or nest clip.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

@@ -368,9 +368,14 @@ extension MetalRenderer {
         destination: CGSize, request: AVAsynchronousVideoCompositionRequest,
         instruction: RecipeInstruction?, live: inout [CVMetalTexture]
     ) -> PreparedLayer? {
-        let partner = layer.transition.flatMap { transition in
-            layers.first { $0.clip == transition.partner }
-        }
+        // A subject copy (spec §11 CO-51) looks up no partner: its partner
+        // has no copy in its group, so its dissolve is weighed uncorrected,
+        // as `partnerBox` weighs a cut-out partner on the canvas (CO-27).
+        let partner = layer.cutout?.subjectCopy == true
+            ? nil
+            : layer.transition.flatMap { transition in
+                layers.first { $0.clip == transition.partner }
+            }
         guard
             var uniforms = self.uniforms(
                 for: layer, canvas: canvas, destination: destination, partner: partner)
@@ -409,6 +414,10 @@ extension MetalRenderer {
             ? placeholder
             : cutoutMask(
                 for: layer, request: request, instruction: instruction, uniforms: &uniforms)
+        // A subject copy without its drawn mask — pending, no person found, a
+        // coverage miss or a slate — draws nothing, so the clip behind the
+        // subject stays whole (spec §11 CO-51).
+        if layer.cutout?.subjectCopy == true, uniforms.cutoutEnabled < 0.5 { return nil }
         // The chroma key's reading in an HLG project (spec §11 HD-19 (c)), asked
         // only of a keyed layer: 0 (HD-13 (h)'s un-lift) in every other block.
         if canvas.output == .hlg, layer.chroma != nil {

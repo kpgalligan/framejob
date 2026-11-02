@@ -245,6 +245,16 @@ when it takes the clip and is not a matte, else on a new front track named
 the inspector on Clip ▸ Color. It is greyed while a nest is open and when
 there is nothing to cover (no range, no selection and an empty timeline);
 §11 GR-6 has the rules.
+Road map creator-jobs CO5 puts **Text Behind Subject** last in Insert, with no
+key equivalent: a title (the Title preset) on a new "Behind Subject" track
+directly above the cut-out clip at the playhead — the front-most selected clip
+of a video file there, else the front-most with Remove Background, else the
+front-most, on a shown track that is not a matte track — and above any matte
+tracks in front of it, at the playhead for 4 s or the clip's rest, already
+behind the person; a clip with no cutout is given one that keeps its
+background. One undo step, "Text Behind Subject", the new title selected. It
+is greyed while a nest is open and when no such clip plays at the playhead;
+§11 CO-53 has the rules and `text_behind_subject` (§7.9g) mirrors it.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`. A keyed item (`ModelKeys.keyed`, §11 CJ-12)
 validates off only for its key when it would send, with the key's sentence as

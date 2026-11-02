@@ -331,6 +331,13 @@
    ],
    "note": "presentAsSheet(GraphicBrowserSheetController); greyed with no graphics store. Inside the sheet: Insert is an edit whose refusal is a label in the sheet, never an alert; From File… dismisses it and begins an NSOpenPanel sheet (:67) from its viewDidDisappear; Export… begins an NSSavePanel sheet on the browser itself (its `exportClicked`), and the export's result or refusal is a label in the sheet; a .fjgraphic chosen there goes to the Import Graphic sheet (GraphicImportSheetController's `present`), and after its Import the browser comes back with the module chosen (:49)"
   },
+  "insertTextBehindSubject:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+BehindSubject.swift `func insertTextBehindSubject(`"
+   ],
+   "note": "an edit"
+  },
   "splitAtPlayhead:": {
    "verdict": "none",
    "code": [

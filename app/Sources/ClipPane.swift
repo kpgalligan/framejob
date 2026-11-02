@@ -98,6 +98,9 @@ final class ClipPane: InspectorPaneView {
             videoPane.allLooked ? "look" : "-",
             // Whether every clip can be cut out adds or removes Background (CO-30 (a)).
             videoPane.allCutoutable ? "cutout" : "-",
+            // Whether the selection can be put behind a subject adds or removes Behind Subject
+            // (CO-55).
+            videoPane.allBehindable ? "behind" : "-",
             // A LUT look over a Camera Log file adds Look's warning row (GR-16).
             videoPane.lutOverCameraLog ? "twice" : "-",
             // A LUT look in an HLG project adds Look's other warning row (HD-13).
@@ -196,6 +199,8 @@ final class ClipPane: InspectorPaneView {
             }
         case .picture:
             sections = [videoPane.transformSection()]
+            // Behind Subject right after Transform (road map creator-jobs CO5, CO-55).
+            if videoPane.allBehindable { sections.append(videoPane.behindSubjectSection()) }
             // `allSourcePixels` asks about the SOURCE KIND, so it says yes to
             // an audio-only file's clip too; the tab itself is what keeps a
             // crop off a clip that draws nothing.

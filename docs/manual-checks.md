@@ -133,6 +133,11 @@ the same way.
 - **Expect:** the paused picture shows the clip whole first, then cut to the person — without pressing play — within the analysis time (about the clip's own length).
 - **Source:** road map creator-jobs CO2b, spec §11 CO-22 (d).
 
+**JOB-63 — A title behind the person has no halo at the edge**
+- **Do:** Place a camera clip of yourself talking (S-TH1 when it exists) and, with the playhead on it, choose Insert ▸ Text Behind Subject; type a large word into the title and move it so the letters pass behind your head and shoulders. Play it, then set the clip's Remove Background Feather to 25 % and play again.
+- **Expect:** the letters disappear behind you where you are and show where you are not, with no bright or dark halo or gap along your outline where the soft edge meets the letters, at Feather 0 and at 25 %; the room behind you stays whole.
+- **Source:** road map creator-jobs CO5, spec §11 CO-50, CO-51, CO-56 (`co5_proof.py` scores the cut on bar-code masks, never a real person's edge on screen).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

@@ -6,7 +6,9 @@
 //! `clamp_video` runs on an action's end ([`clamp_cutout`], which never
 //! fails, so the video group always decodes); and [`restore_base_cutout`],
 //! `actions.rs`'s statement that the key's presence, `subject` and `quality`
-//! are the clip's BASE values, beside motion's.
+//! are the clip's BASE values, beside motion's. And `video.behind_subject`'s
+//! clip-kind refusal (format 40, spec §11 CO-52), run beside the cutout's in
+//! `settle_video` ([`check_behind_subject_clip`]).
 
 use serde_json::{Map, Value};
 
@@ -70,6 +72,27 @@ pub(crate) fn check_cutout_clip(clip: &Clip, props: &VideoProps) -> Result<(), S
         "clip {} is {what} and cannot take a cutout",
         clip.id
     ))
+}
+
+/// `video.behind_subject` on a clip that cannot be cut by a subject,
+/// refused naming what the clip is (CO-52): an adjustment clip draws no
+/// picture of its own, and a nest clip never draws itself (its layers are
+/// its contents'). Fires only when the flag is on.
+pub(crate) fn check_behind_subject_clip(clip: &Clip, props: &VideoProps) -> Result<(), String> {
+    if !props.behind_subject {
+        return Ok(());
+    }
+    match clip.source {
+        Source::Adjustment => Err(format!(
+            "clip {} is an adjustment clip and cannot be put behind a subject",
+            clip.id
+        )),
+        Source::Nest { .. } => Err(format!(
+            "clip {} shows a nest and cannot be put behind a subject",
+            clip.id
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// An evaluated cutout brought into its ranges (CO-20): `edge` to −1…1 and

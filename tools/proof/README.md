@@ -28201,3 +28201,45 @@ RC_PROOF_APP=release python3 tools/proof/co4_proof.py --mutant NAME
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO4 record.
+
+## Road map "creator-jobs" CO5 — Text Behind Subject (`co5_proof.py` P1, B1–B5, B7–B10, Z1 with `co5_probe.swift`; seven mutants; `core/tests/behind_subject.rs`, `schema_v40.rs`; spec §11 CO-50…CO-56)
+
+**`co5_proof.py`** builds `co5_probe.swift` (P1, the planner, no app) and, for the canned rows,
+`co2a_probe.swift` exactly as `co4_proof.py` does, pointing `co2a_proof`'s `PROBE` and `WORK` at
+its own (`tools/proof/work/co5`) and reusing `install_pack`, `barcode_fixtures`,
+`person_fixtures`, `read_pack`, `neighbourhood`, `run_probe`, `close`, `Doc` and `Drawn`. The
+canned rows draw on a 640 × 360, 30 fps transparent canvas: the cut-out `barcode.mov` at scale
+1/3 on the back track over a canned bar-code pack, and a full-canvas opaque red shape with
+`behind_subject` on the track in front. A pixel is all-255 or all-0 by its 3 × 3 mask-texel
+neighbourhood, the mask read from the pack.
+
+| Row | What it holds |
+|---|---|
+| P1 | `BehindSubjectPlan`: the pick order, min(4 s, the rest), the track index above `[V, M→V]` (2), `[V, M1→V, M2]` (3, not 2) and `[V, M→V, T]` (2), the three refusals word for word, three ops with a cutout and four without and what they make once applied, `isCutBySubject` |
+| B1 | at 1 s, all-255 pixels equal the shape hidden and all-0 pixels the camera hidden, byte for byte |
+| B2 | a second cut-out camera IN FRONT of the shape (opacity 0.5, 100 px lower) does not cut it: where the back mask is all-0 and the front one all-255, the frame equals the flag-off frame |
+| B3 | a split, its undo, a move onto a new back track and its undo leave B1's frame byte-identical |
+| B4 | `background: keep`: the camera drawn whole, and B1's two classes |
+| B5 | blur-0 shadows 20 px down on both: all-0 pixels (under the band included) equal the camera hidden — the copy casts no shadow — and all-255 pixels with an all-255 pixel 20 px above equal the shape hidden — the shape's shadow is cut with it |
+| B7 | the no-flag launch: `push_1080.mov`, a title from `text_behind_subject {at: 0}`, masks over 0–4 s; `play_preview` 4 s, three runs each way: the median frames composed with the flag ≥ 95 % of without |
+| B8 | twin projects: Insert ▸ Text Behind Subject (`perform_menu_item`) and `text_behind_subject {}` make equal projects, and one `undo` returns each to its start |
+| B9 | a pack whose coverage [200, 299] misses frame 60: the flagged frame byte-identical to flag-off (control: frame 250 differs) |
+| B10 | a cut-out camera cross-dissolving at 3 s into an uncut clip: at 3.5 s (p = 0.5) all-255 pixels within ±3 of the mean of the flag-off and shape-hidden frames |
+| Z1 | each launch's `grep "Frame Job: "` empty |
+
+Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration, a `core/` edit
+through `hevc_alpha_proof.own_core`; P1's builds only the probe from the copy; the tree's mutated
+files' SHA-256 read before and after): `front-subjects` (B2: a subject on any other track),
+`copy-shadow` (B5: the copy keeps the camera's shadow), `three-steps` (B8: the tool applies each
+op as its own step), `miss-whole` (B9: a copy without its mask drawn whole), `copy-partner` (B10:
+a copy looks up its partner), `one-matte-skip` (P1: one matte track skipped, not the run). The
+seventh, `listed-uncut` (a subject listed with no cut layer), is `core/tests/behind_subject.rs`'s
+`b6` run on a mutated copy of `core/`.
+
+```sh
+python3 tools/proof/co5_proof.py --only P1
+make app-debug && python3 tools/proof/co5_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/co5_proof.py --mutant NAME
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO5 record.

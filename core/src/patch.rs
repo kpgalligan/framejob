@@ -126,6 +126,9 @@ impl Group {
                     ..CursorProps::default()
                 }),
                 cutout: Some(Cutout::default()),
+                // True, since false is not written and the walk reads the
+                // template (CO-52).
+                behind_subject: true,
                 ..VideoProps::default()
             }),
             // Format 29's and 31's keys are left out of `to_json` at their

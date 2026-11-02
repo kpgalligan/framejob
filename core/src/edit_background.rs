@@ -107,7 +107,8 @@
 //! hiding everything the region was hiding.
 //!
 //! `video.cutout` is NOT kept, as `motion` is not (spec §11 CO-20): a
-//! backdrop cut down to the person in front of it is no backdrop.
+//! backdrop cut down to the person in front of it is no backdrop; nor is
+//! `video.behind_subject` (CO-52).
 //!
 //! # The derived values
 //!
@@ -458,6 +459,8 @@ impl Project {
             motion: None,
             // A backdrop cut down to the person is no backdrop (CO-20).
             cutout: None,
+            // Nor is one cut by the person in front of it (CO-52).
+            behind_subject: false,
             ..video
         });
         next.clips.push(copy);

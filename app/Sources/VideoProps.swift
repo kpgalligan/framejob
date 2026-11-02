@@ -49,6 +49,10 @@ struct VideoProps: Codable, Equatable {
     /// The clip's Remove Background (format 39, spec §11 CO-20,
     /// `CutoutProps.swift`); nil is none written.
     var cutout: CutoutProps?
+    /// Text Behind Subject (format 40, spec §11 CO-52): the clip is cut by
+    /// every cut-out layer behind it in its container (CO-50); false is not
+    /// written.
+    var behindSubject: Bool
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -59,7 +63,8 @@ struct VideoProps: Codable, Equatable {
         obscure: [ObscureProps] = [], blend: BlendMode = .normal,
         motion: MotionProps? = nil, wheels: ColorWheels = .neutral,
         curves: ColorCurves = .identity, qualifier: ColorQualifier = .none,
-        look: LookProps? = nil, cursor: CursorProps? = nil, cutout: CutoutProps? = nil
+        look: LookProps? = nil, cursor: CursorProps? = nil, cutout: CutoutProps? = nil,
+        behindSubject: Bool = false
     ) {
         self.x = x
         self.y = y
@@ -83,6 +88,7 @@ struct VideoProps: Codable, Equatable {
         self.look = look
         self.cursor = cursor
         self.cutout = cutout
+        self.behindSubject = behindSubject
     }
 
     init(from decoder: Decoder) throws {
@@ -118,6 +124,7 @@ struct VideoProps: Codable, Equatable {
         look = c.lenient(.look)
         cursor = c.lenient(.cursor)
         cutout = c.lenient(.cutout)
+        behindSubject = c.lenient(.behindSubject, false)
     }
 
     static let identity = VideoProps()

@@ -228,6 +228,11 @@ pub struct VideoProps {
     /// and `quality` are the base's at every time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cutout: Option<Cutout>,
+    /// Text Behind Subject (format 40, spec §11 CO-52): the clip is cut by
+    /// every cut-out layer behind it in its own container (CO-50). Written
+    /// only when true, so every other file's text is what it was.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub behind_subject: bool,
 }
 
 impl Default for VideoProps {
@@ -255,6 +260,7 @@ impl Default for VideoProps {
             look: None,
             cursor: None,
             cutout: None,
+            behind_subject: false,
         }
     }
 }
@@ -341,6 +347,11 @@ pub struct ColorAdjust {
 /// Whether a tone key is neutral, and so left out of the file.
 fn is_zero(value: &f64) -> bool {
     *value == 0.0
+}
+
+/// Whether `behind_subject` is off, and so left out of the file (CO-52).
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Chroma key (M3). `key` is the RGB being removed.

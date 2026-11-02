@@ -121,12 +121,15 @@ struct RecipeCutoutMask: Codable, Equatable {
 
 /// A recipe layer's `cutout` (CO-21): the mask to look up and how to draw
 /// it. No time: the picture segment gives it (CO-3). `mask` is required;
-/// the rest lenient.
+/// the rest lenient. `subjectCopy` marks Text Behind Subject's copy of a
+/// cut-out layer, drawn into its subject group (spec §11 CO-51): drawn
+/// only with its mask, and weighed in a dissolve with no partner.
 struct RecipeCutout: Codable, Equatable {
     let mask: RecipeCutoutMask
     let background: CutoutBackground
     let edge: Double
     let feather: Double
+    let subjectCopy: Bool
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -134,5 +137,6 @@ struct RecipeCutout: Codable, Equatable {
         background = c.lenient(.background, CutoutBackground.remove)
         edge = c.lenient(.edge, 0)
         feather = c.lenient(.feather, 0)
+        subjectCopy = c.lenient(.subjectCopy, false)
     }
 }

@@ -6089,6 +6089,80 @@ edges. No `CLAUDE.md` edit.
 - **Question for the owner:** a clip flag or a track flag? *Recommended: a clip flag* — a title is
   placed per moment, and a track flag would catch every later clip on the track.
 
+#### CO5's record (2026-11-02)
+
+**Landed.** Lane C, base `752952c2` (I's HEAD, CO4; the worktree was made at CO2a2's `e18ef4b4`
+and rebased onto it before the Swift half, since the spec builds on CO3's `CutoutStatus`).
+CO-50…CO-56 are appended to `creator-jobs-5.md` with their index rows, and MT-1, MT-2 and MT-4
+carry "Amended (CO5)" lines. The owner's answer (2026-11-01) — Behind Subject is a clip flag — is
+recorded with them. Format 40 is provisional (CJ-8 (b)); no `rc_*`, no new op, no `ModelKeys`
+row.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/recipe_subject.rs` | 267 | new: `frame_subjects` and `subject_behind` — the relation, the copies, the merge (CO-50, CO-51) |
+| `core/src/recipe.rs` | 517 | one call to `frame_subjects` before `select_layers`; the module doc's line |
+| `core/src/model_props.rs` · `cutout_check.rs` · `edit_props.rs` · `patch.rs` · `edit_background.rs` | 494 · 128 · 445 · 500 · 469 | `video.behind_subject` (written only when true), its clip refusal in `settle_video`, the patch template, the blurred copy drops it |
+| `core/src/format.rs` · `format_history.rs` · the header | — · 388 · — | format 40 |
+| `core/tests/behind_subject.rs` · `schema_v40.rs` | 496 · 109 | 14 and 5 tests |
+| `app/Sources/BehindSubjectPlan.swift` · `EditorViewController+BehindSubject.swift` · `VideoPane+BehindSubject.swift` · `AgentServer+BehindSubject.swift` · `AgentCatalog+BehindSubject.swift` | 161 · 48 · 49 · 40 · 52 | new: the planner, the menu command, the section, the tool and its row |
+| `app/Sources/CompositorEffects.swift` | 482 | a subject copy without its drawn mask draws nothing; a copy looks up no partner |
+| `VideoProps.swift` · `TypedPatches.swift` · `CutoutProps.swift` · `ClipPane.swift` · `EditorViewController.swift` (one line) · `AppDelegate+GraphicMenu.swift` · `UIMenuTable.swift` · `AgentServer+CreatorJobs.swift` · `AgentCatalog+VideoPatch.swift` · `AgentCatalog+Properties.swift` · `AssistantPrompt.swift` | — | the mirror, the wiring and the prose |
+| `tools/proof/co5_proof.py` · `co5_probe.swift` | 701 · 217 | the instrument: P1, B1–B5, B7–B10, Z1; six mutants |
+
+- **Deviations from the spec.** (1) `AssistantPrompt.swift`'s "place clips" row lists
+  `text_behind_subject` and adds no words: a five-word phrase took the search guide to 1525 of its
+  1500 characters (`assistant_prompt_probe` F6, the gate's first run). (2) `allBehindable` also
+  leaves out a selection holding a NEST clip, which the core refuses the flag on, beside an
+  adjustment clip. (3) `creatorTools()` is written as three statements: the one `+` chain no
+  longer type-checked in reasonable time. (4) co2a D15's `BASE` (`f82c5b20`) no longer builds
+  against this tree's core — its app fails the parity check against CU9a's `retime_range` — so
+  D15 was run with `BASE` set to this phase's base `752952c2`.
+
+**Measured.**
+
+- `cargo test --release --test behind_subject` 14 passed, `--test schema_v40` 5; `--test recipe
+  --test matte --test matte_nest --test cutout --test patch_door --test background --test
+  action_off` all passed; `make lint` clean; `make typecheck` exit 0 with the 4 baseline
+  warnings.
+- `co5_proof.py --only P1` 1/1 (20 checks); on Debug every app row passed.
+- `make gate`: first run FAIL at test (F6, above); second PASS 275 s (names 1, typecheck 6, fmt
+  and lint skipped, test 109, app 158).
+- `RC_PROOF_APP=release co5_proof.py` (the final instrument): 11/11. B1 77288 all-255 and 146782
+  all-0 pixels, none differing; B2 52562 pixels equal the flag-off frame; B5 131972 all-0 pixels
+  (13226 under the band) and 61728 all-255 ones; B7 frames composed [119, 120, 120] with the flag
+  and [120, 120, 120] without, median ratio 1.000; B10 77012 all-255 pixels, worst 1.0 level; Z1
+  both launches empty.
+- Release pins: `op_argument_proof.py` 189/189, `phase9_proof.py` 250/250, `recording_probe.py
+  --only catalog` 31/31, `v2_menu.py --only H` 5/5; `co2a_proof.py --only D3,D15` D3 passed, D15
+  failed building the stale base (deviation 4); D15 against `752952c2` 2/2 (3 PNGs and 60 export
+  frames equal).
+- Mutants, each once on Release, all CAUGHT, the tree's files' SHA-256 unchanged:
+  `one-matte-skip` (P1: `[V, M1→V, M2]` index 2), `three-steps` (B8: one undo left the tool's
+  project changed), `miss-whole` (B9), `copy-partner` (B10: worst 127.5, 129488 channels off),
+  `front-subjects` (B2: all 52562 pixels differ), `copy-shadow` (B5: the 13226 pixels under the
+  band differ); `listed-uncut` by hand in the worktree, restored by SHA-256: `b6` FAILED.
+- Fix pass 1: `cargo test --release --test schema_v3 header` 1 passed; `make gate` PASS 443 s
+  (names 1, typecheck 8, fmt 3, lint 15, test 249, app 165); the co5 proof not re-run (a header
+  comment no row reads).
+- At integration, the phase's three commits (`7f56858f`, `54f34ca7`, `f23b72eb`) cherry-picked
+  onto CO4 with no conflict and no cell to reset: `make gate` PASS 401 s (names 1, typecheck 7,
+  fmt 3, lint 9, test 220, app 161).
+
+**Review.** Round 1 (`752952c2..54f34ca7`): every Files and Approach item done but one,
+fix-required: the header's format paragraph still ended "40 and above … are newer" under a define
+of 40. Fix pass 1 (`f23b72eb`) gave it version 40's paragraph and "41 and above, 1014 included".
+Round 2: pass, with one nit carried from round 1 — CO-55 said "no adjustment clip" and a summary
+"On"/"Off" where the code also leaves out a nest clip and writes "on"/"off"; CO-55 was amended to
+match at integration. The `CLAUDE.md` edits the notes owed (the product-tool count to one hundred
+and thirteen; `core/CLAUDE.md`'s `recipe_subject.rs` row, `check_behind_subject_clip` and THREE
+overrides; `app/CLAUDE.md`'s Text Behind Subject family and `RecipeCutout.subjectCopy`) were
+applied at integration.
+
+**Owed.** JOB-63 (`docs/manual-checks.md`), a person's look at the halo where the soft edge meets
+the letters, on S-TH1 once it exists. co2a D15's pinned `BASE` (`f82c5b20`) no longer builds
+against the tree's core — one issue, filed after this commit names it.
+
 ### TX7 — retakes, restarts and repeats
 
 - **What a person gets:** the review also strikes an earlier take of a line said again, a phrase

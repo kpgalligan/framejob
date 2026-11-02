@@ -46,6 +46,8 @@
 //! adding a layer, so with it off the bytes are again what they were.
 //! Grading-2 G2-4 gave it `selection` and `behind` (GR-13), answered by
 //! `recipe_selection.rs` over the finished list before the burn-in.
+//! Text Behind Subject's subject copies and groups (spec §11 CO-50, CO-51)
+//! are merged in by `recipe_subject.rs` just before that, in one call.
 
 use serde_json::{Map, Value};
 
@@ -160,6 +162,11 @@ impl Project {
                 drawn_into: *drawn_into,
             })
             .collect();
+        // Text Behind Subject (spec §11 CO-50): the subject copies and their
+        // groups, merged after the track groups; the inputs come back as
+        // they went in when no behind clip is cut by a subject.
+        let (layers, facts, listed) =
+            self.frame_subjects(&instances, t, layers, facts, mattes.listed);
         let (mut layers, black) = select_layers(layers, &facts, &opts);
         if opts.burn_in_timecode {
             layers.push(burn_in_layer(&self.canvas, t));
@@ -198,7 +205,7 @@ impl Project {
         out.insert("t".to_string(), Value::from(t));
         out.insert("canvas".to_string(), Value::Object(canvas));
         out.insert("layers".to_string(), Value::Array(layers));
-        out.insert("mattes".to_string(), mattes.listed);
+        out.insert("mattes".to_string(), listed);
         Value::Object(out)
     }
 

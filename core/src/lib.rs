@@ -153,6 +153,7 @@ mod recipe_layer;
 mod recipe_matte;
 mod recipe_options;
 mod recipe_selection;
+mod recipe_subject;
 pub mod recipe_text;
 pub mod recipe_words;
 pub mod scope;

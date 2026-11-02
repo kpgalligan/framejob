@@ -380,4 +380,9 @@
 //! `{subject, quality, background, edge, feather}` after `cursor`, written
 //! only when set; no migration. The bump is so an older build refuses a
 //! file with a cutout instead of opening it and dropping the key on save.
-//! Every number from 40 up, 1014 included, is newer than this build.
+//!
+//! Version 40 is Behind Subject (spec §11 CO-52): `video.behind_subject`, a
+//! boolean after `cutout`, written only when true; no migration. The bump
+//! is so an older build refuses a file with the flag instead of drawing the
+//! title uncut and dropping the key on save.
+//! Every number from 41 up, 1014 included, is newer than this build.

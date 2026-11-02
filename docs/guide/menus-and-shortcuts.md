@@ -123,9 +123,10 @@ first selected clip. With nothing selected it is the front-most track. See
 |---|---|---|
 | Adjustment Clip | | Adds an adjustment clip over the in/out range. Without a range it covers the selected clips' span, and without a selection the whole timeline. Greyed while a nest is open ([Colour grading](color-grading.md)) |
 | Graphic… | | Opens the Graphic dialog: the bundled templates by category (and This Project's own graphics), a looping preview, and Insert to add the chosen one at the playhead, From File… to add a `.js` file or import a `.fjgraphic` you choose, or Export… to save the chosen one as a `.fjgraphic` file ([Graphics](graphics.md#adding-a-graphic)) |
+| Text Behind Subject | | Puts a title on a new track above the camera clip at the playhead, behind the person, for 4 s or the clip's rest; turns Remove Background on with Keep background when the clip has none ([Canvas and layers](canvas-and-layers.md#text-behind-the-subject)) |
 
 *Agents:* `add_adjustment_clip`; `list_graphics` and `insert_graphic`, or
-`write_graphic` followed by `add_graphic_clip`.
+`write_graphic` followed by `add_graphic_clip`; `text_behind_subject`.
 
 ## Clip menu
 
@@ -212,6 +213,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Motion ▸ items | A selected clip shows a picture |
 | Look ▸ items | A selected clip shows a picture from a file, or is an adjustment clip |
 | Remove Background | A selected clip plays a video file, or is a freeze frame of one |
+| Text Behind Subject | No nest is open, and a clip of a video file plays at the playhead, with its picture on, on a shown track that is not a matte track |
 | Add Background ▸ | Always |
 | Add Blurred Background | Exactly one clip is selected and it has a picture size: a video, image, still, shape or graphic clip. Dimmed for a nest, text, adjustment or audio-only clip |
 | Rename…, Label ▸ | Something is selected |

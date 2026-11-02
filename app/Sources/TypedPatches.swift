@@ -94,6 +94,9 @@ struct VideoPatch: Codable, Equatable {
     /// written under `cutout` only when `cutout` is nil, and never decoded — an app writer's
     /// key, which animates inside an action where `cutout` itself goes to the base.
     var cutoutPart: CutoutPatch?
+    /// `behind_subject` (format 40, spec §11 CO-52): a boolean, so absent
+    /// keeps and false clears.
+    var behindSubject: Bool?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -104,7 +107,8 @@ struct VideoPatch: Codable, Equatable {
         blend: BlendMode? = nil, motion: MotionProps?? = nil, look: LookPatch?? = nil,
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
         qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
-        cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil
+        cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil,
+        behindSubject: Bool? = nil
     ) {
         self.x = x
         self.y = y
@@ -129,6 +133,7 @@ struct VideoPatch: Codable, Equatable {
         self.cursor = cursor
         self.cutout = cutout
         self.cutoutPart = cutoutPart
+        self.behindSubject = behindSubject
     }
 
     init(from decoder: Decoder) throws {
@@ -160,6 +165,7 @@ struct VideoPatch: Codable, Equatable {
         qualifier = c.lenient(.qualifier)
         cursor = c.nullable(.cursor)
         cutout = c.nullable(.cutout)
+        behindSubject = c.lenient(.behindSubject)
     }
 
     var dictionary: [String: Any] {
@@ -191,6 +197,7 @@ struct VideoPatch: Codable, Equatable {
         if cutout == nil, let cutoutPart, !cutoutPart.isEmpty {
             d["cutout"] = cutoutPart.dictionary
         }
+        if let behindSubject = behindSubject { d["behind_subject"] = behindSubject }
         return d
     }
 

@@ -44,8 +44,9 @@ nests that group clips into one.
 **Canvas and layers.** Move, scale, rotate and crop on the preview; opacity,
 blend modes, shadows, filters, chroma key, spotlight and obscure; Remove
 Background, which keeps the person and drops the rest with no green screen,
-found on your Mac; text, shape, image and background clips; matte tracks that
-cut the track behind them.
+found on your Mac, and Text Behind Subject, a title the person stands in front
+of; text, shape, image and background clips; matte tracks that cut the track
+behind them.
 → [Canvas, layers, text and shapes](docs/guide/canvas-and-layers.md)
 
 **Motion and transitions.** Actions that ease any property to a new state over

@@ -165,6 +165,7 @@ Picture's sections, in order:
 | Section | Shown for |
 |---|---|
 | Transform | every clip that draws |
+| Behind Subject | every clip that draws but an adjustment or nest clip, at the top level |
 | Crop, Corner Radius, Chroma Key | video, image and still clips |
 | Background | clips of a video file, and freeze frames of one |
 | Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included |
@@ -292,6 +293,41 @@ every mask it draws. Status reads:
   the masks could not be written. Fix the cause and press **Analyze Now**.
 - **No picture to analyze** — the clip plays no frame of its file.
 - **—** with several clips selected; the section's summary then reads "on".
+
+### Text behind the subject
+
+A title, shape, picture or graphic can sit behind the person in a camera clip:
+the person stands in front of it while the room stays behind it. **Insert ▸
+Text Behind Subject** does it in one step at the playhead:
+
+- It picks the clip of a video file playing at the playhead on a shown track
+  that is not a matte track: the front-most selected one, else the front-most
+  with Remove Background on, else the front-most.
+- It adds a track named "Behind Subject" directly above that clip's track
+  (above any matte tracks in front of it), and on it a title with the Title
+  preset, from the playhead for 4 seconds or to the clip's end if sooner.
+- The title is put behind the subject. If the clip had no Remove Background,
+  it is turned on with **Keep** background, so the camera picture stays whole
+  and the person still hides the title.
+- The new title is selected; one **Undo** takes it all back.
+
+The item is greyed while a nest is open and when no such clip plays at the
+playhead.
+
+Any clip that draws, but an adjustment or nest clip, can be put behind a
+subject by hand: the Picture tab's **Behind Subject** section, right after
+Transform, has one checkbox, **Behind subject**. A clip with it on is cut, at
+every moment, by the person in every clip with Remove Background on (Remove or
+Keep) that is on a track behind it — inside a nest too, when the nest clip is
+behind it. A cut-out clip on a track in front of it does not cut it. Its shadow
+is cut with it. Where no person mask is drawn yet, or no person is found, the
+clip draws whole. With one clip selected and the box on, the section notes
+"No cut-out clip is behind it at the playhead." when nothing cuts it there.
+With an action selected the checkbox writes the action's end, and it switches
+at the action's end.
+
+*Agents:* `text_behind_subject {clip?, at?, content?}`, and `set_video
+{behind_subject: true}`.
 
 ### Shadow
 

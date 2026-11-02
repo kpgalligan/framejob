@@ -210,13 +210,16 @@ governs a module now.
   re-exported through `model_props.rs`; `cutout_check.rs` `check_cutout` (one line in
   `props_check.rs`'s `check_video`: edge, feather, then `best` refused), `check_cutout_clip` (one
   line in `edit_props.rs`'s `settle_video`: a text, shape, graphic, adjustment, image or nest clip
-  refused naming what it is), `clamp_cutout` (one line in `actions_clamp.rs`'s `clamp_video`; it
+  refused naming what it is), `check_behind_subject_clip` (one line in `settle_video` after it:
+  `video.behind_subject`, format 40, spec §11 CO-52, refused on an adjustment or nest clip),
+  `clamp_cutout` (one line in `actions_clamp.rs`'s `clamp_video`; it
   never fails) and `restore_base_cutout` (one line in `actions.rs`'s `evaluate_clip`, beside
   motion's restore: the presence, `subject` and `quality` the base's). The recipe's `cutout` key
   is `recipe_layer.rs`'s `Project::layer_cutout`: `null` unless a media or still clip's media is
   in the project and the evaluated cutout is set, else `{mask: {kind: "media", media, quality},
   background, edge, feather}`, `media` the clip's own source media. `add_blurred_background`'s
-  copy drops it.
+  copy drops it. `VideoProps.behind_subject` (format 40, after `cutout`, written only when true)
+  is `model_props.rs`'s; the copy drops it too.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -933,9 +936,10 @@ governs a module now.
   marks, or drops, the named adjustment clip's layer and drops every canvas layer in front of
   it) — and is a recipe option, never an export override, because the override table drops an
   unknown key in silence. A layer whose `transition` or `dissolve` is non-null is
-  emitted `blend: "normal"` whatever the clip says: one of the core's TWO
-  deliberate overrides of model values (the other: a matte layer's `blend`,
-  `shadow` and `reflection`, MT-4), because the dissolve's weight correction
+  emitted `blend: "normal"` whatever the clip says: one of the core's THREE
+  deliberate overrides of model values (the others: a matte layer's `blend`,
+  `shadow` and `reflection`, MT-4; and a subject copy's, `recipe_subject.rs`,
+  CO-51), because the dissolve's weight correction
   is the inverse of a fixed-function destination factor, and a routed half
   (`dissolve`) is drawn alone and mixed source-over (spec §11 MT-8). The
   inspector therefore
@@ -966,6 +970,21 @@ governs a module now.
   each layer's `matte` (`into`, `cut`), whether it is drawn into a matte, and
   the listed groups, deepest container first. A layer's levels are walked
   inner to outer, each level's cut asked BEFORE its own matte test.
+- `recipe_subject.rs` — Text Behind Subject at one instant (spec §11 CO-50,
+  CO-51): `frame_subjects`, called once by `recipe.rs` before
+  `select_layers`, finds which layers with a non-null `cutout`, not drawn
+  into a matte, are behind each layer whose clip evaluates
+  `video.behind_subject` (not drawn into a matte, not an adjustment clip) in
+  its own container (`subject_behind`: as deep or deeper, the same enclosing
+  nest clips, a lower level-d track index). It inserts each such subject's
+  COPY directly after it (the original layer with `blend` normal, `shadow`
+  and `reflection` null, `cutout.background` remove, `cutout.subject_copy`
+  true, `matte.into` its group: the recipe's THIRD deliberate override). The
+  group ids start one past the largest any layer's `matte` names, are added
+  to each behind layer's `matte.cut`, ascending, and are appended to `mattes`
+  as `alpha_inverted` after every track group. The copies' Show Selection
+  facts are drawn-into. A frame with no behind layer cut by a subject comes
+  back untouched.
 - `recipe_dissolve.rs` — the transitions a layer plays at one instant (spec
   §7.3, §11 MT-8), walking its levels inner to outer. A `cross_dissolve` or
   `zoom` whose container is a nest, or one of whose clips is a nest clip, is

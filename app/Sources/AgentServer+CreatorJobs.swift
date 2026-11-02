@@ -47,6 +47,8 @@ extension AgentServer {
         "retime_range": { $0.retimeRange },
         // AgentServer+Cutout.swift (CO3, spec §11 CO-31)
         "analyze_cutout": { $0.analyzeCutout },
+        // AgentServer+BehindSubject.swift (CO5, spec §11 CO-54)
+        "text_behind_subject": { $0.textBehindSubject },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
@@ -61,11 +63,15 @@ extension AgentServer {
     /// then `get_timeline_transcript` (TX1, `AgentCatalog+Transcript.swift`),
     /// then `new_project_from_range` (CJ5b, `AgentCatalog+Derived.swift`),
     /// then the op tool `retime_range` (CU9a, `AgentCatalog+Retime.swift`), then
-    /// `analyze_cutout` (CO3, `AgentCatalog+Cutout.swift`).
+    /// `analyze_cutout` (CO3, `AgentCatalog+Cutout.swift`), then
+    /// `text_behind_subject` (CO5, `AgentCatalog+BehindSubject.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
     func creatorTools() -> [[String: Any]] {
-        analysisTools() + transcriptTools() + derivedTools() + retimeTools() + cutoutTools()
+        var tools: [[String: Any]] = analysisTools() + transcriptTools() + derivedTools()
+        tools += retimeTools() + cutoutTools()
+        tools += behindSubjectTools()
+        return tools
     }
 }

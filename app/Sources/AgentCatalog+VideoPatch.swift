@@ -176,6 +176,16 @@ extension AgentServer {
         + "every export, where the clip's media has person masks cached "
         + "(get_media_analysis {kind: \"masks\"} makes them); a frame without its mask, or "
         + "a clip window in which no person was found, draws uncut)"
+    // Text Behind Subject (format 40, spec §11 CO-52), explicitly typed for
+    // `lookClause`'s reason.
+    private static let behindSubjectClause: String =
+        ", behind_subject (true or false, default false: Text Behind Subject, the clip cut "
+        + "at each instant by the person of every cut-out clip — one with a cutout, background "
+        + "remove or keep — on a track behind it in its own container, so the person stands "
+        + "in front of it; a cut-out clip in front of it does not cut it. Any drawing clip "
+        + "but an adjustment or nest clip takes it; those two are refused. In an action's "
+        + "end it switches at the end. text_behind_subject places a title this way in one "
+        + "step)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -215,6 +225,7 @@ extension AgentServer {
         + lookClause
         + cursorClause
         + cutoutClause
+        + behindSubjectClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "
