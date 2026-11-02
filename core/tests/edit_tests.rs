@@ -699,6 +699,8 @@ fn op_table() -> Vec<Value> {
         json!({"op": "remove_media", "media": 3, "with_clips": true}),
         json!({"op": "set_media_color", "media": 1, "color": {"log": "slog3"}}),
         json!({"op": "set_media_speech", "media": 2, "spans": [[600000, 1200000]]}),
+        json!({"op": "set_media_cursor", "media": 1,
+               "cursor": {"path": "/m/a.fjcursor", "in_picture": false}}),
     ]
 }
 

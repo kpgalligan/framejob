@@ -114,6 +114,7 @@ pub mod hdr10_still;
 mod lut;
 pub mod mcp_versions;
 mod media_color;
+mod media_cursor;
 pub mod media_speech;
 pub mod model;
 pub mod model_audio;

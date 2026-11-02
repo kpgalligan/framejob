@@ -176,3 +176,111 @@ ripples when Show Clicks was on.
   transparent. Seven mutants: smoothing and hide_idle routed into the end, the base defaults
   skipped (S5); Size writing `click_size` (S1); Arrow ignored (S2); the null-image fallback removed
   (S6); an arrow made per frame (S7). Person check JOB-22.
+
+## CU5 — cursor data travels (2026-11-02)
+
+Recorded before the code. CU-50…CU-55 are CU5's: a recording's cursor file goes where its movie
+goes (Consolidate Media copies it into `media/`, an open re-anchors it), the Media tab names it
+and offers Locate… and Remove through the new op `set_media_cursor`, and agents read the file's
+events through `get_cursor_events`. No format change (41 stands), no `rc_*` export, no
+`LayerUniforms` or shader change; the FFI's `ReelCursor` and `CursorValues`' `events`/`path` are
+reused. Nothing here sends anything anywhere, so nothing is keyed (CJ-3). The road map asked for
+no owner question at this phase.
+
+- **CU-50 — `set_media_cursor {media, cursor}`, document-level.** `cursor` is `{path, bookmark?,
+  in_picture}` or `null`. Refused inside a scope ("set_media_cursor has no meaning inside nest N",
+  `scope.rs`'s `refused_inside`, beside `set_media_speech`) and listed in
+  `ReelOp.documentLevelNames` (eleven names). `cursor` is read strictly, as `media_color.rs` reads
+  `color`: neither an object nor `null` → `Err` "cursor must be a json object or null, not …"; a
+  key other than `path`, `bookmark` and `in_picture` → `Err` `unknown key "k" in cursor`; a miss
+  against the record's shape (`in_picture` absent, a path that is not a string) → `Err` "cursor
+  does not match the schema: …"; an unknown media → `Err`. `null` clears (an identity when there
+  is none); a value equal to the stored one is an identity; otherwise `cursor_props.rs`'s
+  `check_media_cursor` sentences — an empty path, a media that is not a video with a picture —
+  are refusals. The value is stored as given; the core makes no `movie_size` check (it opens no
+  file). `media_cursor.rs` holds it.
+  - **(b) The tool checks as Locate… does.** For a non-null `cursor` the `set_media_cursor`
+    handler resolves the media (an unknown one goes on to the op's own `Err`), runs
+    `MediaImporter.cursorAttachment(at:to:)` against the media's descriptor before applying, and
+    refuses with the problem's sentence (CU-34: unreadable, refused by `ReelCursor`, no picture,
+    a `movie_size` not the movie's); then refuses an `in_picture` that is not the file header's:
+    "The cursor file <name> was not attached: its in_picture is <h> and the call says <c>."
+    Passing both, the op is applied with the caller's value as given (a bookmark only when
+    given). `null` is not checked. Consolidate and the re-anchor apply the op through the document
+    unchecked: their file is the attached one, copied.
+- **CU-51 — Consolidate's second copy, and its order.** For each media with a `cursor`, after its
+  movie is planned: a file at `cursorURL(for:)` that does not exist → `missingCursors` (the
+  summary says "N cursor file(s) were missing and left alone."); a file already inside `media/`
+  with a bookmark or a differently spelled path → a `cursorRelinks` entry; else a copy named
+  `<stem of the movie's destination, or its in-package URL>.fjcursor`, claimed by the movie
+  rule (case-insensitive, `-2` suffixes). Two media whose cursors resolve to one file share one
+  copy (`cursorAliases`). The run: the movies' relinks and copies first, unchanged; then each
+  cursor copy, only when its movie copy is nil or on disk; then `set_media_cursor {path:
+  destination, in_picture}` (no bookmark) only after that copy succeeded. A failed cursor copy is
+  a `failures` line and leaves `media.cursor` at the original. An alias is set only once its
+  destination exists. Cancel is checked between cursor copies. Cursor files count in `copied`,
+  `bytes` and `isEmpty`. CU-39 holds: Consolidate's `relink_media` ops are unchanged and carry no
+  probe, so they keep `media.cursor`.
+- **CU-52 — The open-time re-anchor.** For each media with a `cursor` whose `cursorURL(for:)`
+  file does not exist while `<package>/media/<last component of cursor.path>` does, the open
+  applies `set_media_cursor {path: candidate, in_picture}`, purely, as
+  `reanchoringConsolidatedMedia` is applied (`reanchoringCursorFiles`). It runs inside
+  `repairingMedia`, after the media re-anchor and before the re-copy; `ProjectDocument.swift`
+  takes no line.
+- **CU-53 — `get_cursor_events`.** Arguments `{media | clip, from?, to?, kinds?, smoothing?}`;
+  the answer `{ok, media, clip?, time: "media"|"clip", from, to, size: [w, h], cursor_file,
+  in_picture, clicks?: [{t, button, down, count, x, y, q?: [qx, qy]}], scrolls?: [{t, x, y, dx,
+  dy, q?}], shortcuts?: [{t, keys, code}], typing?: [{from, to, marks}], path?: {smoothing, t,
+  x, y}, count, next?, project}`.
+  - **(a) Arguments.** Exactly one of `media` and `clip`. `kinds` ⊆ clicks, scrolls, shortcuts,
+    typing, path; the default is the four without `path`. `smoothing` 0–1, read only with `path`;
+    its default the clip's base `video.cursor.smoothing`, else 0.
+  - **(b) Time.** Media time is forward source ticks, default `[0, duration)`. Clip time is clip
+    ticks, default `[0, duration)`, mapped to source through `SourceMap.source(atClip:)` on a
+    ramp, else `in + t × speed`; each event comes back through
+    `AnalysisClipTimes.clipTime(ofSource:)` and is kept only inside `[from, to)`.
+  - **(c) Q.** For clicks and scrolls in clip time only: `q = (x − W/2 − (l − r)/2, y − H/2 −
+    (t − b)/2)`, W × H the media's size in source pixels, the crop the clip's base crop when it
+    has no actions, else `clipState` at `clip.start + t` on the edited project — the region frame
+    `add_zoom_action` takes.
+  - **(d) The path.** Sampled every 60,000 source ticks (the core's 10 Hz bound) at the asked
+    smoothing.
+  - **(e) Paging.** The events of every asked kind and the path samples are merged by time; a
+    page holds at most 5,000; `next` is the first time left out, and the page holds only times
+    `< next` (all at one tick are kept together); a typing stretch across `next` is in both pages.
+    Scrolls are the core's single events; scroll bursts are CU7's (`cursor_bursts.rs`).
+  - **(f) No `scope` argument.** Like `get_media_analysis`, the clip is looked up in the container
+    `set_scope` has open (the call's `scope` is read only for op tools, `AgentServer.swift`
+    frozen). This deviates from the road map's "`scope` declared".
+  - **(g) Refusals, in order.** One of media and clip; `kinds`; `smoothing`; an unknown id; not a
+    media clip; a clip that plays reversed ("Clip C plays reversed; get_cursor_events reads only
+    clips that play forward. Ask with media M for the file's own times.", CU-5); no cursor file;
+    the file missing (naming Locate… and `set_media_cursor`); `to` ≤ `from`; the core's open
+    sentence.
+  - **(h) Threads.** Off main: one main hop resolves the media, clip and file; the file is opened
+    as a fresh `ReelCursor` off main; a last main hop computes Q and the answer.
+- **CU-54 — The Media tab's Cursor section.** Id `media.cursor`, title "Cursor", after Camera Log
+  and HDR10, shown whenever the project has a video media with a picture (so Locate… stays
+  reachable after the last Remove), acting on the selected media. A readout: "Select a video in
+  the list", "No cursor file", "<file name>", "<file name> — missing". **Locate…** (enabled on a
+  video with a picture) opens an `NSOpenPanel` of `.fjcursor` files, runs
+  `MediaImporter.cursorAttachment(at:to:)`, and on success applies one step "Locate Cursor File";
+  on failure an `NSAlert` sheet says the problem's sentence and nothing is edited. **Remove**
+  (enabled with a cursor) applies `set_media_cursor` with `null`, "Remove Cursor File". The
+  summary is the file name, or "missing". The tool's undo names are the same two.
+- **CU-55 — CU5's proof.** `cu5_proof.py` on its own instance, a scratch HOME, `A.mov` copied
+  and a v1 cursor file written in Python with A.mov's `movie_size` and `in_picture: false`: M1
+  Consolidate puts the movie and the `.fjcursor` in `media/`, both paths inside the package, no
+  bookmark; M2 the package moved, the originals removed and reopened: both re-anchored and a
+  cursor frame byte-equal to before Consolidate; M3 (probe) `cursorLine`'s four strings, the
+  section present iff a media is a video with a picture, Locate's attach refusing a wrong
+  `movie_size`; M4 a fixture with crop `{l: 40, t: 20}`: counts, `x`/`y` and Q equal the
+  fixture's arithmetic, `path` equal to CU2's T4 run within 1e-9 px; M5 a cursor file at mode
+  000: the movie relinked, `media.cursor.path` still the original, a failure line; M6
+  `set_media_cursor` with a `scope` refused; M7 a reversed clip refused by name while `{media}`
+  answers; M8 5,003 clicks paged 5,000 then 3 with `next`; M9 the tool refusing a wrong
+  `movie_size` and a differing `in_picture`, each in its sentence, `media.cursor` unchanged, and
+  the matching file applied. Seven mutants: the op emitted before the copy lands (M5); the
+  re-anchor not run (M2); Q without the crop (M4); `SetMediaCursor` out of `refused_inside` (M6);
+  the reversed refusal removed (M7); the page cap not applied (M8); the tool's attach check
+  removed (M9). No person check: the road map names none.

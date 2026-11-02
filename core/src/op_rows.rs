@@ -125,6 +125,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("remove_media", &[req("media", Id), opt("with_clips", Boolean)]),
     op("set_media_color", &[req("media", Id), req("color", Object)]),
     op("set_media_speech", &[req("media", Id), req("spans", Ranges)]),
+    op("set_media_cursor", &[req("media", Id), req("cursor", Object)]),
 ];
 
 /// Every op name, in table order — a projection of [`OP_TABLE`], not a

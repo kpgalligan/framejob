@@ -1422,6 +1422,20 @@
    "reached_after": [],
    "other_caller": "app/Sources/GraphicPane+Source.swift:216 — refuse(), after the name alert above, on a bad or taken name"
   },
+  "app/Sources/MediaPane+Cursor.swift:100": {
+   "token": "beginSheetModal",
+   "func": "locateCursor",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/MediaPane+Cursor.swift `self?.locateCursor(media)` — the Media tab's Cursor section's Locate… button (spec §11 CU-54); no menu item"
+  },
+  "app/Sources/MediaPane+Cursor.swift:113": {
+   "token": "beginSheetModal",
+   "func": "locateCursor",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/MediaPane+Cursor.swift:100 — locateCursor's panel, when the chosen file is refused (spec §11 CU-54)"
+  },
   "app/Sources/MediaPaneCommands.swift:180": {
    "token": "beginSheetModal",
    "func": "relink",

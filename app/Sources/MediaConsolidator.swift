@@ -41,6 +41,15 @@ import AppKit
 /// so a `URL.bookmarkData()` made for a file INSIDE the package is a bookmark
 /// to a file a later save may replace; the path — which `ProjectDocument`
 /// re-anchors to the package on open — is the durable half.
+///
+/// **A recording's cursor file is a second copy** (road map creator-jobs CU5,
+/// spec §11 CU-51): planned after its movie, named for the movie's
+/// destination stem by the same claimed-name rule, copied only once its
+/// movie's copy has landed, and recorded by `set_media_cursor` only once its
+/// own copy has. A failed cursor copy leaves the media's cursor at the
+/// original, which still resolves; Consolidate's `relink_media` ops carry no
+/// probe, so they keep `media.cursor` (CU-39). A media whose movie is
+/// missing is left alone, its cursor file included.
 enum MediaConsolidator {
 
     /// One file to bring inside. `source` has already been resolved through
@@ -51,6 +60,19 @@ enum MediaConsolidator {
         let source: URL
         let destination: URL
         let bytes: Int64
+    }
+
+    /// One cursor file to bring inside (CU-51). `movie` is the movie copy
+    /// that must land in this run before this one may be copied — nil when
+    /// the movie is already inside the package.
+    struct CursorCopy {
+        let media: UInt32
+        let name: String
+        let source: URL
+        let destination: URL
+        let bytes: Int64
+        let inPicture: Bool
+        let movie: URL?
     }
 
     /// What a run will do, computed before anything is touched.
@@ -71,10 +93,20 @@ enum MediaConsolidator {
         /// what it cannot find; Relink… is the fix and the report says so.
         let missing: [String]
         let bytes: Int64
+        /// The cursor files' own three lists, `copies`', `relinks`' and
+        /// `aliases`' meanings (CU-51); their bytes are in `bytes`.
+        var cursorCopies: [CursorCopy] = []
+        var cursorRelinks: [CursorCopy] = []
+        var cursorAliases: [CursorCopy] = []
+        /// The names of cursor files that resolve to nothing; left alone.
+        var missingCursors: [String] = []
 
         /// True when there is nothing to do — every file is already inside
         /// the package and correctly linked.
-        var isEmpty: Bool { copies.isEmpty && relinks.isEmpty && aliases.isEmpty }
+        var isEmpty: Bool {
+            copies.isEmpty && relinks.isEmpty && aliases.isEmpty && cursorCopies.isEmpty
+                && cursorRelinks.isEmpty && cursorAliases.isEmpty
+        }
     }
 
     /// What a run actually did.
@@ -86,6 +118,8 @@ enum MediaConsolidator {
         /// One line per file that could not be copied, with the reason.
         let failures: [String]
         let cancelled: Bool
+        /// The plan's `missingCursors`, reported (CU-51).
+        var missingCursors: [String] = []
 
         /// The sentence the sheet and the agent both report.
         var summary: String {
@@ -106,6 +140,12 @@ enum MediaConsolidator {
                         + "\(missing.count == 1 ? "was" : "were") left alone — relink "
                         + missing.prefix(3).joined(separator: ", ")
                         + (missing.count > 3 ? ", …" : "") + ".")
+            }
+            if !missingCursors.isEmpty {
+                let one = missingCursors.count == 1
+                parts.append(
+                    "\(missingCursors.count) cursor file\(one ? " was" : "s were") missing and "
+                        + "left alone.")
             }
             return parts.joined(separator: " ")
         }
@@ -177,13 +217,20 @@ enum MediaConsolidator {
         var aliases: [Copy] = []
         var missing: [String] = []
         var bytes: Int64 = 0
+        var cursors = CursorPlan()
         for entry in media {
             guard let url = mediaURL(for: entry)?.resolvingSymlinksInPath().standardizedFileURL
             else {
                 missing.append(entry.name)
                 continue
             }
+            // Where the movie will be once the run is done, and the copy that
+            // must land first for its cursor file (CU-51).
+            let movieAt: URL
+            let movieCopy: URL?
             if isInside(url, directory) {
+                movieAt = url
+                movieCopy = nil
                 // Already consolidated. It still needs an op when a stale
                 // bookmark or a differently-spelled path could send
                 // `mediaURL(for:)` back outside the package.
@@ -193,28 +240,94 @@ enum MediaConsolidator {
                             media: entry.id, name: url.lastPathComponent, source: url,
                             destination: url, bytes: 0))
                 }
-                continue
-            }
-            if let shared = bySource[url.path] {
+            } else if let shared = bySource[url.path] {
+                movieAt = shared
+                movieCopy = shared
                 aliases.append(
                     Copy(
                         media: entry.id, name: shared.lastPathComponent, source: url,
                         destination: shared, bytes: 0))
-                continue
+            } else {
+                let destination = directory.appendingPathComponent(
+                    uniqueName(for: url, claimed: &claimed))
+                bySource[url.path] = destination
+                let size = fileSize(url)
+                bytes += size
+                copies.append(
+                    Copy(
+                        media: entry.id, name: destination.lastPathComponent, source: url,
+                        destination: destination, bytes: size))
+                movieAt = destination
+                movieCopy = destination
             }
-            let destination = directory.appendingPathComponent(
-                uniqueName(for: url, claimed: &claimed))
-            bySource[url.path] = destination
-            let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
-            bytes += size
-            copies.append(
-                Copy(
-                    media: entry.id, name: destination.lastPathComponent, source: url,
-                    destination: destination, bytes: size))
+            bytes += planCursor(
+                entry, movieAt: movieAt, movieCopy: movieCopy, directory: directory,
+                claimed: &claimed, into: &cursors)
         }
         return Plan(
             directory: directory, copies: copies, relinks: relinks, aliases: aliases,
-            missing: missing, bytes: bytes)
+            missing: missing, bytes: bytes, cursorCopies: cursors.copies,
+            cursorRelinks: cursors.relinks, cursorAliases: cursors.aliases,
+            missingCursors: cursors.missing)
+    }
+
+    /// The cursor lists as `plan` builds them, and the copies by resolved
+    /// source path, so two media naming one file share one copy.
+    private struct CursorPlan {
+        var copies: [CursorCopy] = []
+        var relinks: [CursorCopy] = []
+        var aliases: [CursorCopy] = []
+        var missing: [String] = []
+        var bySource: [String: URL] = [:]
+    }
+
+    /// Plans `entry`'s cursor file, if it has one, after its movie (CU-51):
+    /// a file that resolves to nothing is missing; one already inside
+    /// `media/` is relinked only when its bookmark or spelling could lead
+    /// out; one another media's cursor already copies is an alias; anything
+    /// else is a copy named `<the movie's stem>.fjcursor` by the claimed-name
+    /// rule. Answers the bytes it adds to the plan.
+    private static func planCursor(
+        _ entry: MediaSnapshot, movieAt: URL, movieCopy: URL?, directory: URL,
+        claimed: inout Set<String>, into cursors: inout CursorPlan
+    ) -> Int64 {
+        guard let cursor = entry.cursor, let file = cursorURL(for: entry) else { return 0 }
+        guard FileManager.default.fileExists(atPath: file.path) else {
+            cursors.missing.append(file.lastPathComponent)
+            return 0
+        }
+        let url = file.resolvingSymlinksInPath().standardizedFileURL
+        if isInside(url, directory) {
+            if cursor.bookmark != nil || cursor.path != url.path {
+                cursors.relinks.append(
+                    CursorCopy(
+                        media: entry.id, name: url.lastPathComponent, source: url,
+                        destination: url, bytes: 0, inPicture: cursor.inPicture, movie: nil))
+            }
+            return 0
+        }
+        if let shared = cursors.bySource[url.path] {
+            cursors.aliases.append(
+                CursorCopy(
+                    media: entry.id, name: shared.lastPathComponent, source: url,
+                    destination: shared, bytes: 0, inPicture: cursor.inPicture, movie: movieCopy))
+            return 0
+        }
+        let named = CursorFileWriter.url(forMovie: movieAt)
+        let destination = directory.appendingPathComponent(
+            uniqueName(for: named, claimed: &claimed))
+        cursors.bySource[url.path] = destination
+        let size = fileSize(url)
+        cursors.copies.append(
+            CursorCopy(
+                media: entry.id, name: destination.lastPathComponent, source: url,
+                destination: destination, bytes: size, inPicture: cursor.inPicture,
+                movie: movieCopy))
+        return size
+    }
+
+    private static func fileSize(_ url: URL) -> Int64 {
+        Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
     }
 
     /// Whether `url` already lives in the package's `media/` directory —
@@ -272,6 +385,9 @@ enum MediaConsolidator {
         for entry in plan.relinks {
             ops.append(.relinkMedia(media: entry.media, path: entry.destination.path))
         }
+        for entry in plan.cursorRelinks {
+            ops.append(cursorOp(entry))
+        }
 
         let manager = FileManager.default
         do {
@@ -280,10 +396,12 @@ enum MediaConsolidator {
             return Outcome(
                 ops: ops, copied: 0, bytes: 0, missing: plan.missing,
                 failures: [plan.directory.lastPathComponent + " — " + error.localizedDescription],
-                cancelled: false)
+                cancelled: false, missingCursors: plan.missingCursors)
         }
 
         var cancelled = false
+        // The movie copies that really landed, which a cursor copy waits on.
+        var landed = Set<String>()
         for entry in plan.copies {
             if cancel?.isCancelled == true {
                 cancelled = true
@@ -300,6 +418,7 @@ enum MediaConsolidator {
                 }
                 try manager.copyItem(at: entry.source, to: entry.destination)
                 ops.append(.relinkMedia(media: entry.media, path: entry.destination.path))
+                landed.insert(entry.destination.path)
                 copied += 1
                 written += entry.bytes
             } catch {
@@ -313,9 +432,45 @@ enum MediaConsolidator {
         for entry in plan.aliases where manager.fileExists(atPath: entry.destination.path) {
             ops.append(.relinkMedia(media: entry.media, path: entry.destination.path))
         }
+        // The cursor files, each after its movie (CU-51): copied only once
+        // that movie's copy landed, recorded only once its own copy did.
+        for entry in plan.cursorCopies where !cancelled {
+            if cancel?.isCancelled == true {
+                cancelled = true
+                break
+            }
+            guard entry.movie.map({ landed.contains($0.path) }) ?? true else { continue }
+            progress?(plan.bytes > 0 ? Double(written) / Double(plan.bytes) : 0, entry.name)
+            do {
+                if manager.fileExists(atPath: entry.destination.path) {
+                    try manager.removeItem(at: entry.destination)
+                }
+                try manager.copyItem(at: entry.source, to: entry.destination)
+                ops.append(cursorOp(entry))
+                copied += 1
+                written += entry.bytes
+            } catch {
+                failures.append(entry.name + " — " + error.localizedDescription)
+                try? manager.removeItem(at: entry.destination)
+            }
+        }
+        for entry in plan.cursorAliases
+        where manager.fileExists(atPath: entry.destination.path)
+            && (entry.movie.map({ landed.contains($0.path) }) ?? true)
+        {
+            ops.append(cursorOp(entry))
+        }
         progress?(1, "")
         return Outcome(
             ops: ops, copied: copied, bytes: written, missing: plan.missing, failures: failures,
-            cancelled: cancelled)
+            cancelled: cancelled, missingCursors: plan.missingCursors)
+    }
+
+    /// `set_media_cursor` at the copy, with no bookmark: a bookmark to a file
+    /// inside the package is one a later save may replace.
+    private static func cursorOp(_ entry: CursorCopy) -> ReelOp {
+        .setMediaCursor(
+            media: entry.media,
+            cursor: MediaCursor(path: entry.destination.path, inPicture: entry.inPicture))
     }
 }

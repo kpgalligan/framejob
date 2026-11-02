@@ -16,10 +16,43 @@ extension ProjectDocument {
 
     /// `readPackage`'s repairs, in order: the re-anchor first, so a
     /// consolidated copy found in the package's `media/` is never copied
-    /// again, then the re-copy.
+    /// again, then the cursor files' re-anchor (spec §11 CU-52), then the
+    /// re-copy.
     static func repairingMedia(_ project: ReelProject, package: URL) -> ReelProject {
         let anchored = reanchoringConsolidatedMedia(project, package: package)
-        return recopyingMissingCopies(anchored)
+        let cursors = reanchoringCursorFiles(anchored, package: package)
+        return recopyingMissingCopies(cursors)
+    }
+
+    /// Points each media's cursor file at the package's `media/` when it was
+    /// consolidated there and the package has moved (road map creator-jobs
+    /// CU5, spec §11 CU-52): a `media.cursor` whose `cursorURL(for:)` names no
+    /// file, while `<package>/media/<its path's last component>` exists, gets
+    /// `set_media_cursor {path: that file, in_picture}` — no bookmark, as
+    /// Consolidate writes it. Applied purely, as the media re-anchor is.
+    static func reanchoringCursorFiles(_ project: ReelProject, package: URL) -> ReelProject {
+        // `media/`, `ProjectDocument`'s private `mediaDirectoryName`, which this
+        // extension in another file cannot read (`ProjectDocument.swift` takes
+        // no line for CU5).
+        let directory = package.appendingPathComponent("media", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return project }
+        var ops: [ReelOp] = []
+        for media in project.snapshot.media {
+            guard let cursor = media.cursor, let file = cursorURL(for: media),
+                !FileManager.default.fileExists(atPath: file.path)
+            else { continue }
+            let name = (cursor.path as NSString).lastPathComponent
+            guard !name.isEmpty else { continue }
+            let candidate = directory.appendingPathComponent(name)
+            guard FileManager.default.fileExists(atPath: candidate.path) else { continue }
+            ops.append(
+                .setMediaCursor(
+                    media: media.id,
+                    cursor: MediaCursor(path: candidate.path, inPicture: cursor.inPicture)))
+        }
+        guard !ops.isEmpty else { return project }
+        // Only `.applied` is a repair; both other arms leave it as opened.
+        return (try? project.applying(ops)).project ?? project
     }
 
     /// Copies again every WebM or Matroska copy that is gone, from its

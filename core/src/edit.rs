@@ -91,13 +91,13 @@
 //! same times its `clips[]` are written in — not project time. A nest has
 //! no speed, so `t − nest_clip.start` is the whole mapping.
 //!
-//! **Eleven ops are an `Err` with a scope**, naming themselves and the nest:
+//! **Twelve ops are an `Err` with a scope**, naming themselves and the nest:
 //! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
 //! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
 //! the parent had when it was made, deliberately, and the rest of a canvas
 //! — the rate, the background, the two switches — is the document's), and
 //! `add_media`, `relink_media`, `remove_media`, `set_media_color`,
-//! `set_media_speech` (a nest
+//! `set_media_speech`, `set_media_cursor` (a nest
 //! references the parent's `media[]` in the parent's one id space, so a
 //! media edit inside a scope is an edit OUTSIDE it wearing a scope, which is
 //! the one thing a scope exists to prevent), `add_adjustment_clip` (an adjustment clip
@@ -195,6 +195,7 @@
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. A `lut` media is no clip's source: it refuses while it is a clip's base look or a media's Camera Log unless `with_clips`, which clears those looks and conversions and keeps the clips and the media (spec §11 GR-8, GR-16). |
 //! | `set_media_color` | A video media's Camera Log (spec §11 GR-16): `color` is `{log, gamut}` (a built-in curve, its gamut defaulting to the curve's first) or `{lut}` (a `lut` media as the input conversion), converted at step 0 for every clip of the media; `null` clears it. A PQ file's `peak` (spec §11 HD-12, 1–10000 cd/m²) is the override of the peak import read into `pq`, beside either or alone; a PQ still (spec §11 HD-20 (b)) takes `peak` alone. `color` replaces the Camera Log and the override together, and `null` clears both, keeping import's reading. Refused, each in its own sentence: an audio or LUT media, and an image unless the colour is a PQ still's `peak` alone; neither or both of `log` and `lut` (and no `peak`); a `gamut` without `log` or outside the curve's pairings; a `lut` that names no `lut` media; `detected` and `pq`, which import writes; a `peak` outside 1–10000 or on media that is not a PQ file. `media_color.rs` holds the rules. |
 //! | `set_media_speech` | A media's speech spans (format 29, spec §11 AU-110, AU-111): `spans` is `[start, end]` pairs in forward-file SOURCE ticks, stored as `media.speech` and read by every clip of the media whose `audio.duck.mode` is `speech`. An empty list is a media with no speech found, stored as such; spans equal to the stored ones are an identity. Refused, each in its own sentence: a media without audio; a span starting before 0, ending at or before its start, or ending past the media's `duration`; spans unsorted or overlapping (touching is allowed); more than 100,000. `Err` for an unknown media. `media_speech.rs` holds the rules. |
+//! | `set_media_cursor` | A media's cursor file (road map "creator-jobs" CU5, spec §11 CU-50): `cursor` is `{path, bookmark?, in_picture}`, the `media.cursor` record of spec §5.2a, stored as given; `null` clears it, and `null` on a media with none or a value equal to the stored one is an identity. `cursor` is read strictly: neither an object nor `null`, a key other than the three, and a value the record's shape refuses (`in_picture` is required) are each an `Err` naming it, as is an unknown media. Refused, each in its own sentence: an empty path; a media that is not a video with a picture. The core opens no file and makes no `movie_size` check; the app's tool and the Media tab's Locate… do (CU-50 (b)). Consolidate's second copy and the open-time re-anchor write through it (CU-51, CU-52). `media_cursor.rs` holds the rules. |
 //!
 //! ### Results
 //!
@@ -716,6 +717,12 @@ pub enum Op {
         media: u32,
         spans: Vec<[Ticks; 2]>,
     },
+    /// `{path, bookmark?, in_picture}` or `null`, read strictly by
+    /// `media_cursor.rs`.
+    SetMediaCursor {
+        media: u32,
+        cursor: Value,
+    },
 }
 
 /// One parsed envelope: the op, and the nest it applies INSIDE.
@@ -1051,6 +1058,7 @@ impl Project {
             Op::RemoveMedia { media, with_clips } => self.remove_media(*media, *with_clips),
             Op::SetMediaColor { media, color } => self.set_media_color(*media, color),
             Op::SetMediaSpeech { media, spans } => self.set_media_speech(*media, spans),
+            Op::SetMediaCursor { media, cursor } => self.set_media_cursor(*media, cursor),
         }
     }
 }

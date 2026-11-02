@@ -93,7 +93,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-five op tools.
+  `AgentCatalog.opTool` prints for all sixty-six op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -129,7 +129,7 @@ detail there.
   explicit null are opposite intentions there, and only the tool can tell
   them apart.
   `scope` is a member folded into `json`; `documentLevelNames` MIRRORS
-  `scope.rs`'s `refused_inside` (ten names: its eleven arms but
+  `scope.rs`'s `refused_inside` (eleven names: its twelve arms but
   `add_adjustment_clip`, sent scoped) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
@@ -300,7 +300,9 @@ detail there.
   the Trash from its recorded original (spec §11 #228-O), through
   `MediaImporter.probeBuiltInCopy` (never ffmpeg, never a question); a
   read on main or inside `withoutAsking` (an agent's `open_project`, off
-  main since #231) passes no watch.
+  main since #231) passes no watch; and, after the media re-anchor and
+  before the re-copy, `reanchoringCursorFiles` re-points a cursor file found
+  again at `<package>/media/<same name>` (spec §11 CU-52).
   `+Alerts` is `present(_:)`: every error the document shows waits in one
   queue (`DocumentAlertQueue`) and shows one alert sheet at a time, each asked
   for a main-queue turn after the last one's `didPresent` or the window's last
@@ -706,7 +708,11 @@ detail there.
   media's voice cache read on the server thread.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
-  `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
+  `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards. A
+  recording's cursor file is a second copy (spec §11 CU-51): planned after
+  its movie as a `CursorCopy` named for the movie's destination stem, copied
+  only once that movie copy landed in the run, and recorded by
+  `set_media_cursor` (no bookmark) only once its own copy did.
 - `GraphicStore.swift` — one document's `graphics/` (road map 10 §5f):
   where it is (`<package>/graphics`, or an untitled document's
   `<NSTemporaryDirectory()>/FrameJob/<UUID>-graphics`, re-pointed by
@@ -1708,7 +1714,11 @@ the key map behind it.
   selected in the list, one undo step "Camera Log") ·
   `MediaPane+HDR10.swift` (the HDR10 section on a PQ file: the Peak field
   and its quick picks, Use File's, the readout; one undo step "PQ Peak",
-  spec §11 HD-12) · `MediaColor.swift` (`LogCurve`, `CameraGamut`,
+  spec §11 HD-12) · `MediaPane+Cursor.swift` (the Cursor section, spec
+  §11 CU-54: the selected video's cursor file, missing or not; Locate…
+  through `MediaImporter.cursorAttachment`, "Locate Cursor File", an alert
+  on a refusal; Remove, "Remove Cursor File"; shown whenever a video with a
+  picture exists, `structureSignature`'s `:c`) · `MediaColor.swift` (`LogCurve`, `CameraGamut`,
   `PeakSource`, `PQColor`, `MediaColor`, whose own decoder reads an absent
   `detected` as false) · `EditorViewController+CameraLog.swift`
   (Use LUT…: Import LUT…'s panel, then `add_media` and `set_media_color`
@@ -3528,6 +3538,15 @@ free.
   media (`MediaImporter.cursorAttachment` on the capture queue,
   `RecordingSegment.withCursor(…, attached:)`), because the settle probe ran before the file
   existed; a failed attach leaves the segment as CU-18 left it.
+- `CursorEventsAnswer.swift` · `AgentServer+Cursor.swift` · `AgentCatalog+Cursor.swift` — a
+  recording's cursor file over MCP (road map creator-jobs CU5, spec §11 CU-50, CU-53).
+  `CursorEventsAnswer` is pure (no `rc_*`): the window mapped to source ticks (`SourceMap` on
+  a ramp, else `in + t × speed`) and back through `AnalysisClipTimes.clipTime(ofSource:)`, Q,
+  the merge by time and the page of 5,000. `AgentServer+Cursor` holds `set_media_cursor`
+  (Locate's attach check and the `in_picture` check, then the op) and `get_cursor_events`
+  (in `creatorOffMainTools`: one main hop resolves, a fresh `ReelCursor` reads off main, a
+  last main hop computes Q from the base crop or `clip_state`). `AgentCatalog+Cursor` holds
+  their two rows, spliced in last by `creatorTools()`.
 - `RecordingEnhance.swift` — Enhance the microphone when it lands (spec §11
   AU-68): the recording's voice paths and clips, readiness and busy, the
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
@@ -3628,7 +3647,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-five op tools is `opTool`'s** and carries no
+  **Every one of the sixty-six op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,

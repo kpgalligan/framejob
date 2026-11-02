@@ -221,6 +221,7 @@ Click a row to select it; the selected row is outlined in the accent colour. Sel
 
 - **Camera Log**, once the project has a video file: how the selected file's log footage is converted. See [HDR and colour](hdr-and-color.md).
 - **HDR10**, once the project has a PQ file: the peak brightness used for the selected file. See [HDR and colour](hdr-and-color.md).
+- **Cursor**, once the project has a video with a picture: the selected screen recording's cursor file — its name, "No cursor file", or the name with "— missing" — with **Locate…** to choose the `.fjcursor` file and **Remove** to forget it. See [Screen recording](screen-recording.md#the-cursor).
 
 ### Putting media on the timeline
 
@@ -274,7 +275,7 @@ Relinking checks the new file as an import does. The media takes the new file's 
 
 To relink one file at any time, use **Relink…** on its Media-tab row: "Choose the file for "*name*"."
 
-A consolidated package that has been moved or renamed finds its own copies again when it opens: any missing media whose file sits in the package's `media/` folder under the same name is pointed back at it, with no sheet.
+A consolidated package that has been moved or renamed finds its own copies again when it opens: any missing media whose file sits in the package's `media/` folder under the same name is pointed back at it, with no sheet. A screen recording's cursor file is found again the same way.
 
 *Agents:* `relink_media` (takes `media` and `path`; the app checks the new file itself). `get_project`'s `missing_media` lists what needs it.
 
@@ -288,6 +289,7 @@ A consolidated package that has been moved or renamed finds its own copies again
 - Two files with the same name are kept apart (`intro.mov`, `intro-2.mov`). Two entries that point at the same file share one copy. Files already inside the package are not copied again.
 - Missing files cannot be copied: relink them first. If there is nothing to do, it says "Nothing to consolidate." and why.
 - LUTs are consolidated like footage.
+- A screen recording's cursor file is copied too, next to its movie and named after it (`Recording.mov` and `Recording.fjcursor`), and counts as one of the files copied. It is copied only once its movie is, and the project points at the copy only once it is there: a cursor file that cannot be copied is listed with the files that could not be, and the recording keeps its original cursor file. A cursor file that is missing is left alone ("1 cursor file was missing and left alone.").
 
 The command is off when the project has no media.
 

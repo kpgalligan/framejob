@@ -230,6 +230,18 @@ The rules every op shares are §6a; the clip ops are §6b.
   The app's Duck by Speech writes it in the same undo step as the `set_audio` that turns the mode
   on, only for a media without spans. A `scope` is an `Err` (`set_media_speech has no meaning inside
   nest 4`).
+- **`set_media_cursor {media, cursor}`** — A media's cursor file (road map "creator-jobs" CU5, §11
+  CU-50): `cursor` is `{path, bookmark?, in_picture}`, the `media.cursor` record of §5.2a, stored as
+  given, or `null`, which clears it. `null` on a media with none and a value equal to the stored one
+  are IDENTITIES. Read strictly: neither an object nor `null` (`cursor must be a json object or
+  null, not "a.fjcursor"`), a key other than the three (`unknown key "movie_size" in cursor`), a
+  value the record's shape refuses (``cursor does not match the schema: missing field
+  `in_picture` …``) and an unknown media are each an `Err`. Refused, each in its own sentence: `media
+  cursor path must not be empty`, `media.cursor needs a video media with a picture, not an audio
+  media`. The core opens no file; the tool and the Media tab's Locate… check the file first
+  (§11 CU-50 (b)). Locate… and Remove write it, Consolidate's second copy and the open-time
+  re-anchor too (CU-51, CU-52). A `scope` is an `Err` (`set_media_cursor has no meaning inside
+  nest 4`).
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

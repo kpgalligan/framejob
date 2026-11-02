@@ -74,8 +74,11 @@ final class MediaPane: InspectorPaneView {
     /// the unused-only switch — see the class doc: putting the filtered set
     /// in here is precisely the bug this pane is built to avoid.
     override var structureSignature: String {
+        // `:c` for a media with a cursor file: a Locate… or a Remove adds or
+        // drops it, so the Cursor section's rows are rebuilt (CU-54).
         let media = binding.snapshot.media.map { entry -> String in
             "\(entry.id):\(mediaURL(for: entry) == nil ? "missing" : "ok")"
+                + (entry.cursor == nil ? "" : ":c")
         }
         return "media|" + media.joined(separator: ",")
     }
@@ -134,11 +137,14 @@ final class MediaPane: InspectorPaneView {
         // Camera Log (spec §11 GR-16) acts on a video file, so it is there
         // once the project has one (`MediaPane+CameraLog.swift`); HDR10 (spec
         // §11 HD-12) on a PQ file, once the project has one
-        // (`MediaPane+HDR10.swift`).
+        // (`MediaPane+HDR10.swift`); Cursor (spec §11 CU-54) on a video with a
+        // picture, once the project has one (`MediaPane+Cursor.swift`).
         let media = binding.documentSnapshot.media
         let video = media.contains { $0.kind == .video }
         let pq = media.contains { $0.color?.pq != nil }
+        let cursor = MediaPane.showsCursorSection(media)
         return (video ? [files, cameraLogSection()] : [files]) + (pq ? [hdr10Section()] : [])
+            + (cursor ? [cursorSection()] : [])
     }
 
     /// Add Media…, its ⇧⌘I hint, and the item count at the trailing edge.

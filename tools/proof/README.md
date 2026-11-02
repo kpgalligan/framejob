@@ -27833,6 +27833,40 @@ make app-debug && python3 tools/proof/cursor_layer_proof.py --only S2,S3,S4,S6,Z
 
 The recorded runs are in `designs/creator-jobs.md`'s CU4 record.
 
+### CU5 — cursor data travels (`cu5_proof.py` M1–M9 with `cu5_probe.swift`; seven mutants by hand; `core/tests/media_cursor.rs`, `scope.rs`; spec §11 CU-50…CU-55)
+
+**`cu5_proof.py`** launches its own instance (`mcp.launch`, a scratch HOME under
+`tools/proof/work/cu5/`) over copies of `tools/proof/media/A.mov` (640 × 360, 10 s) and v1
+cursor files it writes itself per `core/src/cursor_file.rs`: `movie_size` [640, 360],
+`in_picture: false`, 320 × 180 pt at 2 px a point (a file unit is 1/50 px), moves k 0–299 every
+10 ms on the line (20 + k, 40 + k/2) px (no hold), five down clicks at 0.4 s steps at (100 + 2i,
+80 + i) px and two scrolls at 0.6 and 1.4 s. M3 builds `cu5_probe.swift` from `app/Sources`.
+
+| Row | What it holds |
+|---|---|
+| M1 | A.mov imported beside its `.fjcursor` (attached), then `consolidate_media`: the movie and `A.fjcursor` in `<package>/media/`, `get_project`'s two paths there, the cursor with no bookmark, `copied` 2 |
+| M2 | that package closed, moved, its originals removed and reopened: both paths re-anchored into the moved package, and `render_frame` at 1 s (cursor ×3) byte-equal to the frame before Consolidate |
+| M3 | (probe) `MediaPane.cursorLine`'s four strings; the app's own `MediaPane` over a `ProjectDocument`: no `media.cursor` with an audio media or a video with no picture, the section titled "Cursor" with a video with a picture, still there after `set_media_cursor` null; `MediaImporter.cursorAttachment` refusing a 320 × 180 file in CU-34's sentence and attaching the 640 × 360 one |
+| M4 | a clip trimmed to source [0.5 s, 2.5 s) with crop `{l: 40, t: 20}`: `get_cursor_events {clip}` answers 4 clicks and 2 scrolls in clip time, `t`, `x`, `y` and `q = (x − 340, y − 190)` to 1e-9; `{media, to: 3 s, kinds: ["path"]}` 30 samples every 60,000 ticks on the raw line to 1e-9 px |
+| M5 | the cursor file at mode 000 before `consolidate_media`: the movie relinked into the package, `media.cursor.path` still the original, a failure line naming `A.fjcursor` |
+| M6 | `set_media_cursor` with the `scope` of a nest: "set_media_cursor has no meaning inside nest N" |
+| M7 | the clip reversed: `{clip}` refused in CU-53's sentence; `{media}` answers its 5 clicks |
+| M8 | a file of 5,003 clicks set by `set_media_cursor`: 5,000 and `next` 3,000,600, then 3 from `next` with no `next` |
+| M9 | the tool refuses a 320 × 180 file and `in_picture: true` for the file's false, each in its sentence, `media.cursor` unchanged; the matching file and flag apply; `grep "Frame Job: "` over the instance's log prints nothing |
+
+The seven mutants are run by hand, each once on Debug and restored byte-identical (SHA-256): the
+cursor op emitted before its copy (M5); `reanchoringCursorFiles` not called (M2); Q without the
+crop (M4); `SetMediaCursor` moved out of `refused_inside` (`core/tests/scope.rs`, M6); the
+reversed refusal removed (M7); the page cap not applied (M8); the tool's attach check removed
+(M9).
+
+```sh
+cd core && cargo test --release --test media_cursor
+make app-debug && python3 tools/proof/cu5_proof.py [--only M1,M4] [--app PATH]
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU5 record.
+
 ## Road map "creator-jobs" TX1 — the timeline transcript (`timeline_transcript_proof.py` T1–T11, G0–G1, P1–P13, C1; eight mutants; `transcript_spike/` TX-S1; `core/tests/plan_instances.rs`; spec §11 TX-10…TX-14)
 
 ```sh

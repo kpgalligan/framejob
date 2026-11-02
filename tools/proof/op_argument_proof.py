@@ -147,15 +147,17 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # new_project_from_range, spec §11 CJ-52, the hundred-and-tenth; CU9a's op tool
 # retime_range, spec §11 CU-90, the sixty-sixth op and the hundred-and-eleventh tool; CO3's
 # app-state analyze_cutout, spec §11 CO-31, the hundred-and-twelfth; CO5's app-state
-# text_behind_subject, spec §11 CO-54, the hundred-and-thirteenth). D3
+# text_behind_subject, spec §11 CO-54, the hundred-and-thirteenth; CU5's op tool
+# set_media_cursor, spec §11 CU-50, the sixty-seventh op and the hundred-and-fourteenth
+# tool, and its app-state get_cursor_events, CU-53, the hundred-and-fifteenth). D3
 # adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 113
-OPS = 66
+PRODUCT_TOOLS = 115
+OPS = 67
 # The core's ops with no tool, by design: AgentServer.opsWithoutTools
 # (`keep_range`, spec §11 CJ-50, applied only to a derived document).
 OPS_WITHOUT_TOOLS = {"keep_range"}
@@ -976,8 +978,9 @@ def main():
         if fragment.get("type") == "object" and "properties" not in fragment)
     check(f"the core publishes {len(doors)} arguments as an opaque object a tool takes — a "
           "caller's own patch, which deepening D1 made the core the one validator of",
-          # 14 until format 36's `set_track` `compressor` and `limiter` (AU-150).
-          len(doors) == 16, json.dumps(doors))
+          # 14 until format 36's `set_track` `compressor` and `limiter` (AU-150);
+          # 17 since CU5's `set_media_cursor` `cursor` (CU-50).
+          len(doors) == 17, json.dumps(doors))
     # The two graphic doors reach the core only through a module the
     # untitled project's graphics/ holds (road map 10 G3b: the app reads the
     # schema from it and refuses a module it cannot find). `value_for` names

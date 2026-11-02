@@ -194,6 +194,11 @@ A recording's cursor file (`<name>.fjcursor`, beside its movie) travels with the
 - **When a recording lands**, each stretch's movie gets its own cursor file.
 - **When you import a movie**, by **File ▸ Add Media…**, a drop, opening it, or an agent's `import_media`, Frame Job looks beside it for a file with the same name ending in `.fjcursor`. It takes the file only when the file reads as a cursor file and was made for a movie of exactly this movie's size. A file that is missing, damaged or made for another size is left alone, and the movie imports without it. A copy Frame Job makes of a WebM or Matroska file is not looked beside.
 - **When you relink a movie** (**Relink…**, the Media tab, or an agent's `relink_media`), Frame Job takes the cursor file beside the new movie. If there is none, it keeps the cursor file the media already had, as long as that file is still there and the new movie is the same size. Otherwise the media has no cursor file after the relink.
+- **When you consolidate**, the cursor file is copied into the package beside its movie, and a moved package finds it there again (see [Consolidate Media](projects-and-media.md#consolidate-media)).
+
+**On the Media tab.** Select a recording in the list and its **Cursor** section names its cursor file, or says "No cursor file", or adds "— missing" when the file has gone. **Locate…** chooses a `.fjcursor` file for it: Frame Job takes it only when it reads as a cursor file made for a movie of exactly this size, and otherwise says why and changes nothing (undo name "Locate Cursor File"). **Remove** forgets the cursor file, which stays on disk (undo name "Remove Cursor File").
+
+*Agents:* `set_media_cursor` attaches, moves or removes a cursor file as **Locate…** and **Remove** do. `get_cursor_events` reads a recording's clicks, scrolls, shortcuts, typing stretches and pointer path, in the file's own time or in a clip's, with each click's place in the clip's zoom region frame.
 
 **The Cursor section.** A clip whose movie has a cursor file the picture doesn't already show gets a **Cursor** section on the Clip tab's **Picture** sub-tab, after **Background**. It starts closed; its summary says **off**, **on** or **arrow**, with **+ ripples** when clicks ripple. Each row is its own undo step:
 

@@ -205,6 +205,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         Op::RemoveMedia { .. } => Some("remove_media"),
         Op::SetMediaColor { .. } => Some("set_media_color"),
         Op::SetMediaSpeech { .. } => Some("set_media_speech"),
+        Op::SetMediaCursor { .. } => Some("set_media_cursor"),
 
         // An adjustment clip grades what is behind it at the top level only
         // (spec §11 GR-6): `check_clips` refuses one inside a nest, so the

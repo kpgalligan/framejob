@@ -418,7 +418,7 @@ governs a module now.
   `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-five op tools in the agent catalog,
+  reader is every one of the sixty-six op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -456,7 +456,9 @@ governs a module now.
   `Err` arm than any unscoped op** — `check_caps` and `check_nesting` are
   document-wide and run on the MERGED parent, so an op valid inside the nest
   can still return `Err`. `refused_inside` is an EXHAUSTIVE match over every
-  op, so a new op does not compile until it is classified. The READ half is
+  op, so a new op does not compile until it is classified; `set_media_cursor`
+  is refused inside like `set_media_speech` (twelve ops in all, `edit.rs`'s
+  module doc). The READ half is
   `rc_project_scoped` in `ffi.rs`, which calls the same `scoped_view`.
 - `edit_graphic.rs` — `add_graphic_clip` and `set_graphic`: every argument
   checked through `model_graphic.rs` BEFORE `edit_described.rs`'s
@@ -650,6 +652,12 @@ governs a module now.
   (audio, each span inside the file, sorted, not overlapping, at most
   `MAX_SPEECH_SPANS` 100,000, each its own sentence; `validate` calls it
   too).
+- `media_cursor.rs` — a media's cursor file as an op (road map
+  "creator-jobs" CU5, spec §11 CU-50): `set_media_cursor` (the strict
+  `cursor` reader — an object or `null`, only `path`, `bookmark`,
+  `in_picture`; `null` clears; equal is an identity; `cursor_props.rs`'s
+  `check_media_cursor` sentences are its refusals; no file opened, no
+  `movie_size` check, which is the app's tool's and Locate…'s).
 - `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
   things it does to the rest of the document — `check_dimension` (a
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a

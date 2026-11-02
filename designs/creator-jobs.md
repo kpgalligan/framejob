@@ -6859,6 +6859,108 @@ against the tree's core — one issue, filed after this commit names it.
   (M2); Q without the crop (M4); `set_media_cursor` left out of `refused_inside` (M6).
 - **Depends on:** CU3b. **Lane** B.
 
+#### CU5's record (2026-11-02)
+
+**Built.** Lane B, base `59e85465` (I's HEAD, CU4). The decisions first (`103255d6`: CU-50…CU-55
+with their index rows, appended to `creator-jobs-6.md`, 178 → 286 lines), then the code, the
+proof and its pins, the documents and the menu inventory's two sites. The road map asked no
+owner question at this phase. The op `set_media_cursor` is the 67th (`OP_COUNT` 67) and twelfth
+document-level one; its op tool and `get_cursor_events` make 115 product tools. No format (41
+stands), FFI, `rc_*`, `LayerUniforms` or shader change; nothing keyed (CJ-3). No toll: every file
+stayed under its cap.
+
+- **The op.** `media_cursor.rs` reads `cursor` strictly (CU-50) and stores it as given;
+  `check_media_cursor`'s two sentences are its refusals. The tool runs Locate's check first
+  (CU-50 (b)), so an agent cannot attach a file the Media tab would refuse.
+- **Consolidate** (`MediaConsolidator`, 321 → 476 lines) plans each cursor file after its movie
+  as `CursorCopy` (copies, relinks, aliases, missing), named by the movie's destination stem
+  through the movie rule, copied only after its movie copy landed (`landed`, the copies of this
+  run) and recorded only after its own copy; `plan(for:)` and `run(_:cancel:progress:)` and their
+  callers are unchanged (the new `Plan` and `Outcome` fields have defaults, so
+  `sheet_chrome_probe.swift`'s memberwise `Plan` still builds).
+- **The re-anchor** is `reanchoringCursorFiles`, between the media re-anchor and the re-copy in
+  `repairingMedia`.
+- **The Media tab's Cursor section** (`MediaPane+Cursor.swift`) and its gate and signature in
+  `MediaPane.swift`.
+- **`get_cursor_events`**: `CursorEventsAnswer` (pure) maps, keeps, merges and pages;
+  `AgentServer+Cursor` resolves on main, reads a fresh `ReelCursor` on the server thread and
+  computes Q on a last main hop.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/media_cursor.rs` · `core/tests/media_cursor.rs` | 77 · 190 | new: the op; set, replace, clear, the identities, every refusal and `Err`, a scope |
+| `app/Sources/MediaConsolidator.swift` | 476 | the cursor copies, planned and run (CU-51) |
+| `app/Sources/ProjectDocument+MissingCopies.swift` | 104 | `reanchoringCursorFiles` (CU-52) |
+| `app/Sources/MediaPane+Cursor.swift` · `MediaPane.swift` | 118 · 504 | new: the section; its gate and `:c` (CU-54) |
+| `app/Sources/CursorEventsAnswer.swift` | 223 | new: window, Q, merge, page (CU-53) |
+| `app/Sources/AgentServer+Cursor.swift` · `AgentCatalog+Cursor.swift` | 177 · 96 | new: the two handlers and rows |
+| `tools/proof/cu5_proof.py` · `cu5_probe.swift` | 488 · 172 | new: M1–M9 |
+
+**Deviations.** (1) `get_cursor_events` takes no `scope` argument (CU-53 (f)): its clip is looked
+up in the container `set_scope` has open, as `get_media_analysis`'s is. (2) A media whose movie
+is missing is left alone by Consolidate, its cursor file included (CU-51 says "after its movie is
+planned"; a missing movie is not). (3) `reanchoringCursorFiles` spells `media/` as a literal:
+`ProjectDocument`'s `mediaDirectoryName` is private and `ProjectDocument.swift` takes no line.
+(4) The spec put "Eleven ops" → "Twelve" in `scope.rs`'s module doc; that sentence is
+`edit.rs`'s, edited there. (5) M9 also carries the instance's `grep "Frame Job: "` check, so the
+proof scores nine rows. (6) `docs/guide/mcp.md`'s "Nine ops … refuse a `scope`" was stale
+(`set_media_speech` missing): it now lists the eleven op tools. Outside the Files list:
+`tools/proof/capture_spike/inventory.json` (the Locate… panel's and its alert's
+`beginSheetModal` sites, which `inventory.py --check` in `make test` requires) and
+`op_argument_proof.py`'s opaque-door count 16 → 17.
+
+**Measured.**
+
+- `cargo test --release --test media_cursor` 5 passed; `--test scope`, `--test edit_tests`,
+  `--test op_table` pass; `cargo fmt`; `make lint` exit 0.
+- `make typecheck`: exit 0, 0 errors and the 4 baseline warnings.
+  `swift_build.py typecheck tools/proof/cu5_probe.swift` exit 0.
+- Debug: `cu5_proof.py` 9/9 at the first run. On a Debug instance: `op_argument_proof.py` 191/192
+  at first (the opaque-door count, 17 not 16), then 192/192; `op_catalog_proof.py` 23/23;
+  `phase9_proof.py` 251/251; `recording_probe.py --only catalog` 31/31; the log's
+  `grep "Frame Job: "` printed nothing.
+- Mutants, seven, each once on Debug and restored byte-identical (SHA-256), all CAUGHT:
+  `op-before-copy` (M5: the cursor at the failed copy), `no-cursor-reanchor` (M2: the old path,
+  and the frame 39,692 bytes against 41,821 — no cursor drawn), `q-without-crop` (M4: q
+  (−218, −99) for (−238, −109)), `refused-inside` (`core/tests/scope.rs`: 2 tests failed),
+  `no-reversed-refusal` (M7), `no-page-cap` (M8: 5,003 and no `next`), `no-attach-check` (M9).
+- `make gate`: FAIL at test (254 s; `inventory.py --check`'s K1–K4 named the two new
+  `beginSheetModal` sites), then, with them in the inventory, PASS 240 s (names 1, typecheck,
+  fmt and lint skipped as passed, test 75, app 163).
+- Release (the gate's app): `cu5_proof.py` 9/9 (M2's frames 41,821 bytes each); on a Release
+  instance `op_argument_proof.py` 192/192, `op_catalog_proof.py` 23/23, `phase9_proof.py`
+  251/251, `recording_proof.py --no-screen --no-microphone` 142/142 (79 skipped by name); the
+  log's `grep "Frame Job: "` printed nothing.
+
+**Reviews.** Review 1 (`59e85465..87518605`, fix-required): one should-fix and two nits. The
+should-fix: `set_media_cursor`'s attach check opened the path with `~` expanded while the op
+stored the caller's raw path, so `"~/…"` passed the check and stored a path `cursorURL(for:)`
+never finds. Fix pass 1 (`aa4514db`) checks `URL(fileURLWithPath: path)`, CU-50 (b)'s form, the
+path stored as given; `make typecheck` at the baseline, "gate: PASS 441s", and
+`RC_PROOF_APP=release cu5_proof.py --only M6,M8,M9` 3/3. The rest of the proof, the pinned proofs
+and the mutants were not re-run: no row or mutant anchor (`no-attach-check`'s is the line above)
+reads that line. Review 2 (`59e85465..aa4514db`): pass, the two nits open; both resolved at
+integration: `MediaConsolidator.run`'s early return when `media/` cannot be made now carries
+`missingCursors: plan.missingCursors`, so its summary names the missing cursor files, and
+`projects-and-media.md` says the Cursor section shows "once the project has a video with a
+picture" (CU-54's gate).
+
+**Integration (2026-11-02).** Cherry-picked (`103255d6…aa4514db`) onto the integration branch at
+`59e85465`, the lane's own base, with no conflict and no format change. The `CLAUDE.md` edits
+owed went in: the root file's 115 product tools; `core/CLAUDE.md`'s 66 op tools, a
+`media_cursor.rs` entry after `media_speech.rs`'s and `scope.rs`'s twelve refused ops;
+`app/CLAUDE.md`'s 66 op tools (twice), `documentLevelNames`' eleven names, the cursor sentences
+of `MediaConsolidator` (CU-51) and `+MissingCopies` (CU-52), `MediaPane+Cursor.swift` in the
+Media tab's list, and the `CursorEventsAnswer` · `AgentServer+Cursor` · `AgentCatalog+Cursor`
+entry after the cursor file's. `make gate` on the merged tree: names, typecheck, fmt, lint, test
+and app `pass`, "gate: PASS 399s"; then, because the consolidator's nit fix is one `app/Sources`
+line the lane did not run, `RC_PROOF_APP=release cu5_proof.py` on that Release build: 9/9, its
+`grep "Frame Job: "` printing nothing.
+
+**Owed.** Nothing of CU5's; nothing filed. The recorder's own files still say `in_picture: true`
+until CU3c, so a recording lands with a cursor file the picture already shows; scroll bursts are
+CU7's.
+
 ### CO10 — cutout on stills and pictures
 
 **Split by size (2026-11-02):** CO10a builds the model, the recipe and the mirror (CO-100…CO-104,

@@ -171,10 +171,10 @@ extension ReelOp {
     /// paths.
     static let documentLevelNames: Set<String> = [
         "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
-        "remove_media", "set_media_color", "set_media_speech", "keep_range",
+        "remove_media", "set_media_color", "set_media_speech", "set_media_cursor", "keep_range",
     ]
 
-    /// True for one of the ten above — an edit about the document rather
+    /// True for one of the eleven above — an edit about the document rather
     /// than about whatever container the timeline is looking at.
     var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
@@ -1373,5 +1373,20 @@ extension ReelOp {
     /// `ripple_delete_ranges` uses. `DuckSpeech.ops` is the one writer.
     static func setMediaSpeech(media: UInt32, spans: [[Ticks]]) -> ReelOp {
         ReelOp(name: "set_media_speech", args: ["media": media, "spans": spans])
+    }
+
+    /// A media's cursor file (§6 `set_media_cursor`, spec §11 CU-50): `cursor`
+    /// as `MediaCursor.dictionary` (a bookmark only when there is one), or an
+    /// explicit null for nil, which clears it. The Media tab's Locate… and
+    /// Remove, Consolidate's second copy and the open-time re-anchor send it.
+    static func setMediaCursor(media: UInt32, cursor: MediaCursor?) -> ReelOp {
+        setMediaCursorRaw(media: media, cursor: cursor?.dictionary ?? NSNull())
+    }
+
+    /// The same with a caller's `cursor` passed through unread, for the agent
+    /// (`app/CLAUDE.md`, lenient decoding): the core refuses what it cannot
+    /// take by name.
+    static func setMediaCursorRaw(media: UInt32, cursor: Any) -> ReelOp {
+        ReelOp(name: "set_media_cursor", args: ["media": media, "cursor": cursor])
     }
 }

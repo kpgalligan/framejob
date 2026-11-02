@@ -265,10 +265,10 @@ uncut; open one with `set_scope` and call again to look for dead air inside it. 
 
 ### What does not work inside a nest
 
-- Nine ops have no meaning inside a nest and refuse a `scope` by name:
+- Eleven op tools have no meaning inside a nest and refuse a `scope` by name:
   `add_marker`, `set_marker`, `remove_marker`, `set_canvas`, `add_media`,
-  `relink_media`, `remove_media`, `set_media_color` and
-  `add_adjustment_clip`.
+  `relink_media`, `remove_media`, `set_media_color`, `set_media_speech`,
+  `set_media_cursor` and `add_adjustment_clip`.
 - When the nest is only *open* (from `set_scope`) rather than named, most of
   those simply apply to the whole document instead, and the answer lists them
   under `document_ops`. The two that carry a time — `add_marker`, and
@@ -443,6 +443,8 @@ See [Projects and media](projects-and-media.md) and [Timeline](timeline.md).
 | `remove_media` | *op* — removes a media entry; refused while clips use it unless `with_clips`. |
 | `consolidate_media` | Copies every referenced file into the package (**File ▸ Consolidate Media…**). The project must be saved first. |
 | `set_media_color` | *op* — a video file's camera log conversion or LUT, and a PQ file's peak (the Media tab's Camera Log and HDR10 sections). |
+| `set_media_cursor` | *op* — attaches, moves or removes a screen recording's cursor file (the Media tab's Cursor section, **Locate…** and **Remove**). The file must open as a cursor file made for a movie of exactly this size, and `in_picture` must be the file's own; each is refused in its own sentence. |
+| `get_cursor_events` | What a screen recording's cursor file holds: its clicks, scrolls, shortcuts and typing stretches, and with `kinds: ["path"]` the pointer's path ten times a second. With `media` the times are the file's own; with `clip` they are clip times and each click and scroll also has `q`, its place in the clip's region frame, which `add_zoom_action`'s `region` takes. At most 5,000 rows an answer; `next` says where to ask from for the rest. A clip that plays reversed is refused (ask with its media). Read on this Mac, no key. |
 
 See [Projects and media](projects-and-media.md) and [HDR and colour management](hdr-and-color.md).
 

@@ -49,13 +49,16 @@ extension AgentServer {
         "analyze_cutout": { $0.analyzeCutout },
         // AgentServer+BehindSubject.swift (CO5, spec §11 CO-54)
         "text_behind_subject": { $0.textBehindSubject },
+        // AgentServer+Cursor.swift (CU5, spec §11 CU-50, CU-53)
+        "set_media_cursor": { $0.setMediaCursor },
+        "get_cursor_events": { $0.getCursorEvents },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
     /// `AgentServer.offMainTools`.
     static let creatorOffMainTools: Set<String> = [
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
-        "new_project_from_range", "analyze_cutout",
+        "new_project_from_range", "analyze_cutout", "get_cursor_events",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
@@ -64,7 +67,9 @@ extension AgentServer {
     /// then `new_project_from_range` (CJ5b, `AgentCatalog+Derived.swift`),
     /// then the op tool `retime_range` (CU9a, `AgentCatalog+Retime.swift`), then
     /// `analyze_cutout` (CO3, `AgentCatalog+Cutout.swift`), then
-    /// `text_behind_subject` (CO5, `AgentCatalog+BehindSubject.swift`).
+    /// `text_behind_subject` (CO5, `AgentCatalog+BehindSubject.swift`), then the
+    /// op tool `set_media_cursor` and `get_cursor_events` (CU5,
+    /// `AgentCatalog+Cursor.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
@@ -72,6 +77,7 @@ extension AgentServer {
         var tools: [[String: Any]] = analysisTools() + transcriptTools() + derivedTools()
         tools += retimeTools() + cutoutTools()
         tools += behindSubjectTools()
+        tools += cursorTools()
         return tools
     }
 }
