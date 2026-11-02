@@ -555,7 +555,7 @@ See [Timeline](timeline.md), [Canvas and layers](canvas-and-layers.md) and [HDR 
 | `match_audio` | Gives `clips` the loudness of the `reference` clip as it plays and its speech's tone, as each clip's volume, limiter and EQ shelves and bands (**Clip ▸ Match Audio…**). The clips are rendered, so the call can take seconds. |
 | `sync_audio` | Lines clips up by their sound (**Clip ▸ Synchronize Audio**). |
 | `detect_fillers` | Reports filler words as ranges, changing nothing (the read half of **Clip ▸ Remove Filler Words…**). |
-| `transcribe_for_fillers` | Re-transcribes one media file with AssemblyAI, adding filler words — a paid upload. |
+| `transcribe_for_fillers` | Re-transcribes one media file with AssemblyAI, adding filler words — a paid upload. Needs your AssemblyAI key when it would upload; a file that already has a filler transcript is answered without one. |
 
 See [Audio](audio.md) and [Remove Silences and Remove Filler Words](cleanup-tools.md).
 
@@ -563,7 +563,7 @@ See [Audio](audio.md) and [Remove Silences and Remove Filler Words](cleanup-tool
 
 | Tool | What it does |
 |---|---|
-| `transcribe` | Speech to caption clips (**File ▸ Generate Captions…**), on this Mac or with AssemblyAI. |
+| `transcribe` | Speech to caption clips (**File ▸ Generate Captions…**), on this Mac or with AssemblyAI. The AssemblyAI engine needs your AssemblyAI key unless every file is already transcribed. |
 | `import_captions` | An `.srt` file as text clips (**File ▸ Import Captions…**). |
 | `export_captions` | One text track as `.srt` or `.vtt` (**File ▸ Export Captions…**). |
 | `get_transcript` | One clip's spoken words with timeline times; never uploads anything. |

@@ -349,10 +349,8 @@ final class TranscribeSheetController: NSViewController {
                 cancel: stopButton, apply: startButton,
                 leading: [sheetFootnote("captions go on a new track")]))
         // A key saved or removed while this card is up must not leave a
-        // dead Generate button behind it.
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(settingsChanged(_:)),
-            name: SettingsWindowController.didChangeNotification, object: nil)
+        // dead Generate button behind it (spec §11 CJ-10).
+        ModelKeys.observe(self, selector: #selector(settingsChanged(_:)))
         applyEngine()
         refresh()
     }
@@ -419,7 +417,8 @@ final class TranscribeSheetController: NSViewController {
         let note = noteText(jobs: jobs)
         noteLabel.stringValue = note
         noteLabel.isHidden = note.isEmpty
-        startButton?.isEnabled = !jobs.isEmpty && language?.installed == true
+        ModelKeys.mark(
+            startButton, missing: nil, enabled: !jobs.isEmpty && language?.installed == true)
     }
 
     private func noteText(jobs: [Transcriber.Job]) -> String {

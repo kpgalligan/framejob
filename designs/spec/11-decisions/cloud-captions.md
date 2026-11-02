@@ -294,6 +294,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   1–5 restate spec §7.9's order; 5 > 7, 5 > 6 and 7 > 6 are new, recorded
   from `cloud_captions_proof.py`'s row RP (issue batch B24, #80), which
   observed all 21 pairs in this order before this entry was written.
+  **Amended by CJ-11**: the credential arm's words are `ModelKeys`' AssemblyAI sentence.
 - **R6-18 — A request's only timeout is an idle one; a server that drips
   holds it for as long as it drips (accepted).** `timeoutIntervalForRequest`
   resets on every byte, `timeoutIntervalForResource` is URLSession's

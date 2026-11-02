@@ -7880,7 +7880,8 @@ POSTs with that model and `proof-key`, no failures; the log has no
 
 Launch C, **K2** (AI-13: a scratch socket, NO `-RCSecretFolder`, the
 variable set): after `new_project`, `assistant_send`
-is refused "No Anthropic API key is set…"; the stand-in logged no request;
+is refused "No Anthropic API key is set…" (since CJ1 `ModelKeys`' Anthropic
+sentence, spec §11 CJ-11); the stand-in logged no request;
 the app has no helper child.
 
 **Mutant `no-prepare`**: a copy of the tree in `work/assistant_session/mutant/tree`
@@ -22816,8 +22817,8 @@ failure is S0's FAIL). Every sheet gets a `MemoryStore`, an in-memory
   `FillerTranscription.estimate` fate `.upload(.refresh)`, the row's line its
   `describe` ("1 file to upload · 00:00:05.249 of audio · under $0.01 …"), the
   cloud-only note and `uploadHint` of the defaults' region shown; keyless the
-  button is off and the note holds `noKeyNote`, keyed it is on; Remove off,
-  "No cuts".
+  button is off and the note holds `ModelKeys.sentence(.assemblyAI)` (spec
+  §11 CJ-11; `noKeyNote` before CJ1), keyed it is on; Remove off, "No cuts".
 - **S4** `options(for:)` with a marker ("fr", speakers, ["Frame Job"]) and nil.
 - **S5** `jobs(for: 1)` over a built snapshot keeps clip 10, not the reversed
   clip 11 or media 2's clip 12.
@@ -22838,8 +22839,8 @@ failure is S0's FAIL). Every sheet gets a `MemoryStore`, an in-memory
 - **T2** a second call: no submit, `uploaded` [], `cached` [m],
   `audio_seconds` 0, the "already has a transcript" note.
 - **T3** refused by sentence: no `media`, 987654, an imported media no clip plays.
-- **T4** keyless: `CloudTranscriber.AccessError.credentialRequired`'s sentence
-  and no upload.
+- **T4** keyless: "transcribe_for_fillers: " and `ModelKeys`' AssemblyAI
+  sentence (spec §11 CJ-11) and no upload.
 - **T5** T1's package, Clip ▸ Remove Filler Words…: the sheet's layout dump
   reads "1 cut · removes 00:00:00:16"; the timeline PNG with the sheet up
   differs from the one after `cancel_sheet`, which is byte-equal to the one
@@ -27471,3 +27472,45 @@ python3 tools/proof/cursor_track_probe.py --mutant <name>
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU2 record.
+
+## Road map "creator-jobs" CJ1 — the key gate (`keys_proof.py` K1–K8 with `keys_probe.swift`; eleven mutants; spec §11 CJ-10…CJ-13)
+
+```sh
+env -u RC_ASSEMBLYAI_KEY -u ANTHROPIC_API_KEY python3 tools/proof/keys_proof.py [--only IDS] [--mutant NAME]
+```
+
+Nothing spends and nothing reads the owner's keys: the probe and every instance
+get an empty `-RCSecretFolder`, both variables are unset (the script refuses to
+run with either set), and the only keys are the dummy `proof-key` against
+`assemblyai_fake.py` and `anthropic_fake.py`. Its docstring is the full row and
+mutant list.
+
+**The probe rows** (`keys_probe.swift`, built through `swift_build.build()` with
+`FRAMEJOB_DEV_TOOLS` into `work/keys/tree/`, run as `keys-probe
+media/speech.mov -RCSecretFolder <scratch>`): **K3** every `ModelKeys.keyed` row
+with a menu action validated through the editor keyless (off, the sentence as
+tooltip, the title suffixed) and with a key file (on, no tooltip, the base
+title); **K3b** the main menu's mark reset by Settings' notification with no
+validation, and never re-added; **K4** `present` follows a `FileStore` written
+and emptied with no notification; **K4b** the Remove Filler Words and Generate
+Captions sheets enabled, tooltips cleared, by a key saved while they are open,
+and `ModelKeys`' one re-post per key's notification; **K5p** a seeded filler
+transcript turns the menu item on, on the same project handle; **K6** Generate
+Captions' Start keyless, over a reusable batch, and on the on-device engine;
+**K7** the sixth parity part over the shipped catalog and over a copy missing
+`transcribe_for_fillers`' clause.
+
+**The app rows** (`cloud_captions_proof.Instance`/`Session`, the app
+`proof_app` chooses): **K2** keyed, the menu item enabled under its base title,
+its sheet opens, `transcribe_for_fillers` makes one submit; **K1** keyless on
+K2's package, the refusals in their order and the stand-in silent; **K5**
+keyless, the item on over a filler transcript and off, suffixed, without one;
+**K7** no `Frame Job: ` line in either log; **K8** no Anthropic key, View ▸
+Assistant enabled and `assistant_send` refused in the Anthropic sentence.
+
+Mutants: probe mutants (`presence-memo`, `control-tooltip-unset`,
+`item-suffix-kept`, `start-missing-nil`, `settings-unobserved`,
+`no-clause-test`, `memo-without-folder-date`, `no-menu-reset`) rebuild the probe
+over a copy of `app/Sources`; app mutants (`present-ignores-environment`,
+`credential-before-ready`, `no-transcript-arm`) build the app in a tree copy
+(`tree_copy.build_app`, `work/keys/mutant-app/`) and run K2 with their row.

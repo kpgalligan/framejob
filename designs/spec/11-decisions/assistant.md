@@ -80,6 +80,8 @@ in §6).
   `-RCSecretFolder` keeps proofs away from the person's file. R6-5's "integrated AI offering"
   is THIS, and it does not unblock C2 (#125), which still needs the caller's identity. Risk
   accepted: a `0600` file rather than the Keychain, for R6-5's measured reason.
+  **Amended by CJ-10, CJ-11**: whether the key is present is `ModelKeys`'; the failure's words are
+  its Anthropic sentence.
 - **AI-9 — History is append-only, and end-of-turn compaction is the one rewrite.** Rasterize's
   rule, for the same reasons: Opus 5.5 rejects replayed thinking after an edited prefix, and an
   unchanged prefix keeps the cache warm; compaction runs only at the end of a turn, past a

@@ -1070,7 +1070,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             // cheap snapshot question its command's own guard asks, so the
             // menu and the command can never disagree.
             if let answer = validateSilenceAction(action) { return answer }
-            if let answer = validateFillerAction(action) { return answer }
+            if let answer = validateFillerAction(action, item: menuItem) { return answer }
             if let answer = validateTranscribeAction(action) { return answer }
             if let answer = validateCaptionExportAction(action) { return answer }
         }

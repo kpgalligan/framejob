@@ -1943,7 +1943,7 @@ func chromeSheet(_ request: [String: Any]) -> [String: Any] {
         "hintCloudEU": TranscribeSheetController.hint(for: .assemblyai, region: .eu),
         "openingHint": sheet.hintLabel.stringValue,
         "openingEngine": sheet.engine.rawValue,
-        "noKeyNote": TranscribeSheetController.noKeyNote,
+        "noKeyNote": ModelKeys.sentence(.assemblyAI),
         "maxKeyterms": AssemblyAIClient.maxKeyterms,
     ]
     // The Engine popup, switched the way AppKit switches it: select the row,
@@ -6592,9 +6592,13 @@ def section_hygiene(binary, sources):
         name for name in os.listdir(sources)
         if name.endswith(".swift") and not name.startswith("CloudTranscriber")
         and "CloudTranscriber(" in open(os.path.join(sources, name)).read())
-    check("S: `CloudTranscriber(` is constructed in exactly THREE files of app/Sources — "
-          "the tool's cloud arm, the Settings window's Verify and the sheet's cloud run",
-          others == ["AgentServer+CloudCaptions.swift", "SettingsWindowController+Verify.swift",
+    check("S: `CloudTranscriber(` is constructed in exactly FIVE files of app/Sources — "
+          "the tool's cloud arm, the Settings window's Verify and the sheet's cloud run, and "
+          "since cut-by-transcript CT-3 (TR-10) `transcribe_for_fillers` and Remove Filler "
+          "Words' Transcribe",
+          others == ["AgentServer+CloudCaptions.swift", "AgentServer+Fillers.swift",
+                     "FillerSheetController+Transcribe.swift",
+                     "SettingsWindowController+Verify.swift",
                      "TranscribeSheetController+Cloud.swift"], f"found in {others!r}")
     keyterms = sorted(
         name for name in os.listdir(sources)
@@ -6623,10 +6627,10 @@ def section_hygiene(binary, sources):
           in harness_text, "the harness's settings mode does not inject a store")
     sentences = sorted(
         name for name in os.listdir(sources)
-        if name.endswith(".swift") and "Settings ▸ Transcription" in open(
+        if name.endswith(".swift") and "Settings… ▸ Transcription" in open(
             os.path.join(sources, name)).read())
-    check("S: the credential refusal sentence has one source in the coordinator",
-          sentences == ["CloudTranscriber.swift"], f"found in {sentences!r}")
+    check("S: the credential refusal sentence has one source, `ModelKeys` (spec §11 CJ-11)",
+          sentences == ["ModelKeys.swift"], f"found in {sentences!r}")
     catalog_text = open(os.path.join(sources, "AgentCatalog+Captions.swift")).read()
     check("S: the catalog describes both keyed upload and all-cached keyless reuse",
           "New transcription needs an API key" in catalog_text
@@ -6992,7 +6996,8 @@ CLOUD_HINT_US = ("The audio of these files is uploaded to AssemblyAI (United Sta
 
 CLOUD_HINT_EU = CLOUD_HINT_US.replace("(United States)", "(European Union)")
 
-NO_KEY_NOTE = "No AssemblyAI API key is set — Frame Job ▸ Settings…"
+# `ModelKeys.sentence(.assemblyAI)` (spec §11 CJ-11): the note, the tooltip and the refusal.
+NO_KEY_NOTE = "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
 
 # §2's order, which is `AssemblyAILanguages.all`'s and the popup's.
 LANGUAGE_CODES = ["en", "en_au", "en_uk", "en_us", "es", "fr", "de", "it", "pt", "ar", "da",
@@ -7951,7 +7956,7 @@ def section_keyless(binary, sources):
                                             request(cache, **extra), timeout=120)
             check("KL: " + tag + " refuses the entire keyless batch without effects",
                   response is not None and response.get("ok") is False
-                  and "No AssemblyAI API key is set" in response.get("message", "")
+                  and NO_KEY_NOTE in response.get("message", "")
                   and not response.get("cues")
                   and response.get("report", {}).get("cached") == []
                   and response.get("report", {}).get("janitorDeferred")
@@ -8049,7 +8054,7 @@ def section_keyless(binary, sources):
             check(f"KL UI {action}: current package enables Generate without a key",
                   ui is not None and ui.get("enabled") is True
                   and ui.get("estimateReusable") is True
-                  and "No AssemblyAI API key" not in ui.get("note", "")
+                  and NO_KEY_NOTE not in ui.get("note", "")
                   and "without an API key or network request" in ui.get("hint", ""),
                   f"issue={issue!r}, ui={ui!r}")
             if ui is None:
@@ -8057,7 +8062,7 @@ def section_keyless(binary, sources):
             if action == "refresh":
                 check("KL UI refresh: keyless gate and hint return to cloud-work state",
                       ui.get("refreshEnabled") is False
-                      and "No AssemblyAI API key" in ui.get("refreshNote", "")
+                      and NO_KEY_NOTE in ui.get("refreshNote", "")
                       and "uploaded to AssemblyAI" in ui.get("refreshHint", ""),
                       f"ui={ui!r}")
             elif action == "click":
@@ -8072,7 +8077,7 @@ def section_keyless(binary, sources):
                       ui.get("didStart") is True and ui.get("didFinish") is True
                       and ui.get("sameProject") is True
                       and ui.get("textClips") == 0
-                      and "No AssemblyAI API key is set" in ui.get("status", "")
+                      and NO_KEY_NOTE in ui.get("status", "")
                       and qualified in " ".join(ui.get("warnings", [])),
                       f"ui={ui!r}")
             elif action == "queued-cancel":

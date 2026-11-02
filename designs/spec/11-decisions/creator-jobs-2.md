@@ -127,3 +127,76 @@ appended here from now on, before its code.
   second changes. `RecipeSource.set` and `Playback.update` are wired by CU3a2, when the recipe
   carries cursor media (a deviation from the road map's CU2 text: no media has a cursor before
   CU3a1).
+- **CJ-10 — `ModelKeys` is the one test of whether a key is present (CJ1; the owner's CJ1 answers,
+  2026-11-01: (1) Remove Filler Words stays usable with a current filler transcript and no key;
+  (2) View ▸ Assistant stays enabled with no key; (3) the parity check gains a sixth part; (4) a
+  disabled keyed menu item's title gains a suffix beside its tooltip).** `ModelKeys.swift` holds
+  `ModelKey` (`anthropic`, `assemblyAI`) and `ModelKeys`: `present(_:store:environment:)`, whose
+  defaults are the key's own configuration's `store()` (`AssemblyAIConfiguration.store()`,
+  `AssistantConfiguration.store(environment:)`) and the process environment, and which answers
+  whether that configuration's `credential(store:environment:)` resolves, so R6-9's and AI-13's
+  proof isolation is unchanged and the sheets keep passing their injected store and environment;
+  `sentence(_:)`; `refusal(_:)`, a `ToolError` with the sentence; `require(_:)`; and two marking
+  helpers. `mark(control, missing:, enabled:)` sets `isEnabled` to `enabled` and the tooltip to the
+  missing key's sentence, or nil when `missing` is nil; `mark(item, missing:, enabled:)` sets the
+  item's title to its base title plus the missing key's suffix — " (needs your AssemblyAI key)" or
+  " (needs your Anthropic key)", assigned only when it differs — and its tooltip the same way, and
+  answers `enabled`. `enabled` is always the caller's whole rule, key term included, and `missing`
+  says only why it is off: neither helper overrides it, so each caller's own key term stays the
+  gate its mutants test. `ModelKeys.didChangeNotification` (`userInfo` `key`, the source key's raw
+  value) is posted after either key's own notification — `SettingsWindowController`'s for
+  AssemblyAI, `AssistantConfiguration`'s for Anthropic — by one observer of each, installed once,
+  lazily, by `observe(_:selector:)` and by the first `mark(item…)`; each observer, synchronously
+  and in this order, resets the main menu's satisfied marks (`clearSatisfiedMarks(in:)`: every
+  keyed item whose key is now present gets its base title and a nil tooltip, nothing else changes)
+  and re-posts. The reset is there because an item is otherwise re-titled only by its validator,
+  which does not run while a sheet is up or with no editor in the responder chain. Nothing is
+  memoised (a presence test is one small file read; a memo would be wrong for an injected store
+  and stale when another Frame Job writes the key). Every read that decides "a key is present"
+  moves here; the senders still read the credential to send it. `AssistantSettingsPane.swift`'s
+  status line and `SettingsWindowController`'s panes are not gates and are unchanged.
+- **CJ-11 — One sentence per key, for tooltips, notes and refusals:** "No AssemblyAI API key is
+  set. Set one in Frame Job ▸ Settings… ▸ Transcription." and "No Anthropic API key is set. Set
+  one in Frame Job ▸ Settings… ▸ Assistant." They replace `CloudTranscriber.AccessError`'s,
+  `TranscribeSheetController.noKeyNote`'s (deleted) and `AssistantSession`'s words and every
+  bet's own (TX-14, FC-70). The environment variables leave the person-facing sentence (they are
+  in `docs/developing.md`). R6-17's precedence is unchanged, only its credential arm's words. The
+  Assistant tab's no-key row keeps its call to action, which is not a disabled control. Each keyed
+  tool's catalog description ends with its key's clause: "Keyed (spec §11 CJ-3): where it would
+  send to <AssemblyAI | Anthropic> it needs the person's <AssemblyAI | Anthropic> API key, and
+  without one it refuses there with "<the sentence>"".
+- **CJ-12 — The keyed table; every keyed tool refuses in its own precedence.** `ModelKeys.keyed`
+  lists each keyed feature: its name, its key, its menu selector (or none), its tools, and whether
+  it is conditional (keyed only when it would send). A tool refuses only where it would send, after
+  its own earlier refusals and any answer it can give from a cache; no tool is keyed before its
+  arguments are read, so dispatch gains no key check. The shipped rows:
+  - "Remove Filler Words" (AssemblyAI, Clip ▸ Remove Filler Words…, `transcribe_for_fillers`,
+    conditional). `transcribe_for_fillers`' order is unchanged — the id, the cache directory, a
+    clip playing the media, the ready arm (a media with a current filler transcript answers
+    `ready: true`, `uploaded: []` with no key), then the credential. The menu item is disabled,
+    with the AssemblyAI sentence as its tooltip and the suffix on its title, only when the project
+    has a clip that plays sound from a media file, no AssemblyAI key is present AND no media in
+    scope has a current filler transcript (`FillerTranscriptPresence.any`, which is
+    `FillerDetector.read(from:clips: nil)` answering at least one clip). That answer is memoised in
+    one entry keyed by the edited project's handle (held, compared by identity), the selection,
+    the cache directory and the modification date of `<cache>/transcripts/` (nil when absent) —
+    the date in place of the road map's "dropped on the transcript cache's posts", because the
+    transcript cache posts nothing; a transcript written or removed renames an entry in that
+    folder and moves its date. The Remove Filler Words sheet observes `ModelKeys`; a row's
+    Transcribe is marked with the AssemblyAI sentence when no key is present.
+  - "Generate Captions with AssemblyAI" (AssemblyAI, no menu selector, `transcribe`,
+    conditional): `transcribe {engine: "assemblyai"}` keeps R6-16 and R6-17 but for the words;
+    the Engine popup keeps AssemblyAI enabled (its cloud options must show for R6-16's reuse);
+    Start, disabled without a key unless R6-16 admits the batch, carries the AssemblyAI sentence
+    as its tooltip, which the on-device engine clears; the sheet observes `ModelKeys` in place of
+    `SettingsWindowController`'s notification.
+  - "Assistant" (Anthropic, no menu selector, `assistant_send` in a build with the dev tools and no
+    tool in Distribution, not conditional): the composer and Send as today, View ▸ Assistant
+    enabled (the tab says how to set the key), `assistant_send` refusing in the Anthropic sentence
+    when the session opens.
+  The bets add rows: TX6's `review_transcript {fillers}` and Fillers box, TX7's hand-off, FC7b's
+  Rank.
+- **CJ-13 — The startup parity check gains a sixth part:** every tool `ModelKeys.keyed` names is in
+  the catalog, and its description contains its key's clause (CJ-11); every offender is named.
+  `AgentServer.keyedToolFailure` in `AgentServer+Parity.swift`, chained after the fifth part in
+  `AgentServer.swift`'s parity line, reported as the other five are.

@@ -97,6 +97,8 @@ There is nothing to tune. Each run of consecutive fillers becomes one cut:
 
 Filler words come only from an **AssemblyAI** transcript made with filler words. Transcription on your Mac doesn't report them reliably. This makes filler removal a cloud feature: you need an AssemblyAI API key, set in **Frame Job ▸ Settings…** (⌘,) under **Transcription**.
 
+With no key, **Clip ▸ Remove Filler Words…** is greyed and reads **Remove Filler Words… (needs your AssemblyAI key)**; resting the pointer on it says "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." The exception is a project where a file in scope already has a transcript made with filler words: that transcript is already paid for, so the command stays on and cuts its fillers without a key. Saving a key in Settings turns the command on at once.
+
 Every AssemblyAI transcription Frame Job makes asks for filler words. Any file you caption with AssemblyAI (**File ▸ Generate Captions…**, AssemblyAI engine) is therefore already ready for Remove Filler Words, with no second upload. Only files never transcribed in the cloud, or transcribed before filler words were requested, are listed in the sheet.
 
 When a file in scope has no such transcript, the sheet lists it under "Filler words are found only in an AssemblyAI transcript made with filler words — transcription on this Mac does not report them. These files have none yet:". Each listed file gets a row with:
@@ -116,13 +118,13 @@ Pressing **Transcribe** sends one file:
 - While it runs, the row shows its progress, its button reads **Stop**, the other rows' buttons are disabled, and **Remove** is disabled. Return can't make a cut in the middle of a paid upload.
 - When it finishes, the file drops off the list and its fillers join the count. If the run failed, the reason appears in the note.
 
-**Transcribe** is disabled with no API key (the note points to **Frame Job ▸ Settings…**), for a file no clip plays, and while another file's run is going. A project you haven't saved yet can be transcribed; its transcript is kept with the project when you save. Closing the sheet stops a run in progress.
+**Transcribe** is disabled with no API key (the note, and the button's tooltip, read "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."; saving a key in Settings turns the buttons on with the sheet still open), for a file no clip plays, and while another file's run is going. A project you haven't saved yet can be transcribed; its transcript is kept with the project when you save. Closing the sheet stops a run in progress.
 
 ### Captions stay clean
 
 Filler words never reach your captions. **File ▸ Generate Captions…** removes them from every transcript before making captions, so a transcript made with filler words produces the same captions as one made without them. See [Captions](captions.md).
 
-*Agents:* `detect_fillers` answers the ranges the sheet would cut and changes nothing. It takes `clips` and lists each kept run under `fillers`, each left-in run under `dropped` with its reason, files with no filler transcript under `needs_transcript`, and locked clips under `locked`. It also answers `count`, `removes`, `scope` and `clips`, plus `skipped` when `clips` is given (each named clip it couldn't read, with the reason). Pass its `ranges` to `ripple_delete_ranges`. `transcribe_for_fillers` (`media`) is the Transcribe button: a paid upload that answers `ready` when `detect_fillers` can read that file. On a media that already has a filler transcript it uploads nothing and answers `ready: true`; otherwise it answers `uploaded`, `cached`, `audio_seconds`, `engine` and `language`. It is refused with no AssemblyAI key and for a media no clip plays. The built-in assistant can't use it.
+*Agents:* `detect_fillers` answers the ranges the sheet would cut and changes nothing. It takes `clips` and lists each kept run under `fillers`, each left-in run under `dropped` with its reason, files with no filler transcript under `needs_transcript`, and locked clips under `locked`. It also answers `count`, `removes`, `scope` and `clips`, plus `skipped` when `clips` is given (each named clip it couldn't read, with the reason). Pass its `ranges` to `ripple_delete_ranges`. `transcribe_for_fillers` (`media`) is the Transcribe button: a paid upload that answers `ready` when `detect_fillers` can read that file. On a media that already has a filler transcript it uploads nothing and answers `ready: true`; otherwise it answers `uploaded`, `cached`, `audio_seconds`, `engine` and `language`. It is refused for a media no clip plays and, when it would upload, with no AssemblyAI key, in the sentence above. The built-in assistant can't use it.
 
 ## Reading a clip's transcript
 
@@ -150,7 +152,7 @@ It cuts false starts only when you ask. It can also remove fillers the same way 
 
 ## Limits
 
-- **Filler removal is cloud-only.** Without an AssemblyAI key, filler words can't be found. A project transcribed before filler words were requested is transcribed again, and billed again, before its fillers can be cut.
+- **Filler removal is cloud-only.** Without an AssemblyAI key, filler words can't be found in a file that has no filler transcript yet. A project transcribed before filler words were requested is transcribed again, and billed again, before its fillers can be cut.
 - **The service can miss a filler.** A filler AssemblyAI doesn't return isn't cut. A filler it returns that isn't on the list stays in, both in the cut and in captions.
 - **Protection needs a transcript.** A filler cut is kept away from speech in another clip only when that clip's file has a transcript. Speech on another unlocked track with no transcript isn't protected.
 - **Up to a frame can remain.** Inward frame snapping can leave a frame of room tone, or of a filler, behind.

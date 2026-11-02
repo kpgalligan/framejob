@@ -2392,6 +2392,16 @@ free.
   — never `chmod`ed after; `MemoryStore` is
   the probe's. The language table is a DATED static list, not an authority:
   a code AssemblyAI refuses comes back as AssemblyAI's own sentence.
+- `ModelKeys.swift` — the key gate (road map creator-jobs CJ1, spec §11
+  CJ-10…CJ-13): `ModelKey` (`anthropic`, `assemblyAI`, their sentences'
+  sections, the title suffix and the catalog clause), the keyed table
+  `ModelKeys.keyed`, `present` (no memo; the sheets pass their injected store
+  and environment), `sentence`, `refusal`, `require`, `mark` of a control or
+  a menu item (`enabled` always the caller's whole rule), and the one-time
+  relay that resets the main menu's satisfied marks and re-posts either key's
+  notification as `ModelKeys.didChangeNotification`, the one a keyed surface
+  observes. `FillerSheetController.swift`'s `FillerTranscriptPresence` is the
+  filler menu item's memo.
 - `MediaTranscript.swift` — `cache/transcripts/<id>.json` and its
   `.complete.json` sidecar (`MediaImporter.transcriptsKind` is the post kind,
   and lives beside the other three in `MediaCacheFiles.swift`). The provider's

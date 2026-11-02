@@ -627,6 +627,11 @@ Needs your own AssemblyAI key (Setup 3).
 - **Expect:** each voice reads in its own colour (white, then yellow), legible over the band; Pill ignores it; the Speakers row reads whole.
 - **Source:** #93.
 
+**JOB-1 — Commands that need a key, with no key**
+- **Do:** 1. In Settings, remove both keys (Assistant and Transcription). 2. In a project with a spoken clip that has never been transcribed, open the Clip menu and rest the pointer on Remove Filler Words…. 3. File ▸ Generate Captions…, choose AssemblyAI, and rest the pointer on Generate; do the same on a Transcribe button in a Remove Filler Words sheet (open it in a project whose file already has a filler transcript, or with a key, then remove the key). 4. With that sheet open, save an AssemblyAI key in Settings. 5. With no Anthropic key, choose View ▸ Assistant.
+- **Expect:** Remove Filler Words… is greyed and reads "Remove Filler Words… (needs your AssemblyAI key)", and the suffix reads well beside the menu's other items; record whether macOS shows the tooltip on the greyed menu item (it decides whether the suffix stays, the road map's question 4). On the sheets the greyed button's tooltip reads whole: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." Saving the key turns the open sheet's buttons on at once, with no relaunch or reopening, and the menu item's suffix goes. View ▸ Assistant opens the Assistant tab, which says how to add the key.
+- **Source:** road map creator-jobs CJ1 (spec §11 CJ-10…CJ-12).
+
 ## Silence, transitions and motion
 
 **SIL-1 — Remove Silences by voice, listened to**

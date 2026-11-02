@@ -35,7 +35,7 @@ From top to bottom, the tab has:
 4. **The ask-first row**, shown only while the assistant is waiting for your permission.
 5. **The message field and Send.**
 
-Without a key, the message field is replaced by "Add your Anthropic API key in Settings to use the assistant." and an **Open Settings…** button.
+Without a key, the message field is replaced by "Add your Anthropic API key in Settings to use the assistant." and an **Open Settings…** button. **View ▸ Assistant** stays enabled with no key, so the tab can say this; saving the key in Settings brings the message field back at once. If a conversation is started without a key anyway (an agent's `assistant_send`), it fails with "No Anthropic API key is set. Set one in Frame Job ▸ Settings… ▸ Assistant."
 
 The tab doesn't switch away on its own while you work in it. The assistant's own edits change the selection without moving you to the Clip tab. Clicking a clip in the timeline or on the canvas still shows the Clip tab, as it always does.
 

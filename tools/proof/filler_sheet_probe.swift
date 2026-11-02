@@ -236,7 +236,7 @@ if let three = fixture(), let cache = three.document.cacheDirectory,
             && s.cloudNoteLabel.stringValue == FillerSheetController.cloudOnlyNote
             && !s.transcribeSection.isHidden && s.hintLabel.stringValue == hint
             && row0?.button.isEnabled == false
-            && s.noteLabel.stringValue.contains(TranscribeSheetController.noKeyNote)
+            && s.noteLabel.stringValue.contains(ModelKeys.sentence(.assemblyAI))
             && keyedEnabled && !s.applyButton.isEnabled && s.summaryLabel.stringValue == "No cuts",
         "seeded \(wrote), readable \(read); needs \(input.needsTranscript); rows "
             + "\(s.mediaRows.map(\.media)); fate \(String(describing: fate)); row line "

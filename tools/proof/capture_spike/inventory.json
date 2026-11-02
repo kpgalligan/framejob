@@ -468,7 +468,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func removeFillerWords(`",
-    "app/Sources/FillerSheetController.swift:302"
+    "app/Sources/FillerSheetController.swift:307"
    ],
    "note": "presentAsSheet(FillerSheetController); beeps with no clip that plays sound from a media file"
   },
@@ -1444,7 +1444,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/FillerSheetController.swift:302": {
+  "app/Sources/FillerSheetController.swift:307": {
    "token": "presentAsSheet",
    "func": "removeFillerWordsCommand",
    "reached_from": [

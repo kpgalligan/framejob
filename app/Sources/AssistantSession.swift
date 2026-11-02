@@ -105,10 +105,7 @@ final class AssistantSession {
         }
         let store = AssistantConfiguration.store()
         guard let key = AssistantConfiguration.credential(store: store) else {
-            return failure(
-                "No Anthropic API key is set. The assistant uses the person's own key (spec "
-                    + "§11 AI-8): the anthropic-key file in Frame Job's Application Support "
-                    + "folder, or ANTHROPIC_API_KEY.")
+            return failure(ModelKeys.sentence(.anthropic))
         }
         // Read, never prepared here (AI-3): a launch that skipped
         // `prepareAtLaunch()` must refuse the session, not repair itself.

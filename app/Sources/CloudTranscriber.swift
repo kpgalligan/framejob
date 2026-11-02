@@ -57,8 +57,7 @@ final class CloudTranscriber {
         case credentialRequired
 
         var errorDescription: String? {
-            "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ Transcription, "
-                + "or RC_ASSEMBLYAI_KEY for a proof."
+            ModelKeys.sentence(.assemblyAI)
         }
     }
 

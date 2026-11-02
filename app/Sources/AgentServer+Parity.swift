@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - The startup parity check's fifth part
+// MARK: - The startup parity check's fifth and sixth parts
 
 /// Part 5 of `AgentServer.catalogParityFailure`: every op tool declares the
 /// core's own arguments, and says what each one is FOR.
@@ -48,11 +48,12 @@ import Foundation
 /// two catalog proofs.
 ///
 /// **It is a file of its own** because `AgentServer.swift` is frozen at its
-/// size (app/CLAUDE.md) and this is the longest of the five parts — part 4
+/// size (app/CLAUDE.md) and this is the longest of the six parts — part 4
 /// is `AgentServer+Scope.swift`'s for the feature it is about, and parts 1
-/// to 3 stay beside the private dispatch table they read. Its reporting is
-/// identical to all four: an assertion in debug, a `Frame Job: ` line in
-/// release, and the server starts either way.
+/// to 3 stay beside the private dispatch table they read. Part 6, the keyed
+/// tools' clauses (spec §11 CJ-13), is `keyedToolFailure` at its foot. Its
+/// reporting is identical to the others': an assertion in debug, a
+/// `Frame Job: ` line in release, and the server starts either way.
 extension AgentServer {
 
     /// The two keys `AgentCatalog.tool` injects — `project` into every
@@ -191,5 +192,39 @@ extension AgentServer {
             }
         }
         return names
+    }
+
+    /// Part 6 (spec §11 CJ-13): every tool `ModelKeys.keyed` names is in the
+    /// catalog, and its description carries its key's clause (CJ-11), so an
+    /// agent reads which key a keyed tool needs before it calls. Every
+    /// offender is named.
+    static func keyedToolFailure(_ tools: [[String: Any]]) -> String? {
+        var descriptions: [String: String] = [:]
+        for tool in tools {
+            if let name = tool["name"] as? String {
+                descriptions[name] = tool["description"] as? String ?? ""
+            }
+        }
+        var missing: [String] = []
+        var unclaused: [String] = []
+        for row in ModelKeys.keyed {
+            for name in row.tools {
+                guard let description = descriptions[name] else {
+                    missing.append(name)
+                    continue
+                }
+                if !description.contains(row.key.catalogClause) { unclaused.append(name) }
+            }
+        }
+        var problems: [String] = []
+        if !missing.isEmpty {
+            problems.append("ModelKeys.keyed names tools the catalog does not have: \(missing)")
+        }
+        if !unclaused.isEmpty {
+            problems.append(
+                "keyed tools whose description does not carry their key's clause "
+                    + "(ModelKey.catalogClause, spec §11 CJ-11): \(unclaused)")
+        }
+        return problems.isEmpty ? nil : problems.joined(separator: "; ")
     }
 }

@@ -164,8 +164,7 @@ extension AgentServer {
                     + "AssemblyAI, a cloud service that transcribes it and is billed for it, "
                     + "and the transcript is deleted from AssemblyAI once the words have been "
                     + "read back; do not choose it for somebody else's recording without their "
-                    + "say-so. New transcription needs an API key (Frame Job ▸ Settings ▸ "
-                    + "Transcription, or RC_ASSEMBLYAI_KEY); a nonempty batch whose every "
+                    + "say-so. New transcription needs an API key; a nonempty batch whose every "
                     + "media has a current packaged transcript can be reused without a key "
                     + "or network request, unless refresh is true. Pending remote deletion "
                     + "is reported as deferred until a later run with the originating "
@@ -175,7 +174,8 @@ extension AgentServer {
                     + "request and reports them under cached. It adds uploaded, cached, "
                     + "audio_seconds (what was billed), speech_model_used, language_detected, "
                     + "endpoint (the host alone of the server a keyed run's requests go to; "
-                    + "absent when no API key is set) and, when there is something to say, note.",
+                    + "absent when no API key is set) and, when there is something to say, note. "
+                    + ModelKey.assemblyAI.catalogClause + ".",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,

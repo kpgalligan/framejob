@@ -1962,6 +1962,76 @@ guest's agreement, recorded in the spike's README).
   key)" or "(needs your Anthropic key)" beside its tooltip? *Recommended: yes, by default*; if
   JOB-1 finds macOS shows the tooltip on a disabled menu item, the suffix may be dropped.
 
+#### CJ1's record (2026-11-01)
+
+**Landed.** The key gate (spec §11 CJ-10…CJ-13, recorded before the code with the owner's four CJ1
+answers: Remove Filler Words usable over a current filler transcript, View ▸ Assistant enabled, the
+sixth parity part, the title suffix). Lane A, base `eb350b86`: the code, proofs and documents in
+`e0ebb8c3`, the review pass in `5a58bf43`, landed on `worktree-creator-jobs` as one commit after
+CU2. No core, FFI, header or format change. Every count below is a `wc -l` or a run's own output.
+
+- **Swift:** `ModelKeys.swift` (new, 218 lines): `ModelKey`, `KeyedFeature`, `ModelKeys`
+  (`present`, `sentence`, `refusal`, `require`, `mark` of a control and of a menu item,
+  `baseTitle`, `clearSatisfiedMarks`, `observe`, the one-time relay of
+  `SettingsWindowController`'s and `AssistantConfiguration`'s notifications as
+  `didChangeNotification`). `FillerSheetController.swift` 306 → 359: the keyed validator
+  `validateFillerAction(_:item:)` and `FillerTranscriptPresence`, memoised by handle, selection,
+  cache and the transcripts folder's date (CJ-12 in place of the road map's "dropped on the
+  transcript cache's posts": that cache posts nothing); the sheet observes `ModelKeys`.
+  `FillerSheetController+Transcribe.swift`, `TranscribeSheetController.swift` (its observer now
+  `ModelKeys.observe`; the on-device Start through `mark` so a cloud tooltip never lingers),
+  `TranscribeSheetController+Cloud.swift` (`noKeyNote` deleted; Start through `mark`, the anchor
+  line byte-identical), `CloudTranscriber.swift`, `AssistantSession.swift`,
+  `EditorViewController+Assistant.swift`, `AgentServer+Fillers.swift` (the credential arm's words,
+  order unchanged) take presence and the sentences from `ModelKeys`. The catalog clauses on
+  `transcribe_for_fillers`, `transcribe` and `assistant_send`; the sixth part
+  `AgentServer.keyedToolFailure` in `AgentServer+Parity.swift`. Frozen files, wiring only:
+  `EditorViewController.swift` one line (the validator arm passes `menuItem`), `AgentServer.swift`
+  one line (the parity chain). `make typecheck`: 0 errors, the 4 baseline warnings.
+- **Proofs:** `keys_probe.swift` (new, 382 lines) and `keys_proof.py` (new, 575 lines), K1–K8.
+  Re-pinned to the new sentence: `cloud_captions_probe.py` (the sheet's `noKeyNote` row now
+  `ModelKeys.sentence(.assemblyAI)`, `NO_KEY_NOTE`, the KL rows, the "one source" check now
+  `["ModelKeys.swift"]`), `cloud_captions_proof.py` (row 1, `NO_KEY`), `filler_sheet_probe.swift`
+  S3, `filler_sheet_proof.py` T4. `assistant_session_proof.py`'s `startswith` and the assistant
+  tab's no-key row needed no change. `capture_spike/inventory.json`: `FillerSheetController.swift`'s
+  `presentAsSheet` re-pointed 302 → 307. Screen 14b (`designs/screens/`) is `skip`ped: a keyless
+  launch with no filler transcript greys its item (CJ-12).
+- **Docs:** the guide (`settings.md`'s "What each key turns on", `cleanup-tools.md`, `captions.md`,
+  `mcp.md`, `assistant.md`, `menus-and-shortcuts.md`), `docs/developing.md` (keys in a proof),
+  `docs/manual-checks.md` JOB-1, spec §4.3c, §7.9a (the sixth part), §7.9b, §7.9e, §9, the
+  amendment lines on R6-17, AI-8 and TR-10.
+
+**Measured.** `make gate`: PASS 568 s (names 1, typecheck 6, test 341, app 219; fmt and lint
+skipped as unchanged); after the review pass PASS 305 s (names 1, test 303).
+Against Release: `keys_proof.py` 11/11; `filler_sheet_proof.py` 15/15; `cloud_captions_proof.py`
+225/225. In the loop on Debug: `keys_proof.py` K1, K2, K5, K7, K8 5/5; `filler_sheet_proof.py`
+T0–T6 5/5 as run; `cloud_captions_probe.py --only hygiene,chrome,keyless` 148/150, the two failures
+untouched by CJ1: "18: the baseline tree's project.yml reads" (under Owed) and "S:
+`CloudTranscriber(` is constructed in exactly THREE files", stale since cut-by-transcript CT-3 and
+fixed in CJ1's review pass (FIVE files, adding `AgentServer+Fillers.swift` and
+`FillerSheetController+Transcribe.swift`; `--only hygiene` 33/33).
+
+**Mutants.** Eleven, one per decision, each run once on the final instrument and each caught (exit 0): probe — `presence-memo` (K4), `control-tooltip-unset` (K6, K4b), `item-suffix-kept` (K3), `start-missing-nil` (K6), `settings-unobserved` (K4b), `no-clause-test` (K7), `memo-without-folder-date` (K5p), `no-menu-reset` (K3b); app, each in a tree copy's Debug build — `present-ignores-environment` (K2), `credential-before-ready` (K1), `no-transcript-arm` (K5). The three existing mutants on anchor lines CJ1 touched, re-run: `filler_sheet_proof.py --mutant transcribe-without-key` caught (S3 failed, exit 0); `cloud_captions_probe.py --mutant keyless-ui-requires-key` exit 1 with its six "KL UI … enables Generate without a key" rows failing, and `--mutant no-credential-check` exit 1 with "KL UI refresh" and "18: with an EMPTY store … Generate is disabled" failing; both builds scored, beside the baseline-history failures named under Owed.
+
+**Review.** Review 1 found one should-fix and two nits. The should-fix: the hygiene row
+"`CloudTranscriber(` is constructed in exactly THREE files", in the section of
+`cloud_captions_probe.py` CJ1 edits, had failed every run since CT-3; the pass (`5a58bf43`) made
+it expect FIVE with CT-3 (TR-10) as the reason (`--only hygiene` 33/33, `make gate` PASS), and
+skipped the Release proofs and mutants with reasons, no app source, probe or anchor having
+changed. Review 2 passed, the two nits left as nits: `transcribe_for_fillers`' description reads
+"…transcript cache and a media no clip plays from its file." as one condition
+(`AgentCatalog+Audio.swift`), and screen 14b's edited prose line runs past the file's wrap width.
+The CLAUDE.md edits (the root's parity check at six parts, the rule that a model feature tests
+its key through `ModelKeys`, `app/CLAUDE.md`'s `ModelKeys.swift` entry) were applied when the
+phase landed.
+
+**Owed.** JOB-1 (the owner at the machine): whether macOS shows a disabled menu item's tooltip,
+which decides question 4's suffix. Filed as issues when the phase landed: screen 14b's keyless
+capture (a `screens.py` fixture with a cached filler transcript, so Remove Filler Words opens
+keyless), and `cloud_captions_probe.py`'s "18: the baseline tree's project.yml reads", failing
+before CJ1 because its baseline tree is not in the repository (SP3, SP4·off and W fail in a whole
+run for the same reason).
+
 ### CU0a — scope, decisions, tolls
 
 Bet 2 opens here. Its phases run one at a time in lane B (CJ-6), CO's layout phases after them.

@@ -201,7 +201,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Speed Ramp… | Exactly one clip is selected and it plays a media file |
 | Close Gap | There is a current track and the timeline has clips |
 | Remove Silences… | Some clip plays sound |
-| Remove Filler Words… | Some clip plays sound from a media file forwards, with its audio on |
+| Remove Filler Words… | Some clip plays sound from a media file forwards, with its audio on, and either your AssemblyAI key is set or a file in scope has a transcript made with filler words; greyed for the key alone, it reads **Remove Filler Words… (needs your AssemblyAI key)** |
 | Transition ▸ items | A kind: a selected clip has room for a transition. **None**: something is selected |
 | Motion ▸ items | A selected clip shows a picture |
 | Look ▸ items | A selected clip shows a picture from a file, or is an adjustment clip |

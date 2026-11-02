@@ -411,6 +411,7 @@ final class AgentServer {
         // longest of the five, and this file is frozen at wiring.
         return schemaFailure(tools) ?? Self.scopeFailure(tools, ops)
             ?? Self.argumentFailure(tools, ops)
+            ?? Self.keyedToolFailure(tools)
     }
 
     /// Part 3: the structural check on each tool's declared input. It cannot

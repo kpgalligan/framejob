@@ -26,10 +26,6 @@ import AppKit
 /// function the tool uses and not a second copy of it.
 extension TranscribeSheetController {
 
-    /// The note under the button when no credential resolves — §5e's
-    /// sentence, and it names the window that fixes it.
-    static let noKeyNote = "No AssemblyAI API key is set — Frame Job ▸ Settings…"
-
     // MARK: - The engine and its languages
 
     /// Read off the ITEM, never off the index — app/CLAUDE.md's popup rule.
@@ -218,8 +214,7 @@ extension TranscribeSheetController {
         let jobs = self.jobs(in: scope)
         let estimate = cloudEstimate()
         let reusable = estimate?.canReuseWithoutCredential == true
-        let hasCredential = AssemblyAIConfiguration.credential(
-            store: store, environment: environment) != nil
+        let hasCredential = ModelKeys.present(.assemblyAI, store: store, environment: environment)
         hintLabel.stringValue = !hasCredential && reusable
             ? "Current cached transcripts will be used without an API key or network request."
             : Self.hint(
@@ -237,9 +232,13 @@ extension TranscribeSheetController {
         let hasWork = estimate.map {
             !$0.uploads.isEmpty || !$0.cached.isEmpty || !$0.awaiting.isEmpty
         } ?? false
-        startButton?.isEnabled =
+        let startEnabled =
             !jobs.isEmpty
             && document?.cacheDirectory != nil && (hasCredential ? hasWork : reusable)
+        // CJ-12: with no key and no batch R6-16 admits, Start says which key.
+        ModelKeys.mark(
+            startButton, missing: !hasCredential && !reusable ? .assemblyAI : nil,
+            enabled: startEnabled)
     }
 
     /// `noteText`'s cloud arm — the three things that are about the CALL and
@@ -247,10 +246,10 @@ extension TranscribeSheetController {
     /// scope holding nothing that can be transcribed.
     func cloudNoteText(jobs: [Transcriber.Job]) -> String {
         var notes: [String] = []
-        if AssemblyAIConfiguration.credential(store: store, environment: environment) == nil,
+        if !ModelKeys.present(.assemblyAI, store: store, environment: environment),
             cloudEstimate()?.canReuseWithoutCredential != true
         {
-            notes.append(Self.noKeyNote)
+            notes.append(ModelKeys.sentence(.assemblyAI))
         }
         if document?.cacheDirectory == nil {
             notes.append(

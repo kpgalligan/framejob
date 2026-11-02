@@ -318,6 +318,19 @@ server). To look at the chrome without a
 running app or a Screen Recording grant, use the offscreen harness in
 `tools/proof/harness/`.
 
+**Keys in a proof.** A feature that sends to Claude or AssemblyAI works only
+with its key present (spec §11 CJ-3), and the person-facing sentence names
+only Settings. A proof supplies a key three ways, and never the owner's own:
+`-RCSecretFolder <folder>` points both keys' stores at a disposable folder
+(an empty folder is "no key"; the files are `assemblyai-key` and
+`anthropic-key`); `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` are read when no
+key is stored, so a proof sets them to a dummy such as `proof-key` against a
+stand-in server (`tools/proof/assemblyai_fake.py`, `anthropic_fake.py`); and
+a keyless run is started under `env -u RC_ASSEMBLYAI_KEY -u
+ANTHROPIC_API_KEY`. `-RCAssemblyAIEndpoint` (AssemblyAI) and
+`RC_ASSISTANT_BASE_URL` (Anthropic) point at the stand-in, and either one
+without `-RCSecretFolder` leaves the stored key unopened.
+
 The root [`CLAUDE.md`](../CLAUDE.md) ("Verifying a build", "Verification",
 "Seeing the chrome") has the full rules: what a proof may claim, which build a
 recorded run drives, and the dev-only launch defaults.

@@ -247,19 +247,25 @@ else is what bloats files:
   files are the parent text for anything not settled here.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.prepareCatalog()` has FIVE parts: catalog names against handler
+  in `AgentServer.prepareCatalog()` has SIX parts: catalog names against handler
   names, every op in the core's table against the tools (through
   `rc_op_names`, with an explicit allow-list for ops that deliberately have
-  none), each tool's schema shape, that every op tool declares `scope`, and
+  none), each tool's schema shape, that every op tool declares `scope`,
   that every op tool declares the CORE's own arguments for its op — each one
   described, and no description for an argument no op has
-  (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
+  (`AgentServer+Parity.swift`), and that every tool `ModelKeys.keyed` names
+  exists and its description carries its key's clause
+  (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
   stranger by name, for all one hundred and seven product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
+- **A feature that needs a language or cloud model tests its key through
+  `ModelKeys`** (spec §11 CJ-3): presence, the sentence, the control's or
+  menu item's mark, the tool's refusal where it would send, and a row in
+  `ModelKeys.keyed`.
 - **A file at the ~600-line cap gives something up before it takes anything
   on**, as a pure move landed and gated alone; new files are capped at 400
   lines. Frozen files take wiring only. `core/src/edit.rs` and

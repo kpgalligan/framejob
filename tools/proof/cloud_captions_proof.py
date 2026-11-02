@@ -551,8 +551,8 @@ def row_one_no_key(instance, fake):
     text = session.error("transcribe", engine="assemblyai")
     check("1: with no key the run is refused with 5g's own sentence",
           text is not None
-          and "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ Transcription, "
-              "or RC_ASSEMBLYAI_KEY for a proof." in text,
+          and "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ "
+              "Transcription." in text,
           f"got {text!r}")
     check("1: and no request was made to find that out — the credential is read ABOVE the "
           "network", fake.log()["requests"] == [], f"got {routes(fake.log())!r}")
@@ -2178,8 +2178,7 @@ LOSER_MARKERS = {
     4: "only applies with engine", 5: "No AssemblyAI API key is set",
     6: "10-hour limit", 7: "its earlier transcript",
 }
-NO_KEY = ("No AssemblyAI API key is set. Set one in Frame Job ▸ Settings ▸ "
-          "Transcription, or RC_ASSEMBLYAI_KEY for a proof.")
+NO_KEY = "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
 DEFERRED = ("AssemblyAI has not confirmed deleting the transcript of media {media}; cleanup "
             "was deferred because no API key is set. Its deletion ID is retained in the "
             "project; a later run with a key for the originating account and region will "

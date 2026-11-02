@@ -167,6 +167,6 @@ extension EditorViewController {
     /// Whether a key would open a session: the store, then the environment
     /// (AI-8).
     private var assistantHasKey: Bool {
-        AssistantConfiguration.credential(store: AssistantConfiguration.store()) != nil
+        ModelKeys.present(.anthropic)
     }
 }

@@ -139,7 +139,10 @@ Close Gap, Remove
 Silences…, Remove Filler Words… (cut-by-transcript CT-3, §11 TR-10: a sheet over
 `detect_fillers`' answer whose Remove is one `ripple_delete_ranges` step, undo
 "Remove Filler Words", and whose rows' Transcribe is `transcribe_for_fillers`;
-enabled when a clip plays sound from a media file; no key equivalent, for
+enabled when a clip plays sound from a media file and either an AssemblyAI key
+is present or a media in scope has a current filler transcript — greyed for the
+key alone, with `ModelKeys`' sentence as its tooltip and " (needs your
+AssemblyAI key)" on its title, §11 CJ-12; no key equivalent, for
 Remove Silences…' reason), Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
 and None; no key equivalent), Look ▸ (the eight looks, a separator, then the
 project's `.cube` LUTs in media-list order and a second separator when there
@@ -225,4 +228,7 @@ the inspector on Clip ▸ Color. It is greyed while a nest is open and when
 there is nothing to cover (no range, no selection and an empty timeline);
 §11 GR-6 has the rules.
 All menu items are nil-target selectors validated in
-`validateUserInterfaceItem`.
+`validateUserInterfaceItem`. A keyed item (`ModelKeys.keyed`, §11 CJ-12)
+validates off only for its key when it would send, with the key's sentence as
+its tooltip and its title suffix; a key saved in Settings clears the suffix
+at once. View ▸ Assistant stays enabled with no key.

@@ -28,7 +28,8 @@ missing `speech.mov` is a scored FAIL):
       row, `FillerTranscription.estimate` fate `.upload(.refresh)`, the row's
       line `describe` of it with "1 file to upload", the cloud-only note and
       `uploadHint` of the probe's region shown; keyless the button is off and
-      the note holds `noKeyNote`, keyed it is on; Remove off, "No cuts".
+      the note holds `ModelKeys.sentence(.assemblyAI)` (spec §11 CJ-11), keyed it
+      is on; Remove off, "No cuts".
   S4  `options(for:)` keeps a marker's language, speakers and vocabulary with
       the shipped models and fillers; nil is detection, none, none.
   S5  `jobs(for:)` drops another media's clip and a reversed one.
@@ -393,8 +394,7 @@ def app_rows(results, wanted, binary, speech):
                         refusal = session.error("transcribe_for_fillers", media=media)
                         sent = cloud.uploads(fake.log())
                         want = ("transcribe_for_fillers: No AssemblyAI API key is set. Set one "
-                                "in Frame Job ▸ Settings ▸ Transcription, or RC_ASSEMBLYAI_KEY "
-                                "for a proof.")
+                                "in Frame Job ▸ Settings… ▸ Transcription.")
                         return (refusal == want and not sent,
                                 f"refusal {refusal!r}; uploads {len(sent)}")
                     finally:

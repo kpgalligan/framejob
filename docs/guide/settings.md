@@ -15,7 +15,35 @@ The Assistant tab also opens it for you: when no Anthropic key is set, it
 shows "Add your Anthropic API key in Settings to use the assistant." and an
 **Open Settings…** button. The Generate Captions sheet only tells you where
 to go: with AssemblyAI chosen and no key set, the note under its button reads
-"No AssemblyAI API key is set — Frame Job ▸ Settings…".
+"No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸
+Transcription.", and **Generate** shows the same sentence when you rest the
+pointer on it.
+
+### What each key turns on
+
+Anything that sends your words or your audio to a language model or a cloud
+model needs your own key for it, and without the key the command is greyed
+rather than hidden:
+
+- **Your AssemblyAI key** (Transcription, below) turns on the AssemblyAI
+  engine of **File ▸ Generate Captions…** and the **Transcribe** buttons of
+  **Clip ▸ Remove Filler Words…**. With no key, **Generate** is greyed when
+  the AssemblyAI engine is chosen (unless every file is already transcribed,
+  see [Captions](captions.md)), each **Transcribe** button is greyed, and
+  **Clip ▸ Remove Filler Words…** itself is greyed and reads **Remove Filler
+  Words… (needs your AssemblyAI key)** — unless a file in the project already
+  has a transcript made with filler words, which it keeps using without a
+  key.
+- **Your Anthropic key** (Assistant, below) turns on the assistant. With no
+  key, **View ▸ Assistant** still opens the Assistant tab, which says how to
+  add the key.
+
+Resting the pointer on a greyed control shows "No AssemblyAI API key is set.
+Set one in Frame Job ▸ Settings… ▸ Transcription." (or the same sentence for
+Anthropic and **Assistant**). Saving the key turns the commands on at once,
+even with the sheet still open; there is nothing to relaunch. Everything that
+runs on your Mac — on-device captions, Remove Silences, Enhance Voice and the
+rest — needs no key.
 
 Settings is one window, not a set of tabs. It holds four sections, top to
 bottom: **MCP**, **Assistant**, **Transcription** and **Playback**. On a
@@ -33,8 +61,11 @@ press Escape) to close it.
 the region and Background render are set only by a person in this window.
 An agent's cloud tools (`transcribe` with the AssemblyAI engine,
 `transcribe_for_fillers`) do use the key and region saved here, so a person
-must set the key first; without one they refuse with "No AssemblyAI API key
-is set. Set one in Frame Job ▸ Settings ▸ Transcription…".
+must set the key first; without one they refuse, at the point they would
+send, with "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸
+Transcription." A file that already has a transcript they can use is answered
+without a key. The assistant's own tool, `assistant_send` (a dev tool), refuses
+the same way with the Anthropic sentence.
 
 ## MCP
 

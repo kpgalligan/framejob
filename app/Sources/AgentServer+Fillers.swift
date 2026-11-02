@@ -143,8 +143,7 @@ extension AgentServer {
                 let credential = AssemblyAIConfiguration.credential(
                     store: AssemblyAIConfiguration.store())
             else {
-                throw ToolError(
-                    message: CloudTranscriber.AccessError.credentialRequired.localizedDescription)
+                throw ModelKeys.refusal(.assemblyAI)
             }
             let client: AssemblyAIClient
             do {

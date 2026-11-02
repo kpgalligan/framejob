@@ -161,7 +161,18 @@ final class FillerSheetController: NSViewController {
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,
                 leading: [sheetFootnote("markers keep their place")]))
+        // A key saved or removed in Settings while this sheet is up reaches
+        // its rows at once (spec §11 CJ-10).
+        ModelKeys.observe(self, selector: #selector(modelKeysChanged(_:)))
         rebuildRows()
+        refresh()
+    }
+
+    /// A key or the region changed in Settings: the hint names the region,
+    /// and the rows and the note follow the key.
+    @objc func modelKeysChanged(_ note: Notification) {
+        hintLabel.stringValue = Self.uploadHint(
+            region: AssemblyAIConfiguration.region(defaults: defaults))
         refresh()
     }
 
@@ -297,10 +308,52 @@ extension EditorViewController {
     }
 
     /// The half of `validateUserInterfaceItem` this file owns. nil means "not
-    /// mine" and leaves the other answers alone.
-    func validateFillerAction(_ action: Selector) -> Bool? {
+    /// mine" and leaves the other answers alone. Keyed (spec §11 CJ-12): off,
+    /// with the AssemblyAI sentence and the title suffix, only when no key is
+    /// present and no media in scope has a current filler transcript.
+    func validateFillerAction(_ action: Selector, item: NSMenuItem?) -> Bool? {
         guard action == #selector(EditorViewController.removeFillerWords(_:)) else { return nil }
         guard let document = document else { return false }
-        return Transcriber.hasTranscribableClip(in: document.editedProject.snapshot)
+        let playable = Transcriber.hasTranscribableClip(in: document.editedProject.snapshot)
+        let missing: ModelKey? =
+            playable && !ModelKeys.present(.assemblyAI)
+                && !FillerTranscriptPresence.any(in: document) ? .assemblyAI : nil
+        return ModelKeys.mark(item, missing: missing, enabled: playable && missing == nil)
+    }
+}
+
+/// Whether any media in Remove Filler Words' scope has a current filler
+/// transcript (spec §11 CJ-12) — the menu validator's question, asked every
+/// time a menu opens. One entry, kept while the edited project's handle, the
+/// selection, the cache directory and `<cache>/transcripts/`'s modification
+/// date are the ones it was answered for: the transcript cache posts nothing,
+/// and a transcript written or removed renames an entry in that folder.
+enum FillerTranscriptPresence {
+    private struct Key {
+        let project: ReelProject
+        let selection: Set<UInt32>
+        let cache: URL?
+        let stamp: Date?
+    }
+
+    private static var memo: (key: Key, answer: Bool)?
+
+    static func any(in document: ProjectDocument) -> Bool {
+        let cache = document.cacheDirectory
+        let folder = cache?.appendingPathComponent(MediaImporter.transcriptsKind, isDirectory: true)
+        let stamp = folder.flatMap {
+            try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+        let key = Key(
+            project: document.editedProject, selection: document.selection, cache: cache,
+            stamp: stamp)
+        if let memo, memo.key.project === key.project, memo.key.selection == key.selection,
+            memo.key.cache == key.cache, memo.key.stamp == key.stamp
+        {
+            return memo.answer
+        }
+        let answer = !FillerDetector.read(from: document, clips: nil).clips.isEmpty
+        memo = (key, answer)
+        return answer
     }
 }

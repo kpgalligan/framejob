@@ -82,7 +82,7 @@ extension FillerSheetController {
 
     /// Whether a key resolves, through the sheet's own store and environment.
     var hasCredential: Bool {
-        AssemblyAIConfiguration.credential(store: store, environment: environment) != nil
+        ModelKeys.present(.assemblyAI, store: store, environment: environment)
     }
 
     /// The buttons' titles and states: Stop on the running row, Transcribe
@@ -100,7 +100,9 @@ extension FillerSheetController {
                 row.button.isEnabled = true
                 continue
             }
-            row.button.isEnabled = idle && hasCredential && runnable.contains(row.media)
+            ModelKeys.mark(
+                row.button, missing: hasCredential ? nil : .assemblyAI,
+                enabled: idle && hasCredential && runnable.contains(row.media))
         }
     }
 
@@ -108,7 +110,7 @@ extension FillerSheetController {
     func transcribeNotes() -> [String] {
         guard !input.needsTranscript.isEmpty else { return [] }
         var notes: [String] = []
-        if !hasCredential { notes.append(TranscribeSheetController.noKeyNote) }
+        if !hasCredential { notes.append(ModelKeys.sentence(.assemblyAI)) }
         if cacheDirectory == nil {
             notes.append(
                 "This project has nowhere to keep its transcript cache, so it cannot be "

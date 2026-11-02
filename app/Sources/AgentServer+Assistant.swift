@@ -301,7 +301,8 @@ extension AgentServer {
                 + "window's session (the person's key and model, never an argument). Answers "
                 + "the streamed text joined, and every event since the call but the text and "
                 + "progress deltas, and stopped_ms (null unless stop_after pressed Stop). "
-                + "Refused while a turn is running: assistant_answer answers or stops it.",
+                + "Refused while a turn is running: assistant_answer answers or stops it. "
+                + ModelKey.anthropic.catalogClause + ".",
             [
                 "text": ["type": "string", "description": "The message, as the person types it."],
                 "timeout": [

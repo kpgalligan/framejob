@@ -204,6 +204,8 @@ TR-11.
     AI-7.
   - Risk accepted: a request that had speaker labels is billed again with the speakers
     surcharge, and its vocabulary carries over unseen; the person sees the price first.
+  **Amended by CJ-12**: Clip ▸ Remove Filler Words… is disabled, with the key's tooltip, when no
+  AssemblyAI key is present and no media in scope has a current filler transcript.
 - **TR-11 — `get_transcript {clip, language?}` answers one clip's words in timeline ticks with
   fillers flagged, from the media's cached transcript or else this Mac's recogniser, never the
   network; the run is off main and the assistant's Stop reaches it (amends AI-16); the prompt

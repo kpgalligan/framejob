@@ -1,6 +1,7 @@
 ```json screen
 {
   "title": "Remove Filler Words",
+  "skip": "screens.py launches with no AssemblyAI key and the demo project has no filler transcript, so Clip ▸ Remove Filler Words… is disabled (spec §11 CJ-12); a fixture with a cached filler transcript would open it",
   "project": "demo",
   "steps": [
     {"call": "set_selection", "args": {"clips": []}},
@@ -25,7 +26,7 @@ speech grid but never into the words beside it, with its edges snapped inward
 to the frame grid, and that a filler which would cut into another clip's word, a
 nest or a transition is left in. Below it, "No cuts" in small monospaced type —
 nothing in this project has been transcribed with filler words yet — and a grey
-note: "No AssemblyAI API key is set — Frame Job ▸ Settings…".
+note: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
 
 Then the section for the files with no filler transcript: a bold sentence that
 filler words are found only in an AssemblyAI transcript made with filler words,
@@ -37,7 +38,7 @@ until Transcribe is pressed. Two rows follow, "speech.mov" and "toneA.m4a", each
 with its estimate in monospaced grey under the name — "1 file to upload ·
 00:00:05.249 of audio · under $0.01 at AssemblyAI's published rate" and the
 same for 00:00:04.977 — and a dimmed outlined "Transcribe" button on the right,
-off because no key is set. At the foot, "markers keep their place" in small grey
+off because no key is set; hovering it shows the same sentence as its tooltip. At the foot, "markers keep their place" in small grey
 type, "Cancel", and a dimmed "Remove", since there is nothing to remove.
 
 The second capture is the editor's timeline while the sheet is up: the timeline
