@@ -8755,6 +8755,7 @@ APP_STATE_TOOLS = [
     "get_transcript", "list_graphics", "insert_graphic", "export_graphic",
     "import_graphic", "get_media_analysis", "split_at_shots", "get_timeline_transcript",
     "new_project_from_range", "analyze_cutout", "text_behind_subject", "get_cursor_events",
+    "auto_zoom",
 ]
 # `git show 7a198db^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (2a8421b) after `remove_media` and `export_status`,
@@ -8771,8 +8772,9 @@ FILE_GROUP_ORDER = [
 # document, so the catalog is the ops less these plus the app-state tools.
 OPS_WITHOUT_TOOLS = {"keep_range"}
 RECORD_SCREEN_ARGUMENTS = [
-    "camera", "camera_format", "display", "enhance", "include_framejob_windows", "microphone", "path",
-    "place", "project", "rate", "seconds", "show_clicks", "size", "source", "system_audio", "window",
+    "camera", "camera_format", "display", "enhance", "include_framejob_windows", "keys",
+    "microphone", "path", "place", "project", "rate", "seconds", "show_clicks", "size", "source",
+    "system_audio", "window",
 ]
 
 

@@ -237,6 +237,35 @@ With **Record shortcuts** ticked, a display or window recording also writes your
 
 Recording keys needs macOS's **Input Monitoring** permission (see [Permissions](#permissions)). While it records, the menu-bar item shows the keyboard mark (see [The menu-bar item](#the-menu-bar-item)). *Agents:* `record_screen` with `keys: "shortcuts"`, and `get_cursor_events` reads the shortcuts and typing back.
 
+## Auto Zoom
+
+**Clip ▸ Auto Zoom…** zooms a screen recording in where things happen, from its cursor file: it arrives just before each click, stays while you keep working there, and zooms back out once you stop. Every zoom it makes is an ordinary action, like one from [Zoom to Region](motion-and-transitions.md#zoom-to-a-region), so you can move, retime, change or delete any of them afterwards. The whole plan is one undo step, "Auto Zoom".
+
+Select one or more clips whose movies have cursor files (see [The cursor](#the-cursor)) and choose the item. It works inside an open nest too. It is greyed when a selected clip is not a movie with a cursor file.
+
+| Control | What it does | Default |
+|---|---|---|
+| **Zoom** | How far in, as a multiple of the clip's own size. | 2× (1.25–4) |
+| **Arrive** | How many seconds before a click the zoom-in starts. | 0.6 s (0.2–2) |
+| **Stay** | How long the zoom holds after the last click or typing before it zooms back out. | 2.5 s (0.5–10) |
+| **Follow the cursor while zoomed** | Pans along when the pointer stays near the edge of the zoomed view. | on |
+| **Zoom on typing** | Zooms in on stretches of typing too, aimed at the last click before them. Greyed when the recording holds no typing (see [Shortcuts and Input Monitoring](#shortcuts-and-input-monitoring)). | on when there is typing |
+| **Replace existing zooms** | Removes the clips' existing zooms first. Off keeps your own zooms. | off |
+
+The sheet reads the cursor files first ("Reading cursor files…"), then says what Zoom would do, for example "5 zooms in 2 visits." and, when some planned zooms meet an action already on the clip, "1 dropped where an action is already set." It says so instead when a clip can't be planned. Frame Job remembers Zoom, Arrive, Stay, Follow and Replace for next time, but only once you change one; Zoom on typing is never remembered.
+
+How it plans:
+
+- **A visit** starts at a click (any button) or a stretch of typing. A later click within **Stay** of the last activity joins it; a longer gap, or scrolling, ends it. A visit is a zoom-in that arrives **Arrive** seconds before its first click, a pan to each later click that falls outside the middle 60 % of the view, and a 0.8 s zoom back out. When one visit would zoom out less than a second before the next zooms in, it pans across instead.
+- **Follow** adds a half-second pan when the pointer stays outside the middle 70 % of the view for 0.3 s, at most one a second.
+- **The view** keeps the canvas's shape and never shows past the edge of the picture: near a corner it stops at the corner.
+- **Split clips.** The halves of a split clip are planned as one recording, and every zoom out goes back to the first half's placement. No zoom crosses a cut. A zoom held across a cut carries into the next half, which starts already zoomed; when that half has an action of its own there, or wasn't selected, the zoom goes back out at the cut instead.
+- **Your own actions.** A planned zoom that would overlap an action already on the clip is left out. With **Replace existing zooms**, the clips' existing zooms are removed first — only zooms, never a speed change, a fade or anything else.
+
+A clip placed smaller than the canvas (side by side with a camera, or a picture in picture) is refused: "Clip C is placed smaller than the canvas; a zoom would fill the canvas. Nest it (Clip ▸ Nest) and run Auto Zoom inside the nest." Nest it, open the nest and run Auto Zoom there; the zooms then fill the nest. A clip that plays reversed is refused too.
+
+*Agents:* `auto_zoom` plans and applies the same zooms, with the sheet's settings as arguments.
+
 ## Voice-overs (Microphone Only)
 
 To record narration over your edit, choose **Microphone Only** in **Source**:

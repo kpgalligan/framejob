@@ -82,6 +82,8 @@ Frame Job adds a 1-second **Ease In Out** action at the playhead whose end state
 
 The mode needs exactly one selected clip that is drawn at the playhead and is not on a locked track. Otherwise **Z** beeps.
 
+To zoom a screen recording at every click at once, use **Clip ▸ Auto Zoom…**, which plans these same zoom actions from the recording's cursor file (see [Auto Zoom](screen-recording.md#auto-zoom)).
+
 **Zoom Back** (the zoom-out magnifier in the action lane) adds a 1-second **Ease In Out** action at the playhead whose end state is the clip's own base scale, x and y, whatever earlier actions did. Use it after a Zoom to Region to pull back out. It needs the same target as **Z** (one selected clip drawn at the playhead, not on a locked track) and beeps otherwise. The new action is selected.
 
 *Agents:* `add_zoom_action` (`region` as centre and size in source pixels from the centre of the clip's cropped picture, `fit` or `fill`, optional `curve` and `duration`; `region: null` is a zoom back).

@@ -1115,6 +1115,13 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Answer:** was the keyboard mark noticeable, were the shortcuts right, and did the password field leave no marks?
 - **Source:** road map "creator-jobs" CU6 (spec §11 CU-60, CU-61); `tools/proof/cursor_keys_proof.py` Y3 and Y4 post keys in-process only where the terminal holds Screen Recording, Input Monitoring and post access, which an agent's terminal does not, and cannot see the menu bar.
 
+**JOB-25 — Auto Zoom on a real tutorial puts the zooms where a person would**
+- **When:** once a real narrated screen tutorial with its cursor file exists (sample S-ST2), and again when Auto Zoom's figures change. The verdict is carried into CU12's trial.
+- **Do:** 1. Import the tutorial into a project (its `.fjcursor` beside it attaches), put it on the timeline and select it. 2. Clip ▸ Auto Zoom…, leave every control at its default and press Zoom. 3. Play the whole clip. 4. Undo, then try once more with Zoom 1.5× and once with Stay 4 s.
+- **Expect:** the picture zooms in just before each click, holds while you keep working in one place, pans when you move to another part of the screen, and zooms back out after you stop; nothing zooms past the edge of the recording; every zoom is an ordinary action on the clip's action lane.
+- **Answer:** at the defaults, were the zooms where you would have put them? Name any that came too early, too late, too tight, too often or not at all, and say which of 1.5× and Stay 4 s read better.
+- **Source:** road map "creator-jobs" CU7 (spec §11 CU-70, CU-77); `tools/proof/cu7_proof.py` measures the plan against hand-worked fixtures, but whether a zoom is where a person would put it is a viewer's judgement.
+
 **JOB-29 — The cursor spikes at the machine (CU-S1…CU-S3)**
 - **When:** once at CU0b, before CU1b and CU6, and again after each macOS major update, since `NSCursor.currentSystem` may start answering nil.
 - **Do:** 1. Unlock the Mac, close or hide other windows, and leave the terminal holding Screen Recording. Then run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`. It takes a few minutes: it warps the pointer, shows full-screen grey windows, and opens a small text window. Keep your hands off the mouse and keyboard. 2. Run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person` and follow each prompt on the terminal:

@@ -187,7 +187,15 @@ governs a module now.
   the image in force and ripples (CU-23). `cursor_smooth.rs` — `hold_end`, the one
   hold rule, and `SmoothPath` (pins, RDP, centripetal Catmull–Rom; CU-21).
   `cursor_query.rs` — the request vocabulary (its module doc) and `query`.
-  `cursor_bursts.rs` — typing stretches (CU7 adds scroll bursts). `encode_base64`
+  `cursor_bursts.rs` — typing stretches and scroll bursts, one run finder. Auto Zoom's
+  planner (road map creator-jobs CU7, spec §11 CU-70…CU-75), `plan_zooms` in
+  `rc_cursor_query` (one track per clip, and the project): `cursor_zoom.rs` its
+  arguments, refusals in CU-75's order, Replace's removals (`is_zoom` only), the bases a
+  hold across a cut sets, and the ops (`remove_action`, `set_video`, `add_zoom_action` in
+  time order) and answer; `cursor_zoom_run.rs` a run (clips continuing one source on one
+  track) — its anchors through S, scroll bursts, barriers, the 10 Hz follow cursor and
+  `land` (only given clips, no straddled cut); `cursor_zoom_visits.rs` anchors → visits →
+  planned actions in container time, pure. `encode_base64`
   sits beside `decode_base64` in `cursor_file_check.rs`, base64's one home. No file
   I/O, no pixel work: a PNG is checked by its signature.
 - `model_cursor.rs` · `cursor_props.rs` · `recipe_cursor.rs` — the cursor in the model and the
@@ -818,6 +826,14 @@ governs a module now.
   IS the placement equation** between the region frame and canvas pixels,
   rotation and crop included; it composes `add_action` + `set_action` +
   `set_action_end` so a drag is one undo step and every refusal is inherited.
+  `zoom_placement` (the solve, which `zoom_patch` calls), `region_for_placement`
+  (its inverse, spec §11 CU-74) and `region_size` (a region of the canvas's
+  aspect that fits to a scale) are Auto Zoom's.
+- `action_class.rs` — actions classed by content, with no tag (road map
+  creator-jobs CU7, spec §11 CU-73, CO-63, CJ-8 (i)): `PLACEMENT_KEYS`;
+  `is_zoom` (an end's `video` exactly `scale`, `x`, `y`, no other group or a
+  numeric `speed`; the twin of `ActionBands.isZoom`), `is_layout` (all six),
+  `moves` (any of the six).
 - `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`

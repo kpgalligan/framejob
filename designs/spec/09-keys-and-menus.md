@@ -137,7 +137,12 @@ where the clip sits — is asked about first in the Weak match alert sheet,
 Apply (Return) or Cancel (Escape), and Cancel changes nothing; since round 3,
 §11 SY-29, either tier — the sheet included — comes only when the two
 waveforms line up there (a clear GCC-PHAT peak), else the command is refused
-at the inspector's foot), Add Action, Speed… (on a ramped clip it sets the base rate and
+at the inspector's foot), Add Action, Auto Zoom… (road map creator-jobs CU7, §11 CU-76: a sheet
+with Zoom, Arrive before the click, Stay after the last activity, Follow the cursor while zoomed,
+Zoom on typing and Replace existing zooms over the selected clips' cursor files; Zoom is one
+"Auto Zoom" step of ordinary zoom actions; enabled with at least one selected clip, each a media
+clip whose media has a cursor file, and no sheet up, inside a nest too; no key equivalent; its
+mirror is `auto_zoom`), Speed… (on a ramped clip it sets the base rate and
 scales the ramp with it, §11 SR-19 (a), SR-21 (f)), Speed Ramp… (#340, §11 SR-24: the
 speed ramp presets on the one selected media clip, over the in/out range when it lies inside the
 clip; enabled with exactly one such clip selected; no key equivalent; its mirror is

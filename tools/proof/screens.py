@@ -278,6 +278,18 @@ NOT_SHOWN = {
                           "it",
     "RCDevRetimeAccept": "a dev launch default with which the Retime Range sheet presses "
                          "its own Apply (spec §11 CU-90 (d)); no screen launches with it",
+    "RCDevAutoZoomAccept": "a dev launch default with which the Auto Zoom sheet presses its "
+                           "own Zoom (spec §11 CU-76); no screen launches with it",
+    "FrameJobAutoZoomZoom": "Auto Zoom's remembered Zoom (spec §11 CU-76), written only when "
+                            "the sheet's Zoom changes it; no screen shows the sheet",
+    "FrameJobAutoZoomLead": "Auto Zoom's remembered Arrive (spec §11 CU-76); no screen shows "
+                            "the sheet",
+    "FrameJobAutoZoomStay": "Auto Zoom's remembered Stay (spec §11 CU-76); no screen shows "
+                            "the sheet",
+    "FrameJobAutoZoomFollow": "Auto Zoom's remembered Follow (spec §11 CU-76); no screen "
+                              "shows the sheet",
+    "FrameJobAutoZoomReplace": "Auto Zoom's remembered Replace (spec §11 CU-76); no screen "
+                               "shows the sheet",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

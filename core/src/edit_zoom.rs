@@ -359,6 +359,18 @@ fn zoom_offset(video: &VideoProps, region: &ZoomRegion, scale: f64) -> (f64, f64
     (-x, -y)
 }
 
+/// The size of a region with the canvas's aspect that `fit` solves to
+/// exactly `scale` on a layer rotated `rotation` degrees (spec §11 CU-70):
+/// `a·(W, H)` with `a = min(W / (W·k + H·m), H / (W·m + H·k)) / scale`, so
+/// `zoom_scale`'s fit formula gives back `scale` (inside the legal range).
+pub(crate) fn region_size(canvas: (f64, f64), scale: f64, rotation: f64) -> (f64, f64) {
+    let (width, height) = canvas;
+    let (sin, cos) = rotation.to_radians().sin_cos();
+    let (k, m) = (cos.abs(), sin.abs());
+    let a = (width / (width * k + height * m)).min(height / (width * m + height * k)) / scale;
+    (a * width, a * height)
+}
+
 impl Project {
     /// Adds an action at CLIP time `at` whose end patch zooms the layer so
     /// that `region` meets the canvas (spec §6).
@@ -456,12 +468,50 @@ impl Project {
             // later zoom in the same clip measures from.
             return json!({"video": {"scale": base.scale, "x": base.x, "y": base.y}});
         };
+        let (scale, x, y) = self.zoom_placement(target, start, &region, fit.unwrap_or_default());
+        json!({"video": {"scale": scale, "x": x, "y": y}})
+    }
+
+    /// The `scale`, `x`, `y` that put `region` on the canvas for `clip` at
+    /// clip time `at` — (★) solved, the module doc's derivation.
+    pub(crate) fn zoom_placement(
+        &self,
+        clip: &Clip,
+        at: Ticks,
+        region: &ZoomRegion,
+        fit: ZoomFit,
+    ) -> (f64, f64, f64) {
         let canvas = (f64::from(self.canvas.width), f64::from(self.canvas.height));
         // Evaluated, not base: the rectangle was drawn on the frame the
         // clip is actually in at `at` (module doc, "What it reads").
-        let evaluated = self.evaluate_clip(target, start).video;
-        let scale = zoom_scale(canvas, &region, fit.unwrap_or_default(), evaluated.rotation);
-        let (x, y) = zoom_offset(&evaluated, &region, scale);
-        json!({"video": {"scale": scale, "x": x, "y": y}})
+        let evaluated = self.evaluate_clip(clip, at).video;
+        let scale = zoom_scale(canvas, region, fit, evaluated.rotation);
+        let (x, y) = zoom_offset(&evaluated, region, scale);
+        (scale, x, y)
+    }
+
+    /// The inverse of [`Project::zoom_placement`] under `fit` (spec §11
+    /// CU-74): the region of the canvas's aspect ([`region_size`]) whose
+    /// solve at `at` gives `placement` = (`scale`, `x`, `y`) — its centre
+    /// `q = −R(−θ)·(x, y)/s − c`, the module doc's position equation turned
+    /// round, with θ and the crop read evaluated as the solve reads them.
+    pub(crate) fn region_for_placement(
+        &self,
+        clip: &Clip,
+        at: Ticks,
+        placement: (f64, f64, f64),
+    ) -> ZoomRegion {
+        let (scale, x, y) = placement;
+        let canvas = (f64::from(self.canvas.width), f64::from(self.canvas.height));
+        let evaluated = self.evaluate_clip(clip, at).video;
+        let (width, height) = region_size(canvas, scale, evaluated.rotation);
+        let (ux, uy) = rotate(-x / scale, -y / scale, -evaluated.rotation);
+        let crop = evaluated.crop;
+        ZoomRegion {
+            x: ux - (crop.l - crop.r) / 2.0,
+            y: uy - (crop.t - crop.b) / 2.0,
+            width,
+            height,
+        }
     }
 }

@@ -11,6 +11,7 @@
 //!
 //! Declarations and re-exports only — no implementation lives here.
 
+mod action_class;
 pub mod actions;
 mod actions_audio;
 mod actions_clamp;
@@ -45,6 +46,9 @@ mod cursor_props;
 pub mod cursor_query;
 mod cursor_smooth;
 pub mod cursor_track;
+mod cursor_zoom;
+mod cursor_zoom_run;
+mod cursor_zoom_visits;
 mod cutout_check;
 pub mod dynamic_range;
 pub mod edit;

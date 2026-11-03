@@ -31,7 +31,8 @@ detail there.
   `av1_webm` writer, spec §11 CX-15) — `ReelCore+Cursor.swift` holds `ReelCursor`
   (`rc_cursor_open`, `rc_cursor_free`: a cursor file's open, which is its check, spec
   §11 CU-9, CU-15; road map creator-jobs CU1a; and `query`, `rc_cursor_query`'s one
-  JSON request, CU2, spec §11 CU-25) — and `ReelCore+Graphics.swift` the graphics engine's
+  JSON request, CU2, spec §11 CU-25, and the static `query(_:tracks:project:)`, the
+  same call over n tracks with a project (`plan_zooms`, CU-70)) — and `ReelCore+Graphics.swift` the graphics engine's
   wrappers (below), with `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`,
   `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`)
   and `GraphicLibrary.imageCache(limit:)` (`rc_graphic_image_cache`, G-39) — both pure moves
@@ -677,6 +678,29 @@ detail there.
   - The tool writes its own tail, not `editResult`'s. The crossing is read
     on the baseline before the edit, then `created`, the landing and the
     summary. Its catalog row is spliced in by `creatorTools()`.
+- `AutoZoom.swift` · `AutoZoomSheetController.swift` ·
+  `EditorViewController+AutoZoom.swift` · `AgentServer+AutoZoom.swift` ·
+  `AgentCatalog+AutoZoom.swift` — Clip ▸ Auto Zoom… and `auto_zoom` (road map
+  creator-jobs CU7, spec §11 CU-70…CU-76). `AutoZoom` (names no `rc_*`) is the
+  planner both doors call:
+  - `AutoZoomSettings` and its keys (`FrameJobAutoZoomZoom`, `…Lead`, `…Stay`,
+    `…Follow`, `…Replace`). They are read through `double`/`bool(forKey:)`, so
+    a launch argument counts. `remember(changedFrom:)` writes only the changed
+    keys, and typing never.
+  - `cursorFiles`, `readTracks` (off main), `hasTyping`, and `plan` over
+    `ReelCursor.query(_:tracks:project:)` (`ReelCore+Cursor.swift`), with the
+    core's ops read back through `ReelOps.swift`'s factories.
+  - The sheet reads the files off main, re-plans on main at each change, and
+    applies one "Auto Zoom" through `applyEdit`. `-RCDevAutoZoomAccept YES`
+    (dev only) presses Zoom once the first plan exists.
+  - `validateAutoZoomAction` is one line in the frozen file after
+    `validateBehindSubjectAction`. It needs at least one selected clip, each a
+    media clip whose media has a cursor file, and no sheet; it is allowed
+    inside a nest.
+  - The tool runs off main (`creatorOffMainTools`): it resolves on main, reads
+    off main, then refuses if the project or scope changed, plans, and calls
+    `editResult`. It takes no `scope` key.
+  - Its catalog row is spliced in by `creatorTools()` after the cursor rows.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map

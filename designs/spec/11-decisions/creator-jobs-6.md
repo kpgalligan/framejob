@@ -369,3 +369,107 @@ recommended), "⌥ with arrows, delete, return, tab or escape counts as a shortc
   (`cargo test --release --test cursor_file`). `FrameJobRecordingKeys` is the recorder's twelfth
   `FrameJobRecording…` key, pinned off by the harness and `screens.py`. Person checks JOB-23 (the
   grant from a Finder launch) and JOB-24 (a real session).
+
+## CU7 — Auto Zoom (2026-11-02)
+
+Recorded before the code. CU-70…CU-77 are CU7's: Clip ▸ Auto Zoom… and the tool `auto_zoom` plan
+ordinary zoom actions from the selected clips' cursor files through one core planner, `plan_zooms`
+in `rc_cursor_query` (one track per clip; no new `rc_*` export, op or format), applied as one undo
+step "Auto Zoom". The owner's answer (2026-11-01): Replace's default is **off**. Nothing here sends
+anything anywhere, so nothing is keyed (CJ-3). It amends CU-25 (`rc_cursor_query`'s one-track
+rule now belongs to the six reads; `plan_zooms` reads one track per clip and the project).
+
+- **CU-70 — The visits, and the defaults.** Zoom 2× (1.25–4), Arrive before the click (`lead`)
+  0.6 s (0.2–2), Stay after the last activity (`stay`) 2.5 s (0.5–10), Follow on, typing on.
+  - **Anchors** are down clicks (any button) and, with `typing`, typing stretches (CU-25's, marks
+    under 1.0 s apart, at least 3), each read inside its clip's played source window `[in, in +
+    content_length_in_source)` (a stretch by its first mark), mapped to container time through S
+    — `time_for_source` on a ramp, `⌊(s − in)/speed⌋` otherwise — and kept when that time lies in
+    `[from, to)` (both optional, container ticks). A click's activity is its instant; a
+    stretch's runs from its first to its last mark. A position is the movie px of
+    `CursorTrack::to_movie` less half the media size (P, from the uncropped centre); a region
+    written is in Q, P less the evaluated crop's centre at the action's start (`edit_zoom.rs`).
+  - **Visits.** Anchors in time order; an anchor at or before the visit's last activity + `stay`,
+    with no scroll burst (`scroll_bursts`: wheel events under 1.0 s apart, at least 3) starting
+    after that last activity and before it, joins the visit; else it starts a new one. `visits`
+    counts these groups.
+  - **A visit's actions.** A zoom-in `[a − lead, a)` ending at its first anchor; for each later
+    anchor outside the region in force's inner 60 % (|Δ| > 0.3 of a side), a pan `[a − lead, a)`
+    starting no earlier than the previous planned action's end, none when that leaves under one
+    frame; with `follow`, the raw cursor sampled at 10 Hz from the zoom-in's end to the zoom
+    back's start, and a pan of 0.5 s when it has been outside the inner 70 % for 0.3 s — at most
+    one per 1 s start to start, starting after every earlier planned action ends, meeting no later
+    anchor's `[a − lead, a)` and ending by the zoom back's start, aimed at the cursor then; a zoom
+    back of 0.8 s starting at the last activity + `stay`, or at the first scroll burst starting
+    after the last anchor when that is earlier. Each pan's region is centred on its aim.
+  - **Merging.** When a visit's zoom back would end under 1 s before the next visit's zoom-in
+    starts, both are replaced by one pan `[a − lead, a)` ending at the next visit's first anchor
+    (starting no earlier than the previous planned action's end), and the two are planned as one
+    hold (follow runs on through it).
+  - **The region** is `region_size(canvas, rest_scale × zoom, rotation)` — the canvas's aspect, so
+    `fit` solves to exactly that scale — centred on its aim and clamped inside the landing clip's
+    cropped source rect; on an axis it exceeds, centred on that rect. `fit: "fit"`, `curve:
+    "ease_in_out"`.
+  - **Spans** are moved onto clips by CU-74, then snapped as `add_action` snaps them (clip-time
+    `at` and `duration` each to the nearest frame), held inside the clip (an end past it pulled
+    back), and dropped under one frame. A planned span meeting an earlier planned one on the same
+    clip after the moves starts at its end (dropped when nothing is left).
+- **CU-71 — Replace (owner: off by default).** With `replace`, every action of a given clip that
+  `is_zoom` (CU-73) and meets `[from, to)` (the whole clip when absent) is removed first — never a
+  layout, speed, colour or any other action; each later given clip of a run whose base is off the
+  rest placement and that no kept action `moves` is reset to it (`set_video`) unless CU-74 sets
+  it. Replace on or off, a planned action whose snapped span meets a KEPT action on its clip (any
+  kind, a Speed action among them) is dropped and counted in `dropped`, so no op refuses at apply.
+- **CU-72 — Typing's aim** (CU-S3 `dirty=not-stored`): the last down click at or before the
+  stretch's first mark, anywhere in the file; else the raw cursor at that mark.
+- **CU-73 — Actions are classed by content (`action_class.rs`, CJ-8 (i), CO-63).**
+  `PLACEMENT_KEYS` = `x`, `y`, `scale`, `crop`, `corner_radius`, `opacity`. `is_zoom`: `end.video`
+  an object whose keys are exactly `scale`, `x`, `y`; `end.audio` and `end.text` absent, null or
+  `{}`; `end.graphic` absent, null or with `props` absent or `{}`; `end.speed` absent or not a
+  number — the twin of `ActionBands.isZoom`. `is_layout`: `end.video` names all six. `moves`:
+  `end.video` names any of the six.
+- **CU-74 — Runs, the rest placement, and nothing straddles a cut.** A run is clips on one track,
+  each touching the one before (`B.start` = `A.start + A.duration`), of one media, both forward,
+  with `B.in` = the `in` of `source_advanced_through(A, A.duration)`; runs are formed over the
+  whole track, so an unselected first half still sets the rest, and anchors come from given clips
+  only. The **rest placement** is the run's first clip's base `scale`, `x`, `y`. **Every zoom
+  back ends at it**: `region: null` when its clip's base as it will be at apply (after the plan's
+  own `set_video` ops) equals it (each to 1e-9), else `region_for_placement` solved against that
+  same post-`set_video` clip (`edit_zoom.rs`, the inverse of (★)). **Planned actions land only
+  on given clips.** A span straddling a cut is moved, duration kept, to end at the cut when its
+  midpoint is before it, else to start there — but never onto a clip that was not given: then it
+  goes to the given clip's side whatever its midpoint — then held inside the clip. **A hold
+  crossing a cut** into a given clip sets that clip's base to the placement in force there
+  (`zoom_placement` on it, one `set_video`), unless that clip is not given or has a kept action
+  meeting the hold: then the visit closes with a zoom back of 0.8 s ending at the cut (counted
+  in `closed_at_cut`), and later anchors start a new visit.
+- **CU-75 — The refusals, in order, each its own sentence.** An argument out of range ("zoom is
+  Z; it runs 1.25–4", "lead is L s; it runs 0.2–2", "stay is S s; it runs 0.5–10"), or `to` not
+  after `from`; no clips; a track count unlike the clip count; no project; then per clip in the
+  given order: named twice, unknown, not a media clip, its media with no cursor file, reversed
+  ("clip C plays reversed; Auto Zoom plans only clips that play forward" — CU-5), no picture,
+  and **placed**: the run's rest scale below the scoped project's `Project::fit_scale(sw, sh)`
+  (1 for a source that already fits, or with `fit_new_clips` off) by more than 0.1 % — "clip C is
+  placed smaller than the canvas; a zoom would fill the canvas. Nest it (Clip ▸ Nest) and run
+  Auto Zoom inside the nest." A screen scaled up and moved is planned; inside an open nest the
+  scoped project's canvas is the nest's.
+- **CU-76 — The doors.** Clip ▸ Auto Zoom… (after Add Action, no key), on with at least one
+  selected clip, each a media clip whose media has a cursor file, and no sheet; allowed in a nest.
+  The sheet: Zoom (×, 1.25–4), Arrive before the click (s), Stay after the last activity (s),
+  Follow the cursor while zoomed, Zoom on typing (on and enabled only when a file has typing
+  stretches; never remembered), Replace existing zooms (off). It opens with the remembered values
+  (`FrameJobAutoZoomZoom`, `…Lead`, `…Stay`, `…Follow`, `…Replace`), reads the files off the
+  main thread ("Reading cursor files…", Zoom disabled), re-plans at each change and shows "N zooms
+  in V visits" and "D dropped where an action is already set", or the refusal or a missing file's
+  sentence; Zoom applies the plan as one "Auto Zoom" and then writes only the keys whose value
+  changed. `-RCDevAutoZoomAccept YES` (dev tools only) presses Zoom once the first plan exists.
+  **The tool** `auto_zoom {clip | clips, zoom?, lead?, stay?, follow?, typing?, replace?, from?,
+  to?, project?}` takes no `scope` key (dispatch reads `scope` only for op names; CJ2b's and
+  CU5's precedent): it acts in the container `set_scope` has open, on the server thread — the
+  call resolved on main, the files read off it, then on main refused if the project or scope
+  changed, planned and applied; with no ops it answers `ok` with a `note` and makes no undo step.
+- **CU-77 — CU7's proof.** `cu7_proof.py` Z0–Z4, Z6–Z11 over MCP and `cu7_probe.swift` Z5;
+  `core/tests/auto_zoom.rs` the core halves; nine mutants (the merge gap ignored, the region not
+  clamped, clip time without S, Replace removing non-zoom actions, the lead after the click, a
+  later half's zoom back as `region: null`, a span straddling a cut, the placement check removed,
+  the sheet's Arrive not passed); JOB-25 the person check.

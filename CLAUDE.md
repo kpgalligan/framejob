@@ -258,7 +258,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and fifteen product tools (and the dev tools, road
+  stranger by name, for all one hundred and sixteen product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -333,7 +333,7 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `new_project_from_range`, `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `get_timeline_transcript`, `get_media_analysis`, `split_at_shots`, `normalize_clip`, `enhance_voice`, `match_audio`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
-`undo`, `redo`, `render_frame`, `export`, `export_status`, `cancel_export`,
+`undo`, `redo`, `render_frame`, `export`, `export_status`, `auto_zoom`, `cancel_export`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
@@ -373,6 +373,9 @@ proof can time the stop, spec §11 CX-15 (6); and
 its own Import so a proof can see a package land (spec §11 G-47); and
 `-RCDevMatchAudioAccept YES`, with which the Match Audio sheet presses its own
 Match so a proof can drive Clip ▸ Match Audio… to its edit (spec §11 AU-128);
+and `-RCDevAutoZoomAccept YES`, with which the Auto Zoom sheet presses its own
+Zoom once its first plan exists, so a proof can drive Clip ▸ Auto Zoom… to its
+edit (spec §11 CU-76);
 and `-RCDevRetimeAccept YES`, with which the Retime Range sheet presses its
 own Apply so a proof can drive Clip ▸ Retime Range… to its edit (spec §11
 CU-90 (d)); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its

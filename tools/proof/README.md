@@ -28546,3 +28546,52 @@ make app && RC_PROOF_APP=release python3 tools/proof/cursor_keys_proof.py [--onl
 
 The recorded runs are in `designs/creator-jobs.md`'s CU6 record. JOB-23 and JOB-24 are the person
 checks.
+
+## Road map "creator-jobs" CU7 — Auto Zoom (`cu7_proof.py` Z0–Z4, Z6–Z11 with `cu7_probe.swift` Z5; nine mutants; `core/tests/auto_zoom.rs`; spec §11 CU-70…CU-77)
+
+**`cu7_proof.py [SOCKET]`** builds `cu7_probe.swift` over `app/Sources` through
+`swift_build.build()` for Z5 and drives the app for the rest. Given a running instance's
+`<dir>/agent.sock` it runs Z1–Z4 and Z6–Z10 there and greps `<dir>/framejob.log`; without one it
+launches its own (`proof_app.binary()`, a scratch `CFFIXED_USER_HOME`). Z11 always launches two of
+its own with `-RCDevAutoZoomAccept YES`, the second also with `-FrameJobAutoZoomZoom 3
+-FrameJobAutoZoomLead 1` (launch-argument defaults, so no key is written). Its movies are ffmpeg's
+`testsrc` under `tools/proof/work/cu7/media/` (640 × 360 for 20 s, 2560 × 1440 for 3 s), each copied
+per row beside a v1 cursor file written by the script (`movie_size` the movie's, 2 px a point), so
+`import_media` attaches it.
+
+| Row | What it holds |
+|---|---|
+| Z0 | each instance's `grep "Frame Job: "` prints nothing |
+| Z1 | clicks at 2, 3 (inside the inner 60 %), 4 (outside), 12 and 13 s, follow off: in [1.4, 2.0), pan [3.4, 4.0), back [6.5, 7.3), in [11.4, 12.0), back [15.5, 16.3) s, two visits; each back ends at the base |
+| Z2 | a click at (5, 5) px: the zoom-in ends at (2, 320, 180), the region clamped at (−160, −90) |
+| Z3 | a Speed action ×1→×2 over [0, 0.6 s): a click at source 4.9 s is clip 2.6 s, in [2.0, 2.6) and back [5.1, 5.9) s |
+| Z4 | a hand zoom over [1.5, 2.5) s, Replace off: kept; one dropped, four added |
+| Z5 | (probe) `ActionBands.isZoom` equals the core's `is_zoom` (Replace's removals) on twelve ends |
+| Z6 | after Z1, one `undo` named "Auto Zoom" takes every action off |
+| Z7 | a hand-zoomed clip split at 3 s, Auto Zoom on the second half: the zoom back ends at the first half's base (±1e-6) with Replace off and on, and Replace resets the base; a click 0.2 s after the cut with only the second half given: the zoom-in at the cut, the first half untouched |
+| Z8 | a visit across a cut, both halves given: the second half's base set (0 px from the first half's hold), every action inside its clip, the zoom back ending at the rest |
+| Z9 | half the fit, moved left: refused in CU-75's sentence; the same screen nested with the nest clip side by side, planned inside, the nest clip unchanged; 1.2× moved left planned; 2560 × 1440 at 1 on 3840 × 2160 planned |
+| Z10 | a reversed clip refused by name |
+| Z11 | `perform_menu_item` Clip ▸ Auto Zoom… with `-RCDevAutoZoomAccept YES`: one step "Auto Zoom" whose actions equal `auto_zoom`'s on a copy, at the defaults and at Zoom 3, Arrive 1 s |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). Eight in the
+core, each edited into a copy of `core/` beside a link to `graphic/` and run under `cargo test
+--release --test auto_zoom` (target `tools/proof/work/cu7/mutant-target`), CAUGHT when a test of
+its row fails: `merge-gap-ignored` Z1, `region-not-clamped` Z2, `clip-time-without-s` Z3,
+`replace-removes-non-zoom` Z4, `lead-after-click` Z1, `later-half-back-null` Z7, `straddle-cut` Z8,
+`placement-check-removed` Z9. One in the app, on a `tree_copy.py` copy's built app:
+`sheet-arrive-not-passed` Z11 (the plan alone loses Arrive, so the mutant writes no default).
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 116; `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py` name `auto_zoom`; `screens.py`'s `NOT_SHOWN` names
+`RCDevAutoZoomAccept` and the five `FrameJobAutoZoom…` keys; `capture_spike/inventory.json` holds
+`showAutoZoomSheet:` and its `presentAsSheet` site.
+
+```sh
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/cu7_proof.py <dir>/agent.sock [--only Z1,Z9]
+python3 tools/proof/cu7_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/cu7_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU7 record. JOB-25 is the person check.

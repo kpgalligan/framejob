@@ -7709,6 +7709,97 @@ draft's FC1 and FC2 are CJ5a and CJ5b. The analysis needs no key; only Rank does
 - **Question for the owner:** Replace's default? *Recommended: off*, keeping the person's zooms; the
   sheet says how many planned zooms were dropped.
 
+#### CU7's record (2026-11-02)
+
+**Built.** Lane B, base `6110526b` (I's HEAD, CU6). The decisions first: CU-70…CU-77 with their
+index rows, appended to `creator-jobs-6.md` (371 → 475 lines). The owner's answer (2026-11-01):
+Replace is off by default. No format (41 stands), cursor-file version, `rc_*` export or op; one
+product tool, `auto_zoom` (115 → 116); nothing keyed (CJ-3). No toll: every touched file stayed
+under its cap (`edit_zoom.rs` 467 → 517).
+
+- **The core.** `plan_zooms` is a seventh `rc_cursor_query` request, reading one track per clip
+  and the project (the one-track rule moved into the six reads, same sentence; "plan_zooms needs
+  the project" when NULL). `cursor_zoom_visits.rs` (pure) makes visits and their actions in
+  container time; `cursor_zoom_run.rs` is a run — anchors through S, scroll bursts, barriers (cuts
+  into a clip not given or with a kept action meeting the hold, found by re-planning until none
+  is new; the run's end), the 10 Hz cursor and where a span lands; `cursor_zoom.rs` the arguments,
+  refusals, Replace, the bases and the ops. `action_class.rs` (`is_zoom`, `is_layout`, `moves`);
+  `cursor_bursts.rs` one run finder for typing and scrolls; `edit_zoom.rs` `zoom_placement`
+  (which `zoom_patch` now calls), `region_for_placement` and `region_size`.
+- **The app.** `AutoZoom.swift` (settings, keys, files, `plan`), `AutoZoomSheetController.swift`,
+  `EditorViewController+AutoZoom.swift`, `AgentServer+AutoZoom.swift` (off main),
+  `AgentCatalog+AutoZoom.swift`; `ReelCursor.query(_:tracks:project:)`; the menu item after Add
+  Action, its `UIMenuTable` row and validator line; `auto_zoom` in the prompt's actions row.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/cursor_zoom.rs` · `cursor_zoom_run.rs` · `cursor_zoom_visits.rs` | 331 · 266 · 310 | new: the planner |
+| `core/src/action_class.rs` | 65 | new: CU-73 |
+| `core/src/cursor_query.rs` · `cursor_bursts.rs` · `edit_zoom.rs` | 371 · 43 · 517 | the arm; scroll bursts; the solve and its inverse |
+| `core/tests/auto_zoom.rs` | 690 | new: Z1–Z4, Z7–Z10 core halves, follow, typing, merging, `is_zoom` by Replace, every refusal |
+| `app/Sources/AutoZoom.swift` · `AutoZoomSheetController.swift` | 213 · 224 | new |
+| `app/Sources/AgentServer+AutoZoom.swift` · `AgentCatalog+AutoZoom.swift` · `EditorViewController+AutoZoom.swift` | 124 · 92 · 41 | new |
+| `tools/proof/cu7_proof.py` · `cu7_probe.swift` | 737 · 74 | new: Z0–Z11, nine mutants |
+
+**Deviations.** (1) A third new core file, `cursor_zoom_run.rs`: `cursor_zoom.rs` as first written
+was 580 lines, past the 400-line cap for a new file, so the run's half was cut out (and `lib.rs`
+has four `mod` lines, not three). (2) Two refusals beyond the spec's list, each its own sentence:
+a clip named twice, and a NULL project. (3) The tool checks the ranges and `to` ≤ `from` in the
+core's words before it resolves files, so its order matches the core's; the core's sentences
+reach a caller capitalised with a full stop (`AutoZoom.sentence`). (4) `visits` counts anchor
+groups, before merging. (5) `remembered` reads through `double(forKey:)` and `bool(forKey:)`, so a
+launch-argument string reads as its number (Z11's second launch first failed on it). (6) A
+planned span that meets an earlier planned one on its clip after the cut moves starts at its end
+(dropped, uncounted, when nothing is left). (7) Outside the Files list: `screens.py`'s
+`NOT_SHOWN` names the six new key literals (its P2 requires it), and `recording_probe.py`'s
+`RECORD_SCREEN_ARGUMENTS` gained CU6's `keys`, which CU6 left out (7c failed on it).
+
+**Measured.**
+
+- `cargo test --release --test auto_zoom` 15 passed (14, then the follow test added);
+  `--test cursor_track` 16 and `--test zoom` 32 passed; `cargo fmt`. `make lint` failed once on
+  `type_complexity`, clean after a `Placement` alias.
+- `make typecheck`: exit 0, 0 errors and the 4 baseline warnings.
+  `swift_build.py typecheck tools/proof/cu7_probe.swift` exit 0; `inventory.py --check` 5/5 after
+  the two rows; `spec_index_proof.py` 252/252.
+- Debug `cu7_proof.py`: 9/12 (Z9 and Z10 compared against `mcp.py`'s "auto_zoom: " prefix, a
+  proof bug; Z11's set run as deviation 5), then `--only Z9,Z10,Z11` 4/4.
+- Mutants, nine, each exit 1, CAUGHT: `merge-gap-ignored` (Z1), `region-not-clamped` (Z2),
+  `clip-time-without-s` (Z3), `replace-removes-non-zoom` (Z4), `lead-after-click` (Z1),
+  `later-half-back-null` (Z7), `straddle-cut` (Z8), `placement-check-removed` (Z9),
+  `sheet-arrive-not-passed` (Z11). The last one's first form (the sheet's settings lost Arrive)
+  wrote `FrameJobAutoZoomLead` 0.6 into `com.kgalligan.FrameJob.debug` (DEFAULTS MOVED); the key
+  was deleted and the mutant re-aimed at the plan alone, which writes nothing.
+- `make gate`: "gate: PASS 445s" (names 1, typecheck 8, fmt 3, lint 8, test 256, app 168).
+- Release (the gate's app): `RC_PROOF_APP=release cu7_proof.py` 12/12, exit 0, Z0 empty on all
+  three instances; on a `proof_app.py launch --app release` instance `op_argument_proof.py`
+  193/193 and `phase9_proof.py` 251/251; `recording_probe.py --only catalog` 30/31 (7c, deviation
+  7), then 31/31; `v2_menu.py --only H` 5/5.
+- `make gate` after the `keys` pin: "gate: PASS 82s" (names 1, test 80, the rest skipped).
+
+**Review.** One review (`6110526b..91147991`), verdict pass, every Files and Approach item done,
+one nit, filed (`ai-drafted`, `low-priority`): the placement in force at a cut is the aim of the
+last landed action ending at or before it (`cursor_zoom.rs`'s CU-74 loop), which holds only while
+every hold ends with a Back; `plan_chain` leaves out a Back under one frame
+(`cursor_zoom_visits.rs`), which a click in the last frame before a closing barrier makes, and a
+later given cut in that run would then take the stale pan's aim as its base. The fix is to read
+the aim only from holds spanning the cut, or to keep a zero-length Back marker.
+
+**Integration.** Cherry-picked (`44f12d36…91147991`) onto `worktree-creator-jobs` at CU6's
+`6110526b`, the lane's own base: no conflict, nothing renumbered. The owed `CLAUDE.md` edits were
+applied. Root: the argument gate's "one hundred and sixteen product tools", `auto_zoom` in the
+app-state tool list, and `-RCDevAutoZoomAccept YES` among the dev-only launch defaults.
+`core/CLAUDE.md`: the cursor entry's `cursor_bursts.rs` sentence and the planner's three files,
+`edit_zoom.rs`'s three Auto Zoom functions, and a new `action_class.rs` entry. `app/CLAUDE.md`:
+the five files' entry after the Retime Range family's, and `ReelCursor`'s static
+`query(_:tracks:project:)` in the core's edge. `make gate` on the integrated tree, before this
+sentence: "gate: PASS 522s" (names 1 s, typecheck 8 s, fmt 4 s, lint 22 s, test 319 s with 213
+result lines, 2128 passed, 0 failed, app 167 s). The Release proof is the lane's above; the
+integration changed no app input.
+
+**Owed.** JOB-25 (the owner's real tutorial, sample S-ST2). The owner's-sample acceptance ("every
+click falls inside a zoomed region") waits for S-ST2. The review's nit, filed.
+
 ### VR1 — people and salient regions found on the Mac
 
 Bet 3 opens here. VR-1…VR-7 were recorded at CJ0a. VR builds no lane, store, sheet, shot detector or

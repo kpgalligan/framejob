@@ -27,8 +27,16 @@
 //!   sampled at from, from + S, … < to: VR5's read. An unprepared smoothing
 //!   is built for the request and not stored.
 //!
-//! Every request reads one track; `project` is for the planners to come and
-//! is unused by these six. Each refusal is its own lowercase sentence.
+//! - `{"plan_zooms":{"clips":[…], "zoom", "lead", "stay", "follow",
+//!   "typing", "replace", "from"?, "to"?}}` → `{ops, visits, added,
+//!   replaced, dropped, closed_at_cut, bases_set, actions}`: Auto Zoom's
+//!   plan (spec §11 CU-70…CU-75, `cursor_zoom.rs`). It reads one track per
+//!   clip — `tracks[i]` is the cursor track of `clips[i]` — and `project`,
+//!   the scoped one inside a nest; `from` and `to` are its container ticks,
+//!   `lead` and `stay` seconds.
+//!
+//! The other six each read one track and ignore `project`, which
+//! `plan_zooms` reads. Each refusal is its own lowercase sentence.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -37,6 +45,7 @@ use crate::cursor_bursts::typing_stretches;
 use crate::cursor_file_check::encode_base64;
 use crate::cursor_smooth::SmoothPath;
 use crate::cursor_track::{ticks_to_us, us_to_ticks, CursorTrack, MAX_PATH_SAMPLES, PATH_MIN_STEP};
+use crate::cursor_zoom::{plan_zooms, PlanZoomsArgs};
 use crate::model::Project;
 use crate::time::Ticks;
 
@@ -49,18 +58,17 @@ enum Request {
     Image(ImageArgs),
     Events(EventsArgs),
     Path(PathArgs),
+    PlanZooms(PlanZoomsArgs),
 }
 
-impl Request {
-    fn name(&self) -> &'static str {
-        match self {
-            Request::Prepare(_) => "prepare",
-            Request::Unprepare(_) => "unprepare",
-            Request::State(_) => "state",
-            Request::Image(_) => "image",
-            Request::Events(_) => "events",
-            Request::Path(_) => "path",
-        }
+/// The one track a read takes, or the refusal naming the request.
+fn one<'t>(tracks: &[&'t CursorTrack], name: &str) -> Result<&'t CursorTrack, String> {
+    match tracks {
+        [track] => Ok(track),
+        _ => Err(format!(
+            "{name} reads one cursor track; {} were given",
+            tracks.len()
+        )),
     }
 }
 
@@ -150,29 +158,27 @@ struct PathArgs {
 /// sentence.
 pub fn query(
     tracks: &[&CursorTrack],
-    _project: Option<&Project>,
+    project: Option<&Project>,
     request: &str,
 ) -> Result<String, String> {
     let de = &mut serde_json::Deserializer::from_str(request);
     let request: Request = serde_path_to_error::deserialize(de)
         .map_err(|e| format!("the cursor request at \"{}\": {}", e.path(), e.inner()))?;
-    let [track] = tracks else {
-        return Err(format!(
-            "{} reads one cursor track; {} were given",
-            request.name(),
-            tracks.len()
-        ));
-    };
     let answer = match request {
-        Request::Prepare(a) => prepare(track, a.smoothing)?,
+        Request::Prepare(a) => prepare(one(tracks, "prepare")?, a.smoothing)?,
         Request::Unprepare(a) => {
+            let track = one(tracks, "unprepare")?;
             smoothing_in_range(a.smoothing)?;
             json!({ "unprepared": a.smoothing > 0.0 && track.unprepare(a.smoothing) })
         }
-        Request::State(a) => state(track, a)?,
-        Request::Image(a) => image(track, a.id)?,
-        Request::Events(a) => events(track, a)?,
-        Request::Path(a) => path(track, a)?,
+        Request::State(a) => state(one(tracks, "state")?, a)?,
+        Request::Image(a) => image(one(tracks, "image")?, a.id)?,
+        Request::Events(a) => events(one(tracks, "events")?, a)?,
+        Request::Path(a) => path(one(tracks, "path")?, a)?,
+        Request::PlanZooms(a) => {
+            let project = project.ok_or("plan_zooms needs the project")?;
+            plan_zooms(tracks, project, a)?
+        }
     };
     Ok(answer.to_string())
 }

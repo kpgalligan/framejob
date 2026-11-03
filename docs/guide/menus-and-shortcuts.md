@@ -144,6 +144,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Match Audio… | | Gives the selected clips the loudness and the speech's tone of one of them, chosen in a sheet: their volume and limiter, and their EQ's shelves and bands, measured under the Measuring Sound sheet ([Audio](audio.md#match-audio)) |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
+| Auto Zoom… | | Zooms the selected screen recordings in at their clicks and typing and back out after, as ordinary actions, in one undo step ([Screen recording](screen-recording.md#auto-zoom)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
 | Speed Ramp… | | Puts a speed ramp preset on one selected media clip |
 | Close Gap | | Closes the gap under the playhead on the current track |
@@ -203,6 +204,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Match Audio… | Two or more selected clips play sound |
 | Synchronize Audio | Two or more selected clips play sound |
 | Add Action | A selected clip is under the playhead |
+| Auto Zoom… | Every selected clip plays a movie that has a cursor file, and no sheet is open |
 | Speed… | The selection includes a clip that plays a media file |
 | Speed Ramp… | Exactly one clip is selected and it plays a media file |
 | Close Gap | There is a current track and the timeline has clips |

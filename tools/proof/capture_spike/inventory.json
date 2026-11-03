@@ -395,6 +395,14 @@
    ],
    "note": "an edit"
   },
+  "showAutoZoomSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+AutoZoom.swift `@objc func showAutoZoomSheet(`",
+    "app/Sources/EditorViewController+AutoZoom.swift:30"
+   ],
+   "note": "presentAsSheet(AutoZoomSheetController) over the selected clips with cursor files (CU-76); beeps with none or a sheet up"
+  },
   "closeGapAtPlayhead:": {
    "verdict": "none",
    "code": [
@@ -1096,6 +1104,15 @@
    "func": "presentSpeedRampSheet",
    "reached_from": [
     "showSpeedRampSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+AutoZoom.swift:30": {
+   "token": "presentAsSheet",
+   "func": "showAutoZoomSheet",
+   "reached_from": [
+    "showAutoZoomSheet:"
    ],
    "reached_after": [],
    "other_caller": ""

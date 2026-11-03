@@ -890,7 +890,11 @@ void rc_cursor_free(RcCursor *cursor);
  * `prepare {smoothing}`, `unprepare {smoothing}`, `state {at, props}`,
  * `image {id}`, `events {from, to, kinds}` and `path {from, to, step,
  * smoothing}`, each reading one track. Ticks are source ticks, positions
- * movie px. `project` may be NULL; no request reads it yet. NULL with the
+ * movie px. `plan_zooms {clips, zoom?, lead?, stay?, follow?, typing?,
+ * replace?, from?, to?}` (spec §11 CU-70) reads one track per clip,
+ * `tracks[i]` the cursor track of `clips[i]`, and `project`, which is read
+ * by `plan_zooms` alone ("plan_zooms needs the project" when NULL); the six
+ * reads ignore it, so it may be NULL for them. NULL with the
  * sentence through `err_out` on any refusal ("request_json is NULL",
  * "tracks is NULL", "tracks[i] is NULL", "the cursor request at \"<path>\":
  * …", "state reads one cursor track; 2 were given", …). The answer is freed

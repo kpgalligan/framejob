@@ -42,4 +42,23 @@ final class ReelCursor {
         }
         return text
     }
+
+    /// One JSON request against `tracks` together, with `project` — `plan_zooms` (spec §11
+    /// CU-70), whose `tracks[i]` is the cursor track of its `clips[i]` (a media used twice is
+    /// passed twice). The answer's JSON, or throws the core's sentence.
+    static func query(_ requestJSON: String, tracks: [ReelCursor], project: ReelProject) throws
+        -> String
+    {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let handles: [OpaquePointer?] = tracks.map { $0.handle }
+        let answer = withExtendedLifetime((tracks, project)) {
+            handles.withUnsafeBufferPointer {
+                rc_cursor_query($0.baseAddress, handles.count, project.ptr, requestJSON, &err)
+            }
+        }
+        guard let text = takeString(answer) else {
+            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it was not answered"))
+        }
+        return text
+    }
 }
