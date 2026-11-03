@@ -29183,3 +29183,65 @@ make app && RC_PROOF_APP=release python3 tools/proof/co9_proof.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO9 record. The person check is JOB-65.
+
+## Road map "creator-jobs" SW2a — the switch's planner and its numbers (`switch_speaker_probe.py` R1–R6 with `switch_speaker_probe.swift`; seven mutants; `creator_spike/switch_spike.py` SW-S4; `creator_spike/f_turns.py` F-TURNS; spec §11 SW-20…SW-27)
+
+**`creator_spike/f_turns.py`** builds F-TURNS into `tools/proof/media/creator/f_turns/` (never
+committed), reused while its `manifest.json`'s `generator_sha256` equals the script's (`--force`
+rebuilds; exit 2, skipped by name, when `say` has no Samantha or Daniel). Samantha (A) and
+Daniel (B) read a scripted turn table of about 157 s through `say -v` (converted by `afconvert`
+to 48 kHz): turns of 3 s or more, two replies of 0.6 s or less in 0.8 s gaps, one crosstalk
+passage overlapping 2.5 s or more followed by a 1.0 s pause, one 3.5 s silence. Each utterance
+is cropped to its part above −50 dB of its peak and set to −26 dBFS RMS as a SOLO stem; each
+microphone is its own stem at 0 dB, the other at the bleed and seeded pink noise at the floor's
+RMS: `mic_{a,b}_b{12,18,24}_f{55,45}.wav`, 24-bit. A turn's onset is its solo stem's first
+sample above −40 dBFS. The cameras (`cam_a_1.mov` + `cam_a_2.mov` abutting mid-way,
+`cam_b.mov`, `cam_wide.mov`) are flat colour cards, 1920 × 1080 at 30 fps, H.264, no audio,
+with a 16-block binary frame code along the bottom (bit 0 leftmost). The manifest holds the
+variants, the cameras, the turns with onsets, and the expected shots written from the table's
+design (opens on the wide; a turn by someone else cuts to them; a reply never cuts; crosstalk
+cuts to the wide; silence holds) — never by the planner.
+
+**`switch_speaker_probe.py [--only R1,R2]`** builds `switch_speaker_probe.swift` with
+`app/Sources` through `swift_build.build()`, copies `app/Resources/Models` beside the binary
+(the product's Silero pass), runs `f_turns.py` first when R6 is wanted, and scores the rows; a
+probe that will not build is a scored failure. Output under `tools/proof/work/switch_speaker/`.
+
+| Row | What it holds |
+|---|---|
+| R1 | SW-21 at the drafted thresholds (bleed 15, dominance 8, margin 6) over synthetic microphones (100 speech steps at P, 100 quiet at F, then the tests): voice 0.5 active and 0.4999 not; ℓ = P − 15 active and 0.01 dB under not; ℓ = F + 6 active and 0.01 dB under not; 8 dB over the other active alone, 7.99 dB and equal crosstalk; the nearest-rank percentile; an impulse at 20 moving ℓ at 16…25 only (each −10 dB) and the window clipped at the start; `Settings()`'s defaults are SW-S4's chosen setting (15, 8, 6) |
+| R2 | SW-22 at the drafted thresholds over synthetic labels at 10 ms: 0.49 s of nobody bridging two 0.6 s turns, 0.5 s not; opening on the wide and `min_turn` at 1.0 and 0.99 s; the lead snapped to frames 84 and 85; crosstalk to the wide, with `hold` held, at 0.99 s held; a 1.4 s shot merged into the one before, not the wide after; the short first shot into the one after; `wide_after` 4 s; an uncovered stretch handed to the wide; SW-22 (a)'s crosstalk bridge (the owner's option 1): X 0.6, A 0.3, X 0.6 one 1.5 s crosstalk turn to the wide and A 0.5 s not joining; the two-run stretch B 0.04, nobody 0.23 joining; A 0.3, nobody 0.3 (0.6 s) not joining |
+| R3 | SW-24's nine sentences as one list in order; one angle alone; the ceiling: N = 6 (two pieces, four straddling splits) refused at M = RC_MAX_CLIPS − 5 and planned at − 6, RC_MAX_CLIPS 4096 |
+| R4 | SW-20's defaults over snapshots: files the microphones; with none each camera its own; the one leftover angle the wide; two detached cameras all selected giving two angles and no microphone; a detached camera sound never a default |
+| R5 | a two-file angle covering its join; a gap in every angle refused naming 00:00:04:00–00:00:06:00; no wide, A covering [0, 10.5) ∪ [11, 20), a short B kept and every shot covered; the first shot's uncovered start handed to the front-most covering angle |
+| R6 | each F-TURNS variant opened as a `ProjectDocument` (wide, B, A in two files, mic B, mic A), its caches written by `MediaImporter.loudness`/`.speech`, `read` then `plan` at the defaults: the shot angles equal the manifest's and every cut is on the frame grid within τ = 147.3 ms of onset − lead, except SW-S4's named limit (the owner, 2026-11-03): b24_f45's shot 17 (b) late by at most 99,313 ticks (165.5 ms), listed in the note as limited (an early error past τ still misses); each variant's cut errors noted. Skipped by name without either voice |
+
+Mutants (`--mutant NAME`, on a copy of `app/Sources`; CAUGHT exits 1 when every named row fails,
+SURVIVED 0, a control not performed 2): `bleed-removed` (R1), `dominance-removed` (R1),
+`trailing-window` (`before`/`after` 9/0: R1 alone, since R6's τ budgets the half-window's 50 ms
+by design), `merge-into-next` (R2), `camera-sound-beside-files` (R4),
+`crosstalk-bridge-removed` (`bridgingCrosstalk` returning its input: R2, R6) and
+`crosstalk-bridge-single-run` (only a stretch of one run bridged: R2).
+
+**`creator_spike/switch_spike.py`** is spike SW-S4: `rule.check_rule("SW-S4")`, F-TURNS, then the
+probe's `spike` mode over bleed_db {9, 12, 15, 18, 21} × dominance_db {4, 6, 8, 10, 12} ×
+floor_margin_db {3, 6, 9} on all six variants, SW-22 at its defaults; a setting passes when every
+variant passes R6's test, SW-S4's named limit included (b24_f45's shot 17 late by at most 99,313
+ticks, 165.5 ms; each variant's `limited` and the top-level `limit` are in `results.json`). The excerpt arm (S-PC1) is skipped by name while
+`tools/proof/media/creator/S-PC1/` does not exist. It chooses the draft (15, 8, 6) if it passes,
+else the passing setting nearest in grid steps (L1, ties in grid order), and writes
+`tools/proof/work/creator_spike/SW-S4/results.json` with every setting's result. The probe's
+`runs` mode (`<binary> runs <f_turns folder> <scratch>`) prints each variant's label runs at the
+defaults and each microphone's P and F, for reading a miss.
+
+```sh
+python3 tools/proof/creator_spike/f_turns.py
+python3 tools/proof/switch_speaker_probe.py [--only R1,R2]
+python3 tools/proof/switch_speaker_probe.py --mutant <name>
+python3 tools/proof/creator_spike/switch_spike.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s SW2a record: SW-S4's first run (0/75, the
+crosstalk passage never one turn), after SW-22 (a)'s crosstalk bridge its second (0/75,
+b24_f45's one late cut), and after SW-S4's named limit (the owner's second answer) its third
+(59/75, `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6`, the draft). No person check.

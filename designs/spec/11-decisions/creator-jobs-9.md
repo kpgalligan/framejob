@@ -156,3 +156,173 @@ map expects none for VR2a.
   union. With the union off (a diagnostic scratch copy, not the recorded run) the first arm
   answers 98.84 % (1,364 of 1,380) with 16 moves. `FRAMING_TUNING` stays at VR2a1's verdict
   (0.15, 0.12, 0.8, 0.38), VR-23 and VR-S2's rule stay unamended, and nothing is re-run.
+
+## SW2a — the switch's planner and its numbers (2026-11-03)
+
+Recorded before the code. SW2a builds Switch by Speaker's pure planner and nothing visible: the
+inputs it reads off a document, which microphone is active on a 10 ms grid, the shots those turns
+make, and every refusal at once; spike SW-S4 tunes SW-21's thresholds on F-TURNS. The owner's
+answer (2026-11-01) was "the defaults as SW-S4 tunes them". SW-23, SW-26, SW-28 and SW-29 are
+SW2b's (the sheet, the tool, the Program track and the edit). No menu, sheet, tool, op, FFI or
+format change. SW-35's stream guard is not added here: SW3a has not landed, and whichever of SW3a
+and SW2a lands second adds it.
+
+- **SW-20 — The inputs and the pairing** (`SpeakerSwitch.defaults`, `SpeakerSwitch.read`).
+  - Angles are tracks (SW-13): each track holding a selected `.media` clip whose media has a
+    picture (`sourceSize(of:) != nil`), front first. A clip with `enabled.video` off and `linked`
+    set (a `detach_audio` sound half) never makes its track an angle. An angle's spans are
+    `SwitchAngle.pictureClips`, unchanged, so SW-13's covering still counts such a clip.
+  - Microphones are tracks holding a selected `.media` clip that plays sound and whose media has
+    no picture (`hasVideo` false). Only when there are none, each angle track holding a selected
+    clip that plays sound is its own microphone. A detached camera sound is never a default: it
+    is a microphone only when the sheet's Microphone popup picks it or the tool names it (SW2b).
+    In `defaults`, which reads no plan, a clip plays sound when its media has audio, its
+    `enabled.audio` is on and it is not a detached camera sound; `read` reads the plan's audio
+    segments.
+  - The pairing: a microphone that is an angle pairs with itself. The remaining microphones,
+    front to back, pair with the remaining angles, front to back. The wide is the single angle
+    left over; with two or more left over there is no wide. A microphone left without an angle is
+    a speaker with no angle, which SW-24 refuses.
+  - The range is the one given, else the document's In–Out range, else the first selected angle
+    clip's start to the last one's end. The grid is anchored at its start: step k is
+    `[from + k·step, from + (k+1)·step)`, `step` = 6,000 ticks (10 ms, `MediaPeaks.bucketTicks`),
+    `count = (to − from) / step`, a partial last step dropped. A microphone's steps outside its
+    clips are silent and not covered.
+  - The switch trusts the placement and does not check sync (the guide says to run Synchronize
+    Audio first).
+- **SW-21 — A microphone is active when its voice is its own** (`SpeakerSwitch.labels`,
+  `ClipLevelSeries`).
+  - Energy: e(k) is `ClipLoudness.energy` (the K-weighted mean square through the clip's
+    `ChannelMatrix`, AU-35) over the source window of step k, taken through the audio segment
+    covering the step's midpoint (the later-starting one when two do), mapped by
+    `MediaPeaks.sourceTick` and, for a reversed clip, `ReverseMirror` about `reversedPivot`. A
+    step no segment covers has e = 0 and is not covered. Where two selected clips of one track
+    cover a step, the later-starting clip's reading stands.
+  - Level: ℓ(k) = 10·log10 of the mean of e over the CENTRED window k − 5 … k + 4, clipped to
+    `[0, count)`; −∞ when that mean is 0.
+  - Voice: v(k) is the speech cache's probability for the 32 ms chunk holding the source tick
+    under the step's midpoint (`bucketIndex(sourceTick(mid), chunkTicks)`), mirrored when the clip
+    plays reversed; 0 outside the cache or where not covered.
+  - P is the 90th percentile of ℓ over the covered steps with v ≥ `voice_threshold` (0.5); F the
+    10th percentile over the covered steps with v below it, −∞ when there are none. A percentile
+    is the nearest rank, `sorted[⌈p·n⌉ − 1]`.
+  - m is active at k when v ≥ `voice_threshold`, ℓ ≥ P − `bleed_db` and ℓ ≥ F +
+    `floor_margin_db`. When two or more are active and one's ℓ − P exceeds every other active
+    one's by `dominance_db` or more, only it is active.
+  - One active microphone labels the step as that person, two or more as crosstalk, none as
+    nobody. Drafted at `bleed_db` 15, `dominance_db` 8, `floor_margin_db` 6; SW-S4's verdict
+    follows.
+
+    Amended 2026-11-03 (the owner's second answer, option 1). SW-S4's second run, after SW-22
+    (a)'s amendment, still found no passing setting (0/75). Every setting missed b24_f45 (bleed
+    −24 dB, floor −45 dBFS) by the same one cut, at all 75 settings: expected shot 17 (b), onset
+    73,560,687 ticks (122.601 s, the manifest's `expected_shots[17]`), onset − lead 73,440,687,
+    the planned start 73,540,000 (122.567 s), late by 99,313 ticks (165.52 ms) against τ = 88,400
+    ticks (147.33 ms), 10,913 ticks (18.19 ms) past it. The owner accepted that cut as a named
+    limit, in SW-S4's amended rule: b24_f45's shot 17 passes when it is on the frame grid and late
+    by at most 99,313 ticks after onset − lead (an early error past τ still misses). Every other
+    cut of every variant is held to τ; τ is never widened, and this rule's tests and values are
+    unchanged.
+
+    SW-S4's verdict (2026-11-03, its third run, rule `c206847c…a03981a0`): `59/75 settings pass on
+    all 6 variants` and `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6 (0 grid steps from
+    the draft)`, so the defaults are the drafted ones. At the chosen setting each variant's largest
+    |error| from onset − lead is 75.6 ms on b12_f45, b12_f55, b18_f45 and b24_f55, 42.2 ms on
+    b18_f55, and 165.5 ms on b24_f45: its shot 17 (b), the one cut passed by SW-S4's named limit.
+    The 16 settings that fail all miss b12_f45 (dominance 12 at bleed 12–21 and dominance 10 at
+    bleed 18 or 21 with margin 3 or 6), and at dominance 12 b12_f55 as well. The excerpt arm
+    (S-PC1) is owed: until it agrees on ≥ 90 % of single-speaker seconds with no false cut of
+    `min_shot` or more, SW2b shows the bleed row by default (the rule's else branch).
+- **SW-22 — Turns become shots** (`SpeakerSwitch.shots`), in this order:
+  - (a) Each maximal stretch of runs that are not crosstalk, lying between two crosstalk runs and
+    shorter than `bridge` (0.5 s) in total, takes the crosstalk label, whatever it holds (a
+    person's runs, nobody's, or both). Then a run of nobody shorter than `bridge` between two
+    runs of the same label takes that label. A stretch is measured as the nobody bridge is,
+    `steps · step < bridge`, strictly less; a stretch before the first crosstalk run or after the
+    last one is never bridged. The measure is the stretch, not a single run, because the
+    interruptions this answers are runs like "B 0.04, nobody 0.23", two runs.
+
+    Amended 2026-11-03 (the owner's option 1). SW-S4's first run found no passing setting (0/75).
+    SW-21's dominance test flips the label during crosstalk every few tens of milliseconds
+    (b12_f55: X 0.34, B 0.04, nobody 0.23, X 0.26 … s), so no crosstalk turn reached
+    `crosstalk_min`. SW-21 is untouched and τ is never widened.
+  - (b) The maximal runs are turns.
+  - (c) A person turn shorter than `min_turn` (1.0 s), or a crosstalk turn shorter than
+    `crosstalk_min` (1.0 s), starts nothing.
+  - (d) A qualifying person turn starts a shot on its speaker's angle. A qualifying crosstalk
+    turn starts a shot on the wide when `crosstalk` is `wide` and there is a wide; otherwise it
+    starts nothing (holds). A shot starts at `max(the current shot's start, from,
+    snapToFrame(turn start − lead))`, `lead` 0.2 s. A turn whose angle is the current shot's
+    starts nothing; nobody holds. A shot starting where the current one starts replaces it.
+  - (e) The range opens on the wide when there is one; otherwise the first shot is pulled back to
+    `from`. With no wide and no shot, the range is one shot on the front-most angle.
+  - (f) `wide_after` (off by default; with a wide): once a person's shot has run `wide_after`,
+    the wide is inserted at that frame-snapped tick for `min_shot`, then the speaker's angle
+    returns at the frame-snapped tick after it; this repeats to the shot's end.
+  - (g) Shots tile `[from, to)`: each ends where the next starts, the last at `to`. Covering is
+    SW-13's rule over the angle tracks' picture clips. Each maximal sub-span a shot's angle leaves
+    uncovered is reassigned piece by piece from its start: to the wide as far as the wide covers
+    it; else to the shot before's angle as far as that covers it (the shot before extends); else
+    to the front-most angle covering from that tick, as far as it covers. The first shot has no
+    shot before. SW-24's gap refusal guarantees some angle covers every tick.
+  - (h) Merges, repeated until none applies: the earliest shot shorter than `min_shot` (2.0 s)
+    that can merge merges into the shot before when that shot's angle covers the merged span; the
+    first shot, or one the shot before cannot cover, merges into the shot after (which takes its
+    start) when that angle covers it; a short shot neither neighbour covers stays. Equal
+    neighbours are coalesced.
+  - Every planned shot's angle covers its whole span: the invariant SW2b writes from.
+  - `crosstalk` `hold` makes crosstalk hold the current shot even with a wide. SW-22's values
+    stay as drafted: no sample measures them yet (SW-S4's excerpt arm is owed).
+- **SW-24 — It refuses, naming every reason at once (SY-1's form),** one list in this order (T a
+  track id; A and B timecodes `ReelTime.format(_, fps:, frames: true)`):
+  - "Switch by Speaker needs at least two angles: tracks holding a selected clip with a
+    picture."
+  - "Switch by Speaker takes at most nine angles; N tracks hold a selected clip with a picture."
+  - "The speaker on track T has no microphone." — a speaker whose microphone is none or names no
+    microphone track (T the speaker's angle).
+  - "The microphone on track T has no angle to show its speaker." — a speaker whose angle is
+    none or not an angle.
+  - "Track T is the microphone for N speakers; each person needs their own microphone." (until
+    SW8).
+  - From `read`, per microphone, front first: "The microphone on track T is still being analysed
+    — its loudness has not been measured yet. Try again in a moment." and "… — its speech has not
+    been detected yet. Try again in a moment."; then, once, "Speech detection is unavailable on
+    this Mac, so Switch by Speaker cannot tell who is talking." A missing cache file is "still
+    being analysed", never silence.
+  - "The microphone on track T has no speech between A and B, so it never says who is talking."
+    — a microphone with no covered step at v ≥ `voice_threshold`.
+  - "No angle has a picture between A and B." — the first stretch of the range no angle covers.
+  - Only when nothing above is refused: "Switch by Speaker would add N clips to M; the most is
+    4096 — raise the minimum shot.", the number `Int(RC_MAX_CLIPS)`, M
+    `ShotSplit.clipCount` of the document's project. N counts, per shot, the angle clips it
+    overlaps (one piece each, the later clip taking over where two overlap, as SW-15 (d)), plus
+    one split for each angle clip straddling `from` and each straddling `to`. Refused when M + N
+    exceeds `RC_MAX_CLIPS`.
+- **SW-25 — The switch reads caches and computes nothing else.** `plan`, `labels`, `shots` and
+  `defaults` read no document, file or clock; `read` is the only reader (the edited project's
+  plan and snapshot, the loudness and speech caches through `MediaImporter.loadLoudness` and
+  `loadSpeech`, `SileroVAD.isAvailable`). The planner is `SpeakerSwitch.swift`,
+  `SpeakerSwitch+Shots.swift` and `SpeakerSwitch+Read.swift`, the series `ClipLevelSeries.swift`;
+  all are probe-callable and name no `rc_*` but `ReelTime.snapToFrame` and `format`.
+  `ClipLoudness.energy(_:from:to:_:)` loses its `private` so the series reuses it.
+- **SW-27 — The proof's speech is made on the Mac, its truth measured.** F-TURNS
+  (`tools/proof/creator_spike/f_turns.py`, into `tools/proof/media/creator/f_turns/`, reused
+  while its manifest's `generator_sha256` equals the script's): Samantha (A) and Daniel (B) read
+  a scripted turn table of about 150 s through `say -v` — turns of 3 s or more, two replies of
+  0.6 s or less in 0.8 s gaps, one crosstalk passage of 2.5 s or more followed by a pause of
+  0.6 s or more, one silence of 3 s or more. Each voice's SOLO stem is written before mixing;
+  each microphone is its own stem at 0 dB plus the other at the bleed (12, 18 or 24 dB) plus
+  seeded pink noise at the floor (−55 or −45 dBFS RMS), six variants, 48 kHz 24-bit. A turn's
+  onset is the first sample of its solo stem above −40 dBFS. The cameras are flat colour cards
+  with a 16-block binary frame code, 1920×1080 at 30 fps, A in two files abutting mid-way. The
+  manifest's expected shots are written from the script's design, never by the planner. A cut
+  passes when it is on the frame grid and within τ of onset − `lead`: τ = 64 ms (two VAD chunks)
+  + 50 ms (half the window) + one frame (147.3 ms at 30 fps), except SW-S4's named limit:
+  b24_f45's shot 17 late by at most 99,313 ticks (165.5 ms); R6 scores it so. The probe's R6 and the spike are
+  skipped by name when `say -v Samantha` or `say -v Daniel` is missing. The probe is
+  `tools/proof/switch_speaker_probe.swift` (R1–R6, and a `spike` mode), scored by
+  `switch_speaker_probe.py`, with seven mutants (the bleed test removed, R1; the dominance test
+  removed, R1; a trailing window, R1; a short shot merged into the next first, R2; a camera's own
+  sound taken beside picture-less files, R4; the crosstalk bridge removed, R2 and R6; the
+  crosstalk bridge taking only a single run, R2). A trailing window fails R1 alone: R6's τ
+  budgets the half-window's 50 ms by design. No manual check.

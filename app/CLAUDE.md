@@ -865,6 +865,21 @@ detail there.
   transitions_removed, project}` written by hand in that key order).
   `AgentCatalog+Switch` holds both rows, spliced in last by
   `creatorTools()`, after `switch_layout`'s.
+- `SpeakerSwitch.swift` · `SpeakerSwitch+Shots.swift` · `SpeakerSwitch+Read.swift` ·
+  `ClipLevelSeries.swift` — Switch by Speaker's planner (road map creator-jobs SW2a, spec §11
+  SW-20…SW-25), nothing visible yet. `SpeakerSwitch` is pure (names no `rc_*` but
+  `ReelTime.snapToFrame` and `format`): `defaults` (angles are tracks holding a selected media
+  clip with a picture, a detached sound half never one; picture-less files are the microphones,
+  else each sounding angle its own; the pairing front to back and the one leftover wide),
+  `plan` and `refusals` (SW-24's list in order, then the clip ceiling from `RC_MAX_CLIPS`),
+  `reach` and `firstGap` (SW-13's covering over spans). `+Shots`: `percentile` (nearest rank),
+  `labels` (SW-21) and `shots` (SW-22: the crosstalk bridge, the nobody bridge, turns, starts,
+  the wide, `wide_after`, the tiling's hand-offs, merges into a covering neighbour; every
+  shot's angle covers its span). `+Read` is the one reader, `AudioSync.read`'s shape: the
+  edited project's plan and snapshot, the loudness and speech caches (a missing file is still
+  being analysed), each microphone's series on the range's 10 ms grid. `ClipLevelSeries`
+  (pure): a clip's energies through `ClipLoudness.energy` (no longer private) and its
+  `ChannelMatrix`, the centred 100 ms level, the speech chunk per step.
 - `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
   `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
   creator-jobs VR2a2, spec §11 VR-26, VR-28); no menu yet (Clip ▸ Follow

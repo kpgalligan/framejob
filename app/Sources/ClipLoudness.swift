@@ -146,7 +146,7 @@ enum ClipLoudness {
     /// records `[⌊a/step + ½⌋, ⌊b/step + ½⌋)`, else the one record holding the
     /// midpoint. Outside the file reads as silence. Its peak is the largest
     /// true peak of the records it read; its high band the same mean of `h`.
-    private static func energy(
+    static func energy(
         _ cache: MediaLoudness, from a: Ticks, to b: Ticks, _ matrix: ChannelMatrix
     ) -> (energy: Double, peak: Double, high: Double) {
         let step = stepTicks

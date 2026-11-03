@@ -1061,7 +1061,7 @@ its value as `rule_sha256`, and a run whose rule hashes differently re-records i
 | SW-S1 | `4d601156b5b831f19fcdf243f5643870cb3faa68f03e8d744fde08d73446ba43` |
 | SW-S2 | `ecd9d732bf8ec0c13b417c768577092f1b175728ac425c319529ba19324f0961` |
 | SW-S3 | `abc5ccefef8614fdb571da20c44f0768ad2e40bd4066ba7b90870359fd3f1fae` |
-| SW-S4 | `3d8c9c46221e111f713c46d8618a95417ea945707933e6a01fb671eca3fcdb3a` |
+| SW-S4 | `c206847c4b1164a6f72e988b8acb1cbd67e1fecfef88c78d11f71174a03981a0` |
 
 **Verification.** `make gate`.
 
@@ -1840,6 +1840,11 @@ guest's agreement, recorded in the spike's README).
   shows the bleed row by default and the guide names the case; if NO setting places every synthetic
   cut within τ, SW2a stops, each miss is recorded, and SW-21 or SW-22 (the rule, never τ) is amended
   before SW2b's code.
+  **Amended 2026-11-03 (the owner, after the second run's 0/75):** one cut is a named limit.
+  F-TURNS' b24_f45 (bleed −24 dB, floor −45 dBFS), expected shot 17 (b, onset 122.601 s), passes
+  when on the frame grid and late by at most its measured 99,313 ticks (165.5 ms) after onset −
+  lead, 18.2 ms past τ, the same at every setting of the grid. Every other cut of every variant is
+  held to τ; τ is never widened and SW-21 is untouched.
 
 ### CJ1 — the key gate
 
@@ -10850,6 +10855,130 @@ one Release instance `switch_pieces_proof.py` 6/6 (P5's five calls 0.132, 0.141,
 - **Question for the owner:** the defaults (minimum shot 2 s, cut 0.2 s before speech, wide after 1
   s of crosstalk) as SW-S4 tunes them? *Recommended: yes.*
 
+#### SW2a's record (2026-11-03)
+
+**Built, with one named limit.** Lane A, base `b6a2b52a` (VR2a2), with attempts 1–2
+cherry-picked from `7b6c9aa4` (`15b08bda..7b6c9aa4`: attempt 1's `f884bbb6` from base `9d55f6bb`,
+SW1, and attempt 2's three commits from base `15b08bda`, CO9). The owner's answer (2026-11-01):
+the defaults as SW-S4 tunes them. Decisions SW-20…SW-22, SW-24, SW-25 and SW-27 were recorded
+before the code in `creator-jobs-9.md`, after VR2a2's entries, with their index rows; SW-23,
+SW-26, SW-28 and SW-29 are SW2b's. No FFI, header, format, core or MCP change, and nothing
+visible.
+
+- **App** (`wc -l`): `SpeakerSwitch.swift` 255, `SpeakerSwitch+Shots.swift` 287,
+  `SpeakerSwitch+Read.swift` 136, `ClipLevelSeries.swift` 96 (new); `ClipLoudness.swift` 290,
+  `energy(_:from:to:_:)` no longer `private`. `Settings`' defaults are the draft (bleed 15,
+  dominance 8, margin 6), now SW-S4's chosen setting. `make typecheck`: exit 0, the four baseline
+  warnings.
+- **Proof:** `tools/proof/switch_speaker_probe.swift` (R1–R6, `spike` and `runs` modes; R1 and
+  R2 at the drafted thresholds, R1 also holding `Settings()` to the chosen setting; R6 and the
+  spike scoring SW-S4's named limit) and `.py` (seven mutants); `creator_spike/f_turns.py`
+  (F-TURNS: 157 s, 25 utterances, 22 expected shots, six variants);
+  `creator_spike/switch_spike.py`; `tools/proof/README.md`'s SW2a section.
+
+**SW-S4's first run (attempt 1).** `switch_spike.py` printed `SW-S4 rule_sha256 3d8c9c46…fcdb3a
+matches the table` and `0/75 settings pass on all 6 variants`.
+
+- **The crosstalk passage never made a crosstalk turn of `crosstalk_min`.** Over the passage
+  (43.04–46.06 s, both voices at the same RMS) SW-21's dominance test flips the label every few
+  tens of milliseconds; on b12_f55 the runs are X 0.34, B 0.04, nobody 0.23, X 0.26, A 0.34, X
+  0.47, B 0.06, X 0.24, A 0.01, X 0.07, B 0.01, X 0.54, B 0.40 s — crosstalk for 1.92 s of the
+  3.02 s, its longest run 0.54 s, and SW-22 (a) then bridged only nobody. In 417 of the 450
+  (setting, variant) results the plan had no wide at all.
+- **The person cuts:** realigned around the missing wide, the defaults' cuts were within τ on
+  five variants (largest |error| 75.5 ms on b12_f55, b12_f45, b18_f45 and b24_f55, 42.2 ms on
+  b18_f55); on b24_f45 one cut was 165.5 ms late, over τ's 147.3 ms.
+
+**The owner's option 1 (2026-11-03).** SW-22 (a) amended, before the code (`creator-jobs-9.md`):
+each maximal stretch of non-crosstalk runs between two crosstalk runs, under `bridge` (0.5 s) in
+total, takes the crosstalk label; then the nobody bridge as before. SW-21 untouched, τ never
+widened. Built as `SpeakerSwitch.bridgingCrosstalk`, called by `shots` before the nobody bridge.
+`switch_speaker_probe.py --only R1,R2,R3,R4,R5`: 5/5, R2 with the three bridge checks.
+
+**SW-S4's second run.** `switch_spike.py` printed `SW-S4 rule_sha256 3d8c9c46…fcdb3a matches the
+table`, `0/75 settings pass on all 6 variants` and `STOP: no setting places every synthetic cut
+within τ`; the excerpt arm `SKIPPED … S-PC1 is not in tools/proof/media/creator/ (owed)`.
+
+- **The bridge did its work:** at the draft (15, 8, 6) five variants pass with the passage cut to
+  the wide — largest |error| 75.6 ms on b12_f45, b12_f55, b18_f45 and b24_f55, 42.2 ms on
+  b18_f55. 59 of the 75 settings fail only b24_f45; 12 (dominance_db 12 at bleed 12–21) also fail b12_f45
+  and b12_f55, and 4 (bleed 18 or 21, dominance 10, margin 3 or 6) also fail b12_f45.
+- **What remains: b24_f45's one late cut, the same at all 75 settings:** shot 17 (b), onset
+  122.601 s, cut 165.5 ms after onset − lead, against τ 147.3 ms. The label runs at the defaults
+  (the probe's `runs` mode) start that B turn at 122.75 s on b24_f45 and at 122.59–122.62 s on the
+  other five. None of the three tuned thresholds moves it.
+
+**The owner's second answer (2026-11-03), option 1.** SW-S4's rule amended before the code: the
+one cut is a named limit. b24_f45's shot 17 (b) passes when on the frame grid and late by at most
+its measured 99,313 ticks (165.5 ms) after onset − lead: onset 73,560,687 ticks (122.601 s),
+onset − lead 73,440,687, the planned start 73,540,000 (122.567 s, the only grid tick at 165.5 ms),
+18.2 ms past τ (88,400 ticks). Every other cut of every variant is held to τ; τ is never widened
+and SW-21's tests and values are unchanged. The rule's hash moved from `3d8c9c46…fcdb3a` to
+`c206847c…a03981a0`, re-pinned in CJ0a's table. SW-21 gained the amendment and SW-S4's verdict,
+SW-27 the limit's clause, and SW2b's Acceptance and Docs bullets one clause each. In the probe,
+`namedLimit` and `score(…variant:)` pass that cut alone (late only; an early error past τ still
+misses) and list it as `limited`; the spike's rows and `results.json` carry `limited` and a
+top-level `limit`.
+
+**SW-S4's third run.** `switch_spike.py` printed `SW-S4 rule_sha256 c206847c…a03981a0 matches the
+table`, `59/75 settings pass on all 6 variants`, `CHOSEN bleed_db 15, dominance_db 8,
+floor_margin_db 6 (0 grid steps from the draft)` and `SKIPPED the excerpt arm: S-PC1 is not in
+tools/proof/media/creator/ (owed)`; exit 0, 115.76 s wall (with a 104.4 s probe build).
+
+- **At the chosen setting**, each variant's largest |error| from onset − lead: 75.6 ms on b12_f45,
+  b12_f55, b18_f45 and b24_f55; 42.2 ms on b18_f55; 165.5 ms on b24_f45, its shot 17 (b) listed
+  `limited: shot 17 (b) at 165.5 ms, SW-S4's named limit (≤ 165.5 ms)` and no other cut past τ.
+- **The 16 failing settings** each miss b12_f45: dominance 12 at bleed 12, 15, 18 and 21 (every
+  margin, b12_f55 too), and dominance 10 at bleed 18 or 21 with margin 3 or 6. b24_f45's shot 17
+  is `limited` at all 75 settings.
+- Every setting's result is in `tools/proof/work/creator_spike/SW-S4/results.json`.
+
+**The probe, whole.** `switch_speaker_probe.py`: `6/6 rows passed`, exit 0; R6's notes give the
+same worst errors per variant as the spike at (15, 8, 6), b24_f45's with its `limited` line.
+
+**Mutants** (`--mutant NAME`, each on a copy of `app/Sources`):
+`MUTANT bleed-removed CAUGHT: R1 failed`, `MUTANT dominance-removed CAUGHT: R1 failed`, `MUTANT
+trailing-window CAUGHT: R1 failed`, `MUTANT merge-into-next CAUGHT: R2 failed`, `MUTANT
+camera-sound-beside-files CAUGHT: R4 failed`, `MUTANT crosstalk-bridge-removed CAUGHT: R2, R6
+failed` (R6 on all six variants by the shot angles, not the limit) and `MUTANT
+crosstalk-bridge-single-run CAUGHT: R2 failed`; each exit 1.
+
+**`make gate`:** `gate: PASS 658s` (names 1 s, typecheck 9 s, fmt and lint skipped as unchanged,
+test 378 s, app 269 s), exit 0.
+
+**The commits** (lane A, on `b6a2b52a`): `8b139522`, `522e4940`, `84eeb939`, `3811db21`
+(attempts 1–2's `0f86c18c`, `8dac7438`, `f1b979a4`, `7b6c9aa4`, cherry-picked keeping both sides:
+`creator-jobs-9.md` I's file whole then the SW2a section, §7.4's two rows, one `-9` index row);
+`992c8f96` (the spec index's Lines cells); `e740db47` (SW-S4's amended rule and its re-pin, SW-21's
+amendment, SW-27's clause, SW2b's two clauses, before any probe edit); `3cfa06c8` (the probe's
+named limit); `01334770` (SW-S4's verdict in SW-21, R1's defaults check); `50478e86` and
+`d0aade3f` (this record). They land on the integration branch as one commit.
+
+- **Deviations** (the notes): R1's row in `tools/proof/README.md` and R1's paragraph in the `.py`
+  docstring name the new defaults check too; no Release run, the phase's proof being a compiled
+  probe (`swift_build`) that drives no app. Attempts 1–2's deviations carry unchanged.
+- **Review** (`b6a2b52a..d0aade3f`, verdict pass): the planner read against SW-20…SW-25 (the
+  crosstalk bridge strictly under `bridge` and never past the last crosstalk run, dominance ≥ every
+  other active microphone, nearest-rank percentile, the window k − 5…k + 4, SW-24's refusal order
+  with the clip ceiling last, the hand-offs and merges in (g) and (h)'s order) and the limit scoped
+  exactly to (b24_f45, shot 17, `b`, τ < late ≤ 99,313 ticks), an early error past τ still a miss.
+  One nit, left as is: SW-S4's amended lines say "SW-21 is untouched" where SW-21 gained a dated
+  paragraph; §11 says the precise thing (its tests and values unchanged), and editing the line
+  would re-pin CJ-7's hash.
+- **Integration** (2026-11-03): the cherry-pick applied onto `b6a2b52a` with no conflict, the
+  staged tree identical to `d0aade3f`. The `SpeakerSwitch.swift` · `+Shots` · `+Read` ·
+  `ClipLevelSeries.swift` entry was added to `app/CLAUDE.md`'s map after SW1's. `make gate` on
+  the integration branch: `gate: PASS 525s` (names 1 s, typecheck 10 s, fmt and lint skipped as
+  unchanged, test 309 s, app 204 s).
+
+**Owed.** The S-PC1 excerpt arm: until it agrees on ≥ 90 % of single-speaker seconds with no false
+cut of `min_shot` or more, SW2b shows the bleed row by default (SW-S4's else branch). SW-35's
+stream guard (whichever of SW3a and SW2a lands second; SW3a has not landed). The guide's sentence
+naming the limit, in `multicam.md` (SW2b's Docs bullet). No manual check. Filed at integration
+(`ai-drafted`, `low-priority`): "Switch by Speaker: one F-TURNS cut 165.5 ms late at 24 dB bleed
+under a −45 dBFS floor (SW-S4's named limit)", to re-test on S-PC1 and, if it reproduces, try a
+`voice_threshold` grid.
+
 ### SW3b — renders and Reverse read the clip's track
 
 - **What a person gets:** speed ramps, voice isolation, voice effects and Reverse use the track the
@@ -11063,8 +11192,12 @@ section, then CO9's). The CLAUDE.md edits applied: `core/CLAUDE.md`'s `video_gat
   which tracks count as microphones; bleed and Ignore bleed; slip and move break sync); the README
   highlight; `menus-and-shortcuts.md`, `mcp.md`; spec §7.9e, §9, §10's acceptance step; a screen
   `19-switch-by-speaker-sheet.md` (provisional); `docs/manual-checks.md` (JOB-51, JOB-52); root
-  `CLAUDE.md`'s dev launch defaults (`-RCDevSwitchSpeakerAccept`); the counts.
-- **Acceptance:** on F-TURNS every cut on the grid within τ; bleed never cuts; crosstalk shows the
+  `CLAUDE.md`'s dev launch defaults (`-RCDevSwitchSpeakerAccept`); the counts; the named limit
+  (SW-S4's amendment) in `multicam.md`: with heavy bleed in a noisy room (the tests' other voice 24
+  dB down under −45 dBFS of noise), a cut can come later than Cut before speech asks — in the worst
+  case measured, about 35 ms before the first word instead of 0.2 s.
+- **Acceptance:** on F-TURNS every cut on the grid within τ, except SW-S4's named limit: b24_f45's
+  shot 17 late by at most 99,313 ticks (165.5 ms); bleed never cuts; crosstalk shows the
   wide; the microphones' sound unchanged; the timeline outside the range unchanged; one undo step.
 - **Proof** (`switch_speaker_proof.py`, Release; F-TURNS): S1 the shots against the turn table; S2
   bleed at −12 dB with `bleed_db` 15 makes no shot of the silent person; S3 `render_frame` at each
