@@ -316,6 +316,9 @@ extension AppDelegate {
         // Road map "creator-jobs" CU7 (spec §11 CU-76), right after Add
         // Action: the UI path `auto_zoom` names. No key equivalent.
         menu.addItem(item("Auto Zoom…", #selector(EditorViewController.showAutoZoomSheet(_:))))
+        // CU8 (spec §11 CU-84), right after Auto Zoom…: the UI path `add_shortcut_overlays`.
+        menu.addItem(
+            item("Add Shortcut Overlays", #selector(EditorViewController.addShortcutOverlays(_:))))
         menu.addItem(item("Speed…", #selector(EditorViewController.showSpeedSheet(_:))))
         // #340 (spec §11 SR-24), right after Speed…: the UI path
         // `add_speed_ramp` names. No key equivalent, for Remove Silences…'

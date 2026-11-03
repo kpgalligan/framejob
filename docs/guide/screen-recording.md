@@ -266,6 +266,22 @@ A clip placed smaller than the canvas (side by side with a camera, or a picture 
 
 *Agents:* `auto_zoom` plans and applies the same zooms, with the sheet's settings as arguments.
 
+## Shortcut overlays
+
+**Clip ▸ Add Shortcut Overlays** shows each keyboard shortcut you pressed while recording as keycaps on screen, at the moment you pressed it. It needs a recording made with **Record shortcuts** on (see [Shortcuts and Input Monitoring](#shortcuts-and-input-monitoring)); only shortcuts are recorded, never what you typed.
+
+Select one or more clips whose movies have cursor files and choose the item. There is no sheet: it reads the cursor files and places one **Keyboard keys** graphic clip per shortcut, at the bottom of the picture in the dark theme, each shown for 1.5 s. The whole change is one undo step, "Add Shortcut Overlays". It works inside an open nest too, and is greyed when a selected clip is not a movie with a cursor file.
+
+- **Where they go.** On the front-most track named "Shortcuts" when it is in front of the clips, unlocked, shown, not a matte and free where the overlays go; otherwise on a new "Shortcuts" track at the front.
+- **How long.** Each overlay lasts 1.5 s, and never less than the keycaps need to press in turn and fade out: (10 × keys + 25) frames, so 1.5 s for a two-key shortcut at 30 fps.
+- **Repeats.** Pressing the same shortcut again before its overlay ends keeps it up 1.5 s past the last press, labelled "×2", "×3" and so on.
+- **Shortcuts close together.** A different shortcut pressed while one is showing takes over once the first has had its minimum. When that would show it more than half a second late, it is left out, and a sheet says how many were: "1 shortcut came too close to show."
+- **The graphic.** The overlays are drawn by the project's copy of the bundled Keyboard keys template, written into the project's graphics the first time and reused after; if you have edited that copy, a fresh one is written beside it. Change a clip's look in its Graphic sub-tab like any graphic.
+
+When no shortcut was recorded in the selected clips, a sheet says "No shortcut was recorded in the selected clips' played windows, so nothing was added." A clip that plays reversed is refused.
+
+*Agents:* `add_shortcut_overlays` places the same overlays, and takes `duration`, `position` (bottom, center, top), `theme` (dark, light) and a `from`/`to` range.
+
 ## Voice-overs (Microphone Only)
 
 To record narration over your edit, choose **Microphone Only** in **Source**:

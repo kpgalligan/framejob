@@ -34,15 +34,23 @@
 //!   clip — `tracks[i]` is the cursor track of `clips[i]` — and `project`,
 //!   the scoped one inside a nest; `from` and `to` are its container ticks,
 //!   `lead` and `stay` seconds.
+//! - `{"plan_overlays":{"clips":[…], "duration"?, "position"?, "theme"?,
+//!   "module", "schema"?, "from"?, "to"?}}` → `{ops, added, dropped, merged,
+//!   track, new_track, overlays}`: Add Shortcut Overlays' plan (road map
+//!   creator-jobs CU8, spec §11 CU-80…CU-84, `cursor_overlays.rs`), one track
+//!   per clip and `project`, as `plan_zooms`; `duration` seconds, `from` and
+//!   `to` container ticks.
 //!
 //! The other six each read one track and ignore `project`, which
-//! `plan_zooms` reads. Each refusal is its own lowercase sentence.
+//! `plan_zooms` and `plan_overlays` read. Each refusal is its own lowercase
+//! sentence.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::cursor_bursts::typing_stretches;
 use crate::cursor_file_check::encode_base64;
+use crate::cursor_overlays::{plan_overlays, PlanOverlaysArgs};
 use crate::cursor_smooth::SmoothPath;
 use crate::cursor_track::{ticks_to_us, us_to_ticks, CursorTrack, MAX_PATH_SAMPLES, PATH_MIN_STEP};
 use crate::cursor_zoom::{plan_zooms, PlanZoomsArgs};
@@ -59,6 +67,7 @@ enum Request {
     Events(EventsArgs),
     Path(PathArgs),
     PlanZooms(PlanZoomsArgs),
+    PlanOverlays(PlanOverlaysArgs),
 }
 
 /// The one track a read takes, or the refusal naming the request.
@@ -178,6 +187,10 @@ pub fn query(
         Request::PlanZooms(a) => {
             let project = project.ok_or("plan_zooms needs the project")?;
             plan_zooms(tracks, project, a)?
+        }
+        Request::PlanOverlays(a) => {
+            let project = project.ok_or("plan_overlays needs the project")?;
+            plan_overlays(tracks, project, a)?
         }
     };
     Ok(answer.to_string())

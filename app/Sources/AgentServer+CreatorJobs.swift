@@ -54,6 +54,8 @@ extension AgentServer {
         "get_cursor_events": { $0.getCursorEvents },
         // AgentServer+AutoZoom.swift (CU7, spec §11 CU-76)
         "auto_zoom": { $0.autoZoom },
+        // AgentServer+ShortcutOverlays.swift (CU8, spec §11 CU-84)
+        "add_shortcut_overlays": { $0.addShortcutOverlays },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
@@ -61,6 +63,7 @@ extension AgentServer {
     static let creatorOffMainTools: Set<String> = [
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
         "new_project_from_range", "analyze_cutout", "get_cursor_events", "auto_zoom",
+        "add_shortcut_overlays",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
@@ -72,7 +75,8 @@ extension AgentServer {
     /// `text_behind_subject` (CO5, `AgentCatalog+BehindSubject.swift`), then the
     /// op tool `set_media_cursor` and `get_cursor_events` (CU5,
     /// `AgentCatalog+Cursor.swift`), then `auto_zoom` (CU7,
-    /// `AgentCatalog+AutoZoom.swift`).
+    /// `AgentCatalog+AutoZoom.swift`), then `add_shortcut_overlays` (CU8,
+    /// `AgentCatalog+ShortcutOverlays.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
@@ -82,6 +86,7 @@ extension AgentServer {
         tools += behindSubjectTools()
         tools += cursorTools()
         tools += autoZoomTools()
+        tools += shortcutOverlayTools()
         return tools
     }
 }

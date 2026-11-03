@@ -42,6 +42,7 @@ pub mod cube;
 mod cursor_bursts;
 pub mod cursor_file;
 mod cursor_file_check;
+mod cursor_overlays;
 mod cursor_props;
 pub mod cursor_query;
 mod cursor_smooth;

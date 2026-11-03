@@ -390,3 +390,29 @@ fn project_yml_lists_every_template() {
     assert_eq!(listed(phase, "inputFiles"), files, "inputFiles");
     assert_eq!(listed(phase, "outputFiles"), files, "outputFiles");
 }
+
+/// `keyboard-keys` draws the token `plus` as a `+` keycap and never the
+/// word (spec §11 CU-82), at every case the token can arrive in.
+#[test]
+fn keyboard_keys_draws_plus_as_a_plus_keycap() {
+    let module = common::module("keyboard-keys");
+    let d = duration(&module);
+    for keys in ["cmd+plus", "cmd+PLUS", "ctrl+Plus"] {
+        let mut props = module.defaults();
+        props["keys"] = Value::from(keys);
+        props["label"] = Value::from("");
+        let ctx = common::ctx(d / 2, FPS, d, 1920, 1080);
+        let (svg, warnings) =
+            graphic::svg(&module, d / 2, &props, &ctx, BUDGET_MS).expect("keyboard-keys draws");
+        assert!(
+            warnings.is_empty(),
+            "{keys}: {:?}",
+            common::messages(&warnings)
+        );
+        assert!(svg.contains(">+</text>"), "{keys}: no + keycap in the SVG");
+        assert!(
+            !svg.to_lowercase().contains("plus"),
+            "{keys}: the SVG spells the word"
+        );
+    }
+}

@@ -258,8 +258,8 @@ else is what bloats files:
   (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and sixteen product tools (and the dev tools, road
-  map 11), before any handler runs;
+  stranger by name, for all one hundred and seventeen product tools (and the dev tools,
+  road map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A feature that needs a language or cloud model tests its key through
@@ -333,7 +333,7 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `new_project_from_range`, `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `detect_fillers`, `transcribe_for_fillers`, `get_transcript`, `get_timeline_transcript`, `get_media_analysis`, `split_at_shots`, `normalize_clip`, `enhance_voice`, `match_audio`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
-`undo`, `redo`, `render_frame`, `export`, `export_status`, `auto_zoom`, `cancel_export`,
+`undo`, `redo`, `render_frame`, `export`, `export_status`, `auto_zoom`, `add_shortcut_overlays`, `cancel_export`,
 `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic`,

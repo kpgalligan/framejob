@@ -107,7 +107,7 @@ Each template's properties, as the Graphic sub-tab shows them:
 | End screen | title, videoA, videoB, subscribe (the three labels), background, accent |
 | Gauge | value (held between min and max), min, max, label, units, accent |
 | Handle tag | handle, glyph (a pop-up: play, camera, bubble, note, globe), position (a pop-up of the four corners), accent |
-| Keyboard keys | keys (keys joined by "+": cmd, shift, opt or alt, ctrl, up, down, left, right, or any other key's name or character), label (empty hides it), theme (a pop-up: light, dark), position (a pop-up: bottom, center, top), accent |
+| Keyboard keys | keys (keys joined by "+": cmd, shift, opt or alt, ctrl, up, down, left, right, plus (drawn as +), or any other key's name or character), label (empty hides it), theme (a pop-up: light, dark), position (a pop-up: bottom, center, top), accent |
 | Kinetic type | text, stagger (1–30), color, accent |
 | Line chart | values and labels (comma-separated text), title, area (a checkbox), accent |
 | Logo reveal | logo (an image from the project's graphic assets; none draws the mark), mark, tagline, background, accent |

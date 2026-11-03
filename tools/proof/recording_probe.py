@@ -8756,6 +8756,7 @@ APP_STATE_TOOLS = [
     "import_graphic", "get_media_analysis", "split_at_shots", "get_timeline_transcript",
     "new_project_from_range", "analyze_cutout", "text_behind_subject", "get_cursor_events",
     "auto_zoom",
+    "add_shortcut_overlays",
 ]
 # `git show 7a198db^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (2a8421b) after `remove_media` and `export_status`,

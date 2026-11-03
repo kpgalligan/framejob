@@ -715,6 +715,29 @@ detail there.
     off main, then refuses if the project or scope changed, plans, and calls
     `editResult`. It takes no `scope` key.
   - Its catalog row is spliced in by `creatorTools()` after the cursor rows.
+- `ShortcutOverlays.swift` · `EditorViewController+ShortcutOverlays.swift` ·
+  `AgentServer+ShortcutOverlays.swift` · `AgentCatalog+ShortcutOverlays.swift`
+  — Clip ▸ Add Shortcut Overlays and `add_shortcut_overlays` (road map
+  creator-jobs CU8, spec §11 CU-80…CU-84). `ShortcutOverlays` (names no
+  `rc_*`) is the run both doors call:
+  - `ShortcutOverlaySettings` (bottom, dark, 1.5 s; nothing remembered),
+    `template()` (the bundled `keyboard-keys.js` and `GraphicTemplateLibrary`'s
+    compiled schema), `reusableModule` (CU-81: a `graphics/` module whose bytes
+    equal the template's, `keyboard-keys` first), and `plan` over
+    `ReelCursor.query(_:tracks:project:)`.
+  - `prepared` writes the template through `writeGraphicModule(from:)` only
+    when something is placed, and plans again when the written name is not the
+    predicted one. The files are `AutoZoom.cursorFiles` / `readTracks`'. A
+    main-only set holds the documents with a menu run pending.
+  - The menu item has no sheet: the action reads the files on a
+    `.userInitiated` queue, refuses a changed project, places through
+    `performGroupedEdit`, and shows an informational sheet for a refusal,
+    nothing placed or a drop.
+  - `validateShortcutOverlaysAction` is one line in the frozen file after
+    `validateAutoZoomAction`; it reads no file.
+  - The tool runs off main (`creatorOffMainTools`), takes no `scope` key and
+    answers through `editResult`. Its catalog row is spliced in by
+    `creatorTools()` after `auto_zoom`'s.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map

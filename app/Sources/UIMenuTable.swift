@@ -69,6 +69,7 @@ extension UIMenu {
         "attachAudio:": .plain,
         "addActionAtPlayhead:": .plain,
         "showAutoZoomSheet:": .sheet,
+        "addShortcutOverlays:": .plain,
         "closeGapAtPlayhead:": .plain,
         "showRetimeSheet:": .sheet,
         "renameClip:": .plain,

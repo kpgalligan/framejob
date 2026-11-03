@@ -195,7 +195,14 @@ governs a module now.
   time order) and answer; `cursor_zoom_run.rs` a run (clips continuing one source on one
   track) — its anchors through S, scroll bursts, barriers, the 10 Hz follow cursor and
   `land` (only given clips, no straddled cut); `cursor_zoom_visits.rs` anchors → visits →
-  planned actions in container time, pure. `encode_base64`
+  planned actions in container time, pure. Add Shortcut Overlays' planner (road map
+  creator-jobs CU8, spec §11 CU-80…CU-84), `plan_overlays` in `rc_cursor_query` (one track per
+  clip, and the project): `cursor_overlays.rs` — its arguments and refusals, the presses through
+  `cursor_zoom_run.rs`'s `media_in` and `clip_time`, CU-80's timing in grid frames
+  (`min_frames`, D_min(n) = 10n + 25; the same chord merged as "×k"; a different chord more than
+  0.5 s late dropped), CU-83's Shortcuts track rule (`TRACK_NAME`; the front-most one in front of
+  every given clip's track, unlocked, shown, no matte, free over the span, else a new one at the
+  front with `next_id`) and the `add_track` / `add_graphic_clip` ops. `encode_base64`
   sits beside `decode_base64` in `cursor_file_check.rs`, base64's one home. No file
   I/O, no pixel work: a PNG is checked by its signature.
 - `model_cursor.rs` · `cursor_props.rs` · `recipe_cursor.rs` — the cursor in the model and the

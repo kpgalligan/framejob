@@ -113,7 +113,8 @@ opens to import into a project.
 click rings, at 30 or 60 fps, into a new project or at the playhead; a camera,
 on its own or beside the screen as a corner talking head; or a
 microphone-only voice-over. **Clip ▸ Auto Zoom…** zooms a recording in at its
-clicks and typing and back out after, as ordinary actions you can edit.
+clicks and typing and back out after, as ordinary actions you can edit, and
+**Clip ▸ Add Shortcut Overlays** shows the shortcuts you pressed as keycaps.
 → [Screen recording](docs/guide/screen-recording.md)
 
 **Export.** H.264, HEVC (8-bit, 10-bit, with alpha), AV1 in MP4 or WebM

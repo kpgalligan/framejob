@@ -74,8 +74,10 @@ export function render(frame, props, ctx) {
   const caps = tokens.map((t) => {
     const kind = GLYPHS[t.toLowerCase()];
     if (kind) return { kind, w: capH };
-    const text = t.length === 1 ? t.toUpperCase() : t;
-    const font = t.length === 1 ? charFont : wordFont;
+    // The recorder spells the plus key "plus" (spec §11 CU-60, CU-82).
+    const key = t.toLowerCase() === "plus" ? "+" : t;
+    const text = key.length === 1 ? key.toUpperCase() : key;
+    const font = key.length === 1 ? charFont : wordFont;
     return { text, font, w: Math.max(capH, measureText(text, font).width + 70 * u) };
   });
   const rowW = caps.reduce((a, c) => a + c.w, 0) + gap * Math.max(0, caps.length - 1);
@@ -91,6 +93,9 @@ export function render(frame, props, ctx) {
   const cx = ctx.width / 2;
   const cy = top + groupH / 2;
   const enter = (i) => spring({ frame: frame - i * 5, fps: ctx.fps, stiffness: 200, damping: 13 });
+  // The first keycap presses at 5n + 14 and the last at 10n + 9; with the
+  // 15-frame exit, Add Shortcut Overlays never makes a clip shorter than
+  // D_min(n) = 10n + 25 frames (spec §11 CU-80, core/src/cursor_overlays.rs).
   const pressAt = caps.length * 5 + 14;
   const out = interpolate(frame, [D - 15, D - 1], [0, 1], { easing: Easing.inCubic, clamp: true });
   const outScale = 1 - 0.1 * out;

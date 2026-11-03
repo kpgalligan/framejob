@@ -145,3 +145,81 @@ FC3 uses it.
   confusion skipped by name and owed). Six mutants: `window-start` (P2, E6), `mp3-trim-skipped`
   (P4), `early-publish` (P6), `cover-whole-range` (P9, P7), `table-version` (P3),
   `sound-holds-picture` (E11). No manual check.
+
+## CU8 — shortcut overlays (2026-11-02)
+
+Recorded before the code. CU-80…CU-85 are CU8's: Clip ▸ Add Shortcut Overlays and the tool
+`add_shortcut_overlays` place one `keyboard-keys` graphic clip per recorded shortcut of the
+selected clips' cursor files, at its moment, on a front "Shortcuts" track, as one undo step "Add
+Shortcut Overlays". The plan is a core planner, `plan_overlays`, an eighth `rc_cursor_query`
+request (one track per clip and the project, as `plan_zooms`; no new `rc_*` export, op, format or
+cursor-file version). The owner's answer (2026-11-01): "overlays sit at the bottom, in the dark
+theme." Nothing here sends anything anywhere, so nothing is keyed (CJ-3). Only shortcuts are
+placed: no typed key is recorded (CU-7).
+
+- **CU-80 — Placement and timing.** A press is a `keys.shortcut` entry of a given clip's file
+  whose source tick (`us_to_ticks(t)`) lies in the clip's played window `[in, in +
+  content_length_in_source)`, placed at `clip.start + clip_time(clip, s − in)` — through S on a
+  ramp, ⌊read ÷ speed⌋ otherwise (`cursor_zoom_run.rs`'s one mapping) — kept when inside `[from,
+  to)` (container ticks), and snapped to the container's frame grid. Every clip's presses are
+  merged in time order, ties in the given clip order. A chord's keycap count n is the count of
+  non-empty, trimmed `+` tokens of its `keys`. **D_min(n) = 10n + 25 frames** of the container's
+  canvas rate: the template's last keycap presses at frame `pressAt + 5(n − 1)` = 10n + 9
+  (`keyboard-keys.js`; the road map's "5n + 14" is the FIRST keycap's press) and exits over the
+  clip's last 15 frames, so the last press needs 16 frames before the end. Each overlay starts at
+  its press s and lasts max(duration, D_min(n)), `duration` 1.5 s by default (0.5–10). The SAME
+  `keys` pressed at p before the current overlay's end extends its end to max(end, p + duration),
+  its count k + 1, its label "×k" (U+00D7) — else the label is "" (sent: the template's default
+  label is "Screenshot a selection"). A DIFFERENT chord pressed at p before the current end would
+  start at max(p, s + D_min(n_current)): more than 0.5 s after p it is dropped and counted
+  (`dropped`), else the current overlay ends there and the new one begins there. A press at or
+  after the current end starts a new overlay. Every start and end is a frame of the grid, no
+  overlay is shorter than its D_min(n), and none overlap. Props: `keys` verbatim, `label`,
+  `position` (`bottom` · `center` · `top`, `bottom` by default) and `theme` (`dark` · `light`,
+  `dark` by default); `accent` is the template's.
+- **CU-81 — The module.** A module of the document's `graphics/` whose bytes equal the bundled
+  `keyboard-keys.js` is reused — the one named `keyboard-keys` first, else the lowest name —
+  else, only when the plan places at least one overlay, the bundled template is written under
+  `GraphicStore`'s free-name rule (`writeGraphicModule(from:)`, G-16 (b), which rescans), and the
+  plan is made again when the written name differs from the predicted
+  `uniqueModuleName("keyboard-keys")`. The clips carry the template's compiled schema. The write
+  is not undoable (G-3); a run that places nothing writes nothing.
+- **CU-82 — The token `plus`.** `keyboard-keys.js` reads a token spelled `plus` (any case) as the
+  keycap `+` (CU-60 spells the plus key `plus`), for its text and its font; every other token is
+  unchanged. A comment at `pressAt` names CU-80's D_min(n).
+- **CU-83 — The track rule (in the core: it needs the planned span).** The span is [the first
+  overlay's start, the last one's end). The overlays go on the front-most track named exactly
+  "Shortcuts" when it is in front of every given clip's track, not locked, not hidden, has no
+  matte and holds no clip meeting the span; otherwise on a new track named "Shortcuts" added at
+  the front (`add_track` at index `tracks.len()`), its id the project's `next_id` (one id space
+  inside a nest). This deviates from the road map's listing, which put the rule in Swift.
+- **CU-84 — The doors and the refusals.** `plan_overlays {clips, duration?, position?, theme?,
+  module, schema?, from?, to?}` → `{ops, added, dropped, merged, track, new_track, overlays:
+  [{at, duration, keys, label}]}`; with nothing placed `ops` is `[]` and `track` null. Refusals,
+  in order, each its own sentence: `duration` outside 0.5–10 ("duration is D s; it runs 0.5–10"),
+  `to` not after `from`, no clips, a track count unlike the clip count, no project; then per clip
+  named twice, unknown, not a media clip, its media with no cursor file, reversed ("clip C plays
+  reversed; Add Shortcut Overlays places only clips that play forward" — CU-5); an unknown
+  `position` or `theme` in serde's sentence. **Clip ▸ Add Shortcut Overlays** (right after Auto
+  Zoom…, no key, no sheet) is on with at least one selected clip, each a media clip whose media
+  has a cursor file (`AutoZoom.canOffer`), no sheet attached and no run pending for the document;
+  the validator never reads a file. A run finds the files on main, reads them on a
+  `.userInitiated` queue, and back on main refuses if the project or scope changed, then places
+  with the defaults — bottom, dark, 1.5 s; nothing is remembered — through `performGroupedEdit`.
+  An informational sheet shows a refusal, "No shortcut was recorded in the selected clips' played
+  windows, so nothing was added." (no undo step, no module written), the changed-project sentence,
+  or, after a placing run, "N shortcuts came too close to show." **The tool**
+  `add_shortcut_overlays {clip | clips, from?, to?, duration?, position?, theme?}` takes no
+  `scope` key (it acts in the container `set_scope` has open, as `auto_zoom`), runs on the server
+  thread (resolved on main, files read off it, then on main refused if the project or scope
+  changed, placed, `editResult`), and answers `added`, `dropped`, `merged`, `track`, `new_track`,
+  `module`, `written` and `overlays`; with nothing placed `ok` with that `note`, and a `note` of
+  the dropped sentence when any was dropped.
+- **CU-85 — CU8's proof.** `cu8_proof.py` O0–O8 over MCP (O1 four shortcuts well apart; O1b at
+  60 fps no overlap; O2 and O2b the drop; O3 the merge; O4 module and track reuse; O4b a new track
+  in front of a clip's track; O5 `render_frame` bottom-half difference; O6 D_min over every
+  fixture; O7 the menu equals the tool; O8 the refusals and the empty run), O9 in
+  `core/tests/shortcut_overlays.rs` (S on speed 2 and a ramp, `from`/`to`), the template's `plus`
+  in `graphic/tests/templates.rs`; seven mutants (`overlap-allowed`, `module-rewritten`,
+  `times-without-s`, `dmin-ignored`, `repeats-not-merged`, `plus-not-mapped`,
+  `track-behind-reused`). No person check: the look is judged at CU12's trial.

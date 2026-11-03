@@ -56,8 +56,8 @@ pub unsafe extern "C" fn rc_cursor_free(cursor: *mut CursorTrack) {
 
 /// Answers one JSON request (`cursor_query.rs`'s vocabulary, spec §11
 /// CU-25) against the `n` tracks at `tracks`; `project` may be NULL and is
-/// read by `plan_zooms` (CU-70), which refuses without it; the six reads take
-/// one track and ignore it. NULL with the sentence through `err_out` on
+/// read by `plan_zooms` (CU-70) and `plan_overlays` (CU-84), which refuse
+/// without it; the six reads take one track and ignore it. NULL with the sentence through `err_out` on
 /// any refusal ("request_json is NULL", "tracks is NULL", "tracks[i] is
 /// NULL", "the cursor request at …", …). The answer is freed with
 /// `rc_string_free`.

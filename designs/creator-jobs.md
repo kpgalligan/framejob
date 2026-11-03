@@ -8116,6 +8116,95 @@ face pass of its own (CJ2a, CJ2b, CJ3); it adds one kind, `subjects`. Nothing in
 - **Question for the owner:** default position and theme? *Recommended: bottom, dark over a light
   screen.*
 
+#### CU8's record (2026-11-02)
+
+**Built.** Lane B, base `6ce788bf` (I's HEAD, CU7; the lane's worktree was made at CU6's
+`6110526b` and fast-forwarded to it before any edit). The decisions first: CU-80…CU-85 with their
+index rows, appended to `creator-jobs-6.md` (475 → 553 lines). The owner's answer (2026-11-01):
+overlays sit at the bottom, in the dark theme. No format (41 stands), cursor-file version, `rc_*`
+export or op; one product tool, `add_shortcut_overlays` (116 → 117); nothing keyed (CJ-3). No
+toll: every touched file stayed under its cap (`AppDelegate+Menus.swift` 493 → 496,
+`cursor_query.rs` 371 → 384).
+
+- **The core.** `plan_overlays` is an eighth `rc_cursor_query` request, reading one track per clip
+  and the project ("plan_overlays needs the project" when NULL). `cursor_overlays.rs` (319 lines):
+  the arguments, CU-84's refusals, the presses through `cursor_zoom_run.rs`'s `media_in` and
+  `clip_time` inside `content_length_in_source`, CU-80's layout counted in grid frames, CU-83's
+  track rule and the `add_track` / `add_graphic_clip` ops.
+- **The template.** `keyboard-keys.js` draws `plus` as `+` (CU-82); a comment at `pressAt` names
+  D_min(n). `graphic/tests/templates.rs` holds it.
+- **The app.** `ShortcutOverlays.swift` (settings, the template and its schema, the module rule,
+  `plan`, `prepared`, the pending set), `EditorViewController+ShortcutOverlays.swift` (the action,
+  the notice sheet, `validateShortcutOverlaysAction`), `AgentServer+ShortcutOverlays.swift` (off
+  main), `AgentCatalog+ShortcutOverlays.swift`; the menu item after Auto Zoom…, its `UIMenuTable`
+  row and validator line; `add_shortcut_overlays` in the prompt's graphics row.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/cursor_overlays.rs` | 319 | new: the planner |
+| `core/tests/shortcut_overlays.rs` | 498 | new: O1, O1b, O2, O2b, O3, O4, O4b, O6, O9, the empty run, every refusal |
+| `app/Sources/ShortcutOverlays.swift` · `EditorViewController+ShortcutOverlays.swift` | 194 · 110 | new |
+| `app/Sources/AgentServer+ShortcutOverlays.swift` · `AgentCatalog+ShortcutOverlays.swift` | 141 · 78 | new |
+| `tools/proof/cu8_proof.py` | 679 | new: O0–O8, seven mutants |
+
+**Deviations.** (1) The road map's D_min was "5n + 30" from "the last keycap presses at 5n + 14";
+`5n + 14` is `pressAt`, the FIRST keycap's press, and the last presses 5(n − 1) frames later, so
+CU-80 records D_min(n) = 10n + 25 (the spec's construction: last press + 16). O2's figures move with
+it: at 30 fps ⌘S then ⌘C 0.3 s later is dropped (⌘C would wait to 1.5 s); at 60 fps D_min(2) is 45
+frames (0.75 s), as the road map's row says. (2) CU-83's track rule is in the core, not in Swift,
+because it needs the planned span. (3) The menu item has no sheet and remembers nothing (the road
+map's "remembered position and theme" has nothing to write them). (4) The validator reads no file:
+the "file has shortcuts" test moved to the run, which says so in a notice. (5) The inventory's
+notice site lists `addShortcutOverlays:` under `reached_from` as well as `reached_after`: a missing
+cursor file is refused synchronously, before the read.
+
+**Measured.**
+
+- `cargo test --release --test shortcut_overlays` 11 passed (10, then O9's fixture moved: a press
+  inside the first overlay's D_min is delayed by CU-80, which the first form of the test forgot);
+  `--test auto_zoom` 15 passed; `graphic`'s `--test templates` 7 passed; `cargo fmt`; `make lint`
+  exit 0.
+- `make typecheck`: exit 0, 0 errors and the 4 baseline warnings. `inventory.py --check` 5/5;
+  `spec_index_proof.py` 252/252.
+- Debug `cu8_proof.py`: 12/12, exit 0.
+- Mutants, seven, each exit 1, CAUGHT: `overlap-allowed` (O1b), `times-without-s` (O9),
+  `dmin-ignored` (O2, O2b, O6), `repeats-not-merged` (O3), `track-behind-reused` (O4b),
+  `plus-not-mapped` (the template test), `module-rewritten` (O4, on a `tree_copy.py` copy's app).
+- `make gate`: "gate: PASS 511s" (names 1, typecheck 16, fmt 7, lint 3, test 277, app 206).
+- Release (the gate's app): `RC_PROOF_APP=release cu8_proof.py` 12/12, exit 0, O0 empty. On a
+  `proof_app.py launch --app release` instance: `op_argument_proof.py` 191/194 (three rows of its
+  section 4, the untitled project's graphics root: two new roots appeared at once, another lane's
+  instance making one beside it), then 194/194 on the same instance, unchanged; `phase9_proof.py`
+  251/251; `recording_probe.py --only catalog` 31/31; `v2_menu.py --only H` 5/5.
+
+**Review.** One review (`6ce788bf..66ddc01a`, 37 files), verdict pass, every Files and Approach
+item done, three nits, all left as they are: (1) the tool's `position`/`theme` refusal starts
+lowercase ('position is "left"; …') where its other refusals go through `AutoZoom.sentence`;
+(2) with nothing placed and no module to reuse, the answer's `module` names the predicted
+`keyboard-keys`, never written (`written` false); (3) the edited `rc_cursor_query` doc line in
+`ffi_cursor.rs` runs past 100 columns.
+
+**Integration (2026-11-02).** Cherry-picked (`66ddc01a`) onto `worktree-creator-jobs` at FC3's
+`6206a8df`. Conflicts only in the decisions index and the spec index, each kept both sides:
+- FC3 had closed `creator-jobs-6.md` to new entries (476 lines, "the series continues in
+  `creator-jobs-7.md`"), and CU8's block would have made it 554, past the ~500-line rule:
+  CU-80…CU-85 moved, unchanged, to the end of `creator-jobs-7.md` (147 → 225), whose index row
+  now names them and which the six CU-8x rows link.
+- The spec index's cells: §7.9d 145 (CU8's), §7.9e 579 (FC3's), the `11-decisions/` folder 20177
+  in 41 files (`spec_index_proof.py` 255/255).
+FC3 added no tool, format or op, so nothing renumbered and the 117 product tools stand. The owed
+`CLAUDE.md` edits went in: root, the argument gate's "one hundred and seventeen product tools" and
+`add_shortcut_overlays` after `auto_zoom` in the app-state tool list; `core/CLAUDE.md`, the cursor
+entry's `cursor_overlays.rs` sentence; `app/CLAUDE.md`, the four files' entry after Auto Zoom's,
+with `validateShortcutOverlaysAction`'s one line in the frozen file. `make gate` on the integrated
+tree, before this sentence: "gate: PASS 428s" (names 1 s, typecheck 9 s, fmt 3 s, lint 15 s, test
+240 s, app 160 s). The Release proof is the lane's above; the integrated tree differs from the
+lane's tip only by FC3's files, none of which CU8's rows read.
+
+**Owed.** Nothing of CU8's own: no person check (the look is judged at CU12's trial). Real data
+waits for the owner's sample S-ST3 (a recording with Record shortcuts on). Nothing filed; the
+review's three nits stand as recorded above.
+
 ### VR2a — the planner, and `reframe_clip` on clips with no actions
 
 - **What a person gets:** nothing in a menu yet. An agent frames a clip with `reframe_clip`: eased

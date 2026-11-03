@@ -403,6 +403,13 @@
    ],
    "note": "presentAsSheet(AutoZoomSheetController) over the selected clips with cursor files (CU-76); beeps with none or a sheet up"
   },
+  "addShortcutOverlays:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+ShortcutOverlays.swift `@objc func addShortcutOverlays(`"
+   ],
+   "note": "an edit after the cursor files are read off main (CU-84); no sheet of its own — an informational alert sheet only for a refusal, nothing placed, a changed project or a dropped press (reached_from, reached_after); beeps with no clip with a cursor file, a sheet up or a run pending"
+  },
   "closeGapAtPlayhead:": {
    "verdict": "none",
    "code": [
@@ -1115,6 +1122,21 @@
     "showAutoZoomSheet:"
    ],
    "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+ShortcutOverlays.swift:96": {
+   "token": "beginSheetModal",
+   "func": "showShortcutOverlayNotice",
+   "reached_from": [
+    "addShortcutOverlays:"
+   ],
+   "reached_after": [
+    {
+     "selector": "addShortcutOverlays:",
+     "via": "app/Sources/EditorViewController+ShortcutOverlays.swift `self?.placeShortcutOverlays(document, ids, read, asked: asked, scope: scope)`",
+     "gate": "app/Sources/EditorViewController+ShortcutOverlays.swift `showShortcutOverlayNotice(ShortcutOverlays.droppedSentence(run.plan.dropped))` — a refusal, the changed-project sentence, nothing placed, or a press dropped (spec §11 CU-84); reached_from when a selected clip's cursor file is missing"
+    }
+   ],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Retime.swift:17": {

@@ -447,6 +447,7 @@ APP_STATE_TOOLS = {
     "import_graphic", "get_media_analysis", "split_at_shots", "get_timeline_transcript",
     "new_project_from_range", "analyze_cutout", "text_behind_subject", "get_cursor_events",
     "auto_zoom",
+    "add_shortcut_overlays",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`

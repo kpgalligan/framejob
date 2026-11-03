@@ -142,7 +142,11 @@ with Zoom, Arrive before the click, Stay after the last activity, Follow the cur
 Zoom on typing and Replace existing zooms over the selected clips' cursor files; Zoom is one
 "Auto Zoom" step of ordinary zoom actions; enabled with at least one selected clip, each a media
 clip whose media has a cursor file, and no sheet up, inside a nest too; no key equivalent; its
-mirror is `auto_zoom`), Speed… (on a ramped clip it sets the base rate and
+mirror is `auto_zoom`), Add Shortcut Overlays (road map creator-jobs CU8, §11 CU-84: no sheet; one
+Keyboard keys clip per recorded shortcut of the selected clips' cursor files on a front
+"Shortcuts" track, bottom and dark, as one "Add Shortcut Overlays" step; enabled as Auto Zoom… is
+and while no run is reading files; an informational sheet for a refusal, nothing placed or a
+dropped shortcut; no key equivalent; its mirror is `add_shortcut_overlays`), Speed… (on a ramped clip it sets the base rate and
 scales the ramp with it, §11 SR-19 (a), SR-21 (f)), Speed Ramp… (#340, §11 SR-24: the
 speed ramp presets on the one selected media clip, over the in/out range when it lies inside the
 clip; enabled with exactly one such clip selected; no key equivalent; its mirror is

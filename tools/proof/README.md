@@ -28641,3 +28641,50 @@ make app && RC_PROOF_APP=release python3 tools/proof/cu7_proof.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU7 record. JOB-25 is the person check.
+
+## Road map "creator-jobs" CU8 — shortcut overlays (`cu8_proof.py` O0–O8; seven mutants; `core/tests/shortcut_overlays.rs` O9; spec §11 CU-80…CU-85)
+
+**`cu8_proof.py [SOCKET]`** drives the app. Given a running instance's `<dir>/agent.sock` it runs
+every row there and greps `<dir>/framejob.log`; without one it launches its own
+(`proof_app.binary()`, a scratch `CFFIXED_USER_HOME`). Its movie is ffmpeg's `testsrc` under
+`tools/proof/work/cu8/media/` (640 × 360, 30 fps, 20 s), copied per row beside a v1 cursor file
+written by the script with `keys.shortcut` filled, so `import_media` attaches it. Canvases are
+640 × 360 at 30 fps unless a row says 60; D_min(n) = 10n + 25 frames.
+
+| Row | What it holds |
+|---|---|
+| O0 | each instance's `grep "Frame Job: "` prints nothing |
+| O1 | `cmd+s`, `cmd+shift+4`, `ctrl+left`, `cmd+plus` at source 1, 4, 7, 10 s of a clip at 2 s: clips at 3, 6, 9, 12 s of 45, 55, 45, 45 frames, `keys` verbatim, label "", bottom, dark, on one new front "Shortcuts" track, drawn by `keyboard-keys` (written, the only module) |
+| O1b | 60 fps, `cmd+s` at 1 s and `cmd+c` at 2 s: [1, 2) s then 90 frames from 2 s |
+| O2 | `cmd+s` then `cmd+c` 0.3 s later: 30 fps one 45-frame clip, dropped 1 and its note; 60 fps two clips, the second from 1.75 s |
+| O2b | 60 fps `cmd+shift+4` then `cmd+c` 0.3 s later: one clip, dropped 1 |
+| O3 | `cmd+z` three times 0.3 s apart: one 63-frame clip labelled "×3", merged 2 |
+| O4 | a second run on another clip reuses `keyboard-keys` (one file, the bundle's bytes) and the free Shortcuts track; a run over an occupied span adds a track |
+| O4b | a clip on a track added in front of a free Shortcuts track: a new Shortcuts track in front of it, the old one unchanged; after a hand edit of `keyboard-keys.js` the run writes `keyboard-keys-2` |
+| O5 | `render_frame` 30 frames into O1's first overlay differs from the frame with the Shortcuts track hidden, only in rows of the bottom half |
+| O6 | every overlay every row placed lasts at least D_min(n) frames, on the grid |
+| O7 | `perform_menu_item` Clip ▸ Add Shortcut Overlays gives the clips and tracks `add_shortcut_overlays` gives on a copy; one undo named "Add Shortcut Overlays" restores the project |
+| O8 | refusals by sentence (duration 0.2, `to` ≤ `from`, position "left", a text clip, no cursor file, reversed); a file with no shortcuts: the note, the project unchanged, no undo step, no module file |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). Five in the
+core, each edited into a copy of `core/` beside a link to `graphic/` and run under `cargo test
+--release --test shortcut_overlays` (target `tools/proof/work/cu8/mutant-target`), CAUGHT when a
+test of its rows fails: `overlap-allowed` O1b, `times-without-s` O9, `dmin-ignored` O2/O2b/O6,
+`repeats-not-merged` O3, `track-behind-reused` O4b. One in the template, on a copy of `graphic/`
+under `cargo test --release --test templates keyboard_keys`: `plus-not-mapped`. One in the app, on
+a `tree_copy.py` copy's built app: `module-rewritten` O4.
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 117; `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py` name `add_shortcut_overlays`;
+`capture_spike/inventory.json` holds `addShortcutOverlays:` (verdict `none`) and its notice's
+`beginSheetModal` site.
+
+```sh
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/cu8_proof.py <dir>/agent.sock [--only O1,O4b]
+python3 tools/proof/cu8_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/cu8_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU8 record. No person check: the look is
+judged at CU12's trial.
