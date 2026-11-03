@@ -1132,6 +1132,13 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Answer:** at the defaults, were the zooms where you would have put them? Name any that came too early, too late, too tight, too often or not at all, and say which of 1.5× and Stay 4 s read better.
 - **Source:** road map "creator-jobs" CU7 (spec §11 CU-70, CU-77); `tools/proof/cu7_proof.py` measures the plan against hand-worked fixtures, but whether a zoom is where a person would put it is a viewer's judgement.
 
+**JOB-26 — Motion blur reads as motion, not as smear**
+- **When:** once, and again when the blur's drawing changes.
+- **Do:** 1. On a screen recording with its cursor file (S-ST2 when it exists; any recording made by Frame Job), select the clip and choose **Clip ▸ Auto Zoom…**, leave **Motion blur** on and press **Zoom**. 2. Play the clip through several zooms and pans at full Preview Quality, then step frame by frame (← →) through one zoom-in and one fast pointer move. 3. Set the Transform section's **Motion Blur** to 100 %, then to 0 %, and play the same stretch each time. 4. Export the clip (any video row) and play the file.
+- **Expect:** at 50 % the zooms and the pointer's fast moves look smooth, like a camera's motion blur, and a still frame of one shows a soft streak along the move rather than a doubled or ghosted picture; the picture is sharp wherever nothing moves, and the click ripples stay crisp; 100 % is visibly longer streaks, 0 % none; the export looks like the preview.
+- **Answer:** does 50 % read as motion and not as smear, would you keep it on by default, and did any frame show steps or ghosts instead of a streak?
+- **Source:** road map creator-jobs CU11b, spec §11 CU-117…CU-119 (`cu11_proof.py` MB1–MB6 score the drawing against the mean of sharp renders, never how the blur looks).
+
 **JOB-29 — The cursor spikes at the machine (CU-S1…CU-S3)**
 - **When:** once at CU0b, before CU1b and CU6, and again after each macOS major update, since `NSCursor.currentSystem` may start answering nil; and, after CU0c, `--only s2 --person` for the picked rows.
 - **Do:** 1. Unlock the Mac, close or hide other windows, and leave the terminal holding Screen Recording. Then run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`. It takes a few minutes: it warps the pointer, shows full-screen grey windows, and opens a small text window. Keep your hands off the mouse and keyboard. 2. Run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person` and follow each prompt on the terminal:

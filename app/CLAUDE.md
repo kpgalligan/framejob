@@ -722,12 +722,15 @@ detail there.
   creator-jobs CU7, spec §11 CU-70…CU-76). `AutoZoom` (names no `rc_*`) is the
   planner both doors call:
   - `AutoZoomSettings` and its keys (`FrameJobAutoZoomZoom`, `…Lead`, `…Stay`,
-    `…Follow`, `…Replace`). They are read through `double`/`bool(forKey:)`, so
+    `…Follow`, `…Replace`, and `…MotionBlur`, a Bool: on is `motionBlurShutter`, the
+    owner's 0.5, spec §11 CU-118 (d)). They are read through `double`/`bool(forKey:)`, so
     a launch argument counts. `remember(changedFrom:)` writes only the changed
     keys, and typing never.
   - `cursorFiles`, `readTracks` (off main), `hasTyping`, and `plan` over
     `ReelCursor.query(_:tracks:project:)` (`ReelCore+Cursor.swift`), with the
-    core's ops read back through `ReelOps.swift`'s factories.
+    core's ops read back through `ReelOps.swift`'s factories. `plan` then appends one
+    `set_video {motion_blur}` over the planned clips whose base `motion_blur` is 0
+    (`AutoZoomPlan.blurred`, CU-118 (c)).
   - The sheet reads the files off main, re-plans on main at each change, and
     applies one "Auto Zoom" through `applyEdit`. `-RCDevAutoZoomAccept YES`
     (dev only) presses Zoom once the first plan exists.
@@ -1729,7 +1732,10 @@ the key map behind it.
   after Behind Subject when `allLayoutable`, its choices `CameraLayoutSectionState` on
   `ClipPane`; Switch at Playhead runs `CameraLayoutCommand.run`; +`HideSilent` — the Picture
   sub-tab's Hide While Silent section (road map creator-jobs CO9, spec §11 CO-94), registered
-  after Layout when `allHideable` (its entry under `HideSilent.swift`);
+  after Layout when `allHideable` (its entry under `HideSilent.swift`); +`Transform` — the
+  Transform section, a pure move out of `VideoPane.swift` (road map creator-jobs CU11b's toll),
+  with the Motion Blur row (`video.motion_blur` %, after Blend, greyed by `motionBlurApplies`
+  on nest and adjustment clips, spec §11 CU-118 (b));
   +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
@@ -2310,11 +2316,14 @@ the key map behind it.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayer` (with `matte`, `dissolve`, `cursor` — CU-32's key, drawn
-  by `Compositor+Cursor.swift` since CU3a2 — and `cutout`, CO-21's, drawn by `Compositor+Cutout.swift` since CO2a2)
+  by `Compositor+Cursor.swift` since CU3a2 — `cutout`, CO-21's, drawn by `Compositor+Cutout.swift` since CO2a2,
+  and `blur`, CU-114's, drawn by `Compositor+MotionBlur.swift` since CU11b)
   and `FrameRecipe` (with
   `mattes`), out of `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
   `FrameRecipe+Mattes.swift` holds `RecipeLayerMatte`, `RecipeLayerDissolve` and
   `RecipeMatteGroup`, a pure move out of it (road map creator-jobs CJ0d, T14).
+  `FrameRecipe+Blur.swift` holds `RecipeBlur`, `RecipeBlurSample` and `RecipeCursorShutter`
+  (`RecipeCursor.shutter`), lenient (road map creator-jobs CU11b, spec §11 CU-114).
 - `WaveformAnalyzer.swift` (the four scopes' GPU passes over
   `Resources/Shaders/Waveform.metal`: waveform, parade, vectorscope, histogram;
   `WaveformTrace`; pass-keyed, the kind-keyed forms ×1 wrappers; each pass
@@ -2448,7 +2457,7 @@ the key map behind it.
   `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
   0…1 where the shader samples it. The uniform block's field ORDER is a contract
   with the shader checked only by reading both, so change them in one edit; it
-  is 160 floats (640 bytes): the tone group (spec §11 GR-2: the nine tone
+  is 164 floats (656 bytes): the tone group (spec §11 GR-2: the nine tone
   values, `toneEnabled`, then `lookAmount` and `lookEnabled`, spec §11 GR-7),
   then the wheels group (spec §11 GR-11: lift, gamma and gain as x, y, master
   each, `wheelsEnabled`, `curvesEnabled`, spec §11 GR-12, `hueCurvesEnabled`,
@@ -2456,7 +2465,9 @@ the key map behind it.
   `keyReading`) and the cursor group (spec §11 CU-33: the sprite's rect, four
   ripples, the ripple colour, `cursorEnabled`, `cursorOpacity`, `rippleCount`,
   `rippleRadius`) and the cutout group (spec §11 CO-27: `cutoutEnabled`, `cutoutEdge`,
-  `cutoutFeather`, a spare; provisional by landing order, CJ-8 (b)); a next field adds a
+  `cutoutFeather`, a spare; provisional by landing order, CJ-8 (b)) and the cursor travel
+  group (spec §11 CU-117 (d): `cursorTravelX`, `cursorTravelY`, `cursorSamples`, a spare — the
+  shutter's sprite samples, below 1.5 the sprite drawn once); a next field adds a
   group of four. A layer's look is a baked 33³ `rgba16Float`
   lattice at `texture(2)` on every layer, shadow-mask and adjustment draw
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
@@ -2484,7 +2495,13 @@ the key map behind it.
   display `uv` after the lens and the snap, before `orientedUV`, and step 7b multiplies alpha by
   r0's remap only when `cutoutEnabled` is 1; the mask never passes step 0 or `LayerLift`, and a
   same-track dissolve whose incoming half is cut out gets no `partnerBox`
-  (`Compositor+Cutout.swift`, spec §11 CO-27). **Nine pipelines from seven
+  (`Compositor+Cutout.swift`, spec §11 CO-27). A layer whose recipe `blur` lists samples is
+  drawn by `Compositor+MotionBlur.swift`'s `drawBlurred`, the first statement of `drawLayer`
+  (spec §11 CU-117): the prepared layer N times at its samples' placements (`sampleUniforms`;
+  a travelling cursor drawn sharp at each sample's point) into one `MattePool` composite
+  through `MotionBlurPipelines`' accumulate pipelines (source factors `blendColor`/`blendAlpha`,
+  destination `one`, the blend colour 1/N), then laid on the pass once by
+  `framejob_motion_blur_fragment` with the layer's blend, blending OFF. **Nine pipelines from seven
   fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
   adjustment clip's full-frame pass reading the destination, blending off, its
   weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a
@@ -2498,7 +2515,10 @@ the key map behind it.
   fixed-function blending OFF, or the finished pixel is blended twice —
   invisible over an opaque destination, so a proof of it reads the ALPHA channel
   over a translucent one. A shadow's silhouette pass takes `maskState`, the
-  gather specialization without the blend (defensive, not load-bearing). A
+  gather specialization without the blend (defensive, not load-bearing). Motion
+  blur adds three more (`MotionBlurPipelines`, built in `MetalRenderer.init`: the two
+  accumulates and the composite); `MetalRenderer.swift`'s own doc counts fourteen from ten
+  fragment functions. A
   shadow's three passes and its canvas-sized pair are
   `Compositor+Shadow.swift`'s (`encodeShadow`); a layer's uniforms and source
   texture are made by `prepare` in `CompositorEffects.swift`, which

@@ -190,6 +190,7 @@ Colour swatches open the macOS Colors panel, with opacity.
 | Rotation | −180° to 180° | 0° |
 | Opacity | 0–100 % | 100 % |
 | Blend | the eight blend modes below | Normal |
+| Motion Blur | 0–100 % of a frame (quick values 0, 25, 50, 100); greyed on a nest or adjustment clip ([Motion blur](motion-and-transitions.md#motion-blur)) | 0 % |
 
 Two buttons sit under the rows:
 
@@ -198,8 +199,8 @@ Two buttons sit under the rows:
   centres it.
 
 Text clips are skipped, because their size comes from the words. Reset
-Transform sets position, scale, rotation, opacity and blend back to their
-defaults.
+Transform sets position, scale, rotation, opacity, blend and motion blur back to
+their defaults.
 
 #### Blend modes
 

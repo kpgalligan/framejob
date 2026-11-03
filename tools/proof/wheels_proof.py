@@ -73,8 +73,8 @@ tracks, lift masters 0.2 and −0.2, saved for the probe).
   P1 a puck drag over two clips (masters 0.2 / −0.2) is ONE live gesture ended
   "Lift" whose every update sends one `set_video` naming both with a patch of
   exactly `{wheels: {lift: {x, y}}}`; P2 `apply(wheels:)` sets `wheelsEnabled` 1
-  for gain master −0.5 alone and 0 for neutral; P3 `LayerUniforms` is 640 bytes
-  (624 until creator-jobs CO2a2's cutout group, 528 until creator-jobs CU3a2's cursor group, 512 until hdr H-2's HLG group) with `liftX` at 464 and `wheelsEnabled` at 500; P4 `keyedCount` for `{video:
+  for gain master −0.5 alone and 0 for neutral; P3 `LayerUniforms` is 656 bytes
+  (640 until creator-jobs CU11b, 624 until creator-jobs CO2a2's cutout group, 528 until creator-jobs CU3a2's cursor group, 512 until hdr H-2's HLG group) with `liftX` at 464 and `wheelsEnabled` at 500; P4 `keyedCount` for `{video:
   {wheels: …, x: 3}}` is 1 on Color and 1 on Picture; P5 an ⌥ drag moves the
   puck a tenth of a plain one, and a press on the strip's knob grabs it with no
   write, so a double-click there is the reset alone; and, on a fresh document

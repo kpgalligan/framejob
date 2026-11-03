@@ -28927,6 +28927,46 @@ RC_PROOF_APP=release python3 tools/proof/cu11_proof.py
 
 The recorded runs are in `designs/creator-jobs.md`'s CU11a record.
 
+## Road map "creator-jobs" CU11b — motion blur drawn (`cu11_proof.py` MB1–MB6, K2–K4; `capture DIR` / `compare DIR`; six mutants by hand; spec §11 CU-117…CU-119)
+
+CU11b adds the drawing rows to **`cu11_proof.py`** (its docstring is the full list). The picture
+rows run on a 320 × 180, 30 fps canvas at t = 0.5 s and read 16-bit `render_frame` PNGs
+(ffmpeg `rgba64le`) at ±257 in 16-bit units (1/255) per channel per pixel. Every picture fixture
+holds a 16-bit still, so `render_frame` reads the frame deep and writes 16 bits (an 8-bit frame
+quantises each sharp render on its own). The reference for a blurred frame is the mean of 16
+sharp renders, each AT t with sample k's placement: `render_frame` draws whole frames only, so a
+sub-frame time is drawn as the zoom's scale there (the action removed, the base scale set by
+`ease_in_out`'s u²(3 − 2u)) and the pointer there (`set_media_cursor` to a cursor file whose
+moves are the offset earlier). The movies are ffmpeg `color=` and `testsrc2` as raw ARGB
+(`raw `), byte-exact through AVFoundation; the cursor files are `cu7_proof.cursor_body`'s.
+
+| Row | What it holds |
+|---|---|
+| MB1 | a 16-px checker under a 2× `ease_in_out` zoom over [0, 1 s), `motion_blur` 0.5: equal to the mean of 16 sharp renders; control, the sharp frame differs by more than 8/255 |
+| MB1b | MB1 over an opaque 0.2 plate with `blend: add`, greys 0.1 and 0.7, so `add`'s clamp never acts |
+| MB2 | an unmoving clip, and a pointer at rest: blur 0.5 and 0 byte-identical PNGs |
+| MB3 | MB1 exported as `prores_4444`: frame 15 within ±8/255 of `render_frame`; control, more than 24/255 from the sharp frame |
+| MB4 | `compare DIR` only: the package `capture DIR` built on the toll's Release build (version 41: ripples, a zoom, a shadow, `screen`, a reflection) — three PNGs and the export's per-frame md5 byte-identical |
+| MB5 · MB6 | a pointer at 600 px/s on a still movie, without and with MB1's zoom: equal to the mean |
+| K2 | `auto_zoom`: `motion_blur` 0.5 and `blurred` 1; a clip at 0.3 kept; `motion_blur: 0` none; 1.5 refused |
+| K3 | the Picture sub-tab's Transform section: Motion Blur below Blend in `snapshot_ui`'s dump |
+| K4 | Clip ▸ Auto Zoom… with `-RCDevAutoZoomAccept YES` stores 0.5; with `-FrameJobAutoZoomMotionBlur NO` none |
+
+The six mutants are run by hand, each file restored byte-identical by SHA-256: `leading` (the
+core's `shutter_offsets` at k/N) → MB1; `weight` (the blend colour 1/(N + 1)) → MB1;
+`dissolve-blur` (the `dissolve` arm out of `layer`'s `sharp`) → `cargo test --release --test
+motion_blur a_nested_pairs_routed_dissolve_is_sharp`; `composite-normal` (the composite's blend
+mode 0) → MB1b; `cursor-fraction` (k/n in the shader's sprite samples) → MB5;
+`cursor-in-samples` (`sampleUniforms` keeping `cursorSamples`) → MB6.
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/cu11_proof.py capture DIR   # once, on the toll's build
+make app-debug && python3 tools/proof/cu11_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/cu11_proof.py compare DIR
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU11b record.
+
 ## Road map "creator-jobs" CO6 — camera layouts at the playhead (`co6_proof.py` L1–L10, L12, L13, Z1 with `co6_probe.swift` L11; nine mutants; `core/tests/layout.rs`; spec §11 CO-60…CO-67)
 
 **`co6_proof.py [SOCKET]`** drives the app. Given a running instance's `<dir>/agent.sock` it

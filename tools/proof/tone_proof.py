@@ -68,8 +68,8 @@ for the probe), S (CARD, saved twice for N2).
   P: P1 Light's Temperature field over two clips with exposures +1 and −1
   sends one `set_video` naming both whose patch is exactly
   `{color: {temperature: 0.5}}`; P2 `apply(tone:)` sets `toneEnabled` 1 for
-  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 640 bytes (624
-  until creator-jobs CO2a2's cutout group, 528 until creator-jobs CU3a2's cursor group, 512 until hdr H-2's HLG group, 464
+  exposure −1 alone and 0 for neutral; P3 `LayerUniforms` is 656 bytes (640
+  until creator-jobs CU11b, 624 until creator-jobs CO2a2's cutout group, 528 until creator-jobs CU3a2's cursor group, 512 until hdr H-2's HLG group, 464
   until grading-2 G2-2's wheels group) with
   `exposure` at 416; P4 `keyedCount` for `{video: {color: {exposure: 1}, x: 3}}`
   is 1 on Color and 1 on Picture.

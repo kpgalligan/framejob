@@ -451,7 +451,7 @@ Files that were split since the notes wrote them:
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift`, `OpDictionaries.swift` (#190) |
 | `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171), `InspectorRows.swift` (B87), `InspectorLabels.swift` (speed ramps SR5-0) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
-| `VideoPane` | `VideoPane+Obscure.swift`, `VideoPane+Speed.swift` (#190) |
+| `VideoPane` | `VideoPane+Obscure.swift`, `VideoPane+Speed.swift` (#190), `VideoPane+Transform.swift` (creator-jobs CU11b) |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
 | `TranscribeSheetController` | `+Commit`, `+Cloud`, `+Download`, `+Style` |
 | `SilenceDetector` | `SilenceDetector+Vocabulary.swift` (#107) |
@@ -864,8 +864,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   grading road map's GR1 moved `// MARK: Colour` and `colorSection()` to `VideoPane+Color.swift`
   as an `extension VideoPane`, a pure move gated with GR1's other four before the grade section
   landed; nothing lost `private` (`binding` was already internal). `wc -l
-  app/Sources/VideoPane.swift`: 959 before, 904 after; `VideoPane+Color.swift` is 58. The next
-  seam: `chromaSection` to `VideoPane+Chroma.swift`.
+  app/Sources/VideoPane.swift`: 959 before, 904 after; `VideoPane+Color.swift` is 58. Road map
+  creator-jobs CU11b's toll (spec §11 CU-118 (a)) moved `// MARK: Transform` through
+  `fitOrFill`'s closing brace to `VideoPane+Transform.swift` as an `extension VideoPane`, a pure
+  move committed alone before the Motion Blur row landed; every `private` kept, since all its
+  callers moved with it. `wc -l app/Sources/VideoPane.swift`: 871 before, 620 after;
+  `VideoPane+Transform.swift` is 256. The next seam: `chromaSection` to
+  `VideoPane+Chroma.swift`.
 - `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
   `set_transition_duration`) went to `AgentServer+Properties.swift` as #333's toll, a pure move
   gated alone before TR-12's change; the action handlers had gone to `AgentServer+Actions.swift`

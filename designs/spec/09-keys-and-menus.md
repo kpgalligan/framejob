@@ -139,7 +139,8 @@ Apply (Return) or Cancel (Escape), and Cancel changes nothing; since round 3,
 waveforms line up there (a clear GCC-PHAT peak), else the command is refused
 at the inspector's foot), Add Action, Auto Zoom… (road map creator-jobs CU7, §11 CU-76: a sheet
 with Zoom, Arrive before the click, Stay after the last activity, Follow the cursor while zoomed,
-Zoom on typing and Replace existing zooms over the selected clips' cursor files; Zoom is one
+Zoom on typing, Replace existing zooms and Motion blur (CU11b, §11 CU-118 (d): on by default, the
+zoomed clips given a 50 % `motion_blur`) over the selected clips' cursor files; Zoom is one
 "Auto Zoom" step of ordinary zoom actions; enabled with at least one selected clip, each a media
 clip whose media has a cursor file, and no sheet up, inside a nest too; no key equivalent; its
 mirror is `auto_zoom`), Add Shortcut Overlays (road map creator-jobs CU8, §11 CU-84: no sheet; one

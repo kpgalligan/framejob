@@ -2,8 +2,9 @@ import AppKit
 
 /// Clip ▸ Auto Zoom… (road map "creator-jobs" CU7, spec §11 CU-76): zooms planned from the
 /// selected clips' cursor files — Zoom, Arrive before the click, Stay after the last activity,
-/// Follow the cursor while zoomed, Zoom on typing, Replace existing zooms — applied as one undo
-/// step "Auto Zoom". `auto_zoom` (`AgentServer+AutoZoom.swift`) plans through the same
+/// Follow the cursor while zoomed, Zoom on typing, Replace existing zooms, and Motion blur
+/// (CU11b, spec §11 CU-118 (d): the zoomed clips given the owner's 50 % shutter) — applied as
+/// one undo step "Auto Zoom". `auto_zoom` (`AgentServer+AutoZoom.swift`) plans through the same
 /// `AutoZoom.plan`.
 ///
 /// The sheet opens with the remembered values (`AutoZoomSettings.remembered`), reads the files
@@ -34,6 +35,8 @@ final class AutoZoomSheetController: NSViewController, NSTextFieldDelegate {
         checkboxWithTitle: "Zoom on typing", target: nil, action: nil)
     private let replaceBox = NSButton(
         checkboxWithTitle: "Replace existing zooms", target: nil, action: nil)
+    private let motionBlurBox = NSButton(
+        checkboxWithTitle: "Motion blur", target: nil, action: nil)
     private let summaryLabel = NSTextField(wrappingLabelWithString: "")
     private var zoomButton: NSButton?
 
@@ -55,7 +58,10 @@ final class AutoZoomSheetController: NSViewController, NSTextFieldDelegate {
         style(zoomField, range: AutoZoomSettings.zoomRange, value: opened.zoom)
         style(leadField, range: AutoZoomSettings.leadRange, value: opened.lead)
         style(stayField, range: AutoZoomSettings.stayRange, value: opened.stay)
-        for (box, on) in [(followBox, opened.follow), (typingBox, false), (replaceBox, opened.replace)] {
+        for (box, on) in [
+            (followBox, opened.follow), (typingBox, false), (replaceBox, opened.replace),
+            (motionBlurBox, opened.motionBlur > 0),
+        ] {
             box.state = on ? .on : .off
             box.font = DS.sans(13)
             box.target = self
@@ -75,6 +81,7 @@ final class AutoZoomSheetController: NSViewController, NSTextFieldDelegate {
             [NSGridCell.emptyContentView, followBox],
             [NSGridCell.emptyContentView, typingBox],
             [NSGridCell.emptyContentView, replaceBox],
+            [NSGridCell.emptyContentView, motionBlurBox],
         ])
         let cancel = sheetCancelButton(target: self, action: #selector(cancelClicked(_:)))
         let zoom = StickerButton(
@@ -156,6 +163,7 @@ final class AutoZoomSheetController: NSViewController, NSTextFieldDelegate {
         s.follow = followBox.state == .on
         s.typing = typingBox.isEnabled && typingBox.state == .on
         s.replace = replaceBox.state == .on
+        s.motionBlur = motionBlurBox.state == .on ? AutoZoomSettings.motionBlurShutter : 0
         return s
     }
 

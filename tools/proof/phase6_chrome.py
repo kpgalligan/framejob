@@ -249,9 +249,11 @@ ABSENT_ID = GRADIENT_ID + ".nope"         # an id no section has
 BELOW_ID = "shape.arrows"                 # ShapePane's Arrowheads section
 
 # The Transform section's rows, in `VideoPane.transformSection`'s order. The
-# Blend popup is the LAST value row, immediately below Opacity, and the two
-# Fit/Fill buttons follow it.
-TRANSFORM_ROWS = ["Scale", "Position X", "Position Y", "Rotation", "Opacity", "Blend"]
+# Blend popup sits immediately below Opacity, Motion Blur (road map
+# creator-jobs CU11b, spec §11 CU-118 (b)) is the last value row, below Blend,
+# and the two Fit/Fill buttons follow it.
+TRANSFORM_ROWS = ["Scale", "Position X", "Position Y", "Rotation", "Opacity", "Blend",
+                  "Motion Blur"]
 OPACITY_ROW = TRANSFORM_ROWS.index("Opacity")
 BLEND_ROW = TRANSFORM_ROWS.index("Blend")
 
@@ -1112,7 +1114,7 @@ def main():
     # 2. The Blend row. The canvas is WHITE in every fixture here, so
     # `blendNote` never fires (section 3 is where that is proved) and the
     # only thing a mode can move is its own row.
-    print("\n2. the Blend popup — Transform's last value row, under Opacity")
+    print("\n2. the Blend popup — under Opacity, above Motion Blur")
     opacity_diff, _ = report(
         images, "blend-normal", "blend-opacity", "Opacity 100% vs 90%", scale)
     blend_diff, _ = report(

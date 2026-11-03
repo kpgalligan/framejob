@@ -174,11 +174,18 @@ extension MetalRenderer {
     /// itself, `texture(1)` bound to the mattes cutting it. A layer that
     /// needs a neighbourhood filter or a blend mode takes its own pipeline
     /// state for the draw (`pipelineState(gather:blend:)`), its shadow's
-    /// mask the same specialization without the blend.
+    /// mask the same specialization without the blend. A layer whose `blur`
+    /// lists samples is drawn at each of them instead (spec §11 CU-117,
+    /// `Compositor+MotionBlur.swift`).
     func drawLayer(
         _ layer: RecipeLayer, _ prepared: PreparedLayer, matte: MTLTexture,
         canvas: RecipeCanvas, pass: inout DestinationPass
     ) throws {
+        if let blur = layer.blur, !blur.samples.isEmpty {
+            try drawBlurred(
+                layer, prepared, blur: blur, matte: matte, canvas: canvas, pass: &pass)
+            return
+        }
         var uniforms = prepared.uniforms
         let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
         // The look's lattice, or the placeholder (spec §11 GR-7, GR-8), and

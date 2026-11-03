@@ -196,6 +196,9 @@ struct RecipeCursor: Codable, Equatable {
     let smoothing: Double
     let hideIdle: Double?
     let props: CursorProps
+    /// The layer's shutter's two source ends (format 42, spec §11 CU-114,
+    /// `FrameRecipe+Blur.swift`), nil without one; drawn as sprite samples (CU-117 (e)).
+    let shutter: RecipeCursorShutter?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -205,5 +208,6 @@ struct RecipeCursor: Codable, Equatable {
         smoothing = c.lenient(.smoothing, 0)
         hideIdle = c.lenient(.hideIdle)
         props = c.lenient(.props, CursorProps())
+        shutter = c.lenient(.shutter)
     }
 }

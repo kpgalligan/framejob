@@ -55,7 +55,7 @@ extension AgentServer {
             let fields: [String: Any] = [
                 "visits": plan.visits, "added": plan.added, "replaced": plan.replaced,
                 "dropped": plan.dropped, "closed_at_cut": plan.closedAtCut,
-                "bases_set": plan.basesSet, "actions": plan.actions,
+                "bases_set": plan.basesSet, "actions": plan.actions, "blurred": plan.blurred,
             ]
             guard !plan.ops.isEmpty else {
                 var answer = fields
@@ -94,6 +94,8 @@ extension AgentServer {
         settings.zoom = try number("zoom", "", AutoZoomSettings.zoomRange) ?? settings.zoom
         settings.lead = try number("lead", " s", AutoZoomSettings.leadRange) ?? settings.lead
         settings.stay = try number("stay", " s", AutoZoomSettings.stayRange) ?? settings.stay
+        // The shutter given to the zoomed clips (spec §11 CU-118 (e)), the sheet's Motion blur.
+        settings.motionBlur = try number("motion_blur", "", 0...1) ?? settings.motionBlur
         settings.follow = try boolArg(a, "follow") ?? settings.follow
         settings.typing = try boolArg(a, "typing") ?? settings.typing
         settings.replace = try boolArg(a, "replace") ?? settings.replace

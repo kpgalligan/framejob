@@ -277,6 +277,36 @@ An In or Out with a zero duration can come from an agent or an older project. It
 - A text clip has no measured size, so a slide starts or ends half a canvas past the edge. That clears any text narrower than the canvas.
 - A canvas drag started mid-motion starts from the clip's un-moved position.
 
+## Motion blur
+
+The Picture tab's Transform section has a **Motion Blur** row, 0–100 % (quick
+values 0, 25, 50 and 100), off by default. It is the shutter as a share of one
+frame: 50 % is a film camera's 180° shutter. When a clip moves — a zoom or pan
+in an action, a motion preset, the nest it sits in moving — each frame shows it
+blurred along the way it moved during that share of the frame. The clip's
+recorded cursor is streaked along its path the same way, even when the clip
+itself stands still ([The cursor](screen-recording.md#the-cursor)).
+
+The blur is the same in the preview, in **Save Frame**, in `render_frame` and in
+every export: each frame draws the clip 16 times at its positions across the
+shutter and averages them. A clip that does not move in a frame draws exactly as
+it does with the blur off. Motion Blur can change inside an action, so a blur
+can ramp in and out.
+
+A blended clip blends its averaged picture once: a screened clip, for example,
+screens its blurred picture over what is under it.
+
+Drawn sharp, whatever the row says:
+
+- a clip inside a transition, and both halves of a dissolve between nests;
+- a clip on a matte track, and the clips a matte cuts;
+- a clip with Text Behind Subject's cut, and the person copy it draws;
+- a clip with a drop shadow;
+- a nest's own picture: set the blur on the clips inside it. The row is greyed
+  on a nest clip and on an adjustment clip, which has no picture to move.
+
+The cursor's click ripples stay sharp.
+
 ## Transitions
 
 A transition plays across the **overlap** between two clips on the same track. The overlap's length is the transition's duration, and the later clip carries the transition (it is the transition *into* that clip). The overlap is drawn on the timeline as a hatched zone, with the transition's name in it when the word fits.

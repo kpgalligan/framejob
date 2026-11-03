@@ -232,6 +232,9 @@ struct CursorState: Decodable, Equatable {
     let x: Double, y: Double, opacity: Double, pxPerPoint: Double
     let image: Image?
     let ripples: [Ripple]
+    /// The positions at the asked shutter ends (spec §11 CU-115), `[[x0, y0], [x1, y1]]` in
+    /// movie pixels; nil when `ends` was not asked.
+    let ends: [[Double]]?
 }
 
 /// One cursor image: its PNG, its size and hot spot in points, the system cursor it equals.
@@ -300,9 +303,13 @@ extension ReelCursor {
         return answer["unprepared"] ?? false
     }
 
-    func state(at: Int64, props: CursorStateProps) throws -> CursorState {
-        struct Body: Encodable { let at: Int64, props: CursorStateProps }
-        return try ask(["state": Body(at: at, props: props)])
+    /// The state at `at`; with `ends` (two source ticks, CU-115) it also answers the positions
+    /// there. The request carries `ends` only when it is given.
+    func state(at: Int64, props: CursorStateProps, ends: [Int64]? = nil) throws -> CursorState {
+        // A synthesized `Encodable` writes an optional through `encodeIfPresent`: no `ends` key
+        // when nil, so the request is the one it always was.
+        struct Body: Encodable { let at: Int64, props: CursorStateProps, ends: [Int64]? }
+        return try ask(["state": Body(at: at, props: props, ends: ends)])
     }
 
     func image(id: Int) throws -> CursorImage {

@@ -224,6 +224,8 @@ With an action selected, **Size** and **Ripple size** animate across it. **Show 
 
 **Paste Attributes** (⌥⌘V) carries a clip's cursor settings to another clip, with the rest of its picture settings.
 
+**Motion blur.** With the clip's **Motion Blur** above 0 (the Transform section, see [Motion blur](motion-and-transitions.md#motion-blur)), a moving pointer is drawn streaked along its path across the shutter, in the preview, `render_frame` and every export; a still pointer is drawn as it is. The click ripples stay sharp.
+
 The recorder still draws the pointer into the movie itself, so its cursor files say the pointer is already in the picture. A recording therefore shows no **Cursor** section yet, and nothing is drawn twice.
 
 ### Shortcuts and Input Monitoring
@@ -251,8 +253,9 @@ Select one or more clips whose movies have cursor files (see [The cursor](#the-c
 | **Follow the cursor while zoomed** | Pans along when the pointer stays near the edge of the zoomed view. | on |
 | **Zoom on typing** | Zooms in on stretches of typing too, aimed at the last click before them. Greyed when the recording holds no typing (see [Shortcuts and Input Monitoring](#shortcuts-and-input-monitoring)). | on when there is typing |
 | **Replace existing zooms** | Removes the clips' existing zooms first. Off keeps your own zooms. | off |
+| **Motion blur** | Gives each zoomed clip a 50 % [motion blur](motion-and-transitions.md#motion-blur) (a 180° shutter), so the zooms and pans blur along their movement. A clip that already has a Motion Blur keeps its own. | on |
 
-The sheet reads the cursor files first ("Reading cursor files…"), then says what Zoom would do, for example "5 zooms in 2 visits." and, when some planned zooms meet an action already on the clip, "1 dropped where an action is already set." It says so instead when a clip can't be planned. Frame Job remembers Zoom, Arrive, Stay, Follow and Replace for next time, but only once you change one; Zoom on typing is never remembered.
+The sheet reads the cursor files first ("Reading cursor files…"), then says what Zoom would do, for example "5 zooms in 2 visits." and, when some planned zooms meet an action already on the clip, "1 dropped where an action is already set." It says so instead when a clip can't be planned. Frame Job remembers Zoom, Arrive, Stay, Follow, Replace and Motion blur for next time, but only once you change one; Zoom on typing is never remembered.
 
 How it plans:
 
@@ -264,7 +267,7 @@ How it plans:
 
 A clip placed smaller than the canvas (side by side with a camera, or a picture in picture) is refused: "Clip C is placed smaller than the canvas; a zoom would fill the canvas. Nest it (Clip ▸ Nest) and run Auto Zoom inside the nest." Nest it, open the nest and run Auto Zoom there; the zooms then fill the nest. A clip that plays reversed is refused too.
 
-*Agents:* `auto_zoom` plans and applies the same zooms, with the sheet's settings as arguments.
+*Agents:* `auto_zoom` plans and applies the same zooms, with the sheet's settings as arguments; its `motion_blur` (0–1, 0.5 by default) is the sheet's Motion blur, and its answer's `blurred` counts the clips it gave one.
 
 ## Shortcut overlays
 

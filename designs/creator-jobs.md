@@ -9676,6 +9676,105 @@ was owed.
 **Owed.** CU11b (CU-116): the drawing, the Transform row, Auto Zoom's "Motion blur", the docs,
 JOB-26, MB1–MB4 and the road map's three mutants.
 
+#### CU11b's record (2026-11-03)
+
+**Built.** Lane B, base `b6a2b52a` (I's HEAD). The decisions first, committed alone: CU-117…CU-119
+appended to `creator-jobs-9.md` (VR2a2 had started it at 158 lines, so the spec's "new `-9.md`"
+became an append) with their index rows. Then the toll, a pure move committed alone:
+`VideoPane.swift`'s Transform section to `VideoPane+Transform.swift` (871 → 620; the 250 moved
+lines `cmp`-identical; `app-file-history.md`'s entry). Then `cu11_proof.py`'s MB4 fixture and
+`capture`, committed and run on a Release build of the toll's commit before any product edit.
+Then the rest. No core change, no `rc_*`, no op, no format bump (43 stands); nothing keyed
+(CJ-3). The owner's 50 % (2026-11-01) is the shutter Auto Zoom sets.
+
+- **The drawing** (CU-117). `Compositor+MotionBlur.swift`: `MotionBlurPipelines` (the plain and
+  gathering accumulate pipelines — the layer fragment with source factors
+  `blendColor`/`blendAlpha` and destination `one` — and the composite, blending off), built in
+  `MetalRenderer.init`'s guard (fourteen pipelines from ten fragment functions);
+  `drawBlurred`, called by `drawLayer`'s first statement, draws the prepared layer N times at
+  its samples' placements into one `MattePool` composite at blend colour 1/N and lays it on the
+  pass once through `framejob_motion_blur_fragment`'s `blendPremultiplied`. The cursor travel
+  group (`cursorTravelX`, `cursorTravelY`, `cursorSamples`, a spare) after `cutoutReserved`,
+  Swift and Metal in one edit: 164 floats, 656 bytes. `cursorSprite` asks `state` with the
+  shutter's ends (through the new `cursorTime(at:reversed:file:)`); `compositeCursor` averages
+  the sprite samples and `nearCursor` spans both ends; `sampleUniforms` draws a blurred layer's
+  cursor sharp at each sample's point.
+- **The row and Auto Zoom** (CU-118). Motion Blur after Blend, `motionBlurApplies`, Reset
+  writing 0; `AutoZoomSettings.motionBlur` (0.5, `FrameJobAutoZoomMotionBlur` as a Bool),
+  `AutoZoomPlan.blurred` and the appended `set_video`; the sheet's "Motion blur" box; `auto_zoom`'s
+  `motion_blur` and `blurred`; `set_video`'s clause naming the UI path.
+- **Size pins** 640 → 656 in the five probes, their proofs and `phase8_chrome.py`;
+  `phase6_chrome.py`'s `TRANSFORM_ROWS`; `screens.py`'s `NOT_SHOWN` row.
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/Compositor+MotionBlur.swift` · `FrameRecipe+Blur.swift` | 176 · 57 | new |
+| `app/Sources/VideoPane+Transform.swift` | 277 | new: the toll (256), then the row |
+| `app/Sources/VideoPane.swift` | 620 | the toll (871 before) |
+| `tools/proof/cu11_proof.py` | 898 | MB1–MB6, K2–K4, `capture` / `compare` |
+
+**Deviations.** (1) **The reference is drawn at t, not at sub-frame times.** The spec's MB1/MB5
+reference was the mean of 16 `render_frame`s AT t + o_k; the first run showed all 16 PNGs
+byte-identical to the sharp frame at t (md5 equal, 17 of 17): `render_frame` reads the
+composition on its frame grid. So each sharp render is made AT t with what sample k reads at
+t + o_k — the zoom's action removed and the base scale set to 1 + smoothstep((t + o_k)/1 s)
+(`actions.rs`'s `ease_in_out`), and the cursor file swapped by `set_media_cursor` for one whose
+moves are o_k earlier. (2) **16-bit frames come from a 16-bit still.** An SDR frame of 8-bit
+sources is written as an 8-bit PNG, and the mean of 16 separately quantised renders missed the
+blurred frame by 1.12/255 (MB1) and 1.25/255 (MB6). Every picture fixture therefore holds a
+16-bit still — the checker itself, or a 2 × 2 dot far off the canvas — so `render_frame` reads
+the frame deep (PR-9's `DeepStillFrame`) and writes 16 bits; MB1b's greys are 6554 and 45875 of
+65535. (3) `drawBlurred` takes `canvas:` beside the spec's arguments, for `sampleUniforms`' W/2 and
+H/2. (4) The spec's one `swift_build.py typecheck` line over five probes fails as one module (five
+`main` files); each probe was typechecked alone, every one exit 0.
+
+**Measured.**
+
+- `make typecheck` exit 0, the 4 baseline warnings (each printed twice); `xcrun metal -c` exit 0,
+  its two old `unused variable` warnings; each probe's `swift_build.py typecheck` exit 0.
+- Debug: `tone_proof.py --only P3`, `wheels_proof.py --only P3`, `look_proof.py --only L3`,
+  `curves_proof.py --only P13`, `hdr_proof.py --only P9` each 1/1; `cu7_proof.py --only
+  Z1,Z6,Z11` 4/4; `cu11_proof.py` MB1, MB1b, MB2, MB3, MB5, MB6 7/7 and K2, K3, K4 passing;
+  `spec_index_proof.py` 264/264.
+- Mutants, each run on Debug on the final instrument and its file restored byte-identical by
+  SHA-256, all six CAUGHT: `leading` by MB1 (118.29/255), `weight` by MB1 (15.81/255),
+  `dissolve-blur` by `a_nested_pairs_routed_dissolve_is_sharp`, `composite-normal` by MB1b
+  (51.59/255), `cursor-fraction` by MB5 (10.99/255), `cursor-in-samples` by MB6 (127.97/255).
+- `make gate`: "gate: PASS 543s" (names 1, typecheck 10, fmt and lint skipped as unchanged, test
+  350, app 183); after this record and CU-119's "as built" sentences, "gate: PASS 101s" (names 1,
+  test 100, the rest skipped as unchanged).
+- Release (the gate's app): `cu11_proof.py compare <scratch>/cj-cu11b-impl/base` "scores: 12/12",
+  exit 0 — MB1 worst 0.79/255, MB1b 0.66, MB5 0.12, MB6 0.94 (each ≤ 1/255), MB3 1.31/255
+  (≤ 8), the controls 56.28, 56.70 and 178.86/255; MB4 the three PNGs' sha-256 and 30 of 30
+  export frames' md5 equal to the capture; every launch's Z1 empty. `cu7_proof.py` 12/12, exit 0.
+  `phase8_chrome.py` 142/150: the `LayerUniforms` 656-byte check passes; the 8 failures are the
+  View menu's last group (Show Subjects, VR1's, missing from the check's list) and seven of the
+  Media pane's find-band checks, none in a file CU11b touched.
+
+**Review.** One review (`b6a2b52a..a11e75ec`), verdict pass, with three nits. (1) Inside the
+accumulate pass a sample's reflection is added to its layer rather than lying under it
+source-over, so where a layer meets its own reflection the composite holds their sum — at a gap
+of 0 the antialiased seam row, never more than about one pixel: accepted as a limit and written
+into CU-117 (b) at integration. (2) `phase6_chrome.py`'s section heading still called Blend
+Transform's last value row: reworded at integration to "under Opacity, above Motion Blur" (a
+printed heading only; the script is not in the phase's verification list and was not re-run).
+(3) `phase8_chrome.py`'s 142/150, outside this diff: filed as an issue at integration.
+
+**Integration (2026-11-03).** The five commits (`498a5b93`, `3dfbef85`, `943f4a7e`, `d9407d22`,
+`a11e75ec`) cherry-picked onto `worktree-creator-jobs` at `de916495`, SW2a having landed since.
+`creator-jobs-9.md` and both spec indexes conflicted on SW2a's appended section and its Lines
+cells: both sections kept (SW2a's, then CU11b's), the `-9.md` row's summary given CU11b's clause
+after SW2a's, and the Lines cells recounted. No format to renumber (CU11b bumps none).
+`app/CLAUDE.md` gained the owed entries: `FrameRecipe+Blur.swift` and the recipe's `blur`; the
+uniform block at 164 floats (656 bytes) with the cursor travel group; `drawBlurred` and
+`MotionBlurPipelines`' three pipelines; `VideoPane+Transform.swift` with the Motion Blur row;
+Auto Zoom's `…MotionBlur` key and `plan`'s appended `set_video`. `spec_index_proof.py` 264/264;
+`make gate` on the integrated tree "gate: PASS 391s" (names 1, typecheck 10, fmt and lint
+skipped as unchanged, test 200, app 178).
+
+**Owed.** JOB-26 (the person's check). The `phase8_chrome.py` failures above (View's last group
+and the Media pane's find band), filed as an issue.
+
 ### VR5 — screen recordings follow the cursor
 
 - **What a person gets:** a vertical version of a recording with a cursor file follows the pointer,

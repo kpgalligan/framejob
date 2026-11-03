@@ -29,12 +29,16 @@ extension AgentServer {
                     + "own there, when the visit closes at the cut (closed_at_cut). A planned "
                     + "zoom meeting an action already on the clip is dropped (dropped); with "
                     + "replace the clips' existing zooms are removed first (replaced) and never "
-                    + "any other action. Refused: a clip that is not a media clip, whose media "
-                    + "has no cursor file or whose file is missing, that plays reversed, has no "
-                    + "picture, or is placed smaller than the canvas (nest it and call "
-                    + "auto_zoom inside the nest with set_scope). Answers visits, added, "
-                    + "replaced, dropped, closed_at_cut, bases_set and actions [{clip, at, "
-                    + "duration, kind}] (at in clip ticks; kind in, pan, follow or back); with "
+                    + "any other action. Each clip given a zoom whose own motion_blur is 0 is "
+                    + "set to motion_blur (0.5 by default, a 180° shutter; set_video's key, drawn "
+                    + "along the zooms) in the same step — blurred counts them; 0 sets none, and "
+                    + "a clip that already has a shutter keeps it. Refused: a clip that is not a "
+                    + "media clip, whose media has no cursor file or whose file is missing, that "
+                    + "plays reversed, has no picture, or is placed smaller than the canvas (nest "
+                    + "it and call auto_zoom inside the nest with set_scope). Answers visits, "
+                    + "added, replaced, dropped, closed_at_cut, bases_set, blurred and actions "
+                    + "[{clip, at, duration, kind}] (at in clip ticks; kind in, pan, follow or "
+                    + "back); with "
                     + "nothing to zoom, ok with a note and no undo step.",
                 [
                     "clip": [
@@ -74,6 +78,12 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Remove the clips' existing zooms first: false by "
                             + "default.",
+                    ],
+                    "motion_blur": [
+                        "type": "number",
+                        "description": "The shutter given to each zoomed clip whose own "
+                            + "motion_blur is 0, as a fraction of a frame: 0–1, 0.5 by default "
+                            + "(the sheet's Motion blur); 0 sets none.",
                     ],
                     "from": [
                         "type": "integer",

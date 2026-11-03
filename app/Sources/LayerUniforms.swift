@@ -73,9 +73,10 @@ struct LayerUniforms {
     // `CompositorEffects.swift` fills every one of these and is where each
     // field's meaning, units and range are argued; the declarations live here
     // because the layout contract above governs the whole struct and a reader
-    // checking it against `Compositor.metal` has to see all 160 fields in one
+    // checking it against `Compositor.metal` has to see all 164 fields in one
     // list (104 to here, the tone group's twelve, the wheels' twelve, the HLG
-    // group's four, the cursor's twenty-four and the cutout's four at the end).
+    // group's four, the cursor's twenty-four, the cutout's four and the cursor
+    // travel's four at the end).
     //
     // The M3 block's 28 begin with the four floats that used to be
     // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
@@ -292,6 +293,18 @@ struct LayerUniforms {
     var cutoutEdge: Float = 0
     var cutoutFeather: Float = 0
     var cutoutReserved: Float = 0
+    // The cursor's travel across the shutter (spec §11 CU-117 (d), road map
+    // creator-jobs CU11b), filled by `MetalRenderer.cursorSprite` when the
+    // recipe's cursor carries a `shutter` and the pointer moves across it:
+    // `cursorX`/`cursorY` then hold the sprite's origin at the shutter's first
+    // end, `cursorTravelX`/`Y` the move to its second (source display px), and
+    // `cursorSamples` how many sprite samples `compositeCursor` averages along
+    // it; below 1.5 the sprite is drawn once, exactly as before. A spare.
+    // 160 + 4 = 164 floats = 656 bytes, 41 × 16.
+    var cursorTravelX: Float = 0
+    var cursorTravelY: Float = 0
+    var cursorSamples: Float = 0
+    var cursorTravelReserved: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in

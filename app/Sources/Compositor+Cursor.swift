@@ -21,13 +21,20 @@ extension MetalRenderer {
               let track = CursorTracks.shared.ready(url: file.url, smoothing: cursor.smoothing)
         else { return placeholder }
         let props = cursor.props
+        // The shutter's two ends (spec §11 CU-114, CU-117 (e)), read in the same request.
+        let ends = cursor.shutter.map { shutter in
+            [shutter.from, shutter.to].map {
+                Self.cursorTime(at: $0, reversed: cursor.reversed, file: file)
+            }
+        }
         let state: CursorState
         do {
             state = try track.state(
                 at: Self.cursorTime(cursor, file: file),
                 props: CursorStateProps(
                     smoothing: cursor.smoothing, hideIdle: cursor.hideIdle, scale: props.scale,
-                    ripples: props.clicks == .ripple))
+                    ripples: props.clicks == .ripple),
+                ends: ends)
         } catch {
             return placeholder
         }
@@ -64,7 +71,10 @@ extension MetalRenderer {
                     uniforms.cursorH = Float(h)
                 }
             }
-            if drawsSprite { uniforms.cursorOpacity = Float(min(max(state.opacity, 0), 1)) }
+            if drawsSprite {
+                uniforms.cursorOpacity = Float(min(max(state.opacity, 0), 1))
+                travel(cursor.shutter, ends: state.ends, at: state, uniforms: &uniforms)
+            }
         }
         // Ripples (CU-33 (d)): the core answers them newest first; drawn oldest first.
         let ripples = props.clicks == .ripple ? Array(state.ripples.prefix(4).reversed()) : []
@@ -96,11 +106,38 @@ extension MetalRenderer {
         return sprite
     }
 
+    /// The sprite's travel across the shutter (spec §11 CU-117 (e)): with o the drawn sprite's
+    /// origin less the state's point, the origin moves to the first end + o and the travel is
+    /// the second end less the first, drawn as `shutter.samples` sprite samples. No shutter, no
+    /// answered ends, or ends that do not move leave the group at 0: the sprite draws once.
+    private func travel(
+        _ shutter: RecipeCursorShutter?, ends: [[Double]]?, at state: CursorState,
+        uniforms: inout LayerUniforms
+    ) {
+        guard let shutter, let ends, ends.count == 2, ends[0].count >= 2, ends[1].count >= 2
+        else { return }
+        let dx = ends[1][0] - ends[0][0], dy = ends[1][1] - ends[0][1]
+        guard dx != 0 || dy != 0 else { return }
+        let ox = Double(uniforms.cursorX) - state.x, oy = Double(uniforms.cursorY) - state.y
+        uniforms.cursorX = Float(ends[0][0] + ox)
+        uniforms.cursorY = Float(ends[0][1] + oy)
+        uniforms.cursorTravelX = Float(dx)
+        uniforms.cursorTravelY = Float(dy)
+        uniforms.cursorSamples = Float(shutter.samples)
+    }
+
     /// The source tick the cursor file is read at (CU-33 (f)): the recipe's `at` forward; for
     /// a reversed clip the forward stamp of the frame shown, `pivot − at − frame`, at least 0.
     static func cursorTime(_ cursor: RecipeCursor, file: CursorFile) -> Ticks {
-        guard cursor.reversed else { return cursor.at }
-        return max(0, ReverseMirror.mirrored(cursor.at, about: file.pivot) - file.frame)
+        cursorTime(at: cursor.at, reversed: cursor.reversed, file: file)
+    }
+
+    /// `at`, a source tick in the stream the clip plays, as the cursor file's forward tick: itself
+    /// forward; reversed, `pivot − at − frame`, at least 0 (CU-33 (f)). The shutter's ends are
+    /// read through it too (CU-117 (e)).
+    static func cursorTime(at: Ticks, reversed: Bool, file: CursorFile) -> Ticks {
+        guard reversed else { return at }
+        return max(0, ReverseMirror.mirrored(at, about: file.pivot) - file.frame)
     }
 
     /// The recipe's normalised `#rrggbb` or `#rrggbbaa` as straight RGBA in 0…1; anything else

@@ -326,3 +326,108 @@ and SW2a lands second adds it.
   sound taken beside picture-less files, R4; the crosstalk bridge removed, R2 and R6; the
   crosstalk bridge taking only a single run, R2). A trailing window fails R1 alone: R6's τ
   budgets the half-window's 50 ms by design. No manual check.
+
+## CU11b — motion blur drawn, its Transform row and Auto Zoom's Motion blur (2026-11-03)
+
+Recorded before the code. CU11b is the remainder CU-116 names: CU11a stored `video.motion_blur`
+(format 42), the recipe's `blur` key, the cursor's `shutter` and `state`'s `ends`, with nothing
+drawn. CU11b draws them and shows them. No core change, no `rc_*` export, no op and no format
+bump (43 stands); CU-110…CU-115 stand as recorded. Nothing sends anything anywhere, so nothing
+is keyed (CJ-3). The owner's answer of 2026-11-01 stands: the shutter Auto Zoom sets is 50 %
+(a 180° shutter).
+
+- **CU-117 — The drawing.** (a) A recipe layer whose `blur` is non-null with at least one
+  sample is drawn by `Compositor+MotionBlur.swift`'s `drawBlurred`, reached from the first
+  statement of `drawLayer` — the one per-layer draw under `encodeLayers`, so a blurred layer on
+  the canvas, in a matte group's members and in a routed dissolve's half all take it. A layer
+  with `blur` null draws exactly as before; Swift never second-guesses the core's sharp list
+  (CU-111) and never re-derives N: N is `blur.samples.count`. (b) The layer is prepared once
+  (`prepare`: its texture, cursor and cutout), then drawn N times into one destination-sized
+  `mattePool` composite cleared to transparent, sample k at its recipe placement — the anchor
+  W/2 + x, H/2 + y, the scale (floored at 0.0001), the rotation in radians and the sample's
+  `clip_rect` (none clears the clip) — everything else in the block the layer's own; its
+  reflection drawn per sample as `drawLayer` draws it, but ADDED to the layer inside the
+  accumulate pass rather than lying under it source-over, so where a layer meets its own
+  reflection the composite holds their sum: at a gap of 0 the antialiased seam row, never more
+  than about one pixel (CU11b's review, accepted as a limit). The accumulate pipelines are the plain
+  layer fragment (and its gathering specialization) with source factors `blendColor` (RGB) and
+  `blendAlpha` (alpha) and destination factors `one`, the blend colour set to 1/N in all four
+  channels, so the composite holds the mean of the N premultiplied samples. (c) The composite
+  is then laid on the destination in one full-frame draw of `framejob_motion_blur_fragment`,
+  which returns `saturate(blendPremultiplied(mode, accumulated, dst))` with the layer's blend
+  mode, on a pipeline with blending OFF (the programmable-blend rule of
+  `MetalRenderer.pipelineDescriptor`). So a blended clip blends its averaged picture ONCE, not
+  each sample; at `normal` that equals the mean of N sharp source-over draws exactly. A target
+  that cannot be made throws "A motion-blurred layer's offscreen target could not be made."
+  (`MotionBlurError.noTarget`), as a routed dissolve's does. (d) The cursor travel group: four
+  floats after `cutoutReserved` in `LayerUniforms`, Swift and Metal in one edit —
+  `cursorTravelX`, `cursorTravelY`, `cursorSamples`, `cursorTravelReserved` — taking the block
+  from 160 floats (640 bytes) to 164 (656 bytes, 41 × 16); no existing field moves. (e) A
+  cursor whose recipe key carries `shutter` and that draws a sprite asks `state` once with
+  `ends` = the two ends' source ticks, each read through `cursorTime(at:reversed:file:)` (the
+  forward stamp, or for a reversed clip `pivot − at − frame`, CU-33 (f)); with o the sprite's
+  origin less the state's (x, y), `cursorX`/`cursorY` become end 0 + o, the travel end 1 − end 0
+  and `cursorSamples` the shutter's `samples` — only when the travel is not (0, 0); otherwise the
+  group stays 0 and the sprite draws as today. Ripples stay sharp. (f) The shader's
+  `compositeCursor` keeps today's sprite step verbatim while `cursorSamples` < 1.5; at 2 or more
+  it averages min(n, 16) premultiplied sprite samples at origins cursorXY + travel·(k + 0.5)/n
+  (zero outside each rect) and composites that average as the one sprite was. `nearCursor` tests
+  the box spanning both ends (travel read as 0 below 1.5, so every old comparison is the same).
+  (g) A blurred layer whose cursor travels draws in sample k the cursor at its own sharp point,
+  cursorXY + travel·(k + 0.5)/N, with `cursorSamples` 0 in that sample's block: the layer's N
+  samples already average it, and blurring it again inside each would smear it twice.
+- **CU-118 — The Transform row and Auto Zoom's Motion blur.** (a) The toll first, a pure move:
+  `VideoPane.swift`'s Transform section (`transformSection` through `fitOrFill`) into
+  `VideoPane+Transform.swift`, every `private` kept, committed alone. (b) The Transform section
+  gains **Motion Blur** after Blend and before the Fit/Fill buttons: 0–100 %, quick picks 0, 25,
+  50 and 100, writing `video.motion_blur` as value/100 through `binding.ops(video:)` (so inside an
+  action it writes the action's end, CU-113's animatable key); disabled when any selected video
+  clip is a nest clip or an adjustment clip (`VideoPane.motionBlurApplies`), the core's two
+  refusals (CU-111), `blendApplies`' convention. Reset Transform adds `motion_blur: 0`. (c) Auto
+  Zoom (`AutoZoom.plan`, both doors' planner) appends, after the core's ops, one
+  `set_video {motion_blur: s}` over the distinct clips named in the answer's `actions` whose BASE
+  `video.motion_blur` is 0, when s > 0; a clip that already has a shutter keeps it. `blurred` is
+  their count. (d) The sheet's "Motion blur" checkbox under Replace, on by default; on is the
+  owner's 50 % (`AutoZoomSettings.motionBlurShutter`), off is 0. It is remembered as a Bool under
+  `FrameJobAutoZoomMotionBlur`, written by `remember(changedFrom:)` only when changed (mcp.py's
+  DEFAULTS MOVED guard). (e) `auto_zoom` takes `motion_blur` (a number 0–1, default 0.5, through
+  `resolveAutoZoom`'s `number` helper: "Motion_blur is 1.5; it runs 0–1.") and answers `blurred`
+  beside the other counts. (f) `set_video`'s catalog clause says the blur is drawn in the
+  preview, `render_frame` and every export, and names the UI path, the Picture sub-tab's
+  Transform section's Motion Blur.
+- **CU-119 — The proof, the mutants and JOB-26.** `tools/proof/cu11_proof.py` gains MB1–MB6 and
+  K2–K4 and two modes, `capture DIR` and `compare DIR`; every picture row reads 16-bit
+  `render_frame` PNGs through ffmpeg's `rgba64le` and compares at ±1/255 (±257 in 16-bit units)
+  per channel per pixel. MB1 a 320 × 180 16-px checker clip under a 2× `ease_in_out` zoom over
+  [0, 1 s) with `motion_blur` 0.5: `render_frame` at 0.5 s equals the mean of 16 sharp renders of
+  what the shutter reads at t + o_k, o_k = round(((2k + 1 − 16)/32)·0.5·20,000), and the sharp
+  frame at t differs by more than 8/255 somewhere (the control). **As built** (a deviation found
+  at the first run): `render_frame` reads the composition on its frame grid, so a render at
+  t + o_k is the frame at t; each sharp render is made AT t with sample k's placement (the
+  action removed, the base scale set to the action's `ease_in_out` value at t + o_k) and, for a
+  cursor, a cursor file whose moves are o_k earlier (`set_media_cursor`). And since an SDR frame
+  of 8-bit sources is written 8-bit, which quantises each sharp render on its own, every picture
+  fixture holds a 16-bit still (the checker, or a 2 × 2 dot off the canvas) so `render_frame`
+  reads the frame deep and writes a 16-bit PNG. MB1b the same over an opaque 0.2-grey plate
+  with `blend: add` and a checker of greys 0.1 and 0.7: `add` clamps (`kBlendAdd` is `min(src + dst, 1)`), so the mean
+  of sharp `add` renders equals the averaged picture added once only where no sum passes 1 —
+  hence greys whose sums stay below 1; a blend mode lost in the composite misses there by the
+  plate's 0.2. MB2 an unmoving clip, and a cursor at rest, byte-identical with blur 0.5 and 0.
+  MB3 a `prores_4444` export's frame 15 within ±8/255 of `render_frame` at 0.5 s (with the
+  control past 24/255 from the sharp frame) — **a deviation from the road map's "identical"**:
+  the export is lossy, so identity is the MB4 claim on its own bytes, not across writers. MB4
+  (`compare` only) a version-41 package — a cursor movie with ripples, a zoom action, a shadow,
+  a `screen` blend and a reflection — whose 3 `render_frame` PNGs and a 1 s `prores_4444`
+  export's per-frame md5 are byte-identical to the `capture` made on a Release build of the
+  toll's commit, before any product edit. MB5 a cursor moving at 600 px/s on a `color=` movie
+  equals the mean of 16 sharp renders; MB6 MB5 under MB1's zoom. K2 `auto_zoom`'s `motion_blur`
+  (0.5 stored, `blurred` 1; a clip at 0.3 kept; 0 sets none; 1.5 refused in its sentence); K3
+  the Transform section's Motion Blur row below Blend (`snapshot_ui`); K4 the sheet through
+  `-RCDevAutoZoomAccept YES` stores 0.5, and none with `-FrameJobAutoZoomMotionBlur NO`. The
+  mutants, by hand, each file restored byte-identical by SHA-256: `leading` (the core's
+  `shutter_offsets` at k/N) → MB1; `weight` (the blend colour 1/(N + 1)) → MB1;
+  `dissolve-blur` (the `dissolve` arm out of `sharp`) → `cargo test --release --test
+  motion_blur a_nested_pairs_routed_dissolve_is_sharp`; `composite-normal` (the composite's
+  blend mode 0) → MB1b; `cursor-fraction` (k/n in the shader) → MB5; `cursor-in-samples`
+  (`sampleUniforms` keeping `cursorSamples`) → MB6. **JOB-26** is the person's check that the
+  blur reads as motion and not as smear.

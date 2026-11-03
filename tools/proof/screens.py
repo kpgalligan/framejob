@@ -298,6 +298,9 @@ NOT_SHOWN = {
                               "shows the sheet",
     "FrameJobAutoZoomReplace": "Auto Zoom's remembered Replace (spec §11 CU-76); no screen "
                                "shows the sheet",
+    "FrameJobAutoZoomMotionBlur": "Auto Zoom's remembered Motion blur (spec §11 CU-118 (d)), "
+                                  "written only when the sheet's box changes it; no screen "
+                                  "shows the sheet",
     "RCDevSpeedUpTypingAccept": "a dev launch default with which the Speed Up Typing sheet "
                                 "presses its own Apply (spec §11 CU-93); no screen launches "
                                 "with it",

@@ -25,12 +25,14 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Eleven pipelines from nine fragment functions: plain, plain + gather,
+    /// Fourteen pipelines from ten fragment functions: plain, plain + gather,
     /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix,
     /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6), the
     /// selection map (`Compositor+Selection.swift`, spec §11 GR-35), the
-    /// input pass (`Compositor+Input.swift`, spec §11 GR-15) and the output
-    /// pass (`Compositor+Output.swift`, spec §11 HD-14).
+    /// input pass (`Compositor+Input.swift`, spec §11 GR-15), the output
+    /// pass (`Compositor+Output.swift`, spec §11 HD-14) and motion blur's
+    /// three — plain and gathering accumulates over the layer fragment and its
+    /// composite (`Compositor+MotionBlur.swift`, spec §11 CU-117).
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -55,6 +57,9 @@ final class MetalRenderer {
     let cursorSprites: CursorSprites
     /// The cutout's plans, packs and mask textures (spec §11 CO-24…CO-27, `Compositor+Cutout.swift`).
     let cutoutMasks: CutoutMasks
+    /// Motion blur's accumulate and composite pipelines (spec §11 CU-117,
+    /// `Compositor+MotionBlur.swift`).
+    let motionBlur: MotionBlurPipelines
     let sampler: MTLSamplerState
     let textureCache: CVMetalTextureCache
     /// Bound where the shader ignores the texture (the slate): an unbound draw is undefined.
@@ -166,7 +171,8 @@ final class MetalRenderer {
             let outputPipeline = MetalRenderer.outputPipeline(device: device, library: library),
             let looks = LookTextures(device: device, library: library),
             let inputs = InputStage(device: device, library: library),
-            let lift = LayerLift(device: device, library: library)
+            let lift = LayerLift(device: device, library: library),
+            let motionBlur = MotionBlurPipelines(device: device, library: library)
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -215,6 +221,7 @@ final class MetalRenderer {
         self.lift = lift
         self.cursorSprites = CursorSprites(device: device)
         self.cutoutMasks = CutoutMasks(device: device)
+        self.motionBlur = motionBlur
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder

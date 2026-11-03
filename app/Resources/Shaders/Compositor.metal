@@ -423,6 +423,15 @@ struct LayerUniforms {
     float cutoutEdge;
     float cutoutFeather;
     float cutoutReserved;
+    // ── The cursor's travel (spec §11 CU-117 (d)): with `cursorSamples` 2 or
+    // more, `compositeCursor` averages that many sprite samples from
+    // (cursorX, cursorY) along (cursorTravelX, cursorTravelY), the shutter's
+    // move in source display px; below 1.5 the sprite draws once, as before.
+    // Then a spare. 160 + 4 = 164 floats = 656 bytes, 41 × 16.
+    float cursorTravelX;
+    float cursorTravelY;
+    float cursorSamples;
+    float cursorTravelReserved;
 };
 
 /// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
@@ -852,6 +861,9 @@ static inline void cursorOver(thread float3 &rgb, thread float &alpha, float3 c,
 /// R·(1 − (1 − phase)²), width R/8, a 1-px antialiased edge, alpha
 /// `rippleA × (1 − phase)`. Then the sprite, PREMULTIPLIED, × `cursorOpacity`,
 /// sampled with the layer's sampler inside its rect and nothing outside it.
+/// With `cursorSamples` 2 or more (spec §11 CU-117 (f)) the sprite is the mean
+/// of min(n, 16) premultiplied samples at origins cursorXY + travel·(k + 0.5)/n,
+/// each zero outside its own rect, composited as the one sprite is.
 static inline void compositeCursor(thread float3 &rgb, thread float &alpha, float2 px,
                                    texture2d<float> cursor, sampler samp,
                                    constant LayerUniforms &u) {
@@ -874,9 +886,29 @@ static inline void compositeCursor(thread float3 &rgb, thread float &alpha, floa
         if (ca > 0.0) { cursorOver(rgb, alpha, ring, ca); }
     }
     if (u.cursorOpacity > 0.0 && u.cursorW > 0.0 && u.cursorH > 0.0) {
-        float2 local = (px - float2(u.cursorX, u.cursorY)) / float2(u.cursorW, u.cursorH);
-        if (all(local >= 0.0) && all(local < 1.0)) {
-            float4 s = saturate(cursor.sample(samp, local));
+        if (u.cursorSamples < 1.5) {
+            float2 local = (px - float2(u.cursorX, u.cursorY)) / float2(u.cursorW, u.cursorH);
+            if (all(local >= 0.0) && all(local < 1.0)) {
+                float4 s = saturate(cursor.sample(samp, local));
+                float sa = s.a * u.cursorOpacity;
+                float a = sa + alpha * (1.0 - sa);
+                rgb = (s.rgb * u.cursorOpacity + rgb * alpha * (1.0 - sa)) / max(a, 1e-4);
+                alpha = a;
+            }
+        } else {
+            int n = min(int(u.cursorSamples + 0.5), 16);
+            float2 size = float2(u.cursorW, u.cursorH);
+            float2 travel = float2(u.cursorTravelX, u.cursorTravelY);
+            float4 s = float4(0.0);
+            for (int k = 0; k < n; ++k) {
+                float2 origin = float2(u.cursorX, u.cursorY)
+                    + travel * ((float(k) + 0.5) / float(n));
+                float2 local = (px - origin) / size;
+                if (all(local >= 0.0) && all(local < 1.0)) {
+                    s += saturate(cursor.sample(samp, local));
+                }
+            }
+            s /= float(n);
             float sa = s.a * u.cursorOpacity;
             float a = sa + alpha * (1.0 - sa);
             rgb = (s.rgb * u.cursorOpacity + rgb * alpha * (1.0 - sa)) / max(a, 1e-4);
@@ -907,9 +939,16 @@ static inline float2 displayUV(float2 t, float quarterTurns, float mirrored) {
 /// ±1 texel only while one texel is at most 2 display px, which holds while the bound texture
 /// is the source's display size (`sourceWidth` × `sourceHeight`), as every source is today; a
 /// texture bound smaller than that would need the margin scaled by the ratio.
+/// A travelling sprite (`cursorSamples` 2 or more, spec §11 CU-117 (f)) is near
+/// anywhere in the box spanning both ends; below that the travel reads as 0, so
+/// the test is the one-rect test it always was.
 static inline bool nearCursor(float2 px, constant LayerUniforms &u) {
-    if (u.cursorOpacity > 0.0 && px.x > u.cursorX - 2.0 && px.y > u.cursorY - 2.0
-        && px.x < u.cursorX + u.cursorW + 2.0 && px.y < u.cursorY + u.cursorH + 2.0) {
+    float2 travel = u.cursorSamples > 1.5
+        ? float2(u.cursorTravelX, u.cursorTravelY) : float2(0.0);
+    if (u.cursorOpacity > 0.0 && px.x > u.cursorX + min(travel.x, 0.0) - 2.0
+        && px.y > u.cursorY + min(travel.y, 0.0) - 2.0
+        && px.x < u.cursorX + u.cursorW + max(travel.x, 0.0) + 2.0
+        && px.y < u.cursorY + u.cursorH + max(travel.y, 0.0) + 2.0) {
         return true;
     }
     if (u.rippleCount < 0.5) {
@@ -2426,6 +2465,33 @@ fragment float4 framejob_dissolve_fragment(ShadowVaryings in [[stage_in]],
         i = zoomedHalf(incoming, samp, c, float2(u.inAnchorX, u.inAnchorY), zIn, canvas);
     }
     return saturate(mix(o, i, p));
+}
+
+// MARK: - Motion blur's composite (spec §11 CU-117)
+
+// The composite's uniform block, mirrored by `MotionBlurUniforms` in
+// `Compositor+MotionBlur.swift` FIELD FOR FIELD under `LayerUniforms`' layout
+// contract: 4 floats, 16 bytes. `blendMode` is the layer's
+// `BlendMode.shaderCode`.
+struct MotionBlurUniforms {
+    float blendMode;
+    float reserved0;
+    float reserved1;
+    float reserved2;
+};
+
+// A motion-blurred layer's N samples, already averaged into a
+// destination-sized target (PREMULTIPLIED, the mean of the layer fragment's
+// output), laid on the pass ONCE with the layer's blend mode. It reads the
+// destination through `[[color(0)]]` and returns the finished pixel, so its
+// pipeline has blending OFF (`MetalRenderer.pipelineDescriptor`'s
+// programmable-blend rule); at `normal` `blendPremultiplied` is source-over.
+fragment float4 framejob_motion_blur_fragment(ShadowVaryings in [[stage_in]],
+                                             constant MotionBlurUniforms &u [[buffer(0)]],
+                                             texture2d<float> accumulated [[texture(0)]],
+                                             float4 dst [[color(0)]]) {
+    return saturate(blendPremultiplied(int(u.blendMode + 0.5),
+                                       accumulated.read(uint2(in.position.xy)), dst));
 }
 
 // MARK: - The qualifier (spec §11 GR-13)

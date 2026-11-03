@@ -335,10 +335,10 @@ do {
     check(
         "P13 apply(curves:) sets hueCurvesEnabled 1 for a hue curve alone and curvesEnabled for "
             + "a tone curve alone, both for both, neither for hue identities of any x's "
-            + "(hueCurvesEnabled at byte 508 of 640)",
+            + "(hueCurvesEnabled at byte 508 of 656; 640 until creator-jobs CU11b)",
         hue == (0, 1) && sat == (0, 1) && tone == (1, 0) && both == (1, 1) && none == (0, 0)
             && neutral.isIdentity && offset == 508
-            && MemoryLayout<LayerUniforms>.stride == 640,
+            && MemoryLayout<LayerUniforms>.stride == 656,
         "hue \(hue), sat \(sat), tone \(tone), both \(both), identities \(none), offset "
             + "\(offset)")
 }

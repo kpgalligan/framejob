@@ -289,6 +289,10 @@ struct RecipeLayer: Codable, Equatable {
     /// `CutoutProps.swift`); nil for none. Drawn by `Compositor+Cutout.swift`
     /// since CO2a2 (spec §11 CO-24…CO-27).
     let cutout: RecipeCutout?
+    /// The layer's motion blur (format 42, spec §11 CU-114, `FrameRecipe+Blur.swift`): its N
+    /// sub-frame placements, or nil when the core draws it sharp. Drawn by
+    /// `Compositor+MotionBlur.swift` (CU-117).
+    let blur: RecipeBlur?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -322,6 +326,7 @@ struct RecipeLayer: Codable, Equatable {
         input = c.lenient(.input)
         cursor = c.lenient(.cursor)
         cutout = c.lenient(.cutout)
+        blur = c.lenient(.blur)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer
@@ -345,7 +350,7 @@ struct RecipeLayer: Codable, Equatable {
             obscure: obscure, blend: blend, wheels: wheels, curves: curves,
             // No `cutout`: the recipe's is a draw instruction (a mask and how
             // to draw it), not the clip's props.
-            cursor: cursor?.props)
+            cursor: cursor?.props, motionBlur: blur?.shutter ?? 0)
     }
 }
 

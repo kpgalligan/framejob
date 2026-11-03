@@ -7,10 +7,12 @@ import Foundation
 /// and `auto_zoom` (`AgentServer+AutoZoom.swift`) — plan here.
 
 /// What the sheet sets (CU-70's defaults). `typing` is never remembered: it is on whenever the
-/// files hold typing (CU-76).
+/// files hold typing (CU-76). `motionBlur` is the shutter the planned clips are given (spec §11
+/// CU-118 (c)): the owner's 50 % by default, 0 for none.
 struct AutoZoomSettings: Equatable {
     var zoom = 2.0, lead = 0.6, stay = 2.5
     var follow = true, typing = true, replace = false
+    var motionBlur = 0.5
 
     static let zoomRange: ClosedRange<Double> = 1.25...4
     static let leadRange: ClosedRange<Double> = 0.2...2.0
@@ -21,6 +23,10 @@ struct AutoZoomSettings: Equatable {
     static let stayKey = "FrameJobAutoZoomStay"
     static let followKey = "FrameJobAutoZoomFollow"
     static let replaceKey = "FrameJobAutoZoomReplace"
+    /// The sheet's "Motion blur" checkbox, remembered as a Bool: on is `motionBlurShutter`, off 0.
+    static let motionBlurKey = "FrameJobAutoZoomMotionBlur"
+    /// The shutter "Motion blur" sets when on (the owner's answer, 2026-11-01: a 180° shutter).
+    static let motionBlurShutter = 0.5
 
     /// The remembered values, each clamped into its range; the default for a key not stored.
     /// Read through `double(forKey:)` and `bool(forKey:)`, so a launch argument's string
@@ -37,6 +43,9 @@ struct AutoZoomSettings: Equatable {
         number(stayKey, stayRange, &s.stay)
         if d.object(forKey: followKey) != nil { s.follow = d.bool(forKey: followKey) }
         if d.object(forKey: replaceKey) != nil { s.replace = d.bool(forKey: replaceKey) }
+        if d.object(forKey: motionBlurKey) != nil {
+            s.motionBlur = d.bool(forKey: motionBlurKey) ? motionBlurShutter : 0
+        }
         return s
     }
 
@@ -48,14 +57,17 @@ struct AutoZoomSettings: Equatable {
         if stay != opened.stay { d.set(stay, forKey: Self.stayKey) }
         if follow != opened.follow { d.set(follow, forKey: Self.followKey) }
         if replace != opened.replace { d.set(replace, forKey: Self.replaceKey) }
+        if motionBlur != opened.motionBlur { d.set(motionBlur > 0, forKey: Self.motionBlurKey) }
     }
 }
 
-/// `plan_zooms`' answer: the ops in the core's order and its counts.
+/// `plan_zooms`' answer: the ops in the core's order and its counts, then the motion blur
+/// `set_video` (CU-118 (c)) and `blurred`, how many clips it gives a shutter.
 struct AutoZoomPlan {
     let ops: [ReelOp]
     let visits, added, replaced, dropped, closedAtCut, basesSet: Int
     let actions: [[String: Any]]
+    let blurred: Int
 }
 
 enum AutoZoom {
@@ -174,13 +186,34 @@ enum AutoZoom {
         guard let answer = try? JSONSerialization.jsonObject(with: Data(text.utf8))
             as? [String: Any]
         else { throw Refusal(message: "Auto Zoom's plan could not be read.") }
-        let ops = try ((answer["ops"] as? [[String: Any]]) ?? []).map(op)
+        var ops = try ((answer["ops"] as? [[String: Any]]) ?? []).map(op)
         func count(_ key: String) -> Int { (answer[key] as? NSNumber)?.intValue ?? 0 }
+        let actions = (answer["actions"] as? [[String: Any]]) ?? []
+        let blurred = unblurred(actions, in: project.snapshot)
+        if settings.motionBlur > 0, !blurred.isEmpty {
+            ops.append(
+                .setVideo(clips: blurred, patch: VideoPatch(motionBlur: settings.motionBlur)))
+        }
         return AutoZoomPlan(
             ops: ops, visits: count("visits"), added: count("added"),
             replaced: count("replaced"), dropped: count("dropped"),
             closedAtCut: count("closed_at_cut"), basesSet: count("bases_set"),
-            actions: (answer["actions"] as? [[String: Any]]) ?? [])
+            actions: actions, blurred: settings.motionBlur > 0 ? blurred.count : 0)
+    }
+
+    /// The distinct clips the planned actions name, in first-named order, whose BASE
+    /// `video.motion_blur` is 0 (CU-118 (c)): a clip that already has a shutter keeps it.
+    private static func unblurred(_ actions: [[String: Any]], in snapshot: ProjectSnapshot)
+        -> [UInt32]
+    {
+        var clips: [UInt32] = []
+        for action in actions {
+            guard let id = (action["clip"] as? NSNumber)?.uint32Value, !clips.contains(id),
+                let clip = snapshot.clip(id), (clip.video?.motionBlur ?? 0) <= 0
+            else { continue }
+            clips.append(id)
+        }
+        return clips
     }
 
     /// The core's lowercase sentence as one a person reads: capitalised, with a full stop.
