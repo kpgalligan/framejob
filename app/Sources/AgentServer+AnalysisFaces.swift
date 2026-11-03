@@ -88,11 +88,11 @@ extension AgentServer {
         return ["rate": AnalysisFaces.rate, "count": rows.count, "samples": rows]
     }
 
-    /// A Float32 as an answer writes it (faces', sound events'): `answerValue`
-    /// as an `NSDecimalNumber`, NaN as null. `JSONSerialization` prints a
-    /// Double to 17 significant figures, so the rounded value goes out as the
-    /// decimal its shortest form spells, read with a "." separator whatever
-    /// the Mac's locale.
+    /// A Float32 as an answer writes it (faces', sound events', subjects'):
+    /// `answerValue` as an `NSDecimalNumber`, NaN as null. `JSONSerialization`
+    /// prints a Double to 17 significant figures, so the rounded value goes out
+    /// as the decimal its shortest form spells, read with a "." separator
+    /// whatever the Mac's locale.
     static func answerNumber(_ value: Float) -> Any {
         answerValue(value).map {
             NSDecimalNumber(string: String($0), locale: Locale(identifier: "en_US_POSIX"))

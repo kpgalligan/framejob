@@ -223,3 +223,116 @@ placed: no typed key is recorded (CU-7).
   in `graphic/tests/templates.rs`; seven mutants (`overlap-allowed`, `module-rewritten`,
   `times-without-s`, `dmin-ignored`, `repeats-not-merged`, `plus-not-mapped`,
   `track-behind-reused`). No person check: the look is judged at CU12's trial.
+
+## VR1 — people and salient regions found on the Mac (2026-11-02)
+
+VR-10…VR-16 are VR1's, recorded before its code after spike VR-S1 (verdicts in VR-11). The
+owner's answers that set them: 2026-11-01, Batch 7 — Show Subjects is in the product (VR-13);
+2026-11-02, answering VR1's first attempt's STOP — VR-4 is amended to `upperBodyOnly` true (the
+amendment line under VR-4, with VR-S1's figures). Nothing here is keyed (VR-2, CJ-3): Vision is
+on-device. No core, FFI, format or product-tool change; the dev tool `analysis_job` gains `clips`
+and `lane_queued` (VR-16). CJ-20 stands: nothing runs at import.
+
+- **VR-10 — `subjects`, one analysis kind holding people and salient regions.** It amends the road
+  map's draft VR-10 (`upperBodyOnly` false; boxes as centre and size). Per sample of source time:
+  each person box from `VNDetectHumanRectanglesRequest` revision 2 with `upperBodyOnly` true (VR-4
+  as amended: a box covers the head and shoulders), and each salient box from
+  `VNGenerateAttentionBasedSaliencyImageRequest` revision 2's `salientObjects`, each with its
+  confidence; both requests FRESH per analysed frame, performed together on one fresh
+  `VNImageRequestHandler`; no stateful request (VR-4). Boxes are x, y, w, h, 0…1 of the upright
+  picture from its top-left, as `faces`' (`AnalysisFaces.topLeft`). Stored in CJ-22's store
+  (`cache/analysis/subjects/<media>.json` and `<media>/samples.bin`): a 16-byte header (`FJSB`,
+  `UInt16` version 1, `UInt16` 20, `UInt32` samples, `UInt32` boxes), a 16-byte row per sample
+  (`Int64` pts, −1 none; `UInt32` first box; `UInt16` people; `UInt16` salient), then 20-byte boxes
+  (`Float32` x, y, w, h, confidence), a sample's people first, each group in CJ-31's order; the
+  publish merges as `faces`' does (CJ-33). The stamp: kind version 1; vision `{request:
+  "human_rectangles+attention_saliency", quality: "upper_body", revision: 2, rate, read_size}`;
+  device `people:<readback>;salient:<readback>`; the parameter digest names `upper_body_only`, both
+  devices, the file version and record size, the sample rule, the order and `salient_objects`.
+- **VR-11 — VR-S1's verdicts: the grid, the reader and the devices are `faces`'.** The run (macOS
+  26.5.1 (25F80), Apple M2 Max, AC power; three lanes, one-minute loads 7.86…125.69):
+  `VERDICT rate=10 every_other=no size=720 people=neural_engine(branch 1)
+  salient=neural_engine(branch 1) identical=yes reader=converted realtime_1080=6.25
+  realtime_4k=8.52`, `rule_sha256` `6650e95d…03c28ac` (matching; the entry names no
+  `upperBodyOnly`, so the amendment did not move it).
+  - CJ-S2 rule 1 per request, 600 samples of `faces_moving.mov` at 720, each alone: people CPU
+    31.12, 19.31, 12.51 s, GPU 8.75, 9.06, 9.48 s, Neural Engine 4.98, 3.11, 3.66 s; salient CPU
+    25.45, 24.98, 24.78 s, GPU 11.59, 10.12, 10.08 s, Neural Engine 4.98, 4.87, 4.92 s. Every
+    stage read back its pin (people `VNComputeStageMain`; salient also
+    `VNComputeStagePostProcessing`), each device's three digests were equal and the devices'
+    differed: the Neural Engine for both (branch 1).
+  - Size (CJ-S2 rule 3 as VR1 re-runs it): person recall on `faces_small.mov` 0/600 at 720 and
+    0/600 at native — the upper-body request finds no person in that head-only crop at any size —
+    so 720 holds (98 % of 0). VR-S1 rule 2 (S-TH1) is owed.
+  - VR-S1 rule 1, decode and both requests at 720, 10 a second: 6.27, 6.25, 5.78× on 1080p30
+    (median 6.25×), 7.67, 9.08, 8.52× on 4K30 (median 8.52×); both at least 4×, so `faces`' rate.
+  - VR-S1 rule 3: three runs on the Neural Engine, digests equal (people `18433177…5d251881e9`,
+    salient `aee490d5…135e09f65`): no tolerance. Rule 4 (S-TH1) owed, people stay; rule 5 and
+    CJ-S2 rule 5 owed, converted.
+  - Person recall (a person box holding the truth face's centre): `faces_moving.mov` 600/600
+    (whole-body 238/600); `subjects_moving.mov` front 596/600, back 521/600 (whole-body 155/600,
+    22/600) — VR-4's amendment's figures, run again.
+  So: samples on a grid of `AnalysisSubjects.rate` = `AnalysisFaces.rate` (10) a second, sampled
+  by CJ-33's rule (`AnalysisFaces.samples(at:after:grid:)`) through `AnalysisSampleJob`, the
+  sampled-kind job loop lifted out of `AnalysisFaces.run` (a pure move; `faces` byte-identical);
+  frames through `AnalysisFrames.read`'s standard arms (direct, or converted for a converting
+  media) at min(720, the media's long side); both requests pinned to the Neural Engine, a job
+  refusing a readback other than the stamp's (`SubjectError.device`). Nothing is linked (CJ-31);
+  values raw. The instruments are flat files, `creator_spike/subjects_spike.swift`,
+  `subjects_spike.py` and `subjects_deciders.py` (CJ3's `faces_spike.*` shape, not the road map's
+  `vr_subjects/` folder); the results file is `VR-S1/results.json`, `rule_matches: true`.
+- **VR-12 — What a VR command analyses: `FramingAnalysis`.** `windows(clips:in:)`: each media clip
+  among the clips whose media has a moving picture, in order, its media grouped in order of first
+  appearance; each window the clip's played window (`AnalysisClipTimes`: source map, speed,
+  reversal) widened by `margin` (1 s) each side, clamped to 0…duration, merged per media where
+  they overlap or touch; text, shape, graphic, adjustment, nest and still clips are skipped.
+  `requests(clips:in:)`: over the open scope's project, kind-major in `kinds` order (`shots`,
+  `faces`, `subjects`), then media, each kind's need the windows' grid indices widened by its read
+  margin, through `ProjectDocument.analysisRequest(kind:media:url:urls:cacheDir:need:)`; a hit is
+  omitted. Its callers: `analysis_job {clips}` (VR-16) now, Clip ▸ Follow Subject… at VR2b.
+- **VR-13 — View ▸ Show Subjects draws only what is cached (owner, Batch 7: in the product).**
+  After Show SDR Version and before Scopes, no key, always enabled, checked while on;
+  `UIMenuTable` `.plain`, inventory verdict `none`. Per window (`PreviewCanvasView.subjects`, nil
+  while off) and never persisted: no `UserDefaults` key. For the canvas's primary box when its clip
+  is a media clip of a video media: the playhead's forward source tick
+  (`SubjectsOverlay.sourceTick`, `TimelineView.sourceTime` with the clip's source map and
+  `ReverseMirror`), the sample ⌊source · rate⌋ clamped to the grid, drawn per kind only when a
+  marker that answers for the stamp `ProjectDocument.analysisRequest` would make covers it. Each
+  box is placed in the layer's uncropped rectangle and turned with it (ProjectSnapshot's (★)
+  through `CanvasLayerBox`), clipped to the cropped corners: faces in `DS.snapGuide`, people
+  `.systemTeal`, salient regions `.systemPurple` dashed [4, 3], each over a black 40 % backing.
+  With neither kind covering, "Not analyzed" at the layer's top-left corner; VR2b appends "— Clip
+  ▸ Follow Subject… analyzes it" when that item exists. It never starts a job: no
+  `analysisRequest`, no `want`, no `cacheDirectory` (which creates the folder); it reads under
+  `intendedCacheDirectory`, memoised per kind on CO-25's key (the marker's inode, size and mtime,
+  the media, its URL and its LUT's URL), and an `.analysisDidPublish` of `faces` or `subjects` in
+  the document's folder drops the memo and redraws. No MCP mirror: view state, §7.9's Preview
+  Quality exemption as Show Ungraded's; `get_media_analysis` answers what it draws.
+- **VR-14 — `get_media_analysis {kind: "subjects"}` answers rate, count and samples** `[{source,
+  frame, people: [{box, confidence}], salient: [{box, confidence}]}]`, with `clip_time` and
+  `timeline` under `clip`; every value through `answerNumber` (CJ-34's 4 decimals, lifted out of
+  `facesAnswer` with faces' bytes unchanged); over 512 KiB refused naming the `source` of the first
+  row that does not fit. Measured (`vr1_probe` P4): a row with one person and one salient box is
+  177 bytes, 222 with `clip`, so an answer holds 2,945 rows (294.5 s), 2,351 (235.1 s) with
+  `clip`; the prose says about 294 s and 235 s.
+- **VR-15 — CJ-S3 (b) with a `subjects` job: no pause.** `lane_spike.py --playback --kind
+  subjects` on Release (`rule_sha256` `209c6f01…f0309ce830`, matching): idle 599, 600 and 600
+  composed frames, busy 600, 600 and 600 with a `subjects` job over the ten-minute still running
+  through each 20 s play — a 0.0 % drop, so CJ-21 stands and the picture queue does not pause
+  (`CJ-S3-subjects/results.json`, `rule_matches: true`).
+- **VR-16 — `analysis_job` gains `clips`, and every answer `lane_queued`; VR1's proof.**
+  `analysis_job {clips: [int]}` (exclusive with `media`) wants every `FramingAnalysis.requests`
+  request under the document's dev owner and answers `wanted: {project, clips, requests}`;
+  `lane_queued` is `AnalysisLane.queuedTotal()`, the requests the lane queued since launch, never
+  falling. `vr1_proof.py`: P1–P7 (`vr1_probe.swift`: the codec and merge, order and flip, the
+  stamp and requests, the answer and cap, `FramingAnalysis.windows`, the grid and `sampleIndex`,
+  the overlay's corners against (★) and its source tick against speed, `ReverseMirror` and the
+  `SourceMap`); V1 a person box holds the `faces` face centre in ≥ 95 % of `faces_moving.mov`'s
+  samples (`subjects_moving.mov` recorded); V2 two runs byte-identical, the stamp's device; V3 the
+  portrait pair's person centres within 2 % of the width (RMS); V4 every `subjects` source a
+  `faces` source; V6 after `analysis_job {clips}` each kind's coverage the windows ± 1 s; V8 Show
+  Subjects and five playhead moves on an uncached clip: `lane_queued` unchanged, no
+  `cache/analysis/subjects`, no defaults moved; V9 `-RCDevAnalysisHold 5`: the job lands at least
+  5 s after it starts; V10 S-TH4 skipped by name; Z1. Mutants (5): `grid-by-frame-index` (V4),
+  `orientation-not-applied` (V3), `framing-whole-media` (V6), `source-tick-no-mirror` (P7),
+  `show-subjects-wants` (V8). No person check.

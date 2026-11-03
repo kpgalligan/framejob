@@ -126,6 +126,7 @@ extension UIMenu {
         "toggleShowUngraded:": .plain,
         "toggleShowSelection:": .plain,
         "toggleShowSDRVersion:": .plain,
+        "toggleShowSubjects:": .plain,
         "toggleScopes:": .plain,
         "toggleLoudnessMeter:": .plain,
         "performMiniaturize:": .framework,

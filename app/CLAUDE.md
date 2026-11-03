@@ -497,9 +497,12 @@ detail there.
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `MaskPack.swift` ·
   `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
+  `AnalysisSampleJob.swift` · `AnalysisSubjects.swift` · `AnalysisSubjects+Samples.swift` ·
+  `FramingAnalysis.swift` ·
   `SoundEvents.swift` · `AnalysisSoundEvents.swift` · `AnalysisClipTimes.swift` ·
   `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
   `AgentServer+AnalysisMasks.swift` · `AgentServer+AnalysisFaces.swift` ·
+  `AgentServer+AnalysisSubjects.swift` ·
   `AgentServer+AnalysisSoundEvents.swift` · `AgentCatalog+Analysis.swift` ·
   `AgentServer+AnalysisJob.swift` · `ShotSplit.swift` ·
   `AnalyzingSheetController.swift` ·
@@ -560,6 +563,24 @@ detail there.
   rounded to 4 decimals and written as an `NSDecimalNumber` read in
   `en_US_POSIX` (`JSONSerialization` prints a `Double` to 17 significant
   figures), and the cap's refusal.
+  The `subjects` kind (road map creator-jobs VR1, spec §11 VR-10…VR-16):
+  `AnalysisSubjects` reads as `faces` does and, per analysed frame, makes a
+  FRESH `VNDetectHumanRectanglesRequest` (revision 2, `upperBodyOnly` true,
+  VR-4 as amended) and a fresh `VNGenerateAttentionBasedSaliencyImageRequest`
+  (revision 2, its `salientObjects`), performed together on one fresh handler,
+  both pinned to the Neural Engine; a job refuses a request that reads back
+  another device. Its grid is its own sample grid at `AnalysisFaces.rate`, so
+  every instant is a `faces` one. `AnalysisSampleJob` is the sampled kinds'
+  job loop both kinds run (a pure move out of `AnalysisFaces.run`): CJ-33's
+  sample rule, the 30 s and range-end publishes, generic over what a frame
+  yields. `AnalysisSubjects+Samples` is `samples.bin` (`FJSB`, 20-byte boxes,
+  a sample's people then its salient boxes) and its merge write.
+  `AgentServer+AnalysisSubjects` holds the answer's rows through
+  `answerNumber`. `FramingAnalysis` (names no `rc_*`) is what a VR command
+  analyses (VR-12): each video media clip's played window ± 1 s merged per
+  media, and the requests kind-major `shots`, `faces`, `subjects`;
+  `analysis_job {clips}` wants them, and every `analysis_job` answer carries
+  `lane_queued` (`AnalysisLane.queuedTotal()`, monotonic).
   The `sound_events` kind (road map creator-jobs FC3, spec §11 FC-30…FC-34) is
   the one kind on the sound queue, and a running sound job does not count
   against `pictureWidth`. `AnalysisSoundEvents` decodes each missing range of
@@ -954,6 +975,12 @@ the key map behind it.
   validator arm `validateCutoutAction` (the checkmark on, mixed or off,
   `CutoutStatus.menuState`), one line in the frozen file after
   `validateRetimeAction` (road map creator-jobs CO3, spec §11 CO-30).
+- `EditorViewController+Subjects` — View ▸ Show Subjects (road map
+  creator-jobs VR1, spec §11 VR-13): `toggleShowSubjects` sets or clears the
+  canvas's `subjects` (a `SubjectsOverlay`), view state per window that writes
+  no default; `validateSubjectsAction` (always enabled, the checkmark) is
+  reached from `validateSeeingAction`'s `default:` arm, so the frozen file is
+  not edited.
 - `EditorViewController+Panes.swift` — `PaneSplitView`, whose
   `isDraggingDivider` is true only inside `mouseDown(with:)` (AppKit's divider
   drag), and `savePaneSize`: the timeline height and inspector width are saved
@@ -1282,6 +1309,17 @@ the key map behind it.
   through the layer's transform; hit test after the layer's own handles
   (`CanvasHit.yieldsToObscureGrip`), no grip while the target's start list
   and the drawn list differ in length (`obscureStartList`); cursor rects.
+- `SubjectsOverlay.swift` — Show Subjects' drawing (spec §11 VR-13), hung on
+  the frozen `PreviewCanvasView`'s one stored `subjects` (its `didSet` redraws
+  the overlay) and one draw call after `drawObscureRegions()`: the primary
+  box's clip's cached `faces` and `subjects` boxes at the playhead's forward
+  source tick (`TimelineView.sourceTime` with the source map and
+  `ReverseMirror`), placed in the layer's uncropped rect through its rotation
+  and clipped to its crop, else "Not analyzed". It NEVER calls
+  `analysisRequest`, `want` or `cacheDirectory`; it reads under
+  `intendedCacheDirectory`, memoised per kind on CO-25's key (marker inode,
+  size, mtime; the media, its URL, its LUT's URL), and drops the memo on an
+  `.analysisDidPublish` of `faces` or `subjects` in its document's folder.
 - `CanvasObscureSession.swift` — the region-grip drag (spec §11 CI-16): the
   whole `video.obscure` list with one entry replaced, through
   `CanvasEditTarget.op(video:clip:)`, travel read through the box on screen

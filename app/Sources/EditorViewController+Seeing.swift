@@ -192,7 +192,7 @@ extension EditorViewController {
             (item as? NSMenuItem)?.state = scopesPanel?.isShown == true ? .on : .off
             return true
         default:
-            return nil
+            return validateSubjectsAction(action, item: item)
         }
     }
 }

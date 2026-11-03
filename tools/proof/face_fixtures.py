@@ -34,6 +34,12 @@ mode finds on the source picture, scaled to the overlay's side (`truth`).
 - `faces_converting.mov`: `faces_moving`'s picture at 25 fps, 20 s, H.264 —
   `faces_proof.py` sets `set_media_color {log: "slog3"}` on it, so it reads
   through the converted reader.
+- `subjects_moving.mov` (road map VR1, spike VR-S1): the whole cover at 720
+  drifting on the moving still's cosine path over 1920 × 1080, 30 fps, 60 s,
+  H.264 — made because Vision's whole-body person request found a person in
+  under 95 % of `faces_moving`'s samples (a face crop is not a body); spec §11
+  VR-4's amendment cites both modes' figures on it. Its truth is both cover
+  faces at the drift.
 
 `faces.json` holds each FlexAudio image's SHA-256, the crop, each fixture's
 overlay (side, path), size, fps, duration and SHA-256, and the face boxes the
@@ -63,6 +69,7 @@ CROP = (52, 125, 130)  # x, y, side in COVER's pixels: the front man alone
 SIDE = 540
 TWO_HOLD = 5.0
 TWO_SPEED = 60.0
+SUBJECTS_SIDE = 720
 TICKS = 600_000
 
 
@@ -196,6 +203,8 @@ def specs(crop_faces):
         "faces_two": ("faces_two.mov", 1920, 1080, 30, 20, "cover", 1080, "h264"),
         "faces_portrait": ("faces_portrait.mov", 1080, 1920, 30, 20, "crop", SIDE, "h264"),
         "faces_converting": ("faces_converting.mov", 1920, 1080, 25, 20, "crop", SIDE, "h264"),
+        "subjects_moving": ("subjects_moving.mov", 1920, 1080, 30, 60, "cover_moving",
+                            SUBJECTS_SIDE, "h264"),
     }
 
 
@@ -210,7 +219,7 @@ def make_one(spec, crop, force):
     if got and (got["width"], got["height"], round(got["fps"])) == (width, height, fps) \
             and got["frames"] == fps * seconds:
         return out
-    source = COVER if picture == "cover" else crop
+    source = COVER if picture in ("cover", "cover_moving") else crop
     if picture == "cover":
         x, y = str((width - side) // 2), f"-floor(max(0,t-{TWO_HOLD})*{TWO_SPEED})"
     else:
@@ -251,7 +260,8 @@ def make_rotated(upright, force):
 
 def truth(name, t, record):
     """The truth face boxes at t s, top-left frame, 0…1 of the display picture:
-    one box for a crop fixture, [back, front] for `faces_two`."""
+    one box for a crop fixture, [back, front] for `faces_two` and
+    `subjects_moving`."""
     row = record["fixtures"][name]
     width, height = row["size"]
     side = row["side"]
@@ -260,7 +270,7 @@ def truth(name, t, record):
         boxes = record["cover_faces"]
     else:
         ox, oy = drift_at(width, height, side, t)
-        boxes = record["crop_faces"]
+        boxes = record["cover_faces" if row["picture"] == "cover_moving" else "crop_faces"]
     return [((ox + b[0] * side) / width, (oy + b[1] * side) / height, b[2] * side / width,
              b[3] * side / height) for b in (f["box"] for f in boxes)]
 

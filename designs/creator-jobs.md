@@ -7998,6 +7998,149 @@ face pass of its own (CJ2a, CJ2b, CJ3); it adds one kind, `subjects`. Nothing in
 - **Question for the owner:** keep Show Subjects in the product or only as a dev tool? *Recommended:
   the product* — it shows why the framing went where it did.
 
+#### VR1's record (2026-11-02)
+
+**Landed.** Lane C, base `6110526b`, the third attempt. The first (base `d9e762fa`) stopped at
+VR-S1: the person request VR-4 fixed (`upperBodyOnly` false, the whole body) boxed the face
+centre in 238 of 600 samples of `faces_moving.mov`, and the owner amended VR-4 to `upperBodyOnly`
+true (2026-11-02). The second stopped by mistake, on an unrelated owner message relayed into its
+designer's context. The commits, in order:
+- `f80b6d20`: the first attempt's `ba27cb75` cherry-picked (the VR-S1 probe,
+  `subjects_moving.mov`).
+- `3f49f5ec`: VR-4's amendment line with VR-S1's figures, alone, before any decision or code.
+- `119ff4b9`: the head. Spike VR-S1 run; its instruments (the probe's default flipped to upper
+  body, `whole` the comparison row); VR-10…VR-16 recorded, VR-15 pending.
+- `ca290d10`: the toll, a pure move: the faces job loop into `AnalysisSampleJob` (`faces`
+  byte-identical).
+- `1bfec2c7`: the app code, its documents and the proof.
+- This record, with VR-15's verdict.
+
+No core, FFI or format change, and no product tool added (CJ-20, VR-2). An agent gets
+`get_media_analysis {kind: "subjects"}`; a person gets View ▸ Show Subjects.
+
+- **New files** (`wc -l`): `AnalysisSampleJob.swift` 104, `AnalysisSubjects.swift` 145,
+  `AnalysisSubjects+Samples.swift` 147, `AgentServer+AnalysisSubjects.swift` 90,
+  `FramingAnalysis.swift` 101, `SubjectsOverlay.swift` 251, `EditorViewController+Subjects.swift`
+  38.
+- **Changed:** `AnalysisFaces.swift` 270 → 204 (the job loop out), `AnalysisStamp.swift` 234 →
+  245, `AnalysisLane.swift` 373 → 389 (the `.subjects` arm, `queuedTotal()`),
+  `AgentServer+Analysis.swift` 351 → 354, `AgentServer+AnalysisFaces.swift` 104 → 107
+  (`answerNumber`), `AgentServer+AnalysisJob.swift` 201 → 239, `AgentCatalog+Analysis.swift` 135
+  → 147, `PreviewCanvasView.swift` 1121 → 1124 (frozen: the stored `subjects` and its comment, the
+  draw call), `EditorViewController+Seeing.swift` 205 (the `default:` arm), `AppDelegate+ViewMenu.swift`
+  106 → 108, `UIMenuTable.swift` 137 → 138.
+- **Not touched:** the generic callers (`AnalyzingSheetController.swift`, `ShotSplit.swift`,
+  `CutoutMasks.swift`, `CutoutStatus*.swift`, `DerivedCarry.swift`, `ProjectDocument+Analysis.swift`),
+  the frozen `EditorViewController.swift`, `AnalysisFrames.swift` (401) and `BackgroundRender.swift`
+  (CJ-S3 (b) did not fire).
+- **Instruments:** `creator_spike/subjects_spike.swift` (234), `subjects_spike.py` (238),
+  `subjects_deciders.py` (131, 14 selftest rows plus `faces_deciders`' 23), `lane_spike.py --kind
+  subjects`, `face_fixtures.py`'s `subjects_moving.mov`, `vr1_probe.swift` (477) and
+  `vr1_proof.py` (629: P1–P7, V1–V4, V6, V8–V10, Z1, five mutants).
+- **Documents:** spec §4.2, §5.6, §7.4 (row 51), §7.9c, §7.9e (564 → 573; 588 beside FC3's rows), §9 and their index
+  cells; `creator-jobs.md` (VR-4's amendment, 495 → 499) and `creator-jobs-7.md` (225 → 338) with
+  the index's VR-4 row, seven new rows and the file row; `docs/guide/vertical-and-framing.md`
+  (new) and its index row (rows 14–19 renumbered 15–20), `menus-and-shortcuts.md`, `mcp.md`,
+  `projects-and-media.md`, `docs/developing.md`; `tools/proof/README.md`.
+
+**Integrated** onto `worktree-creator-jobs` as one commit after CU8 (`1fb61bfe`), with FC3, CU7
+and CU8 landed since the base:
+- **VR-10…VR-16 moved to `creator-jobs-7.md`.** The lane appended them to `creator-jobs-6.md`,
+  which CU7 had taken to 476 lines (with them, 589, past the ~500-line split rule), and FC3 had
+  opened `creator-jobs-7.md`; the section went there whole, after CU8's, and the index's seven
+  rows and the file row point at it.
+- **`subjects` beside `sound_events`** in every `AnalysisKind` switch, the lane's `perform`, the
+  answer's switch, the catalog's prose and `kind` description, §5.6, §7.4's row, §7.9e,
+  `mcp.md`, `projects-and-media.md` and `tools/proof/README.md` (VR1's section after FC3's).
+  The kinds' order is shots, masks, faces, sound_events, subjects.
+- **`answerNumber`:** FC3 lifted it out of `facesAnswer` too, with the same signature; FC3's
+  (a POSIX locale per call) was kept, so the lane's static locale did not land.
+- The spec index's Lines cells were counted again over the merged files.
+
+**The head.** macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset`: "Now drawing from 'AC
+Power'"), three lanes on the machine (one-minute loads 7.86…125.69 over the spike's runs).
+- **VR-S1** (`rule_sha256` `6650e95d…03c28ac`, matching): `VERDICT rate=10 every_other=no
+  size=720 people=neural_engine(branch 1) salient=neural_engine(branch 1) identical=yes
+  reader=converted realtime_1080=6.25 realtime_4k=8.52 recall_faces_moving=1.0000`. VR-11 holds
+  every run's figures. In short: CJ-S2 rule 1 per request chose the Neural Engine for both (people
+  4.98, 3.11 and 3.66 s; salient 4.98, 4.87 and 4.92 s for 600 samples), every stage reading back
+  its pin; the size stayed 720 (person recall on `faces_small.mov` 0/600 at 720 and at native);
+  VR-S1 rule 1 met 4× on both files (medians 6.25× and 8.52×); rule 3's three runs were
+  identical. Person recall: `faces_moving.mov` 600/600 (whole-body 238/600), `subjects_moving.mov`
+  front 596/600 and back 521/600 (whole-body 155/600 and 22/600) — the first attempt's figures
+  exactly.
+- **CJ-S3 (b) with subjects** (`rule_sha256` `209c6f01…f0309ce830`, matching; Release, PID
+  58652, stopped after): idle 599, 600 and 600, busy 600, 600 and 600, a 0.0 % drop: no pause
+  (VR-15).
+- The results files are `tools/proof/work/creator_spike/VR-S1/results.json` and
+  `CJ-S3-subjects/results.json`, each with `rule_matches: true`.
+
+**Commands and results.**
+- `subjects_spike.py --selftest`: 37 rows, 0 failed.
+- `make typecheck` after the lift and after the app code: exit 0, the four baseline warnings.
+- `faces_proof.py --only P1,…,P5` after the lift: 5/5 (176 and 221 bytes, as CJ3's).
+- `vr1_proof.py --only P1,…,P7`: 7/7 on the final instrument; on the way P1 indexed a sample
+  without a salient box, P3, P5 and P7 found the probe adding one file twice (an identity: media
+  B is now `faces_small.mov`) and a ramp up to ×2 refused past the media's end (now a speed dip
+  to ×0.5) — instrument faults.
+- `v2_menu.py --only H` 5/5; `inventory.py --check` 5/5; `spec_index_proof.py` 252/252.
+- Debug (`make app-debug`), `--only V1,…,V10,Z1`: 8/8, V10 skipped by name.
+- `make gate`: "gate: PASS 676s" (names 1, typecheck 8, fmt and lint skipped, test 446, app
+  220; loads up to 211 while it ran). Over this record and VR-15's verdict, before this
+  sentence: "gate: PASS 84s" (names 1, test 82; the rest skipped).
+- **Release** (`RC_PROOF_APP=release`, after the gate's `make app`), on the final instrument:
+  - `vr1_proof.py`: **15/15**, V10 skipped by name. V1 600/600 (`subjects_moving.mov` front
+    596/600, back 521/600); V2 33,616 bytes twice, identical; V3 a person in 185 of 200 upright
+    samples, the rotated too in 180 (0.973), centres 4.97 px apart (RMS); V4 0 of 600 off the
+    faces grid; V6 six requests, every marker the windows ± 1 s; V8 `lane_queued` 12 before and
+    after, no `cache/analysis/subjects`; V9 the held job 27.29 s from start to end.
+  - `faces_proof.py`: 12/12, F5 skipped by name, every figure as CJ3's but F7, 59.21 s per minute
+    (three lanes building; CJ3 recorded 7.06).
+  - `analysis_proof.py`: 22/22.
+- Z1 printed nothing on every launch.
+- **Mutants** (five), each once, on the final instrument:
+  - `source-tick-no-mirror` (P7, the probe over a sources copy): the reversed clip's tick
+    4,800,000 against 31,200,000.
+  - `grid-by-frame-index` (V4): 1,800 subjects samples, 1,200 of them off the faces grid.
+  - `orientation-not-applied` (V3): the rotated run's person centres 780.53 px off the upright
+    run's.
+  - `framing-whole-media` (V6): every kind's coverage the whole media (shots `[[0, 1799]]`
+    against `[[107, 342], [1157, 1392]]`).
+  - `show-subjects-wants` (V8): `lane_queued` 0 before and 3 after.
+  - The four app mutants were built by `tree_copy.build_app`, which now builds Debug (36–44 s
+    each), not Release as CJ3's were; the copy was removed after.
+
+**Deviations.**
+- **The instruments are flat files** (`creator_spike/subjects_spike.*`, `subjects_deciders.py`),
+  CJ3's shape, not the road map's `vr_subjects/` folder (VR-11).
+- **The size rule decided on zero recall.** The upper-body request finds no person in
+  `faces_small.mov`'s head crop at any size, so 98 % of native is 0 and 720 holds; the honest
+  size test is VR-S1 rule 2 on S-TH1, owed.
+- **VR-S1's first run in this attempt did not build**: app code was edited while the spike's
+  binary compiled over `app/Sources`. The app files were set aside and the spike run again; its
+  figures are the second run's.
+- **The app mutants ran on Debug builds**, `tree_copy.build_app`'s; the spec named Release.
+- **`answerNumber` kept one POSIX locale** as a static in the lane; the integration kept FC3's
+  identical lift instead (above). Faces' bytes are unchanged (P5's 176 and 221).
+
+**Review** (verdict pass, four nits):
+- `analysis_job` with `clips` ignores a `kind`, `from` or `to` passed beside it: its description
+  now says so (the integration).
+- The catalog said about 290 s of samples (230 s with `clip`) where §7.9e says 294 s and 235 s:
+  the catalog and VR-14's clause now say 294 s and 235 s (the integration).
+- This record said eight new index rows; there are seven (fixed above).
+- V8 does not show that the overlay drew (no `snapshot_ui` while Show Subjects is on), so a draw
+  path that wanted a job would pass it if the window never drew; not acted on.
+
+**Owed.**
+- S-TH1: VR-S1 rules 2 (person recall at 720 against 1440) and 4 (people on turned-away and
+  side-on beats).
+- S-TH4: VR-S1 rule 5, CJ-S2 rule 5 for these requests, and V10.
+- To file: "Split spec §7.9e: `get_media_analysis` and `split_at_shots` into `07.9h`" (§7.9e is
+  588 lines).
+
+None is a STOP. No manual check.
+
 ### FC4 — `find_clips`: the analysis any agent can rank
 
 - **What a person gets:** an agent — the Assistant, or Claude Code through `framejob-mcp` — asks for

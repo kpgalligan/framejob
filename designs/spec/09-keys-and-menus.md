@@ -205,9 +205,11 @@ and every ⌘-item whose action lives on the editor would stop resolving while
 the preview was focused; its window sets `isExcludedFromWindowsMenu` for the
 export queue's reason and autosaves its frame, which the queue's deliberately
 does not, so it stays on the display it was put on), then Show Ungraded ⌃⌘U,
-Show Selection (no shortcut), Show SDR Version (no shortcut) and Scopes ⌃⌘W
+Show Selection (no shortcut), Show SDR Version (no shortcut), Show Subjects
+(no shortcut, road map "creator-jobs" VR1, §11 VR-13: always enabled, draws
+the selected clip's cached faces, people and salient regions) and Scopes ⌃⌘W
 (grading GR3 and grading-2 G2-1 and G2-4, §11 GR-4, GR-5, GR-10, GR-13; hdr
-H-3, §11 HD-7, HD-14 (g): four checkmark toggles about the preview, view state
+H-3, §11 HD-7, HD-14 (g): five checkmark toggles about the preview, view state
 that nothing persists — none writes a default; Show Selection is disabled
 while off with no adjustment clip selected, Show SDR Version is always
 enabled and shows an HLG project's SDR version with an "SDR Version" tag),

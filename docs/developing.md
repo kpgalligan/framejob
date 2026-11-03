@@ -310,8 +310,11 @@ simulated memory-pressure event), `loudness_meter` (the live loudness meter's
 reading, and its reset), `land_recording` (fixture files landed as a finished
 recording through the recorder panel's door or `record_screen`'s, for the
 recorder's Enhance the microphone when it lands), `analysis_job` (wants a
-media's analysis under a document's stand-in owner and returns at once, or waits
-for every such job and answers their runs; launch with `-RCDevAnalysisHold <s>`
+media's analysis under a document's stand-in owner and returns at once — or,
+with `clips`, every analysis a framing command reads: each clip's played window
+plus 1 s each side, in shots, faces and subjects — or waits for every such job
+and answers their runs, and always answers `lane_queued`, the requests the
+analysis lane has queued since launch; launch with `-RCDevAnalysisHold <s>`
 to hold each job, `-RCDevAnalysisCanned YES` to honour canned analyses),
 `transcript_view` (what a window's Transcript tab and its bar show, after
 setting the bar's Words from or Language, pressing Read, focusing its view,

@@ -94,6 +94,8 @@ final class AnalysisLane: @unchecked Sendable {
     /// frame until its run ends.
     private var fractions: [AnalysisRequest: Double] = [:]
     private var lastPoll = 0.0
+    /// Requests queued since launch (`queuedTotal()`, VR-16).
+    private var queuedCount = 0
     private let picture = DispatchQueue(
         label: "com.kgalligan.framejob.analysis-picture", qos: .utility, attributes: .concurrent)
     private let sound = DispatchQueue(label: "com.kgalligan.framejob.analysis-sound", qos: .utility)
@@ -209,6 +211,15 @@ final class AnalysisLane: @unchecked Sendable {
         return fractions[request]
     }
 
+    /// How many requests the lane has queued since launch, never less than
+    /// before (spec §11 VR-16): `analysis_job`'s `lane_queued`, which a proof
+    /// reads before and after to see that nothing was wanted. Any thread.
+    func queuedTotal() -> Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return queuedCount
+    }
+
     /// What `owner` wants now (spec §11 CO-22 (h)). Any thread; no poll.
     func requests(of owner: Int) -> [AnalysisRequest] {
         condition.lock()
@@ -265,6 +276,7 @@ final class AnalysisLane: @unchecked Sendable {
                 default: break
                 }
                 queued.append(request)
+                queuedCount += 1
                 record(request, AnalysisRun(
                     queuedAt: Self.now, startedAt: nil, endedAt: nil, outcome: nil))
             }
@@ -351,6 +363,10 @@ final class AnalysisLane: @unchecked Sendable {
                     progress: { [self] fraction in setProgress(fraction, of: request) })
             case .soundEvents:
                 finished = try AnalysisSoundEvents.run(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
+            case .subjects:
+                finished = try AnalysisSubjects.run(
                     request, cancelled: cancelled,
                     progress: { [self] fraction in setProgress(fraction, of: request) })
             }

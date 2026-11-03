@@ -173,6 +173,10 @@ The bets' scope-level decisions, recorded at CJ0a (their phases hold the rest):
   (`VNGenerateAttentionBasedSaliencyImageRequest` r2) from VR1's `subjects`. A fresh
   `VNImageRequestHandler` per sample; no `VNTrackObjectRequest` or other stateful request. Linking
   boxes across samples is the core planner's (CJ-31); masks are out for framing (E9: they flicker).
+  **Amended 2026-11-02, by VR-10 (owner, VR1's VR-S1):** people come from `VNDetectHumanRectanglesRequest`
+  r2 with `upperBodyOnly` true. Whole-body mode boxed the face centre in 238/600 samples on
+  `faces_moving.mov` and in 155/600 (front) and 22/600 (back) on `subjects_moving.mov`; upper-body
+  mode in 600/600, 596/600 and 521/600.
 - **VR-5 — The planner is the core's, and `reframe_clip` is an op (CJ-8 (f)).** Swift measures and
   caches; the core maps samples into clip time, chooses subjects, plans, enforces coverage and
   writes actions, because coverage (VR-7) needs (★) and `fill_scale` and composition into existing

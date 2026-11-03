@@ -27590,6 +27590,45 @@ RC_PROOF_APP=release python3 tools/proof/sound_events_proof.py           # the r
 python3 tools/proof/sound_events_proof.py --mutant <name>
 ```
 
+## Road map "creator-jobs" VR1 — people and salient regions on the Mac, View ▸ Show Subjects (`vr1_proof.py` P1–P7, V1–V4, V6, V8–V10, Z1; five mutants; `creator_spike/subjects_spike.py`; `creator_spike/lane_spike.py --playback --kind subjects`; spec §11 VR-10…VR-16)
+
+`face_fixtures.py` also makes `subjects_moving.mov`: the whole two-person cover at 720 drifting on
+the moving still's cosine path over 1920 × 1080, 30 fps, 60 s, H.264; its truth is both cover
+faces at the drift (VR-4's amendment cites its figures).
+
+**`creator_spike/subjects_spike.py`** is spike VR-S1: `subjects_spike.swift` (built over
+`swift_build.app_sources()`, optimised; mode `run <movie> <side> <rate> <people device|none>
+<salient device|none> [whole]`) reads through the app's `AnalysisFrames.read` and performs a fresh
+`VNDetectHumanRectanglesRequest` r2 (`upperBodyOnly` true; `whole` sets it false, a comparison
+row) and a fresh `VNGenerateAttentionBasedSaliencyImageRequest` r2 on one handler per analysed
+frame, each pinned and read back per stage. It runs CJ-S2 rule 1 per request at 720, the size
+rule on `faces_small.mov`, VR-S1 rule 1 (decode and both requests at least 4× on 1080p30 and
+4K30), rule 3 (three runs identical) and the person recall rows; `subjects_deciders.py` holds the
+rules (stdlib; `--selftest` runs its 14 rows and `faces_deciders`' 23). Results in
+`tools/proof/work/creator_spike/VR-S1/results.json`, one `VERDICT` line.
+
+**`vr1_proof.py`** builds `vr1_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through
+`swift_build.py`.
+- **P1–P7** are probe rows: `samples.bin`'s codec (`FJSB`) and merge; CJ-31's order and the flip;
+  the stamp and the requests (`upper_body`); `subjectsAnswer`'s decimals, row bytes (printed for
+  VR-14) and cap; `FramingAnalysis.windows`; every subjects instant a faces one and
+  `sampleIndex`; the overlay's corners against (★) and its source tick on ×2, reversed and ramped
+  clips.
+- **V1–V4, V6, V8** are app rows on one launch with a scratch `CFFIXED_USER_HOME` (V6 drives
+  `analysis_job {clips}`, V8 View ▸ Show Subjects through `perform_menu_item` and reads
+  `lane_queued`); **V9** runs in a launch of its own with `-RCDevAnalysisHold 5`; Z1 is each
+  launch's parity grep. V10 (S-TH4) is skipped by name and owed.
+
+```sh
+python3 tools/proof/creator_spike/subjects_spike.py --selftest
+python3 tools/proof/creator_spike/subjects_spike.py                   # VR-S1, on AC
+python3 tools/proof/vr1_proof.py --only P1,P2,P3,P4,P5,P6,P7          # no app
+make app-debug && python3 tools/proof/vr1_proof.py
+RC_PROOF_APP=release python3 tools/proof/vr1_proof.py                 # the recorded run
+python3 tools/proof/vr1_proof.py --mutant <name>
+python3 tools/proof/creator_spike/lane_spike.py --playback --kind subjects --socket <dir>/agent.sock   # VR-15, Release
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

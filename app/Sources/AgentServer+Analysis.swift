@@ -5,8 +5,10 @@ import Foundation
 /// cache — `shots`, the hard cuts, first, `masks`, the person masks' runs
 /// (CO1, spec §11 CO-14, `AgentServer+AnalysisMasks.swift`), and `faces`, the
 /// face samples (CJ3, spec §11 CJ-34, `AgentServer+AnalysisFaces.swift`),
-/// and `sound_events`, Sound Analysis' groups per window (FC3, spec §11
-/// FC-33, `AgentServer+AnalysisSoundEvents.swift`).
+/// `sound_events`, Sound Analysis' groups per window (FC3, spec §11
+/// FC-33, `AgentServer+AnalysisSoundEvents.swift`), and `subjects`, the
+/// people and salient regions (VR1, spec §11 VR-14,
+/// `AgentServer+AnalysisSubjects.swift`).
 /// `get_transcript`'s counterpart for pictures and sounds.
 ///
 /// An APP-STATE tool and a read: nothing is edited and no undo step is made.
@@ -183,6 +185,7 @@ extension AgentServer {
         case .masks: result.merge(try masksFields(call)) { _, kind in kind }
         case .faces: result.merge(try facesFields(call)) { _, kind in kind }
         case .soundEvents: result.merge(try soundEventsFields(call)) { _, kind in kind }
+        case .subjects: result.merge(try subjectsFields(call)) { _, kind in kind }
         }
         if let clip = call.clip { result["clip"] = Int(clip.id) }
         if marker?.canned == true {

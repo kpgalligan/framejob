@@ -55,9 +55,9 @@ extension AppDelegate {
                 "Preview Window", #selector(EditorViewController.togglePreviewWindow(_:)), "p",
                 [.command, .shift]))
         // Grading GR3 and grading-2 G2-1 and G2-4 (spec §11 GR-4, GR-5, GR-10,
-        // GR-13; hdr H-3, HD-14 (g)): checkmark toggles about the preview, view
-        // state that nothing persists. Show Selection and Show SDR Version have
-        // no shortcut.
+        // GR-13; hdr H-3, HD-14 (g); creator-jobs VR1, VR-13): checkmark toggles
+        // about the preview, view state that nothing persists. Show Selection,
+        // Show SDR Version and Show Subjects have no shortcut.
         menu.addItem(
             item(
                 "Show Ungraded", #selector(EditorViewController.toggleShowUngraded(_:)), "u",
@@ -66,6 +66,8 @@ extension AppDelegate {
             item("Show Selection", #selector(EditorViewController.toggleShowSelection(_:))))
         menu.addItem(
             item("Show SDR Version", #selector(EditorViewController.toggleShowSDRVersion(_:))))
+        menu.addItem(
+            item("Show Subjects", #selector(EditorViewController.toggleShowSubjects(_:))))
         menu.addItem(
             item(
                 "Scopes", #selector(EditorViewController.toggleScopes(_:)), "w",

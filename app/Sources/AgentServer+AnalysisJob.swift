@@ -50,7 +50,8 @@ final class AnalysisDevOwners: @unchecked Sendable {
 
 extension AgentServer {
 
-    /// `analysis_job {project?, media?, kind?, from?, to?, wait?}` (CJ-27).
+    /// `analysis_job {project?, media? | clips?, kind?, from?, to?, wait?}`
+    /// (CJ-27; `clips` and `lane_queued` spec §11 VR-16).
     func analysisJob(_ a: [String: Any]) throws -> String {
         guard !Thread.isMainThread else {
             throw ToolError(
@@ -63,7 +64,34 @@ extension AgentServer {
                 message: "wait must be 0…\(Int(AnalysisLane.callWaitLimit)) seconds.")
         }
         var result: [String: Any] = ["ok": true]
-        if a["media"] != nil, !(a["media"] is NSNull) {
+        let named = { (key: String) in a[key] != nil && !(a[key] is NSNull) }
+        if named("media"), named("clips") {
+            throw ToolError(message: "Name media or clips, not both.")
+        }
+        if named("clips") {
+            // What a VR command analyses (VR-12): every FramingAnalysis request of
+            // the clips, wanted under the document's dev owner.
+            let made = try onMain { () -> (ProjectDocument, String?, [UInt32], [AnalysisRequest]) in
+                let document = try self.target(a)
+                let clips = try self.clipsArg(a, "clips", document)
+                do {
+                    let requests = try FramingAnalysis.requests(clips: clips, in: document)
+                    return (document, Self.path(of: document), clips, requests)
+                } catch {
+                    throw ToolError(message: error.localizedDescription)
+                }
+            }
+            let (document, path, clips, requests) = made
+            for request in requests {
+                AnalysisDevOwners.shared.want(
+                    request, recipeKey: document.recipeKey, project: path, document: document)
+            }
+            result["wanted"] = [
+                "project": path ?? NSNull(), "clips": clips.map { Int($0) },
+                "requests": requests.count,
+            ] as [String: Any]
+        }
+        if named("media") {
             let made = try onMain { () -> (ProjectDocument, String?, UInt32, AnalysisRequest?) in
                 let document = try self.target(a)
                 let media = try self.mediaArg(a, "media", document)
@@ -115,6 +143,7 @@ extension AgentServer {
             }
         }
         result["now"] = ProcessInfo.processInfo.systemUptime
+        result["lane_queued"] = lane.queuedTotal()
         result["jobs"] = AnalysisDevOwners.shared.all.map { wanted -> [String: Any] in
             let request = wanted.request
             var row: [String: Any] = [
@@ -172,10 +201,16 @@ extension AgentServer {
                 + "CJ-27). With media (then kind is required; from and to as "
                 + "get_media_analysis's media form) it wants that window's missing ranges "
                 + "under the document's dev owner — one per document, alive while it is open, "
-                + "keeping its earlier wants — and returns at once. With wait (seconds, 0…"
+                + "keeping its earlier wants — and returns at once. With clips instead (spec "
+                + "VR-16) it wants what a VR command analyses (FramingAnalysis, VR-12): for "
+                + "each media the clips show, the windows they play plus 1 s each side, in "
+                + "kinds shots, faces, subjects, answering wanted: {project, clips, requests}; "
+                + "kind, from and to are not read with clips. "
+                + "With wait (seconds, 0…"
                 + "\(Int(AnalysisLane.callWaitLimit))) it then waits until every job a dev "
                 + "owner wanted has ended. Answers {ok, now (process uptime), wanted: "
-                + "{project, media, hit}, jobs: [{project, media, kind, ranges, queued_at, "
+                + "{project, media, hit}, lane_queued (requests the lane queued since "
+                + "launch), jobs: [{project, media, kind, ranges, queued_at, "
                 + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, ranges, "
                 + "wanted, outcome, error, queued_at, started_at, ended_at}]}: every job a dev "
                 + "owner wanted since launch, and every want a cutout made (role document, "
@@ -184,6 +219,10 @@ extension AgentServer {
             [
                 "media": [
                     "type": "integer", "description": "The media whose window to want.",
+                ],
+                "clips": [
+                    "type": "array", "items": ["type": "integer"],
+                    "description": "Clips whose framing analyses to want (not with media).",
                 ],
                 "kind": [
                     "type": "string", "enum": AnalysisKind.allCases.map(\.rawValue),

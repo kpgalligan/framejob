@@ -23,9 +23,9 @@ import Vision
 ///
 /// **The frames** are read through `AnalysisFrames.read`'s standard arms (the
 /// direct reader, or the converted one for a converting media, CJ-S2 rule 5)
-/// at `min(longSide, the media's long side)`. A job publishes at each range's
-/// end and every `publishInterval`, mid-range only through the samples
-/// decided.
+/// at `min(longSide, the media's long side)`. A job (`AnalysisSampleJob`)
+/// publishes at each range's end and every `publishInterval`, mid-range only
+/// through the samples decided.
 enum AnalysisFaces {
     static let payloadName = "samples.bin"
 
@@ -180,91 +180,25 @@ enum AnalysisFaces {
 
     // MARK: - The job
 
-    /// Runs `request`'s ranges (sample indices) in order. False when
-    /// `cancelled()` stopped it; `progress` hears the share of samples decided.
+    /// Runs `request`'s ranges (sample indices) in order through
+    /// `AnalysisSampleJob`. False when `cancelled()` stopped it; `progress`
+    /// hears the share of samples decided.
     static func run(
         _ request: AnalysisRequest, cancelled: () -> Bool, progress: (Double) -> Void
     ) throws -> Bool {
         let grid = request.kind.grid(of: request.media)
-        let frames = AnalysisGrid(media: request.media)
-        let source = AnalysisFrames.Source(
-            media: request.media, url: request.url, input: request.input)
-        let side = min(longSide, max(request.media.width, request.media.height))
-        let total = max(1, request.ranges.reduce(0) { $0 + $1.count })
-        var before = 0
-        for range in request.ranges {
-            var job = Job(range: range)
-            let first = frames.index(of: grid.ticks(of: range.lowerBound))
-            let reach = grid.ticks(of: range.upperBound) + Ticks(grid.frameTicks.rounded(.up))
-            let last = min(frames.lastIndex, frames.index(of: reach) + 1)
-            var previous: Int64?
-            var lastPublish = Date()
-            let finished = try AnalysisFrames.read(
-                range: first...max(first, last), grid: frames, source: source, longSide: side,
-                cancelled: cancelled
-            ) { _, pts, picture in
-                defer { previous = pts }
-                // Every sample whose interval ended before this frame is decided.
-                while job.decided < range.upperBound,
-                    Double(grid.ticks(of: job.decided + 1)) + grid.frameTicks <= Double(pts)
-                {
-                    job.decided += 1
-                }
-                if let served = samples(at: pts, after: previous, grid: grid),
-                    served.upperBound >= range.lowerBound, served.lowerBound <= range.upperBound
-                {
-                    let faces = try autoreleasepool { try self.faces(in: picture) }
-                    let mine = max(served.lowerBound, range.lowerBound)...min(
-                        served.upperBound, range.upperBound)
-                    for k in mine { job.samples[k] = Sample(pts: pts, faces: faces) }
-                    job.decided = max(job.decided, mine.upperBound)
-                }
-                progress(Double(before + job.decided - range.lowerBound + 1) / Double(total))
-                if Date().timeIntervalSince(lastPublish) >= publishInterval,
-                    job.decided >= job.from
-                {
-                    try publish(request, &job, through: job.decided, grid: grid)
-                    lastPublish = Date()
-                }
+        return try AnalysisSampleJob.run(
+            request, grid: grid, longSide: longSide, publishInterval: publishInterval,
+            cancelled: cancelled, progress: progress, analyse: { try faces(in: $0) }
+        ) { covering, found in
+            try AnalysisStore.publishFile(
+                kind: .faces, cacheDir: request.cacheDir, mediaID: request.media.id,
+                stamp: request.stamp, covered: [covering], files: [payloadName]
+            ) { onDisk, partial in
+                try write(
+                    onDisk: onDisk, partial: partial, count: grid.count, covering: covering,
+                    samples: found.mapValues { Sample(pts: $0.pts, faces: $0.value) })
             }
-            guard finished else { return false }
-            if job.from <= range.upperBound {
-                try publish(request, &job, through: range.upperBound, grid: grid)
-            }
-            before += range.count
         }
-        return true
-    }
-
-    /// One range's job state: the samples found and not yet published.
-    private struct Job {
-        let range: ClosedRange<Int>
-        var from: Int
-        var decided: Int
-        var samples: [Int: Sample] = [:]
-
-        init(range: ClosedRange<Int>) {
-            self.range = range
-            from = range.lowerBound
-            decided = range.lowerBound - 1
-        }
-    }
-
-    /// Publishes the job's samples `from…through` (an index no frame served
-    /// stays `Sample.empty`) through `AnalysisStore.publishFile`.
-    private static func publish(
-        _ request: AnalysisRequest, _ job: inout Job, through: Int, grid: AnalysisGrid
-    ) throws {
-        let covering = job.from...through
-        let found = job.samples
-        try AnalysisStore.publishFile(
-            kind: .faces, cacheDir: request.cacheDir, mediaID: request.media.id,
-            stamp: request.stamp, covered: [covering], files: [payloadName]
-        ) { onDisk, partial in
-            try write(onDisk: onDisk, partial: partial, count: grid.count, covering: covering,
-                      samples: found)
-        }
-        job.samples = job.samples.filter { !covering.contains($0.key) }
-        job.from = through + 1
     }
 }

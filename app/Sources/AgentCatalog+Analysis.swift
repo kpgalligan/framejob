@@ -1,21 +1,23 @@
 import Foundation
 
 /// The catalog rows of `get_media_analysis` (spec §11 CJ-25; road map
-/// "creator-jobs" CJ2a; `masks` CO-14, `faces` CJ-34, `sound_events` FC-33) and
-/// `split_at_shots`
+/// "creator-jobs" CJ2a; `masks` CO-14, `faces` CJ-34, `sound_events` FC-33,
+/// `subjects` VR-14) and `split_at_shots`
 /// (CJ-29, CJ2b), spliced in by `creatorTools()`.
 extension AgentServer {
 
     func analysisTools() -> [[String: Any]] {
         let rateText = AnalysisFaces.rateName
+        let subjectsRate = AnalysisSubjects.rateName
         return [
             // It mirrors what the Analyzing sheet's command (CJ2b, Clip ▸ Split
             // at Shot Changes) reads: a media's analysis on this Mac,
             // made or reused. `get_transcript` is its counterpart for words.
-            // A read: no op, no `scope`, no undo step. `masks` (CO1) and
-            // `faces` (CJ3) have no menu or pane of their own: a cut-out clip
-            // draws masks, and nothing in the app reads faces yet; nor does
-            // anything read `sound_events` (FC3) until Find Clips (FC4).
+            // A read: no op, no `scope`, no undo step. `masks` (CO1), `faces`
+            // (CJ3) and `subjects` (VR1) have no menu or pane that makes them:
+            // a cut-out clip draws masks, and View ▸ Show Subjects
+            // (SubjectsOverlay) draws the faces and subjects already cached;
+            // nothing reads `sound_events` (FC3) until Find Clips (FC4).
             tool(
                 "get_media_analysis",
                 "Answers an analysis of one media file, or of the part of it one clip plays, "
@@ -65,7 +67,17 @@ extension AgentServer {
                     + "window running past the sound's end). It needs a media with sound, a "
                     + "video or an audio file; a reversed clip is refused, since its sound "
                     + "plays backwards. A row is about 130 bytes, so one answer holds about "
-                    + "an hour of windows. With "
+                    + "an hour of windows. kind \"subjects\" finds people and the regions "
+                    + "the eye is drawn to (Vision's upper-body person rectangles and "
+                    + "attention-based saliency, on the Mac) at \(subjectsRate) samples a "
+                    + "second, each sample instant also a faces sample, and answers rate, count "
+                    + "and samples [{source, frame, people: [{box: [x, y, w, h], confidence}], "
+                    + "salient: [{box, confidence}]}], boxes as faces' and ordered left to "
+                    + "right, with no identity; a person box covers the head and shoulders. A "
+                    + "row with one person and one salient box is about 177 bytes (222 with "
+                    + "clip), so one answer holds about 294 s of samples (235 s with clip). "
+                    + "View ▸ Show Subjects draws the selected clip's faces and subjects at the "
+                    + "playhead from what is cached and never analyses. With "
                     + "clip, from and to default to and are held inside "
                     + "the clip's played window, and each cut, sample or window also has clip_time "
                     + "(ticks from "
@@ -97,7 +109,8 @@ extension AgentServer {
                         "description": "What to find: shots, the hard cuts; masks, a person's "
                             + "masks' runs; faces, every face per sample (box, roll, yaw, "
                             + "mouth); sound_events, laughter, applause, cheering, crowd, "
-                            + "music and speech per window of sound.",
+                            + "music and speech per window of sound; subjects, people and "
+                            + "salient regions per sample.",
                     ],
                     "from": [
                         "type": "integer",

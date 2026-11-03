@@ -20,6 +20,10 @@ enum AnalysisKind: String, Codable, CaseIterable {
     /// FC-30…FC-34; road map FC3): `AnalysisSoundEvents`, on the hop grid,
     /// the one kind on the sound queue.
     case soundEvents = "sound_events"
+    /// People (upper body) and salient regions per sample of source time
+    /// (spec §11 VR-10, VR-11; road map VR1): `AnalysisSubjects`, on its own
+    /// sample grid.
+    case subjects
 
     /// The kind's version: a change to what it stores bumps it, and every
     /// marker of the old version is a miss (Vision request revisions go in
@@ -30,27 +34,29 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .masks: return 1
         case .faces: return 1
         case .soundEvents: return SoundEvents.tableVersion
+        case .subjects: return 1
         }
     }
 
     /// Whether the kind decodes sound (the sound queue) rather than pictures.
     var usesSoundQueue: Bool {
         switch self {
-        case .shots, .masks, .faces: return false
+        case .shots, .masks, .faces, .subjects: return false
         case .soundEvents: return true
         }
     }
 
     /// The compute device the stamp records: `cpu` for `shots`, whose
     /// signature is integer arithmetic on the CPU; for `masks` the device a
-    /// pinned request reads back (spec §11 CO-11); for `faces` each request's
-    /// (CJ-32).
+    /// pinned request reads back (spec §11 CO-11); for `faces` and `subjects`
+    /// each request's (CJ-32, VR-11).
     var device: String {
         switch self {
         case .shots: return "cpu"
         case .masks: return AnalysisMasks.device
         case .faces: return AnalysisFaces.device
         case .soundEvents: return SoundEvents.device
+        case .subjects: return AnalysisSubjects.device
         }
     }
 
@@ -62,6 +68,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .masks: return AnalysisMasks.parameters
         case .faces: return AnalysisFaces.parameters
         case .soundEvents: return SoundEvents.parameters
+        case .subjects: return AnalysisSubjects.parameters
         }
     }
 
@@ -69,7 +76,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var margin: Int {
         switch self {
         case .shots: return AnalysisShots.margin
-        case .masks, .faces, .soundEvents: return 0
+        case .masks, .faces, .soundEvents, .subjects: return 0
         }
     }
 
@@ -80,6 +87,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .masks: return [MaskPack.fileName]
         case .faces: return [AnalysisFaces.payloadName]
         case .soundEvents: return [SoundEvents.payloadName]
+        case .subjects: return [AnalysisSubjects.payloadName]
         }
     }
 
@@ -90,12 +98,14 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .shots, .soundEvents: return nil
         case .masks: return AnalysisMasks.vision
         case .faces: return AnalysisFaces.vision
+        case .subjects: return AnalysisSubjects.vision
         }
     }
 
     /// The grid the kind's coverage and payload are indexed by: the media's
     /// frames, but for `faces` its sample grid, `AnalysisFaces.rate` a second
-    /// (CJ-33), and for `sound_events` its hop grid (FC-31).
+    /// (CJ-33), for `sound_events` its hop grid (FC-31), and for `subjects`
+    /// its own, `AnalysisSubjects.rate` (VR-11).
     func grid(of media: MediaSnapshot) -> AnalysisGrid {
         switch self {
         case .shots, .masks: return AnalysisGrid(media: media)
@@ -103,6 +113,8 @@ enum AnalysisKind: String, Codable, CaseIterable {
             return AnalysisGrid(samplesPerSecond: AnalysisFaces.rate, duration: media.duration)
         case .soundEvents:
             return AnalysisGrid(hopTicks: SoundEvents.hopTicks, duration: media.duration)
+        case .subjects:
+            return AnalysisGrid(samplesPerSecond: AnalysisSubjects.rate, duration: media.duration)
         }
     }
 }
@@ -153,7 +165,7 @@ struct AnalysisStamp: Codable, Equatable {
     /// The conversion, as a converted filmstrip's marker records it; non-nil
     /// iff `reader` is `converted`.
     let conversion: ConvertedThumbsStamp?
-    /// A Vision kind's request (`masks`, `faces`); nil, and absent on disk,
+    /// A Vision kind's request (`masks`, `faces`, `subjects`); nil, and absent on disk,
     /// for `shots`.
     var vision: AnalysisVisionStamp? = nil
 

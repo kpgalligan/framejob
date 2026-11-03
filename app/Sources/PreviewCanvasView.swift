@@ -91,6 +91,8 @@ final class PreviewCanvasView: NSView {
     var gestureTarget = CanvasEditTarget.base
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
+    /// View ▸ Show Subjects (spec §11 VR-13): nil while off.
+    var subjects: SubjectsOverlay? { didSet { overlay.needsDisplay = true } }
     private(set) var cropMode = false
     /// 0 = Fit; otherwise points per canvas pixel.
     private(set) var zoomScale: CGFloat = 0
@@ -848,6 +850,7 @@ final class PreviewCanvasView: NSView {
             strokeBox(box, emphasised: box.id == primaryBox?.id)
         }
         drawObscureRegions()
+        subjects?.draw(on: self)
         if let box = primaryBox, !box.locked, editingClip == nil {
             if cropMode {
                 drawHandles(
