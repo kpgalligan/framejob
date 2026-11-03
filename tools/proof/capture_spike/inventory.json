@@ -576,11 +576,12 @@
    "note": "an edit"
   },
   "switchCameraLayout:": {
-   "verdict": "none",
+   "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController+Layout.swift `func switchCameraLayout(`"
+    "app/Sources/EditorViewController+Layout.swift `func switchCameraLayout(`",
+    "app/Sources/LayoutOfferSheet.swift:28"
    ],
-   "note": "an edit"
+   "note": "an edit through CameraLayoutCommand.run; when the switch is refused because a clip in its reach zooms and nest: true would apply, the nest offer's alert SHEET (:28) — inside the call, or after the camera's person-mask focus is read on CameraLayoutFocus.queue when its masks are cached (spec §11 CO-72)"
   },
   "addSolidColorBackground:": {
    "verdict": "none",
@@ -1671,6 +1672,15 @@
     }
    ],
    "other_caller": "the Volume section's Normalize and Enhance Voice buttons (`AudioPane.normalize`, `AudioPane+Enhance`) press the same door"
+  },
+  "app/Sources/LayoutOfferSheet.swift:28": {
+   "token": "beginSheetModal",
+   "func": "present",
+   "reached_from": [
+    "switchCameraLayout:"
+   ],
+   "reached_after": [],
+   "other_caller": "the Picture sub-tab's Layout section's Switch at Playhead (app/Sources/VideoPane+Layout.swift `CameraLayoutCommand.run(`, the same command)"
   }
  }
 }

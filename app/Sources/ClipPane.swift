@@ -49,6 +49,8 @@ final class ClipPane: InspectorPaneView {
     /// The Background section's held Status (road map creator-jobs CO3, spec §11 CO-30 (d)),
     /// kept here so it outlives a rebuild; its ticker refreshes the pane when the state moves.
     let cutoutMemo = CutoutStatus.Memo()
+    /// The Layout section's choices (road map creator-jobs CO7, spec §11 CO-71), per window.
+    let layoutState = CameraLayoutSectionState()
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -203,6 +205,8 @@ final class ClipPane: InspectorPaneView {
             sections = [videoPane.transformSection()]
             // Behind Subject right after Transform (road map creator-jobs CO5, CO-55).
             if videoPane.allBehindable { sections.append(videoPane.behindSubjectSection()) }
+            // Layout after Behind Subject, before Crop (road map creator-jobs CO7, CO-71).
+            if videoPane.allLayoutable { sections.append(videoPane.layoutSection(layoutState)) }
             // `allSourcePixels` asks about the SOURCE KIND, so it says yes to
             // an audio-only file's clip too; the tab itself is what keeps a
             // crop off a clip that draws nothing.

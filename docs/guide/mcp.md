@@ -526,7 +526,7 @@ See [Canvas and layers](canvas-and-layers.md), [Motion and transitions](motion-a
 |---|---|
 | `add_action` | *op* — an animation span on a clip, in clip time; its end state starts empty. |
 | `add_zoom_action` | *op* — an animated zoom to a `region` (`fit` or `fill`), or back out with `region: null`. |
-| `switch_layout` | *op* — a camera layout at `at`: the `camera` clip and the screen behind it in `corner` (`shape`, `corner`), `side_by_side`, `stacked`, `camera_full` or `screen_only`, eased over 0.5 s and held on later clips until the next switch or `through`; a zoom in the way is refused unless `nest: true` (Clip ▸ Camera Layout ▸). |
+| `switch_layout` | *op* — a camera layout at `at`: the `camera` clip and the screen behind it in `corner` (`shape`, `corner`), `side_by_side`, `stacked`, `camera_full` or `screen_only`, eased over 0.5 s and held on later clips until the next switch or `through`; a zoom in the way is refused unless `nest: true`; an omitted `focus` is filled from the camera clip's cached person masks, and the answer's `focus` is what was sent (Clip ▸ Camera Layout ▸, the Picture sub-tab's Layout section). |
 | `set_action` | *op* — moves, re-times or re-curves an action. |
 | `set_action_end` | *op* — what an action animates to: video, audio, text, a graphic's props, or a `speed`. |
 | `remove_action` | *op* — removes an action. |

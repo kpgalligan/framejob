@@ -328,3 +328,73 @@ recommendation.
     the 710 the projection assumed (6.87 GB a file); every other file within 2 % of its rate
     (H.264 100.5, HEVC 50.4, HEVC 59.94 50.8 Mb/s). The three-hour file was removed after (d).
     SW-S2 runs again at SW9a on the owner's files, and (d) on S-LONG1 when it exists.
+
+## CO7 — the Layout section, the nest offer and the crop on the person (2026-11-03)
+
+Recorded before the code. CO-70…CO-73 are CO7's: the camera's crop in Circle, Side by Side and
+Stacked centres on the person when the camera clip's person masks are cached for every frame it
+plays; a Layout section in the Picture sub-tab sends the menu's op; a switch refused for a zoom
+offers Nest and Switch as one undo step. No core change, no persisted field, no format bump, no
+`rc_*` export and no new tool; nothing is sent anywhere, so nothing is keyed (CJ-3). The road map
+asks the owner nothing at this phase.
+
+- **CO-70 — The crop on the person.** The menu, the Layout section and the `switch_layout` tool
+  send the same `focus` (CO-65). The camera clip's windows are `CutoutWants.windows(of:)`: its
+  plan video segments whatever its cutout, mirrored about the pivot when reversed, over
+  `CutoutStatus.detail`'s handles (`project`, plus `editedProject` with a nest open). The need is
+  CO-22's rule (`CutoutWants.need`); the coverage is the `masks` marker that `answers(for:)` the
+  stamp (`CutoutStatus.stamp`), its pack the payload. Focus is sent only when every needed index
+  is covered: the mean, over found frames, of `CutoutStatus.centroid` (the number
+  `analyze_cutout` answers as `centroid`), minus (w/2, h/2) of the media; otherwise none, and the
+  crop centres on the source (CO-65). Only what is cached is read and no job is started (CO-6);
+  the read is never keyed (CJ-3). The centroid is read off main and memoised on (pack path, file
+  size, modification date, need, media size), at most 64 entries, cleared whole when full. The
+  menu and the section read on `CameraLayoutFocus.queue` and apply on main only if
+  `document.project` and `document.scope` are unchanged, else beep and change nothing. The tool
+  fills `focus` when it is omitted or null (an explicit `[x, y]` wins), on the server thread with
+  three hops as `auto_zoom` does, and refuses a changed project: "the project changed while
+  switch_layout read the camera's person masks, so nothing was laid out. Call switch_layout
+  again." Its answer carries `focus`, `[x, y]` or null. **A filled focus never reaches a nest
+  clip:** `focus` is in the camera MEDIA's pixels, and `nest_then_switch` re-points the switch at
+  the nest clip that replaces a moving camera, keeping `focus`; so a filled focus sent with
+  `nest: true` goes only when `CameraLayoutCommand.keepsFocus` answers true — false only when the
+  `nest: true` trial applies and the camera's id is absent from the applied project's view (the
+  scoped view when the op is scoped) — and otherwise the op goes without it. Both senders call it
+  on main: the offer sheet when it builds its op, the tool in its last hop. A caller's explicit
+  focus is never dropped.
+- **CO-71 — The Layout section** (`video.layout`, the Picture sub-tab). Offered when exactly one
+  clip is selected and it is a `.media` clip with `video` and a source size; after Transform and
+  Behind Subject, before Crop; shut by default. Rows: Layout (Corner, Side by Side, Stacked,
+  Camera Full, Screen Only), Shape (Square, Rounded, Circle), Corner (Bottom Right, Bottom Left,
+  Top Right, Top Left), Duration (s, 2 decimals, 0.01–10, quick 0.25 0.5 1 2, 0.5 by default),
+  and Switch at Playhead. Shape and Corner are enabled only for Corner. The choices are per
+  window (`ClipPane`), not persisted, not undoable, no Reset; the summary is the choice
+  ("Circle, Bottom Right", "Side by Side"). Switch at Playhead is enabled while the window has no
+  sheet and does not read the playhead (`inspectorPlayheadMoved()` refreshes only a clip with
+  actions); pressed off the clip, the core's "clip N does not play at …" reaches the refusal
+  strip through `performGroupedEdit`, with no undo step. It sends exactly the menu's op with the
+  clip as camera and no screen, `duration` only when it is not 0.5 s.
+- **CO-72 — The nest offer.** `CameraLayoutCommand.run`, which the menu and the section share,
+  trials the op (no `nest`) on `document.project`, scoped as `ProjectDocument.addressed` scopes
+  it. When it is refused and the same op with `nest: true` trials applied, a sheet goes up: "Lay
+  out the clips in a nest?", the core's sentence verbatim, then "Nest and Switch puts those clips
+  in a nest first, so the layout moves the nest and the zoom keeps playing inside it. One Undo
+  takes both back.", buttons Nest and Switch and Cancel (Escape). Nest and Switch commits the ONE
+  `switch_layout {nest: true}` through `performGroupedEdit` as one undo step "Camera Layout";
+  Cancel changes nothing. Otherwise, and with no window, the op is committed through
+  `performGroupedEdit`, whose arms beep, post the refusal strip or apply. The tool never offers:
+  an agent sends `nest: true`. Because the item can now raise a sheet, `switchCameraLayout:`'s
+  verdict in the menu inventory and `UIMenu.verdicts` is `sheet` (as `setTransitionKind:`'s is),
+  so the screen catalog can reach the sheet.
+- **CO-73 — The proof.** `tools/proof/co7_proof.py` (Release) with `co7_probe.swift`: Z1 no
+  `Frame Job: ` line; P1 (probe) the section's place, its Switch at Playhead equal to the menu's
+  Circle ▸ Top Left on a twin, one undo step each, Duration 1.00 a 600000-tick action, and a
+  press off the clip refused at the strip with no step; P2 (canned masks of a person left of
+  centre) the circle's crop centre at the masks' centroid within a pixel, P2b with half the
+  window analysed the source's centre, P2c `analyze_cutout`'s centroid the same point; P3 no
+  masks, the source's centre; P4 (probe, an editor in a window) the offer sheet, Cancel, and Nest
+  and Switch equal to `switch_layout {nest: true}` and undone in one step; P5 the tool's filled
+  focus equal to the menu's project and answered; P6 a filled focus dropped when `nest: true`
+  nests the camera. Four mutants, each caught: the coverage guard dropped (P2b), the sheet's
+  edits as two steps (P4), the fill skipped (P5), `keepsFocus` always true (P6). No new JOB row
+  (JOB-64 stands).

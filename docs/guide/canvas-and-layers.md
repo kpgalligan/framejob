@@ -372,20 +372,45 @@ on the camera's track (and on the screen's) that starts before the next layout
 action on that track takes the layout as its own placement — so a camera cut
 into pieces stays in the corner — and keeps its own actions.
 
+**The Layout section:** with one video clip selected, the Clip tab's Picture
+sub-tab has a **Layout** section (after Transform and Behind Subject, shut
+until you open it): **Layout** (Corner, Side by Side, Stacked, Camera Full,
+Screen Only), **Shape** (Square, Rounded, Circle) and **Corner** (Bottom Right,
+Bottom Left, Top Right, Top Left) — Shape and Corner only for Corner — a
+**Duration** for the switch (0.5 s to start, 0.01–10 s) and **Switch at
+Playhead**, which does exactly what the menu does with this clip as the camera
+and the clip behind it as the screen. The section's choices stay while the
+window is open and are not saved; there is no Reset. Pressed with the playhead
+off the clip, the inspector's foot says the clip does not play there and
+nothing changes.
+
+**Centred on the person:** Circle, Side by Side and Stacked crop the camera.
+When the camera clip's person masks are already made for every frame it plays
+— Remove Background makes them, and they stay in the project's cache — the crop
+centres on the person (the middle of where the masks find them, averaged over
+the clip) instead of on the middle of the picture. A layout never starts that
+analysis itself: with no masks, or masks for only part of the clip, the crop
+centres on the picture.
+
 **Zooms:** a switch never fights a zoom. When a clip it would move holds a zoom
-(or another action that moves it) after the playhead, the switch is refused,
-and the inspector's foot names the clip and the action. A screen that is
-still at its full placement is not asked in Corner, Camera Full and Screen
-Only, because those leave it where it is and its zooms keep playing. To lay out
-a zoomed screen anyway, nest its clips first (**Clip ▸ Nest**): the layout then
-moves the nest, and the zooms play inside it. Agents can ask for that nesting
-in the same step with `nest: true`. A nest clip shows square corners only, so
-Rounded Corner and Circle are refused on a nest clip camera.
+(or another action that moves it) after the playhead, the switch is refused.
+A screen that is still at its full placement is not asked in Corner, Camera
+Full and Screen Only, because those leave it where it is and its zooms keep
+playing. When nesting those clips would let the switch go ahead, a sheet asks
+**Lay out the clips in a nest?**, with the reason it was refused: **Nest and
+Switch** puts the clips in a nest first, so the layout moves the nest and the
+zooms keep playing inside it — the nest and the layout are one **Undo** —
+and **Cancel** changes nothing. Otherwise the inspector's foot names the clip
+and the action. A nest clip shows square corners only, so Rounded Corner and
+Circle are refused on a nest clip camera.
 
 *Agents:* `switch_layout {camera, screen?, layout, shape?, corner?, at,
 duration?, curve?, focus?, nest?, through?}` — `focus` centres the camera's
-crop on a point of its picture, and `through` stops the layout holding at a
-time.
+crop on a point of its picture; left out, it is filled from the camera clip's
+person masks as the menu fills it, and the answer's `focus` says what was sent
+(null for none). It is never filled when `nest: true` nests the camera itself.
+An agent is never offered the sheet: it sends `nest: true` to nest in the same
+step. `through` stops the layout holding at a time.
 
 ### Shadow
 

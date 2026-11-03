@@ -356,7 +356,7 @@ enum CutoutStatus {
 
     /// The stamp `ProjectDocument.analysisRequest` would make for `media` at `url`: its asset
     /// read only when the media, its URL or its LUT's URL changed. Main thread.
-    private static func stamp(
+    static func stamp(
         media: MediaSnapshot, url: URL, cacheDir: URL, in document: ProjectDocument
     ) -> AnalysisStamp? {
         let lutID = media.color?.lut

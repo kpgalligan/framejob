@@ -795,12 +795,39 @@ detail there.
   `CameraLayoutRoles.roles`: two selected picture clips on different tracks (the front one
   the camera), one (the camera; the core finds the screen), or none (the clip at the
   playhead on the front-most track named "Camera"). `EditorViewController+Layout` is
-  `switchCameraLayout` (`applyEdit`, "Camera Layout", the playhead as `at`) and
+  `switchCameraLayout` (`CameraLayoutCommand.run` since CO7, "Camera Layout", the playhead
+  as `at`) and
   `validateCameraLayoutAction`, one line in the frozen file after
   `validateSpeedUpTypingAction` (a camera containing the playhead, no sheet; allowed inside
-  a nest). `AgentServer+Layout` is the op tool's handler (main thread, `editResult`; the
-  three required arguments read before an id is looked up), and `AgentCatalog+Layout` its
-  row, spliced in by `creatorTools()` after `speed_up_typing`'s.
+  a nest). `AgentServer+Layout` is the op tool's handler (off main since CO7,
+  `creatorOffMainTools`: one main hop resolves — the three required arguments read before an
+  id is looked up — and captures the camera's masks, the centroid is read on the server
+  thread, a last hop refuses a changed project, drops a filled `focus` `keepsFocus` refuses
+  and answers `focus` through `editResult`), and `AgentCatalog+Layout` its row, spliced in by
+  `creatorTools()` after `speed_up_typing`'s.
+- `CameraLayoutFocus.swift` · `CameraLayoutCommand.swift` · `LayoutOfferSheet.swift` ·
+  `VideoPane+Layout.swift` — the Layout section, the nest offer and the crop on the person
+  (road map creator-jobs CO7, spec §11 CO-70…CO-72). `CameraLayoutFocus` (names no `rc_*`):
+  `inputs` (main) — the camera clip's windows (`CutoutWants.windows(of:)`, whatever its
+  cutout) over `CutoutStatus.detail`'s handles, CO-22's need and the `masks` marker that
+  answers `CutoutStatus.stamp`, nil unless every needed index is covered — and `focus` (any
+  thread) — `CutoutStatus.centroid` less the media's centre, memoised on the pack's path,
+  size and date, the need and the media size, 64 entries cleared whole — and its `queue`.
+  Only what is cached is read; no job is started. `CameraLayoutCommand.run` is the menu's
+  and the section's path: the read on the queue when masks are cached, applied only if
+  `project` and `scope` are unchanged (else a beep); the trial on `document.project` under
+  `ProjectDocument.addressed`'s rule; a refused trial whose `nest: true` trial applies puts
+  up `LayoutOfferSheet` (an `NSAlert`: the core's sentence, Nest and Switch — ONE
+  `switch_layout {nest: true}` through `performGroupedEdit`, "Camera Layout" — and Cancel on
+  Escape), which is why `switchCameraLayout:`'s verdict in `UIMenuTable.swift` and
+  `capture_spike/inventory.json` is `sheet`; otherwise, and with no window,
+  `performGroupedEdit`. `keepsFocus` (false when the `nest: true` trial applies and the
+  camera's id is gone from the view) is shared with the tool. `VideoPane+Layout` is
+  `CameraLayoutSectionState` (kept on `ClipPane` as `layoutState`, per window, not saved) and
+  the Layout section (`video.layout`), registered after Behind Subject and before the
+  `allSourcePixels` block when `allLayoutable` (one `.media` clip with a picture and a source
+  size): Layout, Shape and Corner pop-ups, Duration, Switch at Playhead (enabled with no
+  sheet; `duration` sent only off 0.5 s).
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -1601,7 +1628,10 @@ the key map behind it.
   media's `cursor` adds or removes it): Show cursor, Size, Style, Smoothing, Hide when idle,
   Clicks, Ripple color, Ripple size and Polish (spec §11 CU-40), each its own key through
   `VideoPatch.cursorPart` with its own undo name; Smoothing and Hide when idle read the clip's
-  BASE cursor and are the clip's (⊘); Reset writes all eight defaults;
+  BASE cursor and are the clip's (⊘); Reset writes all eight defaults; +`Layout` — the
+  Picture sub-tab's Layout section (road map creator-jobs CO7, spec §11 CO-71), registered
+  after Behind Subject when `allLayoutable`, its choices `CameraLayoutSectionState` on
+  `ClipPane`; Switch at Playhead runs `CameraLayoutCommand.run`;
   +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
@@ -4048,7 +4078,8 @@ free.
   tools: `get_media_analysis`, `split_at_shots`, `get_timeline_transcript`,
   `new_project_from_range` (CJ5b) and `retime_range` (CU9a); the catalog
   rows are `analysisTools() + transcriptTools() + derivedTools() +
-  retimeTools()`.
+  retimeTools()`. `switch_layout` joined `creatorOffMainTools` at CO7
+  (spec §11 CO-70): it reads the camera's cached person masks off main.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and

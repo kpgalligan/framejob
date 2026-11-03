@@ -162,6 +162,10 @@ SECTIONS = {
     "video.spotlight": True, "video.transform": False, "video.transition": True,
     "video.wheels": False, "video.curves": False, "video.qualifier": False,
     "video.cutout": False,
+    # Road map creator-jobs: `video.layout` pinned OPEN so 05j shows the Layout section's rows
+    # (CO7); the three sections earlier phases declared, at their defaults.
+    "video.layout": False, "video.behind_subject": True, "video.cursor": True,
+    "media.cursor": False,
 }
 
 
@@ -345,6 +349,9 @@ FIXTURES = {
                  "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
     "cutout": {"path": os.path.join(FIXTURE_DIR, "Cutout.framejob"),
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "layout": {"path": os.path.join(FIXTURE_DIR, "Layout.framejob"),
+               "clips": ["screen", "camera"], "media": ["speech.mov"],
+               "sound": ["screen", "camera"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -510,6 +517,8 @@ def build_fixture(mcp, name):
             ids = _dynamics_ops(mcp, path)
         elif name == "cutout":
             ids = _cutout_ops(mcp, path)
+        elif name == "layout":
+            ids = _layout_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -728,6 +737,28 @@ def _cutout_ops(mcp, path):
         raise FixtureError(f"building cutout: the project holds {len(clips)} clips, not 1")
     ids = {"video": clips[0]["id"]}
     _call(mcp, "set_video", path, clips=[ids["video"]], patch={"cutout": {}})
+    return ids
+
+
+def _layout_ops(mcp, path):
+    """Road map "creator-jobs" CO7 (spec §11 CO-71, CO-72): back to front "Screen" and
+    "Camera", each holding `speech.mov` at 0; the screen zooms at its 1 s (`add_zoom_action`,
+    1 s long), so Clip ▸ Camera Layout ▸ Side by Side at 0.5 s with the camera selected is
+    refused for the zoom and offers Nest and Switch (15g); the camera's Picture sub-tab shows
+    the Layout section (05j)."""
+    _call(mcp, "set_track", path, track=1, name="Screen")
+    _call(mcp, "add_track", path, name="Camera")
+    tracks = {t["name"]: t["id"] for t in _project(mcp, path)["tracks"]}
+    ids = {}
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    for name, track in (("screen", "Screen"), ("camera", "Camera")):
+        _call(mcp, "add_clip", path, media=_media_id(video), track=tracks[track], at=0)
+        clips = [c for c in _project(mcp, path)["clips"] if c["track"] == tracks[track]]
+        if len(clips) != 1:
+            raise FixtureError(f"building layout: track {track} holds {len(clips)} clips, not 1")
+        ids[name] = clips[0]["id"]
+    _call(mcp, "add_zoom_action", path, clip=ids["screen"], at=SECOND,
+          region={"x": 0, "y": 0, "width": 320, "height": 180})
     return ids
 
 

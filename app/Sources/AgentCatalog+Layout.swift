@@ -14,8 +14,10 @@ extension AgentServer {
             opTool(
                 "switch_layout",
                 "Lays out a camera clip and the screen recording behind it at a time — what "
-                    + "Clip ▸ Camera Layout ▸ sends at the playhead. One undo step, \"Camera "
-                    + "Layout\". corner puts the camera in a corner box (a quarter of the canvas "
+                    + "Clip ▸ Camera Layout ▸ and the Picture sub-tab's Layout section send at "
+                    + "the playhead. One undo step, \"Camera Layout\". The answer's focus is the "
+                    + "[x, y] sent as the camera crop's centre, or null when none was. corner "
+                    + "puts the camera in a corner box (a quarter of the canvas "
                     + "wide, a third tall, 5 % in from the edges) square, rounded or as a "
                     + "circle, the screen at its full placement (as Add Clip places it); "
                     + "side_by_side puts the screen fitted in the left two-thirds and the "
@@ -56,8 +58,14 @@ extension AgentServer {
                         + "clamped to the clip and to its next layout action.",
                     "curve": "How the switch eases. Default ease_in_out.",
                     "focus": "[x, y]: the point of the camera's picture a crop is centred on, "
-                        + "in its source pixels from the picture's centre, y down; clamped "
-                        + "inside the picture. Default [0, 0].",
+                        + "in the camera MEDIA's source pixels from the picture's centre, y "
+                        + "down; clamped inside the picture. Omitted or null, the tool fills it "
+                        + "as the menu does: the mean centroid of the camera clip's person "
+                        + "masks when they are cached for every frame it plays (analyze_cutout's "
+                        + "centroid, less the media's centre), else nothing, which centres the "
+                        + "crop. A filled focus is dropped when nest: true nests the camera, "
+                        + "since the nest clip is not the media; a focus you send is sent as "
+                        + "given.",
                     "nest": "true: nest a role's clips first when one of them zooms or moves "
                         + "after `at`, instead of refusing. Default false.",
                     "through": "Where the layout stops holding, \(ticks) After `at`; the "

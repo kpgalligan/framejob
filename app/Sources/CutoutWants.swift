@@ -66,6 +66,26 @@ enum CutoutWants {
         return out
     }
 
+    /// Every plan video segment (duration > 0) of `clip`, whatever its cutout, as a forward
+    /// window — mirrored about the clip's pivot when it plays reversed. The camera's crop on the
+    /// person reads these (road map creator-jobs CO7, spec §11 CO-70).
+    static func windows(of clip: UInt32, plan: CompositionPlan, snapshot: ProjectSnapshot)
+        -> [CutoutWindow]
+    {
+        let pivot = (snapshot.clips + snapshot.nests.flatMap(\.clips)).first { $0.id == clip }
+            .flatMap { ReverseMirror.pivot(for: $0, in: snapshot) }
+        var out: [CutoutWindow] = []
+        for track in plan.videoTracks {
+            for segment in track.segments where segment.duration > 0 && segment.clip == clip {
+                let window = window(
+                    segment, from: segment.start, to: segment.start + segment.duration,
+                    pivot: pivot)
+                if !out.contains(window) { out.append(window) }
+            }
+        }
+        return out
+    }
+
     /// The windows a frame at `t` draws cut out: the recipe layers with `background` remove, a
     /// media mask and a composition-track source, each through the segment covering `t` (of the
     /// mask's media), over `[t, t + 1)`.

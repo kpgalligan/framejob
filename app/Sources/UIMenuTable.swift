@@ -92,7 +92,7 @@ extension UIMenu {
         "previewClipMotion:": .plain,
         "setLook:": .plain,
         "toggleRemoveBackground:": .plain,
-        "switchCameraLayout:": .plain,
+        "switchCameraLayout:": .sheet,
         "addSolidColorBackground:": .plain,
         "addImageBackground:": .sheet,
         "addBlurredBackground:": .plain,

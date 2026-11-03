@@ -28914,7 +28914,7 @@ copy's built app: `roles-swapped` (L12's two-selected case).
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 119 and `OPS` 68,
 `op_catalog_proof.py`'s 68; `capture_spike/inventory.json` holds `switchCameraLayout:` (verdict
-`none`, an edit).
+`none`, an edit; `sheet` since CO7, whose nest offer it can raise).
 
 ```sh
 cd core && cargo test --release --test layout
@@ -29002,3 +29002,44 @@ RC_PROOF_APP=release python3 tools/proof/creator_spike/angles_spike.py --rows a 
 ```
 
 The recorded runs are SW-6 and `designs/creator-jobs.md`'s SW0 record. No person check.
+
+## Road map "creator-jobs" CO7 — the Layout section, the nest offer and the crop on the person (`co7_proof.py` P2, P2b, P2c, P3, P5, P6, Z1 with `co7_probe.swift` P1, P4; four mutants; spec §11 CO-70…CO-73)
+
+**`co7_proof.py`** builds `co7_probe.swift` (P1, P4) and `co2a_probe.swift` (its `pack` mode,
+for the canned packs) through `swift_build.py` with `FRAMEJOB_DEV_TOOLS`, then launches its
+own instance (`proof_app.binary()`, or `--app PATH`, on a scratch `CFFIXED_USER_HOME`) with
+`-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`, as `co4_proof.py`'s E4 does. Its media are
+ffmpeg's `testsrc` under `tools/proof/work/co7/media/` (6 s at 30 fps): a 1280 × 720 camera and
+a 1920 × 1080 screen. Each row makes a saved package: the screen on the back track, the camera
+on a front "Camera" track trimmed to [0, 4 s). A pack is `co2a_proof.install_pack`'s, kind
+`person_left` (512 × 288, columns 160–223 × rows 72–215 at 255), so the camera's centroid is
+(480, 360) and its focus (−160, 0): a circle's 720-square crop centred there is l 120, r 440,
+on the source's centre l 280, r 280. `--only P1,P4` runs the probe alone, with no app.
+
+| Row | What it holds |
+|---|---|
+| Z1 | the instance's `grep "Frame Job: "` prints nothing |
+| P1 | (probe) `video.layout` after Transform and Behind Subject, before Crop, absent for two clips; Circle + Top Left and Switch at Playhead equal to the editor's `switchCameraLayout` with Circle ▸ Top Left's tag on a twin, one undo "Camera Layout" each; Duration 1.00 a 600000-tick action; enabled off the clip and back; a press off the clip: no change, no step, "does not play at" at the strip |
+| P2 | the pack over the file: Circle ▸ Bottom Right at 2 s, polled ≤ 10 s, the crop centre (480, 360) ± 1, l 120, r 440 |
+| P2b | the marker's coverage [[0, 59]]: the centre (640, 360) |
+| P2c | the camera cut out: `analyze_cutout`'s `centroid` (480, 360) ± 1e-6 |
+| P3 | no pack: the centre (640, 360) |
+| P4 | (probe, an editor in a window) the screen zooming at 3 s, Side by Side at 1 s: the sheet over an unchanged project, the core's sentence, "Nest and Switch" and "Cancel"; Cancel changes nothing; Nest and Switch equals `switch_layout {nest: true}` on a twin, one undo restores it |
+| P5 | `switch_layout` without `focus`: P2's menu project, answer `focus` [−160, 0]; `focus: [0, 0]` centres |
+| P6 | a zoom on the camera 2.5–3.5 s, side by side at 2 s with `nest: true` and no `focus`: answer `focus` null, the project equal to `focus: [0, 0]` on a twin, the camera inside the new nest |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2):
+`partial-window` (the coverage guard in `CameraLayoutFocus.inputs` dropped; P2b),
+`tool-no-focus` (the tool's fill skipped; P5) and `nest-keeps-focus` (`keepsFocus` always true;
+P6), each on a `tree_copy.py` copy's built app; `two-steps` (the sheet commits a `nest` and the
+switch as two steps; P4) on a copy of `app/Sources` the probe is built from.
+
+```sh
+python3 tools/proof/co7_proof.py --only P1,P4
+make app-debug && python3 tools/proof/co7_proof.py
+make app && RC_PROOF_APP=release python3 tools/proof/co7_proof.py
+RC_PROOF_APP=release python3 tools/proof/co7_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO7 record. No person check (JOB-64
+stands).

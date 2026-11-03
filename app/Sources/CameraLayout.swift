@@ -79,10 +79,18 @@ struct CameraLayoutChoice: Equatable {
     /// layout.
     var title: String { corner?.title ?? kind.title }
 
-    /// The op at `at` for these roles; `duration` and `curve` are the core's.
-    func op(camera: UInt32, screen: UInt32?, at: Ticks) -> ReelOp {
+    /// The core's switch length when `duration` is absent (`DEFAULT_SWITCH`, 0.5 s).
+    static let defaultDuration: Ticks = 300_000
+
+    /// The op at `at` for these roles; an absent `duration` and `curve` are the core's. `focus`
+    /// is the camera crop's centre (CO-70), `nest` the offer's yes (CO-72).
+    func op(
+        camera: UInt32, screen: UInt32?, at: Ticks, duration: Ticks? = nil,
+        focus: (Double, Double)? = nil, nest: Bool? = nil
+    ) -> ReelOp {
         .switchLayout(
-            camera: camera, screen: screen, layout: kind, shape: shape, corner: corner, at: at)
+            camera: camera, screen: screen, layout: kind, shape: shape, corner: corner, at: at,
+            duration: duration, focus: focus, nest: nest)
     }
 }
 

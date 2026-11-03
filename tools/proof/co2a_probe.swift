@@ -14,7 +14,9 @@
 //   picture's own bar-code band; rows 75–95 % the analysed frame's index as a bar code, white
 //   255 and black 0; the rest 0), `zero` (every mask 0, no subject) or `ramp` (CO4's E4, spec
 //   §11 CO-42: column i `round(255 · clamp((i − 240) / 32, 0, 1))` in every row — 0 left of 240,
-//   255 from 272). Each frame's slot is its nearest analysed mask, ties to the earlier
+//   255 from 272) or `person_left` (CO7's P2, spec §11 CO-70: columns 160–223 × rows 72–215
+//   at 255, every other texel 0 — a person left of centre, centroid texel (192, 144)). Each
+//   frame's slot is its nearest analysed mask, ties to the earlier
 //   (`AnalysisMasks.nearest`).
 // - `co2a-probe mask <pack> <slot> <out>`: slot's mask decompressed, its bytes written raw;
 //   prints `{"width", "height"}`.
@@ -101,6 +103,16 @@ func rampPackMask() -> [UInt8] {
     return [UInt8]((0..<h).map { _ in row }.joined())
 }
 
+/// CO7's person left of centre (512 × 288): columns 160–223 × rows 72–215 at 255, the rest 0.
+func personLeftPackMask() -> [UInt8] {
+    let w = 512, h = 288
+    var out = [UInt8](repeating: 0, count: w * h)
+    for y in 72...215 {
+        for x in 160...223 { out[y * w + x] = 255 }
+    }
+    return out
+}
+
 /// The canned bar-code mask of analysed frame `index` (512 × 288).
 func barcodePackMask(_ index: Int) -> [UInt8] {
     let w = 512, h = 288
@@ -146,6 +158,7 @@ case "pack":
             switch kind {
             case "zero": return [UInt8](repeating: 0, count: 512 * 288)
             case "ramp": return rampPackMask()
+            case "person_left": return personLeftPackMask()
             default: return barcodePackMask(index)
             }
         }

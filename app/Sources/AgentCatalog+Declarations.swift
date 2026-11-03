@@ -124,14 +124,15 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Nineteen rows over seven kinds of difference:
+    /// an entry has to pass). Twenty rows over seven kinds of difference:
     /// two bare-string shorthands, one reading of a whole JSON kind, two
     /// nulls that mean something, two ranges the core clamps to rather than
     /// refusing, one the APP refuses outside where the core's kind is
-    /// looser, four times the tool takes from the app what the op would
-    /// have made the caller send, and three times a list the tool will not
-    /// accept empty although the op reads one, and four times an argument
-    /// only the app can fill, which the tool does not publish at all.
+    /// looser, five times the tool takes from the app what the op would
+    /// have made the caller send or would have defaulted, and three times a
+    /// list the tool will not accept empty although the op reads one, and
+    /// four times an argument only the app can fill, which the tool does
+    /// not publish at all.
     ///
     /// **Two rows narrow rather than widen, and they are the same rule read
     /// the other way.** `set_speed.rate` and `set_canvas.fps` each publish a
@@ -276,6 +277,13 @@ extension AgentServer {
                 + "window is looking (AgentServer+Tracks.swift). The core requires the tick "
                 + "because a marker IS a time; the app has one to supply and the core has "
                 + "not."),
+        AgentDeclaration(
+            .argument("focus", of: "switch_layout"), alsoTypes: ["null"],
+            why: "spec §11 CO-70: the op centres an absent focus on the source; the TOOL "
+                + "fills an omitted or null one with the camera's focus from its cached person "
+                + "masks, exactly as Clip ▸ Camera Layout ▸ and the Layout section do. The "
+                + "masks and their cache are app state the core has not got, and null is "
+                + "declared because it is read as omitted — fill it — never as [0, 0]."),
 
         // ---- an argument only the app can fill ------------------------------
 

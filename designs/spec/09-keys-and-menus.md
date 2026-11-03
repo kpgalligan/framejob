@@ -186,8 +186,12 @@ Full · Screen Only; one selector, `switchCameraLayout:`; two selected picture c
 different tracks are the camera (the front one) and the screen, one is the camera and the core
 finds the screen, none takes the clip at the playhead on the front-most track named "Camera";
 enabled when that yields a camera containing the playhead and no sheet is up; `switch_layout`
-at the playhead, one undo step "Camera Layout", a refusal in the inspector's refusal strip; no
-key equivalent; its mirror is `switch_layout`), Add Background ▸ (Solid Color · Image… — road map
+at the playhead, one undo step "Camera Layout", a refusal in the inspector's refusal strip,
+the camera's crop centred on the person when its person masks are cached for every frame it
+plays (CO7, §11 CO-70); a switch refused because a clip in its reach zooms or moves offers a
+sheet, "Lay out the clips in a nest?", whose Nest and Switch sends `switch_layout {nest: true}`
+as one undo step and whose Cancel changes nothing (§11 CO-72); no key equivalent; its mirror is
+`switch_layout`; the Picture sub-tab's Layout section sends the same op), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a

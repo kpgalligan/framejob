@@ -164,6 +164,12 @@ Built by `screens.py` on the first screen that names one, into
   Background on (`set_video {cutout: {}}`). Every launch holds each analysis
   job, so its masks job waits and the Background section's Status reads
   "Analyzing 0 %". Ready once `video`'s peaks are cached.
+- `layout` — `Layout.framejob` (road map "creator-jobs" CO7, spec §11 CO-71,
+  CO-72): two tracks, back to front Screen and Camera, each holding one clip of
+  `media/speech.mov` at 0 — `screen` and `camera`; the screen zooms at its 1 s
+  (`add_zoom_action`, 1 s long), so Clip ▸ Camera Layout ▸ Side by Side at 0.5 s
+  with the camera selected offers Nest and Switch. Ready once both clips' peaks
+  are cached.
 
 ## Adding a screen
 

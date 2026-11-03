@@ -28,9 +28,10 @@ with zoom-in, zoom-out and add (+) buttons, then a lane showing a "Clip" button,
 (selected), Color, Sound and Clip. Below them the TRANSFORM section is open, its summary
 "100%" on the right: Scale (a slider and "100.0%"), Position X and Position Y
 ("0 px" each), Rotation (a slider and "0.0°"), Opacity (a slider and "100%"),
-Blend ("Normal"), and two buttons, "Fit to Canvas" and "Fill Canvas". Closed
-sections follow, each a header with a summary on the right: CROP "none", CORNER
-RADIUS "0 px", CHROMA KEY "off" and SHADOW "off", the last header in view. (The
+Blend ("Normal"), and two buttons, "Fit to Canvas" and "Fill Canvas". Then the
+closed BEHIND SUBJECT header, summary "off", and the LAYOUT section, open (the
+catalog pins it open for `05j-clip-layout`), summary "Square, Bottom Right", its
+Layout ("Corner") and Shape ("Square") pop-ups the last rows in view. (The
 clip's colour controls are the Color sub-tab's, `05b-clip-color`.)
 
 In the light capture the inspector is white with black labels; the section

@@ -58,7 +58,7 @@ extension AgentServer {
         "add_shortcut_overlays": { $0.addShortcutOverlays },
         // AgentServer+SpeedUpTyping.swift (CU9b, spec §11 CU-93)
         "speed_up_typing": { $0.speedUpTyping },
-        // AgentServer+Layout.swift (CO6, spec §11 CO-60…CO-66)
+        // AgentServer+Layout.swift (CO6, spec §11 CO-60…CO-66; off main since CO7, CO-70)
         "switch_layout": { $0.switchLayout },
     ]
 
@@ -67,7 +67,7 @@ extension AgentServer {
     static let creatorOffMainTools: Set<String> = [
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
         "new_project_from_range", "analyze_cutout", "get_cursor_events", "auto_zoom",
-        "add_shortcut_overlays", "speed_up_typing",
+        "add_shortcut_overlays", "speed_up_typing", "switch_layout",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`

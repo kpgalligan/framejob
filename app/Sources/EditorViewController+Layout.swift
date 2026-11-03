@@ -2,11 +2,12 @@ import AppKit
 
 /// Clip ▸ Camera Layout ▸ (road map "creator-jobs" CO6, spec §11 CO-66): the
 /// chosen row's `switch_layout` at the playhead in the container being
-/// edited, its roles by `CameraLayoutRoles`, as one undo step "Camera
-/// Layout" through `applyEdit`, whose refusal reaches the inspector's
-/// refusal strip. The nest is offered, not made: a refusal's sentence says
-/// how (CO7's sheet makes the offer). `switch_layout`'s tool mirrors it
-/// (`AgentServer+Layout.swift`).
+/// edited, its roles by `CameraLayoutRoles`, through `CameraLayoutCommand.run`
+/// (CO7, CO-70, CO-72) — the camera's focus from its cached person masks,
+/// then one undo step "Camera Layout" through `performGroupedEdit`, whose
+/// refusal reaches the inspector's refusal strip, or, for a switch refused
+/// because a clip zooms, the nest offer's sheet. `switch_layout`'s tool
+/// mirrors it (`AgentServer+Layout.swift`).
 extension EditorViewController {
 
     /// The camera and screen the menu would lay out, or nil.
@@ -26,9 +27,9 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let op = CameraLayoutChoice.menuRows[tag].op(
-            camera: roles.camera, screen: roles.screen, at: document.playhead)
-        document.applyEdit("Camera Layout", [op])
+        CameraLayoutCommand.run(
+            CameraLayoutChoice.menuRows[tag], camera: roles.camera, screen: roles.screen,
+            duration: nil, document: document, window: view.window)
     }
 
     /// The menu arm, answered from `validateUserInterfaceItem`'s default case;

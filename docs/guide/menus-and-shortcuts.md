@@ -157,7 +157,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Motion ▸ | | Sets how the clip enters, leaves and moves |
 | Look ▸ | | Puts a look or a LUT on the clip ([Colour grading](color-grading.md)) |
 | Remove Background | | Keeps the person and removes the rest of the picture, or turns that off; checked when every selected clip has it, a dash when some do ([Canvas and layers](canvas-and-layers.md#remove-background)) |
-| Camera Layout ▸ | | Lays out the camera and the screen behind it at the playhead — Corner ▸, Rounded Corner ▸ or Circle ▸ (each Bottom Right, Bottom Left, Top Right, Top Left), Side by Side, Stacked, Camera Full or Screen Only — eased over half a second and held until the next switch ([Canvas and layers](canvas-and-layers.md#camera-layouts)) |
+| Camera Layout ▸ | | Lays out the camera and the screen behind it at the playhead — Corner ▸, Rounded Corner ▸ or Circle ▸ (each Bottom Right, Bottom Left, Top Right, Top Left), Side by Side, Stacked, Camera Full or Screen Only — eased over half a second and held until the next switch; the crop centred on the person when the camera's masks are cached; a zoom in the way offers Nest and Switch ([Canvas and layers](canvas-and-layers.md#camera-layouts)) |
 | Add Background ▸ Solid Color | | Puts a colour plate on a new track behind everything ([Canvas and layers](canvas-and-layers.md)) |
 | Add Background ▸ Image… | | Puts a picture you choose on a new track behind everything |
 | Add Blurred Background | | Puts a blurred copy of the picture on a new track behind everything |

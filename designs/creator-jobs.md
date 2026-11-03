@@ -10201,6 +10201,106 @@ stops short with no marker (above), and `assistant_session_proof.py`'s stale
 - **Acceptance:** the proof against Release; the screens captured; `make gate`.
 - **Manual checks:** none beyond JOB-63. **Depends on:** CO6, CO1. **Lane** B. **Questions:** none.
 
+#### CO7's record (2026-11-03)
+
+**Built.** Lane B, base `2397aff5` (I's HEAD). The decisions first, committed alone: CO-70…CO-73
+appended to `creator-jobs-8.md` (220 → 290 lines; after SW0's section at integration, 330 →
+400) with their index rows after CO-67. Then the
+app, the proof and the documents. No core change, no persisted field, no format bump, no `rc_*`
+export, no new tool (119 product tools, 68 ops); nothing sent anywhere, so nothing keyed (CJ-3).
+The road map asked the owner nothing.
+
+- **The crop on the person (CO-70).** `CutoutWants.windows(of:plan:snapshot:)` (a clip's plan
+  video segments whatever its cutout); `CutoutStatus.stamp` made internal (the file stays 374
+  lines); `CameraLayoutFocus.swift`: `inputs` on main (the windows over `detail`'s handles,
+  CO-22's need, the marker that answers the stamp; nil unless every needed index is covered) and
+  `focus` on any thread (`CutoutStatus.centroid` less the media's centre, memoised on the pack's
+  path, size and date, the need and the media size, 64 entries cleared whole).
+- **The shared path and the offer (CO-72).** `CameraLayoutCommand.run` (the read on
+  `CameraLayoutFocus.queue` when masks are cached, applied only if `project` and `scope` are
+  unchanged; the trial, `ProjectDocument.addressed`'s rule; the offer or `performGroupedEdit`) and
+  `keepsFocus`; `LayoutOfferSheet.swift` (an `NSAlert`, Nest and Switch one
+  `performGroupedEdit`, Cancel on Escape); `switchCameraLayout` now calls `run` (its validator
+  unchanged; the menu's edit moved from `applyEdit` to `performGroupedEdit`, the same undo name).
+  `CameraLayoutChoice.defaultDuration` and the widened `op(...)`; `CameraLayoutRoles.roles`
+  byte-identical.
+- **The section (CO-71).** `VideoPane+Layout.swift` (`CameraLayoutSectionState`, kept on
+  `ClipPane` as `layoutState`; `allLayoutable`; the section, registered after Behind Subject).
+- **The tool.** `switch_layout` joins `creatorOffMainTools`: one main hop resolves (the required
+  arguments still read first, CO6's deviation 5) and captures the masks, the centroid is read on
+  the server thread, a last hop refuses a changed project, drops a filled focus that
+  `keepsFocus` says the nest would carry to a nest clip, and answers `focus`. The catalog row
+  names the Layout section and the answer's `focus`; one declarations row
+  (`switch_layout.focus`, `null` added: read as omitted).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/CameraLayoutFocus.swift` · `CameraLayoutCommand.swift` | 119 · 87 | new |
+| `app/Sources/LayoutOfferSheet.swift` · `VideoPane+Layout.swift` | 33 · 103 | new |
+| `app/Sources/AgentServer+Layout.swift` | 52 → 117 | the three hops |
+| `app/Sources/CutoutWants.swift` · `ClipPane.swift` · `CameraLayout.swift` | 232 → 252 · 283 → 287 · 128 → 136 | |
+| `app/Sources/AgentCatalog+Declarations.swift` | 359 → 366 | one row, the counts |
+| `tools/proof/co7_proof.py` · `co7_probe.swift` | 527 · 347 | new: P1–P6, P2b, P2c, Z1 |
+
+**Deviations.** (1) Clip ▸ Camera Layout ▸ can now raise a sheet, so `switchCameraLayout:`'s
+verdict in `capture_spike/inventory.json` and `UIMenuTable.swift` is `sheet` (as
+`setTransitionKind:`'s), with the new `beginSheetModal` site in `LayoutOfferSheet.swift`:
+`inventory.py --check` (a line of `make test`) needs the site, and `screens.py` performs only
+`sheet` or `window` items, so 15g could not be captured otherwise. Recorded in CO-72. (2) The
+declarations row adds `null` to the published type (`alsoTypes: ["null"]`), because a row that
+changed nothing would be inert and the tool reads `null` as omitted (fill it). (3) `screens.py`'s
+`SECTIONS` lacked three ids earlier phases declared (`video.behind_subject`, `video.cursor`,
+`media.cursor`), so its P2 failed on the tree; they are pinned at their defaults beside
+`video.layout`, pinned open for 05j. That opens Layout under Transform on 05, whose prose now
+says so (and names Behind Subject, which it had missed). `designs/screens/README.md` gains the
+`layout` fixture. (4) The dark capture of the offer sheet comes out white (the `NSAlert`'s dark
+material is not drawn by the capture; the layout dump has every text); 15g's prose says so.
+
+**Measured.**
+
+- `make typecheck` exit 0, the 4 baseline warnings; `swift_build.py typecheck --define
+  FRAMEJOB_DEV_TOOLS co7_probe.swift` exit 0; `inventory.py --check` 5/5; `spec_index_proof.py`
+  258/258.
+- `co7_proof.py --only P1,P4`: the first run failed P1 (the probe pressed the section header's
+  button, not Switch at Playhead — an instrument fault, the lookup now matches the button's
+  tooltip); then P1 1/1. `make app-debug` then Debug `co7_proof.py` 9/9, Z1 empty.
+- `screens.py --only 05j-clip-layout,15g-layout-offer-sheet`: the first run failed the fixture
+  (`speech.mov` imported twice: "Add Media made no change"), the second 05j's `expect` (the
+  section's summary is drawn, not a view's text; the expect now reads the row label
+  "Duration"); the third 7/7 pass, 0 new problems, light and dark. `--only 05-clip-picture` pass,
+  0 new problems.
+- `make gate`: "gate: PASS 477s" (names 1, typecheck 7, fmt and lint skipped as unchanged, test
+  299, app 170; cargo tests 2225 passed, 0 failed).
+- Release (the gate's app): `RC_PROOF_APP=release co7_proof.py` 9/9 (P1, P4, P2, P2c, P2b, P3,
+  P5, P6, Z1), Z1 empty; `RC_PROOF_APP=release co6_proof.py` 14/14; on one Release instance
+  `op_argument_proof.py` 196/196, `op_catalog_proof.py` 23/23, `grep "Frame Job: "` empty.
+- Mutants through `co7_proof.py --mutant` on Release, each CAUGHT, exit 1: `two-steps` (P4: "one
+  undo named "Camera Layout" did not restore the project"), `partial-window` (P2b: the centre
+  (480, 360); a built copy, 189 s), `tool-no-focus` (P5: `focus` None, the project not P2's;
+  186 s), `nest-keeps-focus` (P6: `focus` [−160, 0], the project not the twin's; 171 s).
+
+**Review.** Verdict pass, every Files and Approach item done, the two files outside the list
+(`UIMenuTable.swift`, `inventory.json`) justified and recorded in CO-72. Three nits: (1) the
+tool's last hop refuses a changed project even when no masks were read, so its sentence names a
+read that did not happen — left as built: the guard stays unconditional because hop 1 resolved
+the ids and `at` against the asked project, and the sentence is CO-70's verbatim; (2) the
+catalog's edited string literal and the declarations doc comment ran past the wrap width —
+re-wrapped at integration, the published string byte-identical; (3) the guide said "one camera
+clip selected" where the section is offered for any one video clip with a picture — now "one
+video clip selected" (the clip becomes the camera).
+
+**Integrated.** `212b5615`…`8932d2a9` onto `66d74f2f` (SW0 had landed). The decisions file, its
+index row and `designs/spec/README.md`'s `11-decisions/` total conflicted: SW0's section kept
+and CO7's appended after it (`creator-jobs-8.md` 400 lines, the row's summary holding both, the
+folder 20991 lines in 42 files); `tools/proof/README.md`'s CO7 section placed after SW0's. The
+`app/CLAUDE.md` edits applied: the CameraLayout entry (`CameraLayoutCommand.run`, the tool off
+main), a new entry for the four CO7 files, `VideoPane`'s `+Layout` clause and `switch_layout`
+in `creatorOffMainTools`. No declarations count is kept there, so none changed. `make gate` on
+the merged tree: "gate: PASS 402s" (names 1, typecheck 8, fmt and lint skipped, test 177, app
+215; cargo tests 2225 passed, 0 failed).
+
+**Owed.** Nothing new; JOB-64 stands. Nothing to file.
+
 ### VR5b — a screen and its camera re-laid in a vertical version
 
 - **What a person gets:** in Make Vertical Version, a screen recording and its camera arranged with
