@@ -253,9 +253,12 @@ extern "C" {
  * step.
  *
  * Version 42 is motion blur (spec §11 CU-113): `video.motion_blur`, after
- * `behind_subject`, written only above 0; no migration step. 43 and above,
- * 1014 included, are newer. */
-#define RC_FORMAT_VERSION 42
+ * `behind_subject`, written only above 0; no migration step.
+ *
+ * Version 43 is hide while silent (spec §11 CO-90): `video.hide_silent`,
+ * `{media, pre_roll, hold, fade}` after `motion_blur`, written only when set;
+ * no migration step. 44 and above, 1014 included, are newer. */
+#define RC_FORMAT_VERSION 43
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

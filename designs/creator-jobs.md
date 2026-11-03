@@ -10806,6 +10806,106 @@ one Release instance `switch_pieces_proof.py` 6/6 (P5's five calls 0.132, 0.141,
 - **Question for the owner:** fade, or a Screen Only layout on silence? *Recommended: fade* — a
   silence-driven layout switch would write actions and fight CO-61's switches.
 
+#### CO9's record (2026-11-03)
+
+**Built.** Lane B, base `765bd0c1` (I's HEAD). The decisions first, committed alone: CO-90…CO-95
+appended to `creator-jobs-8.md` (400 → 520 lines) with their index rows after CO-73, and one
+"Amended by CO-90" line each under AU-110 (`audio.md`) and R5-4 (`effects-motion.md`), their
+index rows noting it. Then the core, the app, the proof and the documents. Format 43
+(provisional in the lane; no other lane had taken it, so it stands). No new op, tool or
+`rc_*` export (the parity check unchanged); the spans come from the on-device Silero VAD cache,
+so nothing is keyed (CJ-3). The owner's answer (2026-11-01): on silence the camera fades, not
+Screen Only.
+
+- **Core.** `model_props.rs` `HideSilent` (`media`, `pre_roll`, `hold`, `fade`, all written) and
+  `HIDE_SILENT_*`, `VideoProps.hide_silent` after `motion_blur`; `audio_duck_speech.rs`
+  `widened(spans, before, after)` and `Project::played_speech` (`speech_spans` composed of them,
+  `duck_speech.rs` unchanged and passing); the new `video_gate.rs` (`hide_silent_gate`, the
+  windowed nearest-container read; `gate_entries`, the plan's `gates`; `clear_hide_silent`;
+  `hide_silent_media`, `remap_hide_silent`); `cutout_check.rs` `check_hide_silent`,
+  `Project::check_hide_silent_clip`, `restore_base_video_keys` (replacing `actions.rs`' call to
+  `restore_base_cutout`, net 0); one line each in `check_video`, `settle_video`, `recipe.rs`'s
+  `layer`, `plan.rs`, `remove_media`, `prune_unused`; `not_a_target`'s arm and the patch-presence
+  loop; the patch template's gate; paste's and Paste Attributes' non-shown media and remap.
+- **App.** `HideSilent.swift` (`HideSilentProps`, `HideSilentSources`, `GateCurves`);
+  `VideoProps.hideSilent`, `VideoPatch.hideSilent` (sent to the base by `structural`);
+  `DuckSpeech.ops(forMedia:)` / `problem(forMedia:)`; `VideoPane+HideSilent.swift` (the section,
+  registered after Layout); `PlanGate` and `CompositionPlan.gates`; `TimelineView.gateCurves`
+  (the frozen file's one line), set beside `duckCurves`, drawn by `TimelineView+GateLine.swift`
+  after the audio block; `payloadMediaIDs` names the gate's media; `setVideo` reads
+  `hide_silent.media` and prepends the spans; `set_video`'s catalog clause.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/video_gate.rs` | 281 | new |
+| `core/src/model_props.rs` · `cutout_check.rs` · `audio_duck_speech.rs` | 500 → 536 · 141 → 223 · 190 → 210 | |
+| `core/src/patch.rs` · `recipe.rs` · `plan.rs` · `edit_track.rs` · `props_check.rs` | 500 → 504 · 536 → 538 · 308 → 313 · 566 → 567 · 553 → 554 | wiring |
+| `core/src/edit_paste.rs` · `edit_paste_attributes.rs` | 488 → 494 · 340 → 346 | wiring |
+| `core/tests/hide_silent.rs` · `schema_v43.rs` | 650 · 121 | new |
+| `app/Sources/HideSilent.swift` · `VideoPane+HideSilent.swift` · `TimelineView+GateLine.swift` | 104 · 160 · 48 | new |
+| `app/Sources/DuckSpeech.swift` · `ClipPane.swift` · `AgentServer+Properties.swift` | 153 → 209 · 287 → 292 · 209 → 227 | |
+| `tools/proof/co9_proof.py` · `co9_probe.swift` | 564 · 292 | new: H1–H8, P1–P3, Z1 |
+
+**Deviations.** (1) `ClipPane.swift` takes a second line beyond the registration:
+`structureSignature` carries `allHideable` and the candidates' ids, because "Speech from"'s
+items are fixed when the section is built and a change of the clips under the selection would
+otherwise leave a stale list until the selection changed. (2) The road map's proof named
+`nest_clips`; the op tool is `nest`. (3) The road map's JOB-64 is CO6's; CO9's row is JOB-65.
+(4) The road map's mutant "the gate stored as times" became CO-95's M2 (spans projected at the
+gated clip's origin), and M3 "gated opacity leaking into `clip_state`" is a core mutant caught
+by `hide_silent.rs`, since `get_project` reads stored props. (5) `05-clip-picture`'s capture
+does not reach the new section (it is below Layout, out of view), so its prose is unchanged.
+
+**Measured.**
+
+- `cargo test --release --test hide_silent` 14/14, `schema_v43` 5/5, `duck_speech` 16/16;
+  `schema_v8`, `recipe`, `edit_tests`, `scope`, `motion_blur` all passed; `make lint` exit 0
+  (one `identity_op` fixed in the test first).
+- `make typecheck` exit 0, the 4 baseline warnings; `swift_build.py typecheck --define
+  FRAMEJOB_DEV_TOOLS co9_probe.swift` exit 0; `spec_index_proof.py` 258/258.
+- `make app-debug`, then Debug `co9_proof.py`: 11/12, H8 failed on the fixture (`trim_end` to
+  15 s refused "made no change" on the shorter voice file — an instrument fault, now tolerated);
+  then `--only H8` 2/2.
+- `screens.py --only 05-clip-picture`: P2 pass (65 section ids pinned), 6/6, 0 new problems.
+- `make gate`: "gate: PASS 477s" (names 1, typecheck 8, fmt 3, lint 1, test 287, app 175).
+- Release (the gate's app): `RC_PROOF_APP=release co9_proof.py` 12/12 (P1–P3, H1–H8, Z1), Z1
+  empty; the half-gate frames read 128 for 127.5.
+- Mutants, each CAUGHT, exit 1: M1 (four `hide_silent.rs` tests), M2
+  (`the_windowed_gate_equals…`), M3 (`clip_state_and_get_project…`), M4
+  (`it_is_not_an_animation_target…`), M5 (`a_nested_camera…`), M7 (`remove_media_clears…`,
+  `a_nested_camera…`) under `cargo test` in a copy; M6 on a `tree_copy.py` Release copy (built in
+  203 s): H8 "0 spans saved". The tree's `AgentServer+Properties.swift` SHA-256 was the same
+  before and after.
+
+**Review.** The first review (fix-required) found two should-fixes, both fixed in one pass
+(`083ee0c3`): (1) `gate_ramps` projected every instance of the media for each gated piece, so
+the plan's `gates` cost pieces × instances × spans on every edit — it now windows the spans to
+`[start − hold − fade, end + pre_roll + fade]` as `gate_among` does, exact by the same argument;
+(2) the section, on a media whose speech was not yet detected, still wrote the gate with no
+spans (a camera that never hides, where `set_video` refuses) — `spans(_:)` now answers nil on a
+throw and the row writes nothing, the sentence its note. The fix pass: `hide_silent` 14/14,
+typecheck at the 4 baseline warnings, `make gate` "gate: PASS 482s", Release `co9_proof.py`
+12/12 with the probe rebuilt; no mutant re-run, since no anchor line changed (the three
+`video_gate.rs` anchors re-checked). The second review: verdict pass, one nit — no test let the
+new window drop an instance — resolved at integration by
+`a_short_cameras_ramps_read_only_the_mics_near_it_and_equal_the_oracle` (a camera over
+12–18 s on the 80-span, four-mic fixture, the window dropping two mics on the left and one on
+the right; `check_ramps` now takes the clip's span), `hide_silent` 15/15.
+
+**Integrated.** `f93d2270`…`083ee0c3` onto `9d55f6bb` (SW1 had landed). Conflicts kept both:
+`creator-jobs-8.md` (SW1's section, then CO9's: 635 lines) and its index row (both clauses),
+the spec README's cells (§6b 489, §7.4 100, §7.10 151 — the last two merged clean with SW1's
+stale counts — §11 21243 in 42 files; SW1's §7.9h row kept) and `tools/proof/README.md` (SW1's
+section, then CO9's). The CLAUDE.md edits applied: `core/CLAUDE.md`'s `video_gate.rs` entry,
+`cutout_check.rs`'s hide-while-silent checks and `restore_base_video_keys`, `played_speech` /
+`widened` in `audio_duck_speech.rs`'s entry, `not_a_target`'s `video.hide_silent`;
+`app/CLAUDE.md`'s entry for the three new files and `DuckSpeech.ops(forMedia:)`, `+GateLine`,
+`PlanGate`/`gates` and `VideoPane`'s `+HideSilent`. `spec_index_proof.py` 261/261; `make gate`
+"gate: PASS 436s" (names 1, typecheck 8, fmt 3, lint 14, test 238, app 171); Release
+`co9_proof.py` 12/12 (P1–P3, H1–H8, Z1 empty).
+
+**Owed.** JOB-65 (the owner). Nothing to file.
+
 ### SW2b — Clip ▸ Switch by Speaker…
 
 - **What a person gets:** Clip ▸ Switch by Speaker… over synced cameras and microphones. The sheet

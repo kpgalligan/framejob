@@ -244,14 +244,17 @@ governs a module now.
   or still clip in its own sentence, CO-100), `check_behind_subject_clip` (one line in `settle_video` after it:
   `video.behind_subject`, format 40, spec §11 CO-52, refused on an adjustment or nest clip),
   `clamp_cutout` (one line in `actions_clamp.rs`'s `clamp_video`; it
-  never fails) and `restore_base_cutout` (one line in `actions.rs`'s `evaluate_clip`, beside
-  motion's restore: the presence, `subject` and `quality` the base's). The recipe's `cutout` key
+  never fails) and `restore_base_cutout` (through `restore_base_video_keys`, one line in
+  `actions.rs`'s `evaluate_clip`, beside motion's restore: the presence, `subject` and `quality`
+  the base's). The recipe's `cutout` key
   is `recipe_layer.rs`'s `Project::layer_cutout`: `null` unless a media, still or image clip's media
   is in the project and the evaluated cutout is set, else `{mask: {kind: "media", media, quality},
   background, edge, feather}`, `media` the clip's own source media; an image clip's mask is
   `{kind: "image", media, subject, quality}` (CO-101), drawn uncut until CO10b. `add_blurred_background`'s
   copy drops it. `VideoProps.behind_subject` (format 40, after `cutout`, written only when true)
-  is `model_props.rs`'s; the copy drops it too.
+  is `model_props.rs`'s; the copy drops it too. `cutout_check.rs` also holds hide while
+  silent's checks (format 43, spec §11 CO-92): `check_hide_silent`,
+  `Project::check_hide_silent_clip` and `restore_base_video_keys` (`video_gate.rs`'s entry).
 - `motion_blur.rs` · `recipe_blur.rs` — motion blur (format 42, road map "creator-jobs"
   CU11a, spec §11 CU-110…CU-114): `motion_blur.rs` `MOTION_BLUR_SAMPLES` (CU-S5's N, 16),
   `check_motion_blur` (one line in `check_video`), `clamp_motion_blur` (one line in
@@ -266,6 +269,24 @@ governs a module now.
   is `model_props.rs`'s; `video_json` always carries it; `add_blurred_background`'s copy drops
   it. `recipe_cursor.rs`'s `layer_cursor` takes the shutter's ends and appends `shutter
   {from, to, samples}`.
+- `video_gate.rs` — hide while silent (format 43, road map "creator-jobs" CO9, spec §11
+  CO-90…CO-93): `Project::hide_silent_gate` (an instance's gate at a tick: the nearest container,
+  outward from the layer's own, in which an instance of the media covers it; there, the instances
+  whose played window meets `[t − hold − fade, t + pre_roll + fade]`, each projected at its own
+  origin through `audio_duck_speech.rs`'s `played_speech`, sorted and `widened`; the maximum of 1
+  inside and a ramp to 0 over `fade`, a step at 0; 1 with no gate, no saved speech or no covering
+  instance), multiplied into `recipe.rs`'s `layer` only (`clip_state`, `placement` and every edit
+  read un-gated); `gate_entries` (the plan's `gates`, one per timeline-level gated instance, after
+  `ducks`, only when non-empty, each instance's ramps windowed as the gate is); `clear_hide_silent`
+  (`remove_media`'s non-LUT arm, timeline and every nest); `hide_silent_media` (paste's non-shown
+  media list, `keep_range`'s kept media) and `remap_hide_silent` (an id the map lacks drops the
+  gate, `remap_look_media`'s rule). `HideSilent` (`media`, `pre_roll`, `hold`, `fade`, all
+  written; `HIDE_SILENT_PRE_ROLL`, `_HOLD`, `_FADE`, `_MAX`) and `VideoProps.hide_silent` (after
+  `motion_blur`, written only when set) are `model_props.rs`'s; `check_hide_silent` (one line in
+  `check_video`), `Project::check_hide_silent_clip` (one line in `settle_video`: media named, in
+  the project, with sound, then a nest clip refused) and `restore_base_video_keys` (`actions.rs`'
+  one call: the cutout's restore and the base's whole `hide_silent`) are `cutout_check.rs`'s;
+  `not_a_target` refuses `video.hide_silent` in a patch and in `off`.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -800,7 +821,8 @@ governs a module now.
   except a graphic prop's end, G-34 (c), `edit_action_graphic.rs`, and
   `actions_clamp.rs`'s `clamp_video` is the last line of defence),
   `prune_removed`, `not_a_target` (`video.motion`, `text.words`, and `off`'s
-  `video.cutout`, spec §11 CO-20), `check_cutout_end` (a patch's
+  `video.cutout`, spec §11 CO-20; `video.hide_silent` in a patch and in `off`, CO-92),
+  `check_cutout_end` (a patch's
   `video.cutout` naming `subject` or `quality`, a `null` included, refused,
   `subject` first), and `off` (spec §11 CI-14), the one way to STORE a
   `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` the only
@@ -1166,8 +1188,9 @@ governs a module now.
   AU-112, AU-113): `speech_in_clip` (a media's source spans in clip time,
   each edge through `clip_source_time.rs`'s `clip_time_of_source`: reflected
   when reversed, through the base rate or one `SpeedMap`),
-  `Project::speech_spans` (on the played part, widened by `pre_roll` /
-  `hold`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
+  `Project::speech_spans` (`Project::played_speech` — the media's speech on
+  the played part in project time, unwidened, which `video_gate.rs` reads
+  too — then `widened(spans, before, after)`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
   `extent_gain`), `speech_breaks` (each span's four edges and the
   release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
   here edits.

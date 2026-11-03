@@ -9,17 +9,22 @@
 //! `actions.rs`'s statement that the key's presence, `subject` and `quality`
 //! are the clip's BASE values, beside motion's. And `video.behind_subject`'s
 //! clip-kind refusal (format 40, spec §11 CO-52), run beside the cutout's in
-//! `settle_video` ([`check_behind_subject_clip`]).
+//! `settle_video` ([`check_behind_subject_clip`]). And `video.hide_silent`'s
+//! (format 43, spec §11 CO-92): its ranges ([`check_hide_silent`], in
+//! `check_video`), its media and the nest refusal
+//! ([`Project::check_hide_silent_clip`], in `settle_video`), and the base's
+//! gate put back over an action's end beside the cutout's
+//! ([`restore_base_video_keys`]).
 
 use serde_json::{Map, Value};
 
 use crate::actions_clamp::bounded;
 use crate::evaluate::json;
 use crate::model::{
-    Clip, Cutout, CutoutQuality, CutoutSubject, Source, VideoProps, CUTOUT_EDGE_MAX,
-    CUTOUT_EDGE_MIN, CUTOUT_FEATHER_MAX,
+    Clip, Cutout, CutoutQuality, CutoutSubject, HideSilent, Project, Source, VideoProps,
+    CUTOUT_EDGE_MAX, CUTOUT_EDGE_MIN, CUTOUT_FEATHER_MAX, HIDE_SILENT_MAX,
 };
-use crate::props_check::in_range;
+use crate::props_check::{in_range, ticks_in_range};
 
 /// `video.cutout`'s ranges, each refused in `in_range`'s sentence under its
 /// own key, then `best`, which the vocabulary holds and no op may set until
@@ -136,6 +141,83 @@ pub(crate) fn restore_base_cutout(video: &mut Map<String, Value>, base: Option<&
         }
         _ => {
             video.insert("cutout".to_string(), json(base));
+        }
+    }
+}
+
+/// `video.hide_silent`'s three ranges (CO-91), each 0…5 s in
+/// `ticks_in_range`'s sentence under its own key. No gate is nothing to
+/// check.
+pub(crate) fn check_hide_silent(gate: &Option<HideSilent>) -> Result<(), String> {
+    let Some(gate) = gate else {
+        return Ok(());
+    };
+    for (key, value) in [
+        ("pre_roll", gate.pre_roll),
+        ("hold", gate.hold),
+        ("fade", gate.fade),
+    ] {
+        ticks_in_range(
+            &format!("video.hide_silent.{key}"),
+            value,
+            0,
+            HIDE_SILENT_MAX,
+        )?;
+    }
+    Ok(())
+}
+
+impl Project {
+    /// `video.hide_silent` on this clip (CO-92): the media named (0 is not),
+    /// in the project, with sound; then a nest clip refused, since it never
+    /// draws itself. Fires only when `props` carries a gate.
+    pub(crate) fn check_hide_silent_clip(
+        &self,
+        clip: &Clip,
+        props: &VideoProps,
+    ) -> Result<(), String> {
+        let Some(gate) = props.hide_silent else {
+            return Ok(());
+        };
+        if gate.media == 0 {
+            return Err(
+                "video.hide_silent.media is required: the media whose speech the clip follows"
+                    .to_string(),
+            );
+        }
+        let Some(media) = self.media(gate.media) else {
+            return Err(format!(
+                "video.hide_silent.media {} is not a media of this project",
+                gate.media
+            ));
+        };
+        if !media.has_audio {
+            return Err(format!(
+                "video.hide_silent.media {} has no sound to follow",
+                gate.media
+            ));
+        }
+        if let Source::Nest { .. } = clip.source {
+            return Err(format!(
+                "clip {} shows a nest and cannot hide while silent: set it on the clips inside",
+                clip.id
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// The base's video keys no action may change, put back over the evaluated
+/// state: the cutout's ([`restore_base_cutout`]) and the whole
+/// `hide_silent` (CO-92) — the base's, or no key with none.
+pub(crate) fn restore_base_video_keys(video: &mut Map<String, Value>, base: &VideoProps) {
+    restore_base_cutout(video, base.cutout.as_ref());
+    match &base.hide_silent {
+        Some(gate) => {
+            video.insert("hide_silent".to_string(), json(gate));
+        }
+        None => {
+            video.shift_remove("hide_silent");
         }
     }
 }

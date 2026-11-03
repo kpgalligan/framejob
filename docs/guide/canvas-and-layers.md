@@ -412,6 +412,41 @@ person masks as the menu fills it, and the answer's `focus` says what was sent
 An agent is never offered the sheet: it sends `nest: true` to nest in the same
 step. `through` stops the layout holding at a time.
 
+### Hide while silent
+
+A camera clip can fade out while nobody is talking and fade back in just before
+speech starts. Select the camera and open the Clip tab's Picture sub-tab: the
+**Hide While Silent** section comes after Layout, shut until you open it. It is
+offered for any clip with a picture but a nest clip (set it on the clips inside
+the nest).
+
+- **Hide while silent** turns it on. The camera follows the first file in
+  **Speech from** — the files with sound playing under the clip, the
+  microphone (a file with no picture) first, then the one that plays under it
+  longest. Off, or Reset, takes it away.
+- **Speech from** picks another file to follow.
+- **Pre-roll** (0.2 s to start) is how long before each run of words the
+  camera is fully back; **Hold** (1.5 s) how long it stays after; **Fade**
+  (0.3 s) how long it takes to fade out and in. Each is 0–5 s.
+
+The speech is the same as Duck by Speech's: the runs of words Frame Job finds
+in the file on this Mac when it is added (no key, nothing uploaded). The first
+time a file is followed, those runs are saved in the project, in the same
+**Undo** step. If the file's speech has not been found yet, the checkbox is
+greyed, and its tooltip says to try again in a moment.
+
+Where the file does not play at all, the camera shows. When the camera is
+inside a nest and the microphone is not, the microphone outside is followed.
+The timeline draws a teal line over the camera clip's picture: at the top the
+camera shows, at the bottom it is hidden. The fade is only in the picture: the
+Transform section's Opacity and the agent's `get_project` still show the
+clip's own value, and an action cannot animate it.
+
+*Agents:* `set_video {clips, patch: {hide_silent: {media, pre_roll?, hold?,
+fade?}}}`, the times in ticks; `{hide_silent: null}` removes it. When the media
+has no saved speech the tool saves it first in the same step, and it refuses a
+media with no sound or one whose speech has not been found yet.
+
 ### Shadow
 
 A drop shadow cast by the layer's own shape: the picture, the letters of a

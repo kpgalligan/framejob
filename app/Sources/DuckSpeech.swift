@@ -126,6 +126,62 @@ enum DuckSpeech {
             message: "\(media.name) cannot duck by speech — its speech has not been "
                 + "detected yet. Try again in a moment.")
     }
+
+    // MARK: Hide while silent (spec §11 CO-94)
+
+    /// The `set_media_speech` a clip that hides while `media` is silent needs
+    /// before its `set_video`, in the same undo step: none for a media that
+    /// already has `speech` (frozen, AU-111) or is not in `snapshot` (the core
+    /// then refuses by name), else one from its cache's spans. Throws a
+    /// `Refusal` for a media with no sound, or one whose speech has not been
+    /// detected yet.
+    static func ops(
+        forMedia media: UInt32, in snapshot: ProjectSnapshot, cacheDirectory: URL?
+    ) throws -> [ReelOp] {
+        guard let row = try hideNeeding(media, in: snapshot) else { return [] }
+        guard let directory = cacheDirectory,
+              let p = MediaImporter.loadSpeech(for: row.id, in: directory)
+        else { throw hideNotDetected(row) }
+        return [.setMediaSpeech(media: row.id, spans: spans(p, duration: row.duration))]
+    }
+
+    /// Why a clip cannot hide while `media` is silent, or nil when it can —
+    /// `ops(forMedia:)`'s refusals without reading the cache: a cache counts
+    /// as there when its marker is current.
+    static func problem(
+        forMedia media: UInt32, in snapshot: ProjectSnapshot, cacheDirectory: URL?
+    ) -> String? {
+        do {
+            guard let row = try hideNeeding(media, in: snapshot) else { return nil }
+            guard let directory = cacheDirectory,
+                  MediaImporter.readSpeechStamp(
+                    at: MediaImporter.speechMarkerURL(for: row.id, in: directory))?.version
+                    == MediaImporter.speechVersion
+            else { throw hideNotDetected(row) }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// The media when it still needs its spans; nil when it has them or is
+    /// not in `snapshot`; throws for a media with no sound.
+    private static func hideNeeding(
+        _ media: UInt32, in snapshot: ProjectSnapshot
+    ) throws -> MediaSnapshot? {
+        guard let row = snapshot.media(media) else { return nil }
+        guard row.hasAudio else {
+            throw Refusal(
+                message: "\(row.name) has no sound, so a clip cannot hide while it is silent.")
+        }
+        return row.speech == nil ? row : nil
+    }
+
+    private static func hideNotDetected(_ media: MediaSnapshot) -> Refusal {
+        Refusal(
+            message: "\(media.name)'s speech has not been detected yet, so a clip cannot hide "
+                + "while it is silent. Try again in a moment.")
+    }
 }
 
 /// A speech ducker's own multiplier, read off one handle's plan (`ducks`,

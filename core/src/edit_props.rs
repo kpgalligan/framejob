@@ -292,6 +292,7 @@ impl Project {
         crate::cutout_check::check_cutout_clip(clip, props)?;
         crate::cutout_check::check_behind_subject_clip(clip, props)?;
         crate::motion_blur::check_motion_blur_clip(clip, props)?;
+        self.check_hide_silent_clip(clip, props)?;
         self.check_look_media(props)?;
         self.snap_motion(props);
         Ok(())

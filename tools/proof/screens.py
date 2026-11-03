@@ -166,6 +166,8 @@ SECTIONS = {
     # (CO7); the three sections earlier phases declared, at their defaults.
     "video.layout": False, "video.behind_subject": True, "video.cursor": True,
     "media.cursor": False,
+    # CO9's Hide While Silent, at its default (shut).
+    "video.hide_silent": True,
 }
 
 

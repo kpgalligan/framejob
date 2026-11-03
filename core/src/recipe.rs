@@ -254,6 +254,8 @@ impl Project {
         // ones, so `RecipeLayer.video` reads its per-pixel properties off it
         // and the recipe publishes no `motion` key.
         let mut moved = self.moved(instance, clip_t, &evaluated);
+        // Hide while silent (spec §11 CO-90), here alone: 1 with no gate.
+        moved.opacity *= self.hide_silent_gate(instance, t, crate::audio::Side::Right);
         // A matte layer's drop shadow and reflection do nothing (spec §11
         // MT-4): the matte is the clip's own picture, so they are cleared
         // here, with its blend below — the recipe's second deliberate

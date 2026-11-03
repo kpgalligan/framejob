@@ -73,6 +73,7 @@ extension EditorViewController {
         timeline.sourceMaps = document.editedProject.sourceMap
         // A speech duck's line, off the same handle (spec §11 AU-113).
         timeline.duckCurves = DuckCurves(document.editedProject)
+        timeline.gateCurves = GateCurves(document.editedProject)  // spec §11 CO-93
         // The volume line's envelopes, off the same handle (spec §11 AU-81).
         timeline.volumeLines = VolumeLines(document.editedProject)
         timeline.update(

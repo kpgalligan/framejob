@@ -147,6 +147,11 @@ impl Project {
         if !ducks.is_empty() {
             out.insert("ducks".to_string(), Value::Array(ducks));
         }
+        // Hide while silent's gates (spec §11 CO-93), the same rule.
+        let gates = self.gate_entries();
+        if !gates.is_empty() {
+            out.insert("gates".to_string(), Value::Array(gates));
+        }
         out.insert(
             "instructions".to_string(),
             Value::Array(

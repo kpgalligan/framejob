@@ -33,6 +33,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// and the waveform read a ramped clip through them.
     var sourceMaps: SourceMaps = { _ in nil }
     var duckCurves: DuckCurves?
+    var gateCurves: GateCurves?
     /// The volume line's envelopes, off the same handle (spec §11 AU-81).
     var volumeLines: VolumeLines?
 

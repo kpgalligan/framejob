@@ -513,7 +513,7 @@ See [Speed](speed.md).
 
 | Tool | What it does |
 |---|---|
-| `set_video` | *op* — position, scale, rotation, opacity, crop, corners, shadow, colour and grading, chroma key, filters, reflection, spotlight, motion and Remove Background (`cutout`: the clip drawn as the person in it, where its media's person masks are cached), and Text Behind Subject (`behind_subject`: the clip cut by the person of every cut-out clip behind it). |
+| `set_video` | *op* — position, scale, rotation, opacity, crop, corners, shadow, colour and grading, chroma key, filters, reflection, spotlight, motion and Remove Background (`cutout`: the clip drawn as the person in it, where its media's person masks are cached), and Text Behind Subject (`behind_subject`: the clip cut by the person of every cut-out clip behind it), and Hide While Silent (`hide_silent {media, pre_roll, hold, fade}`: the clip fades out while that media's speech is silent; the media's speech is saved first in the same step when it has none). |
 | `set_audio` | *op* — volume, mute, fades, ducking, mono, keep pitch, pan, compression and noise reduction. |
 | `set_text` | *op* — a text clip's words and typography. |
 | `set_shape` | *op* — a shape clip's geometry and paint. |

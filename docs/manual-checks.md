@@ -143,6 +143,11 @@ the same way.
 - **Expect:** each switch moves the camera and the screen together in half a second, easing out and in, and reads as a deliberate cut in the edit rather than a jump or a slow drift; the circle is round, the corners square or rounded as chosen, and nothing flashes at either end of a switch.
 - **Source:** road map creator-jobs CO6, spec §11 CO-60, CO-61, CO-67 (`co6_proof.py` scores the numbers, never how the move feels).
 
+**JOB-65 — The camera fades out in pauses and back before speech**
+- **Do:** On a screen recording with its camera on one track and the microphone on another (S-ST1 when it exists; any recording of yourself talking with pauses), select the camera and turn on Hide While Silent in the Picture sub-tab, Speech from the microphone at the defaults. Play through several pauses, short and long; then set Fade to 0 and to 1 s and play again.
+- **Expect:** the camera stays through short breaths between words, fades out in a real pause and is fully back just before you speak again, never cutting off the first word; the fade reads as smooth at the default and as a cut at 0; the teal line on the clip matches what plays.
+- **Source:** road map creator-jobs CO9, spec §11 CO-90, CO-91, CO-95 (`co9_proof.py` scores the gate's numbers on a white camera, never how the fade looks over a real face).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

@@ -229,6 +229,7 @@ fn prune_unused(project: &mut Project) {
     for clip in clips {
         media.extend(clip.source.media());
         media.extend(look_media_ids(clip));
+        media.extend(crate::video_gate::hide_silent_media(clip));
     }
     // A kept media's LUT, and that LUT's, until nothing new is named.
     loop {

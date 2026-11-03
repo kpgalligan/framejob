@@ -129,6 +129,7 @@ extension TimelineContentView {
             drawDuckCurve(clip, in: regions.audio, owner: owner, visible: visible)
             drawVolumeLine(clip, rect: rect, owner: owner, visible: visible)
         }
+        drawGateLine(clip, in: regions.video, owner: owner, visible: visible)
         drawActionWash(clip, body: body, owner: owner)
         drawNameStrip(clip, in: body, owner: owner)
         drawActionBands(clip, rect: rect, owner: owner)

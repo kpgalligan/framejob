@@ -29089,3 +29089,48 @@ make app && RC_PROOF_APP=release python3 tools/proof/switch_pieces_proof.py <dir
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s SW1 record. No person check.
+
+## Road map "creator-jobs" CO9 — hide the camera while silent (`co9_proof.py` H1–H8, Z1 with `co9_probe.swift` P1–P3; seven mutants; `core/tests/hide_silent.rs`, `schema_v43.rs`; spec §11 CO-90…CO-95)
+
+**`co9_proof.py`** builds `co9_probe.swift` (P1–P3, no app) and launches its own instance
+(`proof_app.binary()`, `RC_PROOF_APP`, or `--app PATH`, on a scratch `CFFIXED_USER_HOME`) for the
+H rows. Its media are made under `tools/proof/work/co9/media/`: `camera.mov`, a solid white
+1920 × 1080 movie with no sound (20 s at 30 fps), `mic.m4a`, a 440 Hz sine, and `voice.m4a`,
+`say`'s reading of a few sentences. Each fixture is a package on a black canvas with the mic at
+1 s (in point 1 s, ending at 15 s) behind the camera at 0; the mic's spans [2 s, 4 s) and
+[10 s, 11 s) are written with the `set_media_speech` op tool and the camera's gate is
+`{pre_roll: 0.2 s, hold: 1.2 s, fade: 0.4 s}` — every edge and half-fade a multiple of two
+frames. The gated opacity is `render_frame`'s centre pixel /255, ± 3/255.
+
+| Row | What it holds |
+|---|---|
+| Z1 | the instance's `grep "Frame Job: "` prints nothing |
+| P1 | (probe) `DuckSpeech.ops(forMedia:)`: an empty cache folder throws "not been detected yet"; a stamped cache one `set_media_speech`; a media with spans `[]`; an unknown id `[]`; a media with no sound throws "has no sound" |
+| P2 | (probe) `HideSilentSources.candidates`: picture-less first, then overlap, then id; a later and a soundless media left out |
+| P3 | (probe) `video.hide_silent` directly after `video.layout`; its checkbox one edit "Hide While Silent" of `set_media_speech` then `set_video`; one undo restores the project |
+| H1 | 1 at 3 s, 0 at 7 s, 0.5 at 5.4 s (e + hold + fade/2) and 9.6 s (s − pre-roll − fade/2) |
+| H2 | after `ripple_delete_ranges [[6 s, 8 s]]`: 0.5 at 5.4 s, 0 at 7 s, 0.5 at 7.6 s, 1 at 8.5 s |
+| H3 | 1 at 17 s, where the mic does not play |
+| H4 | at 7 s, rendered 0, `get_project`'s opacity 1 |
+| H5 | `remove_media {mic, with_clips: true}` leaves no gate and 1 at 7 s |
+| H6 | `set_action_end` naming `video.hide_silent` in a patch (object, null) and in `off`, refused "video.hide_silent is not an animation target" |
+| H7 | the camera nested alone: 1 at 3 s, 0 at 7 s, 0.5 at 5.4 s |
+| H8 | `set_video {hide_silent: {media: voice}}`, retried while "not been detected yet" (180 s at most), saves the voice's speech and the gate in one step; one `undo` removes both; the camera as media refused "has no sound" |
+
+Mutants (`--mutant M1…M7`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). M1–M5 and
+M7 edit a copy of `core/` beside a link to `graphic/` and run `cargo test --release --test
+hide_silent` (target `tools/proof/work/co9/mutant-target`), CAUGHT when a named test fails: M1
+pre-roll applied after the span, M2 spans projected at the gated clip's origin, M3 the gate
+leaking into `clip_state`, M4 `not_a_target`'s arm dropped, M5 only the layer's own container
+read, M7 `remove_media` not clearing. M6, the tool not prepending the spans, edits a
+`tree_copy.py` copy's `AgentServer+Properties.swift` and runs H8 on its built app.
+
+```sh
+cd core && cargo test --release --test hide_silent --test schema_v43
+python3 tools/proof/swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS tools/proof/co9_probe.swift
+make app-debug && python3 tools/proof/co9_proof.py [--only H1,P2]
+python3 tools/proof/co9_proof.py --mutant M1
+make app && RC_PROOF_APP=release python3 tools/proof/co9_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO9 record. The person check is JOB-65.

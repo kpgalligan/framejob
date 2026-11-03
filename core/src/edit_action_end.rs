@@ -101,6 +101,7 @@ pub(crate) fn check_end_patch(patch: &Value) -> Result<(), String> {
 pub(crate) fn not_a_target(group: &str, key: &str) -> Result<(), String> {
     match (group, key) {
         ("video", "motion") => Err("video.motion is not an animation target".to_string()),
+        ("video", "hide_silent") => Err("video.hide_silent is not an animation target".to_string()),
         ("text", "words") => Err("text.words is not an animation target".to_string()),
         ("video", "cutout") => Err("video.cutout cannot be keyed off at an action's end; \
                                     set_video {cutout: null} removes it"

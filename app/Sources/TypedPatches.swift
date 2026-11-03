@@ -102,6 +102,9 @@ struct VideoPatch: Codable, Equatable {
     var behindSubject: Bool?
     /// `motion_blur` (format 42, spec §11 CU-113): 0…1, 0 removes the key.
     var motionBlur: Double?
+    /// `hide_silent` (format 43, spec §11 CO-90): a `T??`, null removes it; a
+    /// written gate names all four keys (`HideSilentProps.dictionary`).
+    var hideSilent: HideSilentProps??
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -113,7 +116,8 @@ struct VideoPatch: Codable, Equatable {
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
         qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
         cursorPart: CursorPatch? = nil, cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil,
-        behindSubject: Bool? = nil, motionBlur: Double? = nil
+        behindSubject: Bool? = nil, motionBlur: Double? = nil,
+        hideSilent: HideSilentProps?? = nil
     ) {
         self.x = x
         self.y = y
@@ -141,6 +145,7 @@ struct VideoPatch: Codable, Equatable {
         self.cutoutPart = cutoutPart
         self.behindSubject = behindSubject
         self.motionBlur = motionBlur
+        self.hideSilent = hideSilent
     }
 
     init(from decoder: Decoder) throws {
@@ -174,6 +179,7 @@ struct VideoPatch: Codable, Equatable {
         cutout = c.nullable(.cutout)
         behindSubject = c.lenient(.behindSubject)
         motionBlur = c.lenient(.motionBlur)
+        hideSilent = c.nullable(.hideSilent)
     }
 
     var dictionary: [String: Any] {
@@ -210,6 +216,7 @@ struct VideoPatch: Codable, Equatable {
         }
         if let behindSubject = behindSubject { d["behind_subject"] = behindSubject }
         if let motionBlur = motionBlur { d["motion_blur"] = motionBlur }
+        d.putNullable("hide_silent", hideSilent) { $0.dictionary }
         return d
     }
 

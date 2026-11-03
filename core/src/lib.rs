@@ -183,6 +183,7 @@ mod time_bounds;
 mod track_dynamics;
 pub mod transition;
 mod transition_search;
+mod video_gate;
 mod webm_ebml;
 mod webm_ebml_block;
 pub mod webm_layout;

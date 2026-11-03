@@ -129,6 +129,10 @@ impl Group {
                 // True, since false is not written and the walk reads the
                 // template (CO-52).
                 behind_subject: true,
+                hide_silent: Some(crate::model::HideSilent {
+                    media: 1,
+                    ..Default::default()
+                }),
                 ..VideoProps::default()
             }),
             // Format 29's and 31's keys are left out of `to_json` at their

@@ -561,6 +561,7 @@ impl Project {
             nest.clips.retain(|c| !uses_media(c, media));
         }
         next.media.retain(|m| m.id != media);
+        next.clear_hide_silent(media);
         self.finish(next)
     }
 }

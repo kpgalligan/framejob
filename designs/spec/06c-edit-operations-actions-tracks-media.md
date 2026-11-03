@@ -90,7 +90,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   of the end's `eq`, one EQ slot keyed off (§11 AU-88), the only three-part path (an unknown slot
   is an **error** naming the seven, any other deeper path the `"group.key"` one); a malformed
   path, `video.motion`, `video.cutout` (format 39, §11 CO-20: `video.cutout cannot be keyed off
-  at an action's end; set_video {cutout: null} removes it`),
+  at an action's end; set_video {cutout: null} removes it`), `video.hide_silent` (format 43,
+  §11 CO-92: `video.hide_silent is not an animation target`, as a `patch` naming it — a `null`
+  included — is too),
   `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
   also names are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a
@@ -207,7 +209,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   alpha or duration (`a lut media has no video, audio, alpha or duration`), and `remove_media` of a
   LUT refuses while it is some clip's base look (`media 7 is the look of clip 3; pass with_clips:
   true to remove it and clear their looks`); `with_clips` then clears those looks, on the timeline
-  and in every nest, and keeps the clips; an action's end naming it is left, inert. The
+  and in every nest, and keeps the clips; an action's end naming it is left, inert. Removing any
+  other media clears every `video.hide_silent` naming it, on the timeline and in every nest, with
+  no refusal of its own (format 43, §11 CO-92): a gate does not use its media. The
   descriptor may carry `color` (format 19, §11 GR-16), the Camera Log import detected (`{log:
   "apple_log", gamut: "bt2020", detected: true}`) or a PQ file's peak (`{pq: {file: 4000, from:
   "max_cll"}}`, format 22, §11 HD-12), held to `set_media_color`'s rules as an error; a relink's probe may NOT carry it (`unknown key "color" in a relink probe`), and a relink

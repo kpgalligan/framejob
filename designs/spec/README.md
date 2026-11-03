@@ -24,14 +24,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 179 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 144 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
-| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 343 | The Clip tab's sections: every video section. |
+| [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 360 | The Clip tab's sections: every video section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 244 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
 | [`04.3d-inspector-clip-sections-audio-text-shape.md`](04.3d-inspector-clip-sections-audio-text-shape.md) | 246 | The Clip tab's audio, text and shape sections (continues §4.3b). |
 | [`04.3e-inspector-transcript-tab.md`](04.3e-inspector-transcript-tab.md) | 152 | The inspector's Transcript tab (road map "creator-jobs" TX2a, TX2b, TX3a, TX1b, TX3b): the timeline's words in paragraphs, the bar (Words from, Language, the status with Stop or Read, the notes), the highlight that follows the playhead, a click to seek, the keys, selecting words as the in/out range and deleting them as one "Delete Words" (where a cut falls, the refusals), pause tokens shortened as one "Delete Pause", the reading on this Mac and the rebuilds. |
-| [`04.4-timeline.md`](04.4-timeline.md) | 275 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
+| [`04.4-timeline.md`](04.4-timeline.md) | 281 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
-| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 457 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
+| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 465 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
 | [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 314 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 195 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
@@ -39,16 +39,16 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.6-persistence.md`](05.6-persistence.md) | 367 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts, the analysis cache. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 110 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, a linked pair moving as one in time (format 28, AU-90…AU-96), how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eleven ops that are an error with a scope, the checks on the merged parent). |
-| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 480 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, `copy_pieces`, paste and paste attributes; nest and unnest; the patch ops; `retime_range`. The transition ops are §6d. |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 489 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, `copy_pieces`, paste and paste attributes; nest and unnest; the patch ops; `retime_range`. The transition ops are §6d. |
 | [`06d-edit-operations-transitions.md`](06d-edit-operations-transitions.md) | 69 | The transition ops, continuing §6b: `set_transition`, `set_transition_duration`, `add_transition` (handles and the ripple form) and `set_transition_style`. |
-| [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 285 | The action ops (the zoom action, the camera layout switch, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
+| [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 289 | The action ops (the zoom action, the camera layout switch, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 226 | The `rc_*` exports and their contracts. |
-| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 315 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 448 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
+| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 325 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 457 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 99 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 100 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 403 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
@@ -62,11 +62,11 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9f-agent-transcript.md`](07.9f-agent-transcript.md) | 105 | The timeline transcript, `get_timeline_transcript`: what is read (the plan's audio segments, nested ones with `path` and `origin`), on-device starts moved to their sound (TX1b), the answer (words with clip, track, editability, identity and the tab's `cut_start`/`cut_end`; `pauses` with their cuts; `media`, `no_words`, `notes`), the window and `tracks`, paging at 2,000 words, and the whole-file fill (§11 TX-10…TX-18, TX-30, TX-33, TX-34). |
 | [`07.9g-agent-behind-subject.md`](07.9g-agent-behind-subject.md) | 38 | Text Behind Subject's tool, `text_behind_subject`: the planner it runs (the pick, the new track above the mattes, the title, the cutout that keeps the background), its answer and its refusals (§11 CO-53, CO-54). |
 | [`07.9h-agent-switch.md`](07.9h-agent-switch.md) | 51 | `copy_pieces`'s tool and Switch Angle's, `switch_angle`: the empty-list refusal, covering, the re-pick's sequence tried one op at a time, the held edge, the answer and the refusals (§11 SW-11…SW-15). |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 150 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 151 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 299 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 21113 in 42 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 21243 in 42 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

@@ -308,7 +308,11 @@ impl Project {
         }
         // Present at all — a `null` included, since writing `motion: null`
         // into an end patch is still asking an action to decide a preset.
-        for (group, key) in [("video", "motion"), ("text", "words")] {
+        for (group, key) in [
+            ("video", "motion"),
+            ("video", "hide_silent"),
+            ("text", "words"),
+        ] {
             if patch.get(group).and_then(|body| body.get(key)).is_some() {
                 not_a_target(group, key)?;
             }

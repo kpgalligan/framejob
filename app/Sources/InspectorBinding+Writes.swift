@@ -101,6 +101,11 @@ extension InspectorBinding {
             base.cutout = patch.cutout
             animatable.cutout = nil
         }
+        // Hide while silent is not an animation target (spec §11 CO-92).
+        if patch.hideSilent != nil {
+            base.hideSilent = patch.hideSilent
+            animatable.hideSilent = nil
+        }
         // A cursor's `smoothing` and `hide_idle` are the clip's (spec §11 CU-30, CU-40): the
         // recipe reads them from the BASE, so an end carrying them would have no effect. Two
         // independent rules. (a) The clip's own keys go to the base; only the other six stay

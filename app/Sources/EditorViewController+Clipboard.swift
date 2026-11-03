@@ -125,9 +125,10 @@ extension EditorViewController {
     }
 
     /// The media ids one copied clip (its `project.json` object) names: its
-    /// source's, its base look's and each action end's look's (spec §11 GR-8),
-    /// in that order without repeats — the rows a paste into another project
-    /// needs. An end may name a LUT that is gone; its row is simply not found.
+    /// source's, its base look's, its gate's (`video.hide_silent.media`, spec
+    /// §11 CO-92) and each action end's look's (spec §11 GR-8), in that order
+    /// without repeats — the rows a paste into another project needs. An end
+    /// may name a LUT that is gone; its row is simply not found.
     static func payloadMediaIDs(_ clip: [String: Any]) -> [UInt32] {
         func lookMedia(_ video: Any?) -> UInt32? {
             guard let video = video as? [String: Any], let look = video["look"] as? [String: Any]
@@ -137,6 +138,8 @@ extension EditorViewController {
         var found: [UInt32?] = [
             ((clip["source"] as? [String: Any])?["media"] as? NSNumber)?.uint32Value,
             lookMedia(clip["video"]),
+            (((clip["video"] as? [String: Any])?["hide_silent"] as? [String: Any])?["media"]
+                as? NSNumber)?.uint32Value,
         ]
         for action in clip["actions"] as? [[String: Any]] ?? [] {
             found.append(lookMedia((action["end"] as? [String: Any])?["video"]))

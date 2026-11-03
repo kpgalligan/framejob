@@ -36,12 +36,30 @@ extension AgentServer {
     ///
     /// What is left is what the core cannot know: which document, which
     /// clips, and that `patch` was passed at all.
+    ///
+    /// **One key IS read: `hide_silent.media`.** A patch setting a gate is
+    /// the Picture sub-tab's Hide While Silent section (spec §11 CO-94),
+    /// which saves the media's speech spans from its voice cache in the same
+    /// undo step: `DuckSpeech.ops(forMedia:)` is prepended, and its refusal —
+    /// a media with no sound, a speech cache not written yet — is this
+    /// tool's error. Nothing else in the patch is read.
     func setVideo(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let patch = try rawPatchArg(a, "patch")
+        var ops: [ReelOp] = []
+        let gate = (patch as? [String: Any])?["hide_silent"] as? [String: Any]
+        if let media = (gate?["media"] as? NSNumber)?.uint32Value {
+            do {
+                ops = try DuckSpeech.ops(
+                    forMedia: media, in: document.project.snapshot,
+                    cacheDirectory: document.cacheDirectory)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+        }
         return try editResult(
-            document, "Video Properties", [.setVideoRaw(clips: clips, patch: patch)])
+            document, "Video Properties", ops + [.setVideoRaw(clips: clips, patch: patch)])
     }
 
     /// `set_audio` — the Audio tab (`AudioPane`), the timeline's fade

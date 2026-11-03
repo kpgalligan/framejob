@@ -1287,6 +1287,8 @@ recorded before its code.
   a media without audio, a span with `start ≥ end`, a negative start, an end past `duration`,
   spans unsorted or overlapping, and more than the cap; equal spans are an identity. `validate`
   holds a file to the same rules. `add_media` and a relink's probe never carry it.
+  **Amended by CO-90** (road map creator-jobs CO9): a second reader, `video.hide_silent`, reads a
+  media's spans to show a picture while that media's speech plays.
 - **AU-111 — The spans come from the Silero VAD cache, frozen at their first write, in the same
   undo step that turns Speech on.** `DuckSpeech.spans`: runs of `cache/speech/` chunks with
   p ≥ `SilenceDetector.Settings.defaultVoiceConfidence` (0.5, one copy), gaps under 0.2 s

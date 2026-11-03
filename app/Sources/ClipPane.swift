@@ -105,6 +105,10 @@ final class ClipPane: InspectorPaneView {
             videoPane.allBehindable ? "behind" : "-",
             // Whether every media has a cursor not in the picture adds or removes Cursor (CU-38).
             videoPane.allCursored ? "cursor" : "-",
+            // Hide While Silent and its "Speech from" list (CO-94).
+            videoPane.allHideable ? "hide:" + HideSilentSources.candidates(
+                for: binding.clips, in: binding.snapshot).map { "\($0.id)" }.joined(separator: ",")
+                : "-",
             // A LUT look over a Camera Log file adds Look's warning row (GR-16).
             videoPane.lutOverCameraLog ? "twice" : "-",
             // A LUT look in an HLG project adds Look's other warning row (HD-13).
@@ -207,6 +211,7 @@ final class ClipPane: InspectorPaneView {
             if videoPane.allBehindable { sections.append(videoPane.behindSubjectSection()) }
             // Layout after Behind Subject, before Crop (road map creator-jobs CO7, CO-71).
             if videoPane.allLayoutable { sections.append(videoPane.layoutSection(layoutState)) }
+            if videoPane.allHideable { sections.append(videoPane.hideSilentSection()) }  // CO-94
             // `allSourcePixels` asks about the SOURCE KIND, so it says yes to
             // an audio-only file's clip too; the tab itself is what keeps a
             // crop off a clip that draws nothing.

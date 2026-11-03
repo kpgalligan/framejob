@@ -166,7 +166,8 @@ detail there.
   its `map` as a `SourceMap`, checked once at decode and not a coding key (SR-20 (c));
   `PlanSegment.path` (the clip alone when absent) and `origin` (nil) read a nested audio
   segment's instance (spec §11 TX-10); `PlanDuck`
-  and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113). `AudioProps.swift`
+  and `ducks` are a speech ducker's own multiplier (format 29, spec §11 AU-113); `PlanGate` and
+  `gates` a gated clip's hide-while-silent gate (format 43, spec §11 CO-93). `AudioProps.swift`
   (a pure move out of `ProjectSnapshot.swift`, road map "audio" AP11's toll) holds the audio group:
   `AudioProps`, `DuckProps` and `CompressorProps`, with format 29's `DuckMode`,
   `DuckProps.mode` / `preRoll` / `hold` and `FadeShape` (and the popups' titles), and format
@@ -1046,7 +1047,26 @@ detail there.
   handle's plan `ducks`, decoded lazily once, for the timeline). Every duck
   edit of a Speech duck, in the Ducking section and over `set_audio`, puts
   `ops` before the `set_audio`. No span→time or gain arithmetic: that is
-  the core's.
+  the core's. `ops(forMedia:)` / `problem(forMedia:)` are hide while
+  silent's (CO-94), one media rather than clips.
+- `HideSilent.swift` · `VideoPane+HideSilent.swift` · `TimelineView+GateLine.swift` — hide while
+  silent (road map creator-jobs CO9, spec §11 CO-90…CO-94). `HideSilent.swift` (names no `rc_*`):
+  `HideSilentProps` (`VideoProps.hideSilent`, `VideoPatch.hideSilent`, a `T??` sent to the BASE by
+  `structural(video:for:)`; its `dictionary` writes all four keys), `HideSilentSources.candidates`
+  (the media with sound of any clip overlapping a selected clip, picture-less first, then overlap,
+  then id) and `GateCurves` (the plan's `gates` of one handle, decoded lazily once,
+  `DuckCurves`' shape). `VideoPane+HideSilent.swift` the Hide While Silent section, registered
+  after Layout in `ClipPane.makeSections()` when `allHideable` (every clip has pixels, none is a
+  nest clip; `structureSignature` carries it and the candidates' ids): every row one base step
+  "Hide While Silent" writing the whole gate, `DuckSpeech.ops(forMedia:)` first; a refusal there
+  sends nothing and becomes the section's note. `TimelineView+GateLine.swift` `drawGateLine`, a
+  1 pt teal line over a gated clip's VIDEO region from `TimelineView.gateCurves` (the frozen file's
+  one stored property for it, set by `refreshTimeline` beside `duckCurves`), called by
+  `TimelineClipDrawing.swift` after the audio block. `DuckSpeech.ops(forMedia:)` /
+  `problem(forMedia:)` (in `DuckSpeech.swift`): none for a media with `speech` or not in the
+  snapshot, a `Refusal` for no sound or no current cache. `set_video`'s handler
+  (`AgentServer+Properties.swift`) reads ONE key, `hide_silent.media`, and prepends them.
+  `payloadMediaIDs` (`+Clipboard`) names the gate's media so its row travels.
 
 **Frozen files.** `EditorViewController.swift`, `TimelineView.swift`,
 `PreviewCanvasView.swift`, `AgentServer.swift` are **frozen at current
@@ -1326,7 +1346,9 @@ the key map behind it.
   overlaid) · `+DuckCurve` (`drawDuckCurve`, a speech ducker's 1 pt yellow
   line over its audio region from `TimelineView.duckCurves` — the frozen
   file's one stored property for it, set in `refreshTimeline` beside
-  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+VolumeLine`
+  `sourceMaps` — drawn after the waveform; spec §11 AU-113) · `+GateLine` (`drawGateLine`, hide
+  while silent's teal line over a gated clip's video region from `TimelineView.gateCurves`, after
+  the audio block; spec §11 CO-93) · `+VolumeLine`
   (the volume line on the timeline, spec §11 AU-81, AU-82, AU-84:
   `volumeLineGeometry` — what the drawing and the hit both read —
   `drawVolumeLine`, called after the duck line by `TimelineClipDrawing.swift`,
@@ -1666,7 +1688,9 @@ the key map behind it.
   BASE cursor and are the clip's (⊘); Reset writes all eight defaults; +`Layout` — the
   Picture sub-tab's Layout section (road map creator-jobs CO7, spec §11 CO-71), registered
   after Behind Subject when `allLayoutable`, its choices `CameraLayoutSectionState` on
-  `ClipPane`; Switch at Playhead runs `CameraLayoutCommand.run`;
+  `ClipPane`; Switch at Playhead runs `CameraLayoutCommand.run`; +`HideSilent` — the Picture
+  sub-tab's Hide While Silent section (road map creator-jobs CO9, spec §11 CO-94), registered
+  after Layout when `allHideable` (its entry under `HideSilent.swift`);
   +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;

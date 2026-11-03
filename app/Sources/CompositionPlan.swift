@@ -152,6 +152,20 @@ struct PlanDuck: Codable, Equatable {
     }
 }
 
+/// A gated clip's hide-while-silent gate (format 43, spec §11 CO-93): the
+/// line the timeline draws on the clip (`TimelineView+GateLine.swift`).
+/// Nothing builds a composition from it — the recipe gates the opacity.
+struct PlanGate: Codable, Equatable {
+    let clip: UInt32
+    let ramps: [PlanRamp]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        clip = c.lenient(.clip, 0)
+        ramps = c.lenient(.ramps, [])
+    }
+}
+
 /// One `AVVideoCompositionInstruction` range. Instructions tile
 /// `[0, duration]` with no gaps or overlaps — an AVFoundation requirement.
 struct PlanInstruction: Codable, Equatable {
@@ -191,6 +205,8 @@ struct CompositionPlan: Codable, Equatable {
     let output: CanvasOutput
     /// One per speech ducker (spec §11 AU-113); empty when the plan has none.
     let ducks: [PlanDuck]
+    /// One per timeline-level gated clip (spec §11 CO-93); empty when none.
+    let gates: [PlanGate]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -204,6 +220,7 @@ struct CompositionPlan: Codable, Equatable {
         warnings = c.lenient(.warnings, [])
         output = c.lenient(.output, .sdr)
         ducks = c.lenient(.ducks, [])
+        gates = c.lenient(.gates, [])
     }
 
     /// Whether any video segment's media converts at step 0 (spec §11

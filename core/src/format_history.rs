@@ -394,4 +394,10 @@
 //! Version 42 is motion blur (spec §11 CU-113): `video.motion_blur`, a
 //! number after `behind_subject`, written only above 0; no migration. The
 //! bump is so an older build refuses a file with blur instead of dropping it.
-//! Every number from 43 up, 1014 included, is newer than this build.
+//!
+//! Version 43 is hide while silent (spec §11 CO-90, CO-91):
+//! `video.hide_silent`, `{media, pre_roll, hold, fade}` after `motion_blur`,
+//! written only when set, all four keys always; no migration. The bump is so
+//! an older build refuses a file with a gate instead of showing the camera
+//! through every pause and dropping the key on save.
+//! Every number from 44 up, 1014 included, is newer than this build.

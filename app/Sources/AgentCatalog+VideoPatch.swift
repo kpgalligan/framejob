@@ -199,6 +199,24 @@ extension AgentServer {
         + "clip (set it on the clips inside) and on an adjustment clip; drawn sharp under a "
         + "transition, a routed dissolve, a matte, Behind Subject or a drop shadow. Drawing "
         + "is not built yet: the key is stored and the recipe lists the placements)"
+    // Hide while silent (format 43, spec §11 CO-90…CO-94), explicitly typed
+    // for `lookClause`'s reason. The UI path is the Picture sub-tab's Hide
+    // While Silent section (`VideoPane+HideSilent.swift`).
+    private static let hideSilentClause: String =
+        ", hide_silent (null, or {media, pre_roll, hold, fade}: the camera fades out while "
+        + "media's speech is silent and back in just before it — the Picture sub-tab's Hide "
+        + "While Silent section. media is required: a media with sound whose speech the clip "
+        + "follows. pre_roll, hold and fade are ticks, 0–3000000 (0–5 s) each, defaults "
+        + "120000, 900000 and 180000 (0.2 s, 1.5 s, 0.3 s), stored off the frame grid. The "
+        + "drawn opacity is multiplied by a gate: 1 while the media's speech plays, widened by "
+        + "pre_roll before and hold after, ramping to 0 over fade, read from the clips of "
+        + "media in the nearest container (the clip's own, then each enclosing nest outward) "
+        + "where one plays; 1 where none plays. Only the drawn frame sees it: get_project and "
+        + "the clip's state read the opacity ungated. Not animatable (set_action_end refuses "
+        + "it). When media has no saved speech this tool first saves its spans from the "
+        + "on-device voice detection in the same undo step, and refuses when the media has no "
+        + "sound or its speech has not been detected yet (try again in a moment). Refused on "
+        + "a nest clip: set it on the clips inside)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -240,6 +258,7 @@ extension AgentServer {
         + cutoutClause
         + behindSubjectClause
         + motionBlurClause
+        + hideSilentClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "

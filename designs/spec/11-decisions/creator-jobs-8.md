@@ -513,3 +513,123 @@ says lane C; nothing depends on the lane).
   clip's speed (core); the occupancy refusal removed (core); the link kept on the copy (core);
   candidates not required to cover (P3); delete and copy as two steps (P2); neighbours not
   trimmed back (P4). The core mutants run against `cargo test --test copy_pieces`.
+
+## CO9 — hide the camera while silent (2026-11-03)
+
+Recorded before the code. CO-90…CO-95 are CO9's: a picture clip carries `video.hide_silent`
+(format 43, provisional until the phase lands), the recipe multiplies its layer's opacity by a
+gate read from a media's saved speech spans, so the camera fades out in pauses and back in just
+before speech; a Hide While Silent section in the Picture sub-tab and `set_video` set it, both
+saving the media's spans in the same undo step, and the timeline draws the gate's line on the
+clip. No new op, tool or `rc_*` export. The spans come from the on-device Silero VAD cache, so
+nothing is keyed (CJ-3). The owner's answer (2026-11-01): on silence, the camera FADES — not a
+switch to Screen Only.
+
+- **CO-90 — Hide while silent is a presentation term.** `video.hide_silent` is `null` or
+  `{media, pre_roll, hold, fade}`. At project time `t` the core multiplies the layer's placed
+  opacity by a gate:
+  - **The containers** of a layer are its own (the innermost enclosing nest, or the timeline)
+    and then each enclosing one outward. An instance of `media` is IN a container when its
+    `inside` clip-id path starts with that container's path, at any depth.
+  - **The container read** is the NEAREST one in which an instance of `media` covers `t`
+    (`Side::Right`: `start ≤ t < end`; `Side::Left`: `start < t ≤ end`, the limit from the
+    left the plan's ramp ends read).
+  - **The spans:** every instance of `media` in that container whose played window meets
+    `[t − hold − fade, t + pre_roll + fade]` gives its played speech (`played_speech`: the
+    media's spans in clip time, moved to the instance's origin, kept to `[start, end)`); they
+    are sorted, widened by `pre_roll` before and `hold` after, and merged where they overlap or
+    touch. The window is exact: a widened span outside it cannot reach `t`.
+  - **The gate** is the maximum over the merged spans `[s, e]` of 1 inside, `1 − (s − t)/fade`
+    before and `1 − (t − e)/fade` after, floored at 0; a `fade` of 0 is a step (`[s, e)` on
+    the right, `(s, e]` on the left). It is 1 when no container has an instance of `media`
+    covering `t`, when `media` is not in the project or has no saved `speech`, and for a clip
+    with none; a media whose `speech` is the empty list hides the clip wherever it plays.
+  - A clip's `enabled`, its track's mute and its track's `hidden` do not matter: the speech is
+    the media's. It reads the media's default source (`media.speech`); SW4b adds `stream` and
+    `channel`.
+  - Like `video.motion` (R5-4), every edit, `clip_state`, `get_project` and the inspector read
+    the clip UN-gated; only the recipe's layer opacity and the plan's `gates` see it. The gate
+    is applied in `recipe.rs`'s `layer` only, right after `moved`: `placement` (a routed
+    dissolve's and the blur's sub-frame placements) reads only position, so gating there would
+    change nothing.
+  - Amends **AU-110** ("a second reader, `video.hide_silent`, reads a media's spans to show a
+    picture while that media's speech plays") and **R5-4** ("`video.hide_silent`'s gate is the
+    third place the recipe draws what the model does not say").
+- **CO-91 — The numbers.** Defaults: `pre_roll` 0.2 s (120,000 ticks), `hold` 1.5 s
+  (900,000), `fade` 0.3 s (180,000). Each of the three is 0…5 s (0…3,000,000 ticks), the Duck's
+  range, refused outside in `ticks_in_range`'s sentence: "video.hide_silent.pre_roll must be
+  between 0 and 3000000 ticks, not N". They are envelope lengths, stored as typed and off the
+  frame grid (#355's rule). `media` 0 means not named. All four keys are always written; the
+  key itself is written only when set, after `motion_blur`, so every other file's text is what
+  it was.
+- **CO-92 — Refusals and carries.**
+  - `set_video` (and every pasted video group, through `settle_video`) refuses, each in its own
+    sentence: the three ranges (`check_video`); then on the clip (`settle_video`) "video.
+    hide_silent.media is required: the media whose speech the clip follows" (media 0), "video.
+    hide_silent.media 9 is not a media of this project", "video.hide_silent.media 4 has no sound
+    to follow" (`has_audio` false), and "clip 9 shows a nest and cannot hide while silent: set
+    it on the clips inside".
+  - Not animatable: `set_action_end` refuses a patch naming `video.hide_silent` (a `null`
+    included) and an `off` naming it, "video.hide_silent is not an animation target"; the
+    evaluator puts the base's value back over any end (`restore_base_video_keys`, beside the
+    cutout's restore).
+  - Carries: `split` (both halves), paste, Paste Attributes and `add_blurred_background`'s
+    copy keep it (a backdrop leaves with its picture). Paste and Paste Attributes carry the
+    gate's media as a NON-shown id, the look LUT's rule (GR-8): the clipboard payload carries
+    its row, `absorb_media` matches it by path or appends it, and a payload without the row
+    drops the gate to `None`, never a refusal; a pasted gate never follows a target media of
+    the same id that the payload did not name.
+  - `remove_media` clears every gate naming the media, on the timeline and in every nest, with
+    no new refusal (a gate does not "use" its media). `keep_range` keeps a kept clip's gate
+    media.
+- **CO-93 — The plan's `gates` and the timeline's line.** The plan carries `"gates"` only when
+  non-empty, after `ducks`: one entry `{clip, ramps}` per TIMELINE-level instance (empty
+  `inside`) of a gated clip, its ramps tiling `[start, end)` in the handle's time and
+  `coalesce`d — breakpoints at the instance's ends, every instance of the media's ends, each
+  merged span's `s − fade`, `s`, `e` and `e + fade`, and the midpoint of two spans less than
+  `2·fade` apart; each ramp's `from` read on the right and its `to` on the left. The timeline
+  draws it as a teal 1 pt polyline over the clip's VIDEO region, gate 1 at the top, after the
+  audio block. Inside an open nest it reads the scope's handle, so a gate from a container
+  outside the nest is not drawn there (the recipe still applies it).
+- **CO-94 — The section and the tool.**
+  - **Hide While Silent** (`video.hide_silent`), the Picture sub-tab, after Layout, shut by
+    default; offered when every selected clip has pixels and none is a nest clip (inside a nest
+    scope too). Every row is one undo step "Hide While Silent", written to the base
+    (`structural`), each writing the WHOLE props (Duck's rule).
+  - Rows: the checkbox "Hide while silent" (on gives each clip without one
+    `{media: the first candidate}` with the defaults, prefixed by `DuckSpeech.ops(forMedia:)`;
+    off and Reset write `null`; enabled when on, or when a first candidate exists and
+    `problem(forMedia:)` is nil, else its tooltip is the problem); the popup "Speech from" (the
+    candidates by name, plus a set media outside them); Pre-roll, Hold and Fade (seconds, two
+    decimals, 0–5; quick picks 0, 0.1, 0.2, 0.5 · 0.5, 1, 1.5, 3 · 0, 0.15, 0.3, 0.5). A thrown
+    `ops(forMedia:)` makes the row's ops empty and the section's note shows the sentence. The
+    summary is "off", the media's name, or "on" when mixed.
+  - **Candidates:** the media with sound of any clip in the snapshot (selected clips included)
+    overlapping a selected clip's span; picture-less media first ("the microphone first"),
+    then by total overlap descending, then by id.
+  - **`DuckSpeech.ops(forMedia:)`** answers `[]` for a media that already has `speech` (AU-111
+    frozen) or is not in the snapshot (the core then refuses by name), else one
+    `set_media_speech` from `spans(_:duration:)`; it refuses "<name> has no sound, so a clip
+    cannot hide while it is silent." and "<name>'s speech has not been detected yet, so a clip
+    cannot hide while it is silent. Try again in a moment." `problem(forMedia:)` is the same
+    answer without reading the cache.
+  - **`set_video`** reads one key: when `patch.hide_silent` is an object with a numeric
+    `media`, it prepends `DuckSpeech.ops(forMedia:)` over the document's project, its refusal
+    the tool's error, in the same undo step "Video Properties". Its description names
+    `hide_silent`, its keys, defaults, ranges, the gate rule, that it is not animatable, the
+    prepend and its refusals, and the UI path (the Picture sub-tab's Hide While Silent section).
+- **CO-95 — The proof.** `tools/proof/co9_proof.py` (Release) with `co9_probe.swift`: Z1 no
+  `Frame Job: ` line; H1 the rendered opacity 1 inside each widened span, 0 in a gap longer than
+  pre-roll + hold + 2·fade, 0.5 at `e + hold + fade/2` and at `s − pre_roll − fade/2`; H2 after
+  a `ripple_delete_ranges` through both tracks the gate follows the moved speech; H3 1 where no
+  clip of the media plays; H4 `get_project`'s opacity un-gated where the render is 0; H5
+  `remove_media {with_clips: true}` clears the gate and the camera shows; H6 `set_action_end`'s
+  patch and `off` naming `video.hide_silent` refused in the sentence; H7 a camera nested apart
+  from its microphone gated by the microphone in the enclosing container; H8 `set_video
+  {hide_silent: {media}}` on a voice file saves `media[].speech` in the same step (one `undo`
+  removes both), and a media with no sound refused in its sentence; probe P1 `ops(forMedia:)`'s
+  four answers, P2 the candidates' order, P3 the section after Layout and its checkbox one undo
+  step with the spans first. Seven mutants, each caught: pre-roll applied after the span (H1);
+  spans projected at the gated clip's origin (H2); the gate multiplied in `evaluate_clip` (core,
+  H4); `not_a_target`'s arm dropped (H6); only the layer's own container read (H7); the tool not
+  prepending (H8); `remove_media` not clearing (H5). JOB-65 is the person's check of the fade.

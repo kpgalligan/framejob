@@ -84,6 +84,7 @@ use crate::lut::{look_media_ids, remap_look_media};
 use crate::model::{Clip, Media, Nest, Project, Source};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
+use crate::video_gate::{hide_silent_media, remap_hide_silent};
 
 /// One clipboard payload. `media` and `nests` default because most
 /// selections name neither; `clips` deliberately does not, so a payload that
@@ -215,6 +216,7 @@ fn absorb_nests(
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
             remap_look_media(clip, media);
+            remap_hide_silent(clip, media);
             // The speed BEFORE the duration: the bound is measured at it.
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
@@ -350,7 +352,10 @@ fn wanted_media(clips: &[&Clip], payload: &Payload) -> (Vec<u32>, Vec<u32>) {
                 sources.push(id);
             }
         }
-        for id in look_media_ids(clip) {
+        for id in look_media_ids(clip)
+            .into_iter()
+            .chain(hide_silent_media(clip))
+        {
             if !looks.contains(&id) {
                 looks.push(id);
             }
@@ -459,6 +464,7 @@ impl Project {
             fresh.insert(source.id, clip.id);
             clip.source = remap_source(&source.source, &media, &nests);
             remap_look_media(&mut clip, &media);
+            remap_hide_silent(&mut clip, &media);
             // The payload is trusted about WHAT a clip is and checked about
             // what it would do to the project, so a nonsense rate — which
             // only a hand-written payload can carry — falls back to 1:1

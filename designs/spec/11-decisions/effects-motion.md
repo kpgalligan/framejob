@@ -46,6 +46,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   being the forced `normal` blend under a transition (§7.3). It is not an
   animation target: an action cannot animate it, and a file that tries is
   drawn with the base motion.
+  **Amended by CO-90** (road map creator-jobs CO9): `video.hide_silent`'s gate is the
+  third place the recipe draws what the model does not say.
 - **R5-5 — Motion is a pure function of clip time.** No seed, no wall
   clock, no previous frame: `render_frame` at a tick is byte-identical run
   after run, preview and export agree, and two clips with the same preset

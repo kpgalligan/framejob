@@ -447,6 +447,15 @@ the transition ops are §6d.
   **error** naming what it is (`clip 9 shows a nest and cannot take motion blur: set it on the
   clips inside`, `clip 4 is an adjustment clip and cannot take motion blur`), from `set_video`,
   `paste` and `paste_attributes` alike; 0 removes the key.
+  `video.hide_silent` (format 43, §11 CO-90…CO-92) is `{media, pre_roll, hold, fade}`, each time
+  0–3,000,000 ticks (`video.hide_silent.fade must be between 0 and 3000000 ticks, not 3000001`);
+  `media` must be named (`video.hide_silent.media is required: the media whose speech the clip
+  follows`), a media of the project (`video.hide_silent.media 9 is not a media of this project`)
+  with sound (`video.hide_silent.media 4 has no sound to follow`), and a nest clip refuses it
+  (`clip 9 shows a nest and cannot hide while silent: set it on the clips inside`) — each an
+  **error**, from `set_video`, `paste` and `paste_attributes` alike; `null` removes it. Paste and
+  `paste_attributes` carry the gate's media as a non-shown row (the look LUT's rule, §11 GR-8): a
+  row absorbed by path or appended, a payload without it dropping the gate.
   `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
   merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
   **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.

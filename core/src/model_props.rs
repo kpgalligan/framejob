@@ -49,6 +49,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::Color;
+use crate::time::Ticks;
 
 /// The region types — [`Spotlight`], [`ObscureRegion`], the [`SpotShape`]
 /// both are drawn with and the [`MAX_OBSCURE`] budget on the second — live
@@ -238,6 +239,10 @@ pub struct VideoProps {
     /// file's text is what it was.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub motion_blur: f64,
+    /// Hide while silent (format 43, spec §11 CO-90): the layer's opacity
+    /// times a gate from `media`'s speech. Written only when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hide_silent: Option<HideSilent>,
 }
 
 impl Default for VideoProps {
@@ -267,6 +272,37 @@ impl Default for VideoProps {
             cutout: None,
             behind_subject: false,
             motion_blur: 0.0,
+            hide_silent: None,
+        }
+    }
+}
+
+/// `video.hide_silent`'s defaults and its one range (spec §11 CO-91), in
+/// ticks: 0.2 s, 1.5 s and 0.3 s, each of the three 0…5 s.
+pub const HIDE_SILENT_PRE_ROLL: Ticks = 120_000;
+pub const HIDE_SILENT_HOLD: Ticks = 900_000;
+pub const HIDE_SILENT_FADE: Ticks = 180_000;
+pub const HIDE_SILENT_MAX: Ticks = 3_000_000;
+
+/// Hide while silent (spec §11 CO-90, CO-91): the media whose speech the
+/// clip follows (0 = not named) and the envelope around it, off the grid.
+/// All four keys are always written.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HideSilent {
+    pub media: u32,
+    pub pre_roll: Ticks,
+    pub hold: Ticks,
+    pub fade: Ticks,
+}
+
+impl Default for HideSilent {
+    fn default() -> Self {
+        HideSilent {
+            media: 0,
+            pre_roll: HIDE_SILENT_PRE_ROLL,
+            hold: HIDE_SILENT_HOLD,
+            fade: HIDE_SILENT_FADE,
         }
     }
 }

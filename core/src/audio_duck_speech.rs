@@ -63,10 +63,15 @@ pub(crate) fn speech_in_clip(
     out
 }
 
-/// Widens each `[s, e)` to `[s − pre_roll, e + hold]` and merges the ones
-/// that then overlap or touch, in start order.
-fn widened(spans: Vec<(Ticks, Ticks)>, duck: &Duck) -> Vec<(Ticks, Ticks)> {
-    let (before, after) = (duck.pre_roll.max(0), duck.hold.max(0));
+/// Widens each `[s, e)` to `[s − before, e + after]` (each floored at 0)
+/// and merges the ones that then overlap or touch, in start order: a speech
+/// duck's `pre_roll` and `hold`, and `video_gate.rs`'s (spec §11 CO-90).
+pub(crate) fn widened(
+    spans: Vec<(Ticks, Ticks)>,
+    before: Ticks,
+    after: Ticks,
+) -> Vec<(Ticks, Ticks)> {
+    let (before, after) = (before.max(0), after.max(0));
     let mut out: Vec<(Ticks, Ticks)> = Vec::with_capacity(spans.len());
     for (s, e) in spans {
         let (s, e) = (s.saturating_sub(before), e.saturating_add(after));
@@ -79,17 +84,33 @@ fn widened(spans: Vec<(Ticks, Ticks)>, duck: &Duck) -> Vec<(Ticks, Ticks)> {
 }
 
 impl Project {
-    /// A speech ducker's spans in PROJECT time: its media's speech in clip
-    /// time, moved to `origin` (the clip's first frame), kept to `played`
-    /// (the part of the instance that plays), then widened and merged.
-    /// Empty for a clip that is not a media clip or whose media has no
-    /// `speech` — a speech duck with nothing to follow ducks nowhere.
+    /// A speech ducker's spans in PROJECT time: [`Self::played_speech`],
+    /// then widened and merged by its `pre_roll` and `hold`. Empty for a
+    /// clip that is not a media clip or whose media has no `speech` — a
+    /// speech duck with nothing to follow ducks nowhere.
     pub(crate) fn speech_spans(
         &self,
         clip: &Clip,
         origin: Ticks,
         played: (Ticks, Ticks),
         duck: &Duck,
+    ) -> Vec<(Ticks, Ticks)> {
+        widened(
+            self.played_speech(clip, origin, played),
+            duck.pre_roll,
+            duck.hold,
+        )
+    }
+
+    /// A media clip's speech in PROJECT time, unwidened: its media's speech
+    /// in clip time, moved to `origin` (the clip's first frame) and kept to
+    /// `played` (the part of the instance that plays). Sorted. Empty for a
+    /// clip that is not a media clip or whose media has no `speech`.
+    pub(crate) fn played_speech(
+        &self,
+        clip: &Clip,
+        origin: Ticks,
+        played: (Ticks, Ticks),
     ) -> Vec<(Ticks, Ticks)> {
         let Source::Media { media, .. } = clip.source else {
             return Vec::new();
@@ -100,15 +121,14 @@ impl Project {
         let Some(spans) = &media.speech else {
             return Vec::new();
         };
-        let projected: Vec<(Ticks, Ticks)> = speech_in_clip(clip, media, spans)
+        speech_in_clip(clip, media, spans)
             .into_iter()
             .map(|(a, b)| {
                 let a = origin.saturating_add(a).max(played.0);
                 (a, origin.saturating_add(b).min(played.1))
             })
             .filter(|(a, b)| b > a)
-            .collect();
-        widened(projected, duck)
+            .collect()
     }
 }
 

@@ -61,6 +61,7 @@ use crate::model::{Clip, GraphicProps, Project, Qualifier, ShapeProps, Source, T
 use crate::model_graphic::{check_count, check_props};
 use crate::outcome::Outcome;
 use crate::patch::{Group, GROUPS};
+use crate::video_gate::{hide_silent_media, remap_hide_silent};
 
 /// The five groups `paste_attributes` takes by name — `video | audio | text
 /// | shape | graphic` on the wire. The first four are the PATCH groups
@@ -288,9 +289,14 @@ impl Project {
             };
             let takes_video = chosen.contains(&PasteGroup::Video) && target.video.is_some();
             if takes_video && looked.is_none() {
-                let map = absorb_media(&mut next, &payload, &[], &look_media_ids(source))?;
+                let looks = [
+                    look_media_ids(source),
+                    hide_silent_media(source).into_iter().collect(),
+                ];
+                let map = absorb_media(&mut next, &payload, &[], &looks.concat())?;
                 let mut copy = source.clone();
                 remap_look_media(&mut copy, &map);
+                remap_hide_silent(&mut copy, &map);
                 looked = Some(copy);
             }
             let from = looked.as_ref().unwrap_or(source);
