@@ -28,8 +28,9 @@ extension ScreenRecorder {
     /// when the list has none, whose origin may be window-local rather than global points
     /// until the first frame's geometry replaces it), the filter's `contentRect` for a picked
     /// source. The header's
-    /// `pixels_per_point` is the configured width ÷ the point width; `in_picture` true, since
-    /// the pointer is still burned in (CU3c); `cursor_image` none (CU-S1).
+    /// `pixels_per_point` is the configured width ÷ the point width; `in_picture` the choice's
+    /// (spec §11 CU-31: true only In the picture, where the stream burns the pointer in);
+    /// `cursor_image` none (CU-S1).
     static func cursorStart(
         filter: SCContentFilter, choice: RecordingChoice, stream: SCStreamConfiguration
     ) -> CursorSegmentStart {
@@ -64,28 +65,38 @@ extension ScreenRecorder {
                 height: Double(points.height) * contentScale),
             contentScale: contentScale, scaleFactor: scaleFactor)
         return CursorSegmentStart(
-            inPicture: true, source: source, displayID: displayID, sourceFrame: frame,
+            inPicture: choice.effectiveCursor == .inPicture, source: source,
+            displayID: displayID, sourceFrame: frame,
             pointSize: points, pixelsPerPoint: pixelsPerPoint,
             contentSize: CursorPixelSize(
                 width: min(Int(width), 16384), height: min(Int(height), 16384)),
             cursorImage: .none, geometry: geometry)
     }
 
+    /// What a Separate segment's no-file sentences end with (spec §11 CU-31 (d)): the stream drew
+    /// no pointer, so without the file the pointer is nowhere.
+    static let cursorSeparateLost =
+        " The pointer is not in the movie either: it was recorded Separate."
+
     /// A segment's `cursorProblem` once its file was attempted: the writer's sentence when it
-    /// has one (no file was kept); else, when the frames could not be watched, CU-13's
-    /// sentence naming the movie and the reason; else nil.
-    static func cursorProblem(writer: String?, watchLost: String?, movieName: String) -> String? {
-        if let writer { return writer }
+    /// has one (no file was kept), with `cursorSeparateLost` when `separate`; else, when the
+    /// frames could not be watched, CU-13's sentence naming the movie and the reason (a file
+    /// exists, so it is the same for both choices); else nil.
+    static func cursorProblem(
+        writer: String?, watchLost: String?, movieName: String, separate: Bool = false
+    ) -> String? {
+        if let writer { return separate ? writer + cursorSeparateLost : writer }
         guard let watchLost else { return nil }
         return "The cursor file for \(movieName) has only the geometry the screen had when it "
             + "began: its frames could not be watched (\(watchLost)), so a move or resize of "
             + "what was recorded after that is not in it."
     }
 
-    /// CU-12's sentence for a landed segment with no E1.
-    static func cursorNoAnchorProblem(movieName: String) -> String {
+    /// CU-12's sentence for a landed segment with no E1, with `cursorSeparateLost` when
+    /// `separate` (CU-31 (d)).
+    static func cursorNoAnchorProblem(movieName: String, separate: Bool = false) -> String {
         "The cursor file for \(movieName) was not written: the screen never reported its start, "
-            + "so its times have nothing to count from."
+            + "so its times have nothing to count from." + (separate ? cursorSeparateLost : "")
     }
 
     /// MAIN, from `launchScreen`: segment 0 opened, then the poll and the monitors started.
@@ -109,10 +120,13 @@ extension ScreenRecorder {
         let segment = done.segments[index]
         let movie = segment.movieURL
         let name = movie.lastPathComponent
+        let separate = done.choice.effectiveCursor == .separate
         guard let host = segment.screenHost else {
             return then(
                 landed.withCursor(
-                    url: nil, problem: Self.cursorNoAnchorProblem(movieName: name), image: nil))
+                    url: nil,
+                    problem: Self.cursorNoAnchorProblem(movieName: name, separate: separate),
+                    image: nil))
         }
         let watchLost = segment.cursorWatchProblem ?? done.cursorWatchLost
         let size = CursorPixelSize(
@@ -135,7 +149,7 @@ extension ScreenRecorder {
                     + "for it."
             }
             let problem = Self.cursorProblem(
-                writer: writer, watchLost: watchLost, movieName: name)
+                writer: writer, watchLost: watchLost, movieName: name, separate: separate)
             // The written file attached to the segment's media (spec §11 CU-34 (c)): the settle
             // probe ran before it existed. A failed attach leaves the segment as CU-18 left it.
             var attached: MediaCursor?

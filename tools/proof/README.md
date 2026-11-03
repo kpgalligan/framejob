@@ -28748,8 +28748,8 @@ The recorded runs are in `designs/creator-jobs.md`'s TX3b record.
 **Ungranted.** `cursor_keys_probe.py` builds `cursor_keys_probe.swift` from `app/Sources` (no app,
 no grant, no prompt) on `cursor_capture_probe.py`'s shape and exit rule R; Y9 and the order half
 of Y8 are read from the sources by the script itself. The panel is `RecorderPanelController.shared`,
-never shown, under a spy's grant doors, and the twelve `FrameJobRecording…` values and
-`FrameJobInputMonitoringAsked` are put back as they were.
+never shown, under a spy's grant doors, and the thirteen `FrameJobRecording…` values (twelve
+until CU3c) and `FrameJobInputMonitoringAsked` are put back as they were.
 
 | Row | What it holds |
 |---|---|
@@ -29383,3 +29383,64 @@ make app && RC_PROOF_APP=release python3 tools/proof/switch_speaker_proof.py <di
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s SW2b record. Person checks: JOB-51, JOB-52.
+
+## Road map "creator-jobs" CU3c — the recorder stops burning the pointer (`cu3c_probe.py` B0, P1–P7 with `cu3c_probe.swift`; `recording_probe.py`'s B2 and D10 cursor row; `cursor_layer_proof.py` B3, B5; `cursor_proof.py` B1, B4, K17; eight mutants; spec §11 CU-31, CU-36)
+
+**Ungranted, no app.** `cu3c_probe.py` builds `cu3c_probe.swift` from `app/Sources` on
+`cursor_keys_probe.py`'s shape and exit rule R (`--sources`, `--mutant`, `--only`). The panel is
+`RecorderPanelController.shared`, never shown, under doors that read nothing true, and the
+thirteen `FrameJobRecording…` values are put back as they were.
+
+| Row | What it holds |
+|---|---|
+| P1 | the grid row "Cursor:" directly after System Audio and before Show Clicks; the items "Separate" and "In the picture", `representedObject` `separate` and `in_picture`; the action `controlChanged:` |
+| P2 | never chosen: a display shows Separate with `cursor` nil; a picked window (the Window row with a filter) shows In the picture after `refreshSizeNote()`; a tool's `.window` is In the picture; the Window row with no pick (`selectedScreen` nil), the popup set to In the picture by hand, is put back to Separate by `refreshSizeNote()`'s first statement |
+| P3 | a pick writes `FrameJobRecordingCursor` and survives a source change; never chosen, `persistChoices` writes `""` whatever the popup shows; `in_picture` restores, `""` and `bogus` restore to nil |
+| P4 | greyed for Microphone Only and Camera with its value kept, their `cursor` nil; live again on a display |
+| P5 | `RecordingCursor.defaultFor`'s table, a choice beating it, `windowDefault` `.inPicture`, `RecordingChoice().cursor` nil |
+| P6 | `cursorNoAnchorProblem` and `cursorProblem`'s writer arm with `cursorSeparateLost` for Separate and as before In the picture; the watch-lost and nil arms the same for both |
+| P7 | `wantsRipples` only with Show Clicks, Separate and a picture; the remainder of ripples alone named "Cursor Clicks", with a voice "Add Microphone" |
+
+`recording_probe.py`'s section 2 is B2: 32 configuration rows, the 16 In the picture equal to
+`expected_configuration` (today's) and the 16 Separate the same but `showsCursor` and
+`showMouseClicks` false and `pixelFormat` `420v`; 5d and D3 count thirteen keys; 7c's arguments
+gain `cursor`; D10 refuses `{source: voice_over, cursor: separate}` by name.
+
+**Over MCP.** `cursor_layer_proof.py` B3: `land_recording` (with its new `cursor_mode` and
+`show_clicks`) Separate with Show Clicks lands the screen clip with `video.cursor.clicks` `ripple`
+and one undo ("Add Recording") removes the recording; Separate without Show Clicks, and In the
+picture with it, land no `video.cursor`; B3b the same into a new project, whose remainder step
+("Add Microphone": the tool's movie always carries its voice) undoes the ripples; both arguments
+refused without `movie`. B5: `record_screen` with `source: camera, cursor: separate` refused by
+name, `cursor: burned` the vocabulary sentence, the schema's enum `["separate", "in_picture"]`.
+
+**Granted** (skipped by name without Screen Recording or on a locked console; they warp the
+pointer and show a grey window and a red square — keep your hands off the mouse).
+`cursor_proof.py` B1: the probe's grey window recorded Separate holds no pixel beyond 8/255 of
+the grey in a 32 × 32 px box from the warped point, In the picture at least 20. B4: a Separate
+display recording at 30 fps of a red 40 pt square whose top-left corner the pointer holds at 8
+points for 0.5 s each, imported over MCP: the drawn arrow's located tip (its black centroid less
+the probe's `arrow` offset, from renders with and without `show`) within 1.5 px of the square's
+corner at p95 over 3 mid-hold frames per hold, and at each hold change the tip's first frame at
+the new corner within one frame of the square's. K17 now expects `in_picture` false.
+
+Mutants (each must fail its row): `recording_probe.py --mutant separate-shows-cursor --only
+configuration`, `--mutant separate-bgra --only configuration`, `--mutant voice-strangers-cursor
+--only voiceover_doors`; `cu3c_probe.py --mutant window-default-separate` (P2, P5),
+`persist-shown-cursor` (P3), `sync-after-returns` (P2), `separate-lost-dropped` (P6); and by
+hand `ripple-write-skipped` — the `addRipples` call in `RecordingLanding.placement` removed,
+`make app-debug`, `cursor_layer_proof.py --only B3` fails, the file restored byte-identical by
+SHA-256.
+
+```sh
+make rust
+python3 tools/proof/cu3c_probe.py [--only P2,P3]
+python3 tools/proof/cu3c_probe.py --mutant <name>
+python3 tools/proof/recording_probe.py --only files,configuration,chrome,catalog,voiceover_doors
+make app-debug && python3 tools/proof/cursor_layer_proof.py --only B3,B5,I3
+make app && RC_PROOF_APP=release python3 tools/proof/cursor_layer_proof.py
+make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU3c record. JOB-21, JOB-27 and JOB-28 are
+the person checks.

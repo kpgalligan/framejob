@@ -134,6 +134,20 @@ bounds is the bbox of the pixels more than 8/255 from the `show: false` render.
 - S7 (probe) `CursorSprites.arrow`: one upload per pixel size, the sizes, a fill and an outside
   texel.
 
+**CU3c's rows** (road map creator-jobs CU3c, spec §11 CU-31, CU-36), on copies of `clean.mov` in
+`work/cursor-layer/i/` and the probe's `cursor.fjcursor` (`in_picture: false`):
+- B3 `land_recording {voice, movie, cursor, cursor_mode: "separate", show_clicks: true, project}`
+  → the landed screen clip's `video.cursor.clicks` is `ripple`, and one `undo` removes the
+  recording (its media and its clip); `show_clicks: false` with Separate, and `cursor_mode:
+  "in_picture"` with `show_clicks: true`, → no `video.cursor`; B3b the same Separate landing with
+  no `project`, into a new project → the clip's `clicks` `ripple`, and `undo` there (the remainder
+  step, "Add Microphone": `land_recording`'s movie always carries its voice; "Cursor Clicks" alone
+  is `cu3c_probe.py`'s P7) leaves the clip with no `video.cursor`; `cursor_mode` and `show_clicks` without
+  `movie` refused by name.
+- B5 `record_screen {seconds: 1, source: "camera", cursor: "separate"}` refused naming `cursor`;
+  `{seconds: 1, cursor: "burned"}` refused in `enumArg`'s vocabulary sentence, before any grant;
+  `tools/list`'s `record_screen.cursor` a string whose enum is `["separate", "in_picture"]`.
+
 Prints `scores: P/N` and each skip with its reason; exits 0 iff every scored row passed.
 """
 
@@ -166,7 +180,8 @@ PROBE_ROWS = ["B0", "L1d", "L3r", "L9", "L7", "I4", "I6", "S1", "S5", "S7"]
 DRAWING_ROWS = ["L2", "L4", "L5", "L6", "L8", "L8r", "L10", "L11"]
 ATTACH_ROWS = ["I1", "I2", "I3", "I5"]
 SECTION_ROWS = ["S2", "S3", "S4", "S6"]
-APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + SECTION_ROWS + ["Z1"]
+RECORDER_ROWS = ["B3", "B5"]
+APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + SECTION_ROWS + RECORDER_ROWS + ["Z1"]
 ROWS = PROBE_ROWS + APP_ROWS
 RENDER_TIMES = [SEC // 2, 2 * SEC, 4 * SEC]
 SCALE_SENTENCE = "video.cursor.scale must be between 0.25 and 8, not 9"
@@ -1116,6 +1131,98 @@ def s6(client):
         doc.close()
 
 
+# ---- CU3c: what a recording lands with, and record_screen's cursor --------------------------
+
+
+def clip_cursor(project, clip_id):
+    clip = next((c for c in project["clips"] if c["id"] == clip_id), None)
+    return "no clip" if clip is None else (clip.get("video") or {}).get("cursor")
+
+
+def b3(client):
+    doc = new_doc(client, "b3")
+    try:
+        silent = ATTACH / "silent.m4a"
+        ATTACH.mkdir(parents=True, exist_ok=True)
+        if not silent.exists():
+            ffmpeg(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "4", "-c:a", "aac",
+                    str(silent)])
+        cursor_file = FIXTURE["cursor"]
+
+        def land(name, **arguments):
+            movie = clean_copy(name)
+            answer = doc.call("land_recording", voice=[str(silent)], movie=str(movie),
+                              cursor=cursor_file, **arguments)
+            return movie, answer
+
+        movie, answer = land("b3-separate", cursor_mode="separate", show_clicks=True)
+        project = doc.project()
+        got = clip_cursor(project, answer.get("clip"))
+        check("B3", isinstance(got, dict) and got.get("clicks") == "ripple",
+              f"Separate with Show Clicks: the screen clip's video.cursor {got}")
+        undone = doc.call("undo")
+        after = doc.project()
+        check("B3", undone.get("undone") == "Add Recording"
+              and not any(m.get("path") == str(movie) for m in after["media"])
+              and not any(c["id"] == answer.get("clip") for c in after["clips"]),
+              f"one undo ({undone.get('undone')!r}) removes the recording's media and clip")
+        _, answer = land("b3-no-clicks", cursor_mode="separate", show_clicks=False)
+        got = clip_cursor(doc.project(), answer.get("clip"))
+        check("B3", got is None, f"Separate without Show Clicks: video.cursor {got}")
+        _, answer = land("b3-in-picture", cursor_mode="in_picture", show_clicks=True)
+        got = clip_cursor(doc.project(), answer.get("clip"))
+        check("B3", got is None, f"In the picture with Show Clicks: video.cursor {got}")
+        for key, value in (("cursor_mode", "separate"), ("show_clicks", True)):
+            message = error_of(lambda: doc.call("land_recording", voice=[str(silent)],
+                                                **{key: value})) or ""
+            check("B3", key in message and "movie" in message,
+                  f"{key} without movie: {message[:200] or 'no refusal'}")
+    finally:
+        close(client, doc.path)
+    # B3b: no `project`, so a new project — the ripples inside its remainder step.
+    movie = clean_copy("b3b-new")
+    fresh = None
+    try:
+        answer = client.call("land_recording", voice=[str(ATTACH / "silent.m4a")],
+                             movie=str(movie), cursor=FIXTURE["cursor"], cursor_mode="separate",
+                             show_clicks=True)
+        fresh = Doc(client, movie)
+        clip = (answer.get("segments") or [{}])[0].get("clip") or answer.get("clip")
+        project = fresh.project()
+        if clip is None and project["clips"]:
+            clip = project["clips"][0]["id"]
+        got = clip_cursor(project, clip)
+        check("B3", answer.get("landed") == "new_project" and isinstance(got, dict)
+              and got.get("clicks") == "ripple",
+              f"B3b into a new project ({answer.get('landed')}): clip {clip}'s video.cursor {got}")
+        undone = fresh.call("undo")
+        got = clip_cursor(fresh.project(), clip)
+        # land_recording's movie always carries its one voice, so the remainder step holds the
+        # microphone too and is "Add Microphone"; "Cursor Clicks" alone is cu3c_probe's P7.
+        check("B3", undone.get("undone") == "Add Microphone" and got is None,
+              f"B3b undo ({undone.get('undone')!r}): clip {clip}'s video.cursor {got}")
+    finally:
+        if fresh is not None:
+            close(client, fresh.path)
+
+
+def b5(client):
+    message = error_of(lambda: client.call("record_screen", seconds=1, source="camera",
+                                           cursor="separate")) or ""
+    check("B5", message.endswith("With source camera, cursor cannot be given — a camera "
+                                 "recording records the camera alone, at the camera's own "
+                                 "format."),
+          f"source camera with cursor: {message[:240] or 'no refusal'}")
+    message = error_of(lambda: client.call("record_screen", seconds=1, cursor="burned")) or ""
+    check("B5", message.endswith('cursor must be one of separate, in_picture (got "burned").'),
+          f"cursor burned: {message[:240] or 'no refusal'}")
+    schema = (client.schemas().get("record_screen") or {}).get("inputSchema") or {}
+    cursor = (schema.get("properties") or {}).get("cursor") or {}
+    check("B5", cursor.get("type") == "string" and cursor.get("enum") == ["separate", "in_picture"]
+          and bool(cursor.get("description")),
+          f"record_screen.cursor's schema {json.dumps({k: cursor.get(k) for k in ('type', 'enum')})}")
+
+
 def i5(_client):
     skip("I5", "owed to CU1b2: the drawn tip against a burned tip on a real In-the-picture "
          "recording needs CU1b2's burned-tip helper (the road map's granted L1)")
@@ -1137,12 +1244,13 @@ def app_rows(binary):
                     ("L10", l10)]]
         attaching = [("I1", i1), ("I2", i2), ("I3", i3), ("I5", i5)]
         section = [("S2", s2), ("S3", s3), ("S4", s4), ("S6", s6)]
-        bodies = [("L1", l1), ("L3", l3)] + drawing + attaching + section
+        recorder = [("B3", b3), ("B5", b5)]
+        bodies = [("L1", l1), ("L3", l3)] + drawing + attaching + section + recorder
         held = None
         for name, body in bodies:
             if name not in selected:
                 continue
-            if name in DRAWING_ROWS + ["I1", "I2", "I3"] + SECTION_ROWS \
+            if name in DRAWING_ROWS + ["I1", "I2", "I3", "B3"] + SECTION_ROWS \
                     and not FIXTURE.get("cursor"):
                 check(name, False, f"no fixture: {FIXTURE.get('problems') or 'the probe wrote none'}")
                 continue
@@ -1196,16 +1304,17 @@ def main():
             print(f"unknown rows: {sorted(unknown)}")
             return 2
         if selected & ({"L1", "L3"} | set(DRAWING_ROWS) | set(ATTACH_ROWS)
-                       | set(SECTION_ROWS)):
+                       | set(SECTION_ROWS) | set(RECORDER_ROWS)):
             selected.add("Z1")
         if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | set(SECTION_ROWS)
-                       | {"L7", "I4", "I6", "S1", "S5", "S7"}):
+                       | {"L7", "I4", "I6", "S1", "S5", "S7", "B3"}):
             selected.add("B0")
     remove_work()
     HOME.mkdir(parents=True)
-    print(f"CU3a1, CU3a2, CU3b and CU4 — the cursor in the model and the recipe, drawn, "
-          f"attached, then its section ({proof_app.config()} build)", flush=True)
-    if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | set(SECTION_ROWS) | {"L7"}):
+    print(f"CU3a1, CU3a2, CU3b, CU4 and CU3c — the cursor in the model and the recipe, drawn, "
+          f"attached, its section, then what a recording lands with ({proof_app.config()} "
+          f"build)", flush=True)
+    if selected & (set(DRAWING_ROWS) | set(ATTACH_ROWS) | set(SECTION_ROWS) | {"L7", "B3"}):
         try:
             make_clean()
         except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:

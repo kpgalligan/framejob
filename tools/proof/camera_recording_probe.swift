@@ -1101,7 +1101,7 @@ final class PanelGrantSpy {
 }
 
 /// CR1c (spec §11 CAM-5): `RecorderPanelController.shared`, never shown,
-/// under `PanelGrantSpy`, with the twelve `FrameJobRecording…` values put back
+/// under `PanelGrantSpy`, with the thirteen `FrameJobRecording…` values put back
 /// as they were at the end. Neither fake id finds a device, so no camera or
 /// microphone opens.
 func panelRows(_ request: [String: Any]) {
@@ -1115,6 +1115,7 @@ func panelRows(_ request: [String: Any]) {
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
         RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
         RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
+        RecorderPanelController.cursorKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -1222,7 +1223,7 @@ func panelRows(_ request: [String: Any]) {
     panel.restoreChoices()
     let kept = panel.cameraSelected && panel.currentChoice().source == .camera
         && panel.selectedCameraID == "probe-camera"
-    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 12 && kept,
+    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 13 && kept,
              "display key \(display) (sentinel 777), camera key \(stored ?? "nil"), \(keysNow.count) "
                 + "keys \(keysNow), the row and the camera kept through rebuildSources + "
                 + "restoreChoices \(kept)")
@@ -1732,7 +1733,7 @@ func besidePanelRows(
                && stored == true && note.contains("points"))
     let keys = recordingKeys()
     expect("\(keys.count) FrameJobRecording… keys \(keys)",
-           keys.count == 12 && keys.contains(key))
+           keys.count == 13 && keys.contains(key))
     tick(false)
     let unticked = defaults.object(forKey: key) as? Bool
     expect("unticked: key \(unticked.map { "\($0)" } ?? "absent"), camera "

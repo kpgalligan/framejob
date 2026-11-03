@@ -30,7 +30,20 @@ Rows:
   K17 (road map creator-jobs CU3b, spec §11 CU-34 (c)) in the same launch:
       `record_screen {seconds: 2, place: true, path: <scratch>}` into a new project: the landed
       media (the one whose path is `segments[0].path`) has `cursor` with `path`
-      `segments[0].cursor_path` and `in_picture` true — `saveCursor` attached the file it wrote.
+      `segments[0].cursor_path` and `in_picture` false — `saveCursor` attached the file it wrote,
+      and a display recording with no `cursor` is Separate (road map creator-jobs CU3c, spec §11
+      CU-36 (a); `in_picture` true before CU3c).
+  B1  (CU3c, spec §11 CU-31) the probe's grey 1001 × 701 pt window recorded at Nominal with the
+      pointer warped inside it, once Separate and once In the picture: in the movie's last frame,
+      a 32 × 32 px box from the warped point holds no pixel more than 8/255 from the window's
+      grey with Separate, and at least 20 In the picture (the control).
+  B4  (CU3c) a Separate display recording at 30 fps of a red 40 pt square whose top-left corner
+      the pointer holds at 8 points for 0.5 s each, imported over MCP into a canvas of the
+      movie's size: the drawn tip — located as `cursor_layer_proof`'s `tip_from` locates one,
+      from the render with and without `show`, the arrow's black centroid less its hot spot (the
+      probe's `arrow`) — within 1.5 px of the square's corner at p95 over 3 mid-hold frames per
+      hold; and at each of the 7 hold changes the first frame showing the tip at the new corner
+      within one frame of the first showing the square there.
   Z1  the launch's log holds no `Frame Job: ` line.
 
 Prints `scores: P/N` over the rows scored and each skip with its reason; exits 0 iff every
@@ -51,7 +64,10 @@ import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/cursor-proof"
-ROWS = ["K4", "K5", "K7", "K8", "K15", "K17", "Z1"]
+ROWS = ["K4", "K5", "K7", "K8", "K15", "K17", "B1", "B4", "Z1"]
+TIP_PX = 1.5          # B4: the drawn tip against the square's corner, p95
+GREY_TOLERANCE = 8    # B1: /255 from the window's grey
+FPS = 30              # B4's recording rate and canvas
 WALL = 600
 
 results = {}
@@ -232,7 +248,7 @@ def k17(client, folder):
                  if m.get("path") == segment.get("path")]
         cursor = (media[0].get("cursor") if media else None) or {}
         check("K17", bool(segment.get("cursor_path")) and cursor.get("path") ==
-              segment.get("cursor_path") and cursor.get("in_picture") is True,
+              segment.get("cursor_path") and cursor.get("in_picture") is False,
               f"the landed media's cursor {cursor}, segments[0].cursor_path "
               f"{segment.get('cursor_path')!r}")
     finally:
@@ -242,16 +258,221 @@ def k17(client, folder):
             pass
 
 
-def k15(binary):
+def frame_rgb(path, width, height, last=False, index=None):
+    """One frame of `path` as a height × width × 3 uint8 array (the last, or `index`), or None."""
+    import numpy as np
+    args = ["ffmpeg", "-v", "error"]
+    if last:
+        args += ["-sseof", "-0.5"]
+    args += ["-i", str(path)]
+    if index is not None:
+        args += ["-vf", f"select=eq(n\\,{index})", "-fps_mode", "passthrough"]
+    args += ["-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+    try:
+        raw = subprocess.run(args, capture_output=True, timeout=120).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    size = width * height * 3
+    if len(raw) < size:
+        return None
+    frames = len(raw) // size
+    take = frames - 1 if last else 0
+    return np.frombuffer(raw[take * size:(take + 1) * size], dtype=np.uint8).reshape(
+        height, width, 3)
+
+
+def b1(answer):
+    """The grey window recorded each way: the box from the warped point."""
+    run = answer.get("b1") or {}
+    if "skipped" in run:
+        return check("B1", False, run["skipped"])
+    ox, oy = run.get("origin", [0, 0])
+    wx, wy = run.get("warped", [0, 0])
+    for cursor, want_clean in (("separate", True), ("in_picture", False)):
+        segments = (run.get(cursor) or {}).get("segments") or []
+        if not segments:
+            check("B1", False, f"{cursor}: no landed segment: {run.get(cursor)}")
+            continue
+        movie = segments[0]["path"]
+        size = track_size(movie)
+        frame = frame_rgb(movie, *size, last=True) if size else None
+        if frame is None:
+            check("B1", False, f"{cursor}: {movie} did not decode")
+            continue
+        k = size[0] / run.get("points", [1001, 701])[0]
+        px, py = int(round((wx - ox) * k)), int(round((wy - oy) * k))
+        grey = frame[size[1] - 20, 20].astype(int)
+        box = frame[py:py + 32, px:px + 32].astype(int)
+        off = int((abs(box - grey).max(axis=2) > GREY_TOLERANCE).sum())
+        ok = off == 0 if want_clean else off >= 20
+        check("B1", ok, f"{cursor}: {off} pixel(s) beyond {GREY_TOLERANCE}/255 of the grey "
+              f"{grey.tolist()} in the 32 × 32 px box at ({px}, {py}) of {Path(movie).name} "
+              f"({size[0]} × {size[1]}); want {'none' if want_clean else 'at least 20'}")
+
+
+def located_tip(on, off, offset, cut=0.3):
+    """`cursor_layer_proof.tip_from` over arrays, the colour black: each pixel's coverage α
+    is the share of (0 − background) its difference from `off` carries, clamped, below `cut` 0;
+    the α-weighted centroid in continuous pixel coordinates, less the arrow's black centroid
+    offset from its hot spot. None when nothing was covered."""
+    import numpy as np
+    a = on.astype(float)
+    b = off.astype(float)
+    d = -b
+    norm = (d * d).sum(axis=2)
+    alpha = np.where(norm >= 900, ((a - b) * d).sum(axis=2) / np.maximum(norm, 1), 0.0)
+    alpha = np.clip(alpha, 0.0, 1.0)
+    alpha[alpha < cut] = 0
+    total = alpha.sum()
+    if total < 4:
+        return None
+    ys, xs = np.indices(alpha.shape)
+    return ((alpha * (xs + 0.5)).sum() / total - offset[0],
+            (alpha * (ys + 0.5)).sum() / total - offset[1])
+
+
+def square_corner(frame):
+    """The red square's top-left corner in pixel edges, or None."""
+    import numpy as np
+    f = frame.astype(int)
+    red = (f[:, :, 0] > 180) & (f[:, :, 1] < 90) & (f[:, :, 2] < 90)
+    if red.sum() < 200:
+        return None
+    ys, xs = np.nonzero(red)
+    return float(xs.min()), float(ys.min())
+
+
+def b4(client, answer):
+    """The Separate recording of the red square, imported and drawn."""
+    import numpy as np
+    run = answer.get("b4") or {}
+    arrow = answer.get("arrow") or {}
+    if "skipped" in run:
+        return check("B4", False, run["skipped"])
+    segments = run.get("segments") or []
+    if not segments or "offset" not in arrow:
+        return check("B4", False, f"no landed segment or arrow: {run.get('finish_error')} {arrow}")
+    movie = segments[0]["path"]
+    size = track_size(movie)
+    holds = run.get("holds") or []
+    host = run.get("screen_host")
+    placed = run.get("placed_host") or []
+    if not size or len(holds) != 8 or host is None or len(placed) != 8:
+        return check("B4", False, f"the recording's facts are incomplete: size {size}, "
+                     f"{len(holds)} holds, screen_host {host}, {len(placed)} placements")
+    project = WORK / "b4.framejob"
+    if project.exists():
+        shutil.rmtree(project)
+    client.call("new_project", path=str(project))
+
+    def call(tool, **arguments):
+        return client.call_with(tool, {"project": str(project), **arguments})
+
+    try:
+        call("set_canvas", width=size[0], height=size[1], fps=[FPS, 1])
+        media = call("import_media", path=movie)["media"]
+        state = call("get_project")["project"]
+        cursor = next(m for m in state["media"] if m["id"] == media).get("cursor") or {}
+        check("B4", cursor.get("in_picture") is False,
+              f"the imported movie's cursor {cursor} (Separate: in_picture false)")
+        if not state["tracks"]:
+            call("add_track")
+            state = call("get_project")["project"]
+        call("add_clip", track=state["tracks"][0]["id"], media=media, at=0)
+        clip = call("get_project")["project"]["clips"][0]["id"]
+        frame_ticks = 600_000 // FPS
+        times = {}
+        for k in range(8):
+            t0 = placed[k] - host
+            for n in (0.2, 0.25, 0.3):
+                times[("mid", k, n)] = int(round((t0 + n) * FPS))
+            if k > 0:
+                first = int((t0 - 0.2) * FPS)
+                for f in range(first, first + 18):
+                    times[("change", k, f)] = f
+        frames = sorted(set(times.values()))
+
+        def render(tag):
+            out = {}
+            for f in frames:
+                png = WORK / f"b4-{tag}-{f}.png"
+                if png.exists():
+                    png.unlink()
+                call("render_frame", t=f * frame_ticks, path=str(png))
+                out[f] = frame_rgb(png, *size) if png.exists() else None
+            return out
+
+        on = render("on")
+        call("set_video", clips=[clip], patch={"cursor": {"show": False}})
+        off = render("off")
+        # Points to the movie's pixels (1 at Nominal), the arrow drawn at that many a point.
+        kx = size[0] / float((answer.get("main_bounds") or [0, 0, size[0]])[2] or size[0])
+        offset = (arrow["offset"][0] * kx, arrow["offset"][1] * kx)
+        holds = [(x * kx, y * kx) for x, y in holds]
+        errors = []
+        for k in range(8):
+            corner = (holds[k][0], holds[k][1])
+            for n in (0.2, 0.25, 0.3):
+                f = times[("mid", k, n)]
+                if on.get(f) is None or off.get(f) is None:
+                    errors.append(float("inf"))
+                    continue
+                x0, y0 = int(corner[0]) - 24, int(corner[1]) - 24
+                roi = (slice(max(y0, 0), y0 + 72), slice(max(x0, 0), x0 + 72))
+                tip = located_tip(on[f][roi], off[f][roi], offset)
+                sq = square_corner(off[f][roi])
+                if tip is None or sq is None:
+                    errors.append(float("inf"))
+                    continue
+                errors.append(float(np.hypot(tip[0] - sq[0], tip[1] - sq[1])))
+        p95 = float(np.percentile(errors, 95)) if errors else float("inf")
+        check("B4", p95 <= TIP_PX, f"the drawn tip against the square's corner over "
+              f"{len(errors)} mid-hold frames: p95 {p95:.3f} px (≤ {TIP_PX}), max "
+              f"{max(errors):.3f}")
+        late = []
+        for k in range(1, 8):
+            corner = (holds[k][0], holds[k][1])
+            x0, y0 = int(corner[0]) - 24, int(corner[1]) - 24
+            roi = (slice(max(y0, 0), y0 + 72), slice(max(x0, 0), x0 + 72))
+            local = (corner[0] - max(x0, 0), corner[1] - max(y0, 0))
+            tip_at = square_at = None
+            for f in sorted(v for key, v in times.items() if key[0] == "change" and key[1] == k):
+                if on.get(f) is None or off.get(f) is None:
+                    continue
+                sq = square_corner(off[f][roi])
+                if square_at is None and sq is not None and abs(sq[0] - local[0]) <= 2 \
+                        and abs(sq[1] - local[1]) <= 2:
+                    square_at = f
+                tip = located_tip(on[f][roi], off[f][roi], offset)
+                if tip_at is None and tip is not None and abs(tip[0] - local[0]) <= TIP_PX \
+                        and abs(tip[1] - local[1]) <= TIP_PX:
+                    tip_at = f
+            if tip_at is None or square_at is None or abs(tip_at - square_at) > 1:
+                late.append((k, tip_at, square_at))
+        check("B4", not late, f"at the 7 hold changes the tip's first frame at the new corner "
+              f"within one frame of the square's: {'every one' if not late else late}")
+    finally:
+        try:
+            client.call("close_project", project=str(project), discard=True)
+        except mcp.ToolError:
+            pass
+
+
+def k15(binary, cu3c=None):
     folder = WORK / "k15"
     folder.mkdir(parents=True, exist_ok=True)
     started = mcp.launch(binary, ["-RCRecordingFolder", str(folder)], seconds=60, timeout=300)
     try:
         if started.client is None:
-            for row in ("K15", "K17"):
+            for row in ("K15", "K17", "B4"):
                 check(row, False, f"the app did not bind its socket — {started.log_path}")
             return
         client = started.client
+        if "B4" in selected and cu3c is not None:
+            try:
+                b4(client, cu3c)
+            except Exception as error:  # noqa: BLE001 — a row's failure, never the run's
+                check("B4", False, f"{type(error).__name__}: {error}")
         if "K17" in selected:
             k17(client, folder)
         if "K15" not in selected:
@@ -318,9 +539,19 @@ def main():
                "CGPreflightScreenCaptureAccess() is false under this process's grant")
     in_process = [r for r in ("K4", "K5", "K7", "K8") if r in selected]
     if blocked:
-        for row in in_process + [r for r in ("K15", "K17", "Z1") if r in selected]:
+        for row in in_process + [r for r in ("B1", "B4", "K15", "K17", "Z1") if r in selected]:
             skip(row, blocked)
     else:
+        cu3c = None
+        if selected & {"B1", "B4"}:
+            cu3c, why = probe(binary, "cu3c", str(WORK))
+            if cu3c is None:
+                for row in selected & {"B1", "B4"}:
+                    check(row, False, f"CU3c's recordings did not run: {why}")
+            else:
+                (WORK / "answer-cu3c.json").write_text(json.dumps(cu3c, indent=1))
+                if "B1" in selected:
+                    b1(cu3c)
         if in_process:
             answer, why = probe(binary, "run", str(WORK))
             if answer is None or "skipped" in (answer or {}):
@@ -337,11 +568,11 @@ def main():
                     k7(answer)
                 if "K8" in selected:
                     k8(answer)
-        if selected & {"K15", "K17", "Z1"}:
+        if selected & {"K15", "K17", "B4", "Z1"}:
             app = Path(args.app) if args.app else proof_app.binary()
             if app.suffix == ".app":
                 app = proof_app.executable(app)
-            k15(app)
+            k15(app, cu3c)
     failed = [row for row, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [row for row in results if row not in failed]
     print(f"\nscores: {len(passed)}/{len(results)}"

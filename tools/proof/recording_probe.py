@@ -68,13 +68,16 @@ second so the zero padding is pinned; `uniqueURL` over a folder holding
 `create()` makes a nested folder and accepts an existing one; and
 `RecordingChoice()`'s defaults.
 
-Section 2 (`configuration`): `make` read back field by field over the 16
+Section 2 (`configuration`): `make` read back field by field over the 32
 combinations of rate {30, 60} × resolution {nominal, best} × system audio
-{off, on} × show clicks {off, on}, for a 1728×1117 display at scale 2 (this
-machine's, R0): width/height 1728×1117 under nominal and 3456×2234 under
-best, `minimumFrameInterval` 1/rate, `showsCursor` true, `showMouseClicks`
-from the choice, `pixelFormat` BGRA (1111970369) iff clicks else the default
-`420v` (875704438), `capturesAudio` from the choice with 48000 × 2,
+{off, on} × show clicks {off, on} × cursor {in_picture, separate} (B2, road
+map creator-jobs CU3c, spec §11 CU-31), for a 1728×1117 display at scale 2
+(this machine's, R0): width/height 1728×1117 under nominal and 3456×2234
+under best, `minimumFrameInterval` 1/rate, In the picture `showsCursor`
+true, `showMouseClicks` from the choice, `pixelFormat` BGRA (1111970369) iff
+clicks else the default `420v` (875704438) — byte for byte the rows before
+CU3c — and Separate the same but `showsCursor` and `showMouseClicks` false
+and `pixelFormat` `420v` whatever clicks say, `capturesAudio` from the choice with 48000 × 2,
 `excludesCurrentProcessAudio` TRUE and `captureMicrophone` FALSE in every
 row, `videoCodecType` `hvc1` where `availableVideoCodecTypes` offers it
 (`avc1` otherwise — the expectation is derived from the list the probe read
@@ -1092,7 +1095,7 @@ Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1),
 screens + 4; D2 choosing it greys System
 Audio, Show Clicks and Size with their values kept, Microphone, Rate and
 Record Into live, the size note `voiceOverSizeNote`; D3 the display key
-(a sentinel) and the set of twelve `FrameJobRecording…` keys unchanged, the row
+(a sentinel) and the set of thirteen `FrameJobRecording…` keys unchanged, the row
 kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
 brings the three back; D5 Microphone Off refuses with
 `microphoneOffSentence`, no screen read, no microphone request; D6 a
@@ -1102,13 +1105,14 @@ refusal for that choice (no device carries "probe-mic"), idle, never hidden
 — begun by the row itself when D6 did not reach it; D8 `hidesForRecording`
 (false for a camera too, since CR1c);
 D9 the Pause / Resume button; D10 `record_screen`'s `recordingSourceKind`
-— nine calls, the exact sentences, a JSON null not a stranger; D11 the
+— ten calls (CU3c's cursor row the tenth), the exact sentences, a JSON null not a stranger; D11 the
 voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
 rows at Microphone Only (screens + 4 since CR1c's Camera row, whose key makes
 5d's eight, CR2a's Format popup's key its nine, and camera-recording CR3c's "Record the camera
 too" key its ten, spec §11 CAM-11; road map "audio" AP6 part 3's "Enhance the microphone
 when it lands" key its eleven, spec §11 AU-69; road map "creator-jobs" CU6's Record
-shortcuts key its twelve, spec §11 CU-62), 7c's arguments gain `source` (and,
+shortcuts key its twelve, spec §11 CU-62; CU3c's Cursor key its thirteen, spec §11
+CU-36), 7c's arguments gain `source` (and,
 with camera-recording CR1b, spec §11 CAM-4, `camera`, and CR2a's `camera_format`; D10's vocabulary
 sentence lists `screen, voice_over, camera` since) and 7d's
 phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
@@ -1129,6 +1133,20 @@ there:
   voice-strangers-admitted  `strangers` → `[]`
                     (AgentServer+RecordingArguments.swift) — 64/66: D10's
                     display row and its all-five row.
+
+Road map "creator-jobs" CU3c (spec §11 CU-31, CU-36) adds B2's sixteen
+Separate rows to section 2, `cursor` to 7c's arguments, D10's row
+`{source: voice_over, cursor: separate}` refused by name, and three mutants:
+
+  separate-shows-cursor  `showsCursor` left true with Separate
+                    (RecordingSetup.swift) — fails section 2's separate rows.
+  separate-bgra         BGRA asked for whenever clicks are on
+                    (RecordingSetup.swift) — fails section 2's separate
+                    clicks-on rows.
+  voice-strangers-cursor  `cursor` dropped from
+                    `voiceOverScreenOnlyArguments`
+                    (AgentServer+RecordingArguments.swift) — fails D10's
+                    cursor row.
 
 Section 17 (`exclusion`, Include Frame Job windows, spec §11 recording.md;
 section 14 on its own branch, renumbered when it merged beside B55's)
@@ -1423,6 +1441,7 @@ func configuration(_ request: [String: Any]) -> [String: Any] {
         choice.resolution = RecordingResolution(rawValue: row["resolution"] as? String ?? "") ?? .nominal
         choice.systemAudio = row["systemAudio"] as? Bool ?? true
         choice.showClicks = row["showClicks"] as? Bool ?? false
+        choice.cursor = RecordingCursor(rawValue: row["cursor"] as? String ?? "")
         let made = RecordingConfiguration.make(
             choice, displayPointSize: size, scale: scale, outputURL: url)
         let stream = made.stream
@@ -1430,6 +1449,7 @@ func configuration(_ request: [String: Any]) -> [String: Any] {
         return [
             "rate": choice.rate, "resolution": choice.resolution.rawValue,
             "systemAudio": choice.systemAudio, "showClicks": choice.showClicks,
+            "cursor": choice.effectiveCursor.rawValue,
             "width": stream.width, "height": stream.height,
             "minimumFrameInterval": [Int(stream.minimumFrameInterval.value),
                                      Int(stream.minimumFrameInterval.timescale)],
@@ -3740,7 +3760,7 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
                     "topKept": abs(grown.maxY - before.maxY) < 0.5,
                     "back": abs(back.height - before.height) < 0.5,
                     "noteShown": noteShownWhileSet, "noteHiddenAfter": panel.noteLabel.isHidden]
-    // The twelve keys the harness pins are the panel's own, by name.
+    // The thirteen keys the harness pins are the panel's own, by name.
     out["keys"] = [RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
                    RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
                    RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
@@ -3748,7 +3768,7 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
                    RecorderPanelController.cameraKey, RecorderPanelController.cameraFormatKey,
                    RecorderPanelController.cameraBesideKey,
                    RecorderPanelController.enhanceMicrophoneKey,
-                   RecorderPanelController.keysKey]
+                   RecorderPanelController.keysKey, RecorderPanelController.cursorKey]
 
     // AccentButton stores its fill.
     let plain = AccentButton(title: "x", symbol: nil, fallback: "", tooltip: "", action: nil)
@@ -5548,7 +5568,7 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
 
 /// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
 /// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
-/// and `AgentServer.shared`'s argument reader. The twelve `FrameJobRecording…`
+/// and `AgentServer.shared`'s argument reader. The thirteen `FrameJobRecording…`
 /// values are put back as they were at the end, so the probe's own defaults
 /// domain is left as it was found.
 func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
@@ -5561,6 +5581,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
         RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
         RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
+        RecorderPanelController.cursorKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -5753,6 +5774,7 @@ func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
         "micTrue": kind(["source": "voice_over", "microphone": true]),
         "sizeNull": kind(["source": "voice_over", "size": NSNull()]),
         "displayNull": kind(["source": "voice_over", "display": NSNull()]),
+        "cursor": kind(["source": "voice_over", "cursor": "separate"]),
     ]
 
     // D11 — what the tool's answer says for a voice-over.
@@ -6073,6 +6095,16 @@ CONFIGURATION_ROWS = [
     for rate, resolution, audio, clicks in itertools.product(
         [30, 60], ["nominal", "best"], [False, True], [False, True])
 ]
+# B2 (road map creator-jobs CU3c, spec §11 CU-31): every row In the picture and Separate.
+CURSOR_ROWS = [dict(row, cursor=cursor)
+               for cursor in ["in_picture", "separate"] for row in CONFIGURATION_ROWS]
+
+
+def expected_separate(row, available):
+    """A Separate row: In the picture's fields, but no pointer, no ring and `420v`."""
+    want = expected_configuration(row, available)
+    want.update({"showsCursor": False, "showMouseClicks": False, "pixelFormat": DEFAULT_420V})
+    return want
 
 
 def expected_configuration(row, available):
@@ -6097,10 +6129,11 @@ def expected_configuration(row, available):
 
 
 def section_configuration(binary, sources):
-    print("\nSection 2 — RecordingConfiguration.make read back, 16 rows × 15 fields")
+    print("\nSection 2 — RecordingConfiguration.make read back, 32 rows × 15 fields (B2: 16 "
+          "In the picture, 16 Separate)")
     answer, error = run_probe(binary, "configuration", {
         "mode": "configuration", "displayPointSize": DISPLAY_POINTS, "scale": SCALE,
-        "outputURL": OUTPUT_URL, "rows": CONFIGURATION_ROWS})
+        "outputURL": OUTPUT_URL, "rows": CURSOR_ROWS})
     check("2: the probe answers", answer is not None and not answer.get("error"),
           error or (answer or {}).get("error", ""))
     if not answer or answer.get("error"):
@@ -6108,17 +6141,19 @@ def section_configuration(binary, sources):
     check(f"2: a fresh SCStreamConfiguration reads `420v` ({DEFAULT_420V}) — the default the "
           "clicks-off rows keep (R0 q6a)",
           answer.get("freshPixelFormat") == DEFAULT_420V, f"got {answer.get('freshPixelFormat')!r}")
-    keys = ["rate", "resolution", "systemAudio", "showClicks"]
+    keys = ["rate", "resolution", "systemAudio", "showClicks", "cursor"]
     by = {tuple(a.get(k) for k in keys): a for a in answer.get("rows", [])}
     available = None
-    for row in CONFIGURATION_ROWS:
+    for row in CURSOR_ROWS:
         got = by.get(tuple(row[k] for k in keys), {})
         spelled = (f"{row['rate']} fps {row['resolution']} audio={'on' if row['systemAudio'] else 'off'} "
-                   f"clicks={'on' if row['showClicks'] else 'off'}")
+                   f"clicks={'on' if row['showClicks'] else 'off'} cursor={row['cursor']}")
         if available is None:
             available = got.get("availableVideoCodecTypes") or []
             print(f"  host: availableVideoCodecTypes = {available}")
-        want = expected_configuration(row, got.get("availableVideoCodecTypes") or [])
+        # In the picture is byte for byte the rows before CU3c (`expected_configuration`).
+        expect = expected_configuration if row["cursor"] == "in_picture" else expected_separate
+        want = expect(row, got.get("availableVideoCodecTypes") or [])
         for field, value in want.items():
             check(f"2 [{spelled}] {field} → {value!r}", got.get(field) == value,
                   f"got {got.get(field)!r}")
@@ -7707,8 +7742,8 @@ def section_chrome(binary, sources):
     check("5d: … and setNote(\"\") hides it and shrinks the window back",
           rf.get("back") is True and rf.get("noteHiddenAfter") is True, f"{rf}")
     keys = answer.get("keys") or []
-    check("5d: twelve distinct FrameJobRecording… keys",
-          len(set(keys)) == 12 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
+    check("5d: thirteen distinct FrameJobRecording… keys",
+          len(set(keys)) == 13 and all(k.startswith("FrameJobRecording") for k in keys), f"{keys}")
     harness = open(HARNESS_MAIN).read()
     # The pins are spelled as string LITERALS in the harness, not as
     # `RecorderPanelController.<key>`, so that a tree from before the recorder
@@ -7716,7 +7751,7 @@ def section_chrome(binary, sources):
     # (the phase-5 cross-build); the probe reads the constants' VALUES off the
     # app and looks for each of those strings in the harness's text.
     check("5d: the harness pins every one of them by VALUE",
-          len(keys) == 12 and all(f'"{k}"' in harness for k in keys), f"{keys}")
+          len(keys) == 13 and all(f'"{k}"' in harness for k in keys), f"{keys}")
     print("  5e — AccentButton(fill:) and RecorderStatusItem.label")
     a = answer.get("accent") or {}
     check("5e: AccentButton's default fill is DS.accent", a.get("defaultIsAccent") is True, f"{a}")
@@ -8776,8 +8811,8 @@ FILE_GROUP_ORDER = [
 # document, so the catalog is the ops less these plus the app-state tools.
 OPS_WITHOUT_TOOLS = {"keep_range"}
 RECORD_SCREEN_ARGUMENTS = [
-    "camera", "camera_format", "display", "enhance", "include_framejob_windows", "keys",
-    "microphone", "path", "place", "project", "rate", "seconds", "show_clicks", "size", "source",
+    "camera", "camera_format", "cursor", "display", "enhance", "include_framejob_windows",
+    "keys", "microphone", "path", "place", "project", "rate", "seconds", "show_clicks", "size", "source",
     "system_audio", "window",
 ]
 
@@ -9838,7 +9873,7 @@ def section_voiceover_doors(binary, sources):
     check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
           "FrameJobRecording… keys is unchanged — session only",
           d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
-          and len(d3.get("keysAfter") or []) == 12, f"{d3}")
+          and len(d3.get("keysAfter") or []) == 13, f"{d3}")
     check("D3: rebuildSources() + restoreChoices() keep the row",
           d3.get("kept") is True and d3.get("keptSource") is True, f"{d3}")
 
@@ -9904,6 +9939,9 @@ def section_voiceover_doors(binary, sources):
         ("{source: voice_over, size: null} → .voiceOver (a null is not given)", "sizeNull",
          "ok: voice_over"),
         ("{source: voice_over, display: null} → .voiceOver", "displayNull", "ok: voice_over"),
+        ("{source: voice_over, cursor: separate} → cursor refused by name "
+         "(voice-strangers-cursor; CU3c, spec §11 CU-36 (e))", "cursor",
+         "error: With source voice_over, cursor" + VOICE_TAIL),
     ]
     for label, key, want in rows:
         check(f"D10: {label}", d10.get(key) == want, f"got {d10.get(key)!r}")
@@ -10722,6 +10760,22 @@ MUTANTS = {
         "        let strangers = [String]()\n",
         "record_screen takes the screen-only arguments with source voice_over and ignores them"),
     # Road map "creator-jobs" CU6 (spec §11 CU-62): the recorder asks for Input Monitoring.
+    # Road map "creator-jobs" CU3c (spec §11 CU-31, CU-36): the recorder stops burning the pointer.
+    "separate-shows-cursor": (
+        "RecordingSetup.swift",
+        "        stream.showsCursor = inPicture\n",
+        "        stream.showsCursor = true\n",
+        "showsCursor left true with Separate — the pointer burned into a Separate movie"),
+    "separate-bgra": (
+        "RecordingSetup.swift",
+        "        if choice.showClicks && inPicture { stream.pixelFormat = kCVPixelFormatType_32BGRA }\n",
+        "        if choice.showClicks { stream.pixelFormat = kCVPixelFormatType_32BGRA }\n",
+        "BGRA asked for with Separate and clicks on — not today's pixel path"),
+    "voice-strangers-cursor": (
+        "AgentServer+RecordingArguments.swift",
+        "        \"keys\", \"cursor\",\n    ]\n",
+        "        \"keys\",\n    ]\n",
+        "record_screen takes cursor with source voice_over and ignores it"),
     "tool-asks-input-monitoring": (
         "ScreenRecorder.swift",
         "        if choice.keys == .shortcuts, !RecordingGrant.inputMonitoringGranted {\n",

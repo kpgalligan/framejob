@@ -161,7 +161,7 @@ extension RecorderPanelController {
     /// Called last by `syncControlsEnabled`: the Camera and Format popups
     /// are live only while idle with a camera wanted, the box only while
     /// idle with a screen source (CAM-11 (1), (3)); with Source Camera the
-    /// four screen-only controls and Rate are greyed, their values kept.
+    /// screen-only controls and Rate are greyed, their values kept.
     func syncCameraControls() {
         cameraPopup.isEnabled = phase == .idle && cameraWanted
         formatPopup.isEnabled = phase == .idle && cameraWanted
@@ -170,6 +170,7 @@ extension RecorderPanelController {
         let screenAndRate: [NSControl] = [
             systemAudioSwitch, showClicksSwitch, sizePopup, includeFrameJobCheckbox, ratePopup,
             recordShortcutsCheckbox,
+            cursorPopup,
         ]
         for control in screenAndRate { control.isEnabled = false }
     }

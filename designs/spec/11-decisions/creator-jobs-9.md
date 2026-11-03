@@ -597,3 +597,71 @@ nothing sends anything anywhere, so nothing is keyed (VR-2, CJ-3). The owner's a
   differ; the composed placement at a time is F′ there composed into P there, both read raw;
   `composed` and `replaced` are `pub` (not `pub(crate)`) so `core/tests/reframe_compose.rs` can
   read the planner's counts beside (f)'s recount.
+
+## CU3c — the recorder stops burning the pointer (2026-11-03)
+
+Recorded before the code. CU3c gives a screen recording a Cursor choice: the recorder panel's
+Cursor row and `record_screen`'s `cursor`. With Separate, ScreenCaptureKit draws no pointer and no
+click ring, the cursor file says `in_picture: false`, and Frame Job draws the cursor (CU-4,
+CU-32). In the picture is today's configuration, byte for byte. The owner's answers stand:
+2026-11-01 ("Separate, unless CU-S2's Separate rows failed") and 2026-11-03 ("the picker rows
+waived"; CU-6's "Settled 2026-11-03"). No core, FFI, op, format or cursor-file version change.
+Nothing is sent anywhere, so nothing is keyed (CJ-3).
+
+- **CU-31 — The stream's pointer and ring only In the picture** (amends CU-13; restates R0 q6a).
+  (a) `RecordingConfiguration.make` sets `showsCursor = (choice.effectiveCursor == .inPicture)`
+  and `showMouseClicks = showClicks && inPicture`, and asks for `kCVPixelFormatType_32BGRA` only
+  when both hold ("Show Clicks needs BGRA"). Separate leaves the default `420v`. In the picture is
+  byte for byte the configuration before CU3c. (b) The cursor file's `in_picture` follows the
+  choice (`cursorStart`'s `inPicture: choice.effectiveCursor == .inPicture`). The capture, the
+  frame watch (`ScreenFrameWatchRule.attaches`) and the file ride both choices unchanged. (c) With
+  Separate, Show Clicks means "land the screen clips with ripples on". The landing adds ONE
+  `set_video {cursor: {clicks: "ripple"}}` over the placed screen clips whose media's cursor is not
+  in the picture (`RecordingLanding.addRipples`, called right after `addSequence`). It is CU-42's
+  write, inside the landing's one step. In a new project it goes inside `untitled(around:)`'s
+  remainder step, which is named "Cursor Clicks" (`ripplesActionName`) when nothing else is in it.
+  No op is added when no clip qualifies. A voice-over never takes it (`wantsRipples` is
+  `showClicks && effectiveCursor == .separate && !isVoiceOver`). (d) A Separate segment left
+  with no cursor file has no pointer anywhere. That covers no E1, a writer failure and nothing
+  captured. Its `cursor_problem` (CU-12's sentence, and `cursorProblem`'s writer arm) ends with
+  `cursorSeparateLost`: " The pointer is not in the movie either: it was recorded Separate."
+  In the picture keeps the sentences as before. The watch-lost sentence is unchanged for both,
+  since a file exists then.
+- **CU-36 — The default, the key and the tool argument** (the owner, 2026-11-03).
+  - (a) Separate is the default for a display recording. CU-S2's separate rows passed: display tip
+    p95 0–0.5 px, E1 p95 2.5–6.3 ms.
+  - (b) In the picture is the default for a window or picked recording
+    (`RecordingCursor.windowDefault`). It stays so until a quiet-machine re-run of CU-S2's window
+    rows settles their anchor; at load ≈ 30 they were 1.3–3.3 s off under every anchor. That
+    re-run is owed. `RecordingCursor.defaultFor` answers `.separate` for `.display`,
+    `windowDefault` for `.window` and `.picked`, and `.separate` for `.voiceOver` and `.camera`,
+    which have no pointer to draw. `RecordingChoice.cursor` is nil for "the source's default", and
+    `effectiveCursor` is `cursor ?? .defaultFor(source)`.
+  - (c) The flip. When that re-run answers an anchor for the window rows under CU-S2's pinned rule,
+    the phase that records it sets `windowDefault = .separate` and amends CU-36, CU-6 and the
+    guide's default cells. A key never chosen (`""`) and the tool's absent argument follow at once;
+    a person's choice stays. If the re-run fails, window recordings' cursor STOPs to the owner
+    (CU-12) and the default stays.
+  - (d) The key. `FrameJobRecordingCursor` is the panel's thirteenth key: `""` follows the source,
+    `separate` or `in_picture` is a choice. Every `persistChoices` writes it from
+    `cursorChosen`, which only the popup's own change sets, never from the popup's shown row. It
+    is restored on show, and an unknown value reads as `""`. The popup shows `cursorChosen ??
+    .defaultFor(currentChoice().source)` for a screen source (`syncCursorPopup()`, the first
+    statement of `refreshSizeNote()`, so the Window row's early return is covered). It is greyed
+    for Microphone Only and Camera with its value kept. The harness and `screens.py` pin it to
+    `""` (AU-69 (b)).
+  - (e) The tool. `record_screen`'s `cursor` is `separate` or `in_picture`; absent is
+    `defaultFor(source)`. It is read after `keys`, and its vocabulary refusal ("cursor must be
+    one of separate, in_picture (got "x").") falls among the caller's own mistakes after `keys`'.
+    It is refused by name with `voice_over` and with `camera` (`voiceOverScreenOnlyArguments` and
+    `cameraRefusedArguments`, after `keys`). `show_clicks` keeps its meaning per mode: the ring in
+    the picture with In the picture, the landed clips' ripples with Separate. The dev tool
+    `land_recording` takes `cursor_mode` (the same enum, setting `choice.cursor`) and `show_clicks`
+    (default false), each refused by name without `movie`. The road map named the first `cursor`,
+    which is already that tool's file path.
+  - (f) The proof. `cu3c_probe.py` P1–P6 with mutants `window-default-separate`,
+    `persist-shown-cursor`, `sync-after-returns` and `separate-lost-dropped`. `recording_probe.py`
+    B2 has 32 configuration rows and mutants `separate-shows-cursor`, `separate-bgra` and
+    `voice-strangers-cursor`. `cursor_layer_proof.py` has B3 (and B3b) and B5, and mutant
+    `ripple-write-skipped` by hand. `cursor_proof.py` has granted B1 and B4 and K17's
+    `in_picture` false. JOB-21, JOB-27 and JOB-28 are the person's.

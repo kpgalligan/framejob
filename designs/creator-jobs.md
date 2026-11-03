@@ -3048,6 +3048,19 @@ to be fixed with a helper-owned window before CU3c (JOB-29's picked-window step)
 anchor, re-run on a quiet machine. CU-6's and CU-3's "Settled at CU0b" lines carry these, and
 CU-20 is amended to M2 (CU1b1).
 
+**Settled 2026-11-03** (the owner, `cj-owner-answers.md` "2026-11-03: the picker rows waived").
+CU-S2's picked-window rows are waived as not performable: the owner tried twice, and the
+instrument's window never got the picker's Share button. Window mapping is settled from the
+automatic window rows: M2, with tip p95 ≤ 1.414 px against TIP_PX 1.5 on window-moved and
+window-odd, in both modes (picture and separate), measured as separate passes; `separate` passes.
+With the picked rows recorded absent the deciders give mapping_display M2, mapping_window M2,
+separate pass, anchor none, e1 9.1 ms. The anchor is unchanged: E1 for display recordings; window
+recordings' anchor stays owed to a quiet-machine re-run (their rows were 1.3–3.3 s off under every
+anchor, at load average about 30). The figures are in the integration worktree's
+`tools/proof/work/cursor_spike/cu-s2/results.json`. The real recorder's picker path is checked on
+a real app window by JOB-27 (S-ST4). CU3c's defaults follow CU-36: Separate for a display
+recording, In the picture for a window or picked one until the re-run settles their anchor.
+
 #### CU0c's record (2026-11-02)
 
 CU0c makes CU-S2's picked rows performable; no spike's rule, pin or decider changed. The
@@ -3107,7 +3120,9 @@ total is 20566 in 41 files. `spec_index_proof.py` 255/255. No `CLAUDE.md` edit a
 
 **Owed.**
 - The owner's `--only s2 --person` for the picked rows (JOB-29), before CU3c; until then window
-  mapping and `separate` stay owed. #445 closes on that run.
+  mapping and `separate` stay owed. #445 closes on that run. **Waived 2026-11-03** by the owner
+  as not performable (CU0b's "Settled 2026-11-03"): window mapping M2 and `separate` pass from
+  the automatic window rows; #445 closes citing the waiver.
 - The window rows' anchor, re-run on a quiet machine.
 
 ### CJ2b — the Analyzing sheet and Split at Shot Changes
@@ -6396,6 +6411,93 @@ editor's `EditorViewController+Cutout` bullet, `VideoPane`'s +`Cutout` clause,
 - **Depends on:** CU3b, CU1b, CU0c (JOB-29's picked rows performed). **Lane** B.
 - **Question for the owner:** the default? *Recommended: Separate* — the bet's point, with In the
   picture one click away — unless CU-S2's Separate rows failed.
+
+#### CU3c's record (2026-11-03)
+
+**Landed.** Lane B, base `6a12ee93` (I's HEAD, CU11b). The decisions first: CU0b's "Settled
+2026-11-03" paragraph and CU-6's clause (the owner's waiver of CU-S2's picked rows), then CU-31
+and CU-36 in `creator-jobs-9.md` (433 → 501 lines in the lane; 599 → 667 at integration,
+after SW2b's and VR2b1's sections) with their index rows, CU-13's "Amended by
+CU-31" and `recording.md`'s CU-1 line; then the code, the instruments and the documents. The
+owner's answers: Separate, since CU-S2's separate rows passed (2026-11-01), and for window and
+picked recordings In the picture until the quiet-machine re-run settles their anchor (2026-11-03,
+CU-36 (b); the flip is CU-36 (c)). No core, FFI, op, format (43 stands) or cursor-file version
+change; nothing keyed (CJ-3). No toll: every touched file stays under 400 lines.
+
+- **The stream.** `RecordingConfiguration.make` draws the pointer and its ring only In the picture
+  (`effectiveCursor`), BGRA only with both; In the picture is byte for byte the configuration
+  before CU3c (B2's 16 rows). `cursorStart`'s `inPicture` follows the choice.
+- **The landing.** `RecordingLanding+Cursor.swift` (new, 54 lines): `wantsRipples` and
+  `addRipples`, one `set_video {cursor: {clicks: "ripple"}}` over the placed screen clips whose
+  media's cursor is not in the picture, called right after `addSequence`, and in
+  `remainderPlacement` after the later pictures (its guard also passes for the ripples; nil when
+  that was its only reason and no clip took one); `remainderActionName` answers "Cursor Clicks"
+  for one segment with no voice and no camera. The op is applied scoped to the trial and appended
+  unscoped, as every landing step is (the file's header), so the door stamps the scope.
+- **The panel.** A Cursor row between System Audio and Show Clicks; `cursorChosen`, set only by the
+  popup's own change, persisted as `FrameJobRecordingCursor` (`""` follows the source); the popup
+  synced as `refreshSizeNote()`'s first statement (objection 1); greyed for Microphone Only and
+  Camera, its value kept.
+- **The tool.** `record_screen`'s `cursor` (absent: `defaultFor(source)`), refused by name with
+  `voice_over` and `camera`; `land_recording`'s `cursor_mode` and `show_clicks`.
+- **A Separate segment with no file** ends its `cursor_problem` with `cursorSeparateLost`
+  (objection 2); `cursor_proof.py`'s K7 printed it.
+
+**Deviations from the spec.** (1) B3b's undo name is "Add Microphone", not "Cursor Clicks":
+`land_recording`'s movie always carries its one voice, so the new project's remainder holds the
+microphone with the ripples. The "Cursor Clicks" name is scored by a seventh probe row,
+`cu3c_probe.py` P7 (with `wantsRipples`' table). (2) `cursor_keys_probe.swift`,
+`camera_recording_probe.swift` and `audio_ap6c_probe.swift` also put the new key back at the end
+(their key lists gained `cursorKey`), so their "thirteen … put back" prose is true. (3)
+`show_clicks`' catalog description was rewritten per mode: "The cursor itself is always in the
+picture" was no longer true.
+
+**The runs** (lane B's worktree, AC power, three lanes running; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings, tsc clean.
+- `cu3c_probe.py`: `scores: 8/8`. Its four mutants each printed `caught` and exited 1:
+  `window-default-separate` (P2, P5), `persist-shown-cursor` (P3), `sync-after-returns` (P2),
+  `separate-lost-dropped` (P6).
+- `recording_probe.py --only files,configuration,chrome,catalog,voiceover_doors`: 686/686.
+  `--mutant separate-shows-cursor --only configuration` 467/483, `separate-bgra` 475/483,
+  `--mutant voice-strangers-cursor --only voiceover_doors` 31/32; each exited 1.
+- `camera_recording_probe.py --only panel` 28/28; `audio_ap6c_probe.py` 5/5;
+  `cursor_keys_probe.py` 7/7; `cursor_capture_probe.py --only K16` 1/1;
+  `spec_index_proof.py` 264/264.
+- `cursor_layer_proof.py --only B3,B5,I3` on Debug: `scores: 5/5`. The mutant
+  `ripple-write-skipped` by hand (the `addRipples` call in `placement` removed, `make
+  app-debug`): `--only B3` 2/3, B3's Separate-with-Show-Clicks row failed; the file restored,
+  SHA-256 checked.
+- `make gate`: `gate: PASS 637s` (names, typecheck, test 407 s, app 218 s; fmt and lint reused).
+- Release: `cursor_layer_proof.py` `scores: 30/30; skipped ['I5']`; `cursor_proof.py` `scores:
+  8/8; skipped ['K5']` (no post access) — B1 Separate 0 pixels beyond 8/255 in the box, In the
+  picture 134; B4 p95 1.165 px over 24 mid-hold frames (max 1.165), every one of the 7 hold
+  changes within one frame; K17 `in_picture` false; `audio_ap6c_proof.py` 39/39 on a Release
+  instance (its first run aborted V4 on a stale Debug app after the hand mutant; re-run with
+  `RC_PROOF_APP=release`); `grep "Frame Job: "` printed nothing.
+- At integration, cherry-picked onto SW2b's `2cc21ecd` (VR2b's `a4869b62` before it): four
+  conflicts, each resolved keeping both — `creator-jobs-9.md` (VR2b1's section, then CU3c's),
+  the 11-decisions README's `creator-jobs-9.md` row (VR2b1's clause, then CU3c's; Lines 667),
+  the spec README's `11-decisions/` cell (21941 in 43 files) and `tools/proof/README.md`
+  (SW2b's section, then CU3c's); `spec_index_proof.py` 264/264; `make gate` PASS 372 s (names 1, typecheck 10,
+  test 190, app 170; fmt and lint reused).
+
+**Review.** Against the spec, the notes and the checks: every Files and Approach item done,
+deviations 1–8 of the notes justified, verdict pass with two nits and no fix pass; both were fixed
+at integration. (1) The README's screen-recording highlight said the cursor is recorded
+separately without condition; it now says a display recording's is, a window's staying in the
+picture for now (CU-36 (b)). (2) `screen-recording.md`'s refusal-order paragraph lacked an
+unknown `keys` or `cursor` among the caller's own mistakes; both now follow `rate` or `size`, as
+`AgentServer+Recording.swift`'s header has them. `app/CLAUDE.md`'s three map edits (thirteen
+keys, `RecordingCursor`, `+Cursor`) were applied at integration.
+
+**Owed.**
+- The quiet-machine re-run of CU-S2's window rows, and on its pass the flip of `windowDefault`
+  (CU-36 (c)); on its failure window recordings' cursor STOPs to the owner.
+- JOB-21, JOB-27 and JOB-28, the person's.
+- #445 closes citing the 2026-11-03 waiver (the orchestrator's).
+- The owner's report of 2026-11-03 that CU-S2's picker window could not be selected (no
+  button, a plain rectangle) is the spike instrument the waiver covers; the real picker path is
+  JOB-27's. No issue is filed by this phase.
 
 ### CO4 — edges
 

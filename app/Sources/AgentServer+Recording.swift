@@ -22,9 +22,10 @@ import ScreenCaptureKit
 /// **The refusal ORDER is the contract** (`transcribe`'s rule): the caller's
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
 /// missing or outside 1…600, then `source` (its value; for `voice_over`
-/// the screen-only arguments given, `keys` among them, then `microphone:
+/// the screen-only arguments given, `keys` and `cursor` among them, then `microphone:
 /// false`), `display` with `window`, a `rate` or `size` outside the
-/// vocabulary, a `keys` outside its vocabulary (spec §11 CU-62), `enhance:
+/// vocabulary, a `keys` outside its vocabulary (spec §11 CU-62), a `cursor`
+/// outside its vocabulary (spec §11 CU-36 (e)), `enhance:
 /// true` without a microphone and then with `place: false` (spec §11 AU-69),
 /// `microphone: true` (implied by a voice-over) with the Microphone grant
 /// absent (the status WORD in the sentence), `keys: "shortcuts"` with the
@@ -127,6 +128,9 @@ extension AgentServer {
         // CU-62: refused by name with voice_over and camera (the screen-only lists).
         let keys =
             !screen ? RecordingKeys.off : try enumArg(a, "keys", RecordingKeys.self) ?? .off
+        // CU-36 (e): absent is the source's default (`effectiveCursor`); refused with
+        // voice_over and camera by the screen-only lists.
+        let cursor = !screen ? nil : try enumArg(a, "cursor", RecordingCursor.self)
         let place = try boolArg(a, "place") ?? true
         // AU-69 (d): after `place`, before any grant.
         let enhance = try recordingEnhance(a, microphone: microphone, place: place)
@@ -194,7 +198,7 @@ extension AgentServer {
             showClicks: showClicks, rate: rate, resolution: resolution,
             destination: destination, folder: folder ?? RecordingFiles.folder(),
             camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance,
-            keys: keys)
+            keys: keys, cursor: cursor)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(

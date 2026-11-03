@@ -119,7 +119,9 @@ its span and its dissolves, each in one undo step.
 **Screen recording.** A display or a window, with system audio, microphone and
 click rings, at 30 or 60 fps, into a new project or at the playhead; a camera,
 on its own or beside the screen as a corner talking head; or a
-microphone-only voice-over. **Clip ▸ Auto Zoom…** zooms a recording in at its
+microphone-only voice-over. A display recording's cursor is recorded separately
+and drawn by Frame Job, so you can resize, smooth or hide it after the fact (a
+window's stays in the picture for now). **Clip ▸ Auto Zoom…** zooms a recording in at its
 clicks and typing and back out after, as ordinary actions you can edit, and
 **Clip ▸ Add Shortcut Overlays** shows the shortcuts you pressed as keycaps.
 **Clip ▸ Speed Up Typing…** plays the typing faster where nobody speaks.

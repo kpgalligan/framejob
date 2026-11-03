@@ -42,6 +42,19 @@ extension AgentServer {
                 message: "cursor cannot be given without movie — a cursor file belongs to the "
                     + "screen segment's movie.")
         }
+        // CU3c (spec §11 CU-36 (e)): the choice's Cursor and Show Clicks, a screen's only.
+        let cursorMode = try enumArg(a, "cursor_mode", RecordingCursor.self)
+        if cursorMode != nil, movie == nil {
+            throw ToolError(
+                message: "cursor_mode cannot be given without movie — a voice-over has no "
+                    + "pointer.")
+        }
+        let showClicks = try boolArg(a, "show_clicks")
+        if showClicks != nil, movie == nil {
+            throw ToolError(
+                message: "show_clicks cannot be given without movie — a voice-over has no "
+                    + "clicks.")
+        }
         if movie != nil, voice.count != 1 {
             throw ToolError(
                 message: "With movie, voice must name exactly one file — the movie's microphone "
@@ -71,6 +84,8 @@ extension AgentServer {
         choice.systemAudio = false
         choice.destination = destination
         choice.enhanceMicrophone = enhance
+        choice.cursor = cursorMode
+        choice.showClicks = showClicks ?? false
         let now = Date()
         let segments =
             try picture.map {
@@ -206,7 +221,10 @@ extension AgentServer {
                 + "files, one segment each; with movie, one screen segment whose microphone file "
                 + "is voice's one file (mic_offset 0), and cursor, when given, a cursor file "
                 + "attached to that segment's media as a recording's landing attaches the file it "
-                + "wrote (spec CU-34). Each file is probed as a recording's are. "
+                + "wrote (spec CU-34); cursor_mode and show_clicks are that recording's Cursor and "
+                + "Show Clicks, so a separate one with show_clicks lands its screen clip with "
+                + "ripples as a recording does (spec CU-31). Each file is probed as a recording's "
+                + "are. "
                 + "door tool (default) waits out a drag and lands as record_screen does, "
                 + "answering what record_screen would, enhance or enhance_error included; door "
                 + "panel hands the result to the recorder panel's recordingEnded, waits up to "
@@ -215,8 +233,9 @@ extension AgentServer {
                 + "(the panel's), project, enhance_pending (read last)}. Refused by name: a "
                 + "path that will not probe, movie with other than one voice file, place with "
                 + "door panel, door panel while the recorder or the panel is not idle, "
-                + "follow_wait with door tool or outside 0…330, cursor without movie, a cursor "
-                + "file that does not attach (it will not open, or its movie_size is not the "
+                + "follow_wait with door tool or outside 0…330, cursor, cursor_mode or "
+                + "show_clicks without movie, a cursor file that does not attach (it will not "
+                + "open, or its movie_size is not the "
                 + "movie's).",
             [
                 "voice": [
@@ -233,6 +252,16 @@ extension AgentServer {
                     "type": "string",
                     "description": "with movie only: a cursor file (.fjcursor) attached to the "
                         + "screen segment's media; its movie_size must be the movie's.",
+                ],
+                "cursor_mode": [
+                    "type": "string", "enum": RecordingCursor.allCases.map(\.rawValue),
+                    "description": "with movie only: the recording's Cursor, separate or "
+                        + "in_picture (default: the display's, separate).",
+                ],
+                "show_clicks": [
+                    "type": "boolean",
+                    "description": "with movie only: the recording's Show Clicks (default "
+                        + "false).",
                 ],
                 "door": [
                     "type": "string", "enum": LandRecordingDoor.allCases.map(\.rawValue),

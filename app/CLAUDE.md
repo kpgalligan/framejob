@@ -3698,11 +3698,12 @@ free.
   live with it, the warm-up is spent before the countdown, and the press
   reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
   CAM-11). The panel
-  remembers eleven `FrameJobRecording…` keys (the Camera's, the Format's,
-  `FrameJobRecordingCameraBeside` and the eleventh,
-  `FrameJobRecordingEnhanceMicrophone` — "Enhance the microphone when it
-  lands", spec §11 AU-69 — among them; the type doc lists them), and a probe
-  or the harness that touches them handles all eleven. The
+  remembers thirteen `FrameJobRecording…` keys (the Camera's, the Format's,
+  `FrameJobRecordingCameraBeside`, `FrameJobRecordingEnhanceMicrophone` —
+  "Enhance the microphone when it lands", spec §11 AU-69 —,
+  `FrameJobRecordingKeys` (Record shortcuts, CU-62) and
+  `FrameJobRecordingCursor` (Cursor, CU-36) among them; the type doc lists
+  them), and a probe or the harness that touches them handles all thirteen. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -3713,7 +3714,8 @@ free.
 
 **Recording.**
 - `RecordingSetup.swift` (+`Camera`) · `RecordingGrant.swift` · `RecordingResult.swift` — the
-  half a probe can call: choices, file naming, `RecordingConfiguration.make` (PURE), the result
+  half a probe can call: choices, `RecordingCursor` and its source defaults (CU-36), file
+  naming, `RecordingConfiguration.make` (PURE), the result
   types; `RecordingGrant.swift` the grant reads, the step a press takes and the pane URLs,
   Input Monitoring's among them (CU-62) (a pure move out of `RecordingSetup.swift`, road map creator-jobs CU0a's U1; the one file a
   System Settings URL is spelled in); nothing here prompts or opens.
@@ -3796,7 +3798,8 @@ free.
   (`cursorProblem`, `RecordingResult.cursorSegmentsNote` in both doors'
   notes), never the recording's.
 - `RecordingLanding.swift` (+`Placement`, +`Microphone`, +`Remainder`,
-  +`Placing`, +`LeftOut`, +`VoiceOver`, +`Camera`) · `ProjectDocument+Recording.swift`
+  +`Placing`, +`LeftOut`, +`VoiceOver`, +`Camera`, +`Cursor` — the ripples a
+  Separate recording with Show Clicks lands with, CU-31) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
   READ BACK (at an inexact canvas rate a raw add snaps down into a one-tick

@@ -1115,6 +1115,13 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** two `.fjcursor` files, each named after its movie. The first number for the two files adds up to 10 (five each), and each file's second number is twice its first (a down and an up per click). Neither the recording's note nor the panel says anything about the cursor.
 - **Source:** road map "creator-jobs" CU1b1 (spec §11 CU-11, CU-18); `tools/proof/cursor_proof.py` K5 posts clicks only where the terminal may post input, which an agent's terminal cannot.
 
+**JOB-21 — The drawn cursor on a real Separate recording looks like the system's own**
+- **When:** once, and again when the cursor's drawing changes. It needs a 1× display (an external non-Retina one) and a Retina display; with only one kind, do that one and say so.
+- **Do:** 1. File ▸ New Recording…, choose the Retina display, leave **Cursor** at **Separate**, and press Record. 2. Move the pointer over a few apps, hover a link and a text field, click a few times; Stop. 3. Do the same on the 1× display. 4. Play each landed clip at full Preview Quality, and step frame by frame through a few moves. 5. Export one (any video row) and play the file.
+- **Expect:** the movie itself never shows a pointer (check with the clip's Cursor section's **Show cursor** off); with Show cursor on, the drawn pointer sits where the real one was, at the size and crispness of macOS's own pointer at each scale, over every frame, with no lag behind the picture; the export looks like the preview.
+- **Answer:** does the drawn pointer pass for the system's own at 1× and on Retina? Name anything that looked wrong: its size, its edges, a lag, a frame where it jumped.
+- **Source:** road map "creator-jobs" CU3c (spec §11 CU-31, CU-36); `tools/proof/cursor_proof.py` B1 and B4 measure a grey window and a red square under the terminal's grant, not how a real pointer looks.
+
 **JOB-22 — Smoothing and idle hide look natural on a real recording**
 - **When:** once CU3c lands; it needs a recording made with the cursor Separate (not In the picture).
 - **Do:** 1. File ▸ New Recording…, choose a display with the cursor Separate, and press Record. 2. Move the pointer about, pause still for a few seconds, move again, and click a few times; Stop. 3. Select the screen clip, open the Clip tab's Picture sub-tab and the Cursor section. 4. Pick Smoothing Off, Light, Medium and Strong in turn, playing the stretch around a click and a quick move after each. 5. Pick Hide when idle 2 s and play across the pause. 6. Press Polish and play again. 7. Pick Style Arrow, then Size 100 % and 300 %, and play.
@@ -1149,6 +1156,20 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Answer:** does 50 % read as motion and not as smear, would you keep it on by default, and did any frame show steps or ghosts instead of a streak?
 - **Source:** road map creator-jobs CU11b, spec §11 CU-117…CU-119 (`cu11_proof.py` MB1–MB6 score the drawing against the mean of sharp renders, never how the blur looks).
 
+**JOB-27 — A real window recording keeps its cursor on the pointer while the window moves**
+- **When:** once, and again when the window rows' anchor is settled (CU-36 (c)). This is where the real recorder's picker path is checked, since CU-S2's picked rows were waived on 2026-11-03.
+- **Do:** 1. Open a real app window (a Safari or TextEdit window). 2. File ▸ New Recording…, Source ▸ **Window…**, and pick that window in the picker; set **Cursor** to **Separate** (a picked window defaults to In the picture). 3. Press Record. Work in the window for a while: click, type, then drag the window to another place and resize it from a corner, and work in it again; Stop. 4. Play the landed clip and step through the drag and the resize.
+- **Expect:** the picker offers the window and its Share button; the movie has no pointer of its own; the drawn pointer stays on the real pointer's spot in the window throughout, including during and after the drag and the resize, and lands on each click as it happens.
+- **Answer:** did the picker offer the window; did the drawn pointer stay on the pointer through the drag and the resize, and how far off or how late was it anywhere?
+- **Source:** road map "creator-jobs" CU3c (S-ST4, spec §11 CU-36 (b)); CU-S2's window rows ran on a busy machine and its picked rows were waived as not performable, so no script reaches a real picked window.
+
+**JOB-28 — With two displays, a recording of one shows no cursor while the pointer is on the other**
+- **When:** once; skipped with one display.
+- **Do:** 1. With a second display connected, File ▸ New Recording…, choose the first display with **Cursor** **Separate**, and press Record. 2. Move the pointer around on the first display, then over to the second for a few seconds, clicking there, then back; Stop. 3. Play the landed clip.
+- **Expect:** while the pointer is on the second display, the clip shows no pointer and no click ripple anywhere; it reappears at the edge where the pointer comes back.
+- **Answer:** did the pointer disappear cleanly while it was on the other display, and come back at the right place?
+- **Source:** road map "creator-jobs" CU3c (S-ST5); no proof drives two displays.
+
 **JOB-29 — The cursor spikes at the machine (CU-S1…CU-S3)**
 - **When:** once at CU0b, before CU1b and CU6, and again after each macOS major update, since `NSCursor.currentSystem` may start answering nil; and, after CU0c, `--only s2 --person` for the picked rows.
 - **Do:** 1. Unlock the Mac, close or hide other windows, and leave the terminal holding Screen Recording. Then run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`. It takes a few minutes: it warps the pointer, shows full-screen grey windows, and opens a small text window. Keep your hands off the mouse and keyboard. 2. Run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person` and follow each prompt on the terminal:
@@ -1157,7 +1178,7 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
   - type in TextEdit and move the mouse as TYPE and MOVE are printed;
   - click, drag, scroll and type into the two small windows. Do this three times: with no grant, then with Input Monitoring only, then with Accessibility only. Each time, give the grant to "Cursor Spike" in System Settings ▸ Privacy & Security.
   - For each of the two grant calls, say whether a prompt appeared and whether Cursor Spike is listed in Input Monitoring, turn it on, and type until told to stop;
-  - when the window picker appears, pick the window "Cursor Spike S2" of the app "Cursor Spike", once per configuration (In the picture, then Separate). The grey window is drawn by the scratch bundle "Cursor Spike", not by the terminal's probe that presents the picker (CU0c), so the picker offers its Share button.
+  - when the window picker appears, pick the window "Cursor Spike S2" of the app "Cursor Spike", once per configuration (In the picture, then Separate). The grey window is drawn by the scratch bundle "Cursor Spike", not by the terminal's probe that presents the picker (CU0c), so the picker offers its Share button. **Waived 2026-11-03** by the owner as not performable (the picker never offered its Share button for the instrument's window): press Cancel in the picker; window mapping is settled from the automatic window rows (CU-6), and JOB-27 checks the real picker path.
 - **Expect:** both commands exit 0 and print one `VERDICT` line per spike, and the `host:` line reads `console locked False`. Step 2 runs `tccutil reset ListenEvent com.kgalligan.FrameJob.cursorspike` before each grant pair, and on no other id. Any field still `owed` names a row that was skipped, with its reason, in `tools/proof/work/cursor_spike/cu-sN/results.json`.
 - **Answer:** the VERDICT lines and each `rule_sha256`, copied into the road map's CU0b record (a STOP verdict is put to you with its rule's recommendation before CU1a); and whether A11 answered `grant_api`, `relaunch` and `listed`, which settles CU-3's pair.
 - **Source:** road map "creator-jobs" CU0b and CU0c (spec §11 CU-6); `tools/proof/cursor_spike/README.md`. An agent's run cannot post input, hold Input Monitoring or Accessibility, use a person's hand, or see the screen while the console is locked.

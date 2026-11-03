@@ -24,9 +24,10 @@ extension AgentServer {
                     + "alone (see camera; with screen, camera records one beside the "
                     + "screen). With voice_over, "
                     + "display, window, system_audio, show_clicks, size, "
-                    + "include_framejob_windows, keys and microphone: false are refused "
-                    + "by name; with camera, display, window, system_audio, "
-                    + "show_clicks, size, include_framejob_windows, keys and rate are; "
+                    + "include_framejob_windows, keys, cursor and microphone: false are "
+                    + "refused by name; with camera, display, window, system_audio, "
+                    + "show_clicks, size, include_framejob_windows, keys, cursor and rate "
+                    + "are; "
                     + "camera and camera_format are refused with voice_over.",
             ],
             "camera": [
@@ -85,8 +86,21 @@ extension AgentServer {
             ],
             "show_clicks": [
                 "type": "boolean",
-                "description": "Draw a circle around each mouse click (default "
-                    + "false). The cursor itself is always in the picture.",
+                "description": "Show each mouse click (default false). With cursor "
+                    + "in_picture the stream draws a circle around each click into the "
+                    + "movie; with cursor separate the recording's screen clips land "
+                    + "with click ripples on (video.cursor.clicks ripple), drawn by Frame "
+                    + "Job from the cursor file.",
+            ],
+            // The recorder panel's Cursor popup (spec §11 CU-31, CU-36).
+            "cursor": [
+                "type": "string", "enum": RecordingCursor.allCases.map(\.rawValue),
+                "description": "Where the pointer goes: separate — not in the movie; "
+                    + "the cursor file records it and Frame Job draws it on the clip, "
+                    + "where the Cursor section restyles it — or in_picture, burned into "
+                    + "the movie by the system as before. Absent means the source's "
+                    + "default: separate for a display, in_picture for a window. Refused "
+                    + "with source voice_over and camera.",
             ],
             // The recorder panel's Include Frame Job windows checkbox.
             "include_framejob_windows": [

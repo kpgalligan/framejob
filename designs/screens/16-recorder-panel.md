@@ -27,8 +27,13 @@ formats as size and rate — with the same live rule; under Format, a row
 holding the camera's live preview (a 200 × 150 pt well) appears only when a
 camera is wanted, so it is absent here; Microphone "Off", with an
 empty level meter beside it, and under it a greyed, unticked checkbox, "Enhance the
-microphone when it lands", live only with a microphone chosen; System Audio, a switch that is on (blue); Show
-Clicks, a switch that is off; Rate "60 fps"; Size "Nominal (points)", with the
+microphone when it lands", live only with a microphone chosen; System Audio, a switch that is on (blue); Cursor,
+a pop-up reading "Separate" — the pointer is kept out of the movie and drawn by Frame Job; the
+other row is "In the picture", the default for a picked window; Show
+Clicks, a switch that is off, and under it an unticked checkbox, "Record shortcuts", with a
+small grey note: "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete,
+Return, Tab or Esc, and when you type, never what you type. Nothing is recorded while an app
+holds secure input."; Rate "60 fps"; Size "Nominal (points)", with the
 line "1728×1117 points · 3456×2234 pixels" under it — the recorded size of that
 display; and Record Into "Demo.framejob". At the foot, "saved in ~/Movies/Frame Job
 Recordings" in small grey type, a "Close" button, and an orange-red "Record"

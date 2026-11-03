@@ -35,8 +35,12 @@ import ScreenCaptureKit
 /// - **Show Clicks needs BGRA** (q6a). `SCStream.h` says `showMouseClicks`
 ///   "currently applies when pixelFormat is set to BGRA" and a fresh
 ///   configuration reads `420v`, so `make` sets `kCVPixelFormatType_32BGRA`
-///   when clicks are on and leaves the default alone otherwise — measured, a
-///   recording output over a BGRA stream starts and writes.
+///   when the stream draws clicks and leaves the default alone otherwise —
+///   measured, a recording output over a BGRA stream starts and writes. The
+///   stream draws the pointer and its click ring only In the picture
+///   (road map creator-jobs CU3c, spec §11 CU-31): with Separate, `make`
+///   sets neither and keeps `420v`, and Show Clicks lands the screen clips
+///   with ripples instead (`RecordingLanding+Cursor.swift`).
 
 // MARK: - The choice
 
@@ -83,6 +87,28 @@ enum RecordingKeys: String, CaseIterable {
     case shortcuts
 }
 
+/// Where a screen recording's pointer goes (road map creator-jobs CU3c, spec §11 CU-31, CU-36):
+/// `separate` — not in the movie, written to the cursor file for Frame Job to draw — or
+/// `inPicture`, burned in by ScreenCaptureKit as before CU3c. `record_screen`'s `cursor` spells it.
+enum RecordingCursor: String, CaseIterable {
+    case separate
+    case inPicture = "in_picture"
+
+    /// CU-36 (b): a window or picked recording's default until the quiet-machine re-run of
+    /// CU-S2's window rows settles their anchor; that run's phase flips it to `.separate`.
+    static let windowDefault: RecordingCursor = .inPicture
+
+    /// CU-36: `.separate` for a display, `windowDefault` for a window or a picked source, and
+    /// `.separate` for a voice-over or a camera alone, which have no pointer to draw.
+    static func defaultFor(_ source: RecordingSource) -> RecordingCursor {
+        switch source {
+        case .display: return .separate
+        case .window, .picked: return windowDefault
+        case .voiceOver, .camera: return .separate
+        }
+    }
+}
+
 /// Every control of the recorder panel and every argument of
 /// `record_screen`, as one value. `microphone` is an
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60 (a camera
@@ -107,6 +133,11 @@ struct RecordingChoice: Equatable {
     var enhanceMicrophone: Bool = false
     /// Record shortcuts (spec §11 CU-62): only with a display, window or picked source.
     var keys: RecordingKeys = .off
+    /// The Cursor row (spec §11 CU-36): nil follows the source's default.
+    var cursor: RecordingCursor? = nil
+
+    /// The cursor this recording is made with: the choice, else the source's default.
+    var effectiveCursor: RecordingCursor { cursor ?? .defaultFor(source) }
 }
 
 // MARK: - Where the files go
@@ -232,12 +263,14 @@ enum RecordingConfiguration {
         stream.height = Int((displayPointSize.height * factor).rounded())
         stream.captureResolution = choice.resolution == .best ? .best : .nominal
         stream.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(max(choice.rate, 1)))
-        stream.showsCursor = true
-        stream.showMouseClicks = choice.showClicks
+        // CU-31: the pointer and its ring are the stream's only In the picture.
+        let inPicture = choice.effectiveCursor == .inPicture
+        stream.showsCursor = inPicture
+        stream.showMouseClicks = choice.showClicks && inPicture
         // R0 q6a: the click circle draws only under BGRA; the default `420v`
-        // is left alone when clicks are off, so an ordinary recording's
-        // pixel path is byte for byte the spike's.
-        if choice.showClicks { stream.pixelFormat = kCVPixelFormatType_32BGRA }
+        // is left alone when the stream draws no clicks, so an ordinary
+        // recording's pixel path is byte for byte the spike's.
+        if choice.showClicks && inPicture { stream.pixelFormat = kCVPixelFormatType_32BGRA }
         stream.capturesAudio = choice.systemAudio
         stream.sampleRate = sampleRate
         stream.channelCount = channelCount

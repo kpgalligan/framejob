@@ -282,6 +282,7 @@ The owner's answer: the file sits beside the movie as `<stem>.fjcursor` (CU-2, C
     picked source. The header's `pixels_per_point` is the configured pixel width ÷ the point
     width; `content_size` the stream's configured size; `in_picture` true (the pointer is still
     burned in until CU3c); `cursor_image` `none`.
+  - **Amended by CU-31**: `in_picture` follows the choice; capture and the watch ride both choices.
 - **CU-18 — The result, the answer and the notes.** A landed segment carries `cursorURL`,
   `cursorProblem` and `cursorImage` (`RecordingSegment.withCursor`), set by the walker's cursor
   step after the camera's (movie → microphone → camera → cursor; a cursor failure never fails or

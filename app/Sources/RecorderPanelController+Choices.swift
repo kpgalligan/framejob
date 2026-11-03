@@ -40,6 +40,8 @@ extension RecorderPanelController {
         choice.keys =
             recordShortcutsCheckbox.state == .on && !voiceOverSelected && !cameraSelected
             ? .shortcuts : .off
+        // CU-36: the person's pick, nil for the source's default; none without a screen source.
+        choice.cursor = voiceOverSelected || cameraSelected ? nil : cursorChosen
         choice.rate = Self.rates.contains(ratePopup.selectedTag()) ? ratePopup.selectedTag() : 60
         choice.resolution =
             RecordingResolution(rawValue: sizePopup.selectedItem?.representedObject as? String ?? "")
@@ -78,6 +80,8 @@ extension RecorderPanelController {
         defaults.set(cameraBesideCheckbox.state == .on, forKey: Self.cameraBesideKey)
         defaults.set(enhanceMicrophoneCheckbox.state == .on, forKey: Self.enhanceMicrophoneKey)
         defaults.set(recordShortcutsCheckbox.state == .on, forKey: Self.keysKey)
+        // CU-36 (d): the pick, never the row shown; `""` follows the source.
+        defaults.set(cursorChosen?.rawValue ?? "", forKey: Self.cursorKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
     }
@@ -109,6 +113,7 @@ extension RecorderPanelController {
         enhanceMicrophoneCheckbox.state =
             defaults.bool(forKey: Self.enhanceMicrophoneKey) ? .on : .off
         recordShortcutsCheckbox.state = defaults.bool(forKey: Self.keysKey) ? .on : .off
+        cursorChosen = RecordingCursor(rawValue: defaults.string(forKey: Self.cursorKey) ?? "")
         let rate = defaults.integer(forKey: Self.rateKey)
         _ = ratePopup.selectItem(withTag: Self.rates.contains(rate) ? rate : RecordingChoice().rate)
         let size = defaults.string(forKey: Self.sizeKey) ?? ""
@@ -116,10 +121,27 @@ extension RecorderPanelController {
         sizePopup.selectItem(at: RecordingResolution.allCases.firstIndex(of: resolution) ?? 0)
     }
 
+    /// The Cursor popup shows the person's pick, else the screen source's
+    /// default (spec §11 CU-36): Separate for a display, In the picture for a
+    /// picked window until CU-S2's re-run. Left as it is for Microphone Only
+    /// and Camera, whose row is greyed with its value kept.
+    func syncCursorPopup() {
+        guard !voiceOverSelected, !cameraSelected else { return }
+        let shown = cursorChosen ?? .defaultFor(currentChoice().source)
+        if let item = cursorPopup.itemArray.first(where: {
+            $0.representedObject as? String == shown.rawValue
+        }) {
+            cursorPopup.select(item)
+        }
+    }
+
     /// `1728×1117 points · 3456×2234 pixels` for the chosen display; a picked
     /// window records at its own size, which the panel cannot know; a
-    /// voice-over has no picture; a camera records at its best format.
+    /// voice-over has no picture; a camera records at its best format. The
+    /// Cursor popup is synced FIRST, before the three early returns, so the
+    /// Window row (no `selectedScreen`) follows its source too.
     func refreshSizeNote() {
+        syncCursorPopup()
         if voiceOverSelected {
             sizeNote.stringValue = Self.voiceOverSizeNote
             return

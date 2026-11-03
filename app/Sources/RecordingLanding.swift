@@ -54,7 +54,10 @@
 // A camera beside the screen (spec §11 CAM-10) — its media, ONE front track
 // named "Camera", each clip by its segment's offset and the corner rule — is
 // `RecordingLanding+Camera.swift`, called between the pictures and the
-// microphones.
+// microphones. The ripples a Separate recording with Show Clicks lands its
+// screen clips with (road map creator-jobs CU3c, spec §11 CU-31 (c)) are
+// `RecordingLanding+Cursor.swift`'s `addRipples`, called right after the
+// pictures.
 
 import AppKit
 
@@ -181,6 +184,9 @@ struct RecordingLanding {
             pictures = try addSequence(
                 stretches, from: document.playhead, scope: scope, to: &trial, ops: &ops,
                 notes: &notes)
+            try addRipples(
+                pictures.compactMap { $0.clip?.id }, of: result, scope: scope, to: &trial,
+                ops: &ops)
         }
         let cameras = try addCameras(
             result, screenStarts: place ? segmentStarts(pictures.map { $0.at }, of: result) : nil,

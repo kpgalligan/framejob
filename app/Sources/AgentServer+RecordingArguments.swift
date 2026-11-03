@@ -34,7 +34,7 @@ extension AgentServer {
     /// picture or the stream reads.
     static let voiceOverScreenOnlyArguments = [
         "display", "window", "system_audio", "show_clicks", "size", "include_framejob_windows",
-        "keys",
+        "keys", "cursor",
     ]
 
     /// `source`, default `screen`; an unknown value refused with the

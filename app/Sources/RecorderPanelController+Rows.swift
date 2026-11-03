@@ -3,7 +3,7 @@ import AppKit
 import ScreenCaptureKit
 
 /// The recorder panel's rows: how they are built into the card and what
-/// fills the Source, Microphone and Record Into popups —
+/// fills the Source, Microphone, Record Into and Cursor popups —
 /// `RecorderPanelController.swift`'s second file, cut at the 400-line cap.
 /// How the controls become one `RecordingChoice`, and how that choice is
 /// written to and read back from `UserDefaults`, is `+Choices.swift`'s.
@@ -24,13 +24,16 @@ extension RecorderPanelController {
     func buildRows(into content: NSStackView) {
         for popup in [
             sourcePopup, cameraPopup, formatPopup, microphonePopup, ratePopup, sizePopup,
-            destinationPopup,
+            destinationPopup, cursorPopup,
         ] {
             popup.font = DS.sans(13)
             popup.target = self
             popup.action = #selector(controlChanged(_:))
         }
-        for popup in [sourcePopup, cameraPopup, formatPopup, ratePopup, sizePopup, destinationPopup] {
+        for popup in [
+            sourcePopup, cameraPopup, formatPopup, ratePopup, sizePopup, destinationPopup,
+            cursorPopup,
+        ] {
             popup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
         }
         microphonePopup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
@@ -50,6 +53,14 @@ extension RecorderPanelController {
             let item = NSMenuItem(title: "\(rate) fps", action: nil, keyEquivalent: "")
             item.tag = rate
             ratePopup.menu?.addItem(item)
+        }
+        // Cursor (spec §11 CU-36): read from `selectedItem`'s raw value, never by index.
+        for cursor in RecordingCursor.allCases {
+            let item = NSMenuItem(
+                title: cursor == .separate ? "Separate" : "In the picture", action: nil,
+                keyEquivalent: "")
+            item.representedObject = cursor.rawValue
+            cursorPopup.menu?.addItem(item)
         }
         for resolution in RecordingResolution.allCases {
             let item = NSMenuItem(
@@ -87,6 +98,7 @@ extension RecorderPanelController {
             [fieldLabel("Microphone:"), microphoneRow],
             [NSGridCell.emptyContentView, enhanceMicrophoneCheckbox],
             [fieldLabel("System Audio:"), systemAudioSwitch],
+            [fieldLabel("Cursor:"), cursorPopup],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
             [NSGridCell.emptyContentView, recordShortcutsCheckbox],
             [NSGridCell.emptyContentView, recordShortcutsNote],

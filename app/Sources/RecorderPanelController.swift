@@ -114,13 +114,14 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all twelve on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all thirteen on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
 /// session only (the camera itself is remembered, the row is not). "Record
 /// the camera too" (CAM-11) is remembered across launches, and so is Record
-/// shortcuts (road map creator-jobs CU6, spec §11 CU-62), off by default.
+/// shortcuts (road map creator-jobs CU6, spec §11 CU-62), off by default, and
+/// Cursor (CU3c, spec §11 CU-36), whose `""` follows the source's default.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -141,6 +142,8 @@ final class RecorderPanelController: NSWindowController {
     static let enhanceMicrophoneKey = "FrameJobRecordingEnhanceMicrophone"
     /// Record shortcuts (spec §11 CU-62); an absent key reads as off.
     static let keysKey = "FrameJobRecordingKeys"
+    /// Cursor (spec §11 CU-36 (d)): `""` follows the source, else a `RecordingCursor` raw value.
+    static let cursorKey = "FrameJobRecordingCursor"
 
     // MARK: - Metrics and vocabulary
 
@@ -191,6 +194,9 @@ final class RecorderPanelController: NSWindowController {
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()
     let showClicksSwitch = NSSwitch()
+    /// Cursor (spec §11 CU-36): "Separate", "In the picture"; each item's
+    /// `representedObject` its `RecordingCursor` raw value.
+    let cursorPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let recordShortcutsCheckbox = NSButton(
         checkboxWithTitle: "Record shortcuts", target: nil, action: nil)
     let recordShortcutsNote = NSTextField(wrappingLabelWithString: "")
@@ -220,6 +226,8 @@ final class RecorderPanelController: NSWindowController {
     var sourceBeforePick = 0
     /// nil follows the front document; set by the popup's own action.
     var chosenDestination: RecordingDestination?
+    /// nil follows the source's default (CU-36 (d)); set only by the Cursor popup's own change.
+    var cursorChosen: RecordingCursor? = nil
     /// A recording is running and the panel is off screen for it (`show()`
     /// beeps). Set at EVERY `recordingDidStart`, visible panel or not;
     /// `showWhenLanded` remembers whether it WAS visible, which is what
@@ -335,6 +343,10 @@ final class RecorderPanelController: NSWindowController {
             chosenDestination = currentChoice().destination
         }
         if let sender = sender as? NSPopUpButton, sender === cameraPopup { rebuildCameraFormats() }
+        if let sender = sender as? NSPopUpButton, sender === cursorPopup {
+            cursorChosen = RecordingCursor(
+                rawValue: cursorPopup.selectedItem?.representedObject as? String ?? "")
+        }
         persistChoices()
         refreshSizeNote()
         syncControlsEnabled()

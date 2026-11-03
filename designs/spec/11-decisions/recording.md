@@ -21,10 +21,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Amended by CU-1**: the cursor's path and images, every click and scroll,
   and — opt-in, under Input Monitoring — the shortcuts pressed and the times
   of other key presses are recorded as DATA in a cursor file beside each
-  movie. With Cursor set to Separate (the default from CU3c)
-  ScreenCaptureKit draws neither the pointer nor the click ring, and the
-  editor draws the cursor as part of the screen clip's layer. Nothing is
-  reconstructed for a recording that has no cursor file.
+  movie. With Cursor set to Separate (the default for a display recording
+  from CU3c, CU-36) ScreenCaptureKit draws neither the pointer nor the click
+  ring, and the editor draws the cursor as part of the screen clip's layer.
+  Nothing is reconstructed for a recording that has no cursor file.
 - **A recording is ordinary media.** The recorder writes a file and the app
   imports it through exactly the path File ▸ Open and Add Media… use
   (`adoptImported`, the two-try placement). The model learns nothing: no

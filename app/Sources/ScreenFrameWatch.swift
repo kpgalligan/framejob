@@ -4,7 +4,8 @@ import ScreenCaptureKit
 /// When the frame watch is on the stream (road map creator-jobs CU1b1, spec §11
 /// CU-13, amending CAM-9 (3)): with a camera beside the screen, for E2, and
 /// with cursor capture, for the frames' geometry — which is every display,
-/// window or picked recording until CU3c and CU4 give a choice. A failed add
+/// window or picked recording, Separate and In the picture alike: both
+/// choices write a cursor file (spec §11 CU-31 (b)). A failed add
 /// refuses the start only when a camera needs E2; without one the recording
 /// goes on without the watch and its cursor files say so. PURE.
 enum ScreenFrameWatchRule {

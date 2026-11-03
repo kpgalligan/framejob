@@ -9,7 +9,11 @@
 // the 400-line cap, landed alone before camera + screen grows it;
 // `unplacedNote` stays `private`, because nothing else calls it. The voices
 // it lands are `+Microphone`'s `addMicrophones`, its cameras `+Camera`'s
-// `addCameras`, its stretches `+LeftOut`'s `remainderStretches`.
+// `addCameras`, its stretches `+LeftOut`'s `remainderStretches`. Since road
+// map creator-jobs CU3c (spec §11 CU-31 (c)) the remainder also carries the
+// ripples a Separate recording with Show Clicks lands its screen clips with
+// (`+Cursor`'s `addRipples`), and is named `ripplesActionName` when they are
+// all it holds.
 
 import AppKit
 
@@ -43,10 +47,11 @@ extension RecordingLanding {
     /// segment: with a camera beside the screen, "Add Camera and
     /// Microphone" when there is any voice and "Add Camera" when there is
     /// not (CAM-10 (4)); without one, "Add Microphone" for any voice — its
-    /// own (R1's landing, R1's name) or a left-out segment's. "Add
-    /// Recording Segments" otherwise. A one-segment recording with no voice
-    /// and no camera has no remainder and no step, and the answer for it is
-    /// never read.
+    /// own (R1's landing, R1's name) or a left-out segment's. With neither,
+    /// the remainder can only be its ripples (CU-31 (c)): "Cursor Clicks".
+    /// "Add Recording Segments" otherwise. A one-segment recording with no
+    /// voice, no camera and no ripples has no remainder and no step, and the
+    /// answer for it is never read.
     static func remainderActionName(for result: RecordingResult) -> String {
         if result.segments.count == 1 {
             let voice =
@@ -56,6 +61,7 @@ extension RecordingLanding {
                 return voice ? cameraMicrophoneActionName : cameraActionName
             }
             if voice { return microphoneActionName }
+            return ripplesActionName
         }
         return segmentsActionName
     }
@@ -65,7 +71,8 @@ extension RecordingLanding {
     /// FIRST segment's picture at 0 on track 1 before anything else could
     /// run: segments 2…n's media and their pictures on that same track from
     /// clip 1's end, then every segment's microphone by the floor rule. nil
-    /// when there is nothing to add — one segment, no microphone.
+    /// when there is nothing to add — one segment, no microphone, no camera
+    /// and no ripples (`wantsRipples` with a cursor not in the picture, CU-31).
     /// `placement(_:in:place:)` cannot serve it — the first picture's
     /// `add_media` would be the documented identity and its `add_clip` at 0
     /// would meet its own clip on the front track, refuse, and put the whole
@@ -104,6 +111,9 @@ extension RecordingLanding {
     /// segment's picture start — clip 1's included — on ONE new track in
     /// front of the pictures'; without clip 1, as media only with
     /// `unplacedNote`.
+    ///
+    /// **The ripples** (CU-31 (c)) go on clip 1 and the later pictures right
+    /// after those are placed (`addRipples`); without clip 1 there are none.
     static func remainderPlacement(
         _ result: RecordingResult, in document: ProjectDocument
     ) throws -> Placement? {
@@ -111,9 +121,8 @@ extension RecordingLanding {
         let hasMicrophone = result.segments.contains { $0.micDescriptor != nil }
         let hasLeftOutVoice = result.unreadable.contains { $0.micDescriptor != nil }
         let hasCamera = result.segments.contains { $0.cameraDescriptor != nil }
-        guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera else {
-            return nil
-        }
+        let more = result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera
+        guard more || wantsRipples(result) else { return nil }
         let path = trimmed(result.descriptor.path)
         let snapshot = document.editedProject.snapshot
         guard let mediaId = snapshot.media.first(where: { $0.path == path })?.id else {
@@ -139,6 +148,8 @@ extension RecordingLanding {
                 to: &trial, ops: &ops, notes: &notes)
             starts = placed.starts
             clips = placed.clips
+            try addRipples(
+                clips.compactMap { $0 }, of: result, scope: scope, to: &trial, ops: &ops)
         } else {
             for segment in result.segments.dropFirst() {
                 notes.append(unplacedNote(segment.descriptor.path, behind: path))
@@ -161,6 +172,8 @@ extension RecordingLanding {
         let microphones = try addMicrophones(
             voices(of: result), pictureStarts: starts,
             scope: scope, to: &trial, ops: &ops, notes: &notes)
+        // Let in by the ripples alone, and no clip took one: nothing to add.
+        guard more || !ops.isEmpty else { return nil }
         let micMedia = split(microphones.media, of: result)
         let micClips = split(microphones.clips, of: result)
         return Placement(
