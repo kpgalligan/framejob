@@ -392,7 +392,7 @@ by “Frame Job leaves a clip's audio out above ×12. The pictures still play.�
   Speed Ramp… sheet stay open.
 
 The question comes from the Speed sheet, the Speed Ramp… sheet, the Retime
-Range sheet (which stays open on Cancel too), the Speed
+Range sheet and the Speed Up Typing sheet (both stay open on Cancel too), the Speed
 section (Rate, its quick picks, Keep pitch, Reset and Fit to) and the ⌥ rate
 stretch. A stretch is put back while the question is up, and Set Speed applies
 it again. A clip that was already above ×12, or whose sound is switched off,

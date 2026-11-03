@@ -759,6 +759,32 @@ detail there.
   - The tool runs off main (`creatorOffMainTools`), takes no `scope` key and
     answers through `editResult`. Its catalog row is spliced in by
     `creatorTools()` after `auto_zoom`'s.
+- `SpeedUpTyping.swift` · `SpeedUpTypingSheetController.swift` ·
+  `EditorViewController+SpeedUpTyping.swift` · `AgentServer+SpeedUpTyping.swift` ·
+  `AgentCatalog+SpeedUpTyping.swift` — Clip ▸ Speed Up Typing… and
+  `speed_up_typing` (road map creator-jobs CU9b, spec §11 CU-91…CU-93).
+  `SpeedUpTyping` (names no `rc_*`) is what both doors call:
+  - `SpeedUpTypingSettings` and its keys (`FrameJobSpeedUpTypingRate`,
+    `…Shortest`, `…KeepPitch`), written only when changed; `request`.
+  - The speech step `speech`: a stored `speech` skipped; a current VAD cache →
+    `set_media_speech` with `DuckSpeech.spans`; offline and unavailable
+    refused; else pending.
+  - `resolve`: plan, apply the speech ops to the pure handle, plan again; its
+    ops are the speech ops then the retime ops. `waitLimit` (300 s) and
+    `gaveUp`. The files are `AutoZoom.cursorFiles` / `readTracks`'.
+  - The sheet reads the files off main and re-plans at each change. It waits
+    for a pending speech cache: it starts `generateCaches()` once, re-plans
+    on each `speech` landing and gives up at `waitLimit`. It applies through
+    `SpeedAudioDrop.commit`. `-RCDevSpeedUpTypingAccept YES` (dev only)
+    presses Apply.
+  - `validateSpeedUpTypingAction` is one line in the frozen file after
+    `validateShortcutOverlaysAction` (`AutoZoom.canOffer`, no sheet; allowed
+    inside a nest).
+  - The tool runs off main (`creatorOffMainTools`) and takes no `scope` key.
+    It starts the pass and refuses while speech is pending, reads the
+    crossing on the speech-applied handle before `performGroupedEdit`, and
+    writes its own tail. Its catalog row is spliced in by `creatorTools()`
+    after `add_shortcut_overlays`'.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -1014,7 +1040,7 @@ the key map behind it.
   split half taken past ×12 counts under the id the core mints. Every other
   caller's baseline is the project. `answerFields(_:)` is the agent keys for
   a crossing already read. `commit` is the one door a person's speed edit
-  goes through — the Speed, Speed Ramp and Retime Range sheets' Apply and
+  goes through — the Speed, Speed Ramp, Retime Range and Speed Up Typing sheets' Apply and
   the inspector's commit: `before` runs ahead of the edit (a sheet dismisses there),
   `declined` on Cancel or the no-window beep (the inspector refreshes there),
   and it holds the undo pitfall's one comment (#359). `commit` plans

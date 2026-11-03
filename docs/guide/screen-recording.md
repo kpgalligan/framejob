@@ -282,6 +282,30 @@ When no shortcut was recorded in the selected clips, a sheet says "No shortcut w
 
 *Agents:* `add_shortcut_overlays` places the same overlays, and takes `duration`, `position` (bottom, center, top), `theme` (dark, light) and a `from`/`to` range.
 
+## Speeding up typing
+
+**Clip ▸ Speed Up Typing…** plays the typing in a screen recording faster, so a viewer does not sit through every keystroke. It reads the typing from the recording's cursor file: a run of at least three typed keys, each less than a second after the last. Only the moments are recorded, never which keys.
+
+Select one or more clips whose movies have cursor files and choose the item. The sheet has three settings, remembered for next time:
+
+| Setting | Default | What it does |
+|---|---|---|
+| Rate | ×4 (×2 to ×8) | How much faster the typing plays |
+| Shortest stretch | 3 s (1 to 30 s) | Typing shorter than this is left alone |
+| Keep pitch | On | Keeps the sped-up sound at its own pitch (off, it rises like a fast tape) |
+
+The sheet says what Apply would do, for example "2 typing stretches sped up ×4, saving 9.3 s.", or "No typing stretch without speech or a shortcut lasts 3 s or more in the selected clips, so nothing would change." Apply makes one undo step, "Speed Up Typing". It works inside an open nest too, and is greyed when a selected clip is not a movie with a cursor file.
+
+- **Speech stays at normal speed.** Any part of a stretch where a clip with sound under it has speech, on any track, is left at normal speed. Frame Job finds the speech on this Mac (the same detection Duck by Speech uses) and saves it with the project in the same undo step. While it is still being detected the sheet says "Waiting for speech detection on …" and updates by itself; after five minutes it stops waiting and asks you to close the sheet and try again. On a Mac where speech detection cannot run, it says so and changes nothing.
+- **Shortcuts stay at normal speed.** A recorded shortcut and the overlay that shows it (its clip on a "Shortcuts" track, or 1.5 s when there is none) are never sped up, so add the overlays first.
+- **Clean edges.** Each sped stretch keeps 0.3 s at normal speed at both ends.
+- **Split recordings.** The halves of a recording you split are treated as one: typing across the cut is one stretch.
+- **Everything stays in step.** Each stretch is sped with [Retime Range](speed.md#retime-a-range) on every unlocked track, so the camera and the microphone stay in sync and everything after moves up. The sound in a sped stretch is sped too.
+
+Nothing changes when any stretch cannot be sped (a locked track after it, a transition touching it, a detached pair in it…): the sheet names the stretch and the reason. A clip that plays reversed is refused. Taking a clip with sound past ×12 asks first, as [The ×12 question](speed.md#the-12-question) says.
+
+*Agents:* `speed_up_typing` does the same, and takes `rate`, `shortest`, `keep_pitch` and a `from`/`to` range. It answers each sped range and the time saved.
+
 ## Voice-overs (Microphone Only)
 
 To record narration over your edit, choose **Microphone Only** in **Source**:

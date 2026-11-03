@@ -146,7 +146,12 @@ mirror is `auto_zoom`), Add Shortcut Overlays (road map creator-jobs CU8, §11 C
 Keyboard keys clip per recorded shortcut of the selected clips' cursor files on a front
 "Shortcuts" track, bottom and dark, as one "Add Shortcut Overlays" step; enabled as Auto Zoom… is
 and while no run is reading files; an informational sheet for a refusal, nothing placed or a
-dropped shortcut; no key equivalent; its mirror is `add_shortcut_overlays`), Speed… (on a ramped clip it sets the base rate and
+dropped shortcut; no key equivalent; its mirror is `add_shortcut_overlays`), Speed Up Typing…
+(road map creator-jobs CU9b, §11 CU-93: a sheet with Rate ×2–×8, Shortest stretch 1–30 s and Keep
+pitch over the selected clips' cursor files, remembered when changed; its Apply is one "Speed Up
+Typing" step of `set_media_speech` and `retime_range` ops through the ×12 question; it waits, at
+most 300 s, for speech detection; enabled as Auto Zoom… is; no key equivalent; its mirror is
+`speed_up_typing`), Speed… (on a ramped clip it sets the base rate and
 scales the ramp with it, §11 SR-19 (a), SR-21 (f)), Speed Ramp… (#340, §11 SR-24: the
 speed ramp presets on the one selected media clip, over the in/out range when it lies inside the
 clip; enabled with exactly one such clip selected; no key equivalent; its mirror is

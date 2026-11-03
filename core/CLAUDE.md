@@ -202,7 +202,17 @@ governs a module now.
   (`min_frames`, D_min(n) = 10n + 25; the same chord merged as "×k"; a different chord more than
   0.5 s late dropped), CU-83's Shortcuts track rule (`TRACK_NAME`; the front-most one in front of
   every given clip's track, unlocked, shown, no matte, free over the span, else a new one at the
-  front with `next_id`) and the `add_track` / `add_graphic_clip` ops. `encode_base64`
+  front with `next_id`) and the `add_track` / `add_graphic_clip` ops. Speed Up Typing's
+  planner (road map creator-jobs CU9b, spec §11 CU-91, CU-92), `plan_typing` in
+  `rc_cursor_query` (one track per clip, and the project): `cursor_typing.rs` — its arguments
+  and refusals (rate ×2–×8, shortest 1–30 s, then per clip; reversed refused), each typing
+  stretch clamped to the played window through `clip_time`, less every speech span of a media
+  clip with sound under it (`speech_in_clip`) and each recorded press's overlay span
+  (Shortcuts-track clips holding it or starting within `MOST_LATE`, else `DEFAULT_DURATION`,
+  both `cursor_overlays.rs`'s; presses not filtered by `[from, to)`), every clip's pieces
+  united (touching merged) before `shortest` and the 0.3 s margins, `needs_speech` when a
+  counted media has no `speech`, and the `retime_range` ops right to left, tried in order on a
+  clone (all or nothing). `encode_base64`
   sits beside `decode_base64` in `cursor_file_check.rs`, base64's one home. No file
   I/O, no pixel work: a PNG is checked by its signature.
 - `model_cursor.rs` · `cursor_props.rs` · `recipe_cursor.rs` — the cursor in the model and the

@@ -40,10 +40,13 @@
 //!   creator-jobs CU8, spec §11 CU-80…CU-84, `cursor_overlays.rs`), one track
 //!   per clip and `project`, as `plan_zooms`; `duration` seconds, `from` and
 //!   `to` container ticks.
+//! - `{"plan_typing":{"clips":[…], "rate"?, "shortest"?, "keep_pitch"?,
+//!   "from"?, "to"?}}` → `{ops, needs_speech, stretches, short, ranges, saved}`:
+//!   Speed Up Typing's plan (CU9b, spec §11 CU-91, CU-92, `cursor_typing.rs`),
+//!   `retime_range` ops right to left, one track per clip and `project`.
 //!
-//! The other six each read one track and ignore `project`, which
-//! `plan_zooms` and `plan_overlays` read. Each refusal is its own lowercase
-//! sentence.
+//! The other six each read one track and ignore `project`, which the three
+//! planners read. Each refusal is its own lowercase sentence.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -53,6 +56,7 @@ use crate::cursor_file_check::encode_base64;
 use crate::cursor_overlays::{plan_overlays, PlanOverlaysArgs};
 use crate::cursor_smooth::SmoothPath;
 use crate::cursor_track::{ticks_to_us, us_to_ticks, CursorTrack, MAX_PATH_SAMPLES, PATH_MIN_STEP};
+use crate::cursor_typing::{plan_typing, PlanTypingArgs};
 use crate::cursor_zoom::{plan_zooms, PlanZoomsArgs};
 use crate::model::Project;
 use crate::time::Ticks;
@@ -68,6 +72,7 @@ enum Request {
     Path(PathArgs),
     PlanZooms(PlanZoomsArgs),
     PlanOverlays(PlanOverlaysArgs),
+    PlanTyping(PlanTypingArgs),
 }
 
 /// The one track a read takes, or the refusal naming the request.
@@ -191,6 +196,10 @@ pub fn query(
         Request::PlanOverlays(a) => {
             let project = project.ok_or("plan_overlays needs the project")?;
             plan_overlays(tracks, project, a)?
+        }
+        Request::PlanTyping(a) => {
+            let project = project.ok_or("plan_typing needs the project")?;
+            plan_typing(tracks, project, a)?
         }
     };
     Ok(answer.to_string())

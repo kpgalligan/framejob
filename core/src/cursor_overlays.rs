@@ -22,12 +22,14 @@ use crate::time::{self, seconds_to_ticks, Ticks};
 /// The track the overlays go on (CU-83).
 pub(crate) const TRACK_NAME: &str = "Shortcuts";
 /// A different chord may start at most this late after its press (CU-80).
-const MOST_LATE: f64 = 0.5;
+pub(crate) const MOST_LATE: f64 = 0.5;
 /// `duration`'s range, seconds.
 const DURATION_RANGE: (f64, f64) = (0.5, 10.0);
+/// An overlay's length by default, seconds (CU-80).
+pub(crate) const DEFAULT_DURATION: f64 = 1.5;
 
 fn default_duration() -> f64 {
-    1.5
+    DEFAULT_DURATION
 }
 
 /// Where the keycaps sit, the template's `position` (the owner's answer:

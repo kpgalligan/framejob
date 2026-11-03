@@ -319,6 +319,10 @@ extension AppDelegate {
         // CU8 (spec §11 CU-84), right after Auto Zoom…: the UI path `add_shortcut_overlays`.
         menu.addItem(
             item("Add Shortcut Overlays", #selector(EditorViewController.addShortcutOverlays(_:))))
+        // CU9b (spec §11 CU-93), right after Add Shortcut Overlays: the UI path
+        // `speed_up_typing` names. No key equivalent.
+        menu.addItem(
+            item("Speed Up Typing…", #selector(EditorViewController.showSpeedUpTypingSheet(_:))))
         menu.addItem(item("Speed…", #selector(EditorViewController.showSpeedSheet(_:))))
         // #340 (spec §11 SR-24), right after Speed…: the UI path
         // `add_speed_ramp` names. No key equivalent, for Remove Silences…'

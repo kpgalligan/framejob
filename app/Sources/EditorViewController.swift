@@ -1066,6 +1066,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateBehindSubjectAction(action) { return answer }
             if let answer = validateAutoZoomAction(action) { return answer }
             if let answer = validateShortcutOverlaysAction(action) { return answer }
+            if let answer = validateSpeedUpTypingAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, Remove Filler

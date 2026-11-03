@@ -28727,3 +28727,55 @@ make app && RC_PROOF_APP=release python3 tools/proof/cu8_proof.py
 
 The recorded runs are in `designs/creator-jobs.md`'s CU8 record. No person check: the look is
 judged at CU12's trial.
+
+## Road map "creator-jobs" CU9b — Speed Up Typing (`cu9b_proof.py` Z0, R3, R9–R15 with `cu9b_probe.swift` P1, P2; eleven mutants; `core/tests/speed_up_typing.rs`; spec §11 CU-91…CU-94)
+
+**`cu9b_proof.py [SOCKET]`** drives the app. Given a running instance's `<dir>/agent.sock` it
+runs the plain rows there and greps `<dir>/framejob.log`; without one it launches its own
+(`proof_app.binary()`, a scratch `CFFIXED_USER_HOME`). R12 always launches its own instance with
+`-RCDevSpeedUpTypingAccept YES -FrameJobSpeedUpTypingRate 6` (launch arguments: nothing written
+to the defaults domain). Its movie is ffmpeg's `testsrc` under `tools/proof/work/cu9b/media/`
+(640 × 360, 30 fps, 20 s, no sound), copied per row beside a v1 cursor file written by the script
+with `keys.typed` (a mark every 0.25 s over each stretch) and `keys.shortcut`; the microphones are
+a 660 Hz tone and 20 s of silence. A frame is 20 000 ticks; every expected tick is worked by hand
+from CU-91.
+
+| Row | What it holds |
+|---|---|
+| Z0 | each instance's `grep "Frame Job: "` prints nothing |
+| R3 | typing 1.0–9.0 s, a tone on another track with speech [4.0, 5.0) s set by `set_media_speech`: ranges [1.3, 3.7) and [5.3, 8.7) s |
+| R9 | typing 0.5–10.5 s, ⌘S at 4.0 s: [0.8, 3.7) and [5.8, 10.2) s; after `add_shortcut_overlays {duration: 3}`: [0.8, 3.7) and [7.3, 10.2) s |
+| R10 | typing 2.0–8.3 s: the screen [0, 2.3) s ×1, then ×4 from source 2.3 s, then ×1 from source 8.0 s at frame 112 |
+| R11 | one undo named "Speed Up Typing" gives back the project exactly, the speech R14 wrote gone again |
+| R12 | Clip ▸ Speed Up Typing… by `perform_menu_item` (Rate 6 by launch argument) gives the project `speed_up_typing {rate: 6}` gives after one undo |
+| R13 | refusals by sentence (rate 9, shortest 0.5, a text clip, no cursor file, a locked track after the range in the all-or-nothing sentence, reversed); typing 2.0–4.0 s: the note, `short` 1, no undo step |
+| R14 | the silent microphone with no stored speech: `speech_saved` names it and `get_project` has its `speech` (a "not detected yet" refusal retried up to 120 s) |
+| R15 | a recording split at 10 s, typing 8.0–12.5 s, both halves, shortest 3: one range [8.3, 12.2) s on the grid, `short` 0 |
+| P1 | (probe) `SpeedUpTyping.speech`: stored skipped, ready (the cache's `set_media_speech`), pending, offline and unavailable, each sentence the decision's |
+| P2 | (probe) `gaveUp(waitingFor:)` false at 299 s, true at 300 s |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). Eight in the
+core, each edited into a copy of `core/` beside a link to `graphic/` and run under `cargo test
+--release --test speed_up_typing` (target `tools/proof/work/cu9b/mutant-target`), CAUGHT when its
+named test fails: `speech-ignored` (r3), `margins-dropped` (r10), `shortcut-inside` (r9),
+`needs-speech-skipped`, `left-to-right` (the sync test), `no-prevalidation`, `shortest-per-clip`
+(r15), `presses-window-filtered`. Two in the probe, on a copy of `app/Sources`:
+`unavailable-as-pending` P1, `wait-unbounded` P2. One in the app, on a `tree_copy.py` copy's built
+app: `sheet-rate-not-passed` R12.
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 118; `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py` name `speed_up_typing`;
+`capture_spike/inventory.json` holds `showSpeedUpTypingSheet:` (verdict `sheet`), its
+`presentAsSheet` site and a `reached_after` on `SpeedAudioDrop.swift`'s `beginSheetModal` site;
+`screens.py`'s `NOT_SHOWN` holds `RCDevSpeedUpTypingAccept` and the three
+`FrameJobSpeedUpTyping*` keys.
+
+```sh
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/cu9b_proof.py <dir>/agent.sock [--only R3,R15]
+python3 tools/proof/cu9b_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/cu9b_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU9b record. No person check: the feel is
+judged at CU12's trial.

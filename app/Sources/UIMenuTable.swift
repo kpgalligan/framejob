@@ -70,6 +70,7 @@ extension UIMenu {
         "addActionAtPlayhead:": .plain,
         "showAutoZoomSheet:": .sheet,
         "addShortcutOverlays:": .plain,
+        "showSpeedUpTypingSheet:": .sheet,
         "closeGapAtPlayhead:": .plain,
         "showRetimeSheet:": .sheet,
         "renameClip:": .plain,

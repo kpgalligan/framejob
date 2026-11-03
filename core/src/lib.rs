@@ -47,6 +47,7 @@ mod cursor_props;
 pub mod cursor_query;
 mod cursor_smooth;
 pub mod cursor_track;
+mod cursor_typing;
 mod cursor_zoom;
 mod cursor_zoom_run;
 mod cursor_zoom_visits;

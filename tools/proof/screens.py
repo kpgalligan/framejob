@@ -290,6 +290,16 @@ NOT_SHOWN = {
                               "shows the sheet",
     "FrameJobAutoZoomReplace": "Auto Zoom's remembered Replace (spec §11 CU-76); no screen "
                                "shows the sheet",
+    "RCDevSpeedUpTypingAccept": "a dev launch default with which the Speed Up Typing sheet "
+                                "presses its own Apply (spec §11 CU-93); no screen launches "
+                                "with it",
+    "FrameJobSpeedUpTypingRate": "Speed Up Typing's remembered Rate (spec §11 CU-93), written "
+                                 "only when the sheet's Apply changes it; no screen shows the "
+                                 "sheet",
+    "FrameJobSpeedUpTypingShortest": "Speed Up Typing's remembered Shortest stretch (spec §11 "
+                                     "CU-93); no screen shows the sheet",
+    "FrameJobSpeedUpTypingKeepPitch": "Speed Up Typing's remembered Keep pitch (spec §11 "
+                                      "CU-93); no screen shows the sheet",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

@@ -46,7 +46,8 @@ enum AssistantPrompt {
          ["move_clip", "trim_start", "trim_end", "rate_stretch", "slip", "roll", "split",
           "delete", "ripple_delete", "ripple_delete_range", "ripple_delete_ranges", "lift_range",
           "insert_time", "close_gap", "set_speed", "set_reversed", "freeze_frame",
-          "detach_audio", "attach_audio", "split_at_shots", "retime_range"]),
+          "detach_audio", "attach_audio", "split_at_shots", "retime_range",
+          "speed_up_typing"]),
         ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",

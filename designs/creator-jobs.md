@@ -8846,6 +8846,88 @@ is the lane's above; the integration changed no app input.
 - **Question for the owner:** sound in a sped stretch? *Recommended: sped with Keep pitch on*, as
   the clip's other speed changes are; "Mute sped stretches" only if the trial asks.
 
+#### CU9b's record (2026-11-02)
+
+**Built.** Lane B, base `1fb61bfe` (I's HEAD, CU8; the lane's worktree was made at CU6's
+`6110526b` and moved to I's HEAD before any edit). The decisions first, committed alone:
+CU-91…CU-94 with their index rows, appended to `creator-jobs-7.md` (225 → 315 lines). The
+owner's answer (2026-11-01): the sound in a sped stretch is sped with Keep pitch on. No format
+(41 stands), cursor-file version, `rc_*` export or op; one product tool, `speed_up_typing`
+(117 → 118); nothing keyed (CJ-3: speech detection is on-device). No toll: every touched file
+stayed under its cap (`AppDelegate+Menus.swift` 496 → 500, `cursor_query.rs` 384 → 393).
+
+- **The core.** `plan_typing` is a ninth `rc_cursor_query` request ("plan_typing needs the
+  project" when NULL). `cursor_typing.rs` (315 lines): the arguments, CU-92's refusals, each
+  stretch clamped to the played window and placed through `clip_time`, the speech spans of every
+  media clip with sound under a stretch (`speech_in_clip`), each press's overlay span (the
+  Shortcuts-track clips holding it or starting within 0.5 s, else 1.5 s; no window filter),
+  `subtract`, `united` (touching merged), then `shortest` and the 0.3 s margins, `needs_speech`,
+  and the `retime_range` ops right to left, each tried in order on a clone. `cursor_overlays.rs`
+  makes `MOST_LATE` and the new `DEFAULT_DURATION` `pub(crate)` (319 → 321, no behaviour change).
+- **The app.** `SpeedUpTyping.swift` (settings and keys, `request`, the speech step, `resolve`,
+  `waitLimit`, `gaveUp`, the summary), `SpeedUpTypingSheetController.swift` (the sheet and its
+  bounded wait), `EditorViewController+SpeedUpTyping.swift` (the action and
+  `validateSpeedUpTypingAction`), `AgentServer+SpeedUpTyping.swift` (off main, its own tail),
+  `AgentCatalog+SpeedUpTyping.swift`; the menu item after Add Shortcut Overlays, its `UIMenuTable`
+  row and validator line; `speed_up_typing` in the prompt's "cut and time" row.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/cursor_typing.rs` | 315 | new: the planner |
+| `core/tests/speed_up_typing.rs` | 543 | new: R10, R3, needs_speech, R9, a press before `from`, R15, sync across three tracks, a ×2 clip and a ramp, short stretches and the settings, all or nothing, every refusal |
+| `app/Sources/SpeedUpTyping.swift` · `SpeedUpTypingSheetController.swift` | 247 · 264 | new |
+| `app/Sources/EditorViewController+SpeedUpTyping.swift` · `AgentServer+SpeedUpTyping.swift` · `AgentCatalog+SpeedUpTyping.swift` | 42 · 136 · 76 | new |
+| `tools/proof/cu9b_proof.py` · `cu9b_probe.swift` | 683 · 129 | new: Z0, R3, R9–R15, P1, P2, eleven mutants |
+
+**Deviations.** (1) `resolve` applies the speech ops straight to the edited handle it was given
+(the scoped view inside a nest, a whole project) rather than to the document handle scoped again;
+the tool does the same on `effectiveScope`'s view for its crossing. The two are the same project.
+(2) The tool's `rate` and `shortest` ranges are the core's refusals (capitalised through
+`AutoZoom.sentence`), not checked again in Swift. (3) `speech_saved` is always in the answer, `[]`
+when nothing was written. (4) R9's fixture types to 10.5 s (the spec's worked example would have
+left the overlay case's last piece at 2.5 s, under `shortest`). (5) The first form of the
+`sheet-rate-not-passed` mutant changed the controls' rate, so its Apply wrote
+`FrameJobSpeedUpTypingRate` into the Debug domain (`mcp.py` printed DEFAULTS MOVED); the key was
+deleted with `defaults delete`, and the mutant now hands the planner the default settings while
+the remembered values stay the controls', writing nothing.
+
+**Measured.**
+
+- `cargo test --release --test speed_up_typing` 11 passed; `--test shortcut_overlays --test
+  auto_zoom --test retime_range` 11, 15, 18 passed; `cargo fmt`; `make lint` exit 0.
+- `make typecheck`: exit 0, the 4 baseline warnings. `swift_build.py typecheck cu9b_probe.swift`
+  exit 0. `inventory.py --check` 5/5; `spec_index_proof.py` 255/255;
+  `assistant_prompt_proof.py --probe` 14/14.
+- Debug `cu9b_proof.py`: 10/11 on the first run (R9's overlay fixture, deviation (4)), then R9
+  2/2 after the fixture moved.
+- `make gate`: "gate: PASS 494s" (names 1, typecheck 7, fmt 3, lint 1, test 301 with 215 result
+  lines, 2151 passed, 0 failed, app 180). Again after this record and the mutant's re-anchoring:
+  "gate: PASS 144s" (names 1, test 141, the other steps skipped as unchanged).
+- Release (the gate's app): `RC_PROOF_APP=release cu9b_proof.py` 11/11, exit 0, Z0 empty on
+  both instances (R14 retried one "not detected yet" refusal). On a `proof_app.py launch --app
+  release` instance: `op_argument_proof.py` 195/195, `phase9_proof.py` 251/251, `grep "Frame
+  Job: "` on its log printed nothing; then `recording_probe.py --only catalog` 31/31 and
+  `v2_menu.py --only H` 5/5.
+- Mutants, eleven, each exit 1, CAUGHT: in the core `speech-ignored` (r3), `margins-dropped`
+  (r10), `shortcut-inside` (r9), `needs-speech-skipped`, `left-to-right` (the sync test),
+  `no-prevalidation`, `shortest-per-clip` (r15), `presses-window-filtered`; in the probe
+  `unavailable-as-pending` (P1), `wait-unbounded` (P2); in the app `sheet-rate-not-passed` (R12,
+  on a `tree_copy.py` copy's Debug app built in 63 s).
+
+**Review.** Pass, with two nits, both fixed at integration: the tool's nothing-to-do note named
+the argument ("lasted shortest or more") and now names its value as the sheet's summary does
+("lasted 3 s or more"; `cu9b_proof.py`'s `NOTE` with it), and the guide's "saves it on the file"
+became "saves it with the project" (the speech is the media's `speech`, not the movie's).
+
+**Integrated** onto `worktree-creator-jobs` after VR1: conflicts only in `creator-jobs-7.md` (VR1's
+section kept ahead of CU9b's, 338 → 428 lines), its index row and the spec README's Lines cells,
+recounted. `make gate`: "gate: PASS 512s" (names 1, typecheck 9, fmt 4, lint 10, test 266, app
+222). Release (the gate's app): `cu9b_proof.py` 11/11, Z0 empty on both instances, R13's note
+now "lasted 3 s or more"; `op_argument_proof.py` 195/195 with `grep "Frame Job: "` empty.
+
+**Owed.** Nothing person-only: no JOB row (the feel is CU12's trial). Real data waits for the
+owner's screen-tutorial recordings with Record shortcuts on.
+
 ### VR3 — File ▸ Make Vertical Version…
 
 - **What a person gets:** the sheet (Shape, Follow, Zoom, Where Empty, Make a Copy), the Analyzing

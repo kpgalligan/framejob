@@ -336,3 +336,93 @@ and `lane_queued` (VR-16). CJ-20 stands: nothing runs at import.
   5 s after it starts; V10 S-TH4 skipped by name; Z1. Mutants (5): `grid-by-frame-index` (V4),
   `orientation-not-applied` (V3), `framing-whole-media` (V6), `source-tick-no-mirror` (P7),
   `show-subjects-wants` (V8). No person check.
+
+## CU9b — Speed Up Typing (2026-11-02)
+
+Recorded before the code. CU-91…CU-94 are CU9b's: Clip ▸ Speed Up Typing… and the tool
+`speed_up_typing` play each typing stretch of the selected clips' cursor files that has no speech
+and no shortcut at ×4 (the default), keeping 0.3 s at ×1 at each end, as one undo step "Speed Up
+Typing". The plan is a core planner, `plan_typing`, a ninth `rc_cursor_query` request (one track
+per clip and the project, as `plan_zooms` and `plan_overlays`; no new `rc_*` export, op, format or
+cursor-file version), answered as CU-90's `retime_range` ops. The owner's answer (2026-11-01):
+"the sound in a sped stretch is sped with Keep pitch on." Nothing here sends anything anywhere,
+so nothing is keyed (CJ-3); speech detection is on-device.
+
+- **CU-91 — The stretch rule (`plan_typing`, `cursor_typing.rs`),** in this order.
+  (1) Per given clip: each `typing_stretches(file.keys.typed.t)` stretch (`cursor_bursts.rs`,
+  CU-25) `[first, last]`, clamped to the clip's played window `[in, in +
+  content_length_in_source)`, mapped to container time through `cursor_zoom_run.rs`'s
+  `clip_time` (so through S on a ramp), then intersected with `[from, to)`.
+  (2) Subtracted, in container time: (a) every speech span of every media clip in the container
+  whose media `has_audio` and that overlaps the stretch, on any track, muted or not — the
+  media's `speech` through `audio_duck_speech.rs`'s `speech_in_clip`, plus the clip's `start`;
+  (b) per recorded shortcut press p of the given clips — CU8's mapping (`clip.start +
+  clip_time(clip, s − in)` for s in the played window) but with NO `[from, to)` filter, so a press
+  before `from` whose span reaches into the window still counts: the union of the clips on tracks
+  named exactly `cursor_overlays.rs`' `TRACK_NAME` ("Shortcuts") that hold p or start in (p, p +
+  `MOST_LATE`], from min(p, their start) to their end; with none, `[p, p + DEFAULT_DURATION)`
+  (CU-80's 1.5 s).
+  (3) The remaining pieces of ALL given clips are united, overlapping AND touching pieces
+  merged, so a stretch across a cut between two clips is one piece.
+  (4) Only then: a merged piece shorter than `shortest` is dropped and counted (`short`); a kept
+  piece `[a, b)` becomes `[snapped(a + 0.3 s), snapped(b − 0.3 s))`.
+  (5) Sorted, the pieces are answered RIGHT TO LEFT as `{op: "retime_range", from, to, rate,
+  keep_pitch}` (`retime_range` acts on the whole timeline, so a range across a cut is one op, and
+  right to left no op moves a later one's range). `sped_to` = `snapped(from + round((to − from) ÷
+  rate))` (CU-90 (a)'s f); `saved` = Σ (to − sped_to). If any media counted in (2a) has no
+  stored `speech`, the answer is `needs_speech` (its ids, sorted) with no ops and no ranges — not
+  a refusal. **All or nothing:** the ops are applied in order to a clone through
+  `Project::retime_range`; the first refusal or error refuses the plan: "the typing from {a} to
+  {b} ticks cannot be sped up: {sentence}". Answer: `{ops, needs_speech, stretches, short,
+  ranges: [{from, to, sped_to}], saved}`.
+- **CU-92 — Defaults and ranges.** Rate ×4 in ×2–×8; shortest stretch 3 s in 1–30 s; Keep pitch
+  on (the owner's answer); the margin 0.3 s at ×1 each end; the overlay fallback CU-80's 1.5 s and
+  its lateness 0.5 s. Refusals, lowercase, in order: "rate is ×R; it runs ×2–×8", "shortest is S
+  s; it runs 1–30", "to (T) must be after from (F)", "plan_typing needs at least one clip", the
+  track-count sentence in CU-84's wording ("plan_typing reads one cursor track per clip; …"),
+  "plan_typing needs the project"; then per clip: named twice, unknown, not a media clip, no cursor
+  file, reversed ("clip C plays reversed; Speed Up Typing speeds only clips that play forward" —
+  CU-5).
+- **CU-93 — The doors.** Swift's speech step (`SpeedUpTyping.speech`): for each `needs_speech`
+  media, a current VAD cache (`MediaImporter.speechIsCurrent` with `CacheStamp.stamp(for:url:)`)
+  becomes a `set_media_speech` op with `DuckSpeech.spans`; a media with no file is refused "{name}
+  is offline, so its speech cannot be read."; not current while `SileroVAD.isAvailable` is
+  pending, and every door that sees pending STARTS the pass through `ProjectDocument
+  .generateCaches()` (idempotent: a current cache costs a stat, a running pass is waited for),
+  because a pass that could not read the file leaves no marker and is not retried until the next
+  open; detection unavailable is refused "Speech detection is unavailable on this Mac, so Speed
+  Up Typing cannot tell typing from talking." `SpeedUpTyping.resolve` plans, makes the speech ops,
+  applies them to a pure handle (scoped again inside a nest), plans again; the step's ops are the
+  speech ops, then the retime ops. Stored spans are never rewritten (AU-111).
+  **Clip ▸ Speed Up Typing…** (right after Add Shortcut Overlays, no key, no `ModelKeys` row) is
+  on with at least one selected clip passing `AutoZoom.canOffer` and no sheet attached, inside a
+  nest too. Its sheet: Rate (×), Shortest stretch (s), Keep pitch, opened at the remembered
+  values (`FrameJobSpeedUpTypingRate`, `…Shortest`, `…KeepPitch`, each written only when changed
+  from what the sheet opened with); the files are read off main ("Reading cursor files…"); every
+  control change plans again; waiting calls `generateCaches()` once per sheet, shows "Waiting for
+  speech detection on {names}…" with Apply disabled, and plans again on each
+  `.mediaCacheDidChange` of `MediaImporter.speechKind`, bounded at `SpeedUpTyping.waitLimit`, 300
+  s (AU-68's bound), past which it shows "Speech detection has not finished for {names}. Close
+  this sheet and try again." with Apply disabled; the summary "N typing stretches sped up ×R,
+  saving S s." or "No typing stretch without speech or a shortcut lasts S s or more in the
+  selected clips, so nothing would change." (Apply disabled). Apply commits through
+  `SpeedAudioDrop.commit` (Cancel on its question leaves the sheet up), then remembers.
+  `-RCDevSpeedUpTypingAccept YES` (dev tools only) presses Apply once the first plan with ops
+  exists. **The tool** `speed_up_typing {clip | clips, rate?, shortest?, keep_pitch?, from?, to?}`
+  takes no `scope` key (it acts in the container `set_scope` has open, as `auto_zoom`), runs on
+  the server thread (resolved on main, files read off it, back on main refused if the project or
+  scope changed); pending starts the pass and is refused "{name}'s speech has not been detected
+  yet. Try again in a moment."; the crossing is read by `SpeedAudioDrop.crossing(applying:to:)`
+  over the retime ops on the speech-applied handle, and the step is `performGroupedEdit(document,
+  "Speed Up Typing", ops)`. It answers `ok`, `stretches`, `short`, `ranges`, `saved`,
+  `speech_saved` (media ids written), `created`, `audio_left_out`/`audio_note` when any, and
+  `project`; with nothing to speed, `ok` with a `note` and no undo step.
+- **CU-94 — CU9b's proof.** `cu9b_proof.py` Z0, R3, R9, R10, R11, R12, R13, R14, R15 over MCP,
+  `cu9b_probe.swift` P1 (the speech step's five answers) and P2 (`gaveUp(waitingFor:)` false at
+  299 s, true at 300 s), `core/tests/speed_up_typing.rs` (sync across three tracks after two
+  ranges, a ×2 clip and a ramp through S, `from`/`to`, a press before `from`, the union of two
+  clips, every refusal); eleven mutants (`speech-ignored`, `margins-dropped`, `shortcut-inside`,
+  `sheet-rate-not-passed`, `needs-speech-skipped`, `left-to-right`, `no-prevalidation`,
+  `unavailable-as-pending`, `shortest-per-clip`, `presses-window-filtered`, `wait-unbounded`) —
+  above ten because the objections added three decisions, one each. No person check: the feel is
+  judged at CU12's trial.

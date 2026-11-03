@@ -115,6 +115,7 @@ on its own or beside the screen as a corner talking head; or a
 microphone-only voice-over. **Clip ▸ Auto Zoom…** zooms a recording in at its
 clicks and typing and back out after, as ordinary actions you can edit, and
 **Clip ▸ Add Shortcut Overlays** shows the shortcuts you pressed as keycaps.
+**Clip ▸ Speed Up Typing…** plays the typing faster where nobody speaks.
 → [Screen recording](docs/guide/screen-recording.md)
 
 **Export.** H.264, HEVC (8-bit, 10-bit, with alpha), AV1 in MP4 or WebM
