@@ -42,12 +42,12 @@ enum AssistantPrompt {
           "paste", "duplicate"]),
         ("cut and time: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
             + "detach or attach audio, (ripple) delete, delete or lift a range, insert time, "
-            + "close a gap",
+            + "close a gap, copy pieces to another track, switch a shot's camera angle",
          ["move_clip", "trim_start", "trim_end", "rate_stretch", "slip", "roll", "split",
           "delete", "ripple_delete", "ripple_delete_range", "ripple_delete_ranges", "lift_range",
           "insert_time", "close_gap", "set_speed", "set_reversed", "freeze_frame",
           "detach_audio", "attach_audio", "split_at_shots", "retime_range",
-          "speed_up_typing"]),
+          "speed_up_typing", "copy_pieces", "switch_angle"]),
         ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",

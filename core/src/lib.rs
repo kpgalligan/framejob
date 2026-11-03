@@ -80,6 +80,7 @@ mod edit_link;
 pub mod edit_nest;
 pub mod edit_paste;
 pub mod edit_paste_attributes;
+mod edit_pieces;
 pub mod edit_props;
 pub mod edit_relink;
 mod edit_retime;

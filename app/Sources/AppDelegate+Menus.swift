@@ -366,6 +366,9 @@ extension AppDelegate {
         // Road map "creator-jobs" CO6 (spec §11 CO-66): Camera Layout ▸ right after Remove
         // Background, the UI path `switch_layout` names. No key equivalent.
         menu.addItem(submenuItem(cameraLayoutMenu()))
+        // SW1 (spec §11 SW-15): Switch Angle ▸ right after Camera Layout ▸, filled on
+        // open, the UI path `switch_angle` names. No key equivalent.
+        menu.addItem(submenuItem(switchAngleMenu()))
         menu.addItem(.separator())
         // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
         // its own because neither item edits the selection: both put a clip on

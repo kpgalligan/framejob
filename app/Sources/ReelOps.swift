@@ -667,6 +667,23 @@ extension ReelOp {
         return ReelOp(name: "duplicate", args: a.values)
     }
 
+    /// `clip`'s pieces between each range's project times copied onto
+    /// `track` at the same times, each the middle two splits would leave,
+    /// with fresh ids, no transition and no link (spec §11 SW-11, SW-12).
+    /// `video` / `audio` set each piece's switches; nil keeps the clip's.
+    static func copyPieces(
+        clip: UInt32, track: UInt32, ranges: [(from: Ticks, to: Ticks)],
+        video: Bool? = nil, audio: Bool? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("track", track)
+        a.put("ranges", ranges.map { [$0.from, $0.to] })
+        a.put("video", video)
+        a.put("audio", audio)
+        return ReelOp(name: "copy_pieces", args: a.values)
+    }
+
     /// Inserts a clipboard payload's clips with fresh ids, the earliest one
     /// landing exactly at `at` and the rest keeping their offsets from it.
     ///

@@ -583,6 +583,13 @@
    ],
    "note": "an edit through CameraLayoutCommand.run; when the switch is refused because a clip in its reach zooms and nest: true would apply, the nest offer's alert SHEET (:28) — inside the call, or after the camera's person-mask focus is read on CameraLayoutFocus.queue when its masks are cached (spec §11 CO-72)"
   },
+  "switchAngle:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+SwitchAngle.swift `func switchAngle(`"
+   ],
+   "note": "an edit"
+  },
   "addSolidColorBackground:": {
    "verdict": "none",
    "code": [

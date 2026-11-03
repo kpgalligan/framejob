@@ -278,7 +278,7 @@ def main():
     print("\n1 — the catalog is the core's op list plus the app's own tools")
     check(f"the core declares {len(ops)} ops and every one of them but "
           f"{sorted(OPS_WITHOUT_TOOLS)} is a tool",
-          len(ops) == 68 and ops - OPS_WITHOUT_TOOLS <= set(tools)
+          len(ops) == 69 and ops - OPS_WITHOUT_TOOLS <= set(tools)
           and not OPS_WITHOUT_TOOLS & set(tools),
           f"{len(ops)} ops, missing tools: {sorted(ops - OPS_WITHOUT_TOOLS - set(tools))}, "
           f"tools that should not be: {sorted(OPS_WITHOUT_TOOLS & set(tools))}")

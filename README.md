@@ -109,6 +109,11 @@ inspector controls, your own modules too, each saved to share as a
 opens to import into a project.
 → [Motion graphics](docs/guide/graphics.md)
 
+**Several cameras.** Each camera on a track of its own and a program track cut
+from them; **Clip ▸ Switch Angle ▸** re-picks a shot from another camera in
+sync, keeping its span and its dissolves, in one undo step.
+→ [Podcasts and several cameras](docs/guide/multicam.md)
+
 **Screen recording.** A display or a window, with system audio, microphone and
 click rings, at 30 or 60 fps, into a new project or at the playhead; a camera,
 on its own or beside the screen as a corner talking head; or a

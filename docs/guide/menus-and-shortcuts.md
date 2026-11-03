@@ -158,6 +158,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Look ▸ | | Puts a look or a LUT on the clip ([Colour grading](color-grading.md)) |
 | Remove Background | | Keeps the person and removes the rest of the picture, or turns that off; checked when every selected clip has it, a dash when some do ([Canvas and layers](canvas-and-layers.md#remove-background)) |
 | Camera Layout ▸ | | Lays out the camera and the screen behind it at the playhead — Corner ▸, Rounded Corner ▸ or Circle ▸ (each Bottom Right, Bottom Left, Top Right, Top Left), Side by Side, Stacked, Camera Full or Screen Only — eased over half a second and held until the next switch; the crop centred on the person when the camera's masks are cached; a zoom in the way offers Nest and Switch ([Canvas and layers](canvas-and-layers.md#camera-layouts)) |
+| Switch Angle ▸ | | Re-picks the selected shot from another camera track that covers it, keeping its span, its switches and its dissolves, as one undo step; the new pieces are selected ([Podcasts and several cameras](multicam.md)) |
 | Add Background ▸ Solid Color | | Puts a colour plate on a new track behind everything ([Canvas and layers](canvas-and-layers.md)) |
 | Add Background ▸ Image… | | Puts a picture you choose on a new track behind everything |
 | Add Blurred Background | | Puts a blurred copy of the picture on a new track behind everything |
@@ -221,6 +222,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Look ▸ items | A selected clip shows a picture from a file, or is an adjustment clip |
 | Remove Background | A selected clip plays a video file, or is a freeze frame of one |
 | Camera Layout ▸ items | Two selected clips with a picture on different tracks, one selected clip with a picture, or — with none selected — a clip at the playhead on a track named "Camera"; the camera contains the playhead and no sheet is open |
+| Switch Angle ▸ items | Exactly one clip is selected, its track is not locked, it is not linked to a detached sound, the item's track still covers it with video clips, and no sheet is open; **No Covering Angle** never |
 | Text Behind Subject | No nest is open, and a clip of a video file plays at the playhead, with its picture on, on a shown track that is not a matte track |
 | Add Background ▸ | Always |
 | Add Blurred Background | Exactly one clip is selected and it has a picture size: a video, image, still, shape or graphic clip. Dimmed for a nest, text, adjustment or audio-only clip |

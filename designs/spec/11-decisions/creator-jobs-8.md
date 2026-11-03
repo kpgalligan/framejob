@@ -398,3 +398,118 @@ asks the owner nothing at this phase.
   nests the camera. Four mutants, each caught: the coverage guard dropped (P2b), the sheet's
   edits as two steps (P4), the fill skipped (P5), `keepsFocus` always true (P6). No new JOB row
   (JOB-64 stands).
+
+## SW1 — copy pieces to a track, and Switch Angle (2026-11-03)
+
+Recorded before the code. SW-10…SW-16 are SW1's: agents get `copy_pieces`, a core op that copies
+a clip's pieces between given project times onto another track, each piece exactly the middle two
+`split`s would leave; people get Clip ▸ Switch Angle ▸, and agents `switch_angle`, either of which
+re-picks one shot from a covering camera track as one undo step. No persisted field, no format
+bump (42 stands) and no `rc_*` export; nothing is sent anywhere, so nothing is keyed (CJ-3). The
+owner's answers (2026-11-01): no ⌥1–⌥9 keys for Switch Angle (bare 1–9 come with the viewer in
+SW9b), and a re-pick does not keep the shot's own video settings. SW1 ran in lane A (the road map
+says lane C; nothing depends on the lane).
+
+- **SW-10 — The switch writes a program track; it does not cut the cameras in place.**
+  Picture-only cuts on the stacked cameras make two to three clips per shot where the program
+  track makes one (a four-camera three-hour show at 8 s shots is about 5,400 against 1,350, past
+  `MAX_CLIPS`); moving one cut there is trimming pieces on several tracks, here an ordinary roll;
+  both decode one camera at a time.
+- **SW-11 — `copy_pieces {clip, track, ranges, video?, audio?}`** copies the pieces of `clip`
+  between each range's ends onto `track` at the same times, with fresh ids (the clip's and every
+  action's). `ranges` are project times; `video` and `audio`, when given, set each piece's
+  `enabled` switches. A copy has no transition and its link is cleared. Allowed inside a nest.
+  As built (`core/src/edit_pieces.rs`), in this order:
+  - `Err("no clip with id N")` for an unknown clip, then `Err("no track with id N")` for an
+    unknown track.
+  - Each pair is put in order (a reversed pair is the same range) and both ends are snapped by
+    `snapped`, as `split` snaps. A range empty on the grid is dropped; nothing left is an
+    identity (an empty `ranges` too). The ranges are sorted by start.
+  - Then the refusals, each in its own sentence: a nest clip ("clip N is a nest: a piece of it
+    would replay the nest from its first frame"); a range outside the clip ("range [a, b] is
+    outside clip C, which runs from S to E"); overlapping ranges ("ranges [a, b] and [c, d]
+    overlap"; ranges that only touch are allowed); a locked destination (`locked_track(T, "no
+    piece can be copied onto it")`); a destination holding a clip over a range ("track T holds
+    clip X between S and E", the clip's own ends, the first by start).
+- **SW-12 — A piece is exactly the middle a `split` at its two ends would leave:** source window,
+  a ramp's map and rate (SR-18), its actions clipped, a graphic's `in` and `length` (G-9), its
+  words rebased (W-3), all from `split_clip`'s own arithmetic (`edit_split.rs`) on a scratch copy
+  — `self` cloned with `clips` holding only the source clip, cloned again per range, split at
+  `from` when `from` is past the clip's start and the middle split again at `to` when `to` is
+  before its end. `split_clip` and its callers do not change. The middle is written into the
+  result with a fresh id and fresh action ids from the result's own counter, never the scratch's;
+  `track` the destination, `start` = `from`, `transition_in` and `linked` cleared, `enabled`
+  overridden by `video`/`audio` where given; the exit is `finish`.
+- **SW-13 — An angle is a TRACK; Clip ▸ Switch Angle ▸ re-picks one shot.** A track COVERS a span
+  when its media clips with pictures together leave no part of it uncovered (a clip with its
+  picture off, or on a hidden track, still counts). The submenu lists, for the one selected clip,
+  every other track of its container covering the clip's whole span, front first, by name, up to
+  nine; choosing one re-picks by SW-14's sequence, one `copy_pieces` per angle clip the span
+  crosses, as one step "Switch Angle". `switch_angle {clip, angle}` does the same and refuses an
+  angle not covering the shot, naming the first uncovered tick. No key (the owner, 2026-11-01).
+- **SW-14 — A re-picked shot keeps its span, its switches and both its transitions, and nothing
+  else** (a punch-in, grade or action on the old shot does not carry: the owner, 2026-11-01).
+  With B between A and C: record B's span, switches and `transition_in`, A's end and C's start
+  and `transition_in`; `delete` B; `trim_end` A to B's start and `trim_start` C to B's end, each
+  `alone`; `copy_pieces` the angle over B's span with B's switches; trim A and C back to their
+  old edges, re-forming both overlaps as they were; `set_transition` and `set_transition_style`
+  give the new first piece B's `transition_in` and C its own. When the angle's clips cut the span
+  into pieces and an overlap would break the overlap rule against a short piece, that transition
+  is dropped and the step is "Switch Angle (transition removed)".
+- **SW-15 — The menu and the tool.**
+  - (a) Clip ▸ Switch Angle ▸ sits after Camera Layout ▸ and has no key. `SwitchAngleMenuFiller`
+    fills it on open (the `LookMenuFiller` pattern), one item per `SwitchAngle.angles`: its title
+    the track's name, a name two listed tracks share getting " (n)", n the track's 1-based
+    position from the back; its tag the row index, its `representedObject` `NSNumber(track id)`,
+    its selector `switchAngle(_:)`. With not exactly one selected clip, or no angle, the menu holds
+    the single item "No Covering Angle", always disabled: it carries `switchAngle(_:)` with no
+    track, which the validator turns off, and the menu is built holding it, so the selector is a
+    live leaf before any project opens (the menu's three-way check, `v2_menu.py` H1; as built —
+    the spec drafted it with no action).
+  - (b) An item is enabled when exactly one clip is selected, its track is unlocked, it has no
+    `linked`, the item's track is still in `angles`, and no sheet is up. Allowed inside a nest.
+  - (c) `SwitchAngle.plan`'s refusals, in this order: the angle is the clip's own track ("track T
+    is clip C's own track; an angle is another track"); the clip's track is locked ("track T is
+    locked, so clip C cannot be re-picked"); a linked clip ("clip C is linked to clip P (Detach
+    Audio's pair); Switch Angle re-picks a clip with no link"); not covering ("track T does not
+    cover clip C: nothing with a picture plays on it at tick X"). An unknown clip or track
+    throws.
+  - (d) Covering counts only clips with `.media` sources whose media has a picture
+    (`sourceSize(of:) != nil`); `enabled.video` and the track's `hidden` are ignored. The pieces
+    are those angle clips sorted by start, each taking `[max(start, s), min(end, next angle
+    clip's start, e))`, so where two angle clips overlap the later one takes over at its own
+    start. Empty pieces are skipped, and each angle clip gets one `copy_pieces` with
+    `video`/`audio` set to B's `enabled`.
+  - (e) SW-14's ops are tried one at a time on the container's handle
+    (`ReelProject.applying(_ op:)`), because `applying([ReelOp])` does not stop at a refusal.
+    The new piece ids are read from the snapshot after the copies (a scoped view shares its
+    parent's `next_id`). After `delete` B and the two trims away, A's end and C's start are read
+    back. If any op before the trim-backs (`delete`, a trim away, a `copy_pieces`) answers
+    refused, or a trim away is held short of its target (A's end is not exactly s, or C's start
+    not exactly e, as a ramp's held edge leaves it, `source_window.rs`'s `front_edge_held`), the
+    plan is refused and nothing is committed: a refusal gives that op's own sentence, a held trim
+    "clip X's edge is held at tick Y, short of tick Z, so clip B cannot be re-picked". A
+    trim-back that is refused, or held short of its old edge, is left out together with the
+    transition ops for that edge; if the clip of that edge still holds a `transition_in`, it gets
+    `set_transition` to none. When anything is left out, the step is "Switch Angle (transition
+    removed)". A is the clip before B on its track ending after s, and C the clip after B
+    starting before e; only these are trimmed. The menu commits through `applyEdit` and selects
+    the pieces; the tool commits through `performGroupedEdit` and answers `{ok, step, pieces,
+    transitions_removed, project}`, `pieces` in time order. `switch_angle` takes no `scope`: it
+    reads the container `set_scope` has open, as `text_behind_subject` does, and runs on main.
+- **SW-16 — The proof.** `tools/proof/switch_pieces_proof.py` (Release), P1–P5 and six mutants,
+  with no manual check. P1 `copy_pieces` of a ×0.999 drift-corrected angle onto a new track:
+  `render_frame` at five times byte-identical to the angle shown alone; P2 Switch Angle by
+  `perform_menu_item` replaces the shot's media over the same span and one undo restores it; P3
+  `switch_angle` the same, a non-covering angle refused in its sentence, and an angle of two
+  abutting files re-picking a shot crossing their join as two pieces; P4 a shot with a dissolve on
+  its incoming edge, its outgoing edge and both, every overlap's span, kind, curve and audio shape
+  read back equal, a two-piece re-pick breaking the overlap rule named "Switch Angle (transition
+  removed)", and P4d, a ramp-down C reaching its media's end, refused in the held-edge sentence
+  with the project unchanged; P5 `copy_pieces` of 1,000 ranges on a two-hour angle within 0.5 s
+  (median of five; over it, the figure in the guide and a Performance candidate). P5's fixture is
+  generated into `tools/proof/media/creator/sw1/`: a two-hour 320×180 H.264 file stream-copied
+  from repeats of one encoded minute, never committed. The mutants: the piece's `in` without the
+  clip's speed (core); the occupancy refusal removed (core); the link kept on the copy (core);
+  candidates not required to cover (P3); delete and copy as two steps (P2); neighbours not
+  trimmed back (P4). The core mutants run against `cargo test --test copy_pieces`.

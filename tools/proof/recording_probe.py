@@ -8758,6 +8758,7 @@ APP_STATE_TOOLS = [
     "auto_zoom",
     "add_shortcut_overlays",
     "speed_up_typing",
+    "switch_angle",
 ]
 # `git show 7a198db^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (2a8421b) after `remove_media` and `export_status`,

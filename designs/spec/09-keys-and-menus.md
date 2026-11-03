@@ -191,7 +191,16 @@ the camera's crop centred on the person when its person masks are cached for eve
 plays (CO7, §11 CO-70); a switch refused because a clip in its reach zooms or moves offers a
 sheet, "Lay out the clips in a nest?", whose Nest and Switch sends `switch_layout {nest: true}`
 as one undo step and whose Cancel changes nothing (§11 CO-72); no key equivalent; its mirror is
-`switch_layout`; the Picture sub-tab's Layout section sends the same op), Add Background ▸ (Solid Color · Image… — road map
+`switch_layout`; the Picture sub-tab's Layout section sends the same op), Switch Angle ▸ (road map creator-jobs SW1, §11
+SW-13, SW-15: filled when it opens with one row per track of the container covering the ONE
+selected clip's span with media clips that have a picture, front first, by name — a name two
+rows share gets " (n)", n the track's position from the back — up to nine; else the one
+disabled row "No Covering Angle"; one selector, `switchAngle:`, the track id as the row's
+represented object; enabled when exactly one clip is selected, its track is unlocked, it is not
+linked, the row's track still covers it and no sheet is up; allowed inside a nest; re-picks the
+shot from that track as one undo step "Switch Angle" (or "Switch Angle (transition removed)")
+and selects the new pieces, a refusal in the inspector's refusal strip; no key equivalent, the
+owner's answer (bare 1–9 come with the Angle Viewer); its mirror is `switch_angle`), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a

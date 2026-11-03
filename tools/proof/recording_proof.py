@@ -449,6 +449,7 @@ APP_STATE_TOOLS = {
     "auto_zoom",
     "add_shortcut_overlays",
     "speed_up_typing",
+    "switch_angle",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`

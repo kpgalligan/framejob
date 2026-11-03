@@ -635,6 +635,10 @@ fn op_table() -> Vec<Value> {
         // (`UNCHANGING`); `core/tests/link.rs` measures what it merges.
         json!({"op": "attach_audio", "clip": 10}),
         json!({"op": "duplicate", "clips": [10]}),
+        // Clip 10's 1 s – 2 s copied onto track 5, empty there;
+        // `core/tests/copy_pieces.rs` measures the pieces.
+        json!({"op": "copy_pieces", "clip": 10, "track": 5,
+               "ranges": [[600000, 1200000]]}),
         // The two backdrop ops each mint a track as well as a clip, which is
         // why they sit beside `detach_audio` rather than with `add_clip`:
         // what the coverage check below wants from them is only that the

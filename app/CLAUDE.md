@@ -94,7 +94,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-seven op tools.
+  `AgentCatalog.opTool` prints for all sixty-eight op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -828,6 +828,40 @@ detail there.
   `allSourcePixels` block when `allLayoutable` (one `.media` clip with a picture and a source
   size): Layout, Shape and Corner pop-ups, Duration, Switch at Playhead (enabled with no
   sheet; `duration` sent only off 0.5 s).
+- `SwitchAngle.swift` · `EditorViewController+SwitchAngle.swift` ·
+  `AgentServer+Switch.swift` · `AgentCatalog+Switch.swift` — Clip ▸ Switch
+  Angle ▸, `switch_angle` and the op tool `copy_pieces` (road map
+  creator-jobs SW1, spec §11 SW-11…SW-16). `SwitchAngle` (names no `rc_*`)
+  is what both doors run: `pictureClips` (media clips whose media has a
+  picture), `firstUncovered` (SW-13's covering; `enabled.video` and a
+  hidden track ignored), `angles` (every other track covering the clip,
+  front first, up to `menuLimit` 9, a shared name with " (n)", n its
+  position from the back) and `plan` — SW-15 (c)'s four refusals, then
+  SW-14's sequence (`delete`, the two trims away `alone`, one
+  `copy_pieces` per angle clip with the shot's switches, the trim-backs,
+  `set_transition` / `set_transition_style`) tried ONE op at a time on the
+  container's handle, because `applying([ReelOp])` does not stop at a
+  refusal: a refusal before the trim-backs, or a trim away held short (a
+  ramp's held front edge), refuses the whole plan; a refused or held
+  trim-back is left out with its edge's transition and the step is "Switch
+  Angle (transition removed)". `AppDelegate+ClipMenus.swift` holds
+  `switchAngleMenu()` (built holding the placeholder) and
+  `SwitchAngleMenuFiller` (fills on open, and `UIMenu.fillDynamic` calls
+  it: a row per angle, tag the index, the track id as represented object;
+  else the placeholder "No Covering Angle", which carries `switchAngle:`
+  with no track so the three-way check sees the selector, and is always
+  disabled). `EditorViewController+SwitchAngle` is `switchAngle`
+  (`applyEdit`, then the pieces selected; a refusal posted to the strip)
+  and `validateSwitchAngleAction`, one line in the frozen file after
+  `validateCameraLayoutAction` (one selected, unlocked, unlinked clip the
+  row's track still covers, no sheet; allowed inside a nest).
+  `AgentServer+Switch` is `copyPieces` (`editResult`, "Copy Pieces"; an
+  empty `ranges` refused, declared `minItems: 1`) and `switchAngle` (main
+  thread, no `scope`: the container `set_scope` has open,
+  `performGroupedEdit`, the answer `{ok, step, pieces,
+  transitions_removed, project}` written by hand in that key order).
+  `AgentCatalog+Switch` holds both rows, spliced in last by
+  `creatorTools()`, after `switch_layout`'s.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -1191,7 +1225,8 @@ the key map behind it.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
   Background, Transition, Motion, Look and Label, a pure move out of `+Menus`,
-  grading GR1 — +`ViewMenu` — the View menu and its Timeline Track Height
+  grading GR1, then Camera Layout (CO6) and Switch Angle with
+  `SwitchAngleMenuFiller` (SW1) — +`ViewMenu` — the View menu and its Timeline Track Height
   and Preview Quality submenus, a pure move out of `+Menus`, creator-jobs
   CJ0c — +`Recording`, +`Updates` — Frame Job ▸ Check for Updates…
   and the Sparkle updater, compiled only under `FRAMEJOB_UPDATER`
@@ -3826,9 +3861,9 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-seven op tools is `opTool`'s** and carries no
+  **Every one of the sixty-eight op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the forty APP-STATE tools, which have no op behind them
+  callers are the forty-one APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
@@ -3862,7 +3897,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and nineteen
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and twenty-one
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

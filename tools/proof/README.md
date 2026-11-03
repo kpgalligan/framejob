@@ -8198,8 +8198,9 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
 - **F5** every ask-first row's tool, and each conditional withheld row's
   tool and key backticked and its value in double quotes, in the system
   prompt.
-- **F6** no text holds `\n\n`; system ≤ 6000, guide ≤ 1500, compaction ≤
-  1000 characters; none empty.
+- **F6** no text holds `\n\n`; system ≤ 6000, guide ≤ 1600 (1500 until SW1's
+  "copy pieces to another track, switch a shot's camera angle" took it to
+  1558), compaction ≤ 1000 characters; none empty.
 - **F7** `AssistantLiveContext.text` for four samples equals the template;
   `message(t, document:)` is the block, a newline and `t`; `message(t, nil)`
   is `t`; each label is a key of `get_project`.
@@ -29043,3 +29044,48 @@ RC_PROOF_APP=release python3 tools/proof/co7_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CO7 record. No person check (JOB-64
 stands).
+
+## Road map "creator-jobs" SW1 — copy pieces and Switch Angle (`switch_pieces_proof.py` P1–P5, Z1; six mutants; `core/tests/copy_pieces.rs`; spec §11 SW-10…SW-16)
+
+**`switch_pieces_proof.py [SOCKET]`** drives the app. Given a running instance's
+`<dir>/agent.sock` it runs every row there and greps `<dir>/framejob.log`; without one it
+launches its own (`proof_app.binary()`, or `--app PATH`, on a scratch `CFFIXED_USER_HOME`). Its
+short media are ffmpeg's `testsrc`/`testsrc2` at 320 × 180, 30 fps, with a sine, under
+`tools/proof/work/sw1/media/`, each file its own pattern or hue (`a`, `b`, `c`, `d1`, `d2` 20 s;
+`drift` 120 s). P5's two-hour angle is generated into `tools/proof/media/creator/sw1/` (SW-16):
+one encoded minute stream-copied 120 times, about 150 MB, never committed. Each row makes its
+own package on a 320 × 180 canvas. A frame is 20 000 ticks; every expected number is worked
+from the fixture.
+
+| Row | What it holds |
+|---|---|
+| Z1 | the instance's `grep "Frame Job: "` prints nothing |
+| P1 | a 120 s angle at ×0.999 copied with `copy_pieces` over 60–62 s, 90–95 s and 100–110 s onto a new track: with the angle's track hidden, `render_frame` at 60.5, 61.9, 92, 101 and 109 s byte-identical to the angle shown alone |
+| P2 | three program shots copied from Cam A; **Clip ▸ Switch Angle ▸ Cam B** by `perform_menu_item` on the middle one: one clip of Cam B's file over 5–10 s, `in` 5 s, the other shots unchanged; one undo named "Switch Angle" gives back `get_project` exactly |
+| P3 | `switch_angle` the same, its answer's keys `ok, step, pieces, transitions_removed, project`; a track covering only 0–6 s refused naming tick 3,600,000; an angle of two files abutting at 7.5 s re-picking the shot as two pieces, each from its own file at its own `in` |
+| P4 | a 10-frame dissolve (ease_in, audio on, s_curve) into the middle shot, out of it, and both: every overlap's span, kind, curve, audio and audio shape equal after `switch_angle`; an angle whose first piece is 12 frames against the incoming dissolve: "Switch Angle (transition removed)", `transitions_removed` 1, no overlap; P4d, the next shot dissolving in and ramped down to its file's end: refused in the held-edge sentence, `get_project` unchanged |
+| P5 | `copy_pieces` of 1,000 three-second ranges of the two-hour angle: 1,000 pieces, the median of five calls ≤ 0.5 s (each undone) |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). Three in the
+core, each edited into a copy of `core/` beside a link to `graphic/` and run under `cargo test
+--release --test copy_pieces` (target `tools/proof/work/sw1/mutant-target`), CAUGHT when its
+named test fails: `in-without-speed` (the piece's `in` advanced by timeline time, not source:
+`a_clip_at_1_25`, `a_ramp`), `occupancy-removed` (`an_occupied_destination…`), `link-kept`
+(`a_copy_of_a_linked_clip…`; equivalent — `finish`'s `settle_links` clears the copy's one-sided
+link, AU-96 — so it is recorded SURVIVED). Three in the app, on a `tree_copy.py` copy's built
+app: `cover-not-required` (P3), `two-steps` (P2), `no-trim-back` (P4).
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 121 and `OPS` 69,
+`op_catalog_proof.py`'s 69; `capture_spike/inventory.json` holds `switchAngle:` (verdict `none`,
+an edit); `switch_angle` joins the app-state tool lists of `phase9_proof.py`,
+`recording_proof.py` and `recording_probe.py`.
+
+```sh
+cd core && cargo test --release --test copy_pieces
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/switch_pieces_proof.py <dir>/agent.sock [--only P1,P4]
+python3 tools/proof/switch_pieces_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/switch_pieces_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s SW1 record. No person check.

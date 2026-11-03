@@ -286,6 +286,21 @@ the transition ops are §6d.
 - **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
   moves them). A linked partner on an unlocked track is copied too, and the copies are linked to each other (§11 AU-96).
 
+- **`copy_pieces {clip, track, ranges, video?, audio?}`** — Copies `clip`'s pieces between each
+  of `ranges`' project times (`[[from, to], …]`) onto `track` at the same times (§11 SW-11,
+  SW-12). Each piece is exactly the middle a `split` at its two ends would leave — source window,
+  a ramp's map and rate, its actions clipped, a graphic's `in` and `length`, its words rebased —
+  made by `split_clip` itself on a scratch copy; it gets fresh ids (its own and every action's),
+  no transition and no link, and `video`/`audio`, when given, set its `enabled` switches. `Err`
+  for an unknown clip, then an unknown track. Each pair is put in order and snapped; a range
+  empty on the grid is dropped, and nothing left (an empty list too) is an identity; the rest
+  are sorted. Refused, in order: a nest clip ("clip N is a nest: a piece of it would replay the
+  nest from its first frame"); a range outside the clip ("range [a, b] is outside clip C, which
+  runs from S to E"); overlapping ranges ("ranges [a, b] and [c, d] overlap", touching allowed); a
+  locked destination ("track T is locked, so no piece can be copied onto it"); a destination
+  holding a clip over a range ("track T holds clip X between S and E", the first by start).
+  Allowed inside a nest. Clip ▸ Switch Angle ▸ (§9) writes with it.
+
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
   "media": [...]}`, what ⌘C wrote to `com.kgalligan.framejob.clips` — with fresh ids for the clips,
   their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep

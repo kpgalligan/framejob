@@ -459,7 +459,7 @@ func rowF5() {
 
 func rowF6() {
     let texts = [("system", AssistantPrompt.system, 6000),
-                 ("guide", AssistantPrompt.searchGuide, 1500),
+                 ("guide", AssistantPrompt.searchGuide, 1600),
                  ("compaction", AssistantPrompt.compactionInstructions, 1000)]
     var problems: [String] = []
     for (label, text, bound) in texts {

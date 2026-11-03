@@ -461,7 +461,7 @@ governs a module now.
   `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-seven op tools in the agent catalog,
+  reader is every one of the sixty-eight op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -564,6 +564,20 @@ governs a module now.
   - Errors, then refusals (1)–(7) in CU-90's order. A rate of 1 is an
     identity once in range. AU-94's sentence comes through `edit_link.rs`'s
     `linked_rate_sentence`.
+- `edit_pieces.rs` — `copy_pieces` (road map "creator-jobs" SW1, spec §11
+  SW-11, SW-12): a clip's pieces between given project times copied onto
+  another track at the same times. `Err` for an unknown clip, then track;
+  each pair ordered and snapped, an empty one dropped (none left an
+  identity), sorted; then the refusals in order — a nest clip, a range
+  outside the clip, overlapping ranges (touching allowed), a locked
+  destination (`locked_track`), a destination holding a clip (the first by
+  start). Each piece is the middle `edit_split.rs`'s `split_clip` leaves at
+  the range's two ends on a scratch copy holding only the clip, written
+  with fresh ids from the result's counter (`remint`), the destination
+  track, `start` the range's start, no transition and no link (a kept link
+  would be one-sided, which `finish`'s `settle_links` clears anyway),
+  `enabled` overridden where given. The exit is `finish`. Allowed inside a
+  nest.
 - `edit_detach.rs` — `detach_audio` and `set_enabled`, a clip's video and
   audio halves; a pure move out of `edit_clip.rs` (grading L3).
 - `edit_fit.rs` — `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
@@ -719,10 +733,10 @@ governs a module now.
   clip at or after the boundary and each one's linked partner;
   `shift_clips` moves exactly that set and answers a refusal, nothing moved,
   when a partner would start before 0), and `locked_track` — THE locked-track
-  refusal's sentence, written once here for its four callers
+  refusal's sentence, written once here for its five callers
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
-  rippled form, `edit_retime.rs`'s `retime_range`), each passing the clause
-  after the comma.
+  rippled form, `edit_retime.rs`'s `retime_range`, `edit_pieces.rs`'s
+  `copy_pieces`), each passing the clause after the comma.
 - `edit_keep_range.rs` — `keep_range` (road map "creator-jobs" CJ5a, spec
   §11 CJ-50): the project as `[from, to)` of its top-level timeline moved to
   0 — both bounds cut on every track, locks ignored, through `split_clip`

@@ -209,6 +209,21 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             json!({"op":"freeze_frame","clip":10,"at":15*f,"duration":off(3,f)}),
             vec![("/clips/2/duration", json!(4 * f))],
         ),
+        // Both ends of the one range snap up a frame: the piece of clip 10
+        // (from 10 f, in 40 f) lands on track 3 at 14 f for 4 f, reading
+        // from 44 f (spec §11 SW-11).
+        applied(
+            "copy_pieces.ranges",
+            "ranges",
+            one.clone(),
+            json!({"op":"copy_pieces","clip":10,"track":3,"ranges":[[off(13,f),off(17,f)]]}),
+            vec![
+                ("/clips/1/track", json!(3)),
+                ("/clips/1/start", json!(14 * f)),
+                ("/clips/1/duration", json!(4 * f)),
+                ("/clips/1/source/in", json!(44 * f)),
+            ],
+        ),
         applied(
             "paste.at",
             "at",

@@ -1,9 +1,9 @@
 import AppKit
 
-/// The Clip menu's six submenus (spec §9): Add Background, Transition,
+/// The Clip menu's seven submenus (spec §9): Add Background, Transition,
 /// Motion (with its three slot menus), Look (grading GR5b), Camera Layout
-/// (road map creator-jobs CO6) and Label, and the label dot Label's rows
-/// carry.
+/// (road map creator-jobs CO6), Switch Angle (SW1) and Label, and the label
+/// dot Label's rows carry.
 ///
 /// A pure move out of `AppDelegate+Menus.swift` (grading GR1), which stood
 /// near app/CLAUDE.md's ~600-line cap with grading's own menu rows still to
@@ -100,6 +100,17 @@ extension AppDelegate {
         return menu
     }
 
+    /// Clip ▸ Switch Angle ▸ (road map "creator-jobs" SW1, spec §11 SW-15
+    /// (a)): the placeholder until it opens, when `SwitchAngleMenuFiller`
+    /// writes one row per covering track of the one selected clip. No key
+    /// equivalent.
+    func switchAngleMenu() -> NSMenu {
+        let menu = NSMenu(title: "Switch Angle")
+        menu.delegate = SwitchAngleMenuFiller.shared
+        menu.addItem(SwitchAngleMenuFiller.placeholder())
+        return menu
+    }
+
     /// One slot's kinds, the `transitionMenu()` idiom: the index as the tag,
     /// a separator, None as −1.
     private func motionSlotMenu(_ title: String, _ names: [String], _ action: Selector) -> NSMenu {
@@ -173,5 +184,51 @@ final class LookMenuFiller: NSObject, NSMenuDelegate {
             at += 1
         }
         if at > first + 1 { menu.insertItem(.separator(), at: at) }
+    }
+}
+
+/// Clip ▸ Switch Angle ▸'s rows (spec §11 SW-15 (a)), rewritten each time the
+/// menu opens for the main window's editor; `UIMenu.fillDynamic` asks it for
+/// a named window. One row per `SwitchAngle.angles` of the ONE selected clip —
+/// the track's title, its index as the tag, the track id as
+/// `representedObject` — else the single `placeholder()`.
+final class SwitchAngleMenuFiller: NSObject, NSMenuDelegate {
+    static let shared = SwitchAngleMenuFiller()
+
+    /// "No Covering Angle": `switchAngle(_:)` with no track, which its
+    /// validator always turns off. It carries the action so the menu's
+    /// selector is a live leaf before any project opens (the menu's
+    /// three-way check, `v2_menu.py` H1).
+    static func placeholder() -> NSMenuItem {
+        NSMenuItem(
+            title: "No Covering Angle",
+            action: #selector(EditorViewController.switchAngle(_:)), keyEquivalent: "")
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        fill(menu, for: NSApp.mainWindow)
+    }
+
+    func fill(_ menu: NSMenu, for window: NSWindow?) {
+        let editor = window?.contentViewController as? EditorViewController
+        var angles: [SwitchAngle.Angle] = []
+        if let editor, let document = editor.document, editor.selectedClips.count == 1,
+            let clip = editor.selectedClips.first
+        {
+            angles = SwitchAngle.angles(for: clip, in: document.editedProject.snapshot)
+        }
+        menu.removeAllItems()
+        guard !angles.isEmpty else {
+            menu.addItem(Self.placeholder())
+            return
+        }
+        for (index, angle) in angles.enumerated() {
+            let item = NSMenuItem(
+                title: angle.title,
+                action: #selector(EditorViewController.switchAngle(_:)), keyEquivalent: "")
+            item.tag = index
+            item.representedObject = NSNumber(value: angle.track)
+            menu.addItem(item)
+        }
     }
 }

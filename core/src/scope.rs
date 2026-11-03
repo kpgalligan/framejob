@@ -263,6 +263,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::DetachAudio { .. }
         | Op::AttachAudio { .. }
         | Op::Duplicate { .. }
+        | Op::CopyPieces { .. }
         | Op::Paste { .. }
         | Op::PasteAttributes { .. }
         | Op::Nest { .. }

@@ -28,12 +28,13 @@ Read the first four in order to learn the editor; the rest stand alone.
 12. [HDR and colour management](hdr-and-color.md) — how sources are read, camera log, SDR and HDR (HLG) projects, blending, and HDR and SDR deliverables.
 13. [Motion graphics](graphics.md) — graphic clips, the built-in graphics, their properties in the inspector, and bringing in your own.
 14. [Vertical and framing](vertical-and-framing.md) — the faces, people and salient regions Frame Job finds in a clip's picture on this Mac, and View ▸ Show Subjects.
-15. [Screen recording](screen-recording.md) — recording a display or a window with system audio, microphone and click rings, recording a camera on its own or beside the screen, and recording voice-overs.
-16. [Exporting](export.md) — the export sheet, its formats and settings, presets, the Export Queue, and saving single frames.
-17. [The Assistant](assistant.md) — chatting with Claude in the inspector to edit the open project, on your own Anthropic key.
-18. [Driving Frame Job from an AI agent (MCP)](mcp.md) — connecting an MCP client such as Claude Code, how calls behave, and every tool.
-19. [Settings](settings.md) — the Settings window, updates (Check for Updates… in the downloaded copy), the View choices Frame Job remembers, and where it keeps its files.
-20. [Menus and keyboard shortcuts](menus-and-shortcuts.md) — every menu command with its shortcut, and the keys, gestures and context menus that have no menu item.
+15. [Podcasts and several cameras](multicam.md) — cameras on tracks of their own, a program track cut from them, and Clip ▸ Switch Angle ▸ to re-pick one shot from another camera.
+16. [Screen recording](screen-recording.md) — recording a display or a window with system audio, microphone and click rings, recording a camera on its own or beside the screen, and recording voice-overs.
+17. [Exporting](export.md) — the export sheet, its formats and settings, presets, the Export Queue, and saving single frames.
+18. [The Assistant](assistant.md) — chatting with Claude in the inspector to edit the open project, on your own Anthropic key.
+19. [Driving Frame Job from an AI agent (MCP)](mcp.md) — connecting an MCP client such as Claude Code, how calls behave, and every tool.
+20. [Settings](settings.md) — the Settings window, updates (Check for Updates… in the downloaded copy), the View choices Frame Job remembers, and where it keeps its files.
+21. [Menus and keyboard shortcuts](menus-and-shortcuts.md) — every menu command with its shortcut, and the keys, gestures and context menus that have no menu item.
 
 Writing your own graphic module is covered by the
 [graphics API reference](../graphics-api.md).

@@ -10432,6 +10432,86 @@ the merged tree: "gate: PASS 402s" (names 1, typecheck 8, fmt and lint skipped, 
   come with the viewer in SW9b. (2) Should a re-pick keep the shot's own video settings?
   *Recommended: no* (SW-14).
 
+#### SW1's record (2026-11-03)
+
+**Landed.** Lane A (the road map says lane C; SW-16 records it), base `66d74f2f`, integrated
+onto `765bd0c1` (CO7) as one commit. The owner's
+answers (2026-11-01), taken as recommended: no ⌥1–⌥9 keys, and a re-pick keeps none of the
+shot's own video settings. Decisions SW-10…SW-16 were committed before the code in
+`creator-jobs-8.md` (330 → 445 lines on the base; 515 after CO7's CO-70…CO-73) with their index
+rows. No FFI, header, format (42 stands)
+or `schema_vN.rs` change. One op (`copy_pieces`, the sixty-ninth) and two product tools
+(`copy_pieces`, `switch_angle`: 121).
+
+- **Core:** `core/src/edit_pieces.rs` (new, 150 lines), on `split_clip`; `edit.rs`'s row,
+  variant and arm after `duplicate`; `op_rows.rs`'s row; `OP_COUNT` 69; `scope.rs`'s allowed arm.
+  `core/tests/copy_pieces.rs` (20 tests): each piece field-equal (but ids, track, link and
+  transition) to the middle of `split` at both ends for a plain clip, ×1.25, a ramp, a reversed
+  clip, a graphic, a timed text page and straddled actions; every error and refusal in order;
+  snapped ends; a reversed pair; the switches; the link cleared; the identities; a nest. The
+  sweeps: `edit_tests.rs`, `scope.rs` (69), `op_nullability.rs` (93, 85), `op_ticks.rs` (52, 36,
+  57) with a `copy_pieces.ranges` vector.
+- **App** (`wc -l`): `SwitchAngle.swift` 254, `EditorViewController+SwitchAngle.swift` 63,
+  `AgentServer+Switch.swift` 64, `AgentCatalog+Switch.swift` 75 (new); `ReelOps.copyPieces`;
+  `AppDelegate+ClipMenus.swift` 177 → 234 (`switchAngleMenu`, `SwitchAngleMenuFiller`);
+  `AppDelegate+Menus.swift` 503 → 506; `UIMenu.swift` 277 → 279; `EditorViewController.swift`
+  1092 → 1093 (the validator line); `UIMenuTable.swift`'s row; two `creatorHandlers` rows and
+  `switchTools()` last in `creatorTools()`; `AssistantPrompt`'s "cut and time" row;
+  `AgentCatalog+Declarations.swift`'s `minItems: 1` row for `copy_pieces.ranges`.
+- **As built, beyond the spec:** "No Covering Angle" carries `switchAngle:` with no track (always
+  disabled) and the submenu is built holding it, because the menu's three-way check
+  (`v2_menu.py` H1) needs the selector as a live leaf before a project opens; SW-15 (a) says so.
+  `assistant_prompt_probe.swift`'s F6 guide bound is 1,600 (was 1,500): the spec's words took the
+  guide from 1,499 to 1,558. `switch_angle` joins the app-state tool lists of `phase9_proof.py`,
+  `recording_proof.py` and `recording_probe.py`.
+- **Documents:** spec §6b (`copy_pieces`, 480 lines, no split needed), §7.9h (new), §9, §7.4,
+  §7.10 and the spec README; `docs/guide/multicam.md` (new) and its README row,
+  `menus-and-shortcuts.md`, `mcp.md`, the README highlight; `tools/proof/README.md`'s SW1
+  section.
+
+**Verification.** `cargo test --release --test copy_pieces` 20/20; the sweeps (`op_ticks`,
+`op_nullability`, `scope`, `edit_tests`, `op_table`, `op_schemas`) pass; `make lint` clean;
+`make typecheck` the 4 baseline warnings; `inventory.py --check` 5/5; `spec_index_proof.py`
+261/261; `assistant_prompt_proof.py --probe` 14/14; on Debug `v2_menu.py --only H` 5/5 and
+`switch_pieces_proof.py` P1–P5. `make gate` PASS in 487 s, and again in 84 s after this record
+and the `two-steps` mutant's second form (names and test ran; the rest skipped as unchanged).
+On one Release instance:
+`switch_pieces_proof.py` 6/6 (P5's five calls 0.123, 0.110, 0.109, 0.109, 0.108 s, median
+0.109 s against 0.5 s, so no guide figure and no Performance candidate), `op_argument_proof.py`
+199/199, `op_catalog_proof.py` 23/23, no `Frame Job: ` line.
+
+**Mutants**, each run once: `in-without-speed` CAUGHT (`a_clip_at_1_25`, `a_ramp`);
+`occupancy-removed` CAUGHT (`an_occupied_destination_names_its_first_clip_by_start`);
+`cover-not-required` CAUGHT (P3); `no-trim-back` CAUGHT (P4, all five cases); `two-steps`
+CAUGHT (P2) on its second form — the first, two `applyEdit`s in the one menu action, SURVIVED
+because they coalesce into one undo step (`inUndoGroupIfRegistered`), so the mutant now commits
+two explicit groups through `performGroupedEdit`; `link-kept` SURVIVED and is equivalent:
+`finish`'s `settle_links` clears the copy's one-sided link (AU-96), so dropping
+`piece.linked = None` changes no answer.
+
+**Review** (verdict pass, six nits), each resolved at integration: `link-kept` accepted as
+equivalent; `copy_pieces` skipping a range when `split_clip` answers false cannot happen once the
+refusals have passed (every span non-empty and inside the clip), and a comment in
+`edit_pieces.rs` says so; SW-16 names `in-without-speed` as caught by the core, not P1; the F6
+bound of 1,600 kept as recorded; `menus-and-shortcuts.md`'s Switch Angle ▸ enabling row gains "no
+sheet is open"; `mcp.md`'s `switch_angle` row gains a refused step of the re-pick.
+
+**Integration.** CO7 landed between the base and the merge; the eight conflicted files keep both:
+`UIMenuTable.swift` (`switchCameraLayout:` stays `sheet`, CO7's; `switchAngle:` `plain`), spec
+§7.4 (CO7's rows, then SW1's), §9 (CO7's Camera Layout ▸ text, then Switch Angle ▸),
+`creator-jobs-8.md` (CO7's section, then SW1's) and its §11 index row (both clauses), the spec
+README's Lines cells (§7.4 99, §9 299, §11 21113 in 42 files), `menus-and-shortcuts.md` and
+`tools/proof/README.md` (both phases' rows and sections). The CLAUDE.md edits the phase owed are
+applied: the root's gate count (121); `core/CLAUDE.md`'s `edit_pieces.rs` entry, `locked_track`'s
+fifth caller and sixty-eight op tools; `app/CLAUDE.md`'s file-map entry for the four files and
+`SwitchAngleMenuFiller`, `+ClipMenus`' submenus, sixty-eight op tools (twice), forty-one
+app-state tools and the gate's 121. On the integrated tree `make gate` PASS in 437 s, and on
+one Release instance `switch_pieces_proof.py` 6/6 (P5's five calls 0.132, 0.141, 0.125, 0.134,
+0.119 s, median 0.132 s), `op_argument_proof.py` 199/199, `op_catalog_proof.py` 23/23, no
+`Frame Job: ` line.
+
+**Owed.** No person check. Nothing filed.
+
 ### SW3a — every audio track of a file, played
 
 - **What a person gets:** a file with several audio tracks imports all of them. The Media tab says

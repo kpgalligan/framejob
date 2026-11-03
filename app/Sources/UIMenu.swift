@@ -118,10 +118,12 @@ enum UIMenu {
     }
 
     /// Fills each level a delegate fills when it opens — Clip ▸ Look ▸'s LUT
-    /// rows (`LookMenuFiller`) — for the named window, as AppKit would for
+    /// rows (`LookMenuFiller`) and Clip ▸ Switch Angle ▸'s angles
+    /// (`SwitchAngleMenuFiller`) — for the named window, as AppKit would for
     /// the main one before it shows it.
     static func fillDynamic(_ menu: NSMenu, window: NSWindow?) {
         (menu.delegate as? LookMenuFiller)?.fill(menu, for: window)
+        (menu.delegate as? SwitchAngleMenuFiller)?.fill(menu, for: window)
         for item in menu.items {
             if let submenu = item.submenu { fillDynamic(submenu, window: window) }
         }

@@ -254,6 +254,11 @@ extension AgentServer {
                 + "at least one [from, to] pair\" — where the core reads one as an identity. "
                 + "`clips` and `groups` are the same check on the same rule (spec §11's "
                 + "D2-1), and this argument is not a `clips`, so it needs its own row."),
+        AgentDeclaration(
+            .argument("ranges", of: "copy_pieces"), alsoKeys: ["minItems": 1],
+            why: "copyPieces refuses an empty list by name, in ripple_delete_ranges' sentence, "
+                + "where the core reads one as an identity (spec §11 SW-11): a copy of no "
+                + "pieces is a mistake in the asking."),
 
         // ---- a default the app takes from its own state --------------------
 
