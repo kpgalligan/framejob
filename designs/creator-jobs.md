@@ -9457,6 +9457,98 @@ owner's screen-tutorial recordings with Record shortcuts on.
   B.
 - **Question for the owner:** the default shutter when Auto Zoom turns it on? *Recommended: 50 %* (a
   180° shutter).
+- **Split (recorded before code, 2026-11-02).** CU11 is more than one pipeline (spec §11 CU-116).
+  **CU11a:** CU-S5 at the head, CU-110…CU-116, the core (`video.motion_blur`, format 42, the
+  recipe's `blur` and the cursor's `shutter`, `state`'s `ends`) and the minimal Swift mirrors;
+  nothing drawn; proof `cu11_proof.py` Z1, K1. **CU11b:** `Compositor+MotionBlur.swift`, the
+  cursor's samples in `layerSample`, the Transform row, Auto Zoom's "Motion blur" (on, 50 %, the
+  owner's answer) and `auto_zoom`'s `motion_blur`, the docs, JOB-26, MB1–MB4 and the three
+  mutants above.
+
+#### CU11a's record (2026-11-02)
+
+**Built.** Lane B, base `23e8021e` (I's HEAD). CU-S5 ran first; then the decisions, committed
+alone: CU-110…CU-116 in the new `creator-jobs-8.md` (`creator-jobs-7.md` was 586 lines) with
+their index rows and the split bullet above. Then CU11a's toll, a pure move committed alone:
+`cursor_query.rs`'s `events` and `path` reads to `cursor_query_reads.rs` (393 → 265;
+`core-file-history.md`'s entry). Format 42 (provisional; the integrator renumbers). No `rc_*`
+export, op or tool: `rc_cursor_query`'s `state` takes `ends`, and `set_video`'s patch carries
+`motion_blur` to the core unread. Nothing drawn; nothing keyed (CJ-3).
+
+- **CU-S5.** `tools/proof/cursor_spike/blur_spike.py` (`--selftest`: the five arms) built
+  `blur_spike.swift` over `app/Sources` and ran once: five runs of 60 frames after 10 warm-up
+  frames, on an Apple M2 Max, macOS 26.5.1 (25F80), on AC, three lanes on the machine (one-minute
+  load average 201.08 at the end; the five runs are the repeat). Added GPU time at 1920×1080: N =
+  16 1.717 ms, 8 1.107 ms, 4 0.517 ms; at 3840×2160: 16 6.636 ms, 8 3.276 ms, 4 1.333 ms (bounds 4
+  and 8 ms). "VERDICT zoom blur at N = 16"; `MOTION_BLUR_SAMPLES` is 16 (CU-110).
+- **The core.** `motion_blur.rs` (the constant, `check_motion_blur`, `clamp_motion_blur`,
+  `check_motion_blur_clip`, `shutter_offsets`) and `recipe_blur.rs` (`Shutter`, `layer_shutter`,
+  `layer_blur`, `sharpen_matted`); one line each in `check_video`, `clamp_video` and
+  `settle_video`; `video_json` always carrying `motion_blur`; the blurred copy dropping it;
+  `layer` computing `sharp` and the shutter and passing `blur` and the cursor's ends;
+  `sharpen_matted` right after `frame_subjects`; `layer_cursor`'s `shutter`; `state`'s `ends`.
+- **The app.** `VideoProps.motionBlur`, `VideoPatch.motionBlur` and `set_video`'s
+  `motionBlurClause`. `FrameRecipe.swift` decodes no `blur` yet (CU11b).
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/motion_blur.rs` · `recipe_blur.rs` | 75 · 134 | new |
+| `core/src/cursor_query_reads.rs` | 139 | new: the toll's moved reads |
+| `core/tests/motion_blur.rs` · `schema_v42.rs` | 538 · 97 | new |
+| `tools/proof/cursor_spike/blur_spike.py` · `blur_spike.swift` | 188 · 263 | new: CU-S5 |
+| `tools/proof/cu11_proof.py` | 214 | new: K1, Z1 |
+
+**Deviations.** (1) Two existing tests moved with the schema: `qualifier_blur.rs`'s
+`the_recipe_carries_it_only_above_zero` asserted that no `"blur"` appeared anywhere in a recipe's
+text, which every layer's new `blur` key breaks, and now asserts the qualifier has none;
+`schema_v8.rs`'s base video state gains `motion_blur: 0`, which `clip_state` now reports. (2)
+`07.3b-frame-recipe-options.md`'s "twenty-eight layer keys" became twenty-nine. (3) The
+fixture's action ids in `core/tests/motion_blur.rs` move by 10 per clip, since a project refuses
+two actions with one id.
+
+**Measured.**
+
+- `cargo test --release --test motion_blur` 16 passed; `--test schema_v42` 4, `--test recipe`
+  15, `--test cursor_track` 17, `--test behind_subject` 14, `--test matte` 8, `--test
+  cursor_recipe` 14, `--test qualifier_blur` 9 passed; `cargo test --release --no-fail-fast` in
+  `core/`, 193 result lines, every one ok; `cargo fmt --check`; `make lint` exit 0.
+- `make typecheck`: exit 0, the 4 baseline warnings. `spec_index_proof.py` 258/258.
+- Debug `cu11_proof.py`: 2/2, exit 0.
+- Mutants, each caught and its file restored byte-identical by SHA-256: M1 (samples leading) by
+  four `motion_blur` tests; M2 (`transition` arm dropped) by `a_cross_dissolves_pair_is_sharp`;
+  M3 (equality test dropped) by `an_unmoving_layer_has_no_blur` and
+  `the_cursors_shutter_reads_the_ends_in_source_ticks`; M4 (`sharpen_matted` not called) by
+  `behind_subjects_copy_and_cut_layer_are_sharp_and_lose_the_cursors_shutter`; M5 (the nest
+  refusal dropped) by `the_sentences_and_zero_removing_the_key`; M6 (`state`'s ends read at `at`)
+  by `cursor_track`'s `state_with_ends_answers_each_end_as_a_state_at_that_tick`.
+- `make gate`: two failures first (`qualifier_blur`, then `schema_v8`; deviation (1)), then
+  "gate: PASS 392s" (names 1, typecheck skipped as unchanged, fmt 4, lint 2, test 197, app 188).
+- Release (the gate's app): `RC_PROOF_APP=release cu11_proof.py` 2/2, exit 0, Z1 empty.
+
+**Owed.** CU11b (CU-116). No person check in CU11a.
+
+#### CU11's record (2026-11-03)
+
+CU11a's review and landing; what it built and measured is CU11a's record above. CU11b is still to
+come.
+
+**Review.** One review (`23e8021e..f8ba942a`), verdict pass, with one nit, fixed at integration:
+the rewrapped `state` bullet in `cursor_query.rs`'s module doc had a 121-column line, which is now
+wrapped like the rest (comment only, 278 → 279 lines). The two test edits outside the spec's file
+list (`qualifier_blur.rs`, `schema_v8.rs`) were judged to follow directly from the 29th key and
+`video_json`'s new key.
+
+**Integration (2026-11-03).** Cherry-picked (`ea1d53ad`, `5ef42794`, `f8ba942a`) onto
+`worktree-creator-jobs` at `23e8021e`. Nothing else had landed since, so there were no conflicts
+and format 42 kept its number. `core/CLAUDE.md` gained entries for `cursor_query_reads.rs` and for
+`motion_blur.rs` · `recipe_blur.rs`, and the `recipe.rs` entry now says twenty-nine keys with
+`blur` as the twenty-ninth. `make gate` on the integrated tree printed "gate: PASS 457s"
+(names 1, typecheck 9, fmt 4, lint 12, test 259, app 172). Against that Release app,
+`RC_PROOF_APP=release cu11_proof.py` printed "scores: 2/2" and exited 0, and Z1 was empty. No issue
+was owed.
+
+**Owed.** CU11b (CU-116): the drawing, the Transform row, Auto Zoom's "Motion blur", the docs,
+JOB-26, MB1–MB4 and the road map's three mutants.
 
 ### VR5 — screen recordings follow the cursor
 

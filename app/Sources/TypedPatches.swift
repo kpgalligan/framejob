@@ -100,6 +100,8 @@ struct VideoPatch: Codable, Equatable {
     /// `behind_subject` (format 40, spec §11 CO-52): a boolean, so absent
     /// keeps and false clears.
     var behindSubject: Bool?
+    /// `motion_blur` (format 42, spec §11 CU-113): 0…1, 0 removes the key.
+    var motionBlur: Double?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -111,7 +113,7 @@ struct VideoPatch: Codable, Equatable {
         wheels: ColorWheelsPatch? = nil, curves: ColorCurvesPatch? = nil,
         qualifier: ColorQualifierPatch? = nil, cursor: CursorProps?? = nil,
         cursorPart: CursorPatch? = nil, cutout: CutoutProps?? = nil, cutoutPart: CutoutPatch? = nil,
-        behindSubject: Bool? = nil
+        behindSubject: Bool? = nil, motionBlur: Double? = nil
     ) {
         self.x = x
         self.y = y
@@ -138,6 +140,7 @@ struct VideoPatch: Codable, Equatable {
         self.cutout = cutout
         self.cutoutPart = cutoutPart
         self.behindSubject = behindSubject
+        self.motionBlur = motionBlur
     }
 
     init(from decoder: Decoder) throws {
@@ -170,6 +173,7 @@ struct VideoPatch: Codable, Equatable {
         cursor = c.nullable(.cursor)
         cutout = c.nullable(.cutout)
         behindSubject = c.lenient(.behindSubject)
+        motionBlur = c.lenient(.motionBlur)
     }
 
     var dictionary: [String: Any] {
@@ -205,6 +209,7 @@ struct VideoPatch: Codable, Equatable {
             d["cutout"] = cutoutPart.dictionary
         }
         if let behindSubject = behindSubject { d["behind_subject"] = behindSubject }
+        if let motionBlur = motionBlur { d["motion_blur"] = motionBlur }
         return d
     }
 

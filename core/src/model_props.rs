@@ -233,6 +233,11 @@ pub struct VideoProps {
     /// only when true, so every other file's text is what it was.
     #[serde(default, skip_serializing_if = "is_false")]
     pub behind_subject: bool,
+    /// Motion blur (format 42, spec §11 CU-113): the shutter as a fraction
+    /// of one canvas frame, 0…1, 0 off. Written only above 0, so every other
+    /// file's text is what it was.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub motion_blur: f64,
 }
 
 impl Default for VideoProps {
@@ -261,6 +266,7 @@ impl Default for VideoProps {
             cursor: None,
             cutout: None,
             behind_subject: false,
+            motion_blur: 0.0,
         }
     }
 }

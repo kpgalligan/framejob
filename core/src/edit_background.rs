@@ -461,6 +461,8 @@ impl Project {
             cutout: None,
             // Nor is one cut by the person in front of it (CO-52).
             behind_subject: false,
+            // Drawn behind and sharp, so it drops the blur (CU-113).
+            motion_blur: 0.0,
             ..video
         });
         next.clips.push(copy);

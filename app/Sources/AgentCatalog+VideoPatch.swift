@@ -190,6 +190,15 @@ extension AgentServer {
         + "but an adjustment or nest clip takes it; those two are refused. In an action's "
         + "end it switches at the end. text_behind_subject places a title this way in one "
         + "step)"
+    // Motion blur (format 42, spec §11 CU-111…CU-114), explicitly typed for
+    // `lookClause`'s reason.
+    private static let motionBlurClause: String =
+        ", motion_blur (0–1, default 0 = off: the shutter as a fraction of one canvas frame, "
+        + "so 0.5 is a 180° shutter; the clip is drawn blurred along its motion across that "
+        + "much of each frame. It animates in an action's end. Refused above 0 on a nest "
+        + "clip (set it on the clips inside) and on an adjustment clip; drawn sharp under a "
+        + "transition, a routed dissolve, a matte, Behind Subject or a drop shadow. Drawing "
+        + "is not built yet: the key is stored and the recipe lists the placements)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an
@@ -230,6 +239,7 @@ extension AgentServer {
         + cursorClause
         + cutoutClause
         + behindSubjectClause
+        + motionBlurClause
         + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "

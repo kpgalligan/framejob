@@ -62,7 +62,7 @@ the transition ops are §6d.
   copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the
   other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so
   a copy keeping it would duck the mix including the clip it came from — along with its transition,
-  its actions, its label, its `video.cutout` (CO-20), its `video.behind_subject` (CO-52) and its `video.motion` (format version 8 — a backdrop that slid in or
+  its actions, its label, its `video.cutout` (CO-20), its `video.behind_subject` (CO-52), its `video.motion_blur` (CU-113) and its `video.motion` (format version 8 — a backdrop that slid in or
   pulsed behind the clip it copies would be two pictures of one recording disagreeing about where
   they are, and a slide would leave the canvas showing down one side, which is the one thing a
   background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST
@@ -428,6 +428,10 @@ the transition ops are §6d.
   `video.behind_subject` (format 40, §11 CO-52) is a boolean: any drawing clip takes it but an
   adjustment or a nest clip, each an **error** naming what it is (`clip 4 is an adjustment clip and
   cannot be put behind a subject`), from `set_video`, `paste` and `paste_attributes` alike.
+  `video.motion_blur` (format 42, §11 CU-113) is 0–1: above 0, a nest or an adjustment clip is an
+  **error** naming what it is (`clip 9 shows a nest and cannot take motion blur: set it on the
+  clips inside`, `clip 4 is an adjustment clip and cannot take motion blur`), from `set_video`,
+  `paste` and `paste_attributes` alike; 0 removes the key.
   `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
   merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
   **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.

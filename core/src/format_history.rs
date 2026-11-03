@@ -390,4 +390,8 @@
 //! may be `foreground`, an image clip's only; no new key, no migration. The
 //! bump is so an older build refuses the file instead of failing to read
 //! the subject.
-//! Every number from 42 up, 1014 included, is newer than this build.
+//!
+//! Version 42 is motion blur (spec §11 CU-113): `video.motion_blur`, a
+//! number after `behind_subject`, written only above 0; no migration. The
+//! bump is so an older build refuses a file with blur instead of dropping it.
+//! Every number from 43 up, 1014 included, is newer than this build.

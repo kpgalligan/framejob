@@ -384,6 +384,17 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   the new file, its anchor unchanged. `wc -l core/src/edit_action.rs`: 595 before, 402 after;
   `edit_action_end.rs` is 207. CO2a1 then added `check_cutout_end` and `not_a_target`'s
   `video.cutout` arm there; VR2b reuses the door. No next seam is named.
+- `cursor_query.rs`: at 393 of its 400 before road map "creator-jobs" CU11a, which adds
+  `state`'s `ends`, it paid CU11a's toll, a pure move gated alone (`cargo fmt --check`, `cargo
+  test --release --test cursor_track`, `make lint`): lines 145–169 at `23e8021e` (`EventKind`,
+  `EventsArgs`, `PathArgs`) and 294–393 (`events` and `path`) went whole to the new
+  `cursor_query_reads.rs` under a module doc, with the imports only they use, and the blank line
+  after the types (170) went too. Its widenings: the three types and the two functions became
+  `pub(crate)`, because `Request` and `query` stay and name them, and `ordered` and
+  `smoothing_in_range` became `pub(crate)`, because they stay and the moved reads call them. The
+  moved lines differ from the base only in those widened lines. `cursor_query.rs`'s module doc
+  still describes both reads. `wc -l core/src/cursor_query.rs`: 393 before, 265 after;
+  `cursor_query_reads.rs` is 139. No next seam is named.
 
 ## Open items
 

@@ -28848,3 +28848,31 @@ make app && RC_PROOF_APP=release python3 tools/proof/cu9b_proof.py
 
 The recorded runs are in `designs/creator-jobs.md`'s CU9b record. No person check: the feel is
 judged at CU12's trial.
+
+## Road map "creator-jobs" CU11a — motion blur in the model and the recipe (`cu11_proof.py` K1, Z1; six mutants by hand; `core/tests/motion_blur.rs`, `schema_v42.rs`, `cursor_track.rs`; spike CU-S5; spec §11 CU-110…CU-116)
+
+**`cu11_proof.py`** drives the app `proof_app` chooses (or `--app PATH`) in one launch on a
+scratch `CFFIXED_USER_HOME` (`tools/proof/work/cu11`). Its one media is a 64 × 48 RGB PNG the
+script writes with `zlib` and `struct`. Nothing draws the blur until CU11b, which adds MB1–MB4;
+its docstring is the full row list. The spike that chose N is
+`cursor_spike/blur_spike.py` (`cursor_spike/README.md`'s CU-S5 section).
+
+| Row | What it holds |
+|---|---|
+| K1 | `set_video {motion_blur: 0.5}` reads back 0.5; 1.5 is an error carrying `video.motion_blur must be between 0 and 1, not 1.5` and leaves `get_project` unchanged; 0 removes the key; a nest clip's and an adjustment clip's 0.5 are refused in CU-111's sentences |
+| Z1 | no `Frame Job: ` line in the launch's log |
+
+The six mutants are run by hand (each anchor replaced once, the file restored byte-identical by
+SHA-256), each caught by `cargo test --release --test motion_blur` unless named: M1 samples
+leading (`shutter_offsets`' k/N·s·F), M2 the `transition` arm dropped from `layer`'s `sharp`, M3
+`layer_blur`'s equality test dropped, M4 `sharpen_matted` not called, M5
+`check_motion_blur_clip`'s nest arm dropped, and M6 `state`'s `ends` read at `at`, caught by
+`cargo test --release --test cursor_track`.
+
+```sh
+cd core && cargo test --release --test motion_blur --test schema_v42 --test cursor_track
+make app-debug && python3 tools/proof/cu11_proof.py [--only IDS] [--app PATH]
+RC_PROOF_APP=release python3 tools/proof/cu11_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU11a record.

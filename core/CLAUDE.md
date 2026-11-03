@@ -187,6 +187,9 @@ governs a module now.
   the image in force and ripples (CU-23). `cursor_smooth.rs` — `hold_end`, the one
   hold rule, and `SmoothPath` (pins, RDP, centripetal Catmull–Rom; CU-21).
   `cursor_query.rs` — the request vocabulary (its module doc) and `query`.
+  `cursor_query_reads.rs` — its `events` and `path` reads, a pure move out of it (road map
+  creator-jobs CU11a's toll); `state` takes `ends` and answers the shutter's two positions (spec
+  §11 CU-115).
   `cursor_bursts.rs` — typing stretches and scroll bursts, one run finder. Auto Zoom's
   planner (road map creator-jobs CU7, spec §11 CU-70…CU-75), `plan_zooms` in
   `rc_cursor_query` (one track per clip, and the project): `cursor_zoom.rs` its
@@ -249,6 +252,20 @@ governs a module now.
   `{kind: "image", media, subject, quality}` (CO-101), drawn uncut until CO10b. `add_blurred_background`'s
   copy drops it. `VideoProps.behind_subject` (format 40, after `cutout`, written only when true)
   is `model_props.rs`'s; the copy drops it too.
+- `motion_blur.rs` · `recipe_blur.rs` — motion blur (format 42, road map "creator-jobs"
+  CU11a, spec §11 CU-110…CU-114): `motion_blur.rs` `MOTION_BLUR_SAMPLES` (CU-S5's N, 16),
+  `check_motion_blur` (one line in `check_video`), `clamp_motion_blur` (one line in
+  `clamp_video`), `check_motion_blur_clip` (one line in `settle_video`: a nest or adjustment
+  clip refused above 0) and `shutter_offsets` (the N centred offsets and the two ends, on the
+  canvas's frame); `recipe_blur.rs` `Shutter`, `Project::layer_shutter` (none at 0 or when
+  `layer`'s `sharp` holds: drawn into, a matte, a transition, a dissolve, a shadow, an
+  adjustment clip; times clamped into the instance's span), `Project::layer_blur` (the layer's
+  `blur` key from `placement` at each time, `null` when every sample equals the first) and
+  `sharpen_matted` (after `frame_subjects`: every matted layer's `blur` null and its cursor's
+  `shutter` removed). `VideoProps.motion_blur` (after `behind_subject`, written only above 0)
+  is `model_props.rs`'s; `video_json` always carries it; `add_blurred_background`'s copy drops
+  it. `recipe_cursor.rs`'s `layer_cursor` takes the shutter's ends and appends `shutter
+  {from, to, samples}`.
 - `model_media_color.rs` — camera log's vocabulary (format version 19,
   spec §11 GR-16): `LogCurve`, `CameraGamut` (`LogCurve::gamuts`, its
   default first) and `MediaColor` (`log`, `gamut`, `lut`, `detected`, and
@@ -970,9 +987,10 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-eight keys of a layer written in ONE place (`cursor`
+  `recipe.rs`) is the twenty-nine keys of a layer written in ONE place (`cursor`
   the twenty-seventh, `recipe_cursor.rs`'s, CU-32; `cutout` the twenty-eighth,
-  its own `Project::layer_cutout`, CO-21)
+  its own `Project::layer_cutout`, CO-21; `blur` the twenty-ninth,
+  `recipe_blur.rs`'s, CU-114)
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is

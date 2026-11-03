@@ -250,8 +250,12 @@ extern "C" {
  *
  * Version 41 is a picture's cutout (spec §11 CO-100): `video.cutout.subject`
  * may be `foreground` (an image clip's only); no new key, no migration
- * step. 42 and above, 1014 included, are newer. */
-#define RC_FORMAT_VERSION 41
+ * step.
+ *
+ * Version 42 is motion blur (spec §11 CU-113): `video.motion_blur`, after
+ * `behind_subject`, written only above 0; no migration step. 43 and above,
+ * 1014 included, are newer. */
+#define RC_FORMAT_VERSION 42
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

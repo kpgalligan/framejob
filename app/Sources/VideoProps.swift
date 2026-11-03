@@ -53,6 +53,9 @@ struct VideoProps: Codable, Equatable {
     /// every cut-out layer behind it in its container (CO-50); false is not
     /// written.
     var behindSubject: Bool
+    /// Motion blur (format 42, spec §11 CU-113): the shutter as a fraction of
+    /// one canvas frame, 0…1; 0 is off and not written.
+    var motionBlur: Double
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -64,7 +67,7 @@ struct VideoProps: Codable, Equatable {
         motion: MotionProps? = nil, wheels: ColorWheels = .neutral,
         curves: ColorCurves = .identity, qualifier: ColorQualifier = .none,
         look: LookProps? = nil, cursor: CursorProps? = nil, cutout: CutoutProps? = nil,
-        behindSubject: Bool = false
+        behindSubject: Bool = false, motionBlur: Double = 0
     ) {
         self.x = x
         self.y = y
@@ -89,6 +92,7 @@ struct VideoProps: Codable, Equatable {
         self.cursor = cursor
         self.cutout = cutout
         self.behindSubject = behindSubject
+        self.motionBlur = motionBlur
     }
 
     init(from decoder: Decoder) throws {
@@ -125,6 +129,7 @@ struct VideoProps: Codable, Equatable {
         cursor = c.lenient(.cursor)
         cutout = c.lenient(.cutout)
         behindSubject = c.lenient(.behindSubject, false)
+        motionBlur = c.lenient(.motionBlur, 0)
     }
 
     static let identity = VideoProps()

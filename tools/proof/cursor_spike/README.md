@@ -89,3 +89,12 @@ A skipped row is never a failure. A row skipped before its field's value is sett
 - **Units:** MB is 10^6 bytes.
 
 **`CGCursorIsVisible()`** is imported by Swift as unavailable in the macOS 26.2 SDK, an error rather than the warning the road map expected. The probe reaches it through `dlsym`, records its answer in A9's samples, and never decides `hidden` by it alone.
+
+## CU-S5 — motion blur's cost (CU11)
+
+```sh
+python3 tools/proof/cursor_spike/blur_spike.py --selftest     # decide()'s five arms on synthetic figures
+python3 tools/proof/cursor_spike/blur_spike.py [--runs 5] [--frames 60] [--warmup 10]
+```
+
+`blur_spike.py` checks CU-S5's rule hash through `creator_spike/rule.py` (`RULE CHANGED CU-S5`, exit 1, nothing written), builds `blur_spike.swift` over `app/Sources` as `cursor_layer_proof.py`'s probe rows are (with a `default.metallib` of `Compositor.metal` beside it), and runs it once. The probe draws one full-canvas `rgba16Float` layer at a 2× `ease_in_out` zoom's middle, once and N ∈ {4, 8, 16} times at the shutter's centred sub-frame placements (shutter 0.5) accumulated at 1/N into a `mattePool` composite and then drawn onto the destination, at 1920×1080 and 3840×2160, and answers each frame's GPU ms. `decide` picks the largest N adding ≤ 4 ms at 1080p and ≤ 8 ms at 4K, else `STOP zoom blur`, and `VERDICT not measured` when a figure is missing. Exit 0 whatever the verdict; 1 on a changed rule, a failed build or a probe crash; 2 when the core's library or the codecs' stamp is missing. It writes `tools/proof/work/creator_spike/CU-S5/results.json`; the verdict is spec §11 CU-110.

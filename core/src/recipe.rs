@@ -48,6 +48,8 @@
 //! `recipe_selection.rs` over the finished list before the burn-in.
 //! Text Behind Subject's subject copies and groups (spec §11 CO-50, CO-51)
 //! are merged in by `recipe_subject.rs` just before that, in one call.
+//! Motion blur's `blur` key and the cursor's `shutter` (spec §11 CU-111,
+//! CU-114) are `recipe_blur.rs`'s; a matted layer is made sharp after that call.
 
 use serde_json::{Map, Value};
 
@@ -58,6 +60,7 @@ use crate::evaluate::{json, number, Assignment};
 use crate::model::{BlendMode, ColorAdjust, Curves, Nest, Project, Source, VideoProps, Wheels};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
+use crate::recipe_blur::sharpen_matted;
 use crate::recipe_graphic::graphic_source;
 pub(crate) use crate::recipe_hash::content_hash;
 pub(crate) use crate::recipe_layer::RecipeLayer;
@@ -165,8 +168,10 @@ impl Project {
         // Text Behind Subject (spec §11 CO-50): the subject copies and their
         // groups, merged after the track groups; the inputs come back as
         // they went in when no behind clip is cut by a subject.
-        let (layers, facts, listed) =
+        let (mut layers, facts, listed) =
             self.frame_subjects(&instances, t, layers, facts, mattes.listed);
+        // A copy, a cut layer and every matte member drawn sharp (CU-111).
+        sharpen_matted(&mut layers);
         let (mut layers, black) = select_layers(layers, &facts, &opts);
         if opts.burn_in_timecode {
             layers.push(burn_in_layer(&self.canvas, t));
@@ -317,6 +322,19 @@ impl Project {
             .media()
             .map_or(Value::Null, |m| self.media_input(m));
 
+        // Motion blur (spec §11 CU-111, CU-114): none on a layer drawn sharp.
+        let sharp = drawn_into
+            || !matte.is_null()
+            || !transition.is_null()
+            || !dissolve.is_null()
+            || video.shadow.is_some()
+            || is_adjustment(instance.clip);
+        let shutter = self.layer_shutter(instance, t, video, sharp);
+        let blur = self.layer_blur(instance, shutter.as_ref());
+        let ends = shutter
+            .as_ref()
+            .map(|s| (instance.clip_time(s.ends.0), instance.clip_time(s.ends.1)));
+
         RecipeLayer {
             clip: instance.clip.id,
             source,
@@ -327,8 +345,9 @@ impl Project {
             transition,
             matte,
             dissolve,
-            cursor: self.layer_cursor(instance.clip, clip_t, &evaluated.video),
+            cursor: self.layer_cursor(instance.clip, clip_t, &evaluated.video, ends),
             cutout: self.layer_cutout(instance.clip, &evaluated.video),
+            blur,
             input,
             // No blend on an ungraded frame (GR-4, GR-34).
             curve_blends: if ungraded {

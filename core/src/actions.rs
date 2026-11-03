@@ -396,6 +396,8 @@ pub(crate) fn video_json(video: &VideoProps) -> Value {
         if !video.qualifier.is_neutral() {
             fields.insert("qualifier".to_string(), qualifier_json(&video.qualifier));
         }
+        // Present at 0, so an end animates from 0 (spec §11 CU-113).
+        fields.insert("motion_blur".to_string(), to_json(&video.motion_blur));
     }
     value
 }

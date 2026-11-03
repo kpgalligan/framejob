@@ -188,7 +188,13 @@ fn the_bounds_and_the_sentence_after_luma() {
 fn the_recipe_carries_it_only_above_zero() {
     let ranged = project().apply(&set_qualifier(11, json!({"hue": hue()})));
     let unblurred = ranged.recipe_text(SEC);
-    assert!(!unblurred.contains("\"blur\""), "{unblurred}");
+    // The qualifier's, not the layer's own `blur` (motion blur, spec §11
+    // CU-114), which every layer carries.
+    let qualifier = &layer(&ranged, 11, SEC, "{}")["source"]["qualifier"];
+    assert!(
+        qualifier.is_object() && qualifier.get("blur").is_none(),
+        "{unblurred}"
+    );
     let blurred = ranged.apply(&set_qualifier(11, json!({"blur": 0.25})));
     assert_eq!(
         layer(&blurred, 11, SEC, "{}")["source"],

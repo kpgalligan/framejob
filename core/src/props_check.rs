@@ -347,6 +347,7 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     }
     crate::cursor_props::check_cursor(&props.cursor)?;
     crate::cutout_check::check_cutout(&props.cutout)?;
+    crate::motion_blur::check_motion_blur(props.motion_blur)?;
     Ok(())
 }
 

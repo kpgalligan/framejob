@@ -9,11 +9,13 @@
 //! - `{"unprepare":{"smoothing":s}}` → `{"unprepared":b}`: drops a stored
 //!   path; false when none was stored, always at 0. The core never drops one
 //!   on its own; `CursorTracks` owns the cap (CU-26).
-//! - `{"state":{"at":T,"props":{…}}}` → `{visible, x, y, opacity,
-//!   px_per_point, image, ripples}`. `props` takes `smoothing` (0), `hide_idle`
-//!   (null or seconds), `scale` (1) and `clicks` (`"none"` or `"ripple"`) and
-//!   ignores any other key, so the recipe's object may be passed whole. An
-//!   unprepared smoothing answers the raw path and never builds one. `image`
+//! - `{"state":{"at":T,"props":{…},"ends"?:[T0,T1]}}` → `{visible, x, y,
+//!   opacity, px_per_point, image, ripples}`, and `ends` `[[x0, y0], [x1,
+//!   y1]]` (the positions at T0 and T1, as `x`, `y`; CU-115) when asked.
+//!   `props` takes `smoothing` (0), `hide_idle` (null or seconds), `scale`
+//!   (1) and `clicks` (`"none"` or `"ripple"`) and ignores any other key,
+//!   so the recipe's object may be passed whole. An unprepared smoothing
+//!   answers the raw path and never builds one. `image`
 //!   is `{id, w, h, hot_x, hot_y}` in px (points × `px_per_point` × `scale`),
 //!   null under `cursor_image: none` or before the first image change;
 //!   `ripples` (CU-23) only under `clicks: "ripple"`.
@@ -51,11 +53,10 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::cursor_bursts::typing_stretches;
 use crate::cursor_file_check::encode_base64;
 use crate::cursor_overlays::{plan_overlays, PlanOverlaysArgs};
-use crate::cursor_smooth::SmoothPath;
-use crate::cursor_track::{ticks_to_us, us_to_ticks, CursorTrack, MAX_PATH_SAMPLES, PATH_MIN_STEP};
+use crate::cursor_query_reads::{events, path, EventsArgs, PathArgs};
+use crate::cursor_track::{ticks_to_us, CursorTrack};
 use crate::cursor_typing::{plan_typing, PlanTypingArgs};
 use crate::cursor_zoom::{plan_zooms, PlanZoomsArgs};
 use crate::model::Project;
@@ -98,6 +99,9 @@ struct StateArgs {
     at: Ticks,
     #[serde(default)]
     props: Props,
+    /// The shutter's two source ticks (spec §11 CU-115), answered as `ends`.
+    #[serde(default)]
+    ends: Option<[Ticks; 2]>,
 }
 
 /// A `state`'s props: unknown keys ignored, on purpose (the recipe's object).
@@ -142,32 +146,6 @@ struct ImageArgs {
     id: i64,
 }
 
-#[derive(Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-enum EventKind {
-    Clicks,
-    Scrolls,
-    Shortcuts,
-    Typing,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct EventsArgs {
-    from: Ticks,
-    to: Ticks,
-    kinds: Vec<EventKind>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PathArgs {
-    from: Ticks,
-    to: Ticks,
-    step: Ticks,
-    smoothing: f64,
-}
-
 /// Reads `request` and answers it against `tracks`, or the refusal's
 /// sentence.
 pub fn query(
@@ -205,7 +183,7 @@ pub fn query(
     Ok(answer.to_string())
 }
 
-fn smoothing_in_range(s: f64) -> Result<(), String> {
+pub(crate) fn smoothing_in_range(s: f64) -> Result<(), String> {
     if s.is_finite() && (0.0..=1.0).contains(&s) {
         return Ok(());
     }
@@ -219,7 +197,7 @@ fn positive(name: &str, v: f64) -> Result<(), String> {
     Err(format!("{name} is {v}; it must be a finite number above 0"))
 }
 
-fn ordered(from: Ticks, to: Ticks) -> Result<(), String> {
+pub(crate) fn ordered(from: Ticks, to: Ticks) -> Result<(), String> {
     if to < from {
         return Err(format!("to ({to}) is before from ({from})"));
     }
@@ -243,12 +221,16 @@ fn state(track: &CursorTrack, a: StateArgs) -> Result<Value, String> {
     if let Some(h) = p.hide_idle {
         positive("hide_idle", h)?;
     }
+    let position = |t: Ticks| {
+        let at = ticks_to_us(t);
+        match track.position(at, p.smoothing) {
+            Some((x, y)) => track.to_movie(at, x, y),
+            None => (0.0, 0.0),
+        }
+    };
     let at = ticks_to_us(a.at);
     let f = track.px_per_point(at);
-    let (x, y) = match track.position(at, p.smoothing) {
-        Some((x, y)) => track.to_movie(at, x, y),
-        None => (0.0, 0.0),
-    };
+    let (x, y) = position(a.at);
     let opacity = track.opacity(at, p.hide_idle.map(|h| h * 1e6));
     let size = |v: i64| v as f64 / 100.0 * f * p.scale;
     let image = track.image_at(at).and_then(|id| {
@@ -267,10 +249,15 @@ fn state(track: &CursorTrack, a: StateArgs) -> Result<Value, String> {
     } else {
         Vec::new()
     };
-    Ok(json!({
+    let mut answer = json!({
         "visible": opacity > 0.0, "x": x, "y": y, "opacity": opacity,
         "px_per_point": f, "image": image, "ripples": ripples,
-    }))
+    });
+    if let (Some(ends), Value::Object(fields)) = (a.ends, &mut answer) {
+        let [(x0, y0), (x1, y1)] = ends.map(position);
+        fields.insert("ends".to_string(), json!([[x0, y0], [x1, y1]]));
+    }
+    Ok(answer)
 }
 
 fn image(track: &CursorTrack, id: i64) -> Result<Value, String> {
@@ -289,105 +276,4 @@ fn image(track: &CursorTrack, id: i64) -> Result<Value, String> {
         "id": id, "png": encode_base64(&img.png), "w": pt(img.w), "h": pt(img.h),
         "hot_x": pt(img.hot_x), "hot_y": pt(img.hot_y), "kind": img.kind,
     }))
-}
-
-fn events(track: &CursorTrack, a: EventsArgs) -> Result<Value, String> {
-    ordered(a.from, a.to)?;
-    let (from, to) = (ticks_to_us(a.from), ticks_to_us(a.to));
-    let inside = |t: i64| from <= t as f64 && (t as f64) < to;
-    let file = track.file();
-    let mut out = serde_json::Map::new();
-    if a.kinds.contains(&EventKind::Clicks) {
-        let c = &file.clicks;
-        let list: Vec<Value> = (0..c.t.len())
-            .filter(|&i| inside(c.t[i]))
-            .map(|i| {
-                let (x, y) = track.to_movie(c.t[i] as f64, c.x[i] as f64, c.y[i] as f64);
-                json!({ "t": us_to_ticks(c.t[i]), "button": c.button[i], "down": c.down[i],
-                        "x": x, "y": y, "count": c.count[i] })
-            })
-            .collect();
-        out.insert("clicks".into(), list.into());
-    }
-    if a.kinds.contains(&EventKind::Scrolls) {
-        let s = &file.scrolls;
-        let list: Vec<Value> = (0..s.t.len())
-            .filter(|&i| inside(s.t[i]))
-            .map(|i| {
-                let (x, y) = track.to_movie(s.t[i] as f64, s.x[i] as f64, s.y[i] as f64);
-                json!({ "t": us_to_ticks(s.t[i]), "x": x, "y": y,
-                        "dx": s.dx[i] as f64 / 100.0, "dy": s.dy[i] as f64 / 100.0 })
-            })
-            .collect();
-        out.insert("scrolls".into(), list.into());
-    }
-    if a.kinds.contains(&EventKind::Shortcuts) {
-        let k = &file.keys.shortcut;
-        let list: Vec<Value> = (0..k.t.len())
-            .filter(|&i| inside(k.t[i]))
-            .map(|i| json!({ "t": us_to_ticks(k.t[i]), "keys": k.keys[i], "code": k.code[i] }))
-            .collect();
-        out.insert("shortcuts".into(), list.into());
-    }
-    if a.kinds.contains(&EventKind::Typing) {
-        let list: Vec<Value> = typing_stretches(&file.keys.typed.t)
-            .into_iter()
-            .filter(|&(first, last, _)| (first as f64) < to && last as f64 >= from)
-            .map(|(first, last, marks)| {
-                json!({ "from": us_to_ticks(first), "to": us_to_ticks(last), "marks": marks })
-            })
-            .collect();
-        out.insert("typing".into(), list.into());
-    }
-    Ok(Value::Object(out))
-}
-
-fn path(track: &CursorTrack, a: PathArgs) -> Result<Value, String> {
-    smoothing_in_range(a.smoothing)?;
-    ordered(a.from, a.to)?;
-    if a.step < PATH_MIN_STEP {
-        return Err(format!(
-            "path's step is {} ticks; a path is sampled at most 10 times a second (step ≥ \
-             {PATH_MIN_STEP})",
-            a.step
-        ));
-    }
-    let span = i128::from(a.to) - i128::from(a.from);
-    let samples = (span + i128::from(a.step) - 1) / i128::from(a.step);
-    if samples > MAX_PATH_SAMPLES as i128 {
-        return Err(format!(
-            "path's range from {} to {} at step {} is {samples} samples; a path holds at most \
-             {MAX_PATH_SAMPLES}",
-            a.from, a.to, a.step
-        ));
-    }
-    // A stored path when `prepare` made one; else one built for this
-    // request alone and never stored (CU-25).
-    let built = (a.smoothing > 0.0)
-        .then(|| track.prepared(a.smoothing))
-        .flatten()
-        .or_else(|| {
-            (a.smoothing > 0.0)
-                .then(|| std::sync::Arc::new(SmoothPath::build(track.file(), a.smoothing)))
-        });
-    let n = samples as usize;
-    let (mut ts, mut xs, mut ys) = (
-        Vec::with_capacity(n),
-        Vec::with_capacity(n),
-        Vec::with_capacity(n),
-    );
-    for k in 0..n {
-        let t = a.from + a.step * k as i64;
-        let at = ticks_to_us(t);
-        let p = match &built {
-            Some(path) => path.at(at),
-            None => track.raw_at(at),
-        };
-        let Some((x, y)) = p else { break };
-        let (x, y) = track.to_movie(at, x, y);
-        ts.push(t);
-        xs.push(x);
-        ys.push(y);
-    }
-    Ok(json!({ "t": ts, "x": xs, "y": ys }))
 }

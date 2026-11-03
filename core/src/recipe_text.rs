@@ -545,6 +545,8 @@ pub(crate) fn burn_in_layer(canvas: &Canvas, t: Ticks) -> Value {
         dissolve: Value::Null,
         cursor: Value::Null,
         cutout: Value::Null,
+        // The burn-in never moves (CU-111).
+        blur: Value::Null,
         input: Value::Null,
         curve_blends: &[],
     }

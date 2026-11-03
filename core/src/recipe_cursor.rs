@@ -13,32 +13,44 @@
 //! the app reads a reversed tick through `ReverseMirror`. `smoothing` and
 //! `hide_idle` are the clip's BASE values (`with_base_cursor`), and `props`
 //! is all eight keys, so it passes whole to `rc_cursor_query`'s `state`
-//! (CU-25).
+//! (CU-25). A media clip's layer with a shutter (spec §11 CU-114) appends
+//! `shutter`, `{from, to, samples}`: the source ticks its shutter's two ends
+//! read, computed as `at` is, omitted when they are equal and on a still.
 
 use serde_json::{Map, Value};
 
 use crate::cursor_props::{clamp_cursor, with_base_cursor};
 use crate::evaluate::{json, number};
 use crate::model::{Clip, CursorClicks, Project, Source, VideoProps};
+use crate::motion_blur::MOTION_BLUR_SAMPLES;
 use crate::source_window::source_read_by;
 use crate::time::Ticks;
 
 impl Project {
     /// The `cursor` key of `clip`'s layer at clip time `clip_t`, given its
     /// evaluated video props (CU-32): `null`, or `{media, at, reversed,
-    /// smoothing, hide_idle, props}`.
-    pub(crate) fn layer_cursor(&self, clip: &Clip, clip_t: Ticks, evaluated: &VideoProps) -> Value {
-        let (media, at, reversed) = match &clip.source {
+    /// smoothing, hide_idle, props}`, and `shutter` when `ends` (the layer's
+    /// shutter ends in clip time, CU-114) read two source ticks.
+    pub(crate) fn layer_cursor(
+        &self,
+        clip: &Clip,
+        clip_t: Ticks,
+        evaluated: &VideoProps,
+        ends: Option<(Ticks, Ticks)>,
+    ) -> Value {
+        let (media, at, reversed, shutter) = match &clip.source {
             Source::Media {
                 media,
                 r#in,
                 reversed,
-            } => (
-                *media,
-                r#in.saturating_add(source_read_by(clip, clip_t)).max(0),
-                *reversed,
-            ),
-            Source::Still { media, at } => (*media, *at, false),
+            } => {
+                let read = |t: Ticks| r#in.saturating_add(source_read_by(clip, t)).max(0);
+                let shutter = ends
+                    .map(|(from, to)| (read(from), read(to)))
+                    .filter(|(from, to)| from != to);
+                (*media, read(clip_t), *reversed, shutter)
+            }
+            Source::Still { media, at } => (*media, *at, false, None),
             _ => return Value::Null,
         };
         let Some(file) = self.media(media).and_then(|m| m.cursor.as_ref()) else {
@@ -62,6 +74,13 @@ impl Project {
         out.insert("smoothing".to_string(), number(props.smoothing));
         out.insert("hide_idle".to_string(), json(&props.hide_idle));
         out.insert("props".to_string(), json(&props));
+        if let Some((from, to)) = shutter {
+            let mut ends = Map::new();
+            ends.insert("from".to_string(), Value::from(from));
+            ends.insert("to".to_string(), Value::from(to));
+            ends.insert("samples".to_string(), Value::from(MOTION_BLUR_SAMPLES));
+            out.insert("shutter".to_string(), Value::Object(ends));
+        }
         Value::Object(out)
     }
 }

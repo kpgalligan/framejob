@@ -621,3 +621,33 @@ fn a_newer_file_with_only_v1_keys_is_refused_by_its_version() {
         Some("the cursor file is version 2; this Frame Job reads cursor files up to version 1")
     );
 }
+
+#[test]
+fn state_with_ends_answers_each_end_as_a_state_at_that_tick() {
+    // CU-115: each end equals a `state` asked at that tick, raw and smoothed
+    // (prepared and unprepared alike); no `ends` key without the argument.
+    let t: Vec<i64> = (0..=6).map(|k| k * 10_000).collect();
+    let x: Vec<i64> = (0..=6).map(|k| k * 1000).collect();
+    let y: Vec<i64> = (0..=6).map(|k| k * k * 300).collect();
+    let track = Track::open(&with_moves(&t, &x, &y));
+    let (at, t0, t1) = (ticks(25_000), ticks(15_000), ticks(45_000));
+    for (smoothing, prepare) in [(0.0, false), (0.5, false), (0.5, true)] {
+        if prepare {
+            track.ok(json!({"prepare": {"smoothing": smoothing}}));
+        }
+        let props = json!({ "smoothing": smoothing });
+        let answer = track.ok(json!({"state": {"at": at, "props": props, "ends": [t0, t1]}}));
+        let plain = track.state(at, props.clone());
+        assert_eq!(answer["x"], plain["x"]);
+        assert_eq!(answer["y"], plain["y"]);
+        assert!(plain.get("ends").is_none(), "{plain}");
+        let first = track.state(t0, props.clone());
+        let last = track.state(t1, props);
+        assert_eq!(
+            answer["ends"],
+            json!([[first["x"], first["y"]], [last["x"], last["y"]]]),
+            "smoothing {smoothing}, prepared {prepare}"
+        );
+        assert_ne!(answer["ends"][0], answer["ends"][1]);
+    }
+}
