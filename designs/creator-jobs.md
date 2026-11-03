@@ -8452,6 +8452,107 @@ review's three nits stand as recorded above.
   `reframe_cover.rs` (VR-7), VR-24, VR-25, `edit_reframe.rs` (VR-26), the two `op_table.rs` kinds
   and their `op_schema.rs` arms, `edit_background.rs`'s builder lift, the app-filled tool (VR-28)
   and every proof row above.
+- **Split (recorded before code, 2026-11-02).** VR2a's design pass found it more than one
+  pipeline, so it runs as the fallback split above: **VR2a1** (this lane's first pipeline) and
+  **VR2a2** (the next), each with the parts named there. VR2a1's decisions are VR-20…VR-23 in
+  `designs/spec/11-decisions/creator-jobs-7.md`; VR-24…VR-26 and VR-28 stay the drafts above,
+  VR2a2's. VR2a1's deviations from the drafts, each recorded in its decision: the tracks and the
+  choice are a module of their own, `reframe_tracks.rs`, beside `reframe.rs` (both ≤ 400 lines);
+  `plan_framing` answers no path (rather than a refusal) for what VR2a2's op will refuse by name;
+  VR-21 scores a track over ±1 s of its shot, its centrality measured from the picture's centre;
+  VR-22 puts the face at the headroom only in a window taller than wide; VR-23's median is over
+  ±0.5 s (the draft's "over 1 s"), its distance Euclidean, its spacing exception read as the
+  filtered subject point outside the current window, its keys snapped to the canvas's frames (a
+  hold key on or before the previous key dropped, a move at least one frame long, none past the
+  clip's end), and with no chosen subject the window holds until VR-24 replaces that rule;
+  VR-S2 runs over six canned inputs only (S-TH1, T1 and T2 do not exist yet: skipped by name and
+  owed), its rule pooled over them, with a STOP arm when no setting reaches its second cap.
+
+#### VR2a1's record (2026-11-02)
+
+**Landed** in lane C, base `17b01a60` (the harness made the worktree at `6110526b`, four commits
+behind the integration branch; it was fast-forwarded to `17b01a60` before any work). The commits,
+in order:
+- `f1a355b2`: the split paragraph above and VR-20…VR-23 with their index rows, alone, before any
+  code; VR-23 carried VR-S2's inputs, grid, pooling and STOP arm before the run (CJ-7).
+- `2ca11e8b`: the helper, a pure move: `clip_source_time.rs` (`clip_time_of_source`,
+  `in_played_window`), `speech_in_clip` through it (193 → 190 lines), `duck_speech` 16/16 green
+  unchanged, `core/tests/clip_source_time.rs`.
+- `4599034a`: the planner — `reframe_tracks.rs` (VR-21) and `reframe.rs` (VR-20's mapping and
+  window, VR-22, VR-23) — `core/tests/reframe.rs`, and VR-S2's instruments
+  (`core/tests/reframe_spike.rs`, ignored; `creator_spike/reframe_spike.py`).
+- This record's commit: `FRAMING_TUNING` set to the verdict and pinned, VR-22's and VR-23's
+  amendments, spec §7.10's rows, the proof README's section.
+
+No op, tool, FFI, format (41 stands), Swift, catalog or guide change: a person and an agent get
+nothing yet; VR2a2 writes the path as an edit.
+
+- **New files** (`wc -l`): `clip_source_time.rs` 69, `reframe_tracks.rs` 361, `reframe.rs` 384;
+  tests `clip_source_time.rs` 135, `reframe.rs` 601 (a test file, outside the source ledger's
+  400-line cap, as `auto_zoom.rs`' 690), `reframe_spike.rs` 173; `creator_spike/reframe_spike.py`
+  280.
+- **Changed:** `audio_duck_speech.rs` 193 → 190; `lib.rs` (three `pub mod` lines); spec §7.10
+  143 → 146 (three rows; the `audio_duck_speech.rs` row names the helper); `creator-jobs-7.md`
+  338 → 457; `tools/proof/README.md` (the VR2a1 section after VR1's).
+- **VR-S2** (`rule_sha256` `f55e33e6…13cce3870e7`, matching; macOS 26.5.1 (25F80), Apple M2 Max, AC
+  power, load averages 96–118 under three lanes): `VERDICT arm=first dead_zone=0.15
+  dead_zone_height=0.12 speed=0.8 headroom=0.38 containment=0.9841 (1358/1380) moves=15
+  moves_per_minute=5.62` (`VR-S2/results.json`, `rule_matches: true`). Pooled over the 27
+  settings, containment moved only with the speed (0.3: 1324/1380, 0.5: 1345/1380, 0.8:
+  1358/1380) and the moves only with the dead zone (0.06: 25, 0.10: 21, 0.15: 15 in 160 s, i.e.
+  9.38, 7.88 and 5.62 a minute); the headroom changed nothing, because at zoom 1 a 9:16 window on
+  a 16:9 picture is the picture's full height and its centre's y is held. The verdict's inputs:
+  pan 200/200 contained, 11 moves; exit 80/80, 1; two faces 194/200, 1; still 600/600, 0; cuts
+  284/300, 2; card none counted, 0.
+- **The tie-break was resolved after a first run.** The rule's last tie-break, "then to (0.10,
+  0.5, 0.38)", did not say where a tie WITHOUT that setting goes; the first run's instrument fell
+  to grid order and printed headroom 0.33 (the same figures otherwise). `reframe_spike.py` now
+  sends such a tie to the tied setting sharing the most of the default's values (a selftest row
+  holds it), and the run was repeated: headroom 0.38. Recorded in VR-23's amendment.
+- **The jitter's W and H** in VR-23's still input are read as the picture's (1920 × 1080: ±9.6 px
+  across, ±5.4 px down), as the spec's figures were for the source picture; written in the
+  script's docstring.
+- **Targeted:** `cargo test --release --test clip_source_time --test reframe --test duck_speech`
+  6, 22 and 16 passed; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` clean;
+  `reframe_spike.py --selftest` 6/6 PASS; `spec_index_proof.py` 255/255.
+- **`make gate`**: `gate: PASS 639s` (names 1 s, typecheck skipped, fmt 4 s, lint 24 s, test 426 s,
+  app 184 s), three lanes on the machine; then once more after this line was written.
+- **Mutants** (seven), each once on the final code, each CAUGHT by its named test (exit 101):
+  `dead-zone-0` (`a_still_subject_with_jitter_makes_no_move`), `reversal-not-reflected`
+  (`clip_source_time.rs`'s `a_reversed_clip_reflects_over_the_media_duration`), `link-gap-0`
+  (`a_track_bridges_a_gap_of_0_9_s_and_not_1_1_s`), `link-iou-0`
+  (`an_iou_of_0_29_does_not_link_and_0_31_does`), `tracks-cross-cuts` (`a_cut_ends_every_track`),
+  `rival-hysteresis-off` (`a_rival_needs_1_25_times_for_2_s`), `body-yields-off`
+  (`a_faces_body_carries_it_while_it_is_away`).
+- **Owed:** VR-S2's S-TH1, T1 and T2 rows (none exists yet, `samples/README.md`), and with them a
+  measurement of the headroom, which needs a zoom above 1 or a picture taller than the window;
+  JOB-31 judges the feel. No Release proof: this phase has no app change.
+- **Choices the decisions leave to the code**, written in them: a track's score uses the box's
+  centrality at the sample itself; a body is the face track with the most shared samples among
+  those it holds in ≥ 80 %; ties go to the lower track id; the picture's centre for an empty path
+  is the cropped rect's.
+
+**Review.** Pass, with three nits: (1) VR-23's last tie clause (a tie without the default setting
+goes to the tied setting sharing the most of its values) was settled after VR-S2's first run, not
+before it as CJ-7 asks — stated openly above and in VR-23's amendment, and the only number it
+moves is the headroom, which VR-S2 cannot measure; left as recorded. (2) Spec §7.10's three new
+rows sat inside the `audio_*` group — moved at integration to just after `audio_shape.rs`, before
+`snap.rs`. (3) `core/tests/reframe.rs` is 601 lines against the brief's "new files ≤ 400" — read,
+as the root `CLAUDE.md`'s ledger does, as a cap on `core/src/*.rs`; left whole.
+
+**Integration (2026-11-02).** Cherry-picked (`f1a355b2…84682bb8`) onto `worktree-creator-jobs` at
+CU9b's `37f7de3e`. Conflicts only in `creator-jobs-7.md` and both spec indexes, each kept both
+sides: CU9b's section kept ahead of VR2a1's in `creator-jobs-7.md` (now 547 lines; its index row
+names CU-91…CU-94 then VR-20…VR-23 with the verdict), the `11-decisions/` folder 20518 in 41
+files, §7.10 146 (`spec_index_proof.py` 255/255). No format, op, tool or FFI on either side, so
+nothing renumbered. The owed `core/CLAUDE.md` edits went in: the `clip_source_time.rs` entry and
+the `reframe_tracks.rs` · `reframe.rs` entry after `audio_duck_speech.rs`'s, whose
+`speech_in_clip` now names the helper. `make gate` on the integrated tree, before this paragraph:
+"gate: PASS 279s" (names 1 s, typecheck skipped, fmt 4 s, lint 12 s, test 254 s, app 7 s). No
+Release proof: VR2a1 changes no app file.
+
+**Owed.** As above: VR-S2's S-TH1, T1 and T2 rows and the headroom's first real measurement;
+JOB-31's feel. No person check; nothing filed.
 
 ### FC5 — the helper's estimate, its flags, and one helper plumbing
 

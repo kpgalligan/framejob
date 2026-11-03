@@ -27629,6 +27629,41 @@ python3 tools/proof/vr1_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind subjects --socket <dir>/agent.sock   # VR-15, Release
 ```
 
+## Road map "creator-jobs" VR2a1 — the subject-choosing planner (`core/tests/reframe.rs`, `clip_source_time.rs`; `creator_spike/reframe_spike.py` VR-S2 with `core/tests/reframe_spike.rs`; seven mutants; spec §11 VR-20…VR-23)
+
+No app change and no MCP proof: the planner is a pure core function (`plan_framing`), proved by
+its black-box tests, whose oracles are worked by hand from the decisions' figures.
+
+**`creator_spike/reframe_spike.py`** is spike VR-S2. It writes six canned inputs to
+`tools/proof/work/creator_spike/VR-S2/canned/` (a 1080 × 1920 30 fps project framing a 1920 ×
+1080 clip at zoom 1, faces every 100 ms: a 20 s pan, a 10 s exit, 20 s of two faces, a 60 s still
+with jitter, 30 s with two cuts, a 20 s card — 160 s in all), runs the ignored core test
+`reframe_spike.rs` over them (`FRAMEJOB_REFRAME_SPIKE` naming the folder; it plans the 27 grid
+settings and writes `metrics.json`, its log `cargo.log`), and applies VR-23's rule: the highest
+pooled containment (the chosen face's centre inside the window's central 60 %) at no more than 6
+moves a minute, ties to fewer moves and then toward (0.10, 0.5, 0.38); else the dead zone one step
+down at no more than 8; else STOP. `results.json` through `rule.write_results`, one `VERDICT`
+line; it refuses to run off AC power. `--selftest` runs the rule over synthetic metrics: the
+first arm, a tie to the default, a tie toward it, the 8-moves arm with none at 6 and with a winner
+under 97 %, and the STOP arm. S-TH1's and T1's and T2's rows are skipped by name and owed.
+
+| Test | What it holds |
+|---|---|
+| `clip_source_time.rs` | forward, ×2 (`Down` floors, `Up` ceils), reversed (reflected over the media's duration), ramped (through S), no answer without a media source or a rate, the played window at both edges forward, ×2 and reversed |
+| `reframe.rs` (VR-22, VR-23) | a still face with jitter makes no move; a short step moves for the 0.4 s floor and a long one for its distance, snapped; the 0.5 s spacing and its outside-the-window exception; an exception move on the last end drops its hold key; a move at least one frame (1 fps) and none past the clip's end; headroom in a tall window, centred in a wide one; a person's top 12 % down; the clamp at the picture's edge; a crop keeps the point and moves the clamp; samples outside the played window dropped; ×2, reversed (samples arriving descending) and ramped clips; every no-path arm; `FRAMING_TUNING` pinned to VR-S2's verdict |
+| `reframe.rs` (VR-21) | a track bridges 0.9 s and not 1.1 s; IoU 0.29 does not link and 0.31 does; a cut ends every track; a face outranks a bigger person and salient regions count only alone; a face's body carries it while it is away; a rival at 1.25 × takes the frame after 2 s and not after 1.8 s of its 1.9 s |
+
+Mutants, each edited into the tree and restored byte for byte, CAUGHT when its named test fails:
+`dead-zone-0` (the still face), `reversal-not-reflected` (`clip_source_time.rs`'s reversed case),
+`link-gap-0` (the gap), `link-iou-0` (IoU 0.29), `tracks-cross-cuts` (the cut), `rival-hysteresis-off`
+(the rival), `body-yields-off` (the body).
+
+```sh
+cd core && cargo test --release --test clip_source_time --test reframe --test duck_speech
+python3 tools/proof/creator_spike/reframe_spike.py --selftest
+python3 tools/proof/creator_spike/reframe_spike.py                    # VR-S2, on AC
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

@@ -1111,12 +1111,38 @@ governs a module now.
   derive, because `FadeShape`'s own default is the fades' `linear`).
 - `audio_duck_speech.rs` — ducking by speech (format 29, spec §11 AU-110,
   AU-112, AU-113): `speech_in_clip` (a media's source spans in clip time,
-  reflected when reversed, through the base rate or one `SpeedMap`),
+  each edge through `clip_source_time.rs`'s `clip_time_of_source`: reflected
+  when reversed, through the base rate or one `SpeedMap`),
   `Project::speech_spans` (on the played part, widened by `pre_roll` /
   `hold`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
   `extent_gain`), `speech_breaks` (each span's four edges and the
   release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
   here edits.
+- `clip_source_time.rs` — source time to clip time, the one mapping (road
+  map "creator-jobs" VR2a1, spec §11 VR-20): `clip_time_of_source` (a
+  forward-file source tick reflected over `media.duration` when reversed,
+  `in` subtracted, then `SpeedMap::time_at` when ramped, else ÷ the speed,
+  floored or ceiled by `Round`) and `in_played_window` (`in ≤ s′ < in +
+  source_read_by(clip, clip.duration)`). `speech_in_clip` and `reframe.rs`
+  read through it; `cursor_zoom_run.rs`'s `clip_time`, which reads past the
+  clip's end (CU7/CU8), does not.
+- `reframe_tracks.rs` · `reframe.rs` — the framing planner (road map
+  "creator-jobs" VR2a1, spec §11 VR-20…VR-23), pure, no op yet (VR2a2's
+  `edit_reframe.rs` writes its path). `reframe_tracks.rs`: `SubjectBox`,
+  `SubjectSample`, `Follow`, `SubjectKind`, `Chosen` and `choose_subject` —
+  boxes linked into tracks per kind (`LINK_IOU` 0.3, `LINK_GAP` 1 s, every
+  cut ending every track; nothing stored, CJ-31), scored by presence ×
+  median area × centrality over ±1 s of the shot, faces > people > salient,
+  a face's body (`BODY_SHARE` 0.8) carrying it while it is away, a rival
+  needing `RIVAL_MARGIN` 1.25 for `RIVAL_HOLD` 2 s. `reframe.rs`: `Subjects`
+  (media source ticks) into clip time through `clip_source_time.rs` (sorted,
+  de-duplicated), boxes onto the source canvas by the media's displayed size
+  and (★) at θ = 0, the window `W/k × H/k` (`k·s` = zoom × `fill_scale`, at
+  most `SCALE_MAX`) clamped inside the cropped rect, VR-22's composition,
+  VR-23's moves (median ±0.5 s, dead zone, speed, 0.5 s spacing, frame
+  snapping) and `FRAMING_TUNING` (VR-S2's verdict: 0.15, 0.12, 0.8, 0.38);
+  `plan_framing` answers a `FramingPath` of `(t, k, dx, dy, curve)` keys, or
+  none.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

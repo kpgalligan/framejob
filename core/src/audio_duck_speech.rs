@@ -18,11 +18,13 @@
 
 use crate::audio::{coalesce, Ramp, Side};
 use crate::audio_duck::{extent_gain, Ducker};
+use crate::clip_source_time::{clip_time_of_source, Round};
 use crate::model::{Clip, Duck, Media, Project, Source};
 use crate::speed_map::SpeedMap;
 use crate::time::Ticks;
 
-/// A media's saved speech spans in CLIP time, `[0, clip.duration)`: each
+/// A media's saved speech spans in CLIP time, `[0, clip.duration)`, each
+/// edge through `clip_source_time.rs`'s `clip_time_of_source`: each
 /// reflected first when the clip is reversed (`in` is measured in the
 /// reversed stream, `model.rs`'s `Source::Media` doc), then read through the
 /// clip's speed map when it is ramped, else at its base rate — the start
@@ -33,33 +35,28 @@ pub(crate) fn speech_in_clip(
     media: &Media,
     spans: &[[Ticks; 2]],
 ) -> Vec<(Ticks, Ticks)> {
-    let Source::Media { r#in, reversed, .. } = clip.source else {
+    let Source::Media { reversed, .. } = clip.source else {
         return Vec::new();
     };
-    let map = SpeedMap::of(clip);
-    let speed = clip.speed;
-    if map.is_none() && !(speed.is_finite() && speed > 0.0) {
+    if SpeedMap::of(clip).is_none() && !(clip.speed.is_finite() && clip.speed > 0.0) {
         return Vec::new();
     }
-    let at = |source: Ticks, up: bool| -> Ticks {
-        let read = source.saturating_sub(r#in);
-        match &map {
-            Some(map) => map.time_at(read as f64),
-            None if up => (read as f64 / speed).ceil() as Ticks,
-            None => (read as f64 / speed).floor() as Ticks,
-        }
+    // The guard above means the helper always answers; reflection is the
+    // helper's, so a reversed span's edges swap: its start is played from
+    // the span's END.
+    let at = |source: Ticks, round: Round| -> Ticks {
+        clip_time_of_source(clip, media, source, round).unwrap_or(0)
     };
     let mut out: Vec<(Ticks, Ticks)> = spans
         .iter()
         .map(|&[a, b]| {
             if reversed {
-                let d = media.duration;
-                (d.saturating_sub(b), d.saturating_sub(a))
+                (at(b, Round::Down), at(a, Round::Up))
             } else {
-                (a, b)
+                (at(a, Round::Down), at(b, Round::Up))
             }
         })
-        .map(|(a, b)| (at(a, false).max(0), at(b, true).min(clip.duration)))
+        .map(|(a, b)| (a.max(0), b.min(clip.duration)))
         .filter(|(a, b)| b > a)
         .collect();
     out.sort_unstable();
