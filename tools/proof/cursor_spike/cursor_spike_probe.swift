@@ -4,11 +4,12 @@
 //     cursor-spike-probe <mode> <work-dir> <job.json>      (terminal-run: one JSON line)
 //     Cursor Spike.app/Contents/MacOS/Cursor Spike <job.json>  (the scratch bundle, opened
 //                                                          with `open -n -a`; job.mode picks
-//                                                          listen or grant; the answer goes to
-//                                                          job.out)
+//                                                          listen, grant or s2owner; the answer
+//                                                          goes to job.out)
 //
 // Modes here: host, a4, a5, a5thread, a9, target, post, listen, grant. The ScreenCaptureKit
-// modes (a10, s2, still, s3) are in cursor_spike_capture.swift. Compiled AS main.swift through
+// modes (a10, s2, still, s3) are in cursor_spike_capture.swift; s2owner, the picked rows' grey
+// window drawn by the scratch bundle (CU0c), in cursor_spike_picked.swift. Compiled AS main.swift through
 // `swift_build.build` with nothing from app/Sources: every type is `CursorSpike…` and every
 // function `cursorSpike…`.
 //
@@ -755,6 +756,7 @@ case "a10": cursorSpikeAnswer = cursorSpikeModeA10(cursorSpikeJob)
 case "s2": cursorSpikeAnswer = cursorSpikeModeS2(cursorSpikeJob)
 case "still": cursorSpikeAnswer = cursorSpikeModeStill(cursorSpikeJob)
 case "s3": cursorSpikeAnswer = cursorSpikeModeS3(cursorSpikeJob)
+case "s2owner": cursorSpikeAnswer = cursorSpikeModeS2Owner(cursorSpikeJob)
 default: cursorSpikeAnswer = ["outcome": "failed", "reason": "no mode \(cursorSpikeMode)"]
 }
 cursorSpikeAnswer["mode"] = cursorSpikeMode

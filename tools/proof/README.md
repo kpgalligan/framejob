@@ -27472,6 +27472,7 @@ Each is judged by its own entry under the road map's "Every spike, with its rule
 Where things run:
 - The probe builds through `swift_build.build` with nothing from `app/Sources`.
 - A1–A3's listener is the scratch bundle `work/cursor_spike/bundle/Cursor Spike.app` (`com.kgalligan.FrameJob.cursorspike`), opened with `open -n -a`, never a terminal-run process.
+- CU-S2's picked rows' grey window is the scratch bundle's too (mode `s2owner`, CU0c): the system picker offers no Share button over a window of the process presenting it, so the terminal-run probe presents the picker and records while the bundle draws, warps and places on the probe's wall-clock schedule.
 - `tccutil` runs only under `--person`, and only on that id.
 - Every child runs under `graphics_spike/bounded.py`.
 
@@ -27480,7 +27481,8 @@ What the runs do to the host:
 - While the console is locked (`CGSessionScreenIsLocked`), every screen row is skipped by name.
 
 ```sh
-python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    # 16 rows; ten mutants, each exit 1
+python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    # 17 rows; thirteen mutants, each exit 1
+python3 tools/proof/cursor_spike/cursor_spike.py --picked-owner                # S2.picked-owner alone: the grey window listed, owned by the bundle, not the presenter
 python3 tools/proof/cursor_spike/cursor_spike.py --only s4                     # then s3, s2, s1, one group per call
 python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         # the person tier, merged in (JOB-29)
 ```

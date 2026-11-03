@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The cursor spikes — road map "creator-jobs" CU0b (CU-S1…CU-S4).
+"""The cursor spikes — road map "creator-jobs" CU0b (CU-S1…CU-S4), CU0c (the picked rows).
 
 MEASURES what the cursor recorder is built on before any of it is: the capture APIs, grants,
 clocks and the cursor's image (CU-S1), the mapping from global points to movie pixels and the
@@ -8,7 +8,14 @@ speed (CU-S4). It judges by the rules in `designs/creator-jobs.md`'s "Every spik
 rule", pinned by CJ-7: R0 hashes each entry and refuses to run on a changed one. The answers
 are in the road map's CU0b record, not here.
 
+CU-S2's picked rows (`S2.window-picked.*`, person tier) and the automatic row `S2.picked-owner`
+have their grey window drawn by the scratch bundle (mode `s2owner`), not by the probe that
+presents the picker: the system picker offers no Share button over the presenter's own window.
+`S2.picked-owner` proves, with no person, that the window is listed in SCShareableContent and
+owned by a process other than the presenter (`owner_problem`); it is not a field row.
+
     python3 tools/proof/cursor_spike/cursor_spike.py [--only s1,s2,s3,s4] [--person] [--build-only]
+    python3 tools/proof/cursor_spike/cursor_spike.py --picked-owner
     python3 tools/proof/cursor_spike/cursor_spike.py --selftest [--mutant NAME]
 
 Exit 0: every requested row answered or skipped by name, whatever the verdict. Exit 1: an
@@ -54,7 +61,9 @@ READER_BIN = READER / "target/release/cursor-spike-reader"
 GROUPS = {"s1": "CU-S1", "s2": "CU-S2", "s3": "CU-S3", "s4": "CU-S4"}
 MUTANTS = ["rule-unchecked", "clicks-95", "keys-accessibility-ok", "grant-iohid-first",
            "skipped-as-measured", "inherited-grant-counted", "caret-unflipped",
-           "odd-window-ignored", "dirty-128", "body-or"]
+           "odd-window-ignored", "dirty-128", "body-or", "owner-not-listed", "owner-same-process",
+           "owner-offscreen-ok"]
+PICKED_OWNER = "S2.picked-owner"
 PERSON = "a person at the machine (--person; JOB-29)"
 LOCKED = ("the console is locked (CGSSessionScreenIsLocked): ScreenCaptureKit records the lock screen "
           "and nothing activates; owed to a run at the unlocked machine (JOB-29)")
@@ -118,7 +127,8 @@ def build():
     plist = BUILD / "cursor-spike-probe.plist"
     write_if_changed(plist, PLIST.format(ident=BUNDLE_ID + ".probe", name="cursor-spike-probe"))
     try:
-        swift_build.build(sources=[entry, SPIKE / "cursor_spike_capture.swift"], output=PROBE, optimize=True,
+        swift_build.build(sources=[entry, SPIKE / "cursor_spike_capture.swift", SPIKE / "cursor_spike_picked.swift"],
+                          output=PROBE, optimize=True,
                           link_args=["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker",
                                      "__info_plist", "-Xlinker", str(plist)],
                           link_inputs=[plist], timeout=BUILD_WALL)
@@ -534,6 +544,67 @@ def s2_row(answer, rid):
                     frame_info=info)
 
 
+def owner_problem(facts):
+    """Why the picked rows' grey window cannot be picked, or None: listed in SCShareableContent,
+    owned by the helper and not by the picker's presenter, and on screen (unless locked)."""
+    window, presenter, sc, helper = (facts.get("window_id"), facts.get("presenter_pid"),
+                                     facts.get("sc_owner_pid"), facts.get("owner_pid"))
+    if not facts.get("in_shareable") and deciders.MUTANT != "owner-not-listed":
+        return f"the grey window {window} is not in SCShareableContent's windows"
+    if sc == presenter and deciders.MUTANT != "owner-same-process":
+        return f"the grey window belongs to the picker's presenter (pid {presenter})"
+    if sc != helper:
+        return f"the grey window's owner pid {sc} is not the helper's {helper}"
+    if not facts.get("on_screen") and not facts.get("screen_locked") and deciders.MUTANT != "owner-offscreen-ok":
+        return "the grey window is not on screen"
+    return None
+
+
+def picked_row(config, rid, check_only=False):
+    """A picked row (or, with check_only, S2.picked-owner): the scratch bundle draws the grey
+    window and places the holds and the sweep; the probe presents the picker and records."""
+    tag = rid.replace(".", "-")
+    ANSWERS.mkdir(parents=True, exist_ok=True)
+    ready, go = ANSWERS / f"{tag}.ready.json", ANSWERS / f"{tag}.go.json"
+    for path in (ready, go):
+        path.unlink(missing_ok=True)
+    answer_file, why = open_bundle({"mode": "s2owner", "config": config, "ready": str(ready), "go": str(go),
+                                    "check_only": check_only}, f"{tag}-owner")
+    if why:
+        return fail(rid, why)
+    answer, why = probe("s2", {"source": "window-picked", "config": config, "owner_ready": str(ready),
+                               "owner_go": str(go), "check_only": check_only}, tag, 180)
+    if not go.exists():  # a crashed or expired probe never wrote one
+        go.write_text(json.dumps({"stop": True}))
+    helped, _ = bundle_answer(answer_file, f"{tag}-owner", 60)
+    owner = (answer or {}).get("owner")
+    if owner is not None:
+        problem = owner_problem(owner)
+        if problem:
+            return fail(rid, problem)
+    if why:
+        return fail(rid, why)
+    if answer["outcome"] in ("absent", "skipped"):
+        return {answer["outcome"]: answer["reason"]}
+    if answer["outcome"] != "ok":
+        return fail(rid, answer.get("reason"))
+    if helped and helped.get("outcome") == "skipped":
+        return {"skipped": helped.get("reason")}
+    if helped is None:
+        return fail(rid, "the helper gave no answer in 60 s")
+    if helped.get("outcome") != "ok":
+        return fail(rid, f"the helper answered {helped.get('outcome')}: {helped.get('reason')}")
+    if check_only:
+        return measured("auto", **owner)
+    for k, hold in enumerate(answer["holds"]):
+        at = (helped.get("placed") or [])[k:k + 1]
+        if not at or at[0][1:3] != hold[2:4]:
+            return fail(rid, f"the helper placed hold {k} at {at[0][1:3] if at else None}, not {hold[2:4]}")
+    for key in ("move", "warps", "crosshair_hot", "active"):
+        answer[key] = helped.get(key)
+    return s2_row(answer, rid)
+
+
 def group_s2(rows, host, person=False):
     locked = host["screen_locked"]
     for source, (kind, odd, needs_person) in deciders.SOURCES.items():
@@ -547,7 +618,10 @@ def group_s2(rows, host, person=False):
                 rows[rid] = {"skipped": LOCKED}
                 continue
             if needs_person:
-                ask(f"{rid}: pick the instrument's grey window in the picker when it appears; press Return.")
+                ask(f'{rid}: pick the window "Cursor Spike S2" of the app "Cursor Spike" when the picker '
+                    'appears; press Return.')
+                rows[rid] = picked_row(config, rid)
+                continue
             answer, why = probe("s2", {"source": source, "config": config}, rid.replace(".", "-"))
             if why:
                 rows[rid] = fail(rid, why)
@@ -559,6 +633,8 @@ def group_s2(rows, host, person=False):
                 rows[rid] = s2_row(answer, rid)
     if person:
         return
+    # Not skipped under a lock: the facts read every window, on screen or not, and record the lock.
+    rows[PICKED_OWNER] = picked_row("picture", PICKED_OWNER, check_only=True)
     for k in range(1, 11):
         rid = f"S2.still.{k}"
         if locked:
@@ -812,6 +888,18 @@ def selftest():
     check("S4a", (big["body"], small["body"], small["smoothing"]) == ("binary", "json", "per-60s-window"),
           f"30 MB → {big['body']}; 10 MB → {small['body']}, prepare 1.5 s → {small['smoothing']}")
 
+    good = {"presenter_pid": 10, "owner_pid": 20, "window_id": 7, "in_shareable": True, "sc_owner_pid": 20,
+            "sc_owner_bundle": BUNDLE_ID, "on_screen": True, "screen_locked": False}
+    cases = [("good", good, None),
+             ("not listed", dict(good, in_shareable=False, sc_owner_pid=None, sc_owner_bundle=None, on_screen=False),
+              "not in SCShareableContent"),
+             ("the presenter's", dict(good, sc_owner_pid=10), "belongs to the picker's presenter"),
+             ("off screen", dict(good, on_screen=False), "not on screen"),
+             ("off screen, locked", dict(good, on_screen=False, screen_locked=True), None)]
+    answers = [(name, owner_problem(facts), want) for name, facts, want in cases]
+    check("T2", all((got is None) if want is None else (got is not None and want in got) for _, got, want in answers),
+          "; ".join(f"{name} → {got}" for name, got, _ in answers))
+
     still = [{"red_px": 40, "content_scale": 1.0}, {"red_px": 3, "content_scale": 1.0}]
     low = tip_check(still, True, 2.0)
     check("T1", len(low) == 1 and low[0]["red_px"] == 3,
@@ -838,6 +926,8 @@ def main():
     parser.add_argument("--only", default="s1,s2,s3,s4")
     parser.add_argument("--person", action="store_true")
     parser.add_argument("--build-only", action="store_true")
+    parser.add_argument("--picked-owner", action="store_true",
+                        help="R0 (CU-S2), B0 and host, then only S2.picked-owner; no results.json")
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--mutant", choices=MUTANTS)
     args = parser.parse_args()
@@ -853,7 +943,7 @@ def main():
     unknown = [g for g in groups if g not in GROUPS]
     if unknown:
         parser.error(f"unknown group(s): {', '.join(unknown)}")
-    spikes = [GROUPS[g] for g in groups]
+    spikes = ["CU-S2"] if args.picked_owner else [GROUPS[g] for g in groups]
 
     roadmap_text = ROADMAP.read_text()
     changed = deciders.changed_rules(roadmap_text, spikes)
@@ -881,6 +971,12 @@ def main():
           f"{host['post_event']}, listen {host['listen_event']}, "
           f"accessibility {host['accessibility']}; {len(host['displays'])} display(s); "
           f"{host_facts()['power']}")
+    if args.picked_owner:
+        row = picked_row("picture", PICKED_OWNER, check_only=True)
+        print(f"{PICKED_OWNER}: {json.dumps(row, indent=1, sort_keys=True)}")
+        for failure in FAILURES:
+            print(f"INSTRUMENT FAILURE: {failure}", file=sys.stderr)
+        return 1 if row.get("failed") else 0
     for spike in spikes:
         print(f"-- {spike}", flush=True)
         run_spike(spike, args, host, roadmap_text)

@@ -1123,17 +1123,17 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** road map "creator-jobs" CU7 (spec §11 CU-70, CU-77); `tools/proof/cu7_proof.py` measures the plan against hand-worked fixtures, but whether a zoom is where a person would put it is a viewer's judgement.
 
 **JOB-29 — The cursor spikes at the machine (CU-S1…CU-S3)**
-- **When:** once at CU0b, before CU1b and CU6, and again after each macOS major update, since `NSCursor.currentSystem` may start answering nil.
+- **When:** once at CU0b, before CU1b and CU6, and again after each macOS major update, since `NSCursor.currentSystem` may start answering nil; and, after CU0c, `--only s2 --person` for the picked rows.
 - **Do:** 1. Unlock the Mac, close or hide other windows, and leave the terminal holding Screen Recording. Then run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2,s3`. It takes a few minutes: it warps the pointer, shows full-screen grey windows, and opens a small text window. Keep your hands off the mouse and keyboard. 2. Run `python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person` and follow each prompt on the terminal:
   - move the mouse in circles;
   - hold the pointer over TextEdit's text, a Safari link and a window's resize edge;
   - type in TextEdit and move the mouse as TYPE and MOVE are printed;
   - click, drag, scroll and type into the two small windows. Do this three times: with no grant, then with Input Monitoring only, then with Accessibility only. Each time, give the grant to "Cursor Spike" in System Settings ▸ Privacy & Security.
   - For each of the two grant calls, say whether a prompt appeared and whether Cursor Spike is listed in Input Monitoring, turn it on, and type until told to stop;
-  - pick the instrument's grey window in the window picker, twice. **Owed:** the picker offers no Share button for a window owned by the process that presents it, and the instrument draws its grey window itself (the owner's report, 2026-11-02), so this step cannot be performed as built. It waits for the instrument's helper-owned window, before CU3c; until then window mapping is owed.
+  - when the window picker appears, pick the window "Cursor Spike S2" of the app "Cursor Spike", once per configuration (In the picture, then Separate). The grey window is drawn by the scratch bundle "Cursor Spike", not by the terminal's probe that presents the picker (CU0c), so the picker offers its Share button.
 - **Expect:** both commands exit 0 and print one `VERDICT` line per spike, and the `host:` line reads `console locked False`. Step 2 runs `tccutil reset ListenEvent com.kgalligan.FrameJob.cursorspike` before each grant pair, and on no other id. Any field still `owed` names a row that was skipped, with its reason, in `tools/proof/work/cursor_spike/cu-sN/results.json`.
 - **Answer:** the VERDICT lines and each `rule_sha256`, copied into the road map's CU0b record (a STOP verdict is put to you with its rule's recommendation before CU1a); and whether A11 answered `grant_api`, `relaunch` and `listed`, which settles CU-3's pair.
-- **Source:** road map "creator-jobs" CU0b (spec §11 CU-6); `tools/proof/cursor_spike/README.md`. An agent's run cannot post input, hold Input Monitoring or Accessibility, use a person's hand, or see the screen while the console is locked.
+- **Source:** road map "creator-jobs" CU0b and CU0c (spec §11 CU-6); `tools/proof/cursor_spike/README.md`. An agent's run cannot post input, hold Input Monitoring or Accessibility, use a person's hand, or see the screen while the console is locked.
 
 ## Assistant
 

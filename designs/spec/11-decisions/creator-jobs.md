@@ -282,7 +282,13 @@ the rest):
   instrument's own window and the instrument is to own its grey window from a helper process
   before CU3c; the window rows' anchor owed to a re-run on a quiet machine (if they still fail,
   window recordings' cursor STOPs to the owner); `separate` owed. CU-S3 `dirty=not-stored`
-  (0/10 bursts).
+  (0/10 bursts). **Amended at CU0c** (2026-11-02): the picked rows' grey window is drawn by the
+  scratch bundle `Cursor Spike.app` (mode `s2owner`), a LaunchServices-launched process with its
+  own bundle id, not a terminal child; it warps and places on a wall-clock schedule the presenting
+  probe writes, and mach host times are shared across processes. The automatic row
+  `S2.picked-owner` proves the window is listed in `SCShareableContent` and owned by a process
+  other than the picker's presenter. The rule and its pin are unchanged; window mapping and
+  `separate` stay owed to the owner's `--only s2 --person`.
 - **CU-7 — Keys are private by construction.** A key-down while ⌘ or ⌃ is held is a shortcut, stored
   with its spelled keys; every other key-down and every auto-repeat is a mark with a time and no
   identity; no character, key code or label of a typed key is ever stored, so none can reach a tool

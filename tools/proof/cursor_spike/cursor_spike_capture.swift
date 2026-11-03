@@ -18,9 +18,9 @@ import VideoToolbox
 
 final class CursorSpikeBox<T>: @unchecked Sendable { var value: T? }
 
-func cursorSpikeShareable() -> (SCShareableContent?, String?) {
+func cursorSpikeShareable(onScreenOnly: Bool = true) -> (SCShareableContent?, String?) {
     let box = CursorSpikeBox<(SCShareableContent?, String?)>()
-    SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
+    SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: onScreenOnly) { content, error in
         box.value = (content, error.map { "\($0)" })
     }
     guard cursorSpikeSpin(15, until: { box.value != nil }) else { return (nil, "shareable content did not answer in 15 s") }
@@ -224,35 +224,11 @@ func cursorSpikeViewPoint(_ p: CGPoint, in window: NSWindow) -> NSPoint {
 
 // MARK: - mode s2: from global points to movie pixels, and the time anchor (CU-S2)
 
-/// The person tier's picked window: the system picker, single window, bounded at 90 s.
-final class CursorSpikePicker: NSObject, SCContentSharingPickerObserver, @unchecked Sendable {
-    let lock = NSLock()
-    var filter: SCContentFilter? = nil
-    var ended: String? = nil
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
-        lock.withLock { ended = "the picker was cancelled" }
-    }
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
-        lock.withLock { self.filter = filter; ended = "" }
-    }
-    func contentSharingPickerStartDidFailWithError(_ error: any Error) {
-        lock.withLock { ended = "the picker failed: \(error)" }
-    }
-}
-
-func cursorSpikePick() -> (SCContentFilter?, String?) {
-    let picker = SCContentSharingPicker.shared
-    let observer = CursorSpikePicker()
-    picker.add(observer)
-    picker.isActive = true
-    picker.present(using: .window)
-    _ = cursorSpikeSpin(90) { observer.lock.withLock { observer.ended != nil } }
-    picker.isActive = false
-    picker.remove(observer)
-    return observer.lock.withLock { (observer.filter, observer.filter == nil ? (observer.ended ?? "no pick in 90 s") : nil) }
-}
-
 func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
+    // The picked rows' grey window is another process's (cursor_spike_picked.swift, CU0c).
+    if cursorSpikeJobString(job, "source") == "window-picked" {
+        return cursorSpikePickedS2(job, picture: cursorSpikeJobString(job, "config", "picture") == "picture")
+    }
     guard CGPreflightScreenCaptureAccess() else { return cursorSpikeSkipped("the terminal does not hold Screen Recording") }
     let source = cursorSpikeJobString(job, "source", "display-nominal")
     let picture = cursorSpikeJobString(job, "config", "picture") == "picture"
@@ -273,11 +249,7 @@ func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
         ? CGRect(x: display.minX + 160, y: display.minY + 120, width: 1001, height: 701)
         : CGRect(x: display.minX + 140, y: display.minY + 110, width: 900, height: 600)
     let startFrame = frame
-    // The system picker cannot select a window above the normal level (the owner's JOB-29 run,
-    // 2026-11-02: the grey window fell behind the picker's and could not be chosen), so the
-    // picked row's window is a normal one, brought to the front before the picker shows.
-    let level: NSWindow.Level = source == "window-picked" ? .normal : .statusBar + 1
-    let (window, view) = cursorSpikeWindow(frameTL: frame, level: level, title: "Cursor Spike S2")
+    let (window, view) = cursorSpikeWindow(frameTL: frame, level: .statusBar + 1, title: "Cursor Spike S2")
     let crosshair = cursorSpikeCrosshair()
     view.cursor = picture ? crosshair : nil
     let marker = CursorSpikeMarker(frame: NSRect(x: -100, y: -100, width: 24, height: 24))
@@ -306,14 +278,7 @@ func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
         guard let scWindow = content.windows.first(where: { $0.windowID == CGWindowID(window.windowNumber) }) else {
             return ["outcome": "failed", "reason": "the instrument's window is not in the shareable content"]
         }
-        if source == "window-picked" {
-            let (picked, why) = cursorSpikePick()
-            guard let picked else { return cursorSpikeSkipped(why ?? "no window picked") }
-            filter = picked
-            _ = cursorSpikeActivate()
-        } else {
-            filter = SCContentFilter(desktopIndependentWindow: scWindow)
-        }
+        filter = SCContentFilter(desktopIndependentWindow: scWindow)
         width = odd ? 1001 : Int(frame.width * scale)
         height = odd ? 701 : Int(frame.height * scale)
         scDisplayFrame = cursorSpikeArray(scWindow.frame)
@@ -347,15 +312,13 @@ func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
         }
         warps.append([cursorSpikeNow(), Double(p.x), Double(p.y)])
     }
-    let fx = [0.1, 0.9, 0.5, 0.3, 0.7, 0.2, 0.8, 0.55], fy = [0.15, 0.85, 0.5, 0.7, 0.3, 0.6, 0.25, 0.9]
     for k in 0..<8 {
         if source == "window-moved" && k == 4 {
             frame = CGRect(x: frame.minX + 120, y: frame.minY + 70, width: frame.width - 200, height: frame.height - 100)
             window.setFrame(cursorSpikeCocoa(frame), display: true)
             cursorSpikeWait(0.4)
         }
-        let p = CGPoint(x: (frame.minX + 80 + (frame.width - 160) * fx[k]).rounded(),
-                        y: (frame.minY + 80 + (frame.height - 160) * fy[k]).rounded())
+        let p = cursorSpikeHoldPoint(frame, k)
         place(p)
         let rough = CGPoint(x: (p.x - frame.minX) * ppp, y: (p.y - frame.minY) * ppp)
         cursorSpikeWait(0.05)
@@ -370,8 +333,7 @@ func cursorSpikeModeS2(_ job: [String: Any]) -> [String: Any] {
                       Double(frame.width), Double(frame.height)])
     }
     // The moving segment: a horizontal line at 400 pt/s, warped at 120 Hz on the clock.
-    let y = frame.midY.rounded(), x0 = frame.minX + 100
-    let length = min(600.0, frame.width - 200), speed = 400.0
+    let (y, x0, length, speed) = cursorSpikeSweepPlan(frame)
     let t0 = cursorSpikeNow()
     var step = 0
     while true {

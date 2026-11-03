@@ -507,6 +507,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CJ2a | CJ | Agents get `get_media_analysis` with `shots`; the analysis lane, store and reader | CJ0c (T8); CJ-S3, CJ-S4 at its head | C | — |
 | TX1 | TX | Agents get `get_timeline_transcript`: the timeline's words, read once per media and kept | CJ0b, CJ0c (T8), CJ0a (T9); TX-S1 at its head | A | — |
 | CU0b | CU | Nothing: CU-S1…CU-S4's verdicts | CU0a | B | — |
+| CU0c | CU | Nothing: CU-S2's picked rows performable, the grey window drawn by the scratch bundle | CU0b | B | — |
 | CJ2b | CJ | Clip ▸ Split at Shot Changes; the Analyzing sheet | CJ2a, CJ0c (T5) | C | — |
 | TX2a | TX | View ▸ Transcript: the fifth inspector tab; read, follow, click to seek | TX1; TX-S2 at its head | A | — |
 | CU1a | CU | Nothing: the cursor file's format, the core's read-back, the writer | CU0b, CJ0d (T15) | B | — |
@@ -529,7 +530,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CU3b | CU | Import and Relink attach a cursor file; Show cursor | CU3a, CU1b | B | — |
 | CO3 | CO | The Background section, Clip ▸ Remove Background, `analyze_cutout` | CO2b | C | — |
 | TX5 | TX | Cut words greyed in place; Restore Words | TX3, TX4 | A | — |
-| CU3c | CU | The recorder stops burning the pointer: Cursor Separate (default) or In the picture | CU3b, CU1b | B | — |
+| CU3c | CU | The recorder stops burning the pointer: Cursor Separate (default) or In the picture | CU3b, CU1b, CU0c (JOB-29's picked rows performed) | B | — |
 | CO4 | CO | Cleaner edges; Best quality if CO-S1 kept it | CO2a, CO3; CO-S3 | C | — |
 | TX6 | TX | The review strikes long pauses and fillers; Clip ▸ Remove Struck | TX3, CJ1 | A | — |
 | CU4 | CU | The Cursor section: size, style, smoothing, hide when idle, click ripples | CU3b | B | — |
@@ -3041,6 +3042,68 @@ owed.** Window mapping: the picker cannot offer the instrument's own window, and
 to be fixed with a helper-owned window before CU3c (JOB-29's picked-window step). The window rows'
 anchor, re-run on a quiet machine. CU-6's and CU-3's "Settled at CU0b" lines carry these, and
 CU-20 is amended to M2 (CU1b1).
+
+#### CU0c's record (2026-11-02)
+
+CU0c makes CU-S2's picked rows performable; no spike's rule, pin or decider changed. The
+decision is CU-6's "Amended at CU0c" clause, written before the code; CU0c takes no ID.
+
+**What changed.**
+- The picked rows' grey window is drawn by the scratch bundle `Cursor Spike.app` (mode
+  `s2owner`, `tools/proof/cursor_spike/cursor_spike_picked.swift`), a `.normal` window titled
+  "Cursor Spike S2", 900 × 600 pt at (140, 110) on the main display, with the crosshair (In the
+  picture) or the 24 pt marker (Separate) and the ticker. The terminal-run probe presents
+  `SCContentSharingPicker`, checks the picked filter's `includedWindows` holds the bundle's
+  window, records, yields activation to the bundle and writes the go file `{start_wall}` 2.5 s
+  ahead. The bundle activates on reading it, checks it is active at `start_wall` (In the picture
+  skips otherwise), places hold k at `start_wall + k × 0.5 s` and then sweeps; the probe sets each
+  hold's ROI from 0.05 s to 0.40 s into its slot. Mach host times are shared across processes,
+  so the bundle's placements, warps and move join the probe's frames, and the runner fails a row
+  whose placed hold differs from the probe's. Every probe exit before the go file writes
+  `{stop: true}`; the runner writes one too when the probe left none.
+- The new automatic row `S2.picked-owner` (`--picked-owner` runs it alone) reads
+  `SCShareableContent`, every window on screen or not, and `owner_problem` fails it when the grey
+  window is not listed, belongs to the presenting probe, belongs to any pid but the bundle's, or
+  is off screen on an unlocked console. It is not a field row; `decide_s2` never reads it.
+- The hold points and the sweep moved into `cursorSpikeHoldPoint` and `cursorSpikeSweepPlan`,
+  shared with the in-process rows (same values, same order); `CursorSpikePicker` and
+  `cursorSpikePick` moved unchanged; the in-process `s2` lost its `.normal` level and picker
+  branch. Selftest row T2 and the mutants `owner-not-listed`, `owner-same-process` and
+  `owner-offscreen-ok` were added. JOB-29 names the window to pick.
+
+**The runs** (lane B's worktree, AC power, two displays, console unlocked):
+- `--selftest`: `selftest: 17/17 passed`. The thirteen mutants each printed `caught` and exited 1.
+- `--build-only` exited 0.
+- `--picked-owner` exited 0: `in_shareable` true, `on_screen` true, `sc_owner_pid` 91419 equal to
+  `owner_pid` 91419, `presenter_pid` 91420, `sc_owner_bundle`
+  `com.kgalligan.FrameJob.cursorspike`, `screen_locked` false.
+- The bundle's schedule, driven by hand with a go file and no picker, once per configuration:
+  `outcome` ok, `active` true, the eight placed points equal to `cursorSpikeHoldPoint`'s, 188
+  warps, the sweep 600 pt at 400 pt/s.
+- `--only s2`, first run: exit 1. `S2.display-nominal.picture` and `S2.display-best.picture`
+  failed at hold 0 alone (20 still frames with 0 red pixels at (237, 224); holds 1–7 passed).
+  A Notification Center window was listed over that point (8, 221, 360 × 180), and the second
+  display's hold 0 passed. Re-run once: exit 0, `rule_sha256 15d61ec5…c851`, `VERDICT
+  mapping_display=M2 mapping_window=owed separate=owed anchor=none e1_still_p95_ms=9.7`,
+  `S2.picked-owner` measured. The window rows' time errors were again 1.35–3.34 s.
+- `make gate`: `gate: PASS 294s` (names, test; typecheck, fmt, lint and app reused).
+
+**Review.** One review (`d64ff9ff..fcb5a3e2`, 11 files), verdict pass, two nits. (1) The probe
+presents the picker and yields activation without ever being active, so In the picture the
+bundle's activation leans on its own fallback; left as the spec ordered it, and if the owner's
+`--person` run answers "helper not active by start_wall" the fix is one `cursorSpikeActivate()`
+before `cursorSpikePick()`. (2) This record's hold 1–7 figures named no quantity and no check
+printed them; replaced at integration with "holds 1–7 passed".
+
+**Integration (2026-11-02).** Cherry-picked (`fcb5a3e2`) onto `worktree-creator-jobs` after CJ6.
+Two conflicts, each kept both sides: the decisions index's `creator-jobs.md` row keeps its text
+with Lines 507 (CJ6's CJ-60 and this phase's CU-6 clause), and the spec README's `11-decisions/`
+total is 20566 in 41 files. `spec_index_proof.py` 255/255. No `CLAUDE.md` edit and no issue owed.
+
+**Owed.**
+- The owner's `--only s2 --person` for the picked rows (JOB-29), before CU3c; until then window
+  mapping and `separate` stay owed. #445 closes on that run.
+- The window rows' anchor, re-run on a quiet machine.
 
 ### CJ2b — the Analyzing sheet and Split at Shot Changes
 
@@ -6325,7 +6388,7 @@ editor's `EditorViewController+Cutout` bullet, `VideoPane`'s +`Cutout` clause,
   recording keeps its cursor on the pointer (S-ST4). **JOB-28** — with a second display, a recording
   of one display shows no cursor while the pointer is on the other (S-ST5; skipped with one
   display).
-- **Depends on:** CU3b, CU1b. **Lane** B.
+- **Depends on:** CU3b, CU1b, CU0c (JOB-29's picked rows performed). **Lane** B.
 - **Question for the owner:** the default? *Recommended: Separate* — the bet's point, with In the
   picture one click away — unless CU-S2's Separate rows failed.
 
