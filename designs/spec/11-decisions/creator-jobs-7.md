@@ -545,3 +545,42 @@ CJ-3). No owner question: the road map expects none for VR2a.
   verdict's inputs: pan 200 of 200 contained, 11 moves; exit 80 of 80, 1; two faces 194 of 200, 1;
   still 600 of 600, 0; cuts 284 of 300, 2; card none counted, 0 (`VR-S2/results.json`,
   `rule_matches: true`). S-TH1's and T1's and T2's rows are owed; JOB-31 judges the feel.
+
+## CJ6 — the clip ceiling (2026-11-02)
+
+- **CJ-60 — CJ-S1's verdict: 4,096 kept.** No N in the bench passes CJ-S1's rule, so `MAX_CLIPS`
+  and `RC_MAX_CLIPS` stay 4,096, CJ-9 keeps its first arm, and CJ6 ends with this verdict and no
+  code: TX and SW design around the ceiling, reading `RC_MAX_CLIPS`.
+  - **The run.** `tools/proof/creator_spike/ceiling_spike.py` (`rule_sha256`
+    `e4ead1af…3c772d12e2f5`, matching CJ0a's table) against a scratch Release build with both caps
+    at 65,536, never committed; macOS 26.5.1 (25F80), Apple M2 Max, 96 GiB (103,079,215,104 bytes),
+    on AC, three lanes on the machine (one-minute load average 127.64 at the end). N one-second
+    clips of the 1080p fixture over four tracks, `--headroom 0`. Every timed split answered
+    applied (each MCP split added exactly 4 clips, the 50 of row (8) 200), and row (7)'s zoom
+    assertions held in every sample.
+  - **The figures** (medians; (4)–(6) over 3 runs), N = 4,096 · 8,192 · 16,384 · 32,768, the
+    rule's bound in brackets:
+    (1) split 2.7 · 5.3 · 30.2 · 42.4 ms [50];
+    (2) open + plan 34.6 · 75.7 · 258.0 · 393.3 ms [500];
+    (3) recipe 0.8 · 1.6 · 4.6 · 8.3 ms [2];
+    (4) `ripple_delete_ranges` of 100 ranges 3,664 · 10,088 · 32,145 · 175,965 ms [1,000], its
+    undo 56 · 110 · 230 · 598 ms [1,000];
+    (5) the next `get_project` 164 · 265 · 996 · 2,117 ms [1,000];
+    (6) the first frame after a split at most 0.9 · 1.0 · 2.4 · 2.6 s [2];
+    (7) the timeline at the fit zoom 281 · 491 · 902 · 1,085 ms and at the default zoom 126 ·
+    133 · 150 · 206 ms [33];
+    (8) RSS growth over 50 splits 0.41 · 1.95 · 3.67 · 6.21 GB [6.44, a sixteenth of physical].
+  - **What holds 4,096 down.** At N = 4,096 three rows fail: (4) at 3.7 s and (7) at both zooms.
+    (7)'s time is the draw (`cacheDisplay`): 268 of 281 ms at fit and 116 of 126 ms at the
+    default zoom, the view made, laid out and updated in under 12 ms. A smoke run at N = 512
+    already drew in 94 ms (fit) and 123 ms (default), so the default zoom's cost is not the
+    clip count's. (4) at 512 clips took 357 ms. Neither is CJ6's to speed up; both are filed.
+  - **A discarded first run.** The instrument's first full run gave the same verdict (at 4,096,
+    (4) 4.0 s, (7) 395 and 161 ms), but at 32,768 two of its three row-(6) splits answered an
+    identity: an autosave in place during a three-minute ripple had written the last run's split
+    into the package. The script now writes the package's own `project.json` back before every
+    reopen; the recorded run is the second.
+  - **What a raise would have needed** (recorded for a later ceiling): `TranscribeSheetController
+    .refresh()`'s tick sum over clips does not saturate, so the bound in `Transcriber+Jobs.swift`
+    leans on 4,096 × 10¹⁵ < 2⁶³; `shot_split_proof.py`, `transcript_cut_proof.py` and
+    `cloud_captions_probe.py` spell the ceiling as a literal; five core tests spell 4,095–4,098.

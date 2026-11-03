@@ -9543,6 +9543,85 @@ owner's screen-tutorial recordings with Record shortcuts on.
   consumer).
 - **Question for the owner:** raise to the spike's N if it passes? *Recommended: yes.*
 
+#### CJ6's record (2026-11-02)
+
+**Landed.** Lane A, base `17b01a60` (the instruments were written on `6110526b` and the bench ran
+on that tree's core with the scratch cap; the worktree was fast-forwarded to the integration head
+before any document was written). The owner's answer was "raise if it passes"; it did not pass,
+so **4,096 is kept** (spec §11 CJ-60, CJ-9 amended) and the phase is the verdict, its instrument
+and its documents. No core, FFI, format, Swift, op, tool or proof-row change; CJ-61 and CJ-62
+(the raise arm's) were not written.
+
+- **New files** (`wc -l`): `tools/proof/creator_spike/ceiling_spike.py` 392,
+  `ceiling_spike.swift` 211.
+- **Documents:** `creator-jobs-7.md` (338 → 377, CJ-60), `creator-jobs.md` (499 → 501, CJ-9's
+  amendment), the index (CJ-9's row, CJ-60's row, both Lines cells and `creator-jobs-7.md`'s
+  summary), `designs/spec/README.md`'s `11-decisions/` total, and `tools/proof/README.md`'s CJ6
+  section.
+
+**The head.** macOS 26.5.1 (25F80), Apple M2 Max, 96 GiB, on AC power (`pmset`: "Now drawing from
+'AC Power'"), three lanes on the machine (the one-minute load average 127.64 at the end).
+CJ-S1's `rule_sha256` `e4ead1af…3c772d12e2f5` matched CJ0a's table. A scratch Release build with
+`MAX_CLIPS` and `RC_MAX_CLIPS` at 65,536 (`make app`), restored with `git checkout --` and never
+committed; `RC_PROOF_APP=release python3 tools/proof/creator_spike/ceiling_spike.py`, one run of
+every N (each row's own samples: 20 for (1), (3) and (7), 5 for (2), 3 runs for (4)–(6), one
+for (8)). Its medians, N = 4,096 · 8,192 · 16,384 · 32,768:
+
+| Row | Bound | 4,096 | 8,192 | 16,384 | 32,768 |
+|---|---|---|---|---|---|
+| (1) split | 50 ms | 2.7 | 5.3 | 30.2 | 42.4 |
+| (2) open + plan | 500 ms | 34.6 | 75.7 | 258.0 | 393.3 |
+| (3) recipe | 2 ms | 0.8 | 1.6 | **4.6** | **8.3** |
+| (4) ripple, 100 ranges | 1 s | **3.66** | **10.09** | **32.14** | **175.96** |
+| (4) its undo | 1 s | 0.056 | 0.110 | 0.230 | 0.598 |
+| (5) next `get_project` | 1 s | 0.164 | 0.265 | 0.996 | **2.117** |
+| (6) first frame after a split (upper bound) | 2 s | 0.9 | 1.0 | **2.4** | **2.6** |
+| (7) timeline, fit | 33 ms | **281** | **491** | **902** | **1,085** |
+| (7) timeline, default zoom | 33 ms | **126** | **133** | **150** | **206** |
+| (8) RSS growth, 50 splits | 6.44 GB | 0.41 | 1.95 | 3.67 | 6.21 |
+
+N_max: none (every N fails; bold is a failure). Every timed split answered applied — each MCP
+split added exactly 4 clips and row (8)'s fifty added 200 — and row (7)'s zoom assertions held in
+all 160 samples. In every run at every N (twelve), the ripple added 400 clips and its undo
+brought the count back to 0; the review's fix made the script score that, so a ripple that
+answers an identity, or an undo that leaves clips behind, fails row (4) whatever its time — a
+scoring change only, so the recorded run was not repeated. `results.json` is `tools/proof/work/creator_spike/CJ-S1/results.json`
+(`rule_matches: true`, `n_max: null`, `verdict: "keep 4,096"`, the parity grep empty).
+
+- **(7) is the draw.** Its parts at 4,096: the view made 7.4 ms, laid out and updated 4.3 ms,
+  zoomed 2.0 ms, drawn 268 ms (fit); 6.3, 4.0, 0.0 and 116 ms (default). A smoke run at N = 512
+  (scratch build, one run) drew in 94 ms (fit) and 123 ms (default), so the default zoom's cost
+  is the 1440 × 862 timeline's draw under `cacheDisplay`, not the clip count.
+- **(4)** took 357 ms at N = 512 (the smoke run) and 3.7 s at 4,096: a 100-range cut slows with
+  the clip count well before the ceiling.
+- **The first full run is discarded.** Its verdict was the same (at 4,096: (4) 4.0 s, (7) 395 and
+  161 ms), but at 32,768 two of its three row-(6) splits answered an identity, because an autosave
+  in place during a three-minute ripple had written the previous run's split into the package.
+  The script now writes the package's own `project.json` back before every reopen.
+
+**Verification.** `python3 tools/proof/swift_build.py typecheck tools/proof/creator_spike/ceiling_spike.swift`
+exit 0; `python3 tools/proof/spec_index_proof.py` 255/255; `make gate` PASS in 627 s (names,
+typecheck, test and app ran; fmt and lint skipped as unchanged).
+The review's fix pass (row (4) scored on 400 and 0): a fake-client check of `mcp_run` scored
+400/0 and failed 0/0, 400/3 and 399/0; `make gate` PASS in 325 s (names and test ran).
+The raise arm's proof, tests and mutants did not run: there was nothing to raise.
+
+**Review.** The first review asked for one fix: the script recorded row (4)'s clip counts but
+scored only its time, the hole objection 1 had closed for the splits. It was fixed as above, and
+the second review passed. One nit is left, as nits are: row (6)'s `play_preview` retry loops with
+no pause while the tool keeps refusing.
+
+**Integrated** onto `worktree-creator-jobs` after CU9b and VR2a1: conflicts only in
+`creator-jobs-7.md` (CJ6's section kept after VR2a1's, 547 → 586 lines), its index row (CJ-60's
+clause after VR-20…VR-23's) and the spec README's `11-decisions/` total (20560), recounted;
+`spec_index_proof.py` 255/255. `make gate`: "gate: PASS 85s" (names 1, test 83; typecheck, fmt, lint and app skipped as
+unchanged).
+
+**Owed.** No person check. Filed as issues, both `low-priority`: `ripple_delete_ranges` of 100
+ranges takes 3.7 s at 4,096 clips (row (4)); the timeline's full draw takes 116–126 ms at the
+default zoom whatever the clip count (row (7)). Each alone holds the ceiling at 4,096; neither is
+CJ6's to speed up.
+
 ### FC8b — Make Shorts from the ranked list
 
 - **What a person gets:** in the Find Clips window, ticking moments and pressing Make N Shorts opens

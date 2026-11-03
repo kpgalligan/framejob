@@ -27384,6 +27384,38 @@ python3 tools/proof/analysis_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CJ2a record.
 
+## Road map "creator-jobs" CJ6 — the clip ceiling (`creator_spike/ceiling_spike.py`, CJ-S1; spec §11 CJ-9, CJ-60)
+
+**`creator_spike/ceiling_spike.py`** is spike CJ-S1. For each N (default 4,096, 8,192, 16,384
+and 32,768) it writes `work/creator_spike/CJ-S1/n<N>.framejob`: N − `--headroom` one-second
+clips of `h264_1080.mov` over four tracks, made from a one-clip template built over MCP, spread
+round-robin, butt-joined per track, source `in` cycling 0…19 s. Every boundary is on a whole
+second, so a split at a whole second + 0.5 s is strictly inside one clip on each track and adds
+exactly 4 clips. **`creator_spike/ceiling_spike.swift`** (built from `app/Sources` against
+`core/target/release`) runs rows (1) `split` at the middle ×20 (each answer must be applied),
+(2) open + plan ×5, (3) the recipe at 20 seeded times, and (7) a fresh `TimelineView` in a 1440
+× 862 window, laid out, updated, zoomed, drawn by `cacheDisplay`, ×20 at the fit zoom (asserted
+equal to `fitZoom`) and at the default zoom (asserted `defaultZoom`), each sample's parts
+(make, layout and update, zoom and layout, draw) kept beside it. Over MCP, on an instance the
+script launches (`proof_app.py`'s choice, a scratch `CFFIXED_USER_HOME`): (4) one
+`ripple_delete_ranges` of 100 ranges and its `undo`, (5) the `get_project` after it, (6) a
+`split` at the middle until `play_preview` composes a frame (an upper bound, at most 10 s; 4
+more clips must show), the median of 3 runs, each on the package's own `project.json` written
+back and reopened; (8) the RSS growth over 50 `split`s at 50 distinct times (200 more clips
+must show). It applies the road map's rule and writes `results.json` with `rule_sha256`
+(`rule.py`); a row that cannot run scores failed.
+
+N past `RC_MAX_CLIPS` needs a scratch build: set `MAX_CLIPS` and `RC_MAX_CLIPS` to 65,536 in
+`core/src/format.rs` and the header, `make app`, run against Release, then `git checkout --` both
+files. That build is never committed.
+
+```sh
+RC_PROOF_APP=release python3 tools/proof/creator_spike/ceiling_spike.py            # CJ-S1, on AC
+python3 tools/proof/creator_spike/ceiling_spike.py --n 4096 --headroom 1024 --proof   # CJ-S1-proof/
+```
+
+The recorded run is in `designs/creator-jobs.md`'s CJ6 record.
+
 ## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S8, S4n, Z1; eight mutants; spec §11 CJ-28, CJ-29)
 
 **`shot_split_proof.py`** drives the app (`proof_app.binary()`) on a scratch
