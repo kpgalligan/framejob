@@ -1,0 +1,61 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6FR0XDH54WY1S58C32BP0PG",
+  "strategy": "manual-commit",
+  "branch": "worktree-creator-jobs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "core/src/audio_duck_speech.rs",
+    "core/src/clip_source_time.rs",
+    "core/src/lib.rs",
+    "core/src/reframe.rs",
+    "core/src/reframe_tracks.rs",
+    "core/tests/clip_source_time.rs",
+    "core/tests/reframe.rs",
+    "core/tests/reframe_spike.rs",
+    "designs/creator-jobs.md",
+    "designs/spec/07.10-rust-module-map.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/creator-jobs-7.md",
+    "designs/spec/README.md",
+    "tools/proof/README.md",
+    "tools/proof/creator_spike/reframe_spike.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 472653,
+    "cache_read_tokens": 2504117,
+    "output_tokens": 4996,
+    "api_call_count": 6,
+    "subagent_tokens": {
+      "input_tokens": 60,
+      "cache_creation_tokens": 123085,
+      "cache_read_tokens": 2602317,
+      "output_tokens": 11615,
+      "api_call_count": 30
+    }
+  },
+  "redaction": {
+    "replacements": 2,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 2,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
