@@ -110,8 +110,10 @@ opens to import into a project.
 → [Motion graphics](docs/guide/graphics.md)
 
 **Several cameras.** Each camera on a track of its own and a program track cut
-from them; **Clip ▸ Switch Angle ▸** re-picks a shot from another camera in
-sync, keeping its span and its dissolves, in one undo step.
+from them; **Clip ▸ Switch by Speaker…** cuts that program from the
+microphones, showing whoever is talking and the wide while both talk, and
+**Clip ▸ Switch Angle ▸** re-picks a shot from another camera in sync, keeping
+its span and its dissolves, each in one undo step.
 → [Podcasts and several cameras](docs/guide/multicam.md)
 
 **Screen recording.** A display or a window, with system audio, microphone and

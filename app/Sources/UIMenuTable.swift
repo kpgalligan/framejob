@@ -81,6 +81,7 @@ extension UIMenu {
         "enhanceVoice:": .sheet,
         "matchAudio:": .sheet,
         "synchronizeAudio:": .sheet,
+        "showSwitchBySpeakerSheet:": .sheet,
         "showSpeedSheet:": .sheet,
         "showSpeedRampSheet:": .sheet,
         "removeSilences:": .sheet,

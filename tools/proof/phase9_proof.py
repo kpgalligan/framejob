@@ -223,6 +223,7 @@ APP_STATE_TOOLS = {
     "add_shortcut_overlays",
     "speed_up_typing",
     "switch_angle",
+    "switch_by_speaker",
 }
 
 # The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence

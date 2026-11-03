@@ -206,7 +206,7 @@ enum SwitchAngle {
     }
 
     /// The handle the plan has reached and the ops that reached it.
-    private struct Trial {
+    struct Trial {
         var project: ReelProject
         var ops: [ReelOp] = []
 

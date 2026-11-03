@@ -865,12 +865,17 @@ detail there.
   empty `ranges` refused, declared `minItems: 1`) and `switchAngle` (main
   thread, no `scope`: the container `set_scope` has open,
   `performGroupedEdit`, the answer `{ok, step, pieces,
-  transitions_removed, project}` written by hand in that key order).
-  `AgentCatalog+Switch` holds both rows, spliced in last by
+  transitions_removed, project}` written by hand in that key order) and
+  `switchBySpeaker` (SW2b: main thread, no `scope`, `read` →
+  `replaceRefusal` → `plan` → `edit`, `apply: false` answering without
+  editing, `performGroupedEdit` and the selection set).
+  `AgentCatalog+Switch` holds the three rows, spliced in last by
   `creatorTools()`, after `switch_layout`'s.
 - `SpeakerSwitch.swift` · `SpeakerSwitch+Shots.swift` · `SpeakerSwitch+Read.swift` ·
-  `ClipLevelSeries.swift` — Switch by Speaker's planner (road map creator-jobs SW2a, spec §11
-  SW-20…SW-25), nothing visible yet. `SpeakerSwitch` is pure (names no `rc_*` but
+  `ClipLevelSeries.swift` · `SpeakerSwitch+Edit.swift` · `SpeakerSwitch+Settings.swift` ·
+  `SwitchSpeakerSheetController.swift` · `EditorViewController+SwitchSpeaker.swift` — Switch by
+  Speaker's planner (road map creator-jobs SW2a, spec §11 SW-20…SW-25) and Clip ▸ Switch by
+  Speaker… over it (SW2b, SW-23, SW-26). `SpeakerSwitch` is pure (names no `rc_*` but
   `ReelTime.snapToFrame` and `format`): `defaults` (angles are tracks holding a selected media
   clip with a picture, a detached sound half never one; picture-less files are the microphones,
   else each sounding angle its own; the pairing front to back and the one leftover wide),
@@ -882,7 +887,17 @@ detail there.
   edited project's plan and snapshot, the loudness and speech caches (a missing file is still
   being analysed), each microphone's series on the range's 10 ms grid. `ClipLevelSeries`
   (pure): a clip's energies through `ClipLoudness.energy` (no longer private) and its
-  `ChannelMatrix`, the centred 100 ms level, the speech chunk per step.
+  `ChannelMatrix`, the centred 100 ms level, the speech chunk per step. Since SW2b (spec §11
+  SW-23, SW-26): `SpeakerSwitch+Edit.swift` (no `rc_*`) — `canOffer`, `muteDefault`,
+  `replaceable` / `replaceRefusal` (Replace's five tests in order) and `edit`, SW-23's ops tried
+  one at a time through `SwitchAngle.Trial` (internal), the linked-angle refusal before any op;
+  `SpeakerSwitch+Settings.swift` — the ranges, the four remembered keys
+  (`FrameJobSwitchSpeakerMinShot`, `…Lead`, `…Crosstalk`, `…Bleed`, written only when changed),
+  `summary`, `titles`, `microphoneChoices`; `SwitchSpeakerSheetController.swift` — the sheet,
+  re-planned on main at every change and again at Switch on the current handle,
+  `-RCDevSwitchSpeakerAccept YES` (dev only) pressing Switch;
+  `EditorViewController+SwitchSpeaker.swift` — `showSwitchBySpeakerSheet` and
+  `validateSwitchSpeakerAction`, one line in the frozen file after `validateSwitchAngleAction`.
 - `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
   `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
   creator-jobs VR2a2, spec §11 VR-26, VR-28); no menu yet (Clip ▸ Follow
@@ -3946,7 +3961,7 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the sixty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the forty-one APP-STATE tools, which have no op behind them
+  callers are the forty-two APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s five composites and
   `AgentCatalog+Captions.swift`'s four, spliced back at the two points they
@@ -3980,7 +3995,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and twenty-two
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and twenty-three
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

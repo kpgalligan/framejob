@@ -258,7 +258,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and twenty-two product tools (and the dev tools,
+  stranger by name, for all one hundred and twenty-three product tools (and the dev tools,
   road map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -385,7 +385,9 @@ and `-RCDevSpeedUpTypingAccept YES`, with which the Speed Up Typing sheet
 presses its own Apply once its first plan with ops exists (spec §11 CU-93);
 and `-RCDevRetimeAccept YES`, with which the Retime Range sheet presses its
 own Apply so a proof can drive Clip ▸ Retime Range… to its edit (spec §11
-CU-90 (d)); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
+CU-90 (d)); and `-RCDevSwitchSpeakerAccept YES`, with which the Switch by
+Speaker sheet presses its own Switch once its first plan exists (spec §11
+SW-26); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
 document with no window (`display: false`), so a proof can see the windowless
 door (spec §11 CJ-52); and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which

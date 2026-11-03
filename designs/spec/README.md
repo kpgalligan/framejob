@@ -61,12 +61,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9e-agent-app-state-tools.md`](07.9e-agent-app-state-tools.md) | 588 | The app-state tools (the tools that are not ops): scope, documents, media, captions, transcripts, the media analysis (`get_media_analysis`) and Split at Shot Changes (`split_at_shots`), detection, Normalize, Enhance, Match, Synchronize, `render_frame` and export; and the op tools `set_media_color` and `set_media_speech`, and `set_audio`'s `duck.mode`. |
 | [`07.9f-agent-transcript.md`](07.9f-agent-transcript.md) | 105 | The timeline transcript, `get_timeline_transcript`: what is read (the plan's audio segments, nested ones with `path` and `origin`), on-device starts moved to their sound (TX1b), the answer (words with clip, track, editability, identity and the tab's `cut_start`/`cut_end`; `pauses` with their cuts; `media`, `no_words`, `notes`), the window and `tracks`, paging at 2,000 words, and the whole-file fill (§11 TX-10…TX-18, TX-30, TX-33, TX-34). |
 | [`07.9g-agent-behind-subject.md`](07.9g-agent-behind-subject.md) | 38 | Text Behind Subject's tool, `text_behind_subject`: the planner it runs (the pick, the new track above the mattes, the title, the cutout that keeps the background), its answer and its refusals (§11 CO-53, CO-54). |
-| [`07.9h-agent-switch.md`](07.9h-agent-switch.md) | 51 | `copy_pieces`'s tool and Switch Angle's, `switch_angle`: the empty-list refusal, covering, the re-pick's sequence tried one op at a time, the held edge, the answer and the refusals (§11 SW-11…SW-15). |
+| [`07.9h-agent-switch.md`](07.9h-agent-switch.md) | 96 | `copy_pieces`'s tool and Switch Angle's, `switch_angle`: the empty-list refusal, covering, the re-pick's sequence tried one op at a time, the held edge, the answer and the refusals (§11 SW-11…SW-15); `switch_by_speaker`: its arguments, ranges and defaults, errors, refusals, the ops and the answer (§11 SW-23, SW-26). |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 155 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 300 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 310 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 21770 in 43 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 21863 in 43 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

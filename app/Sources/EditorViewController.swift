@@ -1069,6 +1069,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateSpeedUpTypingAction(action) { return answer }
             if let answer = validateCameraLayoutAction(action) { return answer }
             if let answer = validateSwitchAngleAction(action, item: item) { return answer }
+            if let answer = validateSwitchSpeakerAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, Remove Filler

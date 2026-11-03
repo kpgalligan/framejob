@@ -137,7 +137,17 @@ where the clip sits — is asked about first in the Weak match alert sheet,
 Apply (Return) or Cancel (Escape), and Cancel changes nothing; since round 3,
 §11 SY-29, either tier — the sheet included — comes only when the two
 waveforms line up there (a clear GCC-PHAT peak), else the command is refused
-at the inspector's foot), Add Action, Auto Zoom… (road map creator-jobs CU7, §11 CU-76: a sheet
+at the inspector's foot), Switch by Speaker… (road map creator-jobs SW2b, §11
+SW-23, SW-26: right after Synchronize Audio, which it needs first; no key
+equivalent; enabled with no sheet up when the selection holds two or more
+angle tracks — tracks holding a selected clip with a picture — and a selected
+clip with its sound on, inside a nest too; the Switch by Speaker sheet pairs
+each microphone with a camera and takes the wide, Minimum shot, Cut before
+speech, Crosstalk shows, Ignore bleed, the wide after a long shot (off), Mute
+the cameras' own sound and, when an earlier Program track qualifies, Write to;
+Switch writes the Program track as one undo step "Switch by Speaker", a
+refusal staying in the sheet's summary; its mirror is `switch_by_speaker`),
+Add Action, Auto Zoom… (road map creator-jobs CU7, §11 CU-76: a sheet
 with Zoom, Arrive before the click, Stay after the last activity, Follow the cursor while zoomed,
 Zoom on typing, Replace existing zooms and Motion blur (CU11b, §11 CU-118 (d): on by default, the
 zoomed clips given a 50 % `motion_blur`) over the selected clips' cursor files; Zoom is one

@@ -309,6 +309,12 @@ extension AppDelegate {
         // `sync_audio` names. No key equivalent, for Normalize's reason.
         menu.addItem(
             item("Synchronize Audio", #selector(EditorViewController.synchronizeAudio(_:))))
+        // Road map "creator-jobs" SW2b (spec §11 SW-26), right after Synchronize Audio, which
+        // it needs first: the UI path `switch_by_speaker` names. No key equivalent.
+        menu.addItem(
+            item(
+                "Switch by Speaker…",
+                #selector(EditorViewController.showSwitchBySpeakerSheet(_:))))
         menu.addItem(
             item(
                 "Add Action", #selector(EditorViewController.addActionAtPlayhead(_:)), "k",

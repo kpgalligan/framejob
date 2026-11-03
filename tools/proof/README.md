@@ -29327,3 +29327,59 @@ The recorded runs are in `designs/creator-jobs.md`'s SW2a record: SW-S4's first 
 crosstalk passage never one turn), after SW-22 (a)'s crosstalk bridge its second (0/75,
 b24_f45's one late cut), and after SW-S4's named limit (the owner's second answer) its third
 (59/75, `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6`, the draft). No person check.
+
+## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S13, Z0; ten mutants; spec §11 SW-23, SW-26)
+
+**`switch_speaker_proof.py [SOCKET]`** drives the app over F-TURNS (`creator_spike/f_turns.py`,
+run first and reused while its generator hash holds; without `say -v Samantha` or `Daniel` it
+exits 2 and every row is skipped by name). Given a running instance's socket it uses it;
+without one it launches its own on a scratch `CFFIXED_USER_HOME`. S10 and the second half of
+S13 always launch one more instance of the same build with `-RCDevSwitchSpeakerAccept YES
+-FrameJobSwitchSpeakerMinShot 3`. Each document is built over MCP on a 1920 × 1080, 30 fps
+canvas — back to front Wide, Cam B, Cam A (two abutting files), Mic B, Mic A, every clip
+selected — and its caches are waited for by polling `apply: false` past "still being
+analysed". Packages land under `tools/proof/work/sw2b/`.
+
+- **S1** `apply: false` on all six variants and the applied call on b18_f55: the angles equal
+  the manifest's, every cut on the grid within τ (147.3 ms) of onset − lead, b24_f45's shot 17
+  (b) to SW-S4's named limit (late by at most 99,313 ticks); and b18_f55 at `min_shot` 0.5,
+  where only `min_turn` keeps a reply from cutting.
+- **S2** b12_f55 with `bleed_db` 15: no shot of a person with no solo turn inside it.
+- **S3** `render_frame` at each turn's middle: the centre pixel within ±3 of that speaker's card
+  as the app draws it, read first with only that camera shown (the untagged H.264 cards decode
+  about 12 levels off the generator's hex), each card held nearest its own hex.
+- **S4** an `audio_wav` export decoded to PCM, byte-identical before and after.
+- **S5** one undo "Switch by Speaker" gives the project back; Program directly in front of Cam
+  A; `ops` = 1 + one `copy_pieces` per source clip + three `set_track` + four `set_enabled`;
+  angles hidden; pieces picture on, sound off.
+- **S6** `apply: false` = the applied shots, `applied` false, `track` null, nothing changed.
+- **S7** (a) Mic A's loudness cache deleted: still being analysed; (b) 4,095 clips (a spare
+  track of one-frame pieces): SW-24's ceiling sentence.
+- **S8** In–Out 40–100 s: six frames outside byte-identical; every angle track split at both
+  ends, pictures off inside only, none hidden; every angle piece still selected (SW-23 (f), the
+  tail of a clip split at both ends included).
+- **S9** Cam A's shots across its join are two pieces meeting there; the frame code ten frames
+  past the join reads 10.
+- **S10** the 3 s and 2 s plans differ; the menu with the dev accept and Minimum shot 3 gives the
+  project the tool's `min_shot: 3` gives on a copy.
+- **S11** a second run onto the Program track with `min_shot` 4: no new track, exactly that
+  plan's pieces; Mic A and an empty track refused in their sentences.
+- **S12** the default mutes every camera clip, no microphone; `mute_cameras: false` leaves every
+  clip's sound as it was.
+- **S13** Cam B with sound, detached: both `apply` values refused in SW-23 (h)'s sentence, the
+  sheet's summary (`snapshot_ui`, `switchspeaker.summary`) the same; in the dev-accept instance
+  the refused sheet stays up and changes nothing (the layout dump carries no enabled state).
+- **Z0** `grep "Frame Job: "` of every instance's log is empty.
+
+Mutants (`--mutant NAME`, each on a `tree_copy.py` copy's built app; CAUGHT exits 1):
+min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
+whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
+mute-default-inverted (S12); linked-refusal-removed (S13).
+
+```sh
+python3 tools/proof/switch_speaker_proof.py <dir>/agent.sock [--only S1,S8]
+python3 tools/proof/switch_speaker_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/switch_speaker_proof.py <dir>/agent.sock
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s SW2b record. Person checks: JOB-51, JOB-52.

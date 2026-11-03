@@ -20,6 +20,81 @@ The camera tracks stay underneath. They can stay shown — the program track is
 in front and covers them — or be hidden with their track switch; a hidden
 track's clips still count as an angle.
 
+## Switch by Speaker
+
+**Clip ▸ Switch by Speaker…** cuts a whole program track for you from a
+conversation: it watches each person's microphone and shows whoever is
+talking. Do it in this order:
+
+1. **Synchronize Audio first** (Setting it up, above). Switch by Speaker trusts
+   where the clips sit and does not check that they are in sync, so a camera
+   moved or slipped afterwards — with **Clip ▸ Slip** or by dragging it — puts
+   its shots out of step with the voices.
+2. Select every camera's clips and every microphone's clips, then choose
+   **Clip ▸ Switch by Speaker…**. It is offered when the selection holds
+   clips with a picture on two or more tracks (each such track is a camera, up
+   to nine) and at least one clip with its sound on.
+3. Afterwards, fix single shots with **Switch Angle** (below) and move cuts
+   with an ordinary roll.
+
+**Which tracks are microphones.** By default, every track holding a selected
+clip with sound and no picture — a separate recording from a microphone or a
+recorder. When nothing like that is selected, each camera's own sound is its
+microphone. A camera's sound detached with **Clip ▸ Detach Audio** is never
+picked by default; you can choose it in a Microphone pop-up. A camera clip that
+is still linked to its detached sound cannot be switched: the sheet says so
+and names the clip, and **Clip ▸ Attach Audio** puts the two back together
+first.
+
+**The sheet.** One row per person: a Microphone pop-up and the Camera that
+shows them, paired front to back to start with. Then:
+
+- **Wide** — the camera shown when nobody or everybody talks; a camera no
+  person uses is picked to start with when exactly one is left over, else
+  None.
+- **Minimum shot** (2 s) — a shorter shot is merged into its neighbour.
+- **Cut** (0.2 s before speech) — how long before a new speaker's first word
+  the cut comes.
+- **Crosstalk shows** — the Wide, or holds the Current speaker, while two talk
+  at once for a second or more.
+- **Ignore bleed** (15 dB below a speaker's own level) — every microphone also
+  hears the other people, quieter. A voice this far or further below that
+  microphone's own speaker is bleed, and never counts as that person talking.
+  Raise it if a quiet guest is never shown; lower it if someone is shown while
+  only the other person talks.
+- **Cut to the wide after … s on one speaker** (off) — breaks up a long
+  monologue with the wide for one minimum shot.
+- **Mute the cameras' own sound** — on to start with when the microphones are
+  separate recordings, so the cameras' scratch sound is switched off inside the
+  range.
+- **Write to** — shown only when an earlier Program track can be replaced:
+  choose it to write the new cut there instead of adding another track.
+
+The summary under the controls says what Switch will do ("22 shots: 8 on Cam
+A, …. Adds 23 clips."), or every reason it cannot, one per line — a
+microphone still being analysed after import, a microphone with no speech, a
+stretch no camera covers, or more clips than a project may hold. **Switch**
+writes it as one undo step, **Switch by Speaker**:
+
+- a new track **Program** directly in front of the front-most camera, holding
+  a piece of the chosen camera for each shot, in sync, with the picture on and
+  the sound off;
+- the camera tracks hidden — or, when a camera track has clips outside the
+  range, those clips cut at the range's ends and their pictures switched off
+  inside it only;
+- nothing outside the range touched, and the microphones never edited, so what
+  you hear is unchanged.
+
+The range is the In–Out range when one is set, else the selected camera clips'
+whole length. The four values Minimum shot, Cut, Crosstalk shows and Ignore
+bleed are remembered for the next time. Switch by Speaker works inside an open
+nest and has no keyboard shortcut.
+
+**A limit, measured.** With heavy bleed in a noisy room (another voice 24 dB
+down under −45 dBFS of noise), a cut can come later than Cut before speech
+asks — in the worst case measured, about 35 ms before the first word instead
+of 0.2 s.
+
 ## Switch Angle
 
 **Clip ▸ Switch Angle ▸** re-picks one shot of the program from another
@@ -56,9 +131,9 @@ camera. Select the one shot, open the submenu, and choose a camera.
 Switch Angle works inside an open nest too, on the nest's own tracks. It has
 no keyboard shortcut.
 
-## For agents: copy_pieces and switch_angle
+## For agents: copy_pieces, switch_angle and switch_by_speaker
 
-Two MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
+Three MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
 
 - `switch_angle {clip, angle}` is **Clip ▸ Switch Angle ▸**: `clip` the shot,
   `angle` the camera's track id. It answers the step's name, the new pieces'
@@ -70,3 +145,9 @@ Two MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
   speed ramp, actions and timed words — with no dissolve and no link. The
   destination track must be free over every range. An agent cuts a whole
   program from the cameras with one `copy_pieces` per camera.
+- `switch_by_speaker` is **Clip ▸ Switch by Speaker…**: over the selected
+  clips, with the same values as the sheet (`min_shot`, `lead`, `crosstalk`,
+  `bleed_db`, `wide_after`, `mute_cameras`, `track` to replace, `wide`, and
+  `speakers` `[{mic, angle}]` to pair people by hand), plus `min_turn` (the
+  shortest turn that cuts, 1 s) and `dominance_db` (8 dB), which the sheet does
+  not show. `apply: false` answers the shots without editing.

@@ -224,6 +224,10 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobBackgroundRenderDelay", 5),
     ("FrameJobNormalizeMode", "loudness"),
     ("FrameJobNormalizeTargetLUFS", -16.0),
+    ("FrameJobSwitchSpeakerMinShot", 2.0),
+    ("FrameJobSwitchSpeakerLead", 0.2),
+    ("FrameJobSwitchSpeakerCrosstalk", "wide"),
+    ("FrameJobSwitchSpeakerBleed", 15.0),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"FrameJobInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
@@ -311,6 +315,9 @@ NOT_SHOWN = {
                                      "CU-93); no screen shows the sheet",
     "FrameJobSpeedUpTypingKeepPitch": "Speed Up Typing's remembered Keep pitch (spec §11 "
                                       "CU-93); no screen shows the sheet",
+    "RCDevSwitchSpeakerAccept": "a dev launch default with which the Switch by Speaker sheet "
+                                "presses its own Switch (spec §11 SW-26 (b)); no screen launches "
+                                "with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

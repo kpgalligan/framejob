@@ -11429,6 +11429,121 @@ section, then CO9's). The CLAUDE.md edits applied: `core/CLAUDE.md`'s `video_gat
   *Recommended: the program track.* (2) `wide_after`? *Recommended: offered, off by default.* (3)
   Cut to the wide on laughter (FC's `sound_events`)? *Recommended: not here; a candidate issue.*
 
+#### SW2b's record (2026-11-03)
+
+**Built.** Lane A, base `6a12ee93` (CU11b; the lane's worktree was made at `15b08bda` and
+fast-forwarded to the integration branch's head before any edit). The owner's answers
+(2026-11-01): the program track — yes; `wide_after` — offered, off; cut to the wide on laughter —
+not here, a candidate (to file). Decisions SW-23 and SW-26 recorded before the code in
+`creator-jobs-9.md`, after SW2a's, with their index rows (SW-28 reserved for SW2c, SW-29 owed to
+JOB-51). No core, FFI, header, op or format change; SW-35's stream guard not added (SW3a has not
+landed). The road map's MCP bullet said "declaring `scope`"; the tool follows `switch_angle`
+instead (no `scope` key, the container `set_scope` has open), as the phase's spec settled.
+
+- **App** (`wc -l`): new `SpeakerSwitch+Edit.swift` 215 (SW-23: `canOffer`, `muteDefault`,
+  `replaceable`, `replaceRefusal`, `edit`, each op tried singly through `SwitchAngle.Trial`, now
+  internal), `SpeakerSwitch+Settings.swift` 102 (SW-26's ranges, the four remembered keys,
+  `summary`, `titles`, `microphoneChoices`), `SwitchSpeakerSheetController.swift` 339,
+  `EditorViewController+SwitchSpeaker.swift` 33; `AgentServer+Switch.swift` 239
+  (`switchBySpeaker`), `AgentCatalog+Switch.swift` 202; one validator line in the frozen
+  `EditorViewController.swift`; the Clip menu row after Synchronize Audio
+  (`AppDelegate+Menus.swift` 512); `UIMenuTable.swift` and `inventory.json` rows (`sheet`);
+  `switch_by_speaker` in `AssistantPrompt.swift`'s cut-and-time row. `SpeakerSwitch.swift`,
+  `+Shots`, `+Read` and `ClipLevelSeries.swift` unchanged (SW-25). `make typecheck`: exit 0, the
+  four baseline warnings.
+- **Proof:** `tools/proof/switch_speaker_proof.py` (S1–S13, Z0, ten mutants), the README's
+  SW2b section; `op_argument_proof.py` `PRODUCT_TOOLS = 123`; `switch_by_speaker` in
+  `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`'s app-state lists;
+  `screens.py`'s PINS (the four keys) and NOT_SHOWN (`RCDevSwitchSpeakerAccept`); the screen
+  `designs/screens/15h-switch-by-speaker-sheet.md` (the road map's provisional "19", placed with
+  the other sheets).
+- **Docs:** spec §7.9h (retitled, `switch_by_speaker`), §9, §7.4, the spec index's Lines cells;
+  `docs/guide/multicam.md`'s Switch by Speaker section (the order Synchronize Audio → Switch by
+  Speaker → Switch Angle and rolls, which tracks are microphones, a linked camera refused until
+  Attach Audio, bleed and Ignore bleed, slip and move breaking sync, SW-S4's named limit in the
+  guide's words), `menus-and-shortcuts.md`'s two rows, `mcp.md`'s row, the guide index and the
+  README highlight; `docs/manual-checks.md` JOB-51 and JOB-52.
+
+**The proof, whole, against Release** (`RC_PROOF_APP=release`, after the gate's `make app`, on
+an instance from `proof_app.py launch --app release`): `14/14 rows passed`, exit 0.
+
+- S1: 22 shots on every variant; worst error from onset − lead 42.2 ms on b18_f55 (applied,
+  and at `min_shot` 0.5), 75.6 ms on b12_f55, b12_f45, b18_f45 and b24_f55, 165.5 ms on b24_f45
+  with `limited: shot 17 (b) 165.5 ms, the named limit`.
+- S2: b12_f55 at `bleed_db` 15, 22 shots, none of a silent person. S3: 22 turns' middles, none off
+  its speaker's card; the cards as drawn (204, 69, 41), (33, 123, 189) and (28, 157, 96).
+- S4: the mix decoded, 60,288,000 bytes, identical. S5: Program at index 3 in front of Cam A at
+  2, 23 pieces from 4 angle clips, `ops` 12; one undo "Switch by Speaker" gives the project back.
+- S6, S7 ("Switch by Speaker would add 23 clips to 4095; the most is 4096 — raise the minimum
+  shot."; and the loudness cache deleted: still being analysed), S8 (six frames byte-identical,
+  three angle tracks split at both ends), S9 (one Cam A shot across the join, two pieces; the
+  frame code 10), S10 (21 shots at 3 s, 22 at 2 s; menu and tool projects equal), S11 (22 pieces
+  equal the plan's; Mic A and an empty track refused), S12, S13 and Z0 all ok.
+- `op_argument_proof.py`: `201/201 checks passed`. `screens.py --only
+  15h-switch-by-speaker-sheet` (Release): `scores: 6 pass, 0 fail, 0 skip of 6`, P2 `79 key
+  literals: 41 pinned …, 38 not shown`, `0 new problems`. `v2_menu.py --only H` (Debug): `5
+  pass, 0 fail`. `inventory.py --check` 5/5; `assistant_prompt_proof.py --probe` 14/14;
+  `spec_index_proof.py` 264/264. `grep "Frame Job: "` empty on every instance.
+
+**Mutants** (`--mutant NAME`, each on a copy's built Debug app; the full set on the final
+instrument): `MUTANT … CAUGHT` for min-turn-ignored, crosstalk-never-wide, lead-twice and
+snap-removed (S1), ceiling-removed (S7), whole-track-hidden (S8), sheet-min-shot-not-passed
+(S10), replace-clear-removed (S11), mute-default-inverted (S12) and linked-refusal-removed
+(S13), each exit 1. min-turn-ignored SURVIVED its first run: at `min_shot` 2 a reply's short
+shot merges away whatever `min_turn` says, so S1 gained the `min_shot` 0.5 plan on b18_f55,
+where only `min_turn` holds the replies; re-run, CAUGHT (27 shots against 22).
+
+**`make gate`:** `gate: PASS 798s` (names 1 s, typecheck 16 s, fmt and lint skipped as
+unchanged, test 454 s, app 326 s), exit 0, run while the mutants built (three lanes share the
+machine).
+
+- **Deviations** (the notes): S3 compares each turn with its card as the app draws it, not the
+  generator's hex (the untagged H.264 cards decode about 12 levels off it; each drawn card is held
+  nearest its own hex first); "Switch disabled" in S13 is read as the dev accept, which presses
+  Switch only on an edit, changing nothing (the layout dump carries no enabled state); the mute
+  switches `enabled.audio` off on every camera clip inside the range, F-TURNS' silent cameras
+  included, as SW-23 (d) words it.
+
+**Fix pass 1** (the review's should-fix). `SpeakerSwitch+Edit.swift`'s `split` added a split's
+new half to the selection only when the clip was in the selection BEFORE the edit, so a selected
+angle clip straddling both ends of the range lost its tail after `to` (the half made at `from`
+is a new id, split again at `to`): SW-23 (f) broken. It now tests `chosen`, the selection as the
+edit builds it. S8 selects the angle clips and microphones before its run and now also asserts
+that every clip on the three angle tracks is in `get_project`'s `selection` after the edit. The
+control, S8 alone on the pre-fix Release app: `FAIL S8 … angle pieces left out of the selection
+[35, 33]` (Wide's and Cam B's tails), exit 1. On the fixed Debug app (`--only S8`): `ok S8 …
+angle pieces left out of the selection []`, `2/2 rows passed`, exit 0; the same on Release after
+the gate's `make app` (`RC_PROOF_APP=release --only S8`), `2/2 rows passed`, exit 0. `make
+typecheck`: exit 0, the four baseline warnings. `make gate`: `gate: PASS 769s` (names 2 s,
+typecheck 43 s, fmt and lint skipped, test 434 s, app 289 s), exit 0. The review's two nits (argument order in `switch_by_speaker`, the
+guide's sentence on what you hear) were not taken.
+
+**The commits** (lane A, on `6a12ee93`): `1a86086f` (the decisions, alone, before any code),
+`34b73451` (code and proof), `1016764e` (docs, S1's added plan, this record), `85cbd59b` (fix
+pass 1). They land on the integration branch as one commit.
+
+- **Review** (`6a12ee93..1016764e`, verdict fix-required; `..85cbd59b`, verdict pass): one
+  should-fix, SW-23 (f)'s lost tail, fixed by fix pass 1 above. Two nits, left as is:
+  `switch_by_speaker` reads `mute_cameras` and `apply` after `read`, `plan` and `edit`, so a
+  malformed value gets a plan answer before its argument error (SW-26 (c) puts argument errors
+  first); `multicam.md`'s "the microphones never edited, so what you hear is unchanged" passes
+  over a camera's own sound, which Mute the cameras' own sound switches off inside the range.
+- **Integration** (2026-11-03): the cherry-pick onto `a4869b62` (VR2b) conflicted only in the
+  two indexes, resolved keeping both phases: `11-decisions/README.md`'s `creator-jobs-9.md` row
+  (SW2b's SW-23, SW-26 clause beside VR2b's VR-27; Lines 599, past the spec's ~500 split line)
+  and `spec/README.md`'s Lines cells (§11 21863 in 43 files; §7.9h 96 beside VR2b's §7.10 155);
+  `spec_index_proof.py` 264/264. The CLAUDE.md edits owed applied: the root's product-tool count
+  (one hundred and twenty-three) and `-RCDevSwitchSpeakerAccept`'s sentence among the dev launch
+  defaults; `app/CLAUDE.md`'s gate count and the forty-two app-state tools, the SpeakerSwitch
+  entry's four new files and their sentence, and `AgentServer+Switch`'s `switchBySpeaker` with
+  `AgentCatalog+Switch`'s three rows. `make gate` on the integration branch: `gate: PASS 463s`
+  (names 1 s, typecheck 17 s, fmt and lint skipped as unchanged, test 244 s, app 200 s).
+
+**Owed.** JOB-51 (SW-29, the owner's verdict on S-PC1) and JOB-52. The S-PC1 excerpt arm of
+SW-S4 (until then Ignore bleed stays in the main grid). SW-35's stream guard (with SW3a). Filed
+at integration (`ai-drafted`, `low-priority`): "Switch by Speaker: cut to the wide on laughter
+(sound_events)", a candidate.
+
 ### SW4a — every track's caches
 
 - **What a person gets:** a clip on any track of a file has its own waveform, and the loudness, sync

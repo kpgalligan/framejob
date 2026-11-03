@@ -148,6 +148,16 @@ the same way.
 - **Expect:** the camera stays through short breaths between words, fades out in a real pause and is fully back just before you speak again, never cutting off the first word; the fade reads as smooth at the default and as a cut at 0; the teal line on the clip matches what plays.
 - **Source:** road map creator-jobs CO9, spec §11 CO-90, CO-91, CO-95 (`co9_proof.py` scores the gate's numbers on a white camera, never how the fade looks over a real face).
 
+**JOB-51 — Switch by Speaker on a real episode**
+- **Do:** On a real two-person episode of ten minutes or more (S-PC1 when it exists: a camera and a microphone each, and a wide if one was filmed), select every camera and microphone clip, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… at the defaults and press Switch. Play the Program track through.
+- **Expect:** each cut lands just before the new speaker's first word; a short reply ("right", "sure") does not cut; the wide shows while both talk at once; no shot ever shows a listener who says nothing during it. Your verdict is spec §11 SW-29.
+- **Source:** road map creator-jobs SW2b, spec §11 SW-23, SW-26, SW-29 (`switch_speaker_proof.py` scores F-TURNS' synthetic voices, never a real room).
+
+**JOB-52 — The Program track plays without a hitch**
+- **Do:** Play a Program track that Switch by Speaker cut, thirty cuts or more, over 4K cameras.
+- **Expect:** no visible hitch or frozen frame at any cut, and the sound uninterrupted across every cut.
+- **Source:** road map creator-jobs SW2b (SW2c's question, SW-28; SW0's SW-S2 measured rebuild times, never what a person sees).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

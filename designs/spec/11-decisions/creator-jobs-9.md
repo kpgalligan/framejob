@@ -329,6 +329,97 @@ and SW2a lands second adds it.
   crosstalk bridge taking only a single run, R2). A trailing window fails R1 alone: R6's τ
   budgets the half-window's 50 ms by design. No manual check.
 
+## SW2b — Switch by Speaker's sheet, tool and Program track (2026-11-03)
+
+Recorded before the code. SW2b makes SW2a's planner visible: Clip ▸ Switch by Speaker… and the
+tool `switch_by_speaker` run `SpeakerSwitch.read` and `plan` unchanged (SW-25) over the selected
+angles and microphones and write the shots onto a Program track as one undo step. The owner's
+answers (2026-11-01): the program track — *yes*; `wide_after` — *offered, off*; cut to the wide
+on laughter (FC's `sound_events`) — *not here; a candidate* (filed as an issue). No core, FFI,
+header, op or format change. SW-35's stream guard is not added here (SW3a has not landed).
+
+- **SW-23 — What the switch writes, as one undo step "Switch by Speaker"** (`SpeakerSwitch.edit`,
+  `SpeakerSwitch+Edit.swift`). Every op is tried ONE at a time on the container's handle through
+  `SwitchAngle.Trial.require` (`applying([ReelOp])` does not stop at a refusal); the first refusal
+  refuses the whole switch, nothing committed: "Switch by Speaker was refused at <op>: <reason>".
+  - (a) The destination. With no `track`: `add_track {index: trackIndex(the front-most angle) + 1,
+    name: "Program"}`, directly in front of the front-most angle; its id is read from the trial's
+    snapshot. With `track` (Replace the shots on): `split {clips: [c], at: from}` for each clip on
+    it strictly straddling `from`, then the same at `to`, then one `delete` of every clip on it
+    wholly inside `[from, to)` — a `lift_range` of that track alone.
+  - (b) The pieces: one `copy_pieces {clip, track: the destination, ranges, video: true, audio:
+    false}` per angle clip a shot crosses, its ranges the union over the shots of
+    `SwitchAngle.pieceRanges(angle: shot.angle, from: shot.start, to: shot.end)` for that clip
+    (cut at the clip's ends, the later clip taking over where two overlap, SW-15 (d)), the ops in
+    the order of their first range's start.
+  - (c) The angles hidden without touching anything outside the range, per angle track, front
+    first: when every clip on the track is one of its picture clips wholly inside `[from, to)`,
+    `set_track {hidden: true}` (none when it is hidden already); otherwise each picture clip
+    straddling `from`, then each straddling `to`, is `split` there, and each picture clip then
+    wholly inside gets `set_enabled {video: false}`.
+  - (d) "Mute the cameras' own sound": every angle picture clip wholly inside the range, on a
+    track that is not a microphone, gets `audio: false` in that same `set_enabled` (on a hidden
+    track, a `set_enabled {audio: false}` of its own). On by default when no microphone is an
+    angle (`muteDefault`). A track that is only a microphone is never edited.
+  - (e) Replace's tracks (`replaceable`): unlocked, in front of the front-most angle, holding no
+    selected clip, with at least one clip overlapping the range, every such clip a media clip
+    whose media an angle picture clip plays. `replaceRefusal` names the first test that fails, in
+    this order: "Track T cannot take the shots: it is locked." · "…: it holds a selected clip." ·
+    "…: it is not in front of the angles." · "…: it has nothing between A and B to replace." ·
+    "…: clip C is not a piece of an angle." (A and B `ReelTime.format(_, fps:, frames: true)`).
+  - (f) The selection after: the selection before plus every new clip a `split` made from a
+    selected clip, so a second run reads the same angles.
+  - (g) The command is offered (`canOffer`) when SW-20's defaults over the selection hold two or
+    more angles and some selected `.media` clip has `enabled.audio` on and a media with audio.
+  - (h) A linked angle clip is refused before any op is tried: when an angle picture clip
+    crossing `[from, to)` has `linked` set, the first such clip in track-then-start order refuses
+    the switch: "clip C on track T is linked to clip P (Detach Audio's pair); Switch by Speaker
+    cuts between cameras with no link — Attach Audio first" (SW-15 (c)'s rule: `split` acts on
+    the link closure and would edit the microphone, `audio: false` on a picture half mutes
+    nothing, and `video: false` makes it read as a detached sound). The sheet shows it in its
+    summary; the tool throws it after "Switch by Speaker was refused: ".
+- **SW-26 — The sheet and the tool take the same arguments, one set of values, ranges and
+  defaults.**
+  - (a) The sheet (`SwitchSpeakerSheetController`), opened by the command when `canOffer` and no
+    sheet is up; title "Switch by Speaker", hint "Cuts a Program track from the cameras, showing
+    whoever talks on each microphone. Run Synchronize Audio first. One undo step." One row per
+    default speaker: a Microphone popup (every track holding a selected `.media` clip with sound
+    on, a detached sound half included) and a Camera popup (the angles). A Wide popup ("None" and
+    the angles); Minimum shot (s); Cut before speech (s); Crosstalk shows (Wide, Current speaker);
+    Ignore bleed (dB below a speaker's own level), in the main grid (SW-S4's excerpt arm is owed,
+    so its else branch); "Cut to the wide after [20] s on one speaker", off; "Mute the cameras'
+    own sound" (`muteDefault`); "Write to:" ("A new Program track" and "Replace the shots on
+    <name>" per `replaceable`), the row shown only when a track qualifies; the summary; Cancel and
+    Switch. A track is its name, with " (n)" when two listed share it (SW-13's rule).
+  - (b) Every control change and every field's end of editing runs `read` (the selection, the
+    popups' pairing, no range, the settings) → `plan` → `edit` on main; the summary shows "N
+    shots: k on <name>, …. Adds M clips." or the refusals one per line, and Switch is enabled
+    only on an edit. Switch runs `read` → `plan` → `edit` again on the document's current handle
+    (the ops name ids predicted on a trial), shows any refusal and stays open; otherwise it
+    dismisses, applies the ops through `applyEdit` as "Switch by Speaker", sets the selection (f)
+    and writes the remembered values that changed. Remembered: `FrameJobSwitchSpeakerMinShot`,
+    `…Lead`, `…Crosstalk` ("wide" or "hold") and `…Bleed`, each read clamped, an absent key the
+    default, written only when changed. `-RCDevSwitchSpeakerAccept YES` (dev tools only) presses
+    Switch once the first edit exists.
+  - (c) The tool `switch_by_speaker` (app-state, no `scope` key, main thread; the container
+    `set_scope` has open): `speakers` `[{mic, angle}]` (track ids, both required per item);
+    `wide` (an angle's track id, or null for none; absent: SW-20's leftover rule over the
+    speakers used); `from` and `to` (ticks, both or neither, snapped to the frame grid, `to`
+    after `from`); `min_shot` 0.5–30 s, `min_turn` 0.2–10 s, `lead` 0–1 s, `bleed_db` 3–40,
+    `dominance_db` 0–30, `wide_after` 2–600 s or null, `crosstalk` "wide" or "hold",
+    `mute_cameras` (default `muteDefault`), `track` (Replace), `apply` (default true). Argument
+    errors in auto_zoom's form ("min_shot is 0.1 s; it runs 0.5–30 s"), "no track with id N",
+    "wide: track T is not an angle"; then `read` (nil: the plan could not be read), `track`
+    through `replaceRefusal`, `plan` (refused: "Switch by Speaker was refused: " and the reasons
+    joined by spaces), `edit`; `apply: false` answers without editing; otherwise one
+    `performGroupedEdit`, the selection set, and the answer `{ok, applied, step, track, shots:
+    [{angle, start, end}], ops, added, speakers: [{mic, angle}], wide, mute_cameras, project}`
+    (`step` only when applied; `track` the Program track's id, null when not applied and no
+    `track` was named).
+  - (d) The sheet never sets `min_turn` or `dominance_db`; they keep SW-21's and SW-22's
+    defaults there. (e) The step and the undo name are always "Switch by Speaker".
+- SW-28 reserved for SW2c; SW-29 the owner's verdict on JOB-51 (owed).
+
 ## CU11b — motion blur drawn, its Transform row and Auto Zoom's Motion blur (2026-11-03)
 
 Recorded before the code. CU11b is the remainder CU-116 names: CU11a stored `video.motion_blur`

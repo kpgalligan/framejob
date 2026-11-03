@@ -63,6 +63,8 @@ extension AgentServer {
         // AgentServer+Switch.swift (SW1, spec §11 SW-11…SW-15)
         "copy_pieces": { $0.copyPieces },
         "switch_angle": { $0.switchAngle },
+        // AgentServer+Switch.swift (SW2b, spec §11 SW-23, SW-26)
+        "switch_by_speaker": { $0.switchBySpeaker },
         // AgentServer+Framing.swift (VR2a2, spec §11 VR-26, VR-28)
         "reframe_clip": { $0.reframeClip },
     ]
@@ -87,8 +89,9 @@ extension AgentServer {
     /// `AgentCatalog+AutoZoom.swift`), then `add_shortcut_overlays` (CU8,
     /// `AgentCatalog+ShortcutOverlays.swift`), then `speed_up_typing` (CU9b,
     /// `AgentCatalog+SpeedUpTyping.swift`), then the op tool `switch_layout`
-    /// (CO6, `AgentCatalog+Layout.swift`), then the op tool `copy_pieces` and
-    /// `switch_angle` (SW1, `AgentCatalog+Switch.swift`), then the op tool
+    /// (CO6, `AgentCatalog+Layout.swift`), then the op tool `copy_pieces`,
+    /// `switch_angle` (SW1) and `switch_by_speaker` (SW2b), all
+    /// `AgentCatalog+Switch.swift`, then the op tool
     /// `reframe_clip` (VR2a2, `AgentCatalog+Framing.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file

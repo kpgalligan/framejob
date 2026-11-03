@@ -493,6 +493,14 @@
    ],
    "note": "presentAsSheet(AudioSyncSheetController), the Synchronizing Audio sheet while the plan runs off main (SY-22); its answer is an edit, or a weak match asks Apply / Cancel in an alert sheet (SY-19, reached_after)"
   },
+  "showSwitchBySpeakerSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+SwitchSpeaker.swift `@objc func showSwitchBySpeakerSheet(`",
+    "app/Sources/EditorViewController+SwitchSpeaker.swift:22"
+   ],
+   "note": "presentAsSheet(SwitchSpeakerSheetController) over two or more selected angles and a clip with sound (SW-23 (g), SW-26); beeps otherwise or with a sheet up; its Switch is an edit"
+  },
   "showSpeedSheet:": {
    "verdict": "sheet",
    "code": [
@@ -1101,6 +1109,15 @@
    "func": "synchronizeAudio",
    "reached_from": [
     "synchronizeAudio:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+SwitchSpeaker.swift:22": {
+   "token": "presentAsSheet",
+   "func": "showSwitchBySpeakerSheet",
+   "reached_from": [
+    "showSwitchBySpeakerSheet:"
    ],
    "reached_after": [],
    "other_caller": ""

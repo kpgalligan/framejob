@@ -450,6 +450,7 @@ APP_STATE_TOOLS = {
     "add_shortcut_overlays",
     "speed_up_typing",
     "switch_angle",
+    "switch_by_speaker",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`

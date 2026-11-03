@@ -143,6 +143,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Enhance Voice | | Sets the selected clips up for speech from their own measurements: high-pass, isolation or noise reduction and a gate for noisy pauses, the leveller for an uneven voice, the de-esser, a compressor, the limiter and the volume to the Normalize row's target ([Audio](audio.md#enhance-voice)) |
 | Match Audio… | | Gives the selected clips the loudness and the speech's tone of one of them, chosen in a sheet: their volume and limiter, and their EQ's shelves and bands, measured under the Measuring Sound sheet ([Audio](audio.md#match-audio)) |
 | Synchronize Audio | | Lines up the selected clips by their sound. Needs two or more clips that play sound |
+| Switch by Speaker… | | Cuts a Program track from the selected cameras, showing whoever talks on each microphone, as one undo step; run Synchronize Audio first ([Podcasts and several cameras](multicam.md#switch-by-speaker)) |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Auto Zoom… | | Zooms the selected screen recordings in at their clicks and typing and back out after, as ordinary actions, in one undo step ([Screen recording](screen-recording.md#auto-zoom)) |
 | Add Shortcut Overlays | | Shows each keyboard shortcut recorded in the selected screen recordings as keycaps at the moment it was pressed, on a "Shortcuts" track, in one undo step ([Screen recording](screen-recording.md#shortcut-overlays)) |
@@ -207,6 +208,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Enhance Voice | A selected clip plays sound |
 | Match Audio… | Two or more selected clips play sound |
 | Synchronize Audio | Two or more selected clips play sound |
+| Switch by Speaker… | The selected clips with a picture sit on two or more tracks, a selected clip has its sound on, and no sheet is open; inside a nest too |
 | Add Action | A selected clip is under the playhead |
 | Auto Zoom… | Every selected clip plays a movie that has a cursor file, and no sheet is open |
 | Add Shortcut Overlays | Every selected clip plays a movie that has a cursor file, no sheet is open, and it is not already reading the files |
