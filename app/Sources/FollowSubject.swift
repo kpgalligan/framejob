@@ -165,13 +165,15 @@ enum FollowSubject {
                 carried: carried))
     }
 
-    /// VR-27 (f) under `replace`, for `clip` between two handles of its container: re-eased, an
-    /// action in both whose duration shrank and whose after curve is not linear; carried, an
-    /// action with the same id and span in both across which the AFTER handle's video scale,
-    /// x or y differs by more than 1e-6.
-    static func counts(before: ReelProject, after: ReelProject, clip: UInt32)
-        -> (reEased: Int, carried: Int)
-    {
+    /// VR-27 (f), for `clip` between two handles of its container: re-eased, an action in both
+    /// whose duration shrank and whose after curve is not linear; carried, an action with the
+    /// same id and span in both across which — under `replace` — the AFTER handle's video
+    /// scale, x or y differs by more than 1e-6, or — composed (`replace: false`, Make
+    /// Vertical's step, spec §11 VR-34) — the framing F (`framing`) differs by more than 1e-6
+    /// between the action's two ends.
+    static func counts(
+        before: ReelProject, after: ReelProject, clip: UInt32, replace: Bool = true
+    ) -> (reEased: Int, carried: Int) {
         guard let old = before.snapshot.clip(clip), let new = after.snapshot.clip(clip) else {
             return (0, 0)
         }
@@ -181,13 +183,35 @@ enum FollowSubject {
             guard let was = old.actions.first(where: { $0.id == action.id }) else { continue }
             if action.duration < was.duration, action.curve != .linear { reEased += 1 }
             guard action.start == was.start, action.duration == was.duration else { continue }
-            let from = placement(after, clip, at: new.start + action.start)
-            let to = placement(after, clip, at: new.start + action.endTime)
+            let (a, b) = (new.start + action.start, new.start + action.endTime)
+            let from: [Double]?
+            let to: [Double]?
+            if replace {
+                from = placement(after, clip, at: a)
+                to = placement(after, clip, at: b)
+            } else {
+                from = framing(before: before, after: after, clip: clip, at: a)
+                    .map { [$0.k, $0.dx, $0.dy] }
+                to = framing(before: before, after: after, clip: clip, at: b)
+                    .map { [$0.k, $0.dx, $0.dy] }
+            }
             if let from, let to, zip(from, to).contains(where: { abs($0 - $1) > 1e-6 }) {
                 carried += 1
             }
         }
         return (reEased, carried)
+    }
+
+    /// The framing F at project time `t` from both handles' evaluated video (spec §11 VR-34):
+    /// k = s′/s, dx = x′ − k·x, dy = y′ − k·y; nil when either answers no video or s is 0.
+    static func framing(before: ReelProject, after: ReelProject, clip: UInt32, at t: Ticks)
+        -> (k: Double, dx: Double, dy: Double)?
+    {
+        guard let was = placement(before, clip, at: t), let now = placement(after, clip, at: t),
+            was[0] != 0
+        else { return nil }
+        let k = now[0] / was[0]
+        return (k, now[1] - k * was[1], now[2] - k * was[2])
     }
 
     /// The clip's evaluated video (scale, x, y) at project time `t`; nil when the core answers

@@ -924,13 +924,15 @@ detail there.
   subjects" sentence (`FramingWant.noSubjects`, pinned by
   `core/tests/reframe_clip.rs`) leads to
   `FramingAnalysis.requests(clips:in:project:)` over the call's view and
-  `split_at_shots`'s wait; past `AnalysisLane.callWaitLimit` the requests
+  `split_at_shots`'s wait (`waitForAnalysis`, internal, which
+  `make_vertical_version` shares with its own `unmade` and note); past
+  `AnalysisLane.callWaitLimit` the requests
   are wanted again on that owner, held by `FramingWant` (an `NSLock` of its
   own, done from `settled` once every request has ended; the owner never
   released) and the answer is `analyzing {media, covered}` with no edit; the
   subjects are read off main and the last hop refuses a changed project or
   scope, then `editResult`, "Reframe Clip", answering `cached`.
-  `AgentCatalog+Framing` holds its row, spliced in last by
+  `AgentCatalog+Framing` holds its row and `make_vertical_version`'s, spliced in last by
   `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`.
 - `FollowSubject.swift` · `FollowSubjectSheetController.swift` ·
   `EditorViewController+FollowSubject.swift` — Clip ▸ Follow Subject… (road map
@@ -944,7 +946,9 @@ detail there.
   `subjects` (`FramingSubjects.read` over each clip's own windows, any thread), `plan` (the
   `add_track` required, each `reframe_clip` tried through `SwitchAngle.Trial` — applied,
   identity or refused with the core's sentence — `moreTracks` as the track count each applied
-  op added, `remove_track` when empty), `counts` (VR-27 (f) from two handles), `summary`,
+  op added, `remove_track` when empty), `counts` (VR-27 (f) from two handles; `replace: false`
+  is its compose branch, an action carried when F, from `framing(before:after:clip:at:)`,
+  differs between its ends, for Make Vertical's step, VR-34), `summary`,
   `pendingSummary`, `rowName`. The sheet asks `FramingAnalysis.requests` at once, reads the
   subjects off main ("Reading the analysis…"), re-plans on main at every change, commits
   through `performGroupedEdit` on the current handle, and for a following kind with requests
@@ -954,6 +958,29 @@ detail there.
   per request), the changed-project refusal (at landing and after the read off main), the
   grouped commit, refusals posted as `reframe_clip`, and `validateFollowSubjectAction`, one
   line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
+- `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `ProjectDocument+VerticalCopy.swift` ·
+  `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
+  `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; File ▸ Make
+  Vertical Version… is VR3b's). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
+  4:5, 1:1) and `size(from:)` (VR-32), `VerticalSettings`, `classify` (VR-33's first match per
+  top-level clip with a picture, on the OLD snapshot: a "Blurred Background" with its partner
+  in front, a shape or image plate, a picture covering one axis and centred or covering on the
+  other, a nest by the same test, other), `mediaPictures`, `motionNote`, `fill`; `+Plan`:
+  `opening` (`set_canvas` with no rescale and "Backgrounds" at 0, the core's error for either
+  answered as the refusal), `plan` (VR-34 on one `SwitchAngle.Trial`: `reframe_clip` per
+  picture, nest and other clip from the old canvas, a refused op retried as `keep`, a refused
+  `keep` stopping; whole only with a blurred copy added and a constant F; the backdrops removed
+  or re-filled and the plates re-filled; Backgrounds removed when empty; counts over
+  non-`keep` entries through `FollowSubject.counts(…, replace: false)`), `summary` (VR-35),
+  `answerFields`. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
+  source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
+  unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
+  tool, off main (`creatorOffMainTools`): hop 1's refusals in order and a dry plan with no
+  subjects, `FramingAnalysis.requests` on the source over the present media pictures,
+  `waitForAnalysis`, the subjects read off main, the last hop's project check, then
+  `editResult` in place or the copy, saved through `save(_:to:operation:)` with `path`; its
+  row in `AgentCatalog+Framing.swift`, after `reframe_clip`'s; the assistant's ask-first row
+  only with `path`.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map

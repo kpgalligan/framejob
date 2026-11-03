@@ -67,7 +67,7 @@ extension AgentServer {
     #endif
 
     /// True but under `-RCDevDerivedHidden YES` in a build with the dev tools.
-    private static var derivedDisplay: Bool {
+    static var derivedDisplay: Bool {
         #if FRAMEJOB_DEV_TOOLS
         return !UserDefaults.standard.bool(forKey: derivedHiddenKey)
         #else

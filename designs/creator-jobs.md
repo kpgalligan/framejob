@@ -9595,10 +9595,89 @@ owner's screen-tutorial recordings with Record shortcuts on.
   own: it is one more row of the same size rule.)
 - **Manual check:** **JOB-33** — a vertical version on a phone, including how a 1080p source's ×1.78
   looks.
+- **Split (recorded before code, 2026-11-03).** VR3 is more than one pipeline, so it runs as two
+  in lane C, both before VR4, which waits for both (CJ-7). **VR3a** (this lane's pipeline now):
+  the step as a function of a document (VR-32…VR-35: the shapes and sizes, the classes, the
+  order and where it stops, the summary), the copy through CJ5b's derived document as one undo
+  step "Make Vertical" (VR-30, VR-31, VR-37), and the tool `make_vertical_version` (VR-36),
+  settled in `designs/spec/11-decisions/creator-jobs-10.md` before the code; `vr3_proof.py` rows
+  1–11 and Z1 with all seven mutants. **VR3b** (the next): File ▸ Make Vertical Version… and its
+  sheet, the Analyzing sheet and its Stop (VR-37), `-RCDevVerticalAccept YES`, the screen, the
+  guide's section, spec §9, `menus-and-shortcuts.md`, the README highlight and JOB-33.
 - **Depends on:** VR2b, CJ5b. **Lane** C.
 - **Questions for the owner:** (1) Offer 4:5 (1080 × 1350) too? *Recommended: yes* (a size, nothing
   more; VR-32 includes it, and a no removes it). (2) The copy opens with the step as one undo step,
   or as its first state? *Recommended: one undo step.*
+
+#### VR3's record (2026-11-03)
+
+**Landed: VR3a; VR3b is still to build.** Lane C, base `dbe8d1ef` (I's HEAD, VR2b2; the harness
+made the worktree at `a4869b62` and it was fast-forwarded first). The lane's two commits:
+`6bac2054` the decisions alone, VR-30…VR-37 appended to `creator-jobs-10.md` with their index
+rows, AI-7 amended by VR-36 and the Split paragraph above; then `3e589864` the code, the
+instruments and the documents. The owner's answers: 4:5 is offered (VR-32), and the copy opens
+with the step as one undo step (VR-31). No core, FFI, op, `Kind` or format change (43 stands,
+`OP_COUNT` 70); the product tool count goes 123 → 124. Every new file is under 400 lines
+(`VerticalVersion.swift` 204, `+Plan` 313, `ProjectDocument+VerticalCopy.swift` 31,
+`AgentServer+VerticalVersion.swift` 225).
+
+- **The step.** `VerticalVersion.swift`: `VerticalShape` and its size, `VerticalSettings`,
+  `classify` (VR-33's five classes on the old snapshot), `mediaPictures`, `motionNote`, `fill`.
+  `VerticalVersion+Plan.swift`: `opening`, `plan` on one `SwitchAngle.Trial` (the draft's steps 3
+  and 4 swapped, because a backdrop's fate reads its partner's result), the whole test (a blurred
+  copy added and F constant at the clip's start, last tick and every action end), `summary`,
+  `answerFields`. `FollowSubject.swift`: `counts(…, replace:)`'s compose branch and `framing`; the
+  replace branch and its callers are unchanged.
+- **The copy and the tool.** `ProjectDocument+VerticalCopy.swift`: the derived door, used
+  unchanged, then one `performGroupedEdit("Make Vertical", …)`; a copy the step leaves unchanged
+  is closed and refused. `AgentServer+VerticalVersion.swift`: hop 1's refusals in order, a dry plan
+  before any analysis is asked for, requests on the source over the present media only, then
+  `waitForAnalysis`. That wait is `waitForFraming` lifted, with `reframe_clip`'s answers unchanged.
+  Hop 2 checks the project, then the result goes to `editResult` in place or to the copy, saved
+  with `path`. The assistant asks first only when `path` is given.
+
+**Deviations from the spec.** (1) `opening` answers the core's ERROR from `set_canvas` or
+`add_track` as the step's refusal: at 64 tracks `add_track` is `validate`'s `Err` ("too many
+tracks: 65 (max 64)"), not a refusal. (2) `follow`'s refusal reads the string itself, so `fit`,
+`keep` and an unknown word get the one sentence. (3) "Has a picture" is `layers(at:)`'s test
+without the time, so a detached sound half is not classed. (4) A During motion is active when
+its `amount` > 0. (5) The fixture's movies are ffmpeg `testsrc` and its faces are canned. (6) The
+proof waits for the source's `cache/` to hold still before it copies (see Owed). (7) The mutants
+were run by a scratch driver, with each edit written in `tools/proof/README.md`'s VR3a section.
+
+**The runs** (lane C's worktree; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings.
+- `assistant_prompt_proof.py --probe` 14/14 (system 3294/6000, seven ask-first rows).
+- `spec_index_proof.py` 270/270.
+- `op_argument_proof.py` 202/202 and `phase9_proof.py` 253/253.
+- `vr2a_proof.py --only 9` 2/2 and `vr2b_proof.py --only 6,7,10` 4/4.
+- `vr3_proof.py` 12/12.
+- All seven mutants CAUGHT, each by its named row: pip-followed (3), backdrop-own-track (4),
+  step-on-source (2), canvas-rescaled (7), no-from-size (1), blurred-after-picture (3) and
+  continue-after-add-track (10). step-on-source first SURVIVED, because a setup throw was scored
+  only under row 1. The proof now fails every row that throw reaches, and the re-run CAUGHT it.
+- `make gate`: `gate: PASS 508s`.
+- Release: `vr3_proof.py` 12/12, `vr2a_proof.py` 10/10, `vr2b_proof.py` 13/13 and
+  `recording_probe.py --only catalog` 31/31 (124 tools, 70 core ops). Every Z1 printed nothing.
+
+**The review** passed with two nits, neither fixed in the phase. (1) The guide's `mcp.md` row,
+the tool's description and §7.9i speak of File ▸ Make Vertical Version… as if it already
+existed; VR3b makes them true and must check those three sentences when the menu lands. (2) With
+`path`, a failed save leaves the copy open and dirty with no `project` in the answer; filed as
+an issue at integration.
+
+**Integration** (2026-11-03): SW8 and CU10 had landed. VR3a's decisions were appended after
+CU10's in `creator-jobs-10.md` (483 lines), with the file's index row extended. Both
+`switch_by_speaker` and `make_vertical_version` are in `creatorOffMainTools`. The spec index's
+`07.4`, `07.9b` and `11-decisions/` cells were recounted, and `spec_index_proof.py` passed
+270/270 on the merged tree. The root `CLAUDE.md` now counts one hundred and twenty-four product
+tools, and `app/CLAUDE.md` gained the four new files' entry, `counts`' compose branch and
+`waitForAnalysis`. `make gate` on I: `gate: PASS 490s` (names 1 s, typecheck 16 s, test 282 s,
+app 190 s; fmt and lint reused).
+
+**Owed.** VR3b (see the Split above), JOB-33 with it, and the two issues: the derived door's
+cache carry racing a thumbnail pass ("cache/thumbs/3/40.jpg could not be carried", seen once in
+a mutant run), and nit (2).
 
 ### FC7a — Clip ▸ Find Clips…: the window and the analysis
 

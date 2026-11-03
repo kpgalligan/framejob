@@ -67,6 +67,8 @@ extension AgentServer {
         "switch_by_speaker": { $0.switchBySpeaker },
         // AgentServer+Framing.swift (VR2a2, spec §11 VR-26, VR-28)
         "reframe_clip": { $0.reframeClip },
+        // AgentServer+VerticalVersion.swift (VR3a, spec §11 VR-36, VR-37)
+        "make_vertical_version": { $0.makeVerticalVersion },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
@@ -75,7 +77,7 @@ extension AgentServer {
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
         "new_project_from_range", "analyze_cutout", "get_cursor_events", "auto_zoom",
         "add_shortcut_overlays", "speed_up_typing", "switch_layout", "reframe_clip",
-        "switch_by_speaker",
+        "switch_by_speaker", "make_vertical_version",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
@@ -93,7 +95,8 @@ extension AgentServer {
     /// (CO6, `AgentCatalog+Layout.swift`), then the op tool `copy_pieces`,
     /// `switch_angle` (SW1) and `switch_by_speaker` (SW2b), all
     /// `AgentCatalog+Switch.swift`, then the op tool
-    /// `reframe_clip` (VR2a2, `AgentCatalog+Framing.swift`).
+    /// `reframe_clip` (VR2a2) and `make_vertical_version` (VR3a), both
+    /// `AgentCatalog+Framing.swift`.
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.

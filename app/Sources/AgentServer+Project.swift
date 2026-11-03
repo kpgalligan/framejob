@@ -227,7 +227,7 @@ extension AgentServer {
     /// thread: `save(to:ofType:for:completionHandler:)` delivers its
     /// completion on the MAIN thread, which a main-thread wait would be
     /// occupying.
-    private func save(
+    func save(
         _ document: ProjectDocument, to url: URL, operation: NSDocument.SaveOperationType
     ) throws {
         guard !Thread.isMainThread else {

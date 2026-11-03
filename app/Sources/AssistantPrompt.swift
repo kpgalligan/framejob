@@ -29,7 +29,8 @@ enum AssistantPrompt {
     static let searchTopics: [(words: String, tools: [String])] = [
         ("open, create or save a project, move the playhead, set the in and out range, "
             + "select clips, enter or leave a nest",
-         ["open_project", "new_project", "new_project_from_range", "save_project",
+         ["open_project", "new_project", "new_project_from_range", "make_vertical_version",
+          "save_project",
           "set_playhead", "set_range", "set_selection", "set_scope"]),
         ("add, remove, reorder, rename, hide, mute or lock tracks",
          ["add_track", "remove_track", "move_track", "set_track", "remove_empty_tracks"]),

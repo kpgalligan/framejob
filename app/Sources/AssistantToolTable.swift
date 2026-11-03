@@ -88,6 +88,11 @@ enum AssistantToolTable {
             reason: "It writes a project package where the model chose, when the call names a "
                 + "path.",
             askOnlyWith: "path"),
+        AssistantToolRow(
+            tool: "make_vertical_version", rule: .askFirst, onlyWith: nil,
+            reason: "It writes a project package where the model chose, when the call names a "
+                + "path.",
+            askOnlyWith: "path"),
     ]
 
     static let devToolReason =
@@ -139,7 +144,7 @@ enum AssistantToolTable {
             path = given.map {
                 AgentServer.destinationURL($0, extension: GraphicPackage.fileExtension).path
             }
-        case "new_project_from_range":
+        case "new_project_from_range", "make_vertical_version":
             // Where the tool will write: `.framejob` added as `destinationURL` adds it.
             path = given.map {
                 AgentServer.destinationURL($0, extension: ProjectDocument.projectFileExtension)

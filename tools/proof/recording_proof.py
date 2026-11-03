@@ -451,6 +451,7 @@ APP_STATE_TOOLS = {
     "speed_up_typing",
     "switch_angle",
     "switch_by_speaker",
+    "make_vertical_version",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`

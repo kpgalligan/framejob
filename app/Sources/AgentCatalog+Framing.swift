@@ -4,7 +4,8 @@ import Foundation
 /// spec §11 VR-26…VR-28), spliced in last by `creatorTools()`, after
 /// `switch_angle`'s. Its `subjects` is the app's to fill
 /// (`AgentCatalog+Declarations.swift`), so the row describes the eight other
-/// arguments.
+/// arguments. Then `make_vertical_version` (road map "creator-jobs" VR3a, spec §11
+/// VR-36), the tool that runs `reframe_clip` on every picture of a vertical copy.
 extension AgentServer {
 
     func framingTools() -> [[String: Any]] {
@@ -76,6 +77,75 @@ extension AgentServer {
                         + "framing replaces the clip's own moves. Default false: the framing "
                         + "is composed into them. Not read by keep.",
                 ]),
+            // UI path: File ▸ Make Vertical Version… (road map creator-jobs VR3b), spec §11
+            // VR-30…VR-37. The step is VerticalVersion.plan; the copy is
+            // ProjectDocument.verticalCopy; the handler AgentServer+VerticalVersion.swift.
+            tool(
+                "make_vertical_version",
+                "Makes a vertical (9:16), 4:5 or square (1:1) version of the top-level timeline "
+                    + "— what File ▸ Make Vertical Version… does. The new canvas keeps the old "
+                    + "short side, even (from 1920 × 1080: 1080 × 1920, 1080 × 1350, "
+                    + "1080 × 1080). Each top-level clip with a picture is treated by what it "
+                    + "is: a clip that fills the old frame on one side is reframed with "
+                    + "reframe_clip from the old canvas (a movie clip follows its subject with "
+                    + "follow, shown whole on a blurred copy where nothing is found; a still "
+                    + "picture or a nest is centred); a clip the core will not frame (on a "
+                    + "matte track, rotated, spinning) and a movie whose file is missing are "
+                    + "kept as placed and listed; every other clip (a title, a "
+                    + "picture-in-picture, a shape) is kept as placed, rescaled from the old "
+                    + "canvas; an existing \"Blurred Background\" copy is removed when its "
+                    + "clip is followed, else re-filled; a full-frame shape plate or an image "
+                    + "named \"Background\" is re-filled. The blurred copies go on a new "
+                    + "\"Backgrounds\" track at the back, removed when none is needed. With "
+                    + "copy (the default) a NEW project opens, named \"<name> (9:16)\", "
+                    + "\"(4:5)\" or \"(1:1)\", holding the step as its one undo step \"Make "
+                    + "Vertical\" and carrying the project's caches and analysis; the project "
+                    + "you name never changes. With copy false the step is applied to the "
+                    + "project you name as one undo step \"Make Vertical\". The tool analyses "
+                    + "the movie clips on this Mac first (as reframe_clip does) and waits up to "
+                    + "60 s; past that nothing is made and the answer is analyzing {media, "
+                    + "covered} with a note: call make_vertical_version again. Refused, "
+                    + "nothing made: inside a nest; path without copy; a path another open "
+                    + "project holds or where anything exists; a shape the canvas already has; "
+                    + "the core's own sentence for the canvas, the Backgrounds track or a clip "
+                    + "even keep cannot reframe. Answers {ok, canvas {width, height}, cached "
+                    + "(false when an analysis ran), clips [{clip, treatment (followed, whole, "
+                    + "kept, refilled, removed or not_followed), reason?}], backgrounds, "
+                    + "more_tracks, re_eased, moves_carried, summary, project, and for a copy "
+                    + "carried {files, bytes, seconds} and saved (with path)}.",
+                [
+                    "shape": [
+                        "type": "string", "enum": VerticalShape.allCases.map(\.rawValue),
+                        "description": "The new shape: 9:16, 4:5 or 1:1.",
+                    ],
+                    "follow": [
+                        "type": "string",
+                        "enum": FollowSubject.follows.map(\.rawValue),
+                        "description": "What a movie clip follows: subject (the default), face, "
+                            + "person or salient, or center to hold the picture's centre.",
+                    ],
+                    "zoom": [
+                        "type": "number",
+                        "description": "How tight, 1–4 times the scale that fills the new "
+                            + "canvas; default 1.",
+                    ],
+                    "where_empty": [
+                        "type": "string", "enum": FramingWhereEmpty.allCases.map(\.rawValue),
+                        "description": "What a followed clip shows where nothing is found: fit "
+                            + "(the whole picture on a blurred copy, the default) or center.",
+                    ],
+                    "copy": [
+                        "type": "boolean",
+                        "description": "true (the default): open the version as a new project. "
+                            + "false: apply it to the project you name.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "With copy only: where to save the new project, an "
+                            + "absolute path; .framejob is added when missing. Nothing may "
+                            + "exist there yet. Without it the copy opens untitled.",
+                    ],
+                ], required: ["shape"]),
         ]
     }
 }

@@ -135,7 +135,7 @@ The assistant works only on its own window's project. A tool call that names ano
 
 ### Tools it asks about first
 
-Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_media` and `export_graphic`; and a sixth, `new_project_from_range`, asks only when it names a `path` (without one it opens an untitled project and writes no package). Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
+Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_media` and `export_graphic`; a sixth, `new_project_from_range`, asks only when it names a `path` (without one it opens an untitled project and writes no package); and a seventh, `make_vertical_version`, asks only when it names a `path` too. Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
 
 | Tool | The question reads |
 |---|---|
@@ -144,6 +144,7 @@ Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_
 | `save_project` | "save_project writes *path*" (or REPLACES); "save_project writes a file" when no path is known |
 | `consolidate_media` | "consolidate_media copies every referenced file into *package*/media", or "… into the project's package" when the project has never been saved |
 | `new_project_from_range` | "new_project_from_range writes *path*", `.framejob` added when missing (only with a `path`) |
+| `make_vertical_version` | "make_vertical_version writes *path*", `.framejob` added when missing (only with a `path`) |
 
 A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
 

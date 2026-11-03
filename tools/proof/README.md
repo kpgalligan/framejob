@@ -27832,6 +27832,62 @@ python3 tools/proof/vr2b_proof.py --only 6,6b,7,7b,9,10     # Debug, in the loop
 python3 tools/proof/screens.py --only 15i-follow-subject-sheet
 ```
 
+## Road map "creator-jobs" VR3a — Make Vertical's step, its copy and `make_vertical_version` (`vr3_proof.py` rows 1–11, Z1 per launch; seven mutants; spec §11 VR-30…VR-37)
+
+**`vr3_proof.py`** drives the app (`proof_app.binary()`) on a scratch `CFFIXED_USER_HOME` in two
+launches, its packages under `tools/proof/work/vr3-proof/`. The media is one ffmpeg `testsrc`
+movie (1920 × 1080, 30 fps, 50 s, H.264) copied per media and a `testsrc` PNG (480 × 270); the
+analyses are `canned_framing.py`'s. Launch 1 is `-RCDevAnalysisCanned YES` (rows 1–10) over the
+fixture `src.framejob` (1920 × 1080, 30 fps, magenta background): a white plate [0, 2) s, still
+faces A, C (a zoom-and-volume action), D (a During Drift), E (scale 1.25), I (with an
+`add_blurred_background` copy) and J (on its own track under an alpha matte track holding the
+title K), a screen B with nothing found, the canned exit F, an offline movie G (its file removed
+before the fixture is opened again), a nest H, and on a front track a title, a
+picture-in-picture image and a title whose action moves y from 200 to 0. Launch 2 is
+`-RCDevAnalysisHold 30` (row 11) on an uncached project. Every copy is closed with `discard:
+true`. F is solved from two projects' `get_project` placements (k = s′/s, dx = x′ − k·x, dy =
+y′ − k·y).
+
+| Row | What it holds |
+|---|---|
+| 1 | the copies' canvases 1080 × 1920, 1080 × 1350, 1080 × 1080; the 4:5 copy's A never magenta at its corners (10 frames); the 9:16 copy's picture-in-picture equal to a scratch copy's `set_canvas` + `reframe_clip {keep, from_width: 1920, from_height: 1080}`; the untitled 1:1 copy named "src (1:1)" with unsaved changes |
+| 2 | the source's `project.json`, saved again, byte-identical; its undo top unchanged (run even when the copies fail) |
+| 3 | the 9:16 answer's treatments and reasons, every clip listed (A, C, E, I followed with no reason; D followed "moves by its own motion: Drift"; F followed "it is shown whole on a blurred copy where no subject is found"; B whole; G "its media file is missing, so it is kept as placed", H "it is a nest, so it is centred", J the core's matte sentence, all not followed; K, both titles and the picture-in-picture kept; the plate re-filled; I's old copy removed); the plate 1080 × 1920 at scale 1, centred; I's old copy gone; `moves_carried` equal to F's count over the framed clips alone while the y-moving title's F does move |
+| 4 | every "Blurred Background" on the copy's "Backgrounds" track at index 0, two of them |
+| 5 | the copy's track count the source's plus at most one |
+| 6 | one `undo` in the copy answers "Make Vertical" and gives back the source's `get_project` project |
+| 7 | the 9:16 copy's corners never magenta at 40 frames over the plate's span and A, B, C, E, F, I |
+| 8 | `copy: false` on a scratch copy of the package: canvas 1080 × 1920, one step "Make Vertical", no window, `undo` gives the project back |
+| 9 | the copy's `cache/analysis/` holds every source file byte for byte; a second run from the source answers `cached` true, `analysis_job`'s `lane_queued` unchanged |
+| 10 | a 64-track source: "Make Vertical was refused at add_track: " and "too many tracks", no window |
+| 11 | (launch 2) `zoom: 5` answers the core's "zoom must be between 1 and 4 times fill, not 5" within 5 s, `lane_queued` unchanged; then the plain call answers `analyzing` past the 60 s bound, no window |
+| Z1 | each launch's log has no `Frame Job: ` line |
+
+The mutants, each edited into the tree, a Debug app built with it (`make app-debug`), its row
+run and the file restored, every one CAUGHT (its row FAIL, exit 1):
+- **pip-followed** (3): `VerticalVersion.covers` answers `true`, so the picture-in-picture is a
+  picture and centred.
+- **backdrop-own-track** (4): each `reframe_clip` given a fresh `add_track {index: 0}` as its
+  backdrop instead of Backgrounds.
+- **step-on-source** (2): `verticalCopy`'s `performGroupedEdit` sent to the source.
+- **canvas-rescaled** (7): `opening`'s `set_canvas` with `rescaleClips: true` (the plate keeps
+  scale 0.5625 and the corners of its span show the canvas).
+- **no-from-size** (1): `from_width` and `from_height` omitted, so `keep` rescales from the new
+  canvas.
+- **blurred-after-picture** (3): the backdrop class tested after the picture class.
+- **continue-after-add-track** (10): `opening`'s add_track refusal answered with
+  `.opened(trial, backgrounds: <the back-most track>)`.
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 124, and `make_vertical_version` in
+`APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
+`assistant_prompt_probe.swift`'s F5 and F8 read the second conditional ask-first row,
+"`make_vertical_version` with `path`".
+
+```sh
+make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8]
+make app && RC_PROOF_APP=release python3 tools/proof/vr3_proof.py
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

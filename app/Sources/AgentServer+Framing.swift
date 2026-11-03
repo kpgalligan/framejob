@@ -66,7 +66,13 @@ extension AgentServer {
         var subjects: [String: Any]?
         if let reading = call.reading {
             if !reading.requests.isEmpty,
-                let analyzing = try waitForFraming(reading, call, stop: stop)
+                let analyzing = try waitForAnalysis(
+                    reading.requests, document: call.document, stop: stop,
+                    unmade: "nothing was framed",
+                    note: { percent in
+                        "Still analyzing the media of clip \(call.clip) (\(percent) %); call "
+                            + "reframe_clip again to apply."
+                    })
             {
                 return analyzing
             }
@@ -146,16 +152,17 @@ extension AgentServer {
         return UInt32(value)
     }
 
-    /// Wants the requests under an owner of the call's own and waits up to
-    /// CJ-25's bound: nil once every one landed; past the bound the
-    /// `analyzing` answer, the want held (`FramingWant`); a failure or a Stop
-    /// throws naming the kind and the media.
-    private func waitForFraming(
-        _ reading: FramingReading, _ call: FramingCall, stop: AgentCallCancel?
+    /// Wants the requests (non-empty) under an owner of the call's own and
+    /// waits up to CJ-25's bound: nil once every one landed; past the bound
+    /// the `analyzing` answer with `note(percent)`, the want held
+    /// (`FramingWant`); a failure or a Stop throws naming the kind and the
+    /// media, a Stop saying "so <unmade>.". `reframe_clip`'s and
+    /// `make_vertical_version`'s wait (spec §11 VR-28, VR-37).
+    func waitForAnalysis(
+        _ requests: [AnalysisRequest], document: ProjectDocument, stop: AgentCallCancel?,
+        unmade: String, note: @escaping (Int) -> String
     ) throws -> String? {
         let lane = AnalysisLane.shared
-        let requests = reading.requests
-        let document = call.document
         let owner = lane.newOwner()
         lane.want(
             requests, owner: owner,
@@ -177,7 +184,7 @@ extension AgentServer {
         case .cancelled:
             lane.release(owner: owner)
             throw ToolError(
-                message: "\(named) was stopped before it finished, so nothing was framed.")
+                message: "\(named) was stopped before it finished, so \(unmade).")
         case .timedOut:
             let hold = FramingWant(requests: requests)
             lane.want(
@@ -194,8 +201,7 @@ extension AgentServer {
                 return try self.jsonResult([
                     "ok": true,
                     "analyzing": ["media": media.map { Int($0) }, "covered": covered],
-                    "note": "Still analyzing the media of clip \(call.clip) (\(percent) %); call "
-                        + "reframe_clip again to apply.",
+                    "note": note(percent),
                     "project": self.summary(document),
                 ])
             }

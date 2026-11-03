@@ -224,6 +224,7 @@ APP_STATE_TOOLS = {
     "speed_up_typing",
     "switch_angle",
     "switch_by_speaker",
+    "make_vertical_version",
 }
 
 # The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence

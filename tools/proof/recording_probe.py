@@ -8799,6 +8799,7 @@ APP_STATE_TOOLS = [
     "speed_up_typing",
     "switch_angle",
     "switch_by_speaker",
+    "make_vertical_version",
 ]
 # `git show 7a198db^:app/Sources/AgentCatalog.swift`'s last ten rows, in order,
 # with `set_media_color` (2a8421b) after `remove_media` and `export_status`,
