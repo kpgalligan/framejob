@@ -137,7 +137,7 @@ fn point_of(frame: &Frame, c: &Chosen, headroom: f64) -> Option<(SubjectKind, Po
         let (a, o) = (widened(&b), widened(&other));
         let (x0, y0) = (a.0.min(o.0), a.1.min(o.1));
         let (x1, y1) = (a.2.max(o.2), a.3.max(o.3));
-        let (p0, p1) = (frame.point(x0, y0), frame.point(x1, y1));
+        let (p0, p1) = (frame.point(c.t, x0, y0), frame.point(c.t, x1, y1));
         let fits = p1.0 - p0.0 <= frame.window.0 && p1.1 - p0.1 <= frame.window.1;
         fits.then_some(SubjectBox {
             x: x0,
@@ -147,7 +147,7 @@ fn point_of(frame: &Frame, c: &Chosen, headroom: f64) -> Option<(SubjectKind, Po
             c: b.c,
         })
     });
-    let (p, offset) = frame.subject(kind, &pair.unwrap_or(b), headroom);
+    let (p, offset) = frame.subject(c.t, kind, &pair.unwrap_or(b), headroom);
     Some((kind, p, offset))
 }
 
@@ -223,6 +223,7 @@ pub(crate) fn write_keys(
         last_end: None,
     };
     w.keys.push(w.key(0, start_at, Curve::Linear));
+    let mut cut_keys: Vec<Ticks> = Vec::new();
 
     let mut loss: Option<Ticks> = None;
     let mut seen: Option<Ticks> = None;
@@ -258,6 +259,7 @@ pub(crate) fn write_keys(
             };
             if to != w.current {
                 w.go(before(c), c, to, Curve::Linear);
+                cut_keys.push(c);
             }
             w.last_end = Some(c);
             empty = lead.is_none();
@@ -352,6 +354,7 @@ pub(crate) fn write_keys(
     FramingPath {
         keys: w.keys,
         shows_fit: w.shows_fit,
+        cuts: cut_keys,
     }
 }
 

@@ -1,10 +1,10 @@
 import Foundation
 
-/// `reframe_clip` (road map "creator-jobs" VR2a2, spec §11 VR-26, VR-28): the
-/// op tool whose `subjects` the app fills from the analysis cache. No menu
-/// sends it yet — Clip ▸ Follow Subject… arrives in VR2b — so it mirrors no UI
+/// `reframe_clip` (road map "creator-jobs" VR2a2 and VR2b1, spec §11 VR-26…VR-28):
+/// the op tool whose `subjects` the app fills from the analysis cache. No menu
+/// sends it yet — Clip ▸ Follow Subject… arrives in VR2b2 — so it mirrors no UI
 /// path; every refusal is the core's sentence, and Swift copies none of
-/// VR-26's rules.
+/// VR-26's or VR-27's rules (`replace` is passed through as the caller sent it).
 ///
 /// **Runs on the SERVER thread** (`creatorOffMainTools`), in three hops:
 /// - the first main hop resolves the arguments and TRIES the op with no
@@ -32,6 +32,7 @@ extension AgentServer {
         let fromWidth: UInt32?
         let fromHeight: UInt32?
         let backdrop: UInt32?
+        let replace: Bool?
         /// The analysis to read, or nil when the trial needs none.
         let reading: FramingReading?
         let asked: ReelProject
@@ -41,7 +42,7 @@ extension AgentServer {
             .reframeClip(
                 clip: clip, follow: follow, zoom: zoom, whereEmpty: whereEmpty,
                 fromWidth: fromWidth, fromHeight: fromHeight, backdrop: backdrop,
-                subjects: subjects)
+                replace: replace, subjects: subjects)
         }
     }
 
@@ -100,7 +101,8 @@ extension AgentServer {
             document: document, clip: clip.id, follow: follow, zoom: try doubleArg(a, "zoom"),
             whereEmpty: try enumArg(a, "where_empty", FramingWhereEmpty.self),
             fromWidth: try sideArg(a, "from_width"), fromHeight: try sideArg(a, "from_height"),
-            backdrop: backdrop, reading: nil, asked: document.project, scope: document.scope)
+            backdrop: backdrop, replace: try boolArg(a, "replace"), reading: nil,
+            asked: document.project, scope: document.scope)
         let scope = effectiveScope(document)
         let trial: ReelEdit
         do {
@@ -127,7 +129,7 @@ extension AgentServer {
         return FramingCall(
             document: document, clip: call.clip, follow: follow, zoom: call.zoom,
             whereEmpty: call.whereEmpty, fromWidth: call.fromWidth, fromHeight: call.fromHeight,
-            backdrop: backdrop,
+            backdrop: backdrop, replace: call.replace,
             reading: FramingReading(
                 media: media, windows: entry.windows, cacheDir: cacheDir, requests: requests),
             asked: call.asked, scope: call.scope)

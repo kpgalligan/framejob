@@ -21,6 +21,14 @@
 //! x′ = k·x + dx, y′ = k·y + dy` (VR-3, VR-27). Every `wc` is clamped so the
 //! window lies inside the cropped rect (VR-7's covering key).
 //!
+//! **The placement in force** (VR-27 (a)). A clip with actions moves its
+//! picture under the window: a sample's point is (★) through the clip's
+//! evaluated placement at its own tick (`Frame.placed`), and the rect the
+//! window is clamped into is the COMMON one — the cropped rects of the base
+//! and of the placement at every action's end, intersected — with `k`
+//! raised until the window fits it, held so `k·s` stays at most `SCALE_MAX`
+//! at every one of those placements. A clip with no actions is VR2a2's.
+//!
 //! **The path.** VR-21 (`reframe_tracks.rs`) chooses a subject per sample;
 //! VR-22 composes the window on it; `reframe_path.rs` writes the keys —
 //! VR-23's moves only when the median-filtered subject leaves a dead zone,
@@ -113,17 +121,25 @@ pub struct FramingPath {
     /// Some key holds the `fit` state (VR-24 (h)): the picture shows the
     /// canvas around it, so VR-25's backdrop has a span to fill.
     pub shows_fit: bool,
+    /// Each hard cut's key time `c` whose key differs from the hold at
+    /// `c − frame` (VR-24 (b)), ascending: `reframe_compose.rs` splits the
+    /// action a cut lands in (VR-27 (d)).
+    pub cuts: Vec<Ticks>,
 }
 
 pub(crate) type Point = (f64, f64);
 
 /// The geometry one plan reads: the clip's placement on the source canvas,
-/// the cropped rect, and the window.
+/// the common cropped rect (VR-27 (a)), and the window.
 pub(crate) struct Frame {
     pub(crate) anchor: Point,
     pub(crate) s: f64,
     pub(crate) media: Point,
     pub(crate) rect: (Point, Point),
+    /// The placement in force at each in-clip sample tick, `(tick, scale, x,
+    /// y)`, sorted; empty for a clip with no actions, whose points read the
+    /// base (VR-27 (a)).
+    pub(crate) placed: Vec<(Ticks, f64, f64, f64)>,
     pub(crate) k: f64,
     pub(crate) window: Point,
     pub(crate) half_source: Point,
@@ -157,21 +173,55 @@ impl Frame {
         }
         let anchor = (ws / 2.0 + video.x, hs / 2.0 + video.y);
         let c = ((crop.l - crop.r) / 2.0, (crop.t - crop.b) / 2.0);
-        let rect = (
+        let rect_of = |s: f64, anchor: Point| {
             (
-                anchor.0 + s * (c.0 - cw / 2.0),
-                anchor.1 + s * (c.1 - ch / 2.0),
-            ),
-            (
-                anchor.0 + s * (c.0 + cw / 2.0),
-                anchor.1 + s * (c.1 + ch / 2.0),
-            ),
-        );
-        let k = (zoom * project.fill_scale(cw, ch)).min(SCALE_MAX) / s;
+                (
+                    anchor.0 + s * (c.0 - cw / 2.0),
+                    anchor.1 + s * (c.1 - ch / 2.0),
+                ),
+                (
+                    anchor.0 + s * (c.0 + cw / 2.0),
+                    anchor.1 + s * (c.1 + ch / 2.0),
+                ),
+            )
+        };
+        let base_rect = rect_of(s, anchor);
         let (w, h) = (
             f64::from(project.canvas.width),
             f64::from(project.canvas.height),
         );
+        // VR-27 (a): the common rect over the base and every action's end,
+        // and the largest scale among them.
+        let (mut rect, mut s_max) = (base_rect, s);
+        for a in &clip.actions {
+            let p = project
+                .evaluate_clip(clip, a.start.saturating_add(a.duration))
+                .video;
+            if !(p.scale.is_finite() && p.scale > 0.0 && p.x.is_finite() && p.y.is_finite()) {
+                continue;
+            }
+            let ((x0, y0), (x1, y1)) = rect_of(p.scale, (ws / 2.0 + p.x, hs / 2.0 + p.y));
+            rect = (
+                (rect.0 .0.max(x0), rect.0 .1.max(y0)),
+                (rect.1 .0.min(x1), rect.1 .1.min(y1)),
+            );
+            s_max = s_max.max(p.scale);
+        }
+        let ((x0, y0), (x1, y1)) = rect;
+        if !(x0 < x1 && y0 < y1) {
+            rect = base_rect;
+        }
+        let mut k = (zoom * project.fill_scale(cw, ch)).min(SCALE_MAX) / s;
+        // Only a smaller rect raises `k`, so an action-free clip's `k` is
+        // VR2a2's to the bit.
+        let raised = rect != base_rect;
+        if raised {
+            let ((x0, y0), (x1, y1)) = rect;
+            k = k.max(w / (x1 - x0)).max(h / (y1 - y0));
+        }
+        if raised || s_max > s {
+            k = k.min(SCALE_MAX / s_max);
+        }
         // Fit: the cropped picture fitted at θ = 0 by `edit_zoom.rs`'s two
         // solves, written as F so it composes like any key.
         let whole = ZoomRegion {
@@ -192,15 +242,25 @@ impl Frame {
             window: (w / k, h / k),
             half_source: (ws / 2.0, hs / 2.0),
             fit: (kf, fx - kf * video.x, fy - kf * video.y),
+            placed: Vec::new(),
         })
     }
 
-    /// A box point (0…1 of the picture) on the source canvas.
-    pub(crate) fn point(&self, bx: f64, by: f64) -> Point {
+    /// A box point (0…1 of the picture) on the source canvas, through the
+    /// placement in force at clip tick `t` (VR-27 (a)); the base's when
+    /// none was read there.
+    pub(crate) fn point(&self, t: Ticks, bx: f64, by: f64) -> Point {
         let (mw, mh) = self.media;
+        let (s, anchor) = match self.placed.binary_search_by_key(&t, |p| p.0) {
+            Ok(i) => {
+                let (_, s, x, y) = self.placed[i];
+                (s, (self.half_source.0 + x, self.half_source.1 + y))
+            }
+            Err(_) => (self.s, self.anchor),
+        };
         (
-            self.anchor.0 + self.s * (bx * mw - mw / 2.0),
-            self.anchor.1 + self.s * (by * mh - mh / 2.0),
+            anchor.0 + s * (bx * mw - mw / 2.0),
+            anchor.1 + s * (by * mh - mh / 2.0),
         )
     }
 
@@ -249,10 +309,11 @@ impl Frame {
         }
     }
 
-    /// VR-22: the subject point of a kind's box, and the window centre's
-    /// offset from it.
+    /// VR-22: the subject point of a kind's box at clip tick `t`, and the
+    /// window centre's offset from it.
     pub(crate) fn subject(
         &self,
+        t: Ticks,
         kind: SubjectKind,
         b: &SubjectBox,
         headroom: f64,
@@ -261,13 +322,13 @@ impl Frame {
         match kind {
             SubjectKind::Face => {
                 let lift = if h > w { h / 2.0 - headroom * h } else { 0.0 };
-                (self.point(b.x + b.w / 2.0, b.y + b.h / 2.0), (0.0, lift))
+                (self.point(t, b.x + b.w / 2.0, b.y + b.h / 2.0), (0.0, lift))
             }
             SubjectKind::Person => (
-                self.point(b.x + b.w / 2.0, b.y),
+                self.point(t, b.x + b.w / 2.0, b.y),
                 (0.0, h / 2.0 - PERSON_TOP * h),
             ),
-            SubjectKind::Salient => (self.point(b.x + b.w / 2.0, b.y + b.h / 2.0), (0.0, 0.0)),
+            SubjectKind::Salient => (self.point(t, b.x + b.w / 2.0, b.y + b.h / 2.0), (0.0, 0.0)),
         }
     }
 }
@@ -340,8 +401,17 @@ pub fn plan_framing(
     if media.kind != MediaKind::Video || !media.has_video {
         return None;
     }
-    let frame = Frame::of(project, clip, request)?;
+    let mut frame = Frame::of(project, clip, request)?;
     let (samples, shots) = in_clip_time(clip, project, subjects);
+    if !clip.actions.is_empty() {
+        frame.placed = samples
+            .iter()
+            .map(|s| {
+                let p = project.evaluate_clip(clip, s.t).video;
+                (s.t, p.scale, p.x, p.y)
+            })
+            .collect();
+    }
     let chosen = choose_subject(&samples, &shots, request.follow);
     Some(write_keys(
         &frame,
@@ -383,5 +453,6 @@ pub fn fixed_framing(
     Some(FramingPath {
         keys: vec![key],
         shows_fit: state == WhereEmpty::Fit,
+        cuts: Vec::new(),
     })
 }

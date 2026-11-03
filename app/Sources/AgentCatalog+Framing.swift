@@ -1,15 +1,16 @@
 import Foundation
 
-/// The catalog row of `reframe_clip` (road map "creator-jobs" VR2a2, spec §11
-/// VR-26, VR-28), spliced in last by `creatorTools()`, after `switch_angle`'s.
-/// Its `subjects` is the app's to fill (`AgentCatalog+Declarations.swift`), so
-/// the row describes the seven other arguments.
+/// The catalog row of `reframe_clip` (road map "creator-jobs" VR2a2 and VR2b1,
+/// spec §11 VR-26…VR-28), spliced in last by `creatorTools()`, after
+/// `switch_angle`'s. Its `subjects` is the app's to fill
+/// (`AgentCatalog+Declarations.swift`), so the row describes the eight other
+/// arguments.
 extension AgentServer {
 
     func framingTools() -> [[String: Any]] {
         [
             // No menu sends it yet: Clip ▸ Follow Subject… arrives in road map
-            // creator-jobs VR2b. The tool fills `subjects` from the analysis
+            // creator-jobs VR2b2. The tool fills `subjects` from the analysis
             // cache (AgentServer+Framing.swift).
             opTool(
                 "reframe_clip",
@@ -23,9 +24,18 @@ extension AgentServer {
                     + "and frames two people together when both fit. center holds the window "
                     + "on the picture's centre, fit shows the whole picture for the whole clip, "
                     + "and keep rescales the clip from the canvas it was made for "
-                    + "(from_width × from_height) as Change Canvas does. The framing is "
-                    + "written as the clip's position and scale and one action per move, ends "
-                    + "{video: {scale, x, y}}. One undo step, \"Reframe Clip\"; the answer's "
+                    + "(from_width × from_height) as Change Canvas does, its actions' "
+                    + "positions and scales with it. The framing is composed into the clip: "
+                    + "into its position and scale, and into every action end that moves or "
+                    + "scales it, so an existing zoom or pan keeps working inside the new "
+                    + "framing. Its moves are written as actions in the gaps between the "
+                    + "clip's own actions, shifted up to 0.5 s earlier to clear one, or else "
+                    + "carried by the action they overlap along that action's curve; a cut "
+                    + "splits the action it lands in (a linear one plays exactly as before, "
+                    + "an eased one is eased again on each side), except a speed action or "
+                    + "one running past the clip's end, which carries the cut instead. "
+                    + "replace first removes every position and scale from the clip's actions "
+                    + "and fits the picture. One undo step, \"Reframe Clip\"; the answer's "
                     + "cached is false when an analysis ran first. The tool analyses the "
                     + "clip's window (± 1 s; shots, faces and subjects, as get_media_analysis "
                     + "does) and waits up to 60 s; past that nothing changes and the answer "
@@ -35,14 +45,12 @@ extension AgentServer {
                     + "adjustment clip; a clip with no picture, or a crop or scale leaving "
                     + "none; a nest clip, then a still or image clip, with a following kind; "
                     + "unless keep, a clip on a matte track or cut by a matte, then a turned "
-                    + "clip (a rotation, an action turning it, a spin); any action on the "
-                    + "clip, unless keep with no action moving or scaling it; with backdrop "
+                    + "clip (a rotation, an action turning it, a spin); with backdrop "
                     + "where a copy would be made, a nest clip or a track not behind the "
                     + "clip's; last, a following kind with nothing found in the clip. Inside "
                     + "a nest (scope) the nest's canvas is the canvas.",
                 [
-                    "clip": "The clip to frame: a clip with a picture and no actions (keep "
-                        + "allows actions that do not move or scale it).",
+                    "clip": "The clip to frame: a clip with a picture, upright.",
                     "follow": "subject, face, person or salient (follow what is found), "
                         + "center, fit or keep.",
                     "zoom": "How tight, 1–4 times the scale that fills the canvas; default 1. "
@@ -57,7 +65,13 @@ extension AgentServer {
                         + "when the framing shows the whole picture anywhere (fit, or a "
                         + "following kind's fit spans). When that track is locked, a matte or "
                         + "holds a clip over the clip's span, the copy goes on a new back-most "
-                        + "track instead. Absent: no copy.",
+                        + "track instead. Absent: no copy. The copy keeps the clip's speed "
+                        + "actions, so a ramped clip's copy shows the same frames.",
+                    "replace": "true: before framing, remove x, y and scale from every action "
+                        + "end on the clip (an action left with nothing is removed; volume and "
+                        + "every other key stay) and fit the picture to the canvas, so the "
+                        + "framing replaces the clip's own moves. Default false: the framing "
+                        + "is composed into them. Not read by keep.",
                 ]),
         ]
     }

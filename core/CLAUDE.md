@@ -636,7 +636,9 @@ governs a module now.
   props from the evaluation at the cut, unfinished actions rebased, a
   straddled one narrowed, presets and motion halves anchored to the two
   ends. Every splitter in the crate routes here, so a rule stated once is a
-  rule they all obey. A free function over `&mut Project` because it is
+  rule they all obey. `state_patch` and `narrow_to` are `pub(crate)`:
+  `reframe_compose.rs` splits an action at a framing cut through them (spec
+  §11 VR-27 (d)). A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
   A graphic's second half gets `in + cut` through `recipe_graphic.rs`'s
   `graphic_advanced`, and BOTH halves' `length` are pinned to the ORIGINAL's
@@ -1232,7 +1234,11 @@ governs a module now.
   `Chosen` carries `identity`, `lost` and `second`; `reframe.rs` maps shots
   with `Round::Up`, sizes `Frame` (`pub(crate)`) through `source_size`,
   holds `WhereEmpty`, `FramingRequest.where_empty`, `FramingPath.shows_fit`
-  and `fixed_framing` (`center`, `fit`).
+  and `fixed_framing` (`center`, `fit`). Since VR2b1 (spec §11 VR-27 (a)):
+  each sample's point through the placement in force at its tick
+  (`Frame.placed`), the window clamped inside the common cropped rect of the
+  base and every action end, `k` raised until it fits and held at
+  `SCALE_MAX` over every placement; `FramingPath.cuts`.
 - `reframe_path.rs` — a framing path's keys (VR2a1, VR2a2, spec §11 VR-23,
   VR-24): VR-23's moves, moved whole, and VR-24 — a hard cut at each shot
   change (a one-frame linear segment onto the first canvas frame showing the
@@ -1241,18 +1247,37 @@ governs a module now.
   return (`RETURN_SEEN` 0.6 s), two people (`PAIR_WIDEN` 1.15), the first
   key; no move ending after the frame before the next cut; `FramingPath::at`
   and `moves`.
-- `reframe_cover.rs` — a framing written as an edit (VR2a2, spec §11 VR-25,
-  VR-26): `framed` (key 0 composed into the base, one action per later
-  change of value, ends `{video: {scale, x, y}}`, ids in time order), `kept`
-  (`rescale_video`), `with_backdrop` (one `blurred_copy` of the whole clip on
-  the named track when unlocked, not a matte and free over the clip,
-  touching allowed, else `with_back_track`).
-- `edit_reframe.rs` — `reframe_clip` (VR2a2, spec §11 VR-26):
+- `reframe_cover.rs` — a framing written as an edit (VR2a2, VR2b1, spec §11
+  VR-25…VR-27): `kept` (`rescale_video` on the base and on each `x`, `y` and
+  `scale` an end names), `with_backdrop` (one `blurred_copy` of the whole
+  clip on the named track when unlocked, not a matte and free over the clip,
+  touching allowed, else `with_back_track`; the copy keeps the clip's speed
+  actions, each end narrowed to `speed`). The path itself is
+  `reframe_compose.rs`'s.
+- `reframe_compose.rs` — a framing composed into a clip that already moves
+  (road map "creator-jobs" VR2b1, spec §11 VR-27): `replaced` (`replace`'s
+  strip — `x`, `y` and `scale` removed from every end's `video`, an emptied
+  group then an emptied end's action dropped — and the base at Fit through
+  `edit_zoom.rs`'s `zoom_scale` and `zoom_offset`) and `composed`: cuts split
+  the action they land in first (`edit_split.rs`'s `state_patch` and
+  `narrow_to`: a head keeping the id and curve, a one-frame `linear` piece, a
+  tail keeping the end and curve, each clamped into the action; an action
+  naming `speed` or ending past the clip carries the cut), then F's moves are
+  scheduled against the pieces (own in a gap, shifted earlier by at most
+  `SHIFT_MAX` 0.5 s, or carried along the first overlapped action's curve,
+  later moves chaining), then the base becomes F′(0)∘P(0) and every end
+  naming x, y or scale, or one F′ changes across, F′(end)∘P(end); fresh ids
+  in time order, actions in start order; `Composed {re_eased, carried}`.
+  Byte-for-byte VR2a2's writing on a clip with no actions. `pub` for the
+  tests' counts.
+- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, spec §11 VR-26, VR-27):
   `FramingFollow`, `Reframe`, the strict `Subjects` reader (`ZoomRegion`'s
   pattern, an object at every level), `MAX_SUBJECT_SAMPLES`,
   `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's sentence, which the tool
-  matches), four errors and ten refusals in order, "no subjects" last so the
-  tool's trial meets every other first. Allowed inside a nest.
+  matches), four errors and the refusals in order (VR-26's (7) removed by
+  VR-27), "no subjects" last so the tool's trial meets every other first;
+  `replace` (`replaced` before the plan for every follow but `keep`,
+  `composed` after it). Allowed inside a nest.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

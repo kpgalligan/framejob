@@ -1164,7 +1164,8 @@ extension ReelOp {
     static func reframeClip(
         clip: UInt32, follow: FramingFollow, zoom: Double? = nil,
         whereEmpty: FramingWhereEmpty? = nil, fromWidth: UInt32? = nil,
-        fromHeight: UInt32? = nil, backdrop: UInt32? = nil, subjects: [String: Any]? = nil
+        fromHeight: UInt32? = nil, backdrop: UInt32? = nil, replace: Bool? = nil,
+        subjects: [String: Any]? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
@@ -1174,6 +1175,7 @@ extension ReelOp {
         a.put("from_width", fromWidth)
         a.put("from_height", fromHeight)
         a.put("backdrop", backdrop)
+        a.put("replace", replace)
         a.put("subjects", subjects)
         return ReelOp(name: "reframe_clip", args: a.values)
     }

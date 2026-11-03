@@ -9009,11 +9009,118 @@ is the lane's above; the integration changed no app input.
   empty (7); the tool reading the sheet's key (9).
 - **Manual checks:** **JOB-31** — the framing's feel on T1 (S-TH1): no fidget, no lag, moves where a
   camera operator would make them. **JOB-32** — S-PC3's two-shot treatment.
+- **Split (recorded before code, 2026-11-03).** VR2b runs as two pipelines in lane C, both
+  before VR3. **VR2b1** (this lane's pipeline now): VR-27 settled in
+  `designs/spec/11-decisions/creator-jobs-9.md` before the code — the planner reading the
+  placement in force, the composition into the base and the action ends, cuts splitting the
+  action they land in, moves scheduled around the actions, the counts, `replace` and `keep` on
+  ends — with an amendment line under VR-26 removing refusal (7); `reframe_compose.rs`, the op's
+  `replace`, its Swift mirror and docs; `vr2b_proof.py` rows 1–5, 8 and Z1; mutants 1–4 and the
+  design's four more. **VR2b2** (the next): VR-29, Clip ▸ Follow Subject… and its sheet, the
+  Analyzing sheet, the "Backgrounds" track, the summary's counts per VR-27 (f),
+  `-RCDevFollowAccept YES`, the `FrameJobFollow*` keys, spec §9, the screen, the guide's Follow
+  Subject section, `menus-and-shortcuts.md`, proof rows 6, 7 and 9, mutants 5 and 6, JOB-31 and
+  JOB-32.
 - **Depends on:** VR2a, CO2a1 (`edit_action_end.rs`). **Lane** C.
 - **Questions for the owner:** (1) Default zoom: fill, the widest tall window, or a tighter 110 %?
   *Recommended: fill.* (2) Two people who don't fit: follow one, or show both whole on a blurred
   background? *Recommended: follow one.* (3) Headroom: the face at 38 % from the top on a tall
   frame, or centred? *Recommended: 38 %* (VR-S2 tunes it).
+
+#### VR2b1's record (2026-11-03)
+
+**Built** in lane C, base `6a12ee93` (I's HEAD after CU11b; VR2a2 at `b6a2b52a` below it). No
+format (43 stands), FFI, header, op, tool or `Kind` change: `OP_COUNT` 70, 122 product tools. The
+owner's answers for VR2b (fill, follow one, 38 %) are VR2a's settings and stand. The commits:
+- `739e6fbb`: VR-27 (a)–(i) appended to `designs/spec/11-decisions/creator-jobs-9.md` (433 → 507
+  lines) with the amendment line under VR-26 removing refusal (7), the index rows, this road map's
+  "Split" paragraph, alone, before any code.
+- `9cd65d0d`: the code, tests, docs and proof.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/reframe_compose.rs` | 400 | new: `replaced`, `composed`, `SHIFT_MAX`, `Composed` |
+| `core/src/reframe.rs` | 387 → 458 | VR-27 (a): `Frame.placed`, the common rect, `k` raised and held at `SCALE_MAX`; `point` and `subject` take the sample's tick; `FramingPath.cuts` |
+| `core/src/reframe_path.rs` | 368 → 371 | the tick passed through; `cuts` filled |
+| `core/src/reframe_cover.rs` | 123 → 100 | `framed` deleted; `kept` on ends; the copy's speed actions |
+| `core/src/edit_reframe.rs` | 400 → 403 | `replace`; refusal (7) deleted; `replaced` → plan → `composed` |
+| `core/src/edit_split.rs` | 293 | `state_patch`, `narrow_to` `pub(crate)` |
+| `core/tests/reframe_compose.rs` | 554 | new: 14 cases |
+| `tools/proof/vr2b_proof.py` | 400 | new: rows 1–5, 8, Z1 |
+
+**Deviations.** (1) `replaced` and `composed` are `pub`, not `pub(crate)`, so
+`core/tests/reframe_compose.rs` reads the planner's counts beside (f)'s recount (the decision's
+"Choices left to the code"). (2) A cut piece whose action starts at `c − frame` writes no head;
+the first piece written then keeps the action's id. (3) `reframe.rs` grew past VR2a2's 400 to 458
+(its soft cap is ~600; no cut was owed). (4) `vr2b_proof.py`'s row 1 sets the clip's scale to 1
+first: `add_clip` fits a 1920 × 1080 clip at 0.5625 on a tall canvas; and dx is held to 360K to
+1e-3, the canned boxes being float32. (5) The VR2a2 README section's row 8 text names the
+applied action (its proof's row changed with it).
+
+**Measured.**
+- `cargo test --release --test reframe_compose` 14 passed; with `--test reframe_clip --test
+  reframe --test reframe_path --test background --test edit_tests --test op_table --test
+  op_schemas --test op_nullability --test op_names --test scope` every one green (reframe 22,
+  reframe_path 12, reframe_clip 14, op_nullability 2 with the optional inventory 99 → 100 and
+  the non-plain count 91 → 92); step 3's `reframe`, `reframe_path` and `reframe_clip` green
+  unchanged before `reframe_compose.rs` was written. `cargo fmt`; `make lint` exit 0.
+- `make typecheck`: exit 0, the 4 baseline warnings. `spec_index_proof.py` 264/264.
+- Debug: `vr2b_proof.py` 5/7 on its first run (row 1's fixture assumed `add_clip`'s scale 1,
+  row 2's `set_action curve: linear` an identity; both instrument fixes, deviation (4)), then
+  rows 1, 2 and 1 again green; `vr2a_proof.py --only 1,3,8` 4/4.
+- `make gate`: "gate: PASS 703s" (names 1, typecheck 17, fmt 4, lint 13, test 468 with 227
+  result lines, 2305 passed, 0 failed, app 197).
+- Release (the gate's app): `RC_PROOF_APP=release vr2b_proof.py` 7/7, exit 0 (row 2: 1,440,000
+  samples each, 0 differ); `RC_PROOF_APP=release vr2a_proof.py` 10/10, exit 0, both launches'
+  Z1 empty.
+- Mutants, eight, each edited into the tree, run and restored, every one CAUGHT (exit 101 on
+  its named `reframe_compose` test): composition skipped for existing ends (and row 1 on a Debug
+  app built with it, FAIL); the head's end from x, y and scale only; a speed action split;
+  `replace` ignored (and row 4 on a Debug app, FAIL); the planner reading the base only ("face
+  at 220", the 320 px off-centre the test works out by hand); `SHIFT_MAX` unbounded; `k` not raised; moves
+  scheduled before the cut splits.
+
+**Review** (one should-fix, fixed). VR-27 (d) split an action that only met the cut piece
+without clamping, so an action edge off the frame grid inside `[c − frame, c]` (a 1 s action on
+29.97 fps footage) wrote a piece past the action, over its neighbour. Each piece is now clamped
+into the action, and a clamped cut piece is still F′'s own segment; VR-27 (d) says so
+(`creator-jobs-9.md` 507 → 508 lines). `core/tests/reframe_compose.rs` (554 → 638) gained
+`an_action_edge_inside_the_cut_frame_bounds_its_pieces`, 15 passed; the clamp removed and the
+exact-span check restored each failed it (exit 101). `make gate` "gate: PASS 653s" (test 284,
+227 result lines, 2306 passed, 0 failed; app 344); Release `vr2b_proof.py` 7/7 and
+`vr2a_proof.py` 10/10, exit 0, every Z1 empty.
+
+**Owed.** Nothing person-only: JOB-31 and JOB-32 are VR2b2's. VR2b2 (VR-29) is next in lane C.
+
+#### VR2b's record (2026-11-03)
+
+VR2b1's reviews and landing; what it built and measured is VR2b1's record above. VR2b2 is still
+to come.
+
+**Review.** Two reviews. The first (`6a12ee93..d7cc5f14`) found one should-fix: (d)'s pieces
+were not clamped into the action they split. It was fixed in `24493b8f` (above). Its one nit was
+left as written in VR-27 (a): the common rect also reads the placement at the end of an action
+that runs past the clip. The second review (`6a12ee93..24493b8f`) passed with no new findings.
+
+**Integration (2026-11-03).** Cherry-picked (`739e6fbb`, `9cd65d0d`, `d7cc5f14`, `24493b8f`)
+onto `worktree-creator-jobs` at `6a12ee93`. Nothing else had landed since, so there were no
+conflicts; format 43 stands. `core/CLAUDE.md` gained an entry for `reframe_compose.rs`.
+`reframe_cover.rs`'s entry is rewritten (`framed` gone, `kept` on ends, the copy's speed
+actions), `edit_split.rs`'s now names `state_patch` and `narrow_to` as `pub(crate)`, and
+`edit_reframe.rs`'s gains `replace`, with refusal (7) removed. The `reframe_tracks.rs` ·
+`reframe.rs` entry gains VR-27 (a).
+
+On the integrated tree, `make gate` printed "gate: PASS 724s" (names 2, typecheck 19, fmt 5,
+lint 30, test 454 with 227 result lines, 2306 passed, 0 failed, app 213). Against that Release
+app:
+- `RC_PROOF_APP=release vr2b_proof.py` passed 7/7 (row 2: 1,440,000 samples each, 0 differ);
+- `RC_PROOF_APP=release vr2a_proof.py` passed 10/10.
+
+Every Z1 was empty. No issue was owed.
+
+**Owed.** VR2b2 (VR-29): Clip ▸ Follow Subject… and its sheet, the "Backgrounds" track, the
+summary's counts, `-RCDevFollowAccept YES`, the screen, the guide's section, proof rows 6, 7 and
+9, mutants 5 and 6, JOB-31 and JOB-32.
 
 ### FC6 — Claude's ranking, checked, priced and cached
 

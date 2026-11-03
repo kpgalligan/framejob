@@ -87,18 +87,34 @@ The framing is written as ordinary edits: the clip's position and scale, and
 one action per move, which you can change afterwards like any other. Undo
 takes the whole framing back in one step, **Reframe Clip**.
 
+A clip that already has actions keeps them. The framing is composed into them:
+a zoom or pan the clip already makes still happens, inside the new framing, and
+a volume or speed action still does what it did. The framing's own moves go in
+the gaps between the clip's actions; a move that would overlap one is moved up
+to half a second earlier, or else made part of that action, along its curve. A
+shot change that falls inside an action cuts it in three around the one-frame
+cut, so a steady (linear) change of volume still sounds exactly as it did and
+an eased one eases again on each side of the cut; a speed action, or one a trim
+left running past the clip's end, is never cut, and takes the framing's change
+across its length instead. Send `replace: true` to start from the whole picture
+instead: every position and scale the clip's actions set is removed first
+(volume and everything else stay, and an action left with nothing is removed),
+then the clip is framed.
+
 Where the framing shows the whole picture, the canvas around it shows too. Name
 a track behind the clip as `backdrop` and a blurred copy of the clip goes there
 for the clip's whole length — the copy **Clip ▸ Add Blurred Background** makes —
 or on a new track at the back when that track is locked, a matte, or busy over
-the clip.
+the clip. A clip with speed actions keeps them on its copy, so the copy shows
+the same frames.
 
 The tool analyses the part of the file the clip plays, if it has not been
 analysed, and waits up to a minute. If that is not enough it changes nothing,
 says how much is done, and keeps analysing: ask again to apply. `center`,
 `fit` and `keep` need no analysis.
 
-Not every clip can be framed in this release. A clip with actions on it is
-refused (a `keep` that moves nothing is the exception), as are a clip on a
-matte track or cut by one, a rotated or spinning clip, and — for the following
-kinds — a nest, a still or a picture. Each refusal says why.
+Not every clip can be framed. A clip on a matte track or cut by one and a
+rotated or spinning clip are refused, and — for the following kinds — so are a
+nest, a still or a picture. Each refusal says why. `keep` frames any of them,
+rescaling the clip's position and scale, and every position and scale its
+actions set, from the canvas it was made for.

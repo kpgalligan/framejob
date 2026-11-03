@@ -56,8 +56,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   nests the moving role's clips first and lays out the nest clip, refused `clip {id} is already
   laid out; a nest would lay it out twice.` when one is. One undo step.
 - **`reframe_clip {clip, follow, zoom=1, where_empty="fit", from_width?, from_height?, backdrop?,
-  subjects?}`** — Frames one clip on the current canvas (road map creator-jobs VR2a2, §11
-  VR-20…VR-26). `follow` `subject` (faces, then people, then salient regions), `face`, `person` or
+  replace=false, subjects?}`** — Frames one clip on the current canvas (road map creator-jobs
+  VR2a2 and VR2b1, §11 VR-20…VR-27). `follow` `subject` (faces, then people, then salient regions), `face`, `person` or
   `salient` follows the analysed `subjects` — `{samples: [{t, faces?, people?, salient?: [{x, y, w,
   h, c}]}], shots: [t]}` in forward-media SOURCE ticks, boxes 0–1 of the upright picture from its
   top-left, read strictly (an object at every level, a stray, missing or wrong-typed member an
@@ -67,11 +67,27 @@ The rules every op shares are §6a; the clip ops are §6b.
   picture; `center`, the window on the picture's centre), a return after 0.6 s seen, two people
   framed together when both widened boxes fit. `center` holds the window (fill × `zoom`) on the
   picture's centre and `fit` the whole picture; `keep` rescales the base from `from_width ×
-  from_height` (the canvas when absent) by `set_canvas`'s rule. The path is written as the base
-  (its first key) and one action per later change of value, ends `{video: {scale, x, y}}`, ids
-  in time order. `backdrop`: when the framing shows `fit` anywhere, one blurred copy of the whole
+  from_height` (the canvas when absent) by `set_canvas`'s rule, and each `x`, `y` and `scale` an
+  action's end names with it. The path F is COMPOSED into the clip (VR-27), its placement P(t)
+  the clip's evaluated `video`: the planner reads each sample through P at its tick and clamps
+  the window inside the common cropped rect of the base and every action end, raising the zoom
+  until it fits (at most `SCALE_MAX` at every placement); the base becomes F′(0)∘P(0), and an
+  action end naming `x`, `y` or `scale` (or one F′ changes across) writes `video.{scale, x, y}` =
+  F′(end)∘P(end). A cut splits the action it lands in into a head (its id, curve and the
+  evaluated state at `c − frame`, narrowed to its keys), a one-frame `linear` piece (the state at
+  `c`) and a tail (its end and curve) — so a linear action plays unchanged and an eased one is
+  re-eased on each side — except an action naming `speed` or running past the clip's end, which
+  carries the cut. Then each move is its own action (ends `{video: {scale, x, y}}`) in a gap,
+  shifted up to 0.5 s earlier to end where the action it overlaps starts, or else carried by that
+  action: the framing holds to its start and reaches the move's value at its end along its curve,
+  later moves inside it chaining. New actions and tails take ids in time order; the actions are
+  written in start order. `replace: true` (every follow but `keep`) first removes `x`, `y` and
+  `scale` from every end's `video` (an emptied group, then an emptied end's action, removed) and
+  sets the base to the picture fitted. With no actions this is one action per later change of
+  value from the base, as VR2a2 wrote it. `backdrop`: when the framing shows `fit` anywhere, one blurred copy of the whole
   clip (`add_blurred_background`'s builder) on that track when it is unlocked, not a matte and
-  free over the clip, else on a new back-most track (ids: actions, track, copy). Only `keep` reads
+  free over the clip, else on a new back-most track (ids: actions, track, copy), keeping the
+  clip's actions that name `speed`, each end narrowed to `speed`. Only `keep` reads
   `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds read `where_empty` and
   `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
   {z}`; `from_width must be greater than 0, not 0` (and `from_height`); an unknown `backdrop`
@@ -80,9 +96,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   {id}'s crop or scale leaves no picture to frame`; with a following kind `clip {id} shows a nest,
   …` then `clip {id} shows a still picture, …`; unless `keep`, a matte (`clip {id} is on a matte
   track, …`, `clip {id} is cut by the matte on track {t}, …`), then a turn (`clip {id} is turned
-  {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); `clip {id}
-  carries actions, which framing cannot compose with in this build` (unless `keep` with no action
-  naming `x`, `y` or `scale`); bad `subjects` (over 100,000 samples, over 8 boxes of a kind, times
+  {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); bad
+  `subjects` (over 100,000 samples, over 8 boxes of a kind, times
   not strictly increasing, a value outside 0…1, a size ≤ 0); when a copy would be made,
   `add_blurred_background`'s nest sentence or `track {t} is not behind clip {id}'s track, so a
   backdrop there would cover it`; LAST, `clip {id} has no subjects to follow; analyze it first`. A

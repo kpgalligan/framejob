@@ -27724,7 +27724,7 @@ over copies of `face_fixtures.py`'s `faces_moving.mov`; every placement is read 
 | 5 | the canned exit with a backdrop track behind: no action starts in the 1 s after the loss, the ease to fit starts exactly 1 s after it, one "Blurred Background" on the named track |
 | 6 | ×2 and reversed clips of a 60 s pan: each sample `get_media_analysis {clip, kind: faces}` places at its `clip_time` contained as in row 1 |
 | 7 | a `slide_left` arrival kept, and row 2's corners hold at 40 frames after its span |
-| 8 | the tool answers each refusal in the core's sentence (a text clip, an action, a turned clip, a matte track's clip), `zoom` 5 in the core's error, and a caller's own `subjects` as the gate's stranger |
+| 8 | the tool answers each refusal in the core's sentence (a text clip, a turned clip, a matte track's clip), a clip with an action applies (VR2b1: VR-27 removed VR-26's (7)), `zoom` 5 in the core's error, and a caller's own `subjects` as the gate's stranger |
 | 9 | in a launch with `-RCDevAnalysisHold 30` and an uncached copy: a matte-track clip refused in the core's sentence within 5 s with the lane's queued count unchanged; a plain clip's call answering `analyzing` past the 60 s bound with `get_project` unchanged; once the three kinds' markers are on disk the same call applies |
 | Z1 | each launch's log has no `Frame Job: ` line |
 
@@ -27746,6 +27746,48 @@ cd core && cargo test --release --test reframe --test reframe_path --test refram
 make app && RC_PROOF_APP=release python3 tools/proof/vr2a_proof.py
 python3 tools/proof/vr2a_proof.py --only 1,3,8              # Debug, in the loop
 python3 tools/proof/vr2a_proof.py --mutant bound-ignored     # row 9 must fail
+```
+
+## Road map "creator-jobs" VR2b1 — framing composed into a clip's actions, and `replace` (`vr2b_proof.py` rows 1–5, 8, Z1; `core/tests/reframe_compose.rs`; eight mutants; spec §11 VR-27)
+
+**`vr2b_proof.py`** drives the built app over MCP (`proof_app.binary()`, `RC_PROOF_APP`) on a
+scratch `CFFIXED_USER_HOME`, in one launch with `-RCDevAnalysisCanned YES`: `canned_framing.py`'s
+markers over copies of `face_fixtures.py`'s `faces_moving.mov` (row 2's copy muxed with a 440 Hz
+tone by ffmpeg, the picture stream-copied). Every project is 1080 × 1920 at 30 fps; every
+placement is read back with `get_project`. Rows 6, 7 and 9 (Follow Subject) are VR2b2's.
+
+| Row | What it holds |
+|---|---|
+| 1 | a still face at picture x 600, the clip at scale 1, a zoom action [2, 3) s ending `{scale: 1.5, x: 180}`: the base and the end solve to ONE (k, dx, dy) to 1e-6, (K, 360K, 0) |
+| 2 | a linear volume action [5, 15) s across the canned cut at 10 s: split into three, and `audio_wav` exports before and after identical sample for sample (ffmpeg to float32) |
+| 3 | an `ease_in_out` volume action at the same cut: the head (its id, `ease_in_out`, to `c − frame`), one frame of `linear`, the tail (`ease_in_out`, the old end) |
+| 4 | `replace: true`, `follow: fit`: no end names x, y or scale, the volume kept, the x-only action gone, the base at Fit (0.5625, 0, 0) |
+| 5 | a ×1.5 speed action across the cut: its id, start and duration unchanged, no other action over it, its end carrying x, y and scale beside `speed` |
+| 8 | a magenta canvas, a canned pan followed with a zoom and a volume action on the clip: `render_frame`'s corners never magenta at 40 frames |
+| Z1 | the launch's log has no `Frame Job: ` line |
+
+**`core/tests/reframe_compose.rs`** (14 cases) holds the rest: the held zoom followed through
+(VR-27 (a)), the y-pan's raised `k`, the head carrying a move before a cut, the linear split's
+volume at every frame, the eased split's re-easing, a speed action and one past the clip's end
+never split, a move shifted 0.4 s and one carried at 0.6 s, `replace` and its counts against
+(f)'s recount, `keep` on ends, an action-free clip byte-identical to VR2a2's writing, and the
+ramped clip's backdrop keeping its speed action.
+
+The mutants, each edited into the tree, run against its named test and restored, every one
+CAUGHT: composition skipped for existing ends (`an_existing_zoom_is_composed_with_one_framing`,
+and row 1 on a Debug app built with it); the head's end from x, y and scale only
+(`a_linear_volume_action_plays_unchanged_across_a_split`); a speed action split
+(`a_speed_action_is_never_split_and_carries_the_cut`); `replace` ignored
+(`replace_strips_placement_keys_keeps_volume_and_fits_the_base`, and row 4 on a Debug app); the
+planner reading the base only (`a_subject_under_a_held_zoom_is_followed_through_it`);
+`SHIFT_MAX` unbounded (`a_move_is_shifted_by_half_a_second_at_most_else_carried`); `k` not
+raised to the common rect (`a_y_pan_raises_k_until_the_window_fits_the_common_rect`); moves
+scheduled before the cut splits (`cuts_split_first_then_the_head_carries_the_move`).
+
+```sh
+cd core && cargo test --release --test reframe_compose --test reframe_clip
+make app && RC_PROOF_APP=release python3 tools/proof/vr2b_proof.py
+python3 tools/proof/vr2b_proof.py --only 1,4,5              # Debug, in the loop
 ```
 
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)

@@ -173,6 +173,7 @@ mod recipe_subject;
 pub mod recipe_text;
 pub mod recipe_words;
 pub mod reframe;
+pub mod reframe_compose;
 pub mod reframe_cover;
 pub mod reframe_path;
 pub mod reframe_tracks;

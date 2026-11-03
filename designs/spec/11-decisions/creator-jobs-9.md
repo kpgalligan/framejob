@@ -120,6 +120,8 @@ map expects none for VR2a.
   LAST, a following kind with no `subjects` or with no sample in the played window ("clip {id} has
   no subjects to follow; analyze it first"), so that the tool's trial meets every other refusal
   first (VR-28).
+  *Amended by VR-27 (VR2b1, 2026-11-03):* refusal (7) is removed — a clip with actions is
+  framed by composing into them — and (8)–(10) keep their order and their numbers.
 - **VR-28 — The tool fills `subjects` and answers within a bound** (`AgentServer+Framing.swift`,
   off main; `subjects` declared `filledByTheApp`, so the gate refuses a caller's own as a
   stranger). The first main hop resolves the target and the effective scope's view, reads every
@@ -431,3 +433,76 @@ is keyed (CJ-3). The owner's answer of 2026-11-01 stands: the shutter Auto Zoom 
   blend mode 0) → MB1b; `cursor-fraction` (k/n in the shader) → MB5; `cursor-in-samples`
   (`sampleUniforms` keeping `cursorSamples`) → MB6. **JOB-26** is the person's check that the
   blur reads as motion and not as smear.
+
+## VR2b1 — framing composed into existing actions, and `reframe_clip`'s `replace` (2026-11-03)
+
+Recorded before the code. VR2b is split (the road map's "Split" paragraph under VR2b): VR2b1
+settles VR-27, the core's composition and the op's `replace`; VR2b2 is VR-29 (Clip ▸ Follow
+Subject…), its sheet, menu, screen, manual checks and the proof's menu rows. No FFI, no header,
+no new op, tool or `Kind`, and no format change (43 stands; `OP_COUNT` 70; 122 product tools);
+nothing sends anything anywhere, so nothing is keyed (VR-2, CJ-3). The owner's answers of
+2026-11-01 for VR2b (fill, follow one, 38 %) are VR2a's settings and stand.
+
+- **VR-27 — Compose, or replace** (`core/src/reframe_compose.rs`, new; `reframe.rs`,
+  `reframe_path.rs`, `reframe_cover.rs`, `edit_reframe.rs`). P(t) is the clip's evaluated
+  `video` (scale, x, y) at clip tick t; F the planned path; F′ the scheduled path.
+  (a) **The planner reads the placement in force.** Each sample's point is (★) through P at its
+  own tick (`Frame.placed`, filled by `plan_framing` from `evaluate_clip` at each in-clip
+  sample). Every window is clamped inside the COMMON rect: the intersection of the cropped rects
+  of the base and of P at every action's end. Where the window would not fit, `k` is raised:
+  `k = max(k_base, W / common_w, H / common_h)`, still held so that `k·s` at every one of those
+  placements is at most `SCALE_MAX`. Coverage at every written key except a `fit` key then holds
+  by convexity (VR-7). Where `SCALE_MAX` stops the raise, `clamp` centres, as VR2a2 does. An
+  empty common rect falls back to the base rect. With no action naming x, y or scale this is
+  VR2a2's arithmetic exactly.
+  (b) **Composition.** The base becomes F′(0)∘P(0). Every action end writes
+  `video.{scale,x,y}` = F′(end)∘P(end) when it names any of them (`null` included) or when F′
+  changes across its span; otherwise its end is untouched. Exact wherever F′ is constant over an
+  action, or P is constant over a move.
+  (c) **Scheduling** runs after (d): cuts split first, then moves are scheduled against the
+  resulting pieces. Busy spans are the clip's actions after the splits, `[start,
+  start + duration)`; a head, a cut piece or a tail is a busy span of its own and may carry. A
+  move (two consecutive keys of F whose values differ, cuts excluded) that overlaps no busy span
+  becomes its own action. One that overlaps a span is shifted earlier to end at the start of the
+  first span it overlaps, when the shift is at most `SHIFT_MAX` (0.5 s) and the move then starts
+  at or after both the previous key and the previous span's end. Otherwise the move is CARRIED
+  by that first span's action A: F′ holds until A's start and reaches the move's end value at
+  A's end, along A's curve. Later moves that overlap A chain into it, and A's end takes the last
+  one's value.
+  (d) **Cuts.** A cut piece `[c − frame, c]` (`FramingPath.cuts`: each hard cut's key time whose
+  key differs from the hold at `c − frame`, VR-24 (b)) inside an action A that names `speed`, or
+  that ends past the clip's duration, is carried as in (c). Any other A is split into up to three
+  pieces: the head `[A.start, c − frame]`, which keeps A's id and curve and whose end is
+  `narrow_to(state_patch(eval at c − frame), A.end)`; the cut piece, `linear`, ending at
+  `narrow_to(state_patch(eval at c), A.end)`; and the tail `[c, A.end]`, which keeps A's end and
+  curve (`edit_split.rs`'s two helpers, lifted `pub(crate)`). Each piece is clamped into A (an
+  edge of A off the frame grid can fall inside the cut frame, and the clamped cut piece is still
+  F′'s own segment), and one of length 0 is not written. Each piece then takes (b)'s x, y and
+  scale rule. A linear A plays unchanged on every key, volume included; an eased A is re-eased on
+  each side. A cut in no action is its own `linear` action, as VR2a2's.
+  (e) **Ids** are minted in time order for the new actions and tails (a head keeps its
+  action's id), then VR-25's track, then the copy. A clip's actions are written in start order.
+  (f) **Counts.** `Composed {re_eased, carried}`: `re_eased` the non-linear actions that were
+  split, `carried` the actions across which F′ changes from a carried move or a carried cut. The
+  op answers only applied, identity or refused, so a command recomputes them from the two
+  handles with no planner: re-eased = an action id of the clip in both handles whose duration
+  shrank and whose curve is not `linear`; carried = an action in both with the same span across
+  which F, solved from both handles' `rc_project_clip_state` at its two ends (`k = s′/s`,
+  `dx = x′ − k·x`, `dy = y′ − k·y`), differs by more than 1e-6. Under `replace` (g) P is
+  constant once (g) has run, so the before handle's placement is not read: carried is then an
+  action in both handles with the same span across which the AFTER handle's (scale, x, y)
+  differs by more than 1e-6.
+  (g) **`replace: true`**, read by every follow but `keep` (absent is `false`): the keys `x`,
+  `y` and `scale` are removed from every end's `video` (removed, not keyed off), a `video` group
+  left empty is dropped, then an action whose end is left `{}`; the base is set to the Fit
+  placement of the cropped picture on the canvas (`zoom_scale(.., ZoomFit::Fit, 0)` and
+  `zoom_offset`, as `Frame`'s `fit`); then the clip is planned and composed.
+  (h) **`keep`** applies `rescale_video`'s rule to the base and to every end key among x, y and
+  scale that the end names (through `rescale_video` itself, never restated).
+  (i) **The backdrop copy keeps the speed actions.** VR-25's copy keeps the original's actions
+  that name `speed`, each end narrowed to `speed`, so a ramped clip's copy reads the same frames;
+  every other action is dropped, as before. Its actions' ids follow the copy's.
+  **Choices left to the code:** F′ "changes across" an action when F′ at its start and at its end
+  differ; the composed placement at a time is F′ there composed into P there, both read raw;
+  `composed` and `replaced` are `pub` (not `pub(crate)`) so `core/tests/reframe_compose.rs` can
+  read the planner's counts beside (f)'s recount.

@@ -29,9 +29,10 @@ project is 1080 × 1920 at 30 fps; every placement is read back through
    `ReverseMirror`) is contained as in row 1.
 7. A `slide_left` arrival: the motion is kept and, outside its span, row 2's
    corners hold.
-8. Every refusal is the core's sentence (a text clip, a clip with an action, a
-   matte track's clip, a turned clip), a bad `zoom` the core's error, and a
-   caller's own `subjects` the gate's stranger.
+8. Every refusal is the core's sentence (a text clip, a matte track's clip, a
+   turned clip), a clip with an action applies (VR-27 removed VR-26's (7)), a
+   bad `zoom` is the core's error, and a caller's own `subjects` the gate's
+   stranger.
 
 **Launch 2** (`-RCDevAnalysisHold 30`, an uncached copy), row 9: a clip on a
 matte track answers the core's sentence within 5 s with no `analyzing` and the
@@ -400,8 +401,13 @@ def refusal_row(client):
            "reframes it", follow="fit")
     acted = doc.clip_of(media, 4, at=10 * SEC)
     doc.call("add_action", clip=acted, at=0)
-    expect("actions", acted, f"clip {acted} carries actions, which framing cannot compose with "
-           "in this build", follow="center")
+    try:
+        good = bool(doc.reframe(acted, follow="center").get("ok"))
+        why = "not ok"
+    except mcp.ToolError as error:
+        good, why = False, str(error)
+    ok = ok and good
+    details.append(f"a clip with an action: {'applied' if good else why}")
     turned = doc.clip_of(media, 4, at=20 * SEC)
     doc.call("set_video", clips=[turned], patch={"rotation": 90})
     expect("turned", turned, f"clip {turned} is turned 90°, and framing works on an upright "

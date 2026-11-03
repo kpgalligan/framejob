@@ -41,7 +41,7 @@ use crate::time::Ticks;
 /// graphic's evaluated props go in as `graphic.props` (G-34), which
 /// [`narrow_to`] narrows to the props the action named, carrying its
 /// `kinds` through untouched.
-fn state_patch(evaluated: &Evaluated) -> Value {
+pub(crate) fn state_patch(evaluated: &Evaluated) -> Value {
     let mut out = serde_json::Map::new();
     // `video_json`: a tone key at exactly 0 at the cut must still be here,
     // or `narrow_to` puts back the action's END value (spec §11 GR-2).
@@ -62,7 +62,7 @@ fn state_patch(evaluated: &Evaluated) -> Value {
 /// the same reach as the original. Keeping the shape means a split action's
 /// first half animates exactly the fields the whole action animated, rather
 /// than pinning every property of the clip.
-fn narrow_to(state: &Value, shape: &Value, depth: u32) -> Value {
+pub(crate) fn narrow_to(state: &Value, shape: &Value, depth: u32) -> Value {
     let (Value::Object(from), Value::Object(keys)) = (state, shape) else {
         return shape.clone();
     };

@@ -1,7 +1,11 @@
 //! `reframe_clip` — one clip framed on the current canvas (road map
-//! "creator-jobs" VR2a2, spec §11 VR-26). The planner is `reframe.rs`'s
-//! (VR-20…VR-24), the writing `reframe_cover.rs`'s (VR-25); this module
-//! reads the arguments, refuses in VR-26's order, and finishes.
+//! "creator-jobs" VR2a2 and VR2b1, spec §11 VR-26, VR-27). The planner is
+//! `reframe.rs`'s (VR-20…VR-24), the writing `reframe_compose.rs`'s (the
+//! path composed into the base and the actions the clip already carries,
+//! VR-27) and `reframe_cover.rs`'s (`keep`, the backdrop, VR-25); this
+//! module reads the arguments, refuses in VR-26's order, and finishes.
+//! `replace: true` strips `x`, `y` and `scale` from the ends and fits the
+//! base before planning, for every follow but `keep`.
 //!
 //! **What reads what.** The FOLLOWING kinds (`subject`, `face`, `person`,
 //! `salient`) plan over `subjects`; `center` and `fit` are `fixed_framing`;
@@ -75,6 +79,7 @@ pub struct Reframe {
     pub from_width: Option<u32>,
     pub from_height: Option<u32>,
     pub backdrop: Option<u32>,
+    pub replace: Option<bool>,
     pub subjects: Option<Subjects>,
 }
 
@@ -204,7 +209,7 @@ impl Project {
         }
     }
 
-    /// Refusals (1)–(8) of VR-26, in order.
+    /// Refusals (1)–(6) and (8) of VR-26, in order ((7) removed by VR-27).
     fn refusal(&self, clip: &Clip, r: &Reframe) -> Option<String> {
         let id = clip.id;
         let keep = r.follow == FramingFollow::Keep;
@@ -266,16 +271,6 @@ impl Project {
                 return Some(why);
             }
         }
-        let moving = clip.actions.iter().any(|a| {
-            ["x", "y", "scale"]
-                .iter()
-                .any(|k| a.end["video"].get(k).is_some())
-        });
-        if !clip.actions.is_empty() && (!keep || moving) {
-            return Some(format!(
-                "clip {id} carries actions, which framing cannot compose with in this build"
-            ));
-        }
         if following {
             if let Some(Err(why)) = r.subjects.as_ref().map(check_subjects) {
                 return Some(why);
@@ -308,14 +303,22 @@ impl Project {
         let id = clip.id;
         let zoom = r.zoom.unwrap_or(1.0);
         let canvas = (self.canvas.width, self.canvas.height);
+        if r.follow == FramingFollow::Keep {
+            let from = (r.from_width, r.from_height);
+            let from = (from.0.unwrap_or(canvas.0), from.1.unwrap_or(canvas.1));
+            return self.finish(self.kept(id, from));
+        }
+        // VR-27 (g): the strip and the Fit base come before the plan.
+        let stripped;
+        let source = if r.replace == Some(true) {
+            stripped = self.replaced(id);
+            &stripped
+        } else {
+            self
+        };
         let path = match (r.follow, r.follow.following()) {
-            (FramingFollow::Keep, _) => {
-                let from = (r.from_width, r.from_height);
-                let from = (from.0.unwrap_or(canvas.0), from.1.unwrap_or(canvas.1));
-                return self.finish(self.kept(id, from));
-            }
-            (FramingFollow::Center, _) => fixed_framing(self, id, WhereEmpty::Center, zoom),
-            (FramingFollow::Fit, _) => fixed_framing(self, id, WhereEmpty::Fit, 1.0),
+            (FramingFollow::Center, _) => fixed_framing(source, id, WhereEmpty::Center, zoom),
+            (FramingFollow::Fit, _) => fixed_framing(source, id, WhereEmpty::Fit, 1.0),
             (_, Some(follow)) => {
                 let Some(subjects) = &r.subjects else {
                     return Ok(Outcome::Refused(no_subjects(id)));
@@ -327,7 +330,7 @@ impl Project {
                     from_height: canvas.1,
                     where_empty: r.where_empty.unwrap_or_default(),
                 };
-                plan_framing(self, id, subjects, &request, &FRAMING_TUNING)
+                plan_framing(source, id, subjects, &request, &FRAMING_TUNING)
             }
             (_, None) => None,
         };
@@ -356,7 +359,7 @@ impl Project {
                 return Ok(Outcome::Refused(no_subjects(id)));
             }
         }
-        let mut next = self.framed(id, &path);
+        let (mut next, _) = source.composed(id, &path);
         if let Some(track) = backdrop {
             next = next.with_backdrop(&original, track)?;
         }

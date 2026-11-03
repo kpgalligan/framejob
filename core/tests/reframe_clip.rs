@@ -495,14 +495,17 @@ fn every_refusal_in_order() {
         "clip 10 spins in its motion, and framing works on an upright picture; only keep \
          reframes it",
     );
-    // (7) any action, unless keep and none names x, y or scale.
-    let actions = "clip 10 carries actions, which framing cannot compose with in this build";
+    // (7) removed by VR-27: a clip with actions is framed by composing
+    // into them, whatever the follow and whatever its ends name.
     let volume = project(
         vec![],
         json!({"actions": [{"id": 91, "start": 0, "duration": SEC,
                                                     "end": {"audio": {"volume": 0.5}}}]}),
     );
-    volume.refuses_with(&reframe(json!({"follow": "center"})), actions);
+    assert!(matches!(
+        volume.try_apply(&reframe(json!({"follow": "center"}))),
+        Ok(Outcome::Applied(_))
+    ));
     assert!(matches!(
         volume.try_apply(&reframe(json!({"follow": "keep", "from_width": 2160}))),
         Ok(Outcome::Applied(_))
@@ -512,10 +515,10 @@ fn every_refusal_in_order() {
         json!({"actions": [{"id": 91, "start": 0, "duration": SEC,
                                                     "end": {"video": {"x": 10.0}}}]}),
     );
-    zoomed.refuses_with(
-        &reframe(json!({"follow": "keep", "from_width": 2160})),
-        actions,
-    );
+    assert!(matches!(
+        zoomed.try_apply(&reframe(json!({"follow": "keep", "from_width": 2160}))),
+        Ok(Outcome::Applied(_))
+    ));
     // (8) bad subjects, before the backdrop (9).
     let p = plain();
     let many = json!({"samples": [{"t": 0, "faces": (0..9).map(|_| face(600.0)).collect::<Vec<_>>()}],
