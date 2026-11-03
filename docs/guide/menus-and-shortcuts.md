@@ -44,6 +44,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | New Recording… | ⌥⌘N | Opens the recorder. While a recording runs, the item is called **Stop Recording** and stops it ([Screen recording](screen-recording.md)) |
 | Pause Recording | | Pauses the running recording. It is called **Resume Recording** while paused, and is enabled only during a recording |
 | New Project from Range… | | Opens the In–Out range as a new untitled project, with its media's caches and its graphics ([New Project from Range](projects-and-media.md#new-project-from-range)). Enabled with an In–Out range set and no nest open |
+| Make Vertical Version… | | Makes a 9:16, 4:5 or 1:1 version of the timeline, each full-frame movie clip following its subject, opened as a new untitled project or made in this one ([Make Vertical Version](vertical-and-framing.md#make-vertical-version)) |
 | Open… | ⌘O | Opens a project or a media file |
 | Open Recent ▸ | | Recently opened documents, then **Clear Menu** |
 | Close | ⌘W | Closes the window |
@@ -76,6 +77,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 
 | Item | Enabled when |
 |---|---|
+| Make Vertical Version… | The project has a clip, no nest is open and no recording is running |
 | Generate Captions… | Some clip plays sound from a media file forwards, with its audio on |
 | Export Captions… | The project has a caption track: a track whose clips are all text clips |
 | Consolidate Media… | The project has media |

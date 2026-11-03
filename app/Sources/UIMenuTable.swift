@@ -24,6 +24,7 @@ extension UIMenu {
         "newRecording:": .window,
         "pauseOrResumeRecording:": .plain,
         "newProjectFromRange:": .window,
+        "showVerticalVersionSheet:": .sheet,
         "openDocument:": .framework,
         "clearRecentDocuments:": .framework,
         "performClose:": .framework,

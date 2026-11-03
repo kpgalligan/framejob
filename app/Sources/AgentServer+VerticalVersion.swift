@@ -4,8 +4,9 @@ import Foundation
 /// 9:16, 4:5 or 1:1 version made by `VerticalVersion.plan`, opened as a copy through
 /// `ProjectDocument.verticalCopy` (the default; saved at `path` when given) or, with
 /// `copy: false`, applied to the addressed project in place as one undo step "Make Vertical".
-/// Its UI path is File ▸ Make Vertical Version… (road map creator-jobs VR3b). It never asks
-/// the person and reads no `UserDefaults`.
+/// Its UI path is File ▸ Make Vertical Version… (road map creator-jobs VR3b, spec §11 VR-39:
+/// `EditorViewController+VerticalVersion.swift` and `VerticalVersionSheetController.swift`). It
+/// never asks the person and reads no `UserDefaults`.
 ///
 /// **Runs on the SERVER thread** (`creatorOffMainTools`), in hops:
 /// - the first main hop resolves and refuses in VR-36's order, runs a DRY plan with no
@@ -187,12 +188,8 @@ extension AgentServer {
         }
         let settings = VerticalSettings(
             shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty)
-        let urls = document.mediaURLs()
-        let pictures = VerticalVersion.mediaPictures(
-            VerticalVersion.classify(project), in: project.snapshot)
-        let missing = Set(pictures.filter { id in
-            project.snapshot.clip(id)?.source.mediaID.map { urls[$0] == nil } ?? false
-        })
+        let (present, missing) = VerticalVersion.analysisTargets(
+            project, urls: document.mediaURLs())
         // The dry plan: the core's error for a bad argument, before any analysis. Its
         // refusal and its plan are discarded.
         do {
@@ -201,7 +198,7 @@ extension AgentServer {
         } catch {
             throw ToolError(message: error.localizedDescription)
         }
-        let targets = follow.follows ? pictures.filter { !missing.contains($0) } : []
+        let targets = follow.follows ? present : []
         var requests: [AnalysisRequest] = []
         var cacheDir: URL?
         if !targets.isEmpty {

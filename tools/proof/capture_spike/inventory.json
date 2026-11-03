@@ -72,6 +72,14 @@
    ],
    "note": "ProjectDocument.derived: the In–Out range opened as a new untitled document and its window shown (CJ-52); beeps with no range, inside a nest or with a sheet up"
   },
+  "showVerticalVersionSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+VerticalVersion.swift `@objc func showVerticalVersionSheet(`",
+    "app/Sources/EditorViewController+VerticalVersion.swift:24"
+   ],
+   "note": "presentAsSheet(VerticalVersionSheetController) over the top-level timeline (VR-39 (a), (b)); beeps inside a nest, with a sheet up, while recording or with no clip; its Make hands off, and the editor opens the copy's window (ProjectDocument.verticalCopy) or applies the step in place when the analysis is cached or Follow is Center, else puts up the Analyzing sheet while the faces, people and shot changes are found on this Mac (CJ-28; app/Sources/EditorViewController+VerticalVersion.swift:52, reached_after), whose answer is the copy or the edit (VR-39 (f), (g))"
+  },
   "openDocument:": {
    "verdict": "framework",
    "code": [
@@ -1131,6 +1139,28 @@
      "selector": "showFollowSubjectSheet:",
      "via": "app/Sources/FollowSubjectSheetController.swift `DispatchQueue.main.async { analyze(handOff.0, handOff.1) }`",
      "gate": "app/Sources/FollowSubjectSheetController.swift `handOff = (settings, requests)` — the Follow Subject sheet's Follow with a following kind while an analysis request is missing (VR-29 (d))"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+VerticalVersion.swift:24": {
+   "token": "presentAsSheet",
+   "func": "showVerticalVersionSheet",
+   "reached_from": [
+    "showVerticalVersionSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+VerticalVersion.swift:52": {
+   "token": "presentAsSheet",
+   "func": "analyzeForVertical",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showVerticalVersionSheet:",
+     "via": "app/Sources/VerticalVersionSheetController.swift `DispatchQueue.main.async { make(handOff) }`",
+     "gate": "app/Sources/VerticalVersionSheetController.swift `handOff = VerticalHandOff(` — the Make Vertical Version sheet's Make with a following kind while an analysis request is missing (VR-39 (f))"
     }
    ],
    "other_caller": ""

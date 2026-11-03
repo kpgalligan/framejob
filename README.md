@@ -53,7 +53,10 @@ behind them.
 on your Mac and drawn over the preview by View ▸ Show Subjects; Clip ▸ Follow
 Subject… frames landscape recordings for a vertical or square canvas, easing
 onto the subject, cutting with the shots and filling the edges with a blurred
-copy, as ordinary actions in one undo step.
+copy, as ordinary actions in one undo step. File ▸ Make Vertical Version… turns
+a whole landscape edit into its 9:16, 4:5 or 1:1 version in a new project, each
+full-frame shot following its subject and titles and pictures-in-picture kept
+as placed.
 → [Vertical and framing](docs/guide/vertical-and-framing.md)
 
 **Motion and transitions.** Actions that ease any property to a new state over

@@ -9679,6 +9679,78 @@ app 190 s; fmt and lint reused).
 cache carry racing a thumbnail pass ("cache/thumbs/3/40.jpg could not be carried", seen once in
 a mutant run), and nit (2).
 
+#### VR3b's record (2026-11-03)
+
+**Landed in the lane: VR3b, File ▸ Make Vertical Version… (spec §11 VR-39).** Lane C, base
+`d78a694d` (I's HEAD, VR3a). The lane's two commits: the decisions alone — VR-39 (a)–(k) in a new
+`creator-jobs-11.md` (`creator-jobs-10.md` was at 483 lines), its index rows, VR-30's and
+VR-37's "owed to VR3b" now "built by VR-39" — then the code, the instruments and the documents.
+No core, FFI, header, op, tool, `Kind` or format change (43 stands, `OP_COUNT` 70, 124 product
+tools); nothing keyed; no new `FrameJob…` key. New files: `VerticalVersionSheetController.swift`
+324 lines, `EditorViewController+VerticalVersion.swift` 161; `AppDelegate+Menus.swift` 523; the
+frozen `EditorViewController.swift` took its one validator line.
+
+- **The helpers.** `VerticalVersion.analysisTargets` (the media pictures split by whether their
+  media has a URL) and `offered` (the shapes whose size differs from the canvas);
+  `pendingSummary(files:width:height:)`. `make_vertical_version`'s first hop now reads
+  `analysisTargets`; its answers are unchanged (rows 1–11 pass).
+- **The sheet.** Shape, Follow, Zoom (100 %), Where Empty, Make a copy (ticked, never remembered),
+  the summary; Follow and Where Empty through VR-29's two keys. At `viewDidAppear` it captures the
+  project and scope, splits the pictures and asks for the requests; Make remembers, dismisses and
+  hands a `VerticalHandOff` to the editor after `viewDidDisappear`.
+- **The editor.** The project-and-scope check on both paths, the Analyzing sheet (Stop makes
+  nothing), the checks after landing and after the read off main, the plan again on the current
+  handle, then `verticalCopy(…, display: true)` or `performGroupedEdit("Make Vertical", …)`;
+  refusals as `set_canvas`. `-RCDevVerticalAccept YES` or `in-place`.
+- **Wiring and documents.** `UIMenuTable` `.sheet`; the inventory's selector and two sites; the
+  screen `15j-make-vertical-sheet` (not the draft's `18b`: screens run in name order and the
+  recorder panel must be last); `screens.py`'s `NOT_SHOWN`; the guide's new section, its intro and
+  Follow Subject's last sentence; `menus-and-shortcuts.md`'s two rows; the guide index; `mcp.md`
+  without ", coming next" (review nit 1 closed: the tool's description and §7.9i were checked and
+  are true now); the README highlight; spec §9 and §7.4; JOB-33.
+
+**Deviations from the spec.** (1) Row 12 puts the source's missing-media sheet away before the
+nest test (the fixture's source is opened with its offline movie gone; with that sheet attached
+the item is disabled for the sheet's reason, so the nest would not be tested). (2) Row 12 counts
+editor windows: the menu's copy carries the same offline media and opens with its own
+missing-media sheet, which `snapshot_ui` lists as a window. (3) With no requests and no pictures
+to read, the sheet sets its subjects to `[:]` at once rather than staying at "Reading the
+analysis…". (4) The screen's prose describes the `demo` fixture as captured: its 640 × 360 movie
+does not fill the 960 × 540 canvas, so the summary reads "Makes a 540 × 960 version. Keeps 4
+clips as placed.".
+
+**The runs** (lane C's worktree; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings.
+- `spec_index_proof.py` 273/273; `capture_spike/inventory.py --check` 5/5; `v2_menu.py --only H`
+  5/5 (127 rows against the inventory's 127).
+- `vr3_proof.py --only 11,12,13`: 11 and 13 passed at once; 12 failed once, for deviations (1) and
+  (2) together, then passed. `screens.py --only 15j-make-vertical-sheet` 6/6, 0 new problems.
+- All five mutants CAUGHT, each by its named row: nest-enabled (12), copy-hidden (12),
+  follow-ignored (12), copy-ignored (13) and analysis-skipped (13).
+- `make gate`: `gate: PASS 509s` (names 1 s, typecheck 9 s, fmt and lint skipped, test 317 s,
+  app 182 s).
+- Release: `vr3_proof.py` 14/14 (rows 1–13 and each launch's Z1, which printed nothing);
+  `screens.py --only 15j-make-vertical-sheet` 6/6, 0 new problems.
+
+**The review** passed with two nits, neither changed. (1) With a sheet already on the window at
+hand-off, the Analyzing path beeps with no sentence, where every other refusal goes through
+`refuseVertical`; kept as the defensive beep Follow Subject's hand-off also has. (2) In the
+pending arm Make is enabled without trying the plan, so a project the step would refuse (64
+tracks) sits through the analysis before the refusal; VR-39 (d) does not ask the sheet to plan
+there, and the tool's dry plan (VR-36) is unchanged.
+
+**Integration** (2026-11-03): CO8 had landed. `creator-jobs-10.md` (574 lines with CO8's
+CO-80…CO-84) kept its row, which now ends "the series continues in `creator-jobs-11.md`"; VR-39
+kept its number and its file. The spec index's `07.4` (107) and `11-decisions/` (22678 in 45
+files) cells were recounted, and `spec_index_proof.py` passed 273/273 on the merged tree. The
+root `CLAUDE.md`'s dev launch defaults gained `-RCDevVerticalAccept`, and `app/CLAUDE.md`
+gained the two new files' entry and `analysisTargets`, `offered` and `pendingSummary` in
+VR3a's. `make gate` on I: `gate: PASS 342s` (names 1 s, typecheck 8 s, test 164 s, app 169 s;
+fmt and lint reused).
+
+**Owed.** JOB-33 (a person at the machine, a phone). Nothing filed; the two issues VR3a's
+integration filed stand.
+
 ### FC7a — Clip ▸ Find Clips…: the window and the analysis
 
 - **What a person gets:** Clip ▸ Find Clips… opens a Find Clips window for the project, with or

@@ -77,9 +77,11 @@ extension AgentServer {
                         + "framing replaces the clip's own moves. Default false: the framing "
                         + "is composed into them. Not read by keep.",
                 ]),
-            // UI path: File ▸ Make Vertical Version… (road map creator-jobs VR3b), spec §11
-            // VR-30…VR-37. The step is VerticalVersion.plan; the copy is
-            // ProjectDocument.verticalCopy; the handler AgentServer+VerticalVersion.swift.
+            // UI path: File ▸ Make Vertical Version… (road map creator-jobs VR3b, spec §11
+            // VR-39: EditorViewController+VerticalVersion.swift and
+            // VerticalVersionSheetController.swift), spec §11 VR-30…VR-37. The step is
+            // VerticalVersion.plan; the copy is ProjectDocument.verticalCopy; the handler
+            // AgentServer+VerticalVersion.swift.
             tool(
                 "make_vertical_version",
                 "Makes a vertical (9:16), 4:5 or square (1:1) version of the top-level timeline "

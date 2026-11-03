@@ -329,6 +329,10 @@ NOT_SHOWN = {
     "RCDevFollowAccept": "a dev launch default with which the Follow Subject sheet presses its "
                          "own Follow once it is first enabled (spec §11 VR-29 (h)); no screen "
                          "launches with it",
+    "RCDevVerticalAccept": "a dev launch default with which the Make Vertical Version sheet "
+                           "presses its own Make once it is first enabled (YES), or unticks "
+                           "Make a copy first (in-place) (spec §11 VR-39 (h)); no screen "
+                           "launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

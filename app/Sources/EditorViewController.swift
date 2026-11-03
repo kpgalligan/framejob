@@ -1061,6 +1061,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateAudioAction(action) { return answer }
             if let answer = validateShotSplitAction(action) { return answer }
             if let answer = validateNewFromRangeAction(action) { return answer }
+            if let answer = validateVerticalVersionAction(action) { return answer }
             if let answer = validateRetimeAction(action) { return answer }
             if let answer = validateCutoutAction(action, item: item) { return answer }
             if let answer = validateBehindSubjectAction(action) { return answer }

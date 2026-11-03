@@ -286,6 +286,12 @@ extension VerticalVersion {
         return lines.joined(separator: "\n")
     }
 
+    /// VR-39 (d)'s pending summary, while the analysis is still to be made.
+    static func pendingSummary(files: Int, width: Int, height: Int) -> String {
+        "Finds the faces, people and shot changes in \(counted(files, "file")) on this Mac "
+            + "first, then makes a \(width) × \(height) version."
+    }
+
     /// The answer's keys every door shares (VR-36): `canvas`, `clips` in id order,
     /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried` and `summary`.
     static func answerFields(_ plan: Plan) -> [String: Any] {

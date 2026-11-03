@@ -139,6 +139,12 @@ extension AppDelegate {
             item(
                 "New Project from Range…",
                 #selector(EditorViewController.newProjectFromRange(_:))))
+        // The timeline's 9:16, 4:5 or 1:1 version, opened as a copy or made in place (spec §11
+        // VR-39); no key.
+        menu.addItem(
+            item(
+                "Make Vertical Version…",
+                #selector(EditorViewController.showVerticalVersionSheet(_:))))
         menu.addItem(item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"))
 
         // AppKit auto-populates a submenu whose sole item's action is

@@ -79,7 +79,9 @@ Project with no separator, because both make a document out of nothing),
 Pause Recording (#98 — under New Recording…, live only while a recording
 runs, retitled Resume Recording while paused, no key), New Project from
 Range… (§11 CJ-52 — under Pause Recording, on only with an In–Out range,
-no nest open and no sheet, no key), Open…, Open Recent, Close, Save, Save As…,
+no nest open and no sheet, no key), Make Vertical Version… (§11 VR-39 —
+under New Project from Range…, on only with a clip, no nest open, no sheet
+and no recording, no key), Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,

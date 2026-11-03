@@ -389,7 +389,9 @@ CU-90 (d)); and `-RCDevSwitchSpeakerAccept YES`, with which the Switch by
 Speaker sheet presses its own Switch once its first plan exists (spec §11
 SW-26); and `-RCDevFollowAccept YES`, with which the Follow Subject sheet
 presses its own Follow once it is first enabled (spec §11 VR-29 (h)); and
-`-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
+`-RCDevVerticalAccept YES` (or `in-place`, which unticks Make a copy first),
+with which the Make Vertical Version sheet presses its own Make once it is
+first enabled (spec §11 VR-39 (h)); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
 document with no window (`display: false`), so a proof can see the windowless
 door (spec §11 CJ-52); and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which

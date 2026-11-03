@@ -960,19 +960,22 @@ detail there.
   line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
 - `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `ProjectDocument+VerticalCopy.swift` ·
   `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
-  `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; File ▸ Make
-  Vertical Version… is VR3b's). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
+  `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; its menu is the
+  entry below). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
   4:5, 1:1) and `size(from:)` (VR-32), `VerticalSettings`, `classify` (VR-33's first match per
   top-level clip with a picture, on the OLD snapshot: a "Blurred Background" with its partner
   in front, a shape or image plate, a picture covering one axis and centred or covering on the
-  other, a nest by the same test, other), `mediaPictures`, `motionNote`, `fill`; `+Plan`:
+  other, a nest by the same test, other), `mediaPictures`, `analysisTargets` (the media
+  pictures split by whether their media has a URL, `present` and `missing`: the tool's first
+  hop and the sheet both read it, VR-39 (d)), `offered` (the shapes whose VR-32 size differs
+  from the canvas, the sheet's Shape pop-up), `motionNote`, `fill`; `+Plan`:
   `opening` (`set_canvas` with no rescale and "Backgrounds" at 0, the core's error for either
   answered as the refusal), `plan` (VR-34 on one `SwitchAngle.Trial`: `reframe_clip` per
   picture, nest and other clip from the old canvas, a refused op retried as `keep`, a refused
   `keep` stopping; whole only with a blurred copy added and a constant F; the backdrops removed
   or re-filled and the plates re-filled; Backgrounds removed when empty; counts over
   non-`keep` entries through `FollowSubject.counts(…, replace: false)`), `summary` (VR-35),
-  `answerFields`. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
+  `pendingSummary` (VR-39 (d)), `answerFields`. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
   source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
   unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
   tool, off main (`creatorOffMainTools`): hop 1's refusals in order and a dry plan with no
@@ -981,6 +984,28 @@ detail there.
   `editResult` in place or the copy, saved through `save(_:to:operation:)` with `path`; its
   row in `AgentCatalog+Framing.swift`, after `reframe_clip`'s; the assistant's ask-first row
   only with `path`.
+- `VerticalVersionSheetController.swift` · `EditorViewController+VerticalVersion.swift` — File ▸
+  Make Vertical Version… (road map creator-jobs VR3b, spec §11 VR-39), the menu door over VR3a's
+  step and copy. The sheet: Shape (`VerticalVersion.offered`, each titled "9:16 (1080 × 1920)"),
+  Follow, Zoom (100 %, never remembered), Where Empty (off while Follow is Center) and Make a copy
+  (ticked, never remembered); Follow and Where Empty through `FollowSubjectSettings.remembered` /
+  `remember(changedFrom:in:)`, VR-29's two keys. At `viewDidAppear` it captures `document.project`
+  and `scope`, splits the pictures by `analysisTargets` and asks `FramingAnalysis.requests` over
+  `present`; with nothing missing it reads the subjects off main ("Reading the analysis…"), with
+  something missing a following kind shows `pendingSummary`, Center never analyzes, and it
+  re-plans on main at every change. Make remembers, dismisses and hands a `VerticalHandOff`
+  (settings, copy, targets, missing, requests, subjects, the captured project and scope) to the
+  editor on the main queue's next turn after `viewDidDisappear`; the sheet never edits and never
+  opens a window. `-RCDevVerticalAccept YES` (or `in-place`, which unticks Make a copy first; dev
+  only) presses Make once it is first enabled. The extension: `showVerticalVersionSheet`, the
+  project-and-scope check on both paths (no requests: "the project changed while the Make
+  Vertical Version sheet was open…"; requests: the analyzing sentence, no Analyzing sheet), the
+  Analyzing sheet (one row per request, `FollowSubject.rowName`; Stop makes nothing), the checks
+  after landing and after the subjects are read off main, `commitVertical` (the plan again on
+  `document.project`, `verticalCopy(…, path: nil, display: true)` or
+  `performGroupedEdit("Make Vertical", …)`), refusals posted as `set_canvas`, and
+  `validateVerticalVersionAction`, one line in the frozen file after `validateNewFromRangeAction`
+  (a clip, no nest, no sheet, no recording).
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map

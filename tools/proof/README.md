@@ -27888,6 +27888,46 @@ make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8]
 make app && RC_PROOF_APP=release python3 tools/proof/vr3_proof.py
 ```
 
+## Road map "creator-jobs" VR3b — File ▸ Make Vertical Version… (`vr3_proof.py` rows 12, 13, Z1 per launch; five mutants; spec §11 VR-39)
+
+The same `vr3_proof.py`. Both launches now pin the sheet's remembered keys as launch arguments
+(`-FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`, the argument domain, VR2b2's
+reason) and set the dev accept: launch 1 adds `-RCDevVerticalAccept YES` (the sheet presses
+Make once it is first enabled) and runs row 12 inside `launch_one`, before the source closes;
+launch 2 adds `-RCDevVerticalAccept in-place` (Make a copy unticked first) and runs row 13 after
+row 11. The menu is driven through `perform_menu_item ["File", "Make Vertical Version…"]` on
+the source's window.
+
+| Row | What it holds |
+|---|---|
+| 12 | the source's missing-media sheet (its offline G) put away first; with `set_scope` into the nest H the menu is refused "… is disabled here: …" and no sheet comes up; out of the nest the menu opens exactly one new editor window within 30 s (a sheet is not counted), whose `get_project` is named "src (9:16)" with unsaved changes and whose `clips`, `tracks` and `canvas` equal row 1's 9:16 tool copy; `undo` in it answers "Make Vertical" and gives back the source's project; the source's `project.json`, saved again, is byte-identical and its undo top unchanged; the copy is closed with `discard: true` |
+| 13 | (launch 2) a fresh saved project `menu.framejob` with one 3 s clip of its own `testsrc` copy: the menu puts up the Analyzing sheet (its title in `snapshot_ui`'s layout dump) within 60 s; `cancel_sheet` (Stop) leaves the window count, `get_project` and the undo top unchanged for 5 s; the menu again: the Analyzing sheet closes within 300 s, within 30 s the canvas is 1080 × 1920 with no window opened, and `undo` answers "Make Vertical" and gives the project back |
+
+The mutants, each edited into `app/Sources/EditorViewController+VerticalVersion.swift`, a Debug
+app built with it (`make app-debug`), its row run and the file restored (a scratch driver), every
+one CAUGHT (its row FAIL, exit 1):
+- **nest-enabled** (12): `validateVerticalVersionAction`'s `document.scope == nil &&` dropped.
+- **copy-hidden** (12): `verticalCopy(…, display: false)`.
+- **follow-ignored** (12): the commit plans with `follow: .center`.
+- **copy-ignored** (13): `guard handOff.copy else {` made `guard true else {`, so it always
+  copies.
+- **analysis-skipped** (13): `guard !handOff.requests.isEmpty else {` made `guard false else
+  {`, so the hand-off commits with the sheet's `[:]` subjects and no Analyzing sheet.
+
+The sheet's look is the screen `designs/screens/15j-make-vertical-sheet.md`
+(`screens.py --only 15j-make-vertical-sheet`; `FrameJobFollowKind` and
+`FrameJobFollowWhereEmpty` are pinned in `PINS`, `RCDevVerticalAccept` is in `NOT_SHOWN`).
+`UIMenuTable`'s `showVerticalVersionSheet:` is `.sheet`, and `capture_spike/inventory.json`
+holds its selector and its two `presentAsSheet` sites (the sheet `reached_from`, the Analyzing
+sheet `reached_after` through the hand-off), which `v2_menu.py --only H` and `inventory.py
+--check` hold.
+
+```sh
+make app-debug && python3 tools/proof/vr3_proof.py --only 11,12,13
+make app && RC_PROOF_APP=release python3 tools/proof/vr3_proof.py
+python3 tools/proof/screens.py --only 15j-make-vertical-sheet
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

@@ -48,7 +48,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 325 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 459 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 106 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 107 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 430 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
@@ -65,9 +65,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 81 | `make_vertical_version`: its arguments, the size, the step's classes and order, the treatments and reasons, the copy, the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37). |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 155 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 318 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 320 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 22564 in 44 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 22678 in 45 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

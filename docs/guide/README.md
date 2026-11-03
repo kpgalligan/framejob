@@ -27,7 +27,7 @@ Read the first four in order to learn the editor; the rest stand alone.
 11. [Colour grading](color-grading.md) — the Color tab, wheels, curves, looks and LUTs, adjustment clips and qualifiers, Show Ungraded and the scopes.
 12. [HDR and colour management](hdr-and-color.md) — how sources are read, camera log, SDR and HDR (HLG) projects, blending, and HDR and SDR deliverables.
 13. [Motion graphics](graphics.md) — graphic clips, the built-in graphics, their properties in the inspector, and bringing in your own.
-14. [Vertical and framing](vertical-and-framing.md) — the faces, people and salient regions Frame Job finds in a clip's picture on this Mac, View ▸ Show Subjects, and Clip ▸ Follow Subject…, which frames the selected clips on them for a vertical or square canvas.
+14. [Vertical and framing](vertical-and-framing.md) — the faces, people and salient regions Frame Job finds in a clip's picture on this Mac, View ▸ Show Subjects, Clip ▸ Follow Subject…, which frames the selected clips on them for a vertical or square canvas, and File ▸ Make Vertical Version…, which makes the whole timeline's 9:16, 4:5 or 1:1 version.
 15. [Podcasts and several cameras](multicam.md) — cameras on tracks of their own, a program track cut from them, Clip ▸ Switch by Speaker… to cut it from the microphones, and Clip ▸ Switch Angle ▸ to re-pick one shot from another camera.
 16. [Screen recording](screen-recording.md) — recording a display or a window with system audio, microphone and click rings, recording a camera on its own or beside the screen, and recording voice-overs.
 17. [Exporting](export.md) — the export sheet, its formats and settings, presets, the Export Queue, and saving single frames.

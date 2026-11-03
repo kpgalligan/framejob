@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road map "creator-jobs" VR3a — Make Vertical's step, its copy and
-`make_vertical_version` (spec §11 VR-30…VR-37).
+"""Road map "creator-jobs" VR3a and VR3b — Make Vertical's step, its copy,
+`make_vertical_version` (spec §11 VR-30…VR-37) and File ▸ Make Vertical
+Version… (VR-39).
 
     python3 tools/proof/vr3_proof.py [--only 1,3,8] [--app PATH]
 
@@ -23,7 +24,8 @@ front track a title [2, 6), a picture-in-picture image [6, 10) and a title
 whose action moves y from 200 to 0 [10, 14); then a matte pair: a still face J
 [44, 48) on its own track with an alpha matte track in front holding a title K.
 
-**Launch 1** (`-RCDevAnalysisCanned YES`), rows 1–10:
+**Launch 1** (`-RCDevAnalysisCanned YES -RCDevVerticalAccept YES
+-FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`), rows 1–10 and 12:
 1. The copies' canvases are 1080 × 1920, 1080 × 1350 and 1080 × 1080; the
    4:5 copy's A passes row 7's corners; the 9:16 copy's picture-in-picture
    placement equals a scratch copy's `set_canvas` + `reframe_clip {keep,
@@ -53,15 +55,34 @@ whose action moves y from 200 to 0 [10, 14); then a matte pair: a still face J
    queued count is unchanged.
 10. A source at 64 tracks answers "Make Vertical was refused at add_track: "
     and the core's sentence, and opens nothing.
+12. (VR3b, before the source closes) With `set_scope` into the nest H, File ▸
+    Make Vertical Version… (`perform_menu_item`) is refused as disabled and no
+    sheet comes up. Out of the nest, the menu (the dev accept presses Make)
+    opens exactly one new window within 30 s: its `get_project` is named
+    "src (9:16)" with unsaved changes, and its `clips`, `tracks` and `canvas`
+    equal row 1's 9:16 tool copy; `undo` in it answers "Make Vertical" and
+    gives back the source's project; the source's `project.json`, saved again,
+    is byte-identical and its undo top unchanged.
 
-**Launch 2** (`-RCDevAnalysisHold 30`, an uncached project), row 11: `{shape:
-"9:16", zoom: 5}` answers the core's "zoom must be between 1 and 4 times fill,
-not 5" within 5 s with the lane's queued count unchanged; then `{shape: "9:16"}`
-passes the 60 s bound and answers `analyzing` with no window opened. Z1 is each
-launch's parity grep.
+**Launch 2** (`-RCDevAnalysisHold 30 -RCDevVerticalAccept in-place
+-FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`, uncached
+projects), rows 11 and 13:
+11. `{shape: "9:16", zoom: 5}` answers the core's "zoom must be between 1 and
+    4 times fill, not 5" within 5 s with the lane's queued count unchanged; then
+    `{shape: "9:16"}` passes the 60 s bound and answers `analyzing` with no
+    window opened.
+13. (VR3b) A fresh saved project with one 3 s movie clip of its own media copy:
+    the menu (the dev accept unticks Make a copy and presses Make) puts up the
+    Analyzing sheet within 60 s; `cancel_sheet` (Stop) leaves the window count,
+    `get_project` and the undo top unchanged for 5 s; the menu again: the
+    Analyzing sheet closes within 300 s, then within 30 s the canvas is
+    1080 × 1920 with no window opened, and `undo` answers "Make Vertical" and
+    gives the project back.
+
+Z1 is each launch's parity grep.
 
 Every copy is closed with `discard: true`. The mutants (tools/proof/README.md's
-VR3a section) are edited into the tree by hand, a Debug app built, the row run
+VR3a and VR3b sections) are edited into the tree by hand, a Debug app built, the row run
 and the file restored.
 """
 
@@ -91,8 +112,12 @@ SEC = 600_000
 FRAME = 20_000
 MAGENTA = (255, 0, 255)
 BLURRED = "Blurred Background"
-ROWS = [str(n) for n in range(1, 12)] + ["Z1"]
-LAUNCH_1 = [str(n) for n in range(1, 11)]
+MENU = ["File", "Make Vertical Version…"]
+STEP = "Make Vertical"
+PINS = ["-FrameJobFollowKind", "subject", "-FrameJobFollowWhereEmpty", "fit"]
+ROWS = [str(n) for n in range(1, 14)] + ["Z1"]
+LAUNCH_1 = [str(n) for n in range(1, 11)] + ["12"]
+LAUNCH_2 = ["11", "13"]
 
 results = {}
 selected = set(ROWS)
@@ -285,6 +310,49 @@ def magenta(pixel):
 
 def windows(client):
     return len(client.call("snapshot_ui").get("windows") or [])
+
+
+def editors(client):
+    """The editor windows open: a sheet, such as a copy's missing-media sheet, is not one."""
+    return len([w for w in client.call("snapshot_ui").get("windows") or []
+                if w.get("kind") == "editor"])
+
+
+def sheet_up(doc):
+    return ((doc.call("perform_menu_item").get("window") or {}).get("sheet")) is not None
+
+
+def sheet_views(doc, tag):
+    """The attached sheet's layout dump's views, or None with no sheet."""
+    (WORK / "sheets").mkdir(parents=True, exist_ok=True)
+    try:
+        got = doc.call("snapshot_ui", window="sheet", path=str(WORK / "sheets" / f"{tag}.png"))
+    except mcp.ToolError:
+        return None
+    path = got.get("layout_path") if isinstance(got, dict) else None
+    if not path:
+        return None
+    return json.loads(Path(path).read_text()).get("views") or []
+
+
+def wait_analyzing(doc, tag, bound=60):
+    """Whether the attached sheet shows "Analyzing" within `bound` s, and when."""
+    began = time.monotonic()
+    while time.monotonic() - began < bound:
+        views = sheet_views(doc, tag)
+        if any(v.get("text") == "Analyzing" and not v.get("hidden") for v in views or []):
+            return True, time.monotonic() - began
+        time.sleep(0.2)
+    return False, time.monotonic() - began
+
+
+def wait_no_sheet(doc, bound):
+    began = time.monotonic()
+    while time.monotonic() - began < bound:
+        if not sheet_up(doc):
+            return True
+        time.sleep(0.2)
+    return False
 
 
 def lane_queued(doc):
@@ -613,9 +681,69 @@ def launch_one(client):
     if "10" in selected:
         attempt(row10, "10")
 
+    if "12" in selected:
+        attempt(lambda: menu_row(client, doc, tall_state, bytes_before, undo_before), "12")
+
     for path in (tall_path, portrait_path):
         close(client, path)
     doc.close()
+
+
+def menu_row(client, doc, tall_state, bytes_before, undo_before):
+    """Row 12: the menu refused inside a nest, then the menu's copy equal to the tool's. The
+    source was opened with its offline media's file gone, so its missing-media sheet is put
+    away first: a sheet on the window would disable the item for its own reason."""
+    if sheet_up(doc):
+        doc.call("cancel_sheet")
+    nest = doc.state()["nests"][0]["id"]
+    doc.call("set_scope", nest=nest)
+    try:
+        doc.call("perform_menu_item", path=MENU)
+        refused, why = False, "performed"
+    except mcp.ToolError as error:
+        why = str(error)
+        refused = "is disabled here" in why
+    nested_sheet = sheet_up(doc)
+    if nested_sheet:
+        try:
+            doc.call("cancel_sheet")
+        except mcp.ToolError:
+            pass
+    doc.call("set_scope")
+    count = editors(client)
+    doc.call("perform_menu_item", path=MENU)
+    began, opened = time.monotonic(), 0
+    while time.monotonic() - began < 30:
+        opened = editors(client) - count
+        if opened >= 1:
+            time.sleep(1)
+            opened = editors(client) - count
+            break
+        time.sleep(0.25)
+    if opened < 1:
+        check("12", False, f"in the nest refused {refused} ({why[:120]!r}), a sheet "
+              f"{nested_sheet}; no window opened within 30 s")
+        return
+    front = client.call("get_project")  # the untitled copy, the front window
+    made = front.get("project") or {}
+    same = {k: made.get(k) == tall_state.get(k) for k in ("clips", "tracks", "canvas")}
+    named = front.get("name") == "src (9:16)" and front.get("unsaved_changes") is True
+    undone = client.call("undo").get("undone")
+    back = client.call("get_project").get("project") == doc.state()
+    try:
+        client.call("close_project", discard=True)
+    except mcp.ToolError:
+        pass
+    doc.call("save_project")
+    source_same = (doc.path / "project.json").read_bytes() == bytes_before
+    undo_after = doc.undo_top()
+    check("12", refused and not nested_sheet and opened == 1 and all(same.values()) and named
+          and undone == STEP and back and source_same and undo_after == undo_before,
+          f"in the nest refused {refused} ({why[:120]!r}), a sheet {nested_sheet}; {opened} "
+          f"window(s) opened; the copy {front.get('name')!r} unsaved "
+          f"{front.get('unsaved_changes')}; equal to the tool's 9:16 copy {same}; undo "
+          f"{undone!r}, back to the source {back}; the source's project.json byte-identical "
+          f"{source_same}, undo top {undo_before!r} → {undo_after!r}")
 
 
 # ---- launch 2 -------------------------------------------------------------------
@@ -647,6 +775,58 @@ def held_row(client):
           f"after {waited:.1f} s analyzing {answer.get('analyzing')}, note "
           f"{answer.get('note')!r}; {opened} windows opened")
     doc.close()
+
+
+def stop_row(client):
+    """Row 13: the Analyzing sheet's Stop makes nothing; the menu again applies in place."""
+    movie, _ = make_media()
+    doc = Doc(client, WORK / "menu.framejob")
+    media, _ = doc.media(movie, "menu")
+    doc.clip_of(media, 0, 3)
+    doc.call("save_project")
+    before = doc.state()
+    undo_before = doc.undo_top()
+    count = windows(client)
+    doc.call("perform_menu_item", path=MENU)
+    seen, took = wait_analyzing(doc, "stop-1")
+    if not seen:
+        check("13", False, f"the Analyzing sheet not seen within {took:.0f} s")
+        doc.close()
+        return
+    doc.call("cancel_sheet")
+    stayed = True
+    for _ in range(5):
+        time.sleep(1)
+        stayed = stayed and doc.state() == before and windows(client) == count
+    stayed = stayed and doc.undo_top() == undo_before and not sheet_up(doc)
+    doc.call("perform_menu_item", path=MENU)
+    again, took_again = wait_analyzing(doc, "stop-2")
+    closed = again and wait_no_sheet(doc, 300)
+    canvas = {}
+    began = time.monotonic()
+    while closed and time.monotonic() - began < 30:
+        canvas = doc.state().get("canvas") or {}
+        if (canvas.get("width"), canvas.get("height")) == (1080, 1920):
+            break
+        time.sleep(0.25)
+    made = (canvas.get("width"), canvas.get("height")) == (1080, 1920)
+    opened = windows(client) - count
+    undone = doc.call("undo").get("undone") if made else None
+    back = doc.state() == before if made else False
+    check("13", stayed and again and closed and made and opened == 0 and undone == STEP
+          and back,
+          f"Analyzing seen after {took:.1f} s; after Stop unchanged for 5 s {stayed}; again "
+          f"Analyzing {again} after {took_again:.1f} s, closed {closed}; canvas "
+          f"{canvas.get('width')} × {canvas.get('height')}; {opened} windows opened; undo "
+          f"{undone!r}, the project given back {back}")
+    doc.close()
+
+
+def launch_two(client):
+    if "11" in selected:
+        attempt(lambda: held_row(client), "11")
+    if "13" in selected:
+        attempt(lambda: stop_row(client), "13")
 
 
 # ---- launches -------------------------------------------------------------------
@@ -694,14 +874,15 @@ def main():
     binary = Path(args.app) if args.app else proof_app.binary()
     if binary.suffix == ".app":
         binary = proof_app.executable(binary)
-    print(f"VR3a — Make Vertical's step, copy and make_vertical_version "
+    print(f"VR3a and VR3b — Make Vertical's step, copy, make_vertical_version and menu "
           f"({proof_app.config()} build)", flush=True)
     if selected & set(LAUNCH_1):
-        run_launch(binary, ["-RCDevAnalysisCanned", "YES"], "canned", LAUNCH_1,
+        run_launch(binary, ["-RCDevAnalysisCanned", "YES", "-RCDevVerticalAccept", "YES",
+                            *PINS], "canned", LAUNCH_1,
                    lambda client: attempt_rows(lambda: launch_one(client), LAUNCH_1))
-    if "11" in selected:
-        run_launch(binary, ["-RCDevAnalysisHold", "30"], "held", ["11"],
-                   lambda client: attempt(lambda: held_row(client), "11"))
+    if selected & set(LAUNCH_2):
+        run_launch(binary, ["-RCDevAnalysisHold", "30", "-RCDevVerticalAccept", "in-place",
+                            *PINS], "held", LAUNCH_2, launch_two)
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]
     print(f"\n{len(passed)}/{len(results)} rows passed" + (f"; failed {failed}" if failed else ""))

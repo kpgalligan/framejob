@@ -5,7 +5,8 @@ regions the eye is drawn to. It finds them on this Mac with Apple's Vision
 framework — nothing is uploaded and no key is needed — and keeps what it found
 in the project's cache, so it is found once per file. This page covers what is
 found, how to see it, how **Clip ▸ Follow Subject…** frames the selected clips
-on it, and how an agent reframes a clip with it.
+on it, how **File ▸ Make Vertical Version…** makes a tall or square version of
+the whole timeline, and how an agent reframes a clip with it.
 
 ## What is found
 
@@ -22,7 +23,8 @@ Boxes are found in each sample on its own: Frame Job does not follow a person
 from one moment to the next or put names to faces.
 
 Nothing is looked at when you import a file. A file is analysed when something
-asks for it — **Clip ▸ Follow Subject…** (below), an agent
+asks for it — **Clip ▸ Follow Subject…** and **File ▸ Make Vertical
+Version…** (below), an agent
 (`get_media_analysis` with `kind: "faces"` or `"subjects"`, see [MCP](mcp.md)),
 or `reframe_clip` (below); Follow Subject and `reframe_clip` ask for the part of
 the file each clip plays. Analysis runs in the background and
@@ -92,7 +94,66 @@ the picture on the canvas to nudge where its frame ends, as with any action.
 
 Follow Subject does not offer `fit` or `keep` (an agent can send them), does
 not frame stills or pictures, and does not change the canvas: set the vertical
-canvas first in the Document tab.
+canvas first in the Document tab, or let **File ▸ Make Vertical Version…**
+(below) change the canvas and frame the whole timeline in one go.
+
+## Make Vertical Version
+
+Choose **File ▸ Make Vertical Version…** to make a tall or square version of a
+landscape edit — for a phone, a reel or a square post. It works on the whole
+timeline: it is offered when the project has a clip and no nest is open, and
+not while a recording runs. The sheet has five controls:
+
+- **Shape** — **9:16**, **4:5** or **1:1**, each with the size it makes. The
+  new canvas keeps the old short side: from 1920 × 1080 they are 1080 × 1920,
+  1080 × 1350 and 1080 × 1080. A shape the canvas already has is not offered.
+- **Follow**, **Zoom** and **Where Empty** — as in Follow Subject (above).
+  Follow and Where Empty are the same remembered choice as Follow Subject's;
+  Zoom always starts at 100 %, the scale at which a picture just covers the new
+  canvas.
+- **Make a copy** — ticked whenever the sheet opens. With it, the vertical
+  version opens as a new untitled project, named after this one with the shape
+  — "Interview (9:16)" — and this project does not change; save the copy when
+  you want to keep it. Unticked, this project itself becomes the vertical
+  version.
+
+Under them the sheet says what **Make** will do: the new size, how many clips
+are followed, shown whole, kept as placed or re-filled, the blurred copies it
+removes, the tracks it adds and the actions that carry a move, then each clip
+that is not followed and why.
+
+Each clip with a picture on the top-level timeline is treated by what it is:
+
+- **A movie clip that fills the old frame** on one side — the usual full-frame
+  shot, or one punched in a little — follows its subject, as Follow Subject
+  frames it, with its own moves and actions kept inside the framing. Where the
+  frame shows the whole picture, a blurred copy of it goes behind on a new
+  **Backgrounds** track at the back. A movie whose file is missing is kept as
+  placed.
+- **A still or a picture that fills the frame, and a nest that does**, is
+  centred.
+- **Everything else is kept as placed** — titles, graphics, shapes, a
+  picture-in-picture — moved and scaled from the old canvas to the new one as
+  the Document tab's canvas change does when it rescales clips.
+- **A blurred copy** already behind a clip is removed when that clip now
+  follows its subject (the framing makes a new one where it is needed), and
+  otherwise re-filled to cover the new canvas; a **background** plate
+  (**Clip ▸ Add Background**) is re-filled too.
+
+When the movies have not been analysed, the sheet says it will find the faces,
+people and shot changes first: **Make** then shows the Analyzing sheet while
+that runs on this Mac, and makes the version when it is done. **Stop** makes
+nothing: no project opens and this one does not change. What was found is kept
+in this project's cache (and carried into the copy), so making another shape
+afterwards needs no analysis. **Center** needs no analysis.
+
+The whole change is one undo step, **Make Vertical**: in the copy, **Edit ▸
+Undo Make Vertical** gives back the landscape edit; in place, it takes the
+command back on this project.
+
+A vertical canvas shows the middle of a landscape picture enlarged: a 1080p
+source framed on 1080 × 1920 is enlarged ×1.78, which can look soft on a
+phone. Shoot 4K for footage you mean to make vertical.
 
 ## Reframing a clip (for agents)
 

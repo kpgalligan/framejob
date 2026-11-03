@@ -4,7 +4,9 @@ import Foundation
 /// tall or square version as one grouped edit — `set_canvas`, a "Backgrounds" track, one
 /// `reframe_clip` per picture from the old canvas, its backdrops and plates re-filled — tried
 /// on one `SwitchAngle.Trial`. The copy is `ProjectDocument+VerticalCopy.swift`'s, the tool
-/// `AgentServer+VerticalVersion.swift`'s; File ▸ Make Vertical Version… is VR3b's.
+/// `AgentServer+VerticalVersion.swift`'s; File ▸ Make Vertical Version… is
+/// `VerticalVersionSheetController.swift` and `EditorViewController+VerticalVersion.swift` (VR3b,
+/// VR-39).
 ///
 /// This file holds the shapes (VR-32), the settings and the classes (VR-33);
 /// `VerticalVersion+Plan.swift` the step (VR-34) and the summary (VR-35). Swift restates none
@@ -93,6 +95,29 @@ enum VerticalVersion {
                 case .media = clip.source
             else { return nil }
             return entry.clip
+        }
+    }
+
+    /// VR-37's analysis targets: the media pictures (`mediaPictures(classify(project), …)`),
+    /// split by whether their media has a URL in `urls` (`document.mediaURLs()`); `missing` are
+    /// kept, not followed. The tool's first hop and the sheet both read it (VR-39 (d)).
+    static func analysisTargets(_ project: ReelProject, urls: [UInt32: URL])
+        -> (present: [UInt32], missing: Set<UInt32>)
+    {
+        let snapshot = project.snapshot
+        let pictures = mediaPictures(classify(project), in: snapshot)
+        let missing = Set(pictures.filter { id in
+            snapshot.clip(id)?.source.mediaID.map { urls[$0] == nil } ?? false
+        })
+        return (pictures.filter { !missing.contains($0) }, missing)
+    }
+
+    /// VR-32's "not offered": `VerticalShape.allCases` whose size differs from `canvas`, in case
+    /// order (the sheet's Shape pop-up, VR-39 (b)).
+    static func offered(_ canvas: CanvasSnapshot) -> [VerticalShape] {
+        VerticalShape.allCases.filter { shape in
+            let size = shape.size(from: canvas)
+            return size.width != canvas.width || size.height != canvas.height
         }
     }
 

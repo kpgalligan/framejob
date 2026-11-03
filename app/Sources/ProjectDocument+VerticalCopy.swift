@@ -4,8 +4,8 @@ import AppKit
 /// document handed the source's handle unchanged (`range: nil`, so every media stays and
 /// every cache and analysis is carried), named "<source> (<shape>)", with the step applied
 /// there as its one undo step, "Make Vertical". The source is never edited and gains no undo
-/// step. `make_vertical_version` (`AgentServer+VerticalVersion.swift`) is the door today;
-/// File ▸ Make Vertical Version… is VR3b's.
+/// step. Its doors are `make_vertical_version` (`AgentServer+VerticalVersion.swift`) and File ▸
+/// Make Vertical Version… (`EditorViewController+VerticalVersion.swift`, VR3b).
 extension ProjectDocument {
 
     /// The copy, and what was carried. Main only. A copy the step did not change is closed,
