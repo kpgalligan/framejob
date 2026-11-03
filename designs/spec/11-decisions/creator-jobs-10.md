@@ -229,3 +229,125 @@ tool-schema change.
   skips by name while S-PC2 is absent and is owed; the band is the middle one by the owner's
   answer. The floor 0.02 is provisional until S-PC2 measures it: then the high band drops SW-82's
   hedge, and the low band files the road map's candidate.
+
+## CU10 — the recorder polishes on landing (2026-11-03)
+
+Recorded before the code. CU10 runs CU7's Auto Zoom, CU8's Add Shortcut Overlays and CU9b's
+Speed Up Typing over a finished screen recording's clips, after the landing, from three
+remembered recorder-panel boxes under "When it lands:" and from `record_screen`'s (and the dev
+tool `land_recording`'s) `auto_zoom`, `shortcut_overlays` and `speed_up_typing`. The owner's
+answer (2026-11-01) sets the defaults: "the landing checkboxes default to zoom on, shortcuts on
+when recorded, and speed-up off". No new tool, op, `rc_*` export, format or core change (43
+stands); nothing is sent anywhere, so nothing is keyed (CJ-3). The product tool count (123) and
+the dev tool count are unchanged.
+
+- **CU-100 — Follow-ups, not part of the landing** (AU-68's shape). The landing, its step names,
+  its notes and the answer's landing fields are unchanged. Each command is its own undo step,
+  named by its title: "Auto Zoom", "Add Shortcut Overlays", "Speed Up Typing" (the speed-up's
+  "and Re-time Captions" when captions ride, as its sheet's). The panel commits through
+  `document.performGroupedEdit`, because a timer is not an AppKit event. The tool door calls
+  each tool's own body, `autoZoom(document:clips:settings:)`,
+  `addShortcutOverlays(document:clips:settings:)` and `speedUpTyping(document:clips:settings:)`
+  (`from`/`to` nil; the `(_ a:)` handlers call the same bodies, their answers and refusals byte
+  for byte as before). The panel door plans through `AutoZoom.plan`,
+  `ShortcutOverlays.prepared` and `SpeedUpTyping.resolve`, the menu doors' planners.
+- **CU-101 — Order, the clips, readiness and the two follows.**
+  - (a) **Order.** Enhance Voice first, when asked: the polish waits while
+    `RecordingEnhance.isPending(document)`, and its clock restarts when that ends. The tool door
+    polishes after `enhanceVoice` returns. Then Auto Zoom (zooms are planned on unsplit clips),
+    then Add Shortcut Overlays, then Speed Up Typing (its stretches avoid the overlays, CU-91).
+    `RecordingPolish.commands(of:)` answers the chosen commands in that order (`allCases`).
+  - (b) **The clips.** `screenPaths(of:)` is each segment's movie path (none for a voice-over or
+    a camera alone). `screenClips` is every clip of the open container whose media's path is one
+    of them AND whose media has a cursor file, in id order. It is recomputed at every check, so
+    the speed-up's splits and any clips added later are seen.
+  - (c) **Readiness.** Auto Zoom and Add Shortcut Overlays need only the cursor files, read once,
+    off main. The speed-up is ready when `SpeedUpTyping.resolve` does not answer `.waiting`; its
+    first `.waiting` calls `document.generateCaches()`. A throw counts as ready, so the run
+    reports the refusal.
+  - (d) **Busy** is AU-68 (c)'s: `RecordingEnhance.isBusy` (a drag, or the open container is not
+    the landing's), plus at the panel no editor window or a sheet already on it.
+  - (e) **`decide`, in this order:** no clips → `.drop`; `enhancing` → `.wait`; ready and not
+    busy → `.run(command, clips)`; `elapsed ≥ 300` s (`waitLimit`) → `.giveUp(command)`;
+    otherwise `.wait`. Pure.
+  - (f) **The panel's follow.** Each landing gets a follow of its own, never joined (unlike
+    AU-68's). A repeating 0.5 s timer (`checkInterval`, the landing's) runs in the DEFAULT
+    run-loop mode, so it waits out a drag. The follow ends FIRST — its timer invalidated and its
+    entry removed — on `.drop`, on `.giveUp`, after the last run, or when the cursor files fail
+    to read; then the step acts. A refusal from one run moves on to the next command, whose clock
+    starts then. `isPending(document)` is true while any follow of that document runs.
+  - (g) **The panel's settings.** `AutoZoomSettings.remembered(.standard)` with `typing =
+    AutoZoom.hasTyping(tracks)` (CU-76's sheet rule), `ShortcutOverlaySettings()` (the menu
+    item's), and `SpeedUpTypingSettings.remembered(.standard)` — what each menu door would use.
+  - (h) **The panel's quiet and refused results.** A plan with no ops is quiet, and so is
+    `.drop`. A refusal, `.giveUp` or a read failure posts `projectDocumentDidRefuse` with
+    `ReelRefusal(op: command.rawValue, reason:)` at the inspector's foot, as
+    `RecordingEnhance.refuse` does. No beep, no sheet.
+  - (i) **The speed-up's question.** The panel cannot ask (no person pressed anything): a
+    speed-up whose `SpeedAudioDrop.crossing` is non-empty is not applied, and its refusal is
+    `SpeedAudioDrop.note(crossing)`. Otherwise it applies `CaptionRetime.withRetime(
+    SpeedUpTyping.actionName, speechOps + plan.ops, on: document.editedProject)` grouped.
+  - (j) **The tool door** (`AgentServer.polishLanded`, SERVER THREAD) polls `decide` through
+    `onMain` every 0.5 s, with the tools' defaults (`AutoZoomSettings()`,
+    `ShortcutOverlaySettings()`, `SpeedUpTypingSettings()`; a tool reads no `UserDefaults`). Its
+    readiness is the same `isReady`, the cursor files read once on the server thread. On
+    `.drop`, `.giveUp` or the call's cancel, every command not yet run gets its sentence in
+    `…_error`. A body's `ToolError` becomes that command's `…_error`, and the door continues. The
+    answer gains `auto_zoom` / `auto_zoom_error`, `shortcut_overlays` /
+    `shortcut_overlays_error` and `speed_up_typing` / `speed_up_typing_error` — each the tool's
+    answer object, or a sentence — and `project` is read last when enhance or the polish ran.
+  - (k) **Sentences.** `noScreenSentence`: "No screen clip with a cursor file landed on the
+    timeline, so <title> did not run." `notReadySentence`: "<title> did not run on the recording:
+    " + (the speed-up: "its speech was not detected within 5 minutes." | otherwise: "the project
+    was busy for 5 minutes.") + (panel: " Select its clips and choose <menuPath>." | tool: " Call
+    <rawValue> with its clips."). `stoppedSentence`: "record_screen was stopped before <title>
+    ran, so it did not run." The titles are each command's `actionName`; the menu paths are
+    "Clip ▸ Auto Zoom…", "Clip ▸ Add Shortcut Overlays" and "Clip ▸ Speed Up Typing…".
+- **CU-102 — The keys, the panel's rows and the tools' arguments.**
+  - (a) **The panel rows**, under the Record shortcuts note and before Rate: "When it lands:"
+    with **Zoom in on clicks**, then **Show shortcuts** and **Speed up typing** under it. Zoom in
+    on clicks is live only while idle with a screen source (a display, window or picked one);
+    Show shortcuts and Speed up typing only then AND with Record shortcuts ticked. Greyed, each
+    keeps its value. `applyPolish`: `autoZoom` = its box && a screen source; the other two = their
+    box && `choice.keys == .shortcuts`. The keys `FrameJobRecordingAutoZoom`,
+    `FrameJobRecordingShortcutOverlays` and `FrameJobRecordingSpeedUpTyping` are the panel's
+    fourteenth to sixteenth, written on change and restored on show; an absent key (tested by
+    `object(forKey:) == nil`) reads on, on and off (the owner). The harness and `screens.py` pin
+    them at those values. Each box's tooltip names its step.
+  - (b) **`record_screen`'s refusals.** `auto_zoom`, `shortcut_overlays` and `speed_up_typing`
+    are booleans, default false (a tool reads no `UserDefaults`). They are read right after
+    `enhance` and refused before any grant, in the order auto_zoom, shortcut_overlays,
+    speed_up_typing, each checking `place` and then `keys`:
+    "auto_zoom: true plans on the landed screen clips, so it needs place: true." /
+    "shortcut_overlays: true places overlays over the landed screen clips, so it needs place:
+    true." / "shortcut_overlays: true needs keys: \"shortcuts\" — without it the cursor file
+    records no shortcut to show." / "speed_up_typing: true speeds up the landed screen clips'
+    typing, so it needs place: true." / "speed_up_typing: true needs keys: \"shortcuts\" —
+    without it the cursor file records no typing to speed up." With `voice_over` or `camera`, each
+    is a stranger refused by name in the existing lists (`voiceOverScreenOnlyArguments`,
+    `cameraRefusedArguments`).
+  - (c) **`land_recording`** (the dev tool) takes `keys` (`RecordingKeys`) and the same three
+    booleans, each only with `movie`: without it, "<arg> cannot be given without movie — a
+    voice-over has no screen clips." The shared `recordingPolish(a, place: place ?? true, keys:
+    keys ?? .off)` runs after the `follow_wait` checks. Its panel door also waits on
+    `RecordingPolish.isPending` and answers `polish_pending`. Its `RecordingChoice` is built by
+    the tool itself, so the three `FrameJobRecording…` polish keys never reach it; the panel
+    door's plan reads the Auto Zoom and Speed Up Typing sheet keys (CU-101 (g)).
+- **CU-103 — The proof.** `tools/proof/cu10_proof.py` (MCP): Z0 (no "Frame Job: " in any
+  instance's log); P1 the door tool with `keys: "shortcuts"` and all three into a fresh project —
+  the answer holds the three objects, undo reads "Speed Up Typing", "Add Shortcut Overlays",
+  "Auto Zoom", "Add Recording", and `get_project` equals a second fresh landing given the three
+  tools by hand; P1b the panel door with `follow_wait`, on its own instance with the nine Auto
+  Zoom and Speed Up Typing sheet keys pinned at their defaults by launch arguments — the same
+  names in order and the same project; P2 the speed-up waited for speech (`speech_saved` names
+  the voice); P3 `auto_zoom: true` refused by name with `source: voice_over` and without `movie`;
+  P4 `place: false` and `speed_up_typing` without `keys` refused in CU-102 (b)'s sentences through
+  both tools, the project unchanged. App mutants `wrong-order` and `one-step` on `tree_copy.py`
+  copies, caught by P1. `tools/proof/cu10_probe.py` (built through `swift_build.build()`, the
+  panel never shown): Q1 the grid rows, titles and action; Q2 absent keys on, on, off, persist and
+  restore; Q3 the enabling and `applyPolish`'s gates; Q4 `commands(of:)`'s order; Q5 `decide`'s
+  arms; Q6 `recordingPolish`'s and `recordingSourceKind`'s refusals, exact. Probe mutants
+  `place-admitted`, `keys-admitted` (Q6), `enhance-ignored`, `ready-ignored` (Q5),
+  `absent-zoom-off` (Q2) and `shortcuts-without-keys` (Q3). No JOB row: the feel is CU12's
+  trial. `recording_proof.py` and `camera_recording_proof.py` gain the arguments in
+  `RECORD_PROPERTIES` and are not run (they record only when granted).

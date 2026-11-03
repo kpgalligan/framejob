@@ -29544,3 +29544,50 @@ python3 tools/proof/creator_spike/mouth_spike.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: JOB-55.
+
+## Road map "creator-jobs" CU10 — the recorder polishes on landing (`cu10_probe.py` B0, Q1–Q6 with `cu10_probe.swift`; `cu10_proof.py` Z0, P1, P1b, P2, P3, P4; eight mutants; spec §11 CU-100…CU-103)
+
+**Ungranted, no app.** `cu10_probe.py` builds `cu10_probe.swift` from `app/Sources` on
+`cu3c_probe.py`'s shape and exit rule R (`--sources`, `--mutant`, `--only`). The panel is
+`RecorderPanelController.shared`, never shown, under `sealed()` doors, and the sixteen
+`FrameJobRecording…` values are put back as they were.
+
+| Row | What it holds |
+|---|---|
+| Q1 | "When it lands:" with Zoom in on clicks, then Show shortcuts and Speed up typing unlabelled under it, directly after the Record shortcuts note and before Rate; each box `controlChanged:` on the panel, its tooltip naming its step |
+| Q2 | the three keys absent read on, on, off; a change writes all three; stored values restore |
+| Q3 | Zoom in on clicks live idle with a screen source, the other two only with Record shortcuts; greyed boxes keep their values; `applyPolish` gates the choice the same; Microphone Only, Camera and a countdown grey all three |
+| Q4 | `RecordingPolish.commands(of:)` in `allCases` order; the titles; `RecordingChoice()` asks none |
+| Q5 | `decide`: drop with no clips, wait while enhancing (past the limit too), run when ready and not busy, wait at 299 s, give up at 300 s |
+| Q6 | `recordingPolish`'s refusals in CU-102 (b)'s sentences and order, exact; `recordingSourceKind` refusing the three with voice_over (in `voiceOverScreenOnlyArguments` order) and camera |
+
+`recording_probe.py`'s 5d and D3 count sixteen keys and 7c's arguments gain the three;
+`camera_recording_probe.swift`'s P3 and its box row count sixteen.
+
+**Over MCP.** `cu10_proof.py [SOCKET]`, every recording landed by `land_recording` into a fresh
+saved package (a `testsrc` movie, its cursor file with two clicks, ⌘S at 5.0 s and typing
+4.0–16.0 s, and a silent voice). P1: the tool door with `keys: "shortcuts"` and all three answers
+the three objects, undo reads Speed Up Typing, Add Shortcut Overlays, Auto Zoom, Add Recording,
+and `get_project` equals a second package landed with none and given the three tools by hand.
+P1b (its own instance, the nine Auto Zoom and Speed Up Typing sheet keys pinned at their defaults
+by launch arguments): the panel door with `follow_wait` gives the same names and the same project.
+P2: `speed_up_typing.speech_saved` names the voice. P3: `auto_zoom` refused by name with `source:
+voice_over` and without `movie`. P4: `place: false` and `speed_up_typing` without `keys` refused
+through both tools, the project unchanged.
+
+Mutants (each must fail its row): `cu10_probe.py --mutant place-admitted` and `keys-admitted`
+(Q6), `enhance-ignored` and `ready-ignored` (Q5), `absent-zoom-off` (Q2),
+`shortcuts-without-keys` (Q3); `cu10_proof.py --mutant wrong-order` and `one-step` (P1), each on
+a `tree_copy.py` copy whose app it builds.
+
+```sh
+make rust
+python3 tools/proof/cu10_probe.py [--only Q2,Q6]
+python3 tools/proof/cu10_probe.py --mutant <name>
+make app-debug && python3 tools/proof/cu10_proof.py <dir>/agent.sock
+make app && RC_PROOF_APP=release python3 tools/proof/cu10_proof.py
+python3 tools/proof/cu10_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CU10 record. No person check: the feel is
+CU12's trial.

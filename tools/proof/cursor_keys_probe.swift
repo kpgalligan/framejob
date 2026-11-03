@@ -11,7 +11,7 @@
 //
 // The panel is `RecorderPanelController.shared`, NEVER shown, under a spy's grant doors: no
 // prompt, no System Settings, no camera or microphone opens (the fake microphone id finds no
-// device), and the thirteen `FrameJobRecording…` values and `FrameJobInputMonitoringAsked` are
+// device), and the sixteen `FrameJobRecording…` values and `FrameJobInputMonitoringAsked` are
 // put back as they were. The answer is one JSON object on stdout, `{"rows": [...]}`, each row
 // `{"id", "pass", "detail"}`; `cursor_keys_probe.py` prints and scores them (Y9 is its own,
 // read from the sources).
@@ -385,7 +385,9 @@ do {
         RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
         RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
         RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
-        RecorderPanelController.cursorKey, RecorderGrantDoors.inputMonitoringAskedKey,
+        RecorderPanelController.cursorKey, RecorderPanelController.autoZoomKey,
+        RecorderPanelController.shortcutOverlaysKey, RecorderPanelController.speedUpTypingKey,
+        RecorderGrantDoors.inputMonitoringAskedKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {

@@ -97,7 +97,7 @@ SEC = 600_000
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
     "size", "place", "path", "include_framejob_windows", "source", "camera", "camera_format",
-    "enhance",
+    "enhance", "keys", "cursor", "auto_zoom", "shortcut_overlays", "speed_up_typing",
 }
 CAMERA_STRANGERS = ["display", "window", "system_audio", "show_clicks", "size",
                     "include_framejob_windows", "rate"]

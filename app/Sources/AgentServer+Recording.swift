@@ -22,11 +22,14 @@ import ScreenCaptureKit
 /// **The refusal ORDER is the contract** (`transcribe`'s rule): the caller's
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
 /// missing or outside 1…600, then `source` (its value; for `voice_over`
-/// the screen-only arguments given, `keys` and `cursor` among them, then `microphone:
-/// false`), `display` with `window`, a `rate` or `size` outside the
+/// the screen-only arguments given, `keys`, `cursor` and the polish's three
+/// among them, then `microphone: false`), `display` with `window`, a `rate` or `size` outside the
 /// vocabulary, a `keys` outside its vocabulary (spec §11 CU-62), a `cursor`
 /// outside its vocabulary (spec §11 CU-36 (e)), `enhance:
 /// true` without a microphone and then with `place: false` (spec §11 AU-69),
+/// `auto_zoom`, `shortcut_overlays` and `speed_up_typing` in that order, each
+/// with `place: false` and the last two without `keys: "shortcuts"` (road map
+/// creator-jobs CU10, spec §11 CU-102 (b)),
 /// `microphone: true` (implied by a voice-over) with the Microphone grant
 /// absent (the status WORD in the sentence), `keys: "shortcuts"` with the
 /// Input Monitoring grant absent (CU-3's sentence, read and never
@@ -134,6 +137,8 @@ extension AgentServer {
         let place = try boolArg(a, "place") ?? true
         // AU-69 (d): after `place`, before any grant.
         let enhance = try recordingEnhance(a, microphone: microphone, place: place)
+        // CU-102 (b): the polish on landing, after `enhance`, before any grant.
+        let polish = try recordingPolish(a, place: place, keys: keys)
         let folder = try recordingFolder(a)
         if microphone {
             let status = RecordingGrant.microphoneStatus
@@ -198,7 +203,9 @@ extension AgentServer {
             showClicks: showClicks, rate: rate, resolution: resolution,
             destination: destination, folder: folder ?? RecordingFiles.folder(),
             camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance,
-            keys: keys, cursor: cursor)
+            keys: keys, cursor: cursor, autoZoom: polish.contains(.autoZoom),
+            shortcutOverlays: polish.contains(.shortcutOverlays),
+            speedUpTyping: polish.contains(.speedUpTyping))
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(
@@ -209,7 +216,8 @@ extension AgentServer {
         awaitGestureEnd(destination)
 
         // 7. The landing, on main, through the door the panel does not use;
-        //    then, with `enhance`, Enhance Voice as its own step (AU-68 (f)).
+        //    then, with `enhance`, Enhance Voice as its own step (AU-68 (f)),
+        //    then the polish, each command its own step (CU-101 (j)).
         return try landAndEnhance(result, place: place)
     }
 

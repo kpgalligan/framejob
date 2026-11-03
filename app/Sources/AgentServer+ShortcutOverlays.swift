@@ -30,6 +30,29 @@ extension AgentServer {
                     + "missing from AgentServer.creatorOffMainTools.")
         }
         let call = try onMain { try self.resolveShortcutOverlays(a) }
+        return try runShortcutOverlays(call)
+    }
+
+    /// The tool's body over `clips` of `document` with `settings` and no `from`/`to`: what
+    /// `record_screen`'s polish on landing calls (road map "creator-jobs" CU10, spec §11
+    /// CU-100). **SERVER THREAD**; one undo step "Add Shortcut Overlays", answered as the tool
+    /// answers.
+    func addShortcutOverlays(
+        document: ProjectDocument, clips: [UInt32], settings: ShortcutOverlaySettings
+    ) throws -> String {
+        guard !Thread.isMainThread else {
+            throw ToolError(
+                message: "add_shortcut_overlays must run on the server thread — its name is "
+                    + "missing from AgentServer.creatorOffMainTools.")
+        }
+        let call = try onMain {
+            try self.shortcutOverlayCall(document, clips, settings: settings, from: nil, to: nil)
+        }
+        return try runShortcutOverlays(call)
+    }
+
+    /// Both forms' body after the first hop: the files read here, then the last main hop.
+    private func runShortcutOverlays(_ call: ShortcutOverlayCall) throws -> String {
         let tracks: [UInt32: ReelCursor]
         do {
             tracks = try AutoZoom.readTracks(call.files)
@@ -112,6 +135,14 @@ extension AgentServer {
         let document = try target(a)
         let ids =
             given("clip") ? [try clipArg(a, "clip", document).id] : try clipsArg(a, "clips", document)
+        return try shortcutOverlayCall(document, ids, settings: settings, from: from, to: to)
+    }
+
+    /// The clips' cursor files and the handle the last hop compares. Main.
+    private func shortcutOverlayCall(
+        _ document: ProjectDocument, _ ids: [UInt32], settings: ShortcutOverlaySettings,
+        from: Ticks?, to: Ticks?
+    ) throws -> ShortcutOverlayCall {
         let snapshot = document.editedProject.snapshot
         let clips = ids.compactMap { snapshot.clip($0) }
         let files: [UInt32: URL]

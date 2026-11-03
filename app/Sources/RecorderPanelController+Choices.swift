@@ -51,6 +51,7 @@ extension RecorderPanelController {
         } else {
             choice.destination = .newProject
         }
+        applyPolish(to: &choice)
         return choice
     }
 
@@ -84,6 +85,7 @@ extension RecorderPanelController {
         defaults.set(cursorChosen?.rawValue ?? "", forKey: Self.cursorKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
+        persistPolish(defaults)
     }
 
     /// The stored choices, each falling back to `RecordingChoice`'s default
@@ -119,6 +121,7 @@ extension RecorderPanelController {
         let size = defaults.string(forKey: Self.sizeKey) ?? ""
         let resolution = RecordingResolution(rawValue: size) ?? RecordingChoice().resolution
         sizePopup.selectItem(at: RecordingResolution.allCases.firstIndex(of: resolution) ?? 0)
+        restorePolish(defaults)
     }
 
     /// The Cursor popup shows the person's pick, else the screen source's

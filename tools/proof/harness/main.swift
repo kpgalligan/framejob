@@ -406,6 +406,11 @@ enum Harness {
             "FrameJobRecordingEnhanceMicrophone": false,
             "FrameJobRecordingKeys": false,
             "FrameJobRecordingCursor": "",
+            // The "When it lands:" boxes (road map creator-jobs CU10, spec §11 CU-102 (a)), at
+            // their absent-key readings: on, on, off.
+            "FrameJobRecordingAutoZoom": true,
+            "FrameJobRecordingShortcutOverlays": true,
+            "FrameJobRecordingSpeedUpTyping": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5

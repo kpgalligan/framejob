@@ -55,6 +55,14 @@ extension AgentServer {
                 message: "show_clicks cannot be given without movie — a voice-over has no "
                     + "clicks.")
         }
+        // CU10 (spec §11 CU-102 (c)): Record shortcuts and the polish, a screen's only.
+        let keys = try enumArg(a, "keys", RecordingKeys.self)
+        for name in ["keys"] + RecordingPolish.Command.allCases.map(\.rawValue)
+        where a[name] != nil && !(a[name] is NSNull) && movie == nil {
+            throw ToolError(
+                message: "\(name) cannot be given without movie — a voice-over has no screen "
+                    + "clips.")
+        }
         if movie != nil, voice.count != 1 {
             throw ToolError(
                 message: "With movie, voice must name exactly one file — the movie's microphone "
@@ -74,6 +82,7 @@ extension AgentServer {
                 throw ToolError(message: "follow_wait must be 0…330 seconds (got \(followWait)).")
             }
         }
+        let polish = try recordingPolish(a, place: place ?? true, keys: keys ?? .off)
         let voices = try voice.map(landRecordingProbe)
         let picture = try movie.map(landRecordingProbe)
         let destination = try onMain { try self.recordingDestination(a) }
@@ -86,6 +95,10 @@ extension AgentServer {
         choice.enhanceMicrophone = enhance
         choice.cursor = cursorMode
         choice.showClicks = showClicks ?? false
+        choice.keys = keys ?? .off
+        choice.autoZoom = polish.contains(.autoZoom)
+        choice.shortcutOverlays = polish.contains(.shortcutOverlays)
+        choice.speedUpTyping = polish.contains(.speedUpTyping)
         let now = Date()
         let segments =
             try picture.map {
@@ -157,7 +170,7 @@ extension AgentServer {
 
     /// The panel's door: `recordingEnded(.success)` on main, then up to 25 s
     /// for the panel to be idle again, then up to `followWait` seconds for its
-    /// follow to end. `landed` is `document` or `new_project` when the
+    /// follows — Enhance's and the polish's (CU-102 (c)) — to end. `landed` is `document` or `new_project` when the
     /// recording's first file is in a project, else null; `note` the panel's.
     private func landThroughPanel(_ result: RecordingResult, followWait: Double) throws -> String {
         let before = try onMain { () throws -> Set<ObjectIdentifier> in
@@ -194,7 +207,11 @@ extension AgentServer {
         }
         if let document, followWait > 0 {
             let until = Date().addingTimeInterval(followWait)
-            while Date() < until, onMain({ RecordingEnhance.isPending(document) }) {
+            while Date() < until,
+                onMain({
+                    RecordingEnhance.isPending(document) || RecordingPolish.isPending(document)
+                })
+            {
                 Thread.sleep(forTimeInterval: RecordingEnhance.checkInterval)
             }
         }
@@ -205,6 +222,7 @@ extension AgentServer {
             ]
             if let document { fields["project"] = self.summary(document) }
             fields["enhance_pending"] = document.map(RecordingEnhance.isPending) ?? false
+            fields["polish_pending"] = document.map(RecordingPolish.isPending) ?? false
             return try self.jsonResult(fields)
         }
     }
@@ -223,18 +241,23 @@ extension AgentServer {
                 + "attached to that segment's media as a recording's landing attaches the file it "
                 + "wrote (spec CU-34); cursor_mode and show_clicks are that recording's Cursor and "
                 + "Show Clicks, so a separate one with show_clicks lands its screen clip with "
-                + "ripples as a recording does (spec CU-31). Each file is probed as a recording's "
-                + "are. "
+                + "ripples as a recording does (spec CU-31); keys is its Record shortcuts, and "
+                + "auto_zoom, shortcut_overlays and speed_up_typing its When it lands boxes, run "
+                + "after the landing (and any enhance) as record_screen's are, refused as "
+                + "record_screen refuses them (spec CU-102). Each file is probed as a "
+                + "recording's are. "
                 + "door tool (default) waits out a drag and lands as record_screen does, "
                 + "answering what record_screen would, enhance or enhance_error included; door "
                 + "panel hands the result to the recorder panel's recordingEnded, waits up to "
                 + "25 s for the panel to be idle and then up to follow_wait seconds for its "
-                + "follow to end, and answers {landed (document, new_project or null), note "
-                + "(the panel's), project, enhance_pending (read last)}. Refused by name: a "
+                + "follows to end, and answers {landed (document, new_project or null), note "
+                + "(the panel's), project, enhance_pending and polish_pending (read last)}. "
+                + "Refused by name: a "
                 + "path that will not probe, movie with other than one voice file, place with "
                 + "door panel, door panel while the recorder or the panel is not idle, "
-                + "follow_wait with door tool or outside 0…330, cursor, cursor_mode or "
-                + "show_clicks without movie, a cursor file that does not attach (it will not "
+                + "follow_wait with door tool or outside 0…330, cursor, cursor_mode, "
+                + "show_clicks, keys, auto_zoom, shortcut_overlays or speed_up_typing without "
+                + "movie, a cursor file that does not attach (it will not "
                 + "open, or its movie_size is not the "
                 + "movie's).",
             [
@@ -262,6 +285,26 @@ extension AgentServer {
                     "type": "boolean",
                     "description": "with movie only: the recording's Show Clicks (default "
                         + "false).",
+                ],
+                "keys": [
+                    "type": "string", "enum": RecordingKeys.allCases.map(\.rawValue),
+                    "description": "with movie only: the recording's Record shortcuts, off "
+                        + "(default) or shortcuts.",
+                ],
+                "auto_zoom": [
+                    "type": "boolean",
+                    "description": "with movie only: Zoom in on clicks when it lands (default "
+                        + "false); needs place.",
+                ],
+                "shortcut_overlays": [
+                    "type": "boolean",
+                    "description": "with movie only: Show shortcuts when it lands (default "
+                        + "false); needs place and keys shortcuts.",
+                ],
+                "speed_up_typing": [
+                    "type": "boolean",
+                    "description": "with movie only: Speed up typing when it lands (default "
+                        + "false); needs place and keys shortcuts.",
                 ],
                 "door": [
                     "type": "string", "enum": LandRecordingDoor.allCases.map(\.rawValue),

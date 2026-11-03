@@ -44,7 +44,7 @@ extension RecorderPanelController {
         for box in [
             includeFrameJobCheckbox, cameraBesideCheckbox, enhanceMicrophoneCheckbox,
             recordShortcutsCheckbox,
-        ] {
+        ] + polishBoxes.all {
             box.font = DS.sans(13)
             box.target = self
             box.action = #selector(controlChanged(_:))
@@ -88,7 +88,8 @@ extension RecorderPanelController {
         recordShortcutsNote.textColor = DS.textFaint
         recordShortcutsNote.preferredMaxLayoutWidth = Self.controlWidth
 
-        let grid = makeSheetGrid([
+        // CU-102 (a): "When it lands:" under the Record shortcuts note, before Rate.
+        var gridRows: [[NSView]] = [
             [fieldLabel("Source:"), sourcePopup],
             [NSGridCell.emptyContentView, includeFrameJobCheckbox],
             [NSGridCell.emptyContentView, cameraBesideCheckbox],
@@ -102,11 +103,15 @@ extension RecorderPanelController {
             [fieldLabel("Show Clicks:"), showClicksSwitch],
             [NSGridCell.emptyContentView, recordShortcutsCheckbox],
             [NSGridCell.emptyContentView, recordShortcutsNote],
+        ]
+        gridRows += polishRows()
+        gridRows += [
             [fieldLabel("Rate:"), ratePopup],
             [fieldLabel("Size:"), sizePopup],
             [NSGridCell.emptyContentView, sizeNote],
             [fieldLabel("Record Into:"), destinationPopup],
-        ])
+        ]
+        let grid = makeSheetGrid(gridRows)
 
         let inner = Self.cardWidth - sheetInset * 2
         countdownLabel.font = DS.display(56)

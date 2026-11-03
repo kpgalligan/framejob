@@ -69,6 +69,7 @@ extension RecorderPanelController {
         // AU-69 (a): live only while idle with a microphone, on any source; greyed keeps its value.
         enhanceMicrophoneCheckbox.isEnabled = idle && currentChoice().microphone != nil
         syncCameraControls()
+        syncPolishControls()
     }
 
     /// The Pause / Resume button beside Stop: on screen only while a

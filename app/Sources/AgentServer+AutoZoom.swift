@@ -29,6 +29,28 @@ extension AgentServer {
                     + "AgentServer.creatorOffMainTools.")
         }
         let call = try onMain { try self.resolveAutoZoom(a) }
+        return try runAutoZoom(call)
+    }
+
+    /// The tool's body over `clips` of `document` with `settings` and no `from`/`to`: what
+    /// `record_screen`'s polish on landing calls (road map "creator-jobs" CU10, spec §11
+    /// CU-100). **SERVER THREAD**; one undo step "Auto Zoom", answered as the tool answers.
+    func autoZoom(document: ProjectDocument, clips: [UInt32], settings: AutoZoomSettings) throws
+        -> String
+    {
+        guard !Thread.isMainThread else {
+            throw ToolError(
+                message: "auto_zoom must run on the server thread — its name is missing from "
+                    + "AgentServer.creatorOffMainTools.")
+        }
+        let call = try onMain {
+            try self.autoZoomCall(document, clips, settings: settings, from: nil, to: nil)
+        }
+        return try runAutoZoom(call)
+    }
+
+    /// Both forms' body after the first hop: the files read here, then the last main hop.
+    private func runAutoZoom(_ call: AutoZoomCall) throws -> String {
         let tracks: [UInt32: ReelCursor]
         do {
             tracks = try AutoZoom.readTracks(call.files)
@@ -106,6 +128,14 @@ extension AgentServer {
         }
         let document = try target(a)
         let ids = given("clip") ? [try clipArg(a, "clip", document).id] : try clipsArg(a, "clips", document)
+        return try autoZoomCall(document, ids, settings: settings, from: from, to: to)
+    }
+
+    /// The clips' cursor files and the handle the last hop compares. Main.
+    private func autoZoomCall(
+        _ document: ProjectDocument, _ ids: [UInt32], settings: AutoZoomSettings, from: Ticks?,
+        to: Ticks?
+    ) throws -> AutoZoomCall {
         let snapshot = document.editedProject.snapshot
         let clips = ids.compactMap { snapshot.clip($0) }
         let files: [UInt32: URL]

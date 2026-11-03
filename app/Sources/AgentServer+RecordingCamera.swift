@@ -33,7 +33,7 @@ extension AgentServer {
     /// format's rate.
     static let cameraRefusedArguments = [
         "display", "window", "system_audio", "show_clicks", "size", "include_framejob_windows",
-        "keys", "cursor", "rate",
+        "keys", "cursor", "auto_zoom", "shortcut_overlays", "speed_up_typing", "rate",
     ]
 
     /// `camera` (CAM-4 point 1): a device's `uniqueID` or name, trimmed; nil

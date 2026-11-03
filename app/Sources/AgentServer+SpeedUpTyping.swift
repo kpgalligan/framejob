@@ -33,6 +33,29 @@ extension AgentServer {
                     + "from AgentServer.creatorOffMainTools.")
         }
         let call = try onMain { try self.resolveSpeedUpTyping(a) }
+        return try runSpeedUpTyping(call)
+    }
+
+    /// The tool's body over `clips` of `document` with `settings` and no `from`/`to`: what
+    /// `record_screen`'s polish on landing calls (road map "creator-jobs" CU10, spec §11
+    /// CU-100). **SERVER THREAD**; one undo step "Speed Up Typing", answered as the tool
+    /// answers (its "not detected yet" refusal included).
+    func speedUpTyping(
+        document: ProjectDocument, clips: [UInt32], settings: SpeedUpTypingSettings
+    ) throws -> String {
+        guard !Thread.isMainThread else {
+            throw ToolError(
+                message: "speed_up_typing must run on the server thread — its name is missing "
+                    + "from AgentServer.creatorOffMainTools.")
+        }
+        let call = try onMain {
+            try self.speedUpTypingCall(document, clips, settings: settings, from: nil, to: nil)
+        }
+        return try runSpeedUpTyping(call)
+    }
+
+    /// Both forms' body after the first hop: the files read here, then the last main hop.
+    private func runSpeedUpTyping(_ call: SpeedUpTypingCall) throws -> String {
         let tracks: [UInt32: ReelCursor]
         do {
             tracks = try AutoZoom.readTracks(call.files)
@@ -124,6 +147,14 @@ extension AgentServer {
         let document = try target(a)
         let ids =
             given("clip") ? [try clipArg(a, "clip", document).id] : try clipsArg(a, "clips", document)
+        return try speedUpTypingCall(document, ids, settings: settings, from: from, to: to)
+    }
+
+    /// The clips' cursor files and the handle the last hop compares. Main.
+    private func speedUpTypingCall(
+        _ document: ProjectDocument, _ ids: [UInt32], settings: SpeedUpTypingSettings,
+        from: Ticks?, to: Ticks?
+    ) throws -> SpeedUpTypingCall {
         let snapshot = document.editedProject.snapshot
         let clips = ids.compactMap { snapshot.clip($0) }
         let files: [UInt32: URL]

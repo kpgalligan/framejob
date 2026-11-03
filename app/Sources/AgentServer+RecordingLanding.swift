@@ -116,13 +116,31 @@ extension AgentServer {
     /// Enhance Voice over the recording's voice clips as its own step (spec
     /// §11 AU-68 (f)): `decide` polled through `onMain` every
     /// `RecordingEnhance.checkInterval`, then `enhance_voice`'s own body at
-    /// its default target (a tool reads no `UserDefaults`). The answer is
-    /// `land`'s with `enhance` (that body's answer) or `enhance_error`, and
-    /// `project` read again.
+    /// its default target (a tool reads no `UserDefaults`); then, when it asks
+    /// for any, the polish on landing (road map creator-jobs CU10, spec §11
+    /// CU-101 (j), `polishLanded`). The answer is `land`'s with `enhance`
+    /// (that body's answer) or `enhance_error`, the polish's answers or
+    /// `…_error` sentences, and `project` read again, last, when either ran.
     func landAndEnhance(_ result: RecordingResult, place: Bool) throws -> String {
         let stop = AgentLane.shared.callCancel
         let (answer, document) = try onMain { try self.land(result, place: place) }
-        guard result.choice.enhanceMicrophone else { return answer }
+        let polish = !RecordingPolish.commands(of: result.choice).isEmpty
+        guard result.choice.enhanceMicrophone || polish else { return answer }
+        var fields = Self.resultObject(answer) ?? [:]
+        if result.choice.enhanceMicrophone {
+            try enhanceLanded(result, in: document, stop: stop, into: &fields)
+        }
+        if polish { polishLanded(result, in: document, into: &fields) }
+        fields["project"] = onMain { self.summary(document) }
+        return try jsonResult(fields)
+    }
+
+    /// SERVER THREAD. AU-68 (f)'s wait and Enhance Voice, its answer or
+    /// `enhance_error` written into `fields`.
+    private func enhanceLanded(
+        _ result: RecordingResult, in document: ProjectDocument, stop: AgentCallCancel?,
+        into fields: inout [String: Any]
+    ) throws {
         let (clips, scope) = onMain {
             (RecordingEnhance.voiceClips(of: result, in: document), document.scope)
         }
@@ -138,7 +156,6 @@ extension AgentServer {
             }
             if step == .wait { Thread.sleep(forTimeInterval: RecordingEnhance.checkInterval) }
         }
-        var fields = Self.resultObject(answer) ?? [:]
         switch step {
         case .enhance(let ids):
             do {
@@ -157,12 +174,10 @@ extension AgentServer {
                 "record_screen was stopped while the microphone's sound was being analysed, so "
                 + "Enhance Voice did not run."
         }
-        fields["project"] = onMain { self.summary(document) }
-        return try jsonResult(fields)
     }
 
     /// The object a `jsonResult` envelope's text holds, nil for anything else.
-    private static func resultObject(_ envelope: String) -> [String: Any]? {
+    static func resultObject(_ envelope: String) -> [String: Any]? {
         guard
             let call = (try? JSONSerialization.jsonObject(with: Data(envelope.utf8)))
                 as? [String: Any],

@@ -132,6 +132,7 @@ extension RecorderPanelController {
                 Self.editor(of: document)?.viewStateDidChange()
                 landed(result, asNewProject: false, notes: placement.notes)
                 RecordingEnhance.follow(result, in: document)  // AU-68: after the commit
+                RecordingPolish.follow(result, in: document)  // CU-100: after it, its own steps
             } catch {
                 failedToLand(result, error)
             }
@@ -140,6 +141,7 @@ extension RecorderPanelController {
                 let (opened, notes) = try ProjectDocument.untitled(around: result)
                 landed(result, asNewProject: true, notes: notes)
                 RecordingEnhance.follow(result, in: opened)  // AU-68: after the commit
+                RecordingPolish.follow(result, in: opened)  // CU-100: after it, its own steps
             } catch {
                 failedToLand(result, error)
             }

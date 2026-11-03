@@ -10,7 +10,7 @@
 //   cu3c_probe <work dir>
 //
 // The panel is `RecorderPanelController.shared`, NEVER shown, under doors that read nothing true
-// and ask nothing: no prompt, no System Settings, no camera or microphone opens. The thirteen
+// and ask nothing: no prompt, no System Settings, no camera or microphone opens. The sixteen
 // `FrameJobRecording…` values are put back as they were. The answer is one JSON object on stdout,
 // `{"rows": [...]}`, each row `{"id", "pass", "detail"}`; `cu3c_probe.py` prints and scores them.
 import AppKit
@@ -169,7 +169,8 @@ let keys = [
     RecorderPanelController.includeFrameJobWindowsKey, RecorderPanelController.cameraKey,
     RecorderPanelController.cameraFormatKey, RecorderPanelController.cameraBesideKey,
     RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
-    RecorderPanelController.cursorKey,
+    RecorderPanelController.cursorKey, RecorderPanelController.autoZoomKey,
+    RecorderPanelController.shortcutOverlaysKey, RecorderPanelController.speedUpTypingKey,
 ]
 let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
 UserDefaults.standard.set("", forKey: RecorderPanelController.cursorKey)

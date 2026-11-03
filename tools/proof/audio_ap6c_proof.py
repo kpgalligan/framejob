@@ -35,8 +35,9 @@ is phase5_proof's BS.1770 on an exported WAV.
       undo's top "Add Recording"; the panel door with follow_wait 30:
       enhance_pending false, the clip untouched.
   V8  record_screen declares enhance (boolean, described); land_recording's
-      ten arguments (CU3b's cursor the eighth, CU3c's cursor_mode and show_clicks the ninth and
-      tenth); follow_wait with door "tool" refused by name; the parity
+      fourteen arguments (CU3b's cursor the eighth, CU3c's cursor_mode and show_clicks the ninth
+      and tenth, CU10's keys, auto_zoom, shortcut_overlays and speed_up_typing the eleventh to
+      fourteenth); follow_wait with door "tool" refused by name; the parity
       log clean.
 """
 
@@ -511,9 +512,10 @@ def catalog_rows(m):
     land = (schemas.get("land_recording") or {}).get("inputSchema", {})
     names = sorted(land.get("properties") or {})
     want = sorted(["voice", "movie", "door", "enhance", "place", "project", "follow_wait",
-                   "cursor", "cursor_mode", "show_clicks"])
+                   "cursor", "cursor_mode", "show_clicks", "keys", "auto_zoom",
+                   "shortcut_overlays", "speed_up_typing"])
     check(names == want and land.get("required") == ["voice"],
-          f"V8 land_recording's ten arguments: {names}, required {land.get('required')}")
+          f"V8 land_recording's fourteen arguments: {names}, required {land.get('required')}")
     try:
         m.call("land_recording", voice=[os.path.join(FIX, "silent.m4a")], follow_wait=5)
         got = "(no refusal)"

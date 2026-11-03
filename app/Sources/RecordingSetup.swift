@@ -135,6 +135,11 @@ struct RecordingChoice: Equatable {
     var keys: RecordingKeys = .off
     /// The Cursor row (spec §11 CU-36): nil follows the source's default.
     var cursor: RecordingCursor? = nil
+    /// The polish on landing (spec §11 CU-100…CU-102): Auto Zoom, Add Shortcut Overlays and
+    /// Speed Up Typing over the landed screen clips, each its own undo step after the landing.
+    var autoZoom: Bool = false
+    var shortcutOverlays: Bool = false
+    var speedUpTyping: Bool = false
 
     /// The cursor this recording is made with: the choice, else the source's default.
     var effectiveCursor: RecordingCursor { cursor ?? .defaultFor(source) }

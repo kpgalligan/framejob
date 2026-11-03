@@ -18,7 +18,8 @@ import Foundation
 /// CR1b's `recordingCameraClause` (spec §11 CAM-4) is a fifth, and CR3b's
 /// `recordingCameraBesideClause` (CAM-10) a sixth, and AP6 part 3's
 /// `recordingEnhanceClause` (AU-69) a seventh, and CU1b1's `recordingCursorClause`
-/// (CU-18) an eighth, for the same.
+/// (CU-18) an eighth, and CU10's `recordingPolishClause` (CU-100…CU-102) a ninth,
+/// for the same.
 /// It is SPLICED back in where it left — LAST, after `cancel_export` — so the
 /// catalog's order, which `recording_probe.py` reads and `tools/list`
 /// publishes, and the description `recording_proof.py` section 0 reads, are
@@ -207,6 +208,20 @@ extension AgentServer {
             + "cursor_problem when it was not or holds only the geometry the screen had when "
             + "the segment began (also said in the note); a cursor problem never fails the "
             + "recording."
+        // CU10's polish paragraph (spec §11 CU-100…CU-102), hoisted for the same budget reason.
+        let recordingPolishClause: String =
+            " WHEN IT LANDS: auto_zoom, shortcut_overlays and speed_up_typing run auto_zoom, "
+            + "add_shortcut_overlays and speed_up_typing over the recording's SCREEN clips (each "
+            + "segment's movie whose media has a cursor file) after the landing and after any "
+            + "enhance, in that order, each as its OWN undo step named Auto Zoom, Add Shortcut "
+            + "Overlays and Speed Up Typing, with those tools' defaults and no from or to. "
+            + "speed_up_typing waits for the clips' speech to be detected, up to 5 minutes. The "
+            + "answer then also carries each one's own answer under its name, or a sentence "
+            + "under <name>_error saying why it did not run (no screen clip with a cursor file, "
+            + "the project busy or the speech not detected within 5 minutes, the call stopped, "
+            + "or the tool's own refusal); project is read after them. The recorder panel's When "
+            + "it lands boxes — Zoom in on clicks, Show shortcuts and Speed up typing — do the "
+            + "same."
         return [
             // MARK: Recording
             //
@@ -257,7 +272,9 @@ extension AgentServer {
                     + "mistakes first (seconds missing or outside 1…600, a source outside the "
                     + "vocabulary and the arguments that source refuses, display and window "
                     + "both given, a rate or size outside the vocabulary, enhance: true "
-                    + "without a microphone and then with place: false, microphone: true "
+                    + "without a microphone and then with place: false, auto_zoom, "
+                    + "shortcut_overlays and speed_up_typing each with place: false and the "
+                    + "last two without keys: shortcuts, microphone: true "
                     + "without the Microphone grant, a project naming nothing open), then for "
                     + "a camera recording or a camera beside the screen the camera lookup, "
                     + "then its camera_format, then the Camera grant, then for a screen "
@@ -268,7 +285,7 @@ extension AgentServer {
                     + recordingPauseClause
                     + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause
                     + recordingCameraClause + recordingCameraBesideClause
-                    + recordingEnhanceClause + recordingCursorClause,
+                    + recordingEnhanceClause + recordingCursorClause + recordingPolishClause,
                 recordScreenArguments(), required: ["seconds"]),
         ]
     }

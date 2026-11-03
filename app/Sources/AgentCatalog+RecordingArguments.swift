@@ -24,10 +24,11 @@ extension AgentServer {
                     + "alone (see camera; with screen, camera records one beside the "
                     + "screen). With voice_over, "
                     + "display, window, system_audio, show_clicks, size, "
-                    + "include_framejob_windows, keys, cursor and microphone: false are "
+                    + "include_framejob_windows, auto_zoom, shortcut_overlays, "
+                    + "speed_up_typing, keys, cursor and microphone: false are "
                     + "refused by name; with camera, display, window, system_audio, "
-                    + "show_clicks, size, include_framejob_windows, keys, cursor and rate "
-                    + "are; "
+                    + "show_clicks, size, include_framejob_windows, keys, cursor, auto_zoom, "
+                    + "shortcut_overlays, speed_up_typing and rate are; "
                     + "camera and camera_format are refused with voice_over.",
             ],
             "camera": [
@@ -153,6 +154,30 @@ extension AgentServer {
                     + "false); the answer gains enhance or enhance_error. Refused "
                     + "without microphone: true (or source voice_over), and with "
                     + "place: false.",
+            ],
+            // The recorder panel's "When it lands:" boxes (spec §11 CU-100…CU-102).
+            "auto_zoom": [
+                "type": "boolean",
+                "description": "Run auto_zoom over the recording's screen clips once they land, "
+                    + "as its own undo step Auto Zoom (default false); the answer gains auto_zoom "
+                    + "(auto_zoom's own answer) or auto_zoom_error. Refused with place: false, "
+                    + "and with source voice_over and camera.",
+            ],
+            "shortcut_overlays": [
+                "type": "boolean",
+                "description": "Run add_shortcut_overlays over the recording's screen clips "
+                    + "after auto_zoom, as its own undo step Add Shortcut Overlays (default "
+                    + "false); the answer gains shortcut_overlays or shortcut_overlays_error. "
+                    + "Refused with place: false, without keys: shortcuts, and with source "
+                    + "voice_over and camera.",
+            ],
+            "speed_up_typing": [
+                "type": "boolean",
+                "description": "Run speed_up_typing over the recording's screen clips last, once "
+                    + "their speech is detected, as its own undo step Speed Up Typing (default "
+                    + "false); the answer gains speed_up_typing or speed_up_typing_error. "
+                    + "Refused with place: false, without keys: shortcuts, and with source "
+                    + "voice_over and camera.",
             ],
             "path": [
                 "type": "string",

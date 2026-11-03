@@ -9697,6 +9697,88 @@ owner's screen-tutorial recordings with Record shortcuts on.
 - **Question for the owner:** the defaults? *Recommended: Zoom in on clicks on, Show shortcuts on
   when Record shortcuts is on, Speed up typing off.*
 
+#### CU10's record (2026-11-03)
+
+**Landed.** Lane B, base `ca2d98a0` (I's HEAD, CU3c; the harness made the worktree at
+`a4869b62`, behind I, and it was fast-forwarded to I's HEAD before any change). The lane's two
+commits: `35f1b361` the decisions alone, CU-100…CU-103 in a new `creator-jobs-10.md` (`-9.md`
+stood at 667 lines), with its file row and four index rows after CU-94's; then `be2409cd` the
+code, the instruments and the documents. At integration VR2b2 and SW8 had already started
+`creator-jobs-10.md`, so CU10's section was appended to theirs (353 lines; one file row, its
+description extended) and the spec index's `11-decisions/` and `07.4` cells recounted; the proof
+README keeps SW8's section and CU10's after it. The owner's answer (2026-11-01): the boxes default to Zoom in on clicks on, Show
+shortcuts on (live only with Record shortcuts) and Speed up typing off; the tool's three default
+false. No new tool, op, `rc_*`, format (43 stands) or core change; nothing keyed (CJ-3); the
+product tool count stays 123. No toll: every touched file stays under its cap
+(`RecorderPanelController.swift` 394).
+
+- **The follow-ups.** `RecordingPolish.swift` (new): the commands a choice asks for in
+  `allCases` order, the screen paths (each segment's movie; none for a voice-over or a camera
+  alone) and clips (the open container's clips of those media with a cursor file, recomputed at
+  every check), `isReady` (the speed-up's `SpeedUpTyping.resolve` not `.waiting`, its first wait
+  per document starting `generateCaches()`; a throw counts as ready), the pure `decide` and
+  CU-101 (k)'s sentences. `RecordingPolish+Follow.swift` (new): the panel's follow, one per
+  landing, a 0.5 s default-mode timer, the cursor files read once on a global queue, Auto Zoom at
+  the remembered sheet values with typing from the files, the overlays' defaults, the speed-up at
+  its remembered values with a crossing refused by `SpeedAudioDrop.note`, every commit
+  `performGroupedEdit`, a refusal or give-up at the inspector's foot.
+- **The panel.** `RecorderPanelController+Polish.swift` (new): `RecorderPolishBoxes`, the three
+  keys (the fourteenth to sixteenth, absent on, on, off), the rows under the Record shortcuts note,
+  `applyPolish`, persist, restore and `syncPolishControls` (the last statement of
+  `syncControlsEnabled()`); `+Landing` calls `RecordingPolish.follow` after each
+  `RecordingEnhance.follow`.
+- **The tools.** `AgentServer+RecordingPolish.swift` (new): `recordingPolish` (CU-102 (b)'s
+  refusals) and `polishLanded`, the tool door, which runs each tool's new
+  `(document:clips:settings:)` body at the tools' defaults. `landAndEnhance` runs the enhance (its
+  body moved whole into `enhanceLanded`), then the polish, and reads `project` last.
+  `record_screen` reads the three after `enhance`; `land_recording` takes `keys` and the three,
+  waits on `RecordingPolish.isPending` and answers `polish_pending`.
+
+**Deviations from the spec.** (1) The three tools' `(_ a:)` forms and the new
+`(document:clips:settings:)` bodies share a private `run…(call)` after their first main hop, rather
+than the `(_ a:)` form calling the public body: the public body has no `from`/`to`, and the shared
+run keeps the `(_ a:)` form's one resolving hop (arguments, clips and cursor files together)
+exactly as it was. `cu7_proof.py`, `cu8_proof.py` and `cu9b_proof.py` passed unchanged on it. (2)
+The tool door polls readiness with the cursor files read once on the server thread only for the
+speed-up; Auto Zoom and the overlays read their own files inside their bodies, which is where a
+read failure is reported. (3) The `one-step` mutant opens one undo group around the tool door's
+three runs (`groupsByEvent` off for its span); `wrong-order` reverses `allCases` in
+`commands(of:)`.
+
+**The runs** (lane B's worktree, AC power, three lanes running; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings.
+- `cu10_probe.py`: `scores: 7/7`. Its six mutants each printed `caught` and exited 1:
+  `place-admitted` and `keys-admitted` (Q6), `enhance-ignored` and `ready-ignored` (Q5),
+  `absent-zoom-off` (Q2), `shortcuts-without-keys` (Q3).
+- `cu10_proof.py` on Debug: 6/6 rows. `cu7_proof.py` 12/12, `cu8_proof.py` 12/12,
+  `cu9b_proof.py` 11/11 on the same instance.
+- `spec_index_proof.py` 267/267.
+- `make gate`: `gate: PASS 743s` (names 1 s, typecheck 21 s, test 468 s, app 251 s; fmt and lint
+  reused).
+- Release: `cu10_proof.py` 6/6 (P1, P1b, P2, P3, P4, Z0 on both instances);
+  `audio_ap6c_proof.py` 39/39 on a Release instance; `grep "Frame Job: "` printed nothing.
+- `recording_probe.py --only chrome,catalog,voiceover_doors` 182/182;
+  `camera_recording_probe.py --only tool,panel,beside` 46/46; `cu3c_probe.py` 8/8;
+  `cursor_keys_probe.py` 7/7; `audio_ap6c_probe.py` 5/5.
+- App mutants on `tree_copy.py` copies: `cu10_proof.py --mutant wrong-order` CAUGHT, exit 1 (undo read Auto Zoom, Add Shortcut Overlays, Speed Up Typing, Add Recording, and the project differed);
+  `--mutant one-step` CAUGHT, exit 1 (the undos ran out before four: "There is nothing to undo.").
+- `recording_proof.py` and `camera_recording_proof.py` gained `keys`, `cursor` and the three in
+  `RECORD_PROPERTIES` and were not run: they record only when granted.
+
+**The review** passed with two nits. (1) The tool door reads `document.scope` when the polish
+starts, after `enhanceLanded` returns, where the panel's follow reads it at landing: after an
+enhance that gave up while the person sat in another nest, the polish would drop with "No screen
+clip … landed" rather than wait. Not fixed in the phase; filed as an issue at integration
+("record_screen's polish reads the scope after the enhance"). (2) This record was written after
+the lane's gate, so its names step never read it; the integration gate on I does.
+
+**Integration** (2026-11-03): `app/CLAUDE.md`'s recorder entry now counts sixteen
+`FrameJobRecording…` keys, and it gained the four new files' entry and `land_recording`'s
+arguments; `spec_index_proof.py` 267/267 on the merged tree; `make gate` on I: `gate: PASS 475s`
+(names 1 s, typecheck 17 s, test 269 s, app 185 s; fmt and lint reused).
+
+**Owed.** No person check (the feel is CU12's trial). The nit (1) issue.
+
 ### VR4 — captions re-paged and graphics re-laid
 
 - **What a person gets:** the vertical version's word captions fit the narrow frame with every

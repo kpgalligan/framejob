@@ -3733,12 +3733,15 @@ free.
   live with it, the warm-up is spent before the countdown, and the press
   reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
   CAM-11). The panel
-  remembers thirteen `FrameJobRecording…` keys (the Camera's, the Format's,
+  remembers sixteen `FrameJobRecording…` keys (the Camera's, the Format's,
   `FrameJobRecordingCameraBeside`, `FrameJobRecordingEnhanceMicrophone` —
   "Enhance the microphone when it lands", spec §11 AU-69 —,
-  `FrameJobRecordingKeys` (Record shortcuts, CU-62) and
-  `FrameJobRecordingCursor` (Cursor, CU-36) among them; the type doc lists
-  them), and a probe or the harness that touches them handles all thirteen. The
+  `FrameJobRecordingKeys` (Record shortcuts, CU-62),
+  `FrameJobRecordingCursor` (Cursor, CU-36) and the "When it lands:" boxes'
+  `FrameJobRecordingAutoZoom`, `FrameJobRecordingShortcutOverlays` and
+  `FrameJobRecordingSpeedUpTyping` (CU-102, absent on, on, off) among them;
+  the type doc lists them), and a probe or the harness that touches them
+  handles all sixteen. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -3903,13 +3906,33 @@ free.
   landing, ended before a step acts, `.enhance` through
   `AudioMeasureDoor.enhanceLanded`). `record_screen {enhance}` polls the same
   `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`.
+- `RecordingPolish.swift` · `RecordingPolish+Follow.swift` ·
+  `RecorderPanelController+Polish.swift` · `AgentServer+RecordingPolish.swift`
+  — the recorder polishes on landing (road map creator-jobs CU10, spec §11
+  CU-100…CU-102): Auto Zoom, Add Shortcut Overlays and Speed Up Typing over
+  the landed screen clips (each segment's movie whose media has a cursor
+  file, recomputed at every check), each its own undo step after the landing
+  and any Enhance Voice, in that order. `RecordingPolish` is the commands,
+  the screen paths and clips, `isReady` (the speed-up's speech; its first
+  wait starts `generateCaches()`), the pure `decide` and the sentences;
+  `+Follow` the panel's follow (a 0.5 s default-mode timer per landing, never
+  joined, ended before the last run, the sheets' remembered values, commits
+  through `performGroupedEdit`, a crossing refused, refusals at the
+  inspector's foot); `RecorderPanelController+Polish` the "When it lands:"
+  boxes, their keys and gates (Show shortcuts and Speed up typing only with
+  Record shortcuts); `AgentServer+RecordingPolish` `record_screen`'s three
+  booleans and refusals and the tool door, `polishLanded`, through each
+  tool's `(document:clips:settings:)` body at the tools' defaults.
 - `AgentServer+LandRecording.swift` — the dev tool `land_recording` (spec §11
   AU-69 (e)): fixture files landed as a finished recording through the
   panel's `recordingEnded` or `record_screen`'s landing; its `cursor` (road map
   creator-jobs CU3b, spec §11 CU-34 (d)), only with `movie`, attaches a fixture cursor
   file to the screen segment's media through `MediaImporter.cursorAttachment` and
   `RecordingSegment.withCursor(…, attached:)`, refused by name without `movie` or when the
-  file does not attach.
+  file does not attach; `keys`, `auto_zoom`, `shortcut_overlays` and `speed_up_typing`
+  (CU10, spec §11 CU-102 (c)), only with `movie`, are the choice's Record shortcuts and
+  "When it lands:" boxes, refused as `record_screen` refuses them; the panel door also
+  waits on `RecordingPolish.isPending` and answers `polish_pending`.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`

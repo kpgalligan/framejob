@@ -467,6 +467,10 @@ RECORD_PROPERTIES = {
     "camera_format",
     # Road map "audio" AP6 part 3 (spec §11 AU-69): Enhance Voice after the landing.
     "enhance",
+    # Road map "creator-jobs" CU6 (spec §11 CU-62) and CU3c (CU-36): Record shortcuts, Cursor.
+    "keys", "cursor",
+    # Road map "creator-jobs" CU10 (spec §11 CU-102): the polish on landing.
+    "auto_zoom", "shortcut_overlays", "speed_up_typing",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of
