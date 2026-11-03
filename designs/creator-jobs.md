@@ -7632,6 +7632,151 @@ draft's FC1 and FC2 are CJ5a and CJ5b. The analysis needs no key; only Rank does
 - **Question for the owner:** run the pass at import so the first Find Clips is instant?
   *Recommended: no* (FC-32, CJ-20): every import would pay CPU for a feature most imports never use.
 
+#### FC3's record (2026-11-02)
+
+**Landed.** Lane A, base `6110526b`, the second attempt. The commits, in order:
+- `a10f22cc`: the head. Spike FC-S1 re-run under the owner's amended agreement test, FC-30…FC-34
+  recorded, the instruments. That commit came before the app code.
+- The app code, its documents, the proof and this record.
+
+No core, FFI, format, op, tool or key change (FC-32, CJ-3). An agent gets
+`get_media_analysis {kind: "sound_events"}`; a person sees nothing.
+
+- **New files** (`wc -l`): `SoundEvents.swift` 189, `AnalysisSoundEvents.swift` 263,
+  `AgentServer+AnalysisSoundEvents.swift` 90.
+- **Changed:** `AnalysisStamp.swift` 234 → 246 (`sound_events` in every switch),
+  `AnalysisFrames.swift` 401 → 409 (`AnalysisGrid(hopTicks:duration:)` only), `AnalysisLane.swift`
+  373 → 381 (the `.soundEvents` arm, and only picture jobs counted against `pictureWidth`),
+  `MediaImporter+Speech.swift` 169 → 174 (`speechReader`'s `window:`), `ProjectDocument+Analysis.swift`
+  90 → 94 (no input for a sound kind), `AgentServer+Analysis.swift` 351 → 368 (the reversed-clip
+  and no-sound refusals, the arm), `AgentServer+AnalysisFaces.swift` 104 → 108 (`answerNumber`
+  moved out of `facesAnswer`), `AgentServer+AnalysisJob.swift` 201 → 207 (the dev tool's guard by
+  kind), `AgentCatalog+Analysis.swift` 135 → 153.
+- **Not touched:** `ShotSplit.swift`, `CutoutWants.swift`, `CutoutStatus.swift`,
+  `AnalyzingSheetController.swift`, `DerivedCarry.swift`, `AgentServer+AnalysisMasks.swift` and
+  `writeSpeech`.
+- **Instruments:** `creator_spike/sound_spike.swift` (186, attempt 1's, unchanged),
+  `sound_deciders.py` (267, 17 selftest rows), `sound_spike.py` (226), `sound_events_probe.swift`
+  (572) and `sound_events_proof.py` (638: P1–P9, E1–E11, Z1, six mutants).
+- **Documents:** spec §5.6 (345 → 357), §7.4 (the analysis row), §7.7 (256 → 258), §7.9e (564 →
+  579) and their index cells, `creator-jobs-6.md` (371 → 505) with five index rows,
+  `docs/guide/mcp.md`, `projects-and-media.md`, and `tools/proof/README.md`.
+
+**Attempt 1's STOP.** Attempt 1 (base `59e85465`, instruments at `64b74355`) ran FC-S1 and
+stopped at its spec's first STOP condition: the stream analyzer failed the agreement test as that
+spec defined it (every rising 0.5 crossing matched by a crossing on the other side within one
+hop). Six crossings were unmatched at 1.0 s and 3.0 s (none at 1.5 s), each one window where the
+two analyzers sat either side of 0.5 (0.501/0.498, 0.511/0.495, 0.507/0.493, 0.437/0.525,
+0.458/0.506). Its line: `VERDICT window=1.5 hop=0.75 groups=weak(all, no S-EV) labels=all
+stream_agrees=no deterministic=yes rt_1.0_file=218.6 rt_1.0_stream=229.5 rt_1.5_file=276.4
+rt_1.5_stream=297.6 rt_3.0_file=353.7 rt_3.0_stream=390.3`. It offered (a) a value tolerance in
+the test, (b) the test at the kept window only, (c) the file analyzer, and recommended (a).
+**The owner chose (a)** (2026-11-02): a crossing is also matched when the other side's value in
+that window is within ±0.1 of 0.5.
+
+**The head.** macOS 26.5.1 (25F80), Apple M2 Max, on AC power (`pmset`: "Now drawing from 'AC
+Power'"), three lanes on the machine.
+- **FC-S1** (`rule_sha256` `7fe7bcab…8fa8b06989`, matching; the rule's text and pin unchanged —
+  the amendment lives in `sound_deciders.agreement`): `VERDICT window=1.5 hop=0.75
+  groups=weak(all, no S-EV) labels=all stream_agrees=yes strict_unmatched=6 deterministic=no
+  rt_1.0_file=79.7 rt_1.0_stream=227.3 rt_1.5_file=261.0 rt_1.5_stream=277.6 rt_3.0_file=187.6
+  rt_3.0_stream=102.4`.
+  - Agreement: every `<window>/<input>` agrees under the amended test. Six crossings are tolerated
+    (none unmatched), the six attempt 1's strict test missed (FC-30 lists them with their value
+    pairs). The re-run's `tolerated` list printed each pair: 1.0/filler speech 25.5 s (file 0.5010,
+    0.7308), 1.0/loop music 317.5 s (stream 0.3389, 0.4952), 365.5 s (0.1223, 0.4926), 80 s (file
+    0.2959, 0.4369), 530 s (0.3339, 0.4913), 3.0/loop speech 312 s (stream 0.5060, 0.8489).
+  - Speed: every window × analyzer's median above 60×, so the window rule keeps 1.5 s (no S-EV,
+    so a tie). The re-run's runs were slower and noisier than attempt 1's (the 3.0 s stream runs
+    77.2, 102.4 and 215.2×): the one-minute load average rose from 5.53 at the start to 129.41
+    by its end.
+  - Labels: all eleven in `.version1`'s 303.
+  - Determinism: the 1.0 s stream digests equal over three runs, and equal to attempt 1's
+    (`b25647d9…`); at 1.5 s two of three equal (attempt 1's `d459d981…`); at 3.0 s none. Four
+    more 1.5 s and three 3.0 s stream runs at a load average of 239.03 differed from their first
+    by at most 0.0026 and 0.0229, the window starts identical. FC-30 records this; the proof
+    compares runs within 0.01.
+- The results file is `tools/proof/work/creator_spike/FC-S1/results.json` (`rule_matches: true`,
+  `value_tolerance: 0.1`).
+
+**Commands and results.**
+- `sound_spike.py --selftest`: 17 rows, all pass (12 attempt 1's, five for the tolerance).
+- `make typecheck` after the app code: exit 0, the four baseline warnings.
+- `swift_build.py typecheck --define FRAMEJOB_DEV_TOOLS tools/proof/sound_events_probe.swift`:
+  exit 0.
+- `sound_events_proof.py --only P1,…,P9`: the probe crashed at first ("Range requires lowerBound
+  <= upperBound"): `AnalysisSoundEvents.coverage` built `end + 1…upperBound` when the answered
+  prefix reached the range's end, which every completed whole run does. Fixed with a `stride`.
+  Then 7/9: P5's ramped clip was refused (its ramp ran past the 20 s descriptor's end; the
+  descriptor is 40 s now), and P9 expected the NaN tail against the media's duration where FC-31
+  says the decoded sound's end — the 9.0 s file decodes to 143,994 samples, six short of 144,000,
+  so window 10 (7.5–9.0 s) overhangs it and is NaN. P9 now decodes the file as the job does and
+  compares with that. Then 9/9.
+- `analysis_proof.py --only P1,…,P9`: 9/9. `faces_proof.py --only P1,…,P5`: 5/5.
+- Debug (`make app-debug`), the app rows: 8/10 at first. E1 measured 0.75 s: the bare speech's
+  onset window starts at the file's first sample and cannot start earlier, so prepending 2 s moved
+  it less than 2 s. E1 now compares the speech behind 2 s of silence with the same behind 4 s
+  (2.25 s). E8's reversed clip overlapped E7's clip and was refused by `add_clip`; it is placed at
+  600 s now. Then `--only E1,E8` 3/3.
+- `make gate`: "gate: PASS 585s" (names 1, typecheck 10, fmt and lint skipped, test 388, app 184). Over this
+  record, before this sentence: "gate: PASS 2s" (names alone ran).
+- `spec_index_proof.py`: 252/252.
+- **Release** (`RC_PROOF_APP=release`, after the gate's `make app`), on the final instrument:
+  - `sound_events_proof.py`: **19/19**, E9 and E10 skipped by name, in 126 s. E1 moved 2.25 s;
+    E2 both onsets 0.0 s; E3 856 bytes unchanged, cached after `slog3`, a miss after the touch;
+    E4 ran `[[8, 19]]` and the coverage became `[[0, 19]]`; E11 the shots job started 0.004 s
+    after the sound job and 3.59 s before it ended.
+  - `analysis_proof.py --only A1,A2,A3,A9,A10,Z1`: 6/6.
+- Z1 printed nothing on every launch.
+- **Mutants** (six): each once, on the final instrument, CAUGHT:
+  - `mp3-trim-skipped` (P4): the reader started at 3.0 s, not 3.012 s; lag 192 samples.
+  - `early-publish` (P6): coverage `[0…32]` of a cancelled run, windows unanswered, ∞ apart.
+  - `cover-whole-range` (P9, P7): a cut-short decode covered windows 6–11; P7 failed too.
+  - `table-version` (P3): version 1 against the table's 2.
+  - `window-start` (P2, E6; the app built by `make app-debug`, Debug, in a tree copy): the kind's grid not the hop
+    grid; E6's rows past `windows.bin`'s end.
+  - `sound-holds-picture` (E11, the app built by `make app-debug`, Debug, in a tree copy): the shots job started
+    0.0003 s after the sound job ended.
+  - The copy was removed after.
+
+**Deviations.**
+- **E1 compares 2 s against 4 s of lead silence**, not the bare speech against 2 s (above).
+- **P9's tail is measured against the decoded sound**, as FC-31 says, not the media's duration.
+- **P6 and P7 compare within 0.01**, not bit for bit: FC-30's determinism under load.
+- **The tolerance row "through the window before"** in `--selftest` uses 25.5 s's real shape
+  (the stream side crosses 0.498 → 0.742; the file side, 0.501 → 0.731, does not, and is
+  tolerated through its 0.501), since an "other side" of 0.498 → 0.742 would itself be a crossing.
+- **The file's name** is `AnalysisSoundEvents.swift` (FC-31).
+
+**Owed.**
+- S-EV: every group's recall at a threshold, laughter recall per window, E9; until then every
+  group is weak.
+- S-TH1 and S-ST1: the false calls per ten minutes of speech only.
+- S-MU: music's false calls and confusion, E10.
+
+None is a STOP. No manual check.
+
+**Integration (2026-11-02).** Cherry-picked (`a10f22cc…ecc99f61`, the last the review's fix pass:
+"Six crossings" above, and the two app mutants' tree copy named as built by `make app-debug`) onto
+`worktree-creator-jobs` at CU7's `6ce788bf`. Conflicts only in the decisions file and both spec
+indexes, each kept both sides:
+- `creator-jobs-6.md` held CU7's CU-70…CU-77 at 475 lines, so FC3's block would have made it 609,
+  past the series' ~500-line rule: FC-30…FC-34 moved, unchanged, to a new
+  `11-decisions/creator-jobs-7.md` (147 lines), which its own index row and the five FC rows link;
+  `creator-jobs-6.md` (476) and its index row now say the series goes on in `creator-jobs-7.md`.
+- The spec indexes' cells recomputed: §7.9e 579, the `11-decisions/` folder 20093 in 41 files
+  (`spec_index_proof.py` 255/255).
+No app file is both CU7's and FC3's, and neither has a format, so nothing renumbered. The owed
+`app/CLAUDE.md` edits went in: the three files in the analysis entry's list and the `sound_events`
+paragraph after the `faces` one. `make gate` on the integrated tree, before this sentence: "gate:
+PASS 489s" (names 1 s, typecheck 17 s, fmt and lint skipped, test 233 s, app 237 s). The Release
+proof is the lane's above; the integrated tree differs from the lane's base only by CU7's files,
+none of which FC3's rows read.
+
+**Owed (at integration).** As above: S-EV (E9), S-TH1/S-ST1, S-MU (E10). Nothing filed; the second
+review's nit (`answerNumber` building its `en_US_POSIX` locale once per value) was left as review 1
+left it.
+
 ### CU7 — Auto Zoom
 
 - **What a person gets:** Clip ▸ Auto Zoom… on one or more clips whose media has cursor data, at the

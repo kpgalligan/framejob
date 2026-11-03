@@ -125,14 +125,19 @@ extension MediaImporter {
     /// reader starts at `MP3Gapless.leadingTrim` when it is past zero — the
     /// MP3 encoder delay Core Audio leaves in (spec §11 SY-38, SY-42) — so
     /// chunk 0 is the recording's first 32 ms; for every other file it reads
-    /// the whole track, as it always has.
+    /// the whole track, as it always has. With `window` (the `sound_events`
+    /// job's range, spec §11 FC-31) it reads only `window`, measured from
+    /// that same first frame: `trim + window.start` for `window.duration`.
     static func speechReader(
         asset: AVURLAsset, track: AVAssetTrack,
-        sampleRate: Double? = Double(SileroVAD.sampleRate)
+        sampleRate: Double? = Double(SileroVAD.sampleRate), window: CMTimeRange? = nil
     ) -> (reader: AVAssetReader, output: AVAssetReaderTrackOutput)? {
         guard let reader = try? AVAssetReader(asset: asset) else { return nil }
         let trim = MP3Gapless.leadingTrim(of: asset.url, track: track)
-        if trim > .zero {
+        if let window {
+            reader.timeRange = CMTimeRange(
+                start: CMTimeAdd(trim, window.start), duration: window.duration)
+        } else if trim > .zero {
             reader.timeRange = CMTimeRange(start: trim, duration: .positiveInfinity)
         }
         var settings: [String: Any] = [

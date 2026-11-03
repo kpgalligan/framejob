@@ -270,7 +270,11 @@ final class AnalysisLane: @unchecked Sendable {
             }
         }
         let width = Self.pictureWidth
-        while running.count < width, let index = queued.firstIndex(where: { !$0.kind.usesSoundQueue }) {
+        // Only picture jobs count against the picture queue's width: a running
+        // sound job never holds one back (spec §11 FC-31).
+        while running.keys.filter({ !$0.kind.usesSoundQueue }).count < width,
+            let index = queued.firstIndex(where: { !$0.kind.usesSoundQueue })
+        {
             let request = queued.remove(at: index)
             running[request] = false
             picture.async { [self] in execute(request) }
@@ -343,6 +347,10 @@ final class AnalysisLane: @unchecked Sendable {
                     progress: { [self] fraction in setProgress(fraction, of: request) })
             case .faces:
                 finished = try AnalysisFaces.run(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
+            case .soundEvents:
+                finished = try AnalysisSoundEvents.run(
                     request, cancelled: cancelled,
                     progress: { [self] fraction in setProgress(fraction, of: request) })
             }

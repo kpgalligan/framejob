@@ -45,6 +45,14 @@ struct AnalysisGrid: Equatable {
         self.duration = max(0, duration)
     }
 
+    /// The hop grid of `hopTicks` (spec §11 FC-31: `sound_events`), index k
+    /// at k × `hopTicks`.
+    init(hopTicks: Ticks, duration: Ticks) {
+        num = 600_000
+        den = Double(max(1, hopTicks))
+        self.duration = max(0, duration)
+    }
+
     /// Grid indices per tick.
     var rate: Double { num / (600_000 * den) }
 

@@ -53,7 +53,11 @@ extension ProjectDocument {
         kind: AnalysisKind, media: MediaSnapshot, url: URL, urls: [UInt32: URL],
         cacheDir: URL, need: [ClosedRange<Int>]
     ) throws -> AnalysisRequest? {
-        let (input, fullRange) = analysisInput(media: media, url: url, urls: urls)
+        // A sound kind reads raw sound: no picture input, so `set_media_color`
+        // never changes its stamp (spec §11 FC-31).
+        let (input, fullRange) =
+            kind.usesSoundQueue
+            ? (nil, false) : analysisInput(media: media, url: url, urls: urls)
         guard
             let stamp = AnalysisStamp.make(
                 kind: kind, media: media, url: url, input: input, fullRange: fullRange)

@@ -72,8 +72,14 @@ extension AgentServer {
                     throw ToolError(message: "kind must be one of "
                         + AnalysisKind.allCases.map(\.rawValue).joined(separator: ", ") + ".")
                 }
-                guard media.kind == .video, media.hasVideo else {
-                    throw ToolError(message: "Media \(media.id) has no moving picture.")
+                if kind.usesSoundQueue {
+                    guard media.hasAudio else {
+                        throw ToolError(message: "Media \(media.id) has no sound.")
+                    }
+                } else {
+                    guard media.kind == .video, media.hasVideo else {
+                        throw ToolError(message: "Media \(media.id) has no moving picture.")
+                    }
                 }
                 let end = max(0, media.duration)
                 let from = min(max(try self.intArg(a, "from").map { Ticks($0) } ?? 0, 0), end)

@@ -497,11 +497,12 @@ detail there.
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `MaskPack.swift` ·
   `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
-  `AnalysisClipTimes.swift` ·
+  `SoundEvents.swift` · `AnalysisSoundEvents.swift` · `AnalysisClipTimes.swift` ·
   `ProjectDocument+Analysis.swift` · `AgentServer+Analysis.swift` ·
   `AgentServer+AnalysisMasks.swift` · `AgentServer+AnalysisFaces.swift` ·
-  `AgentCatalog+Analysis.swift` · `AgentServer+AnalysisJob.swift` ·
-  `ShotSplit.swift` · `AnalyzingSheetController.swift` ·
+  `AgentServer+AnalysisSoundEvents.swift` · `AgentCatalog+Analysis.swift` ·
+  `AgentServer+AnalysisJob.swift` · `ShotSplit.swift` ·
+  `AnalyzingSheetController.swift` ·
   `EditorViewController+ShotSplit.swift` · `ProjectDocument+Masks.swift` ·
   `CutoutWants.swift` · `EditorViewController+Cutout.swift` ·
   `CutoutStatus.swift` · `CutoutStatus+Memo.swift` · `VideoPane+Cutout.swift` ·
@@ -559,6 +560,19 @@ detail there.
   rounded to 4 decimals and written as an `NSDecimalNumber` read in
   `en_US_POSIX` (`JSONSerialization` prints a `Double` to 17 significant
   figures), and the cap's refusal.
+  The `sound_events` kind (road map creator-jobs FC3, spec §11 FC-30…FC-34) is
+  the one kind on the sound queue, and a running sound job does not count
+  against `pictureWidth`. `AnalysisSoundEvents` decodes each missing range of
+  the first audio track through `MediaImporter.speechReader` (16 kHz mono
+  float, past an MP3's encoder delay, `window` the range's span plus one hop)
+  into one `SNAudioStreamAnalyzer` running `SNClassifySoundRequest`
+  `.version1` at FC-30's window and hop. It publishes every 30 s through the
+  contiguous answered prefix. `SoundEvents` is pure: the group table
+  (`tableVersion` is the kind's version), `windows.bin` (`FJSE`) and its
+  merge, and `events(in:covered:grid:for:)`, which places a media's windows on
+  a clip through `AnalysisClipTimes` (none for a reversed clip). Its grid is
+  `AnalysisGrid(hopTicks:duration:)`, and its stamp's reader is always `raw`.
+  `AgentServer+AnalysisSoundEvents` holds the answer's rows.
   `get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`,
   off main) wait holding the agent lane's lock, at most
   `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and

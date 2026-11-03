@@ -16,6 +16,10 @@ enum AnalysisKind: String, Codable, CaseIterable {
     /// Every face per sample of source time (spec §11 CJ-30…CJ-34; road map
     /// CJ3): `AnalysisFaces`, on its own sample grid (`grid(of:)`).
     case faces
+    /// Sound Analysis' confidence per window for six groups (spec §11
+    /// FC-30…FC-34; road map FC3): `AnalysisSoundEvents`, on the hop grid,
+    /// the one kind on the sound queue.
+    case soundEvents = "sound_events"
 
     /// The kind's version: a change to what it stores bumps it, and every
     /// marker of the old version is a miss (Vision request revisions go in
@@ -25,6 +29,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .shots: return 1
         case .masks: return 1
         case .faces: return 1
+        case .soundEvents: return SoundEvents.tableVersion
         }
     }
 
@@ -32,6 +37,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var usesSoundQueue: Bool {
         switch self {
         case .shots, .masks, .faces: return false
+        case .soundEvents: return true
         }
     }
 
@@ -44,6 +50,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .shots: return "cpu"
         case .masks: return AnalysisMasks.device
         case .faces: return AnalysisFaces.device
+        case .soundEvents: return SoundEvents.device
         }
     }
 
@@ -54,6 +61,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .shots: return AnalysisShots.parameters
         case .masks: return AnalysisMasks.parameters
         case .faces: return AnalysisFaces.parameters
+        case .soundEvents: return SoundEvents.parameters
         }
     }
 
@@ -61,7 +69,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var margin: Int {
         switch self {
         case .shots: return AnalysisShots.margin
-        case .masks, .faces: return 0
+        case .masks, .faces, .soundEvents: return 0
         }
     }
 
@@ -71,13 +79,15 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .shots: return [AnalysisShots.payloadName]
         case .masks: return [MaskPack.fileName]
         case .faces: return [AnalysisFaces.payloadName]
+        case .soundEvents: return [SoundEvents.payloadName]
         }
     }
 
-    /// A Vision kind's request, as its stamp records it; nil for `shots`.
+    /// A Vision kind's request, as its stamp records it; nil for `shots` and
+    /// `sound_events`.
     var vision: AnalysisVisionStamp? {
         switch self {
-        case .shots: return nil
+        case .shots, .soundEvents: return nil
         case .masks: return AnalysisMasks.vision
         case .faces: return AnalysisFaces.vision
         }
@@ -85,12 +95,14 @@ enum AnalysisKind: String, Codable, CaseIterable {
 
     /// The grid the kind's coverage and payload are indexed by: the media's
     /// frames, but for `faces` its sample grid, `AnalysisFaces.rate` a second
-    /// (CJ-33).
+    /// (CJ-33), and for `sound_events` its hop grid (FC-31).
     func grid(of media: MediaSnapshot) -> AnalysisGrid {
         switch self {
         case .shots, .masks: return AnalysisGrid(media: media)
         case .faces:
             return AnalysisGrid(samplesPerSecond: AnalysisFaces.rate, duration: media.duration)
+        case .soundEvents:
+            return AnalysisGrid(hopTicks: SoundEvents.hopTicks, duration: media.duration)
         }
     }
 }

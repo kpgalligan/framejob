@@ -4,7 +4,9 @@ import Foundation
 /// analysis kind of one media or clip, made on this Mac or read from its
 /// cache — `shots`, the hard cuts, first, `masks`, the person masks' runs
 /// (CO1, spec §11 CO-14, `AgentServer+AnalysisMasks.swift`), and `faces`, the
-/// face samples (CJ3, spec §11 CJ-34, `AgentServer+AnalysisFaces.swift`).
+/// face samples (CJ3, spec §11 CJ-34, `AgentServer+AnalysisFaces.swift`),
+/// and `sound_events`, Sound Analysis' groups per window (FC3, spec §11
+/// FC-33, `AgentServer+AnalysisSoundEvents.swift`).
 /// `get_transcript`'s counterpart for pictures and sounds.
 ///
 /// An APP-STATE tool and a read: nothing is edited and no undo step is made.
@@ -31,8 +33,9 @@ extension AgentServer {
     }
 
     /// `get_media_analysis` — refused in CJ-25's order: not exactly one of
-    /// `media` and `clip`; an unknown id; not a media clip, or a media with
-    /// no moving picture; the file missing; `to` ≤ `from`; the wait's bound;
+    /// `media` and `clip`; an unknown id; not a media clip; for
+    /// `sound_events` a reversed clip (FC-33); a media with no moving picture
+    /// (a picture kind) or no sound (`sound_events`); the file missing; `to` ≤ `from`; the wait's bound;
     /// the answer's cap.
     func getMediaAnalysis(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
@@ -103,6 +106,11 @@ extension AgentServer {
                     message: "Clip \(snapshot.id) is not a media clip (it shows "
                         + "\(snapshot.source.kindName)), so it has no media to analyse.")
             }
+            guard !(kind == .soundEvents && snapshot.source.isReversed) else {
+                throw ToolError(
+                    message: "Clip \(snapshot.id) plays in reverse, so its sound events are "
+                        + "not read: its sound plays backwards.")
+            }
             media = entry
             clip = AnalysisClipTimes(
                 clip: snapshot, media: entry,
@@ -110,10 +118,18 @@ extension AgentServer {
         } else {
             media = try mediaArg(a, "media", document)
         }
-        guard media.kind == .video, media.hasVideo else {
-            throw ToolError(
-                message: "Media \(media.id) has no moving picture, so it has no "
-                    + "\(kind.rawValue) to find.")
+        if kind.usesSoundQueue {
+            guard media.hasAudio else {
+                throw ToolError(
+                    message: "Media \(media.id) has no sound, so it has no \(kind.rawValue) to "
+                        + "find.")
+            }
+        } else {
+            guard media.kind == .video, media.hasVideo else {
+                throw ToolError(
+                    message: "Media \(media.id) has no moving picture, so it has no "
+                        + "\(kind.rawValue) to find.")
+            }
         }
         guard document.mediaURLs()[media.id] != nil else {
             throw ToolError(
@@ -166,6 +182,7 @@ extension AgentServer {
         case .shots: result.merge(try shotsFields(call)) { _, kind in kind }
         case .masks: result.merge(try masksFields(call)) { _, kind in kind }
         case .faces: result.merge(try facesFields(call)) { _, kind in kind }
+        case .soundEvents: result.merge(try soundEventsFields(call)) { _, kind in kind }
         }
         if let clip = call.clip { result["clip"] = Int(clip.id) }
         if marker?.canned == true {

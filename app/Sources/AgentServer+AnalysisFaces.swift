@@ -43,14 +43,7 @@ extension AgentServer {
         _ samples: [AnalysisFaces.Sample], indices: [Int], grid: AnalysisGrid,
         clip: AnalysisClipTimes?, landmarks: Bool, from: Ticks, to: Ticks
     ) throws -> [String: Any] {
-        // `JSONSerialization` prints a Double to 17 significant figures, so the
-        // rounded value goes out as the decimal its shortest form spells, read
-        // with a "." separator whatever the Mac's locale.
-        let posix = Locale(identifier: "en_US_POSIX")
-        func number(_ value: Float) -> Any {
-            answerValue(value).map { NSDecimalNumber(string: String($0), locale: posix) }
-                ?? NSNull()
-        }
+        let number = answerNumber
         let rows = indices.map { k -> [String: Any] in
             let sample = samples[k]
             let source = grid.ticks(of: k)
@@ -93,6 +86,17 @@ extension AgentServer {
                     + "at most \(fits) from from \(from).")
         }
         return ["rate": AnalysisFaces.rate, "count": rows.count, "samples": rows]
+    }
+
+    /// A Float32 as an answer writes it (faces', sound events'): `answerValue`
+    /// as an `NSDecimalNumber`, NaN as null. `JSONSerialization` prints a
+    /// Double to 17 significant figures, so the rounded value goes out as the
+    /// decimal its shortest form spells, read with a "." separator whatever
+    /// the Mac's locale.
+    static func answerNumber(_ value: Float) -> Any {
+        answerValue(value).map {
+            NSDecimalNumber(string: String($0), locale: Locale(identifier: "en_US_POSIX"))
+        } ?? NSNull()
     }
 
     /// A Float32 as the answer prints it: nil for NaN, else rounded to 4

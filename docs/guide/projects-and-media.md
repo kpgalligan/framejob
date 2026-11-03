@@ -38,7 +38,7 @@ The new project opens untitled and with unsaved changes, named after the project
 
 What it brings with it, so nothing has to be measured again when it opens:
 
-- each kept media's filmstrip, waveform, loudness, speech and sync caches, the transcripts read on this Mac, its analyses (shots, people's masks, faces) and the backwards render of a reversed clip;
+- each kept media's filmstrip, waveform, loudness, speech and sync caches, the transcripts read on this Mac, its analyses (shots, people's masks, faces, sound events) and the backwards render of a reversed clip;
 - a cloud transcript only once AssemblyAI has been told to delete its copy; one still waiting for that stays in the original project;
 - the graphic modules its clips draw, and every font and asset of the project's graphics.
 
@@ -82,7 +82,7 @@ A package is a folder that the Finder shows as one file:
 | Inside | What it is |
 |---|---|
 | `project.json` | The edit itself: canvas, media list, tracks, clips, markers. The only thing a package needs in order to open. |
-| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips, speed-ramp audio, the shot changes and faces found for an agent, and the person masks found for one or made for a clip with Remove Background (`cache/analysis/`; a minute of 1080p video's masks take about 62 MB). A package with a missing or damaged `cache/` still opens and just redraws. |
+| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips, speed-ramp audio, the shot changes, faces and sound events found for an agent, and the person masks found for one or made for a clip with Remove Background (`cache/analysis/`; a minute of 1080p video's masks take about 62 MB). A package with a missing or damaged `cache/` still opens and just redraws. |
 | `media/` | Only after **Consolidate Media…**: copies of the footage (see [Consolidate Media](#consolidate-media)). |
 | `graphics/` | Only once you add a graphic: graphic modules, their fonts, images and kept versions. See [Graphics](graphics.md). |
 

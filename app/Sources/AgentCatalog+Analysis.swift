@@ -1,7 +1,8 @@
 import Foundation
 
 /// The catalog rows of `get_media_analysis` (spec §11 CJ-25; road map
-/// "creator-jobs" CJ2a; `masks` CO-14, `faces` CJ-34) and `split_at_shots`
+/// "creator-jobs" CJ2a; `masks` CO-14, `faces` CJ-34, `sound_events` FC-33) and
+/// `split_at_shots`
 /// (CJ-29, CJ2b), spliced in by `creatorTools()`.
 extension AgentServer {
 
@@ -13,7 +14,8 @@ extension AgentServer {
             // made or reused. `get_transcript` is its counterpart for words.
             // A read: no op, no `scope`, no undo step. `masks` (CO1) and
             // `faces` (CJ3) have no menu or pane of their own: a cut-out clip
-            // draws masks, and nothing in the app reads faces yet.
+            // draws masks, and nothing in the app reads faces yet; nor does
+            // anything read `sound_events` (FC3) until Find Clips (FC4).
             tool(
                 "get_media_analysis",
                 "Answers an analysis of one media file, or of the part of it one clip plays, "
@@ -49,9 +51,23 @@ extension AgentServer {
                     + "A sample row with one face is about 176 bytes (221 with clip), so one "
                     + "answer holds about 296 s of samples (236 s with clip), less when more "
                     + "faces are in frame: read a longer media in from/to windows of at most "
-                    + "that, e.g. 2 minutes. With "
+                    + "that, e.g. 2 minutes. kind \"sound_events\" listens to the media's "
+                    + "first sound track (Apple's Sound Analysis classifier, on the Mac) in "
+                    + "windows of \(SoundEvents.windowTicks) ticks (1.5 s) every "
+                    + "\(SoundEvents.hopTicks) (0.75 s) and answers window and hop (ticks), "
+                    + "groups [{name, labels, first_class, threshold}] — laughter, applause, "
+                    + "cheering, crowd, music, speech, each the classifier labels it is the "
+                    + "highest confidence of; none is first_class yet, so read the values as "
+                    + "hints, never alone as a finding, and threshold is null — count and "
+                    + "windows [{source, laughter, applause, cheering, crowd, music, speech}]: "
+                    + "source the window's start in SOURCE ticks and each group's confidence "
+                    + "0…1, rounded to 4 decimals, null where the classifier gave none (a "
+                    + "window running past the sound's end). It needs a media with sound, a "
+                    + "video or an audio file; a reversed clip is refused, since its sound "
+                    + "plays backwards. A row is about 130 bytes, so one answer holds about "
+                    + "an hour of windows. With "
                     + "clip, from and to default to and are held inside "
-                    + "the clip's played window, and each cut or sample also has clip_time "
+                    + "the clip's played window, and each cut, sample or window also has clip_time "
                     + "(ticks from "
                     + "the clip's start, in its playing direction — through its speed, ramp "
                     + "and reversal) and timeline (the clip's start plus clip_time). cached "
@@ -61,14 +77,15 @@ extension AgentServer {
                     + "upright picture size; stamp what the cache was made with. A call waits "
                     + "at most \(Int(AnalysisLane.callWaitLimit)) s and then refuses naming "
                     + "how much of the window was covered — what was covered is kept, so call "
-                    + "again to continue; an answer over 512 KiB of cuts, runs or samples is "
+                    + "again to continue; an answer over 512 KiB of cuts, runs, samples or "
+                    + "windows is "
                     + "refused naming the largest to that fits. It edits nothing and makes no "
                     + "undo step.",
                 [
                     "media": [
                         "type": "integer",
-                        "description": "The media whose picture to analyse — exactly one of "
-                            + "media and clip.",
+                        "description": "The media whose picture or sound to analyse — exactly "
+                            + "one of media and clip.",
                     ],
                     "clip": [
                         "type": "integer",
@@ -79,7 +96,8 @@ extension AgentServer {
                         "type": "string", "enum": AnalysisKind.allCases.map(\.rawValue),
                         "description": "What to find: shots, the hard cuts; masks, a person's "
                             + "masks' runs; faces, every face per sample (box, roll, yaw, "
-                            + "mouth).",
+                            + "mouth); sound_events, laughter, applause, cheering, crowd, "
+                            + "music and speech per window of sound.",
                     ],
                     "from": [
                         "type": "integer",

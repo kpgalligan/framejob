@@ -27544,6 +27544,52 @@ python3 tools/proof/faces_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind faces --socket <dir>/agent.sock   # CJ-35, Release
 ```
 
+## Road map "creator-jobs" FC3 — sound events heard on the Mac (`sound_events_proof.py` P1–P9, E1–E11, Z1; six mutants; `creator_spike/sound_spike.py`; spec §11 FC-30…FC-34)
+
+**`creator_spike/sound_spike.py`** is spike FC-S1: `sound_spike.swift` (built over
+`swift_build.app_sources()`, optimised; modes `labels` and `run <file> <window> file|stream`)
+answers FC-31's labels against `.version1` and runs one file through `SNAudioFileAnalyzer` or
+through `SNAudioStreamAnalyzer` fed by the app's `MediaImporter.speechReader`.
+`sound_deciders.py` holds the rule (stdlib, no I/O; `--selftest` runs 17 rows): the group rule,
+the window rule, and `agreement` with the owner's ±0.1 value tolerance (2026-11-02, option (a)) —
+a rising 0.5 crossing on one side is matched by a crossing on the other within one hop, or
+tolerated when the other side's value at the crossing or the window before is within 0.1 of 0.5 —
+beside `agreement_strict`, attempt 1's metric, kept for the record. Inputs:
+`samples/Rode-usb-mic.m4a`, `tools/proof/media/filler-sample/test-recording.aifc`, two `say`
+fixtures and a ten-minute `-stream_loop` of the Rode file; S-EV, S-TH1/S-ST1 and S-MU are owed.
+Results in `tools/proof/work/creator_spike/FC-S1/results.json` (`agreement_metric`,
+`value_tolerance`, `agreement`, `agreement_strict`, `tolerated`), one `VERDICT` line with
+`stream_agrees=` and `strict_unmatched=`.
+
+**`sound_events_proof.py`** makes its fixtures in `tools/proof/work/sound-events-fixtures/` from
+`say` and ffmpeg (a speech WAV at 48 kHz, the same behind 2 s and 4 s of silence, its libmp3lame
+MP3, a test-picture movie with that sound, a picture with none, and 9.0, 9.1 and 9.4 s cuts), and
+builds `sound_events_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through
+`swift_build.py`.
+- **P1–P9** are probe rows: `windows.bin`'s round trip with NaN, the merge in either order, a
+  damaged file written fresh; the hop grid; the stamp (reader `raw` with `color.log` set); the
+  MP3's windowed read past its encoder delay against the WAV; ×2 and ramped placement against
+  `MediaPeaks.sourceTick`, a reversed clip none; a run cancelled once four windows are covered;
+  halves against a whole run within 0.01 (FC-30: the values move in the third decimal under
+  load); `soundEventsAnswer`'s decimals, nulls and cap; the NaN tail against the decoded sound's
+  end on the three cuts, and a whole lookup's hit.
+- **E1–E11** are app rows over `get_media_analysis {kind: "sound_events"}` and `analysis_job`
+  on a plain launch (E1–E4, E6–E8) and one with `-RCDevAnalysisHold 3` (E5, E11), each with a
+  scratch `CFFIXED_USER_HOME` and Z1 its parity grep. E9 (S-EV recall) and E10 (S-MU
+  confusion) are skipped by name and owed.
+- Mutants: `window-start` (P2, E6), `mp3-trim-skipped` (P4), `early-publish` (P6),
+  `cover-whole-range` (P9, P7), `table-version` (P3), `sound-holds-picture` (E11); one with an
+  app row builds a copy of the tree with `make app-debug` (`tree_copy.py`).
+
+```sh
+python3 tools/proof/creator_spike/sound_spike.py --selftest
+python3 tools/proof/creator_spike/sound_spike.py                         # FC-S1, on AC
+python3 tools/proof/sound_events_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9   # no app
+make app-debug && python3 tools/proof/sound_events_proof.py
+RC_PROOF_APP=release python3 tools/proof/sound_events_proof.py           # the recorded run
+python3 tools/proof/sound_events_proof.py --mutant <name>
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

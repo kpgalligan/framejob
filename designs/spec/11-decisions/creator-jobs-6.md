@@ -9,7 +9,8 @@ The IDs continue the series of [`creator-jobs.md`](creator-jobs.md),
 TX-, SW-, CU- and CO-), so a citation never has to say which file; `creator-jobs.md` says what the
 road map builds and how its IDs are made (CJ-7). This file is new because `creator-jobs-5.md`
 would pass the road map's ~500-line split rule with TX3b's entry (468 lines, 2026-11-02); each
-phase's decisions are appended here from now on, before its code.
+phase's decisions are appended here from now on, before its code. The series continues in
+[`creator-jobs-7.md`](creator-jobs-7.md) from FC3's FC-30.
 
 ## TX3b — the pause token (2026-11-02)
 
