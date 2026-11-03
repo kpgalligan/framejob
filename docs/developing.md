@@ -319,8 +319,11 @@ to hold each job, `-RCDevAnalysisCanned YES` to honour canned analyses),
 `transcript_view` (what a window's Transcript tab and its bar show, after
 setting the bar's Words from or Language, pressing Read, focusing its view,
 selecting words or clicking one; `stop_after` presses the bar's Stop that many
-seconds after its answer) and `assistant_send` /
-`assistant_answer` (an assistant turn against a stand-in server). To look at the chrome without a
+seconds after its answer), `playback_rebuilds` (each preview rebuild of a
+window since the last reset, with the milliseconds to its build and to its
+landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing)
+and `assistant_send` / `assistant_answer` (an assistant turn against a
+stand-in server). To look at the chrome without a
 running app or a Screen Recording grant, use the offscreen harness in
 `tools/proof/harness/`.
 

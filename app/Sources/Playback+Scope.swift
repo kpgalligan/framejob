@@ -47,6 +47,9 @@ extension Playback {
             return
         }
         restoring = false
+        #if FRAMEJOB_DEV_TOOLS
+        rebuildLog.landed()
+        #endif
         let rest = currentTime
         if rest != reported { report(rest) }
         if refreshWanted { refreshPausedFrame() }

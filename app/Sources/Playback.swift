@@ -21,8 +21,9 @@ import AppKit
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
-/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` and the main
-/// hop `onMain` in `+Step`, `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`,
+/// `previewComposition`, `setPreviewQuality` and `recompose()` live in
+/// `Playback+PreviewQuality.swift`, `stepFrames` and the main hop `onMain` in `+Step`,
+/// `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`,
 /// the playing preview's graphics prefetch, `syncPrefetch(from:)`, in `+Prefetch` (G-36).
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
@@ -73,6 +74,9 @@ final class Playback {
     /// would give `DispatchQueue.main.async`, its holder runs it on main, once — with `nil` for
     /// the build's own result, or an error `finishRebuild` receives as the build's failure.
     var rebuildHop: ((@escaping ((any Error)?) -> Void) -> Void)?
+    #if FRAMEJOB_DEV_TOOLS
+    let rebuildLog = PlaybackRebuildLog()
+    #endif
 
     /// The in/out range when one is set: playback wraps at its end (§4.4).
     var loopRange: (start: Ticks, duration: Ticks)?
@@ -113,7 +117,7 @@ final class Playback {
     /// and the setting is a fact about the player and not about the document.
     /// `EditorViewController+PreviewQuality.swift` holds the enum, the aspect
     /// rule and the menu.
-    private(set) var previewQuality = PreviewQuality.stored()
+    var previewQuality = PreviewQuality.stored()
     /// The seek state is internal only so `Playback+Scope.swift` can write it; nothing else does.
     var isSeeking = false
     var pendingSeek: Ticks?
@@ -136,6 +140,9 @@ final class Playback {
 
     init(recipeKey: Int) {
         self.recipeKey = recipeKey
+        #if FRAMEJOB_DEV_TOOLS
+        rebuildHop = PlaybackRebuildLog.heldHop()
+        #endif
         GraphicPrefetch.shared.beginKeeping(recipeKey)
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resizeAspect
@@ -323,51 +330,6 @@ final class Playback {
 
     // MARK: - Preview quality and the second layer (road map 2's phase 8)
 
-    /// View ▸ Preview Quality ▸ — Full, Half or Quarter of the canvas, for the
-    /// PLAYER's composition alone.
-    ///
-    /// The setting has to survive two different moments, which is why it is
-    /// stored as well as applied: with an item on the player it is a
-    /// re-assignment (`AVPlayerItem.videoComposition` is a COPY property, so
-    /// nothing done to the retained composition could reach the live item),
-    /// and with no item — an empty timeline, or
-    /// a rebuild still on the queue — there is nothing to re-assign and
-    /// `finishRebuild` applies it to the item it is about to install. Both go
-    /// through `previewComposition`, so the two paths cannot drift.
-    ///
-    /// Not routed through `update(project:urls:isLive:)`, deliberately: that
-    /// function short-circuits on the plan JSON and the audio DSP, neither of
-    /// which a quality change touches, and teaching it a third term would make
-    /// every property edit compare one more thing for a setting that changes
-    /// once in a session. Not `invalidate()` either — the editor's forced
-    /// rebuild path pauses the transport and blanks the preview, which is a
-    /// heavy price for what is one property assignment.
-    func setPreviewQuality(_ quality: PreviewQuality) {
-        guard quality != previewQuality else { return }
-        previewQuality = quality
-        quality.store()
-        recompose()
-    }
-
-    /// The item's composition re-assigned as Preview Quality and View ▸ Show
-    /// SDR Version (spec §11 HD-14 (g), the key's `dynamicRange`) now ask —
-    /// no rebuild — then one forced frame. With no item there is nothing to
-    /// re-assign, and `finishRebuild` applies both to the item it installs.
-    func recompose() {
-        guard let item = player.currentItem, let built = built else { return }
-        item.videoComposition = Self.previewComposition(
-            built, quality: previewQuality, sdrVersion: showsSDRVersion)
-        // A paused preview would otherwise keep the frame it has until the
-        // next seek: the item's composition changed, but nothing asked it for
-        // a picture. The same trick a property-only edit uses.
-        refreshPausedFrame()
-    }
-
-    /// Whether this document's key asks for the SDR version (Show SDR Version).
-    private var showsSDRVersion: Bool {
-        RecipeSource.shared.options(for: recipeKey).dynamicRange == .sdr
-    }
-
     /// A second `AVPlayerLayer` on this document's player, for the preview
     /// window (`PreviewWindowController.swift`).
     ///
@@ -411,6 +373,9 @@ final class Playback {
 
         generation += 1
         let generation = self.generation
+        #if FRAMEJOB_DEV_TOOLS
+        rebuildLog.started(generation: generation)
+        #endif
         let key = recipeKey
         let plan = request.plan
         let planJSON = request.planJSON
@@ -456,6 +421,9 @@ final class Playback {
             }
             onError?(error)
         case .success(let composition):
+            #if FRAMEJOB_DEV_TOOLS
+            rebuildLog.built(generation: generation)
+            #endif
             holding = false
             let time = currentTime
             let rate = player.rate
@@ -494,6 +462,8 @@ final class Playback {
 
     var isPlaying: Bool { player.rate != 0 }
     var rate: Float { player.rate }
+    /// The player's current item, read by `Playback+PreviewQuality.swift`'s `recompose()`.
+    var currentItem: AVPlayerItem? { player.currentItem }
 
     /// The playhead in ticks. While a seek is in flight the TARGET is
     /// returned, not the player's lagging time — otherwise a scrub would

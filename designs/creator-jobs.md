@@ -10029,6 +10029,123 @@ rule by one named file (SW-43).
   *Recommended: yes, once.* (2) Run (d) on a generated three-hour file (about 68 GB, 1.5–3 hours) or
   wait for S-LONG1? *Recommended: wait for S-LONG1.*
 
+#### SW0's record (2026-11-03)
+
+**Landed.** Lane A (the road map says lane C; SW-5 records it), base `285d87df`. The owner's
+answers (2026-11-01): F-4K built once, and the three-hour file generated now rather than waiting
+for S-LONG1 (a departure from the recommendation, SW-2). Nothing changes in the product: no core,
+FFI, format (42 stands), op, product tool, menu item or key. Decisions SW-1, SW-2, SW-4 and SW-5
+were committed before the code, SW-6 after the runs, in `creator-jobs-8.md` (the phase opened
+its own `-8` beside CU11a's; at integration its section was appended to CU11a's file, 330 lines).
+
+- **The toll, committed and gated alone:** `setPreviewQuality`, `recompose()` and
+  `showsSDRVersion` moved verbatim from `Playback.swift` to `Playback+PreviewQuality.swift`,
+  reading a new internal `currentItem`; `previewQuality` lost `private(set)` and
+  `showsSDRVersion` `private`; `player` stays private. `wc -l app/Sources/Playback.swift` 592 →
+  550, `Playback+PreviewQuality.swift` 54 → 100; `make gate` PASS in 482 s. The next seam,
+  `refreshPausedFrame()` → `Playback+Scope.swift`, is in `designs/adr/app-file-history.md`.
+- **New files** (`wc -l`): `app/Sources/PlaybackRebuildLog.swift` 88,
+  `app/Sources/AgentServer+PlaybackRebuilds.swift` 67, `tools/proof/rebuild_log_proof.py` 339,
+  `tools/proof/creator_spike/angles_fixtures.py` 272, `angles_spike.py` 826 (proof instruments
+  are held to no cap). `Playback.swift` 550 → 562 (the stored log, the held hop in `init`, the
+  start and the build, each one line under `#if FRAMEJOB_DEV_TOOLS`), `Playback+Scope.swift`
+  60 → 63 (the landing), `AgentServer+DevTools.swift` 123 → 126.
+- **Documents:** spec §7.9c (`playback_rebuilds` and `-RCDevRebuildHold`), §7.4's dev-tools row,
+  `creator-jobs-8.md` and its index rows, the spec README's Lines and total,
+  `docs/developing.md`'s dev-tool list, `tools/proof/README.md`'s SW0 section,
+  `tools/proof/dev_tools.py` (`DEV_TOOLS` 13), `tools/proof/screens.py`'s `NOT_SHOWN`
+  (`RCDevRebuildHold`: P2 requires every `…Key` literal pinned or listed). No guide page: (b)
+  passed, so "What you'll notice after an edit" takes no figure.
+
+**SW-1's proof.** `rebuild_log_proof.py` 4/4 on Debug, then on Release (R1: one `trim_end`, one
+entry, `built_ms` 1.7 ≤ `landed_ms` 15.2; R2: `reset: true` answered `count` 0 and `[]`, then one
+landed entry; R3: two `trim_end`s 0.03 s apart under `-RCDevRebuildHold 2`, `count` 1, `built_ms`
+2117.1). Both mutants CAUGHT, each in a Debug tree copy: `built-before-guard` R3 (`count` 2, the superseded generation 4's
+entry kept), `reset-ignored` R2 (`count` 1 after `reset: true`).
+
+**SW-S2** (SW-6; `rule_sha256` `ecd9d732…324f0961`, matching CJ0a's table). macOS 26.5.1
+(25F80), Apple M2 Max, 12 cores, 96 GiB, on AC (`pmset` powermode 0), Release, three runs a row.
+`results.json` is `tools/proof/work/creator_spike/SW-S2/results.json` (`rule_matches: true`,
+every row's runs with their host facts, the parity grep empty in every run).
+
+| Row | Rule | Figure (median; spread) | One-minute load | Verdict |
+|---|---|---|---|---|
+| (d) seek 0:30:00 | recorded | 0.535 s; 0.534–0.538 | 3.0–3.7 | 3/3 composed |
+| (d) seek 1:00:00 | recorded | 0.558 s; 0.556–0.564 | 3.0–3.7 | 3/3 composed |
+| (d) seek 2:00:00 | recorded | 0.586 s; 0.582–0.591 | 3.0–3.7 | 3/3 composed |
+| (d) seek 2:59:00 | recorded | 0.529 s; 0.529–0.543 | 3.0–3.7 | 3/3 composed |
+| (b) roll's `landed_ms` | ≤ 1,500 ms | 78.75 ms; 76.8–134.0 (30 rolls) | 33.6–34.9 | **pass** |
+| (a) H.264 pair | ≥ 0.99 | 0.9999; 0.8523–1.0 | 4.9–6.4 | noise-bound |
+| (a) HEVC pair | ≥ 0.99 | 0.9837; 0.9717–0.9996 | 7.6–18.6 | noise-bound |
+| (a) ProRes 422 HQ pair | ≥ 0.99 | 0.6774; 0.6502–0.84 | 6.7, 106, 112 | below; loaded |
+| (a) HEVC 59.94 pair | ≥ 0.99 | 0.6921; 0.3955–0.8868 | 47–116 | below; loaded |
+| (c) Half, N = 1 · 2 · 3 · 4 | ≥ 0.98 | 0.8401 · 0.9422 · 0.9994 · 0.9994 | 8.7–120 | noise-bound |
+| (c) Full, N = 1 · 2 · 3 · 4 | — | 0.9983 · 1.0 · 0.9883 · 0.9283 | 8.3–108 | — |
+
+- **(d)** is the wall time from the `set_playhead` send to the first `play_preview {seconds:
+  0.5}` that composed a frame — an upper bound holding that call's own 0.5 s — and every point
+  composed on the first call, with no "still seeking" refusal. The open's rebuild landed in 30–97
+  ms. A three-hour file seeks as quickly at its end as at its start.
+- **(b)** passes by 19×: the 1,072-clip two-hour timeline (1,000 program shots, 48 angle and 24
+  microphone placements) rebuilt after each roll in about 45 ms (`built_ms`; 97–101 ms for each
+  run's first roll) and landed in about 78 ms; the open's rebuild landed in 43–190 ms. No guide
+  figure and no Performance issue.
+- **(a) and (c) are not called** (SW-6): the other lanes' builds pushed the one-minute load average
+  to as much as 120 in the runs' own facts (270 between them), which this host's own quiet runs (H.264 at 1.0 twice at a load of
+  about 5) do not share. In (c), N = 1's Half median (0.84) sits below N = 4's (0.9994), which
+  is load, not angle count. Both are owed to a run on a quiet machine: `RC_PROOF_APP=release
+  python3 tools/proof/creator_spike/angles_spike.py --rows a,c` (F-4K kept). Until then SW2c's
+  head (the (a) verdict) and SW9a's live cell count are open. Since review, a pair whose every
+  run is below 0.99 decides (a) ("SW2c is owed"), and the runner prints that for these figures;
+  the call is withheld for the load, and the quiet run's print decides.
+- **The fixtures.** The three-hour file: SW-5's rule chose 30 Mb/s (50 needed 63.2 GiB and 40
+  needed 50.6 GiB of the 68.6 GiB free; 30 projected 37.9 GiB); `ffprobe` 30,473,383 b/s,
+  10,804.79 s, 41,157,328,852 bytes, made in about 2 minutes, removed after (d). F-4K,
+  `tools/proof/media/creator/f4k/`, kept: 38,086,813,978 bytes (35.5 GiB) — `a1_h264.mov`
+  7,542,189,851 and `a2_h264.mov` 7,540,697,041 (100.5 Mb/s, 600.27 s); `a3_hevc.mov`
+  3,783,543,900 and `a4_hevc.mov` 3,783,200,840 (50.4 Mb/s); `p1_prores.mov` 6,870,104,834 and
+  `p2_prores.mov` 6,869,865,178 (915.6 Mb/s, 60.03 s — the projection's 710 Mb/s was low by 3.7
+  GiB in all); `h1_hevc5994.mov` 761,809,210 and `h2_hevc5994.mov` 762,602,920 (50.8 Mb/s,
+  120.02 s); `mic1.wav` and `mic2.wav` 86,400,102 each. Free space was 68.6 GiB before F-4K;
+  the other lanes later took it to 16 GiB with F-4K on disk (`angles_fixtures.py --clean`
+  frees its 35 GiB).
+- **Two instrument passes were discarded.** The first made no (a) or (c) package (a second clip
+  added over the first, and `set_video`'s `clips`); (b) and its figures come from that run, whose
+  package was right. The second stopped: the maker's `a2_h264.mov` strip stopped with tiles
+  511–527 and 600 unwritten and no marker, twice the same, beside `a1_h264.mov`'s pass, while
+  the file decodes whole. The runner now gives a template one fresh pass (save, close, open) when
+  a marker is still missing at 180 s; the recorded (a) and (c) run needed it once (`a-h264`,
+  `thumbs/3`), then settled in 200 s.
+
+**Verification.** `make typecheck` 0 errors, the 4 baseline warnings; `spec_index_proof.py`
+258/258; `make gate` PASS twice: after the toll alone, 482 s, and at the end, 185 s (names,
+typecheck, test and app ran; fmt and lint skipped as unchanged).
+
+**Review.** The first review asked one fix: row (a) answered "re-run on a quiet machine"
+whenever a pair straddled 0.99, even when another pair's every run was below it, which already
+decides "SW2c is owed". Fixed (`46b42f3b`): a wholly-below pair now decides the row before the
+noise-bound arm; checked on the recorded ratios and three synthetic cases; `make gate` PASS in
+284 s; the Release proof and the spike were not re-run (no Swift and no measuring code changed).
+Its nits were left as built: ProRes is still projected at 710 Mb/s against the 915.6 measured
+(the disk guard under-counts each ProRes file by about 1.4 GiB after `--clean`); (c)'s
+`noisy` also counts a straddle below the measured live N, which cannot change it;
+`rebuild_log_proof.py`'s `settled()` takes an empty log as settled (harmless while the held
+open keeps `rebuilding` true); and the index row's stray "." (gone at integration). The second
+review passed, adding only that `results.json` could name the pair that decided (a).
+
+**Integrated.** `b28bfd8d`…`46b42f3b` onto `2397aff5`. The decisions merged into CU11a's
+`creator-jobs-8.md` (its index row and Lines, the folder's total); `tools/proof/README.md` keeps
+CU11a's and CO6's sections before SW0's. The CLAUDE.md edits applied: the root's dev-tool
+sentence (`playback_rebuilds`, `-RCDevRebuildHold <s>`), and `app/CLAUDE.md`'s Playback bullet
+(`+PreviewQuality`'s members, `currentItem`, the held hop) and its entries for
+`PlaybackRebuildLog.swift` and `AgentServer+PlaybackRebuilds.swift`.
+
+**Owed.** (a) and (c) on a quiet machine (above), the head of SW2c and SW9a's live cell count.
+SW-S2 again at SW9a on the owner's files, and (d) on S-LONG1 when it exists. No person check.
+Filed at integration, after this commit (`ai-drafted`, `low-priority`): the thumbnail strip that
+stops short with no marker (above), and `assistant_session_proof.py`'s stale
+`len(DEV_TOOLS) == 8` pin.
+
 ### FC9 — vertical shorts, and the owner's trial
 
 - **What a person gets:** Make Short's Shape row (9:16, 4:5, 1:1, Keep) goes live: each short is

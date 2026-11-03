@@ -218,3 +218,113 @@ eased in and out; the nest is offered, not made automatically.
   layout end missing an unchanged key (L11), the first-frame marker left out (L2), `through`
   ignored (L8), circle's radius from the uncropped side (L10), the menu's roles swapped (L12).
   JOB-64 (`docs/manual-checks.md`): each switch's eased move reads as deliberate at 0.5 s.
+
+## SW0 — measuring several 4K angles (2026-11-02)
+
+Recorded before the code. SW-1, SW-2, SW-4 and SW-5 are SW0's; SW-3 (multicam as a program track)
+was recorded at CJ0a, and SW-6 is SW-S2's verdict, appended after its runs. Nothing changes in the
+product: no core, FFI, format (42 stands), op, product tool, menu item or key. The owner's answers
+that set it (2026-11-01, batch 9): "SW0: build F-4K once: YES. The three-hour file: BUILD BOTH
+NOW" — a generated three-hour fixture, not waiting for S-LONG1, a departure from the road map's
+recommendation.
+
+- **SW-1 — The preview's rebuilds are counted and timed, in the dev tools only.**
+  `PlaybackRebuildLog` (`PlaybackRebuildLog.swift`, the whole file under `FRAMEJOB_DEV_TOOLS`) is
+  one log per `Playback`, main thread only. Three calls feed it, each under
+  `#if FRAMEJOB_DEV_TOOLS`: `startRebuild` notes a generation's START (uptime nanoseconds) right
+  after it takes its generation; `finishRebuild`'s success arm, after the generation guard, KEEPS
+  the entry with its `built_ms` — so a superseded generation, discarded by that guard, is never an
+  entry, and a build that fails is not one either; and the landing arm of `seekFinished()`
+  (`Playback+Scope.swift`, right after `restoring = false`) FILLS the last entry's `landed_ms`
+  only while it has none: the restore seek that follows the item swap is the first seek to land
+  after the build. A kept entry drops every start at or before its generation. The log keeps the
+  last 256 entries, oldest first; `count` counts every entry since the last reset and may exceed
+  256; a reset empties both and keeps the starts of generations in flight.
+  - **The tool.** The dev tool `playback_rebuilds {project?, reset?}` (`AgentServer+
+    PlaybackRebuilds.swift`) runs on main, refuses a project with no editor window in
+    `loudness_meter`'s sentence shape, resets first when `reset` is true, and answers `{count,
+    rebuilding, rebuilds: [{generation, built_ms, landed_ms}]}` in that key order, times in ms from
+    the start rounded to 0.1, `landed_ms` null until the entry lands. It is a `devHandlers` row and
+    the last `devTools()` row, never in `devOffMainTools`; the assistant withholds it as every dev
+    tool (`devToolNames`). Distribution carries none of it: no `#else` arm, and nothing outside
+    `#if FRAMEJOB_DEV_TOOLS` names the log.
+  - **Its proof.** `rebuild_log_proof.py` R0–R3: R0 no `Frame Job: ` line, the tool in the
+    catalog with exactly `reset` and `project`, the dev marker count `len(DEV_TOOLS)`; R1 one
+    `trim_end` on a one-clip project makes exactly one entry with 0 < `built_ms` ≤ `landed_ms`;
+    R2 `reset: true` answers `count` 0 and `[]`, and the next `trim_end` exactly one landed entry;
+    R3 under `-RCDevRebuildHold 2`, two `trim_end`s within 0.5 s leave `count` 1 and `built_ms` ≥
+    2,000. The road map's proof said `set_clip`; R1 uses `trim_end` because `set_clip` only names
+    or labels a clip, which the plan does not carry (`core/src/plan.rs`), so it never rebuilds.
+    Two mutants: `built-before-guard` (the entry kept for a superseded generation; R3 must fail)
+    and `reset-ignored` (R2 must fail).
+- **SW-2 — SW-S2 runs now, on fixtures built from repeats.** CJ0a's question 4 was answered yes,
+  so SW0 is built. The owner's SW0 answers: F-4K is built once (about 34 GB), and the three-hour
+  file is generated now rather than waiting for S-LONG1. Every long fixture is a stream copy of
+  repeats of one encoded minute, so the encoding time is a minute per file and the length costs
+  only disk. (d) runs on the generated file; S-LONG1 stays owed (TX-S1 and SW-S2 (d) again when it
+  exists), and SW9a re-runs SW-S2 on the owner's own files.
+- **SW-4 — `-RCDevRebuildHold <s>`, a dev-only launch default.** When positive, `Playback.init`
+  installs `PlaybackRebuildLog.heldHop()` as `rebuildHop`: each rebuild's main-thread landing
+  waits s seconds (`DispatchQueue.main.asyncAfter`) and then finishes as the build answered. It is
+  installed only when the default is present, because `scope_playhead_probe.swift` sets
+  `rebuildHop` itself. It is what makes R3 deterministic: two edits inside one held flight.
+- **SW-5 — The fixtures and the disk rule.** `tools/proof/creator_spike/angles_fixtures.py` writes
+  every fixture under the gitignored `tools/proof/media/creator/`, never committed. The source is
+  lavfi `testsrc2=size=3840x2160` with `noise=alls=16:allf=t` and a hue per angle; each long file
+  is a stream-copy concat (`-f concat -safe 0 … -c copy`) of repeats of a one-minute encode.
+  - **F-4K** (`f4k/`, behind `--build-4k`): `a1_h264.mov` and `a2_h264.mov`, 10 min at 30000/1001,
+    `h264_videotoolbox -profile:v high -b:v 100M -g 15`, `-video_track_timescale 30000` (as the
+    GH5 writes); `a3_hevc.mov` and `a4_hevc.mov`, 10 min, `hevc_videotoolbox -profile:v main10
+    -pix_fmt p010le -tag:v hvc1 -b:v 50M -g 30`; `p1_prores.mov` and `p2_prores.mov`, 1 min,
+    `prores_ks -profile:v 3 -pix_fmt yuv422p10le` (ProRes 422 HQ), projected at 710 Mb/s;
+    `h1_hevc5994.mov` and `h2_hevc5994.mov`, 2 min at 60000/1001, HEVC Main 10 at 50M, `-g 60`,
+    timescale 60000; `mic1.wav` and `mic2.wav`, 10 min of mono 48 kHz `pcm_s24le` pink noise
+    (`anoisesrc=color=pink:amplitude=0.03`). Projected total about 34.8 GB (32.4 GiB).
+  - **The long file** (`long/long_hevc.mov`, behind `--long`): 3 h of HEVC Main 10 at 29.97 from
+    180 repeats of one minute, its rate the first of 50, 40, 30 and 20 Mb/s whose projection leaves
+    at least 20 GiB free; below 20 Mb/s it refuses. It is made and measured before F-4K exists and
+    removed after (d) unless `--keep-long`; F-4K is kept (SW2c may re-run (a) on it); `--clean`
+    removes everything.
+  - **The disk rule.** Before each output the script projects its size as bitrate × duration plus
+    the one-minute segment; if `shutil.disk_usage`'s free space minus that projection is under
+    20 GiB it writes nothing more, prints `STOP: <file> needs <x> GiB, <y> GiB free, floor 20 GiB`
+    and exits 3, and the phase records that STOP with its figures rather than generating.
+  - **Where it ran.** The road map puts SW0 in lane C; it ran in lane A (2026-11-02), as the
+    orchestrator scheduled it. Nothing in the phase depends on its lane.
+- **SW-6 — SW-S2's verdict: (b) and (d) answered; (a) and (c) re-run on a quiet machine.**
+  `rule_sha256` `ecd9d732…324f0961`, matching CJ0a's table (`rule_matches: true`): **the rule
+  and its pin are unchanged.** macOS 26.5.1 (25F80), Apple M2 Max, 12 cores, 96 GiB, on AC
+  (`pmset` powermode 0), three lanes on the machine; Release, `angles_spike.py`, three runs a
+  row, each run with its host's facts, all in `tools/proof/work/creator_spike/SW-S2/results.json`.
+  - **(b) rebuild: within 1,500 ms — no guide figure and no Performance issue.** The two-hour
+    timeline held 1,072 clips (1,000 program shots, 48 angle and 24 microphone placements). All
+    30 rolls landed; the median `landed_ms` was **78.75 ms** (spread 76.8–134.0; run medians
+    78.3, 79.3 and 79.2), `built_ms` about 45 ms after a first roll of 97–101 ms. Run under a
+    one-minute load average of 33.6–34.9, so the margin (19×) is not one the noise can swallow.
+  - **(d) long files, recorded.** On the generated three-hour file (SW-5's rate rule chose
+    30 Mb/s at 68.6 GiB free; `ffprobe` 30,473,383 b/s, 10,804.8 s, 41,157,328,852 bytes), each
+    of 0:30:00, 1:00:00, 2:00:00 and 2:59:00 composed on the first `play_preview {seconds: 0.5}`
+    in every run (12 of 12, no "still seeking" refusal). The wall time from the `set_playhead`
+    send, an upper bound that includes that call's own 0.5 s play: medians 0.535, 0.558, 0.586
+    and 0.529 s (spreads 0.534–0.538, 0.556–0.564, 0.582–0.591, 0.529–0.543), at a one-minute
+    load average of 3.0–3.7. A three-hour file seeks as quickly at its end as at its start.
+  - **(a) cuts on one composition track: not called.** Median ratios over three runs (spread in
+    brackets): H.264 0.9999 [0.8523–1.0], HEVC 0.9837 [0.9717–0.9996], ProRes 422 HQ 0.6774
+    [0.6502–0.84], HEVC 59.94 0.6921 [0.3955–0.8868]. H.264's and HEVC's runs fall on both sides
+    of 0.99 (`noise_bound`); ProRes' and HEVC 59.94's are all below it, but five of those six
+    runs ran at a one-minute load average of 47–116 (the other lanes' builds), and ProRes' one
+    quiet run (6.7) gave 0.84. The verdict — keep the plan's assignment, or build SW2c — is
+    owed to a run on a quiet machine (`angles_spike.py --rows a`, F-4K kept). Since review, a
+    pair whose every run is below 0.99 decides the row, so the runner prints "SW2c is owed" for
+    these figures; that call is withheld for the load above, and a quiet run's print is the one.
+  - **(c) angles at once: not called.** Median Half ratios N = 1…4: 0.8401, 0.9422, 0.9994,
+    0.9994 (spreads 0.6479–0.842, 0.6268–0.9994, 0.535–1.0, 0.9766–1.0); Full 0.9983, 1.0,
+    0.9883, 0.9283. N = 2…4 straddle 0.98 (`noise_bound`), and N = 1 below it while N = 4 is
+    above says the load (8.7–120 at the Half runs), not the angle count, decided them. As
+    measured the live count would be 4 ("four live"); the mapping SW9a ships is owed to a run on
+    a quiet machine (`--rows c`).
+  - **The fixtures.** F-4K is 38,086,813,978 bytes (35.5 GiB) under
+    `tools/proof/media/creator/f4k/`, kept: ProRes 422 HQ of noise came in at 915.6 Mb/s against
+    the 710 the projection assumed (6.87 GB a file); every other file within 2 % of its rate
+    (H.264 100.5, HEVC 50.4, HEVC 59.94 50.8 Mb/s). The three-hour file was removed after (d).
+    SW-S2 runs again at SW9a on the owner's files, and (d) on S-LONG1 when it exists.

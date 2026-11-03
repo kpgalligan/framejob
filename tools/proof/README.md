@@ -28925,3 +28925,80 @@ make app && RC_PROOF_APP=release python3 tools/proof/co6_proof.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CO6 record. The person check is JOB-64.
+
+## Road map "creator-jobs" SW0 — the rebuild log and SW-S2
+
+The dev tool `playback_rebuilds {reset?}` (spec §11 SW-1, `AgentServer+PlaybackRebuilds.swift`)
+answers a project's editor window's preview rebuilds since the last reset: `count`,
+`rebuilding` and `rebuilds`, oldest first, each `{generation, built_ms, landed_ms}` in ms from
+the rebuild's start (`Playback.startRebuild`) to its build (`finishRebuild`'s success arm, after
+the generation guard) and to the first seek landing after it (`seekFinished()`), rounded to 0.1.
+The dev-only launch default `-RCDevRebuildHold <s>` (SW-4) holds each rebuild's main-thread
+landing s seconds. `dev_tools.py`'s `DEV_TOOLS` holds it last.
+
+`rebuild_log_proof.py` (R0–R3; two mutants; spec §11 SW-1, SW-4), on a scratch
+`CFFIXED_USER_HOME`, a fresh one-clip project (`analysis_fixtures.h264_1080()`) per instance:
+
+| Row | Claim |
+|---|---|
+| R0 | no `Frame Job: ` line in any log; `playback_rebuilds` in the catalog with exactly `reset` and `project`; the dev marker counts `len(DEV_TOOLS)` |
+| R1 | the open settled, `reset`, one `trim_end` to 10 s: exactly one entry, 0 < `built_ms` ≤ `landed_ms` (`set_clip` would not rebuild: the plan carries no name) |
+| R2 | `reset: true` answers `count` 0 and `[]`; the next `trim_end` exactly one landed entry |
+| R3 | under `-RCDevRebuildHold 2`, two `trim_end`s within 0.5 s: `count` 1, `built_ms` ≥ 2000 |
+
+Mutants (`--mutant NAME`, a `tree_copy.py` copy built in the configuration `RC_PROOF_APP`
+chooses; CAUGHT exits 0, SURVIVED 1, a control not performed 2): `built-before-guard` (the entry
+kept before `finishRebuild`'s generation guard) R3, `reset-ignored` R2.
+
+```sh
+make app-debug && python3 tools/proof/rebuild_log_proof.py [--only R1,R3]
+python3 tools/proof/rebuild_log_proof.py --mutant built-before-guard
+make app && RC_PROOF_APP=release python3 tools/proof/rebuild_log_proof.py
+```
+
+**SW-S2** (`creator_spike/angles_spike.py`, its rule pinned in `designs/creator-jobs.md`) runs
+on fixtures `creator_spike/angles_fixtures.py` writes under the gitignored
+`tools/proof/media/creator/` (spec §11 SW-5), never committed. Every video is lavfi
+`testsrc2=size=3840x2160` with `noise=alls=16:allf=t` and a hue per file; a long one is a
+stream-copy concat of repeats of one encoded minute:
+
+```sh
+# one minute, then N repeats of it
+ffmpeg -f lavfi -i "testsrc2=size=3840x2160:rate=30000/1001:duration=60,noise=alls=16:allf=t,hue=h=0" \
+  -c:v h264_videotoolbox -profile:v high -b:v 100M -g 15 -video_track_timescale 30000 -an seg.mov
+ffmpeg -f concat -safe 0 -i list.txt -c copy -video_track_timescale 30000 a1_h264.mov
+```
+
+F-4K (`--build-4k`, `f4k/`, about 34.8 GB): `a1_h264.mov`, `a2_h264.mov` (10 min, H.264 High
+100 Mb/s, GOP 15); `a3_hevc.mov`, `a4_hevc.mov` (10 min, `hevc_videotoolbox -profile:v main10
+-pix_fmt p010le -tag:v hvc1 -b:v 50M -g 30`); `p1_prores.mov`, `p2_prores.mov` (1 min,
+`prores_ks -profile:v 3 -pix_fmt yuv422p10le`); `h1_hevc5994.mov`, `h2_hevc5994.mov` (2 min at
+60000/1001, HEVC Main 10 50M, GOP 60, timescale 60000); `mic1.wav`, `mic2.wav` (10 min mono 48 kHz
+24-bit, `anoisesrc=color=pink:amplitude=0.03`). The long file (`--long`,
+`long/long_hevc.mov`): 3 h of HEVC Main 10 at 29.97 from 180 repeats of one minute, at the first
+of 50, 40, 30 and 20 Mb/s that leaves 20 GiB free. Before each output the script projects
+bitrate × duration plus the segment and, under 20 GiB left, prints `STOP: <file> needs <x> GiB,
+<y> GiB free, floor 20 GiB` and exits 3. A file with its `.done` stamp is kept; `--remove-long`
+and `--clean` remove.
+
+The runner makes each package on a maker instance over MCP, waits for every media's cache
+markers and a steady listing before saving, then writes the shots into `project.json`; each
+timing instance (`-FrameJobPreviewQuality 0|1`, never the menu) opens it, waits for the open's
+rebuild in `playback_rebuilds`, checks the markers again and measures. Rows: (a) cuts between two
+4K angles per codec on one track, `frames_composed / frames_expected` over 60 s `play_preview`
+calls, every pair's median ≥ 0.99; (b) ten `roll`s on a two-hour, 1,000-shot timeline, the
+median `landed_ms` ≤ 1,500; (c) N = 1…4 cells at Half and Full, the largest N at ≥ 0.98 at Half;
+(d) the wall time to the first composed frame after seeks into the three-hour file (an upper
+bound that includes the 0.5 s `play_preview` call). Each row runs `--runs` times (3) with the
+host's facts; a row with runs on both sides of its threshold is `noise_bound`, "re-run on a
+quiet machine", unless (a) has a pair with every run below 0.99, which answers "SW2c is
+owed". Rows merge into `tools/proof/work/creator_spike/SW-S2/results.json`.
+
+```sh
+make app
+RC_PROOF_APP=release python3 tools/proof/creator_spike/angles_spike.py --long --rows d
+RC_PROOF_APP=release python3 tools/proof/creator_spike/angles_spike.py --build-4k --rows a,b,c
+RC_PROOF_APP=release python3 tools/proof/creator_spike/angles_spike.py --rows a   # F-4K kept
+```
+
+The recorded runs are SW-6 and `designs/creator-jobs.md`'s SW0 record. No person check.

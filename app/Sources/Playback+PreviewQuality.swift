@@ -1,7 +1,8 @@
 import AVFoundation
 
 /// View ▸ Preview Quality's composition copy. A pure move out of `Playback.swift`, which sat at the
-/// 600-line cap (issue batch B21); `setPreviewQuality` stays there because it reads `player`.
+/// 600-line cap (issue batch B21); `setPreviewQuality` and `recompose()` followed it (road map
+/// creator-jobs SW0's toll), reading the player's item through `currentItem`.
 extension Playback {
     /// The composition to hand the player: the one the plan built at Full, and
     /// otherwise the builder's configuration with a smaller `renderSize` (#91).
@@ -50,5 +51,50 @@ extension Playback {
         }
         guard changed else { return built.videoComposition }
         return AVVideoComposition(configuration: configuration)
+    }
+
+    /// View ▸ Preview Quality ▸ — Full, Half or Quarter of the canvas, for the
+    /// PLAYER's composition alone.
+    ///
+    /// The setting has to survive two different moments, which is why it is
+    /// stored as well as applied: with an item on the player it is a
+    /// re-assignment (`AVPlayerItem.videoComposition` is a COPY property, so
+    /// nothing done to the retained composition could reach the live item),
+    /// and with no item — an empty timeline, or
+    /// a rebuild still on the queue — there is nothing to re-assign and
+    /// `finishRebuild` applies it to the item it is about to install. Both go
+    /// through `previewComposition`, so the two paths cannot drift.
+    ///
+    /// Not routed through `update(project:urls:isLive:)`, deliberately: that
+    /// function short-circuits on the plan JSON and the audio DSP, neither of
+    /// which a quality change touches, and teaching it a third term would make
+    /// every property edit compare one more thing for a setting that changes
+    /// once in a session. Not `invalidate()` either — the editor's forced
+    /// rebuild path pauses the transport and blanks the preview, which is a
+    /// heavy price for what is one property assignment.
+    func setPreviewQuality(_ quality: PreviewQuality) {
+        guard quality != previewQuality else { return }
+        previewQuality = quality
+        quality.store()
+        recompose()
+    }
+
+    /// The item's composition re-assigned as Preview Quality and View ▸ Show
+    /// SDR Version (spec §11 HD-14 (g), the key's `dynamicRange`) now ask —
+    /// no rebuild — then one forced frame. With no item there is nothing to
+    /// re-assign, and `finishRebuild` applies both to the item it installs.
+    func recompose() {
+        guard let item = currentItem, let built = built else { return }
+        item.videoComposition = Self.previewComposition(
+            built, quality: previewQuality, sdrVersion: showsSDRVersion)
+        // A paused preview would otherwise keep the frame it has until the
+        // next seek: the item's composition changed, but nothing asked it for
+        // a picture. The same trick a property-only edit uses.
+        refreshPausedFrame()
+    }
+
+    /// Whether this document's key asks for the SDR version (Show SDR Version).
+    var showsSDRVersion: Bool {
+        RecipeSource.shared.options(for: recipeKey).dynamicRange == .sdr
     }
 }

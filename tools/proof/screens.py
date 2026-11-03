@@ -273,6 +273,8 @@ NOT_SHOWN = {
                            "honoured (spec §11 CJ-26); no screen launches with it",
     "RCDevCursorLoadHold": "a dev launch default that holds each cursor file's load "
                            "(CursorTracks.swift); no screen launches with it",
+    "RCDevRebuildHold": "a dev launch default that holds each preview rebuild's landing "
+                        "(PlaybackRebuildLog.swift, spec §11 SW-4); no screen launches with it",
     "RCDevDerivedHidden": "a dev launch default with which new_project_from_range opens its "
                           "project without a window (spec §11 CJ-52); no screen launches with "
                           "it",

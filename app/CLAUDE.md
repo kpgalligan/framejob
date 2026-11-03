@@ -1872,7 +1872,10 @@ the key map behind it.
 - `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`) — one
   `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
-  (hdr H-3's pure move). `recompose()` re-colours the player's copy of the
+  (hdr H-3's pure move); `+PreviewQuality` holds `previewComposition`,
+  `setPreviewQuality` and `recompose()` with `showsSDRVersion`, reading the
+  player's item through the internal `currentItem` (road map "creator-jobs"
+  SW0's toll; `player` stays private). `recompose()` re-colours the player's copy of the
   composition without a rebuild (`previewComposition(…, sdrVersion:)`, the
   way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14. **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
@@ -1886,8 +1889,9 @@ the key map behind it.
   a held scope change whose rebuild fails, or whose new plan is empty, drops
   the item rather than leave the outgoing one, keeps its time and is heard
   once (`endHoldWithoutItem` in `+Scope`, #185; the seek flags are internal
-  for `+Scope` alone); `rebuildHop` is the probe's seam, nil in the app, and
-  its block takes an error it delivers as the build's failure; `report(_:)` is the one
+  for `+Scope` alone); `rebuildHop` is the probe's seam, nil in the app
+  unless the dev-only `-RCDevRebuildHold <s>` installs
+  `PlaybackRebuildLog.heldHop()` (SW-4), and its block takes an error it delivers as the build's failure; `report(_:)` is the one
   caller of `onTimeChanged`. While paused, an observer callback is heard only
   for the tick the player is at or seeking to, and only when it differs from
   the last report — a late callback for a superseded seek or a swapped-out
@@ -4086,6 +4090,20 @@ free.
   for silence), `from_frame`/`to_frame`/`sample_rate`, `resets`,
   `last_reset` — after an optional `manual` reset.
   `tools/proof/audio_ap7_proof.py` drives it beside `play_preview`.
+- `PlaybackRebuildLog.swift` — the preview's rebuilds counted and timed (road
+  map "creator-jobs" SW0, spec §11 SW-1; dev only, wholly under the flag,
+  main thread): one per `Playback` (`rebuildLog`). `started` is called at
+  `startRebuild`; `built` at `finishRebuild`'s success arm, AFTER the
+  generation guard, so a superseded generation is never an entry; `landed`
+  at `seekFinished()`'s landing arm, filling only the last entry's first
+  landing. It keeps the last 256 entries; `reset` keeps the starts in
+  flight. `heldHop()` is `-RCDevRebuildHold <s>`'s hop (SW-4), installed by
+  `Playback.init` only when the default is given.
+- `AgentServer+PlaybackRebuilds.swift` — `playback_rebuilds {reset?}` (dev
+  only, wholly under the flag, on main; spec §11 SW-1): `{count, rebuilding,
+  rebuilds: [{generation, built_ms, landed_ms}]}` in that key order, written
+  by hand, times rounded to 0.1 ms. `tools/proof/rebuild_log_proof.py` and
+  `creator_spike/angles_spike.py` drive it.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
   time and, while a trial asks, a SHA-256 of the destination's pixels;

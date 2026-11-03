@@ -1019,6 +1019,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   seam: the two composition re-assignments (`setPreviewQuality`, `recompose()`) out to
   `Playback+PreviewQuality.swift` behind an internal read of the player's current item, so
   `player` itself stays private.
+- `Playback.swift`: road map "creator-jobs" SW0 paid that seam before the rebuild log's calls:
+  `setPreviewQuality` and `recompose()` with their docs, and `showsSDRVersion`, moved verbatim
+  to the end of `Playback+PreviewQuality.swift`, reading the new internal
+  `currentItem` (`player.currentItem`) where they read `player.currentItem`; `previewQuality`
+  lost `private(set)` (the setter is in the other file) and `showsSDRVersion` lost `private`
+  (`finishRebuild` still reads it); `player` stays private. The type's doc and `+PreviewQuality`'s
+  name the moved pair. A pure move gated alone. `wc -l app/Sources/Playback.swift`: 592 before,
+  550 after; `Playback+PreviewQuality.swift` 54 → 100. The next seam: `refreshPausedFrame()` out
+  to `Playback+Scope.swift`.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`). The grading road map's GR1 moved the Clip menu's submenu
   builders (`backgroundMenu`, `transitionMenu`, `motionMenu`, `motionSlotMenu`, `labelMenu`,
