@@ -66,14 +66,14 @@ fn every_published_tick_pair_executes_on_both_frame_grids() {
                 .map(|a| (row.name, a.name))
         })
         .collect();
-    assert_eq!(declared.len(), 48, "declared tick arguments changed");
+    assert_eq!(declared.len(), 51, "declared tick arguments changed");
     assert_eq!(
         declared
             .iter()
             .map(|(op, _)| *op)
             .collect::<BTreeSet<_>>()
             .len(),
-        34
+        35
     );
     for (fps, frame) in [([30, 1], 20_000), ([30_000, 1_001], 20_020)] {
         let cases = clips::cases(fps, frame)
@@ -88,8 +88,8 @@ fn every_published_tick_pair_executes_on_both_frame_grids() {
         assert_eq!(covered, declared, "{fps:?}: missing or extra tick vector");
         assert_eq!(
             cases.len(),
-            53,
-            "{fps:?}: expected 48 primary plus 5 branch vectors"
+            56,
+            "{fps:?}: expected 51 primary plus 5 branch vectors"
         );
         for case in cases {
             execute(case);

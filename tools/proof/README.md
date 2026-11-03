@@ -28876,3 +28876,52 @@ RC_PROOF_APP=release python3 tools/proof/cu11_proof.py
 ```
 
 The recorded runs are in `designs/creator-jobs.md`'s CU11a record.
+
+## Road map "creator-jobs" CO6 — camera layouts at the playhead (`co6_proof.py` L1–L10, L12, L13, Z1 with `co6_probe.swift` L11; nine mutants; `core/tests/layout.rs`; spec §11 CO-60…CO-67)
+
+**`co6_proof.py [SOCKET]`** drives the app. Given a running instance's `<dir>/agent.sock` it
+runs every row there and greps `<dir>/framejob.log`; without one it launches its own
+(`proof_app.binary()`, or `--app PATH`, on a scratch `CFFIXED_USER_HOME`). Its media are ffmpeg's
+`testsrc` under `tools/proof/work/co6/media/` (20 s at 30 fps): a 1280 × 720 camera, a
+1920 × 1080 screen and a 2560 × 1440 screen. Each row makes its own package with the screen on
+the back track and the camera in front. A frame is 20 000 ticks; every expected placement is
+worked in the script from CO-60's figures, never read back from `layout.rs`.
+
+| Row | What it holds |
+|---|---|
+| Z1 | the instance's `grep "Frame Job: "` prints nothing |
+| L1 | on 1920 × 1080 and 1080 × 1920, each of the five layouts at 2 s: one layout action on the camera and one on the screen, each end exactly the six keys at CO-60's numbers |
+| L2 | a switch at the camera's first frame: the layout as its base and a one-frame layout action at 0 ending at it |
+| L3 | the camera cut into five; a corner switch at the fifth's first frame, then side by side on the second at 5 s: the third and fourth take it as their base, the fifth is unchanged |
+| L4 | corner at 2 s and stacked at 6 s on one clip: two layout actions, the last stacked |
+| L5 | a later clip with a mid-clip layout action takes the new base and keeps its action |
+| L6 | a later screen piece zooming: refused naming the clip and the zoom; with `nest: true` the zoom inside the nest, `render_frame` at 12.5 s byte-identical to `nest` then `switch_layout` on a twin, and `get_project` equal |
+| L7 | the camera inside an opacity action: refused, "moves (action N)" |
+| L8 | `through` 8 s: the clip after it byte-unchanged |
+| L9 | one undo named "Camera Layout" gives back the project exactly |
+| L10 | circle's crop the 720 square, radius 360; rounded's radius; a nest-clip camera refusing both |
+| L11 | (probe) `ActionBands.isZoom` false on every L1 action, each end exactly the six keys |
+| L12 | `perform_menu_item` Circle ▸ Top Left (camera selected), Side by Side (both selected) and Side by Side (none selected, a "Camera" track): each equal to `switch_layout` at the playhead after one undo named "Camera Layout" |
+| L13 | the 2560 × 1440 screen at its full placement with zooms at 8 s and 12 s: Circle ▸ Bottom Right applies with both zooms unchanged; side by side at 5 s refused naming the first zoom; with `nest: true` nested |
+
+Mutants (`--mutant NAME`; CAUGHT exits 1, SURVIVED 0, a control not performed 2). Eight in the
+core, each edited into a copy of `core/` beside a link to `graphic/` and run under `cargo test
+--release --test layout` (target `tools/proof/work/co6/mutant-target`), CAUGHT when its named test
+fails: `exemption-dropped` (L13's half), `reach-stops-at-zoom` (L6), `reach-past-layout` (L3),
+`reach-first-clip-only` (L3), `end-missing-key` (L11), `first-frame-marker-dropped` (L2),
+`through-ignored` (L8), `circle-radius-uncropped` (L10). One in the app, on a `tree_copy.py`
+copy's built app: `roles-swapped` (L12's two-selected case).
+
+The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 119 and `OPS` 68,
+`op_catalog_proof.py`'s 68; `capture_spike/inventory.json` holds `switchCameraLayout:` (verdict
+`none`, an edit).
+
+```sh
+cd core && cargo test --release --test layout
+make app-debug && python3 tools/proof/proof_app.py launch
+python3 tools/proof/co6_proof.py <dir>/agent.sock [--only L1,L13]
+python3 tools/proof/co6_proof.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/co6_proof.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO6 record. The person check is JOB-64.

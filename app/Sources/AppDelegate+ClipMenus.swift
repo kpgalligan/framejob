@@ -1,8 +1,9 @@
 import AppKit
 
-/// The Clip menu's five submenus (spec §9): Add Background, Transition,
-/// Motion (with its three slot menus), Look (grading GR5b) and
-/// Label, and the label dot Label's rows carry.
+/// The Clip menu's six submenus (spec §9): Add Background, Transition,
+/// Motion (with its three slot menus), Look (grading GR5b), Camera Layout
+/// (road map creator-jobs CO6) and Label, and the label dot Label's rows
+/// carry.
 ///
 /// A pure move out of `AppDelegate+Menus.swift` (grading GR1), which stood
 /// near app/CLAUDE.md's ~600-line cap with grading's own menu rows still to
@@ -73,6 +74,29 @@ extension AppDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(tagged("None", #selector(EditorViewController.setLook(_:)), -1))
+        return menu
+    }
+
+    /// Clip ▸ Camera Layout ▸ (road map "creator-jobs" CO6, spec §11 CO-66):
+    /// Corner ▸, Rounded Corner ▸ and Circle ▸ with the four corners each, a
+    /// separator, then Side by Side, Stacked, Camera Full and Screen Only —
+    /// one selector, each row tagged with its index in
+    /// `CameraLayoutChoice.menuRows`, the `transitionMenu()` idiom.
+    func cameraLayoutMenu() -> NSMenu {
+        let menu = NSMenu(title: "Camera Layout")
+        let action = #selector(EditorViewController.switchCameraLayout(_:))
+        let rows = CameraLayoutChoice.menuRows.enumerated()
+        for shape in CameraLayoutShape.allCases {
+            let corners = NSMenu(title: shape.menuTitle)
+            for (index, row) in rows where row.kind == .corner && row.shape == shape {
+                corners.addItem(tagged(row.title, action, index))
+            }
+            menu.addItem(submenuItem(corners))
+        }
+        menu.addItem(.separator())
+        for (index, row) in rows where row.kind != .corner {
+            menu.addItem(tagged(row.title, action, index))
+        }
         return menu
     }
 

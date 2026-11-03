@@ -461,14 +461,15 @@ governs a module now.
   `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-six op tools in the agent catalog,
+  reader is every one of the sixty-seven op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
   `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed (twenty-three kinds; `Texts`, a list of strings, is
+  `Kind` is closed (twenty-seven kinds — `switch_layout` added `Layout`,
+  `LayoutShape`, `Corner` and `Point`, `[f64; 2]`; `Texts`, a list of strings, is
   `set_action_end`'s `off`), carries each vocabulary's members, and has exactly ONE
   kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
@@ -866,8 +867,28 @@ governs a module now.
 - `action_class.rs` — actions classed by content, with no tag (road map
   creator-jobs CU7, spec §11 CU-73, CO-63, CJ-8 (i)): `PLACEMENT_KEYS`;
   `is_zoom` (an end's `video` exactly `scale`, `x`, `y`, no other group or a
-  numeric `speed`; the twin of `ActionBands.isZoom`), `is_layout` (all six),
-  `moves` (any of the six).
+  numeric `speed`; the twin of `ActionBands.isZoom`), `is_layout` (all six;
+  read by `switch_layout`, CO6), `moves` (any of the six).
+- `layout.rs` — camera layouts' geometry (road map creator-jobs CO6, spec §11 CO-60,
+  CO-65), pure: `CameraLayout`, `LayoutShape`, `LayoutCorner`, `LayoutChoice`, `Placement`
+  (the six keys, `to_json`, `of`, `from_end`), `holds_full` (nine numbers within 1e-9),
+  `full_placement` (`add_clip`'s: `fit_scale`, honouring `fit_new_clips`),
+  `screen_placement`, `camera_placement` — the corner box (CAM-10 (3)'s), side by side,
+  stacked, camera full at `fill_scale`, screen only at opacity 0 — crops centred on `focus`
+  and placed by `edit_zoom.rs`'s (★), `x`/`y` rounded half away from zero; the constants,
+  `DEFAULT_SWITCH` 0.5 s. Capped at 400 lines.
+- `edit_layout.rs` · `edit_layout_reach.rs` — `switch_layout` (CO-61, CO-62, CO-64):
+  `edit_layout.rs` `LayoutSwitch`, the roles (the camera; a given screen behind it, or the
+  front-most shown, non-matte picture clip behind it at `at`), the nest-clip refusal for
+  rounded and circle, `nest: true` (each refused role's clips nested, refused when one is
+  laid out, then the switch on the nest clip), and the composition — a layout action at
+  `at` replaced, one running at `at` shortened, the layout action clamped to the clip and
+  the next layout action or at a first frame the base plus a one-frame marker, the reach's
+  bases — from `remove_action`, `set_action`, `add_action`, `set_action_end`, `set_video`
+  and `nest_clips`, each refusal inherited; `edit_layout_reach.rs` a `Role` and its reach
+  (to the next later layout action on the track, `through` or the track's end),
+  `mover_refusal` (a non-layout mover ending after `at`, a full-placement screen exempt in
+  corner, camera_full and screen_only) and `laid_out`.
 - `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`

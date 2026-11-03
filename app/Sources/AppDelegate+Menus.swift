@@ -363,6 +363,9 @@ extension AppDelegate {
         // equivalent (the owner's answer, 2026-11-01).
         menu.addItem(
             item("Remove Background", #selector(EditorViewController.toggleRemoveBackground(_:))))
+        // Road map "creator-jobs" CO6 (spec §11 CO-66): Camera Layout ▸ right after Remove
+        // Background, the UI path `switch_layout` names. No key equivalent.
+        menu.addItem(submenuItem(cameraLayoutMenu()))
         menu.addItem(.separator())
         // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
         // its own because neither item edits the selection: both put a clip on

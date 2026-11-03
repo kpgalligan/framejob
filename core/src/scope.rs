@@ -169,7 +169,7 @@ pub(crate) fn read(value: Option<&Value>) -> Result<Option<u32>, String> {
 }
 
 /// The ops with no meaning inside a nest, by name, or `None` for the
-/// fifty-five that work in there unchanged.
+/// fifty-six that work in there unchanged.
 ///
 /// Exhaustive rather than a short list with a `_` arm, and that is the
 /// point of writing it out: an op added by a later phase does not compile
@@ -281,6 +281,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::AddAction { .. }
         | Op::AddZoomAction { .. }
         | Op::AddSpeedRamp { .. }
+        | Op::SwitchLayout { .. }
         | Op::SetAction { .. }
         | Op::SetActionEnd { .. }
         | Op::RemoveAction { .. }

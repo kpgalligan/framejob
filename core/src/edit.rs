@@ -104,7 +104,7 @@
 //! grades what is behind it at the top level only, spec §11 GR-6), and
 //! `keep_range` (it keeps a range of the DOCUMENT's timeline, and is
 //! applied only to a derived document, spec §11 CJ-50).
-//! Everything else — all fifty-five — works
+//! Everything else — all fifty-six — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -170,6 +170,7 @@
 //! | `add_action` | A new action at CLIP time `at` (the caller subtracts `clip.start`), 1 s long when `duration` is absent, end patch empty. Refuses when it would overlap another action or run past the clip. |
 //! | `add_zoom_action` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. An absent `duration` is 1 s, an absent `fit` is `fit` and an absent `curve` is `ease_in_out`. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `add_speed_ramp` | A speed ramp preset in one step (spec §11 SR-23, #340), made of ordinary Speed actions (`end.speed`, SR-10). `shape` is `ramp_up`, `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both given or both absent (the whole clip, [0, D)). The base b is the rate the clip plays at `from` before the edit. Up and Down are one action [from, to) ending at `rate`; Dip and Burst are two, of r = max(snapped_down((to − from)·(1 − hold)/2), one frame) each, [from, from + r) ending at `rate` and [to − r, to) ending at b, the span between holding the target. `hold` (Dip and Burst only) is clamped to 0–0.9, 0.5 when absent; `curve` is every new action's, `ease_in_out` when absent. A positive `rate` is clamped to ×0.1–×1000. `Err` on an unknown or non-media clip, a non-positive rate, one of `from`/`to` alone, a negative `from`, `to` not after `from`, and a `hold` on Up or Down. Refused, in order: `to` past the clip (`add_action`'s sentence); any action the span [from, to) runs into, named — a hold gap included; a Dip or Burst under two frames; a rate not above b (Up, Burst) or not below it (Down, Dip); and a preset that would read past the end of the media (SR-2), naming the largest rate that fits. `edit_action_ramp.rs`'s module doc. |
+//! | `switch_layout` | Camera layouts at the playhead (spec §11 CO-60…CO-65, `edit_layout.rs`'s module doc): the `camera` clip and the `screen` behind it placed in `layout` — `corner` (`shape` `square` (absent), `rounded` or `circle`; `corner` `bottom_right` (absent), `bottom_left`, `top_right`, `top_left`), `side_by_side`, `stacked`, `camera_full` or `screen_only` — each role written all six placement keys (`x`, `y`, `scale`, `crop`, `corner_radius`, `opacity`) solved by `layout.rs`. Per role the clip under `at` gets a LAYOUT ACTION at clip time `at − start` of `duration` (0.5 s when absent) and `curve` (`ease_in_out` when absent), clamped to the clip and the next later layout action on it, at least one frame; at the clip's first frame the layout is its base plus a one-frame layout action at 0 ending there. A layout action on it starting at `at` is replaced; one running at `at` is shortened to end there. The REACH runs to the first later layout action on the role's track, `through`, or the track's end: every picture clip starting inside it takes the layout as its base and keeps its actions. `screen` absent: the clip playing at `at` on the front-most shown, non-matte track behind the camera's with a drawn picture; none leaves the camera alone (`side_by_side` and `stacked` refuse). `focus` is the camera crop's centre in source pixels from the uncropped centre, y down, `[0, 0]` when absent. `Err` on a negative `at`, a non-positive `duration`, `through` not after `at`, a non-finite `focus`. Refused, in order: a camera (then a screen) with no picture or not playing at `at`, a screen not behind the camera; no screen for `side_by_side`/`stacked`; a nest-clip camera asked for `rounded` or `circle`; a role clip in the reach with a non-layout action that moves it and ends after `at` (a screen at its full placement exempt in `corner`, `camera_full` and `screen_only`), naming it — with `nest: true` the moving role's clips are nested first, refused when one is already laid out; then `add_action`'s own. One undo step. |
 //! | `set_action` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. Refused (`action_past_end`) only when the new end is past the clip's end AND later than the action's end before the edit (spec §11 SR-22, #338): an action already past the end can be re-curved, moved earlier or shortened, and one inside the clip cannot be pushed past it. When the action's end names a `speed` (spec §11 SR-10) and the change would make the clip read past the end of its media it is refused (SR-2, R3), naming the latest clip end that fits. |
 //! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked, except a graphic prop's (G-34 (c)). A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). `off` (absent or `null`: none) is a list of `"group.key"` paths written as `null` AFTER the merge — the optional property keyed OFF at the end, where a `null` in `patch` removes (spec §11 CI-14); each is an `Err` when malformed, when it is `video.motion` or `text.words` (the same two sentences), when it names a key the group lacks or a required key, and when `patch` names it too. A `graphic` object is a graphic clip's props as a fourth target (G-34): `{props: {<key>: <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` (the module's current revision, which the app fills) under `graphic.props.<key>` — no schema, a prop the schema lacks and a prop its module marks `animate: false` (G-41) are each an `Err` naming the prop, and so are `name`, `width`, `height`, `in` and `length` — and its schema `type` written into `kinds`; a `kinds` in the patch is discarded. A number and a colour ramp, anything else — an `asset` included, `""` naming no image (G-42) — switches at the end. A prop the clip's own `props` lacks gets the schema's current default appended in the same step. `graphic: null` or `graphic.props: null` removes the group; a `null` prop removes it and its kind, unchecked. `graphic` in `off` is an `Err`: "graphic props cannot be keyed off; name the value a prop ends at in patch". `speed` (format 27, SR-10) is a media clip's rate as a fifth target, a number at the patch's top beside the groups, stored clamped to ×0.1–×1000; `null` removes it and `off` cannot name it. Any other JSON kind is an `Err` (`speed must be a number, not "fast"`), and so is a clip that is not a media clip. The clip keeps its start and duration (SR-2): an end rate that would read past the end of its media is refused naming the largest end rate that fits, floored to 0.001 (R1), or, when no rate down to ×0.1 fits, the latest clip end that fits at ×0.1 (R2); a `null` that would do so is refused naming the latest clip end that fits (R3). |
 //! | `remove_action` | Removes the action. Refused when the action's end names a `speed` and the clip would then read past the end of its media (R3, spec §11 SR-10), naming the latest clip end that fits. |
@@ -240,10 +241,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::edit_action_ramp::RampShape;
+use crate::edit_layout::LayoutSwitch;
 use crate::edit_paste_attributes::PasteGroup;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
+use crate::layout::{CameraLayout, LayoutCorner, LayoutShape};
 use crate::model::{
     CanvasBlending, CanvasOutput, Color, Curve, FadeShape, Project, TrackMatte, TransitionKind,
 };
@@ -582,6 +585,29 @@ pub enum Op {
         curve: Option<Curve>,
         #[serde(default)]
         hold: Option<f64>,
+    },
+    /// Camera layouts at the playhead (spec §11 CO-61): the fields are
+    /// `edit_layout.rs`'s `LayoutSwitch`, in the row's order.
+    SwitchLayout {
+        camera: u32,
+        #[serde(default)]
+        screen: Option<u32>,
+        layout: CameraLayout,
+        #[serde(default)]
+        shape: Option<LayoutShape>,
+        #[serde(default)]
+        corner: Option<LayoutCorner>,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        #[serde(default)]
+        curve: Option<Curve>,
+        #[serde(default)]
+        focus: Option<[f64; 2]>,
+        #[serde(default)]
+        nest: Option<bool>,
+        #[serde(default)]
+        through: Option<Ticks>,
     },
     SetAction {
         clip: u32,
@@ -961,6 +987,31 @@ impl Project {
                 curve,
                 hold,
             } => self.add_speed_ramp(*clip, *shape, *rate, *from, *to, *curve, *hold),
+            Op::SwitchLayout {
+                camera,
+                screen,
+                layout,
+                shape,
+                corner,
+                at,
+                duration,
+                curve,
+                focus,
+                nest,
+                through,
+            } => self.switch_layout(&LayoutSwitch {
+                camera: *camera,
+                screen: *screen,
+                layout: *layout,
+                shape: *shape,
+                corner: *corner,
+                at: *at,
+                duration: *duration,
+                curve: *curve,
+                focus: *focus,
+                nest: *nest,
+                through: *through,
+            }),
             Op::SetAction {
                 clip,
                 action,

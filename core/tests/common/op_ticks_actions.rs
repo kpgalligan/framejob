@@ -99,6 +99,38 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
                 ("/clips/0/actions/0/duration", json!(8 * f)),
             ],
         ),
+        // A camera alone in the bottom-right corner (spec §11 CO-60): on the
+        // 640 × 360 canvas a 640 × 360 source lands at x 208.
+        applied(
+            "switch_layout.at",
+            "at",
+            one.clone(),
+            json!({"op":"switch_layout","camera":10,"layout":"corner","at":off(13,f),
+                   "duration":5*f}),
+            vec![
+                ("/clips/0/actions/0/start", json!(4 * f)),
+                ("/clips/0/actions/0/duration", json!(5 * f)),
+            ],
+        ),
+        applied(
+            "switch_layout.duration",
+            "duration",
+            one.clone(),
+            json!({"op":"switch_layout","camera":10,"layout":"corner","at":12*f,
+                   "duration":off(4,f)}),
+            vec![
+                ("/clips/0/actions/0/start", json!(2 * f)),
+                ("/clips/0/actions/0/duration", json!(5 * f)),
+            ],
+        ),
+        applied(
+            "switch_layout.through",
+            "through",
+            pair.clone(),
+            json!({"op":"switch_layout","camera":10,"layout":"corner","at":12*f,
+                   "through":off(30,f)}),
+            vec![("/clips/1/video/x", json!(208.0))],
+        ),
         applied(
             "set_action.start",
             "start",

@@ -138,6 +138,11 @@ the same way.
 - **Expect:** the letters disappear behind you where you are and show where you are not, with no bright or dark halo or gap along your outline where the soft edge meets the letters, at Feather 0 and at 25 %; the room behind you stays whole.
 - **Source:** road map creator-jobs CO5, spec §11 CO-50, CO-51, CO-56 (`co5_proof.py` scores the cut on bar-code masks, never a real person's edge on screen).
 
+**JOB-64 — A layout switch reads as deliberate**
+- **Do:** On a screen recording with its camera on the "Camera" track (S-ST1 when it exists), put the playhead mid-sentence and choose Clip ▸ Camera Layout ▸ Circle ▸ Bottom Right, then a few seconds later Side by Side, then Camera Full, then Corner ▸ Bottom Right. Play it through.
+- **Expect:** each switch moves the camera and the screen together in half a second, easing out and in, and reads as a deliberate cut in the edit rather than a jump or a slow drift; the circle is round, the corners square or rounded as chosen, and nothing flashes at either end of a switch.
+- **Source:** road map creator-jobs CO6, spec §11 CO-60, CO-61, CO-67 (`co6_proof.py` scores the numbers, never how the move feels).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

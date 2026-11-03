@@ -330,6 +330,63 @@ at the action's end.
 *Agents:* `text_behind_subject {clip?, at?, content?}`, and `set_video
 {behind_subject: true}`.
 
+### Camera layouts
+
+A screen recording with a camera in front of it can switch between layouts as
+it plays. Put the playhead where the switch should happen and choose one from
+**Clip ▸ Camera Layout ▸**:
+
+- **Corner ▸**, **Rounded Corner ▸** and **Circle ▸**, each with **Bottom
+  Right**, **Bottom Left**, **Top Right** and **Top Left** — the camera in a
+  box a quarter of the canvas wide and a third tall, 5 % in from the edges, as
+  a recording lands it. Corner shows the whole camera picture with square
+  corners, Rounded Corner rounds them, and Circle crops the largest square of
+  the picture to a circle. The screen fills the canvas as Add Clip places it.
+- **Side by Side** — the screen fitted in the left two-thirds, the camera
+  cropped to fill the right third, with a margin around and between them and
+  slightly rounded corners.
+- **Stacked** — the screen across the top, the camera cropped to fill the rest
+  below it.
+- **Camera Full** — the camera fills the canvas.
+- **Screen Only** — the camera is hidden where it is (its opacity goes to 0),
+  and the screen fills the canvas.
+
+**Which clips:** with two clips with a picture selected on different tracks,
+the front one is the camera and the other the screen. With one selected, it is
+the camera and the screen is the clip drawing behind it at the playhead (the
+front-most one on a shown track that is not a matte track). With none
+selected, the camera is the clip at the playhead on the front-most track named
+"Camera" — the track a recording's camera lands on. The item is greyed when
+there is no such camera at the playhead, or a sheet is open. It works inside
+an open nest too. Side by Side and Stacked need a screen; the other three lay
+out a camera alone.
+
+**The switch** eases over half a second from the playhead — a layout action on
+each clip, which you see on its action lane and can retime like any other. At
+a clip's first frame it cuts instead: the layout becomes the clip's own
+placement there. Choosing another layout while one is still easing ends the
+first where the second begins. One **Undo** takes the whole switch back.
+
+**How far it reaches:** a layout holds until the next switch. Every later clip
+on the camera's track (and on the screen's) that starts before the next layout
+action on that track takes the layout as its own placement — so a camera cut
+into pieces stays in the corner — and keeps its own actions.
+
+**Zooms:** a switch never fights a zoom. When a clip it would move holds a zoom
+(or another action that moves it) after the playhead, the switch is refused,
+and the inspector's foot names the clip and the action. A screen that is
+still at its full placement is not asked in Corner, Camera Full and Screen
+Only, because those leave it where it is and its zooms keep playing. To lay out
+a zoomed screen anyway, nest its clips first (**Clip ▸ Nest**): the layout then
+moves the nest, and the zooms play inside it. Agents can ask for that nesting
+in the same step with `nest: true`. A nest clip shows square corners only, so
+Rounded Corner and Circle are refused on a nest clip camera.
+
+*Agents:* `switch_layout {camera, screen?, layout, shape?, corner?, at,
+duration?, curve?, focus?, nest?, through?}` — `focus` centres the camera's
+crop on a point of its picture, and `through` stops the layout holding at a
+time.
+
 ### Shadow
 
 A drop shadow cast by the layer's own shape: the picture, the letters of a

@@ -28,6 +28,7 @@ fn sample(kind: Kind) -> Value {
         Kind::Object => json!({}),
         Kind::Color => json!([0.0, 0.0, 0.0, 1.0]),
         Kind::FrameRate => json!([30, 1]),
+        Kind::Point => json!([0.0, 0.0]),
         Kind::Region => json!({"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}),
         Kind::Transition
         | Kind::Alignment
@@ -37,7 +38,10 @@ fn sample(kind: Kind) -> Value {
         | Kind::Output
         | Kind::Blending
         | Kind::RampShape
-        | Kind::FadeShape => {
+        | Kind::FadeShape
+        | Kind::Layout
+        | Kind::LayoutShape
+        | Kind::Corner => {
             json!(kind.values()[0])
         }
     }
@@ -92,11 +96,11 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 83, "optional inventory changed");
+    assert_eq!(seen.len(), 91, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }
-    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 75);
+    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 83);
 }
 
 #[test]

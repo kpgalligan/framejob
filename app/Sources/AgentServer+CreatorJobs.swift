@@ -58,6 +58,8 @@ extension AgentServer {
         "add_shortcut_overlays": { $0.addShortcutOverlays },
         // AgentServer+SpeedUpTyping.swift (CU9b, spec §11 CU-93)
         "speed_up_typing": { $0.speedUpTyping },
+        // AgentServer+Layout.swift (CO6, spec §11 CO-60…CO-66)
+        "switch_layout": { $0.switchLayout },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
@@ -79,7 +81,8 @@ extension AgentServer {
     /// `AgentCatalog+Cursor.swift`), then `auto_zoom` (CU7,
     /// `AgentCatalog+AutoZoom.swift`), then `add_shortcut_overlays` (CU8,
     /// `AgentCatalog+ShortcutOverlays.swift`), then `speed_up_typing` (CU9b,
-    /// `AgentCatalog+SpeedUpTyping.swift`).
+    /// `AgentCatalog+SpeedUpTyping.swift`), then the op tool `switch_layout`
+    /// (CO6, `AgentCatalog+Layout.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
@@ -91,6 +94,7 @@ extension AgentServer {
         tools += autoZoomTools()
         tools += shortcutOverlayTools()
         tools += speedUpTypingTools()
+        tools += layoutTools()
         return tools
     }
 }

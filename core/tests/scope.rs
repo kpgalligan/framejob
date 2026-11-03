@@ -647,7 +647,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use framejob_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 67, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 68, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -861,6 +861,12 @@ fn every_op() -> Vec<(&'static str, Value)> {
         (
             "add_speed_ramp",
             json!({"op":"add_speed_ramp","clip":13,"shape":"speed_dip","rate":0.5}),
+        ),
+        // The graphic clip as the camera at its middle; nothing draws
+        // behind it then, so the camera is laid out alone.
+        (
+            "switch_layout",
+            json!({"op":"switch_layout","camera":14,"layout":"camera_full","at":5*SEC+SEC/2}),
         ),
         (
             "set_action",

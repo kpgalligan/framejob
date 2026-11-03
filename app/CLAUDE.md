@@ -94,7 +94,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-six op tools.
+  `AgentCatalog.opTool` prints for all sixty-seven op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -785,6 +785,22 @@ detail there.
     crossing on the speech-applied handle before `performGroupedEdit`, and
     writes its own tail. Its catalog row is spliced in by `creatorTools()`
     after `add_shortcut_overlays`'.
+- `CameraLayout.swift` · `EditorViewController+Layout.swift` · `AgentServer+Layout.swift` ·
+  `AgentCatalog+Layout.swift` — Clip ▸ Camera Layout ▸ and `switch_layout` (road map
+  creator-jobs CO6, spec §11 CO-60…CO-66). `CameraLayout` (names no `rc_*`) holds the three
+  vocabularies (`CameraLayoutKind`, `CameraLayoutShape`, `CameraLayoutCorner`, the core's
+  members), `CameraLayoutChoice` and its `menuRows` (a menu item's tag is its index; Corner ▸,
+  Rounded Corner ▸ and Circle ▸ with four corners each, then Side by Side, Stacked, Camera
+  Full, Screen Only — built by `AppDelegate+ClipMenus.swift`'s `cameraLayoutMenu()`), and
+  `CameraLayoutRoles.roles`: two selected picture clips on different tracks (the front one
+  the camera), one (the camera; the core finds the screen), or none (the clip at the
+  playhead on the front-most track named "Camera"). `EditorViewController+Layout` is
+  `switchCameraLayout` (`applyEdit`, "Camera Layout", the playhead as `at`) and
+  `validateCameraLayoutAction`, one line in the frozen file after
+  `validateSpeedUpTypingAction` (a camera containing the playhead, no sheet; allowed inside
+  a nest). `AgentServer+Layout` is the op tool's handler (main thread, `editResult`; the
+  three required arguments read before an id is looked up), and `AgentCatalog+Layout` its
+  row, spliced in by `creatorTools()` after `speed_up_typing`'s.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -3776,7 +3792,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-six op tools is `opTool`'s** and carries no
+  **Every one of the sixty-seven op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -3812,7 +3828,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and nine
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and nineteen
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

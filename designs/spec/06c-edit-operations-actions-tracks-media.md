@@ -29,6 +29,32 @@ The rules every op shares are §6a; the clip ops are §6b.
   names its path (`bad value at "region.width"`). A non-finite or non-positive number is an
   **error** too — `region.width must be greater than 0` — because a zero-width region asks for an
   infinite scale.
+- **`switch_layout {camera, screen?, layout, shape="square", corner="bottom_right", at,
+  duration=0.5 s, curve="ease_in_out", focus=[0, 0], nest=false, through?}`** — A camera layout at
+  `at` (road map creator-jobs CO6, §11 CO-60…CO-65): the `camera` clip and the `screen` behind it
+  placed in `layout` — `corner` (`shape` square, rounded or circle; `corner` bottom_right,
+  bottom_left, top_right, top_left), `side_by_side`, `stacked`, `camera_full` or `screen_only` —
+  each role written all six placement keys (`x`, `y`, `scale`, `crop`, `corner_radius`,
+  `opacity`) as `core/src/layout.rs` solves them. Per role the clip under `at` gets a LAYOUT
+  ACTION at clip time `at − start` of `duration`, clamped to the clip and the next later layout
+  action on it, at least one frame; at its first frame the layout is its base plus a one-frame
+  layout action ending there. One starting at `at` is replaced, one running at `at` is shortened
+  to end there. The REACH runs to the first later layout action on the role's track, `through`,
+  or the track's end; every picture clip starting inside it takes the layout as its base and keeps
+  its actions. `screen` absent is the clip playing at `at` on the front-most shown, non-matte
+  track behind the camera's with a drawn picture; none lays out the camera alone. `focus` is the
+  camera crop's centre in source pixels from the uncropped centre, y down. **Errors**: a negative
+  `at`, a non-positive `duration`, `through` not after `at`, a non-finite `focus`. **Refused**, in
+  order: `clip {id} has no picture to lay out`, `clip {id} does not play at {timecode}` (the
+  camera, then a given screen), `the screen (clip {s}) must be on a track behind the camera's
+  (clip {c})`, `no clip draws behind clip {c} at {timecode} to be the screen` (side_by_side and
+  stacked), `clip {id} is a nest clip, which cannot draw a rounded corner or a circle.`, a role
+  clip in the reach with a non-layout action that moves it and ends after `at` — `The {screen|
+  camera} clip {id} at {timecode} {zooms|moves} (action {a}); nest the {role}'s clips so the
+  layout moves the nest and the {zoom|action} stays inside it.` (a screen at its full placement
+  is exempt in corner, camera_full and screen_only) — then `add_action`'s own. `nest: true`
+  nests the moving role's clips first and lays out the nest clip, refused `clip {id} is already
+  laid out; a nest would lay it out twice.` when one is. One undo step.
 - **`add_speed_ramp {clip, shape, rate, from?, to?, curve="ease_in_out", hold=0.5}`** — A speed
   ramp preset in one step, made of ordinary Speed actions (§11 SR-23, #340): `shape` is `ramp_up`,
   `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both or neither (the

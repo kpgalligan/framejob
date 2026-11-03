@@ -27,7 +27,7 @@
 //! for the schema of a kind would agree with any mapping at all. Its match
 //! is exhaustive for the reason every match on `Kind` in these tests is — a
 //! kind added to the table does not compile until this file says what JSON
-//! it is — and [`all_twenty_three_kinds_are_carried_by_an_argument`] is what
+//! it is — and [`all_twenty_seven_kinds_are_carried_by_an_argument`] is what
 //! stops a kind being published wrongly with no argument standing on it to
 //! notice. `tools/proof/op_schema_probe.py` carries a THIRD, of twelve
 //! representative rows: it is another process in another language reading
@@ -122,6 +122,10 @@ fn expected_kind(kind: Kind) -> Value {
         Kind::FrameRate => json!({
             "type": "array", "items": whole, "minItems": 2, "maxItems": 2,
         }),
+        Kind::Point => json!({
+            "type": "array", "items": {"type": "number"},
+            "minItems": 2, "maxItems": 2,
+        }),
         Kind::Transition
         | Kind::Alignment
         | Kind::Curve
@@ -130,7 +134,10 @@ fn expected_kind(kind: Kind) -> Value {
         | Kind::Output
         | Kind::Blending
         | Kind::RampShape
-        | Kind::FadeShape => {
+        | Kind::FadeShape
+        | Kind::Layout
+        | Kind::LayoutShape
+        | Kind::Corner => {
             json!({"type": "string", "enum": kind.values()})
         }
         Kind::Groups => json!({
@@ -305,12 +312,12 @@ fn every_argument_is_published_as_its_kind_says() {
 /// The test above only reaches a kind some argument HAS, so this is what
 /// says none is sitting unexercised: the number of DISTINCT kinds in use is
 /// `Kind`'s whole variant count, which by the pigeonhole is every one of
-/// them. The 23 is that variant count, written here because Rust will not
+/// them. The 27 is that variant count, written here because Rust will not
 /// count an enum's arms for a test; the exhaustive matches in
 /// `op_schema.rs` and in [`expected`] are what keep it honest, since a
 /// kind added to the vocabulary does not compile until both say what it is.
 #[test]
-fn all_twenty_three_kinds_are_carried_by_an_argument() {
+fn all_twenty_seven_kinds_are_carried_by_an_argument() {
     let mut kinds: Vec<Kind> = Vec::new();
     for op in &OP_TABLE {
         for argument in op.arguments {
@@ -319,12 +326,12 @@ fn all_twenty_three_kinds_are_carried_by_an_argument() {
             }
         }
     }
-    assert_eq!(kinds.len(), 23, "the kinds in use are {kinds:?}");
+    assert_eq!(kinds.len(), 27, "the kinds in use are {kinds:?}");
 }
 
 /// A closed vocabulary publishes its members and nothing else does — which
 /// is what makes "pick a legal value out of the schema" possible for the
-/// nine scalar vocabularies and the one list, and unfakeable for anything
+/// twelve scalar vocabularies and the one list, and unfakeable for anything
 /// else: an `enum` on an id would be a vocabulary the core has not got.
 #[test]
 fn only_a_closed_vocabulary_publishes_an_enum() {

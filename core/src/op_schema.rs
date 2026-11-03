@@ -146,6 +146,13 @@ fn schema_of_kind(kind: Kind) -> Value {
             "minItems": 2,
             "maxItems": 2,
         }),
+        // `switch_layout`'s `focus`: a point, two numbers (spec §11 CO-65).
+        Kind::Point => json!({
+            "type": "array",
+            "items": {"type": "number"},
+            "minItems": 2,
+            "maxItems": 2,
+        }),
         // A closed vocabulary's members, from the core's own list — the
         // `enum` an agent picks a legal value out of without guessing, and
         // the one part of a schema the catalog could never derive.
@@ -157,7 +164,10 @@ fn schema_of_kind(kind: Kind) -> Value {
         | Kind::Output
         | Kind::Blending
         | Kind::RampShape
-        | Kind::FadeShape => {
+        | Kind::FadeShape
+        | Kind::Layout
+        | Kind::LayoutShape
+        | Kind::Corner => {
             json!({"type": "string", "enum": kind.values()})
         }
         Kind::Groups => json!({

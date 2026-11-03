@@ -688,3 +688,34 @@ fn every_refusal_in_order() {
         "state reads one cursor track; 2 were given"
     );
 }
+
+#[test]
+fn replace_removes_no_layout_action() {
+    // CO6's layout actions name all six placement keys (spec §11 CO-63), so
+    // `is_zoom` never holds for one and Replace leaves every one in place —
+    // here the ones `switch_layout` writes, a cut at the first frame and a
+    // switch later on.
+    let handle = one_clip(json!({}), json!([]))
+        .apply(&json!({"op": "switch_layout", "camera": 10, "layout": "camera_full", "at": 0}))
+        .apply(
+            &json!({"op": "switch_layout", "camera": 10, "layout": "corner",
+                       "at": 15 * SEC}),
+        );
+    let layouts: Vec<Value> = handle.value()["clips"][0]["actions"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(layouts.len(), 2);
+    let track = Track::open(&z1_file());
+    let answer = plan(&handle, &[&track], json!({"clips": [10], "replace": true}));
+    assert_eq!(answer["replaced"], 0);
+    assert!(ops(&answer).iter().all(|o| o["op"] != "remove_action"));
+    let after = handle.apply_all(&ops(&answer));
+    let kept = after.value()["clips"][0]["actions"]
+        .as_array()
+        .unwrap()
+        .clone();
+    for layout in &layouts {
+        assert!(kept.contains(layout), "{layout} was removed");
+    }
+}

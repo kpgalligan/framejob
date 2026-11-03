@@ -678,6 +678,9 @@ fn op_table() -> Vec<Value> {
         // actions ending at ×0.5 and back at ×1.
         json!({"op": "add_speed_ramp", "clip": 10, "shape": "speed_dip", "rate": 0.5,
                "from": 2400000, "to": 4800000}),
+        // Clip 46 on the front track is the camera, the nest clip 41 behind
+        // it the screen, side by side at 1 s.
+        json!({"op": "switch_layout", "camera": 46, "layout": "side_by_side", "at": 600000}),
         json!({"op": "set_action", "clip": 10, "action": 11, "curve": "linear"}),
         json!({"op": "set_action_end", "clip": 10, "action": 11,
                "patch": {"video": {"opacity": 0.2}}}),

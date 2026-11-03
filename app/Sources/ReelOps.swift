@@ -1098,6 +1098,32 @@ extension ReelOp {
         return ReelOp(name: "add_speed_ramp", args: a.values)
     }
 
+    /// A camera layout at `at` (spec §11 CO-60…CO-65): the camera clip and
+    /// the screen behind it (the core finds one when nil) placed and eased
+    /// in one layout action each. Every nil is omitted, so the core's
+    /// defaults apply — 0.5 s, `ease_in_out`, square, bottom right, focus at
+    /// the centre, no nest, the reach to the next switch.
+    static func switchLayout(
+        camera: UInt32, screen: UInt32? = nil, layout: CameraLayoutKind,
+        shape: CameraLayoutShape? = nil, corner: CameraLayoutCorner? = nil, at: Ticks,
+        duration: Ticks? = nil, curve: Curve? = nil, focus: (Double, Double)? = nil,
+        nest: Bool? = nil, through: Ticks? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("camera", camera)
+        a.put("screen", screen)
+        a.put("layout", layout.rawValue)
+        a.put("shape", shape?.rawValue)
+        a.put("corner", corner?.rawValue)
+        a.put("at", at)
+        a.put("duration", duration)
+        a.put("curve", curve?.rawValue)
+        a.put("focus", focus.map { [$0.0, $0.1] })
+        a.put("nest", nest)
+        a.put("through", through)
+        return ReelOp(name: "switch_layout", args: a.values)
+    }
+
     /// Moves or re-curves an action; the same overlap checks apply.
     static func setAction(
         clip: UInt32, action: UInt32, start: Ticks? = nil, duration: Ticks? = nil,

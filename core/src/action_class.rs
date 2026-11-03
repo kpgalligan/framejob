@@ -1,7 +1,7 @@
 //! Actions classed by content, with no tag (spec §11 CU-73, CO-63; CJ-8
 //! (i)): what an action's end patch DOES, read from its keys. Auto Zoom's
-//! Replace removes only zooms (`cursor_zoom.rs`); CO6's layouts read
-//! `is_layout` and `moves`.
+//! Replace removes only zooms (`cursor_zoom.rs`); CO6's `switch_layout`
+//! (`edit_layout.rs`, `edit_layout_reach.rs`) reads `is_layout` and `moves`.
 //!
 //! - A **zoom** is an end whose `video` keys are exactly `scale`, `x` and
 //!   `y`, naming no other group (an empty `audio` or `text`, or a `graphic`
@@ -53,8 +53,8 @@ pub(crate) fn is_zoom(action: &Action) -> bool {
 }
 
 /// A layout action: its `video` names all six placement keys. CO6's
-/// `switch_layout` is its first reader (CO-63); CU7 only defines it.
-#[allow(dead_code)]
+/// `switch_layout` is its reader (CO-63): the action it replaces, shortens
+/// or stops its reach at, and the mover it never refuses.
 pub(crate) fn is_layout(action: &Action) -> bool {
     video(action).is_some_and(|v| PLACEMENT_KEYS.iter().all(|k| v.contains_key(*k)))
 }

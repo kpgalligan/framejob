@@ -50,7 +50,7 @@
 //! [`Kind::Text`], [`Kind::Texts`], [`Kind::Ids`] and [`Kind::Ranges`] are
 //! `Ticks`, `f64`, `bool`, `String`, `Vec<String>` (`set_action_end`'s
 //! `off` paths), `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`, and
-//! the fifteen named types map like this:
+//! the nineteen named types map like this:
 //!
 //! - [`Kind::Id`] — `u32`: an id naming a clip, track, action, marker or
 //!   media, and the canvas's two pixel dimensions, which are the same whole
@@ -70,6 +70,12 @@
 //!   picking a legal value out of a schema is a reason this table exists.
 //!   [`Kind::Groups`] is `Vec<PasteGroup>`, the one vocabulary arriving
 //!   as a list.
+//! - [`Kind::Layout`], [`Kind::LayoutShape`] and [`Kind::Corner`] —
+//!   `CameraLayout`, `LayoutShape`, `LayoutCorner`: `switch_layout`'s three
+//!   closed vocabularies (spec §11 CO-60), members in [`Kind::values`].
+//!   [`Kind::Point`] is `[f64; 2]`, its `focus`: two numbers, whose LENGTH
+//!   serde refuses like a colour's and whose members it names as `f64`
+//!   where a frame rate's are `u32`.
 //! - [`Kind::Region`] — `ZoomRegion`, `add_zoom_action`'s four numbers. NOT
 //!   an opaque object: it is a caller-authored object whose members the
 //!   core declares and refuses by name (`edit_zoom.rs`), so a later schema
@@ -89,7 +95,7 @@ pub use crate::op_rows::{OP_NAMES, OP_TABLE};
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 67;
+pub const OP_COUNT: usize = 68;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -160,6 +166,10 @@ pub enum Kind {
     Blending,
     RampShape,
     FadeShape,
+    Layout,
+    LayoutShape,
+    Corner,
+    Point,
 }
 
 impl Kind {
@@ -198,8 +208,17 @@ impl Kind {
             Blending => &["encoded", "linear"],
             RampShape => &["ramp_up", "ramp_down", "speed_dip", "speed_burst"],
             FadeShape => &["linear", "s_curve", "plus_3db", "minus_3db"],
+            Layout => &[
+                "corner",
+                "side_by_side",
+                "stacked",
+                "camera_full",
+                "screen_only",
+            ],
+            LayoutShape => &["square", "rounded", "circle"],
+            Corner => &["bottom_right", "bottom_left", "top_right", "top_left"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
-            | Color | FrameRate | Region => &[],
+            | Color | FrameRate | Region | Point => &[],
         }
     }
 }

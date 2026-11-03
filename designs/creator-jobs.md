@@ -9886,6 +9886,106 @@ CJ6's to speed up.
   CO-62's offer versus nesting the screen automatically on the first switch? *Recommended: the
   offer* — a nest changes how every later edit of the screen works and should be seen being made.
 
+#### CO6's record (2026-11-03)
+
+**Built.** Lane B, base `20f16a76` (I's HEAD). The decisions first, committed alone: CO-60…CO-67
+appended to `creator-jobs-8.md` (96 → 220 lines) with their index rows between CO-56 and CO-100.
+Then the core, then the app, the proof and the documents. One op, `switch_layout` (`OP_COUNT`
+68), one op tool (119 product tools); no persisted field, no format bump, no `rc_*` export;
+nothing sent anywhere, so nothing keyed (CJ-3). The owner's answers: 0.5 s `ease_in_out`; the
+nest offered, not automatic (the refusal's sentence says how; CO7's sheet makes the offer).
+
+- **The core.** `layout.rs` (CO-60's geometry, pure: the three vocabularies, `LayoutChoice`,
+  `Placement`, `holds_full`, `full_placement`, `screen_placement`, `camera_placement`, the
+  constants); `edit_layout.rs` (`LayoutSwitch`, `switch_layout`: the roles, the nest-clip
+  refusal, `nest: true` and the laid-out refusal, the composition); `edit_layout_reach.rs` (cut
+  beside it for the 400-line cap the spec allowed: a `Role` and its reach, the mover refusal with
+  the full-placement screen's exemption, `laid_out`). `action_class.rs`'s `is_layout` lost its
+  `#[allow(dead_code)]`. Four kinds (`Layout`, `LayoutShape`, `Corner`, `Point`), the row after
+  `add_speed_ramp`, the `Op` arm and dispatch, `scope.rs`'s "everything else" arm (fifty-six
+  ops work inside a nest).
+- **The app.** `CameraLayout.swift` (the vocabularies, `CameraLayoutChoice.menuRows`, the role
+  rule), `ReelOps.switchLayout`, `cameraLayoutMenu()` in `AppDelegate+ClipMenus.swift` and its
+  three lines in `AppDelegate+Menus.swift` after Remove Background,
+  `EditorViewController+Layout.swift` (the action through `applyEdit` "Camera Layout", the
+  validator, one line in the frozen file after `validateSpeedUpTypingAction`), the
+  `UIMenuTable` and `inventory.json` rows, `AgentServer+Layout.swift` (through `editResult`),
+  `AgentCatalog+Layout.swift` (after `speed_up_typing`'s row), the prompt's actions topic.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/layout.rs` · `edit_layout.rs` · `edit_layout_reach.rs` | 400 · 364 · 170 | new |
+| `core/tests/layout.rs` | 968 | new: 24 tests |
+| `app/Sources/CameraLayout.swift` · `EditorViewController+Layout.swift` | 128 · 41 | new |
+| `app/Sources/AgentServer+Layout.swift` · `AgentCatalog+Layout.swift` | 52 · 68 | new |
+| `tools/proof/co6_proof.py` · `co6_probe.swift` | 780 · 70 | new: L1–L13, Z1 |
+| `app/Sources/AppDelegate+Menus.swift` | 500 → 503 | three lines |
+
+**Deviations.** (1) The four-step core test puts the zoom at 40 s, not 10 s: CO-62 refuses a
+mover that ENDS after `at`, and a zoom at 10–11 s ends before a switch at 30 s, so the test's
+order is corner at 2 s, a zoom at 40 s, side by side at 30 s. (2) `Placement::to_json` takes
+`self` by value (clippy's `wrong_self_convention` on a `Copy` type), where the spec wrote
+`&self`. (3) The kind count in `op_schemas.rs` (23 → 27, the test renamed
+`all_twenty_seven_kinds_…`) and `op_table.rs`'s "fifteen named types" (now nineteen) moved with
+the four new kinds. (4) "A camera that is or would become a nest clip" is checked on every
+camera-role clip in the reach, not only the one under `at`. (5) The tool reads its three
+required arguments before it looks an id up, so `op_argument_proof.py`'s left-out rows see each
+named as missing (its first Release run failed that row with "No clip has id 0").
+
+**Measured.**
+
+- `cargo test --release --test layout` 24 passed; `--test auto_zoom layout` 1 passed;
+  `--test scope --test edit_tests --test op_table --test op_schemas --test op_nullability
+  --test op_ticks` 53, 24, 10, 8, 6, 38 passed (op ticks 51 primary + 5 branch vectors). `make
+  lint` exit 0; `cargo fmt`.
+- `make typecheck` exit 0, the 4 baseline warnings; `swift_build.py typecheck co6_probe.swift`
+  exit 0; `inventory.py --check` 5/5; `spec_index_proof.py` 258/258;
+  `assistant_prompt_proof.py --probe` 14/14.
+- Debug `co6_proof.py`: the first run stopped at `set_canvas`'s "made no change" for a canvas
+  already 1920 × 1080 (an instrument fault); the second scored 11/14 (L1 and L2 found the
+  packages the first run left open, so L11 had no projects); with `Doc` closing what it opened,
+  `--only L1,L2,L11` 4/4, Z1 empty. The other rows passed on Debug in the second run.
+- `make gate`: "gate: PASS 473s" (names 1, typecheck 8, fmt 3, lint 9, test 278, app 172; test
+  2225 passed, 0 failed); then, after the tool's argument order (deviation 5), "gate: PASS 334s"
+  (fmt and lint skipped as unchanged, test 163, app 162; 2225 passed).
+- Release (the gate's app): `RC_PROOF_APP=release co6_proof.py` 14/14 on its own launch, Z1
+  empty; on one Release instance `op_argument_proof.py` 196/196, `op_catalog_proof.py` 23/23,
+  `v2_menu.py --only H` 5/5, `co6_proof.py` 14/14, `grep "Frame Job: "` empty.
+- Mutants through `co6_proof.py --mutant` (the core's in a copy under `cargo test --release
+  --test layout`), each CAUGHT, exit 1: `exemption-dropped` by
+  `a_full_placement_screen_with_zooms_takes_a_corner_and_keeps_them`; `reach-stops-at-zoom` by
+  `a_later_zoom_refuses_and_nest_true_nests_like_nest_then_switch` and
+  `a_laid_out_clip_refuses_the_nest`; `reach-past-layout` by
+  `the_reach_carries_to_later_clips_and_stops_at_a_layout_action` and the mid-clip test;
+  `reach-first-clip-only` by the reach test and `through_ends_the_reach`; `end-missing-key` by
+  every placement test; `first-frame-marker-dropped` by `a_first_frame_switch_is_a_cut`;
+  `through-ignored` by `through_ends_the_reach`; `circle-radius-uncropped` by
+  `circle_crops_the_largest_square_and_rounded_takes_its_radius`; `roles-swapped` (a built
+  Release copy, 178 s) by L12's two-selected case, "the menu item changed nothing". Its first
+  run was caught too, but by a cascade: the instrument undid a step the refused menu item never
+  made. `menu_twin` now scores an unchanged project and stops; L12 was re-run on Release after
+  that edit (2/2 with Z1) and the mutant again.
+
+**Review.** Verdict pass, no blocker or should-fix: the geometry checked against CO-60 (the
+corner box, the circle's square crop and half-side radius, the rounded radius over the scale,
+side by side, stacked, (★) in `place`, the focus crop's direction) and the switch against
+CO-61, CO-62 and CO-64 (replace, shorten, add; the clamps; the first-frame marker; the reach and
+`ender` out of the nest; the mover filter; the exemption only in `screen_full()` layouts;
+`laid_out` by placement; the refusal order). Two nits, both left as built: (1) `stacked` sizes
+every camera reach clip's box from the screen under `at` (`edit_layout.rs`'s `screen_size`), so
+a later screen clip of another aspect leaves its camera's box overlapping it or short of it —
+same-aspect sources are unaffected; (2) `AgentServer+Layout.swift` reads `at` twice, harmlessly.
+
+**Integrated.** Cherry-picked clean onto `20f16a76`. The CLAUDE.md edits applied: the root's
+gate count and `app/CLAUDE.md`'s (one hundred and nineteen product tools; the latter stood at
+one hundred and nine), sixty-seven op tools (`app/CLAUDE.md` twice, `core/CLAUDE.md`), the
+twenty-seven kinds, `is_layout`'s reader, and the new entries for `layout.rs`,
+`edit_layout.rs` · `edit_layout_reach.rs` and the four Swift files.
+
+**Owed.** JOB-64 (the owner's). Review nit (1), the stacked box for a later screen of another
+aspect: a CO-60 limit to record, or solve a later camera's box against the screen clip playing
+at that clip's start.
+
 ### SW0 — measuring several 4K angles
 
 Bet 5 opens here. Its switching phases run last in lane C, its audio-track phases at the end of lane

@@ -111,6 +111,7 @@ fn value_of(kind: Kind) -> Value {
         Kind::Object => json!({}),
         Kind::Color => json!([0.0, 0.0, 0.0, 1.0]),
         Kind::FrameRate => json!([30, 1]),
+        Kind::Point => json!([0.0, 0.0]),
         Kind::Region => json!({"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}),
         Kind::Groups => json!([]),
         Kind::Transition
@@ -121,7 +122,10 @@ fn value_of(kind: Kind) -> Value {
         | Kind::Output
         | Kind::Blending
         | Kind::RampShape
-        | Kind::FadeShape => {
+        | Kind::FadeShape
+        | Kind::Layout
+        | Kind::LayoutShape
+        | Kind::Corner => {
             json!(kind.values()[0])
         }
     }
@@ -150,6 +154,10 @@ fn wrong_values(kind: Kind) -> Vec<(Value, String)> {
         Kind::Texts => vec![wrong(json!("x"), "expected a sequence")],
         Kind::Color => vec![wrong(json!("white"), "expected an array of length 4")],
         Kind::FrameRate => vec![wrong(json!("thirty"), "expected an array of length 2")],
+        Kind::Point => vec![
+            wrong(json!("centre"), "expected an array of length 2"),
+            wrong(json!(["a", 0]), "expected f64"),
+        ],
         Kind::Region => vec![wrong(json!([0, 0, 1, 1]), "expected an object, not")],
         Kind::Groups => vec![wrong(json!("video"), "expected a sequence")],
         Kind::Object => vec![],
@@ -161,7 +169,10 @@ fn wrong_values(kind: Kind) -> Vec<(Value, String)> {
         | Kind::Output
         | Kind::Blending
         | Kind::RampShape
-        | Kind::FadeShape => {
+        | Kind::FadeShape
+        | Kind::Layout
+        | Kind::LayoutShape
+        | Kind::Corner => {
             vec![wrong(json!(5), "expected string or map")]
         }
     }

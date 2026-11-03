@@ -575,6 +575,13 @@
    ],
    "note": "an edit"
   },
+  "switchCameraLayout:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Layout.swift `func switchCameraLayout(`"
+   ],
+   "note": "an edit"
+  },
   "addSolidColorBackground:": {
    "verdict": "none",
    "code": [

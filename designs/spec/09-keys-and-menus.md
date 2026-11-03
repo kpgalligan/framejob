@@ -179,7 +179,15 @@ creator-jobs CO3, §11 CO-30 (e): enabled when the selection in the open scope h
 or still clip of a video file with pictures; checked when every such clip has Remove
 Background on, a dash when some do; all on turns every one off, otherwise the ones without
 it on, each clip's own values kept; one undo step "Remove Background"; no key equivalent, the
-owner's answer; its mirrors are `set_video`'s `cutout` and `analyze_cutout`), Add Background ▸ (Solid Color · Image… — road map
+owner's answer; its mirrors are `set_video`'s `cutout` and `analyze_cutout`), Camera Layout ▸
+(road map creator-jobs CO6, §11 CO-66: Corner ▸, Rounded Corner ▸ and Circle ▸, each Bottom
+Right · Bottom Left · Top Right · Top Left, a separator, then Side by Side · Stacked · Camera
+Full · Screen Only; one selector, `switchCameraLayout:`; two selected picture clips on
+different tracks are the camera (the front one) and the screen, one is the camera and the core
+finds the screen, none takes the clip at the playhead on the front-most track named "Camera";
+enabled when that yields a camera containing the playhead and no sheet is up; `switch_layout`
+at the playhead, one undo step "Camera Layout", a refusal in the inspector's refusal strip; no
+key equivalent; its mirror is `switch_layout`), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a
