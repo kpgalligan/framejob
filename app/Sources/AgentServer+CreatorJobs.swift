@@ -75,6 +75,7 @@ extension AgentServer {
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
         "new_project_from_range", "analyze_cutout", "get_cursor_events", "auto_zoom",
         "add_shortcut_overlays", "speed_up_typing", "switch_layout", "reframe_clip",
+        "switch_by_speaker",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`

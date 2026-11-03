@@ -7,7 +7,9 @@ import Foundation
 /// `copy_pieces` is the op it writes with, one op, one undo step "Copy
 /// Pieces". And `switch_by_speaker` (SW2b, spec §11 SW-23, SW-26), mirroring
 /// Clip ▸ Switch by Speaker… (`SwitchSpeakerSheetController`) through the same
-/// `SpeakerSwitch.read`, `plan` and `edit`, one undo step "Switch by Speaker".
+/// `SpeakerSwitch.read`, `plan` and `edit`, one undo step "Switch by Speaker";
+/// since SW8 (spec §11 SW-86) off main, waiting for a faces mode's missing faces
+/// where the menu shows the Analyzing sheet.
 extension AgentServer {
 
     func copyPieces(_ a: [String: Any]) throws -> String {
@@ -64,14 +66,63 @@ extension AgentServer {
         }
     }
 
-    // MARK: - switch_by_speaker (SW2b)
+    // MARK: - switch_by_speaker (SW2b, SW8)
 
-    /// SW-26 (c): the container `set_scope` has open, no `scope` key, on the main thread,
-    /// committed through `performGroupedEdit`. Argument errors first, then `read`, Replace's
-    /// track, `plan` and `edit`; `apply: false` answers the same without editing.
+    /// What the first hop resolved: the document, the values, and the project and scope the
+    /// call read, which the last hop requires unchanged (SW-86).
+    private struct SpeakerCall {
+        let document: ProjectDocument
+        let settings: SpeakerSwitch.Settings
+        let pairing: SpeakerSwitch.Pairing?
+        let range: (from: Ticks, to: Ticks)?
+        let track: UInt32?
+        let asked: ReelProject
+        let scope: UInt32?
+    }
+
+    /// SW-26 (c) as SW-86 amends it: on the server thread (`creatorOffMainTools`), the container
+    /// `set_scope` has open, no `scope` key. One main hop reads the arguments, `read` and the faces
+    /// the store still misses; with none it plans and edits in that hop. Otherwise the call wants
+    /// them under an owner of its own and waits at most `AnalysisLane.callWaitLimit`, then a last
+    /// hop refuses a changed project or scope, reads again and runs SW2b's sequence: Replace's
+    /// track, `plan` and `edit`, `apply: false` answering without editing, one
+    /// `performGroupedEdit`.
     func switchBySpeaker(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
+        guard !Thread.isMainThread else {
+            throw ToolError(
+                message: "switch_by_speaker must run on the server thread — its name is missing "
+                    + "from AgentServer.creatorOffMainTools.")
+        }
+        let (call, wants, answer): (SpeakerCall, [SpeakerSwitch.FacesWant], String?) = try onMain {
+            let call = try speakerCall(a)
+            let input = try speakerInput(call)
+            let wants: [SpeakerSwitch.FacesWant]
+            do {
+                wants = try SpeakerSwitch.facesWanted(input, in: call.document)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+            guard wants.isEmpty else { return (call, wants, nil) }
+            return (call, wants, try finishSpeakerSwitch(a, call, input))
+        }
+        if let answer { return answer }
+        try waitForFaces(wants, document: call.document, stop: stop)
+        return try onMain {
+            guard call.document.project === call.asked, call.document.scope == call.scope else {
+                throw ToolError(
+                    message: "the project changed while \(SpeakerSwitch.actionName) was "
+                        + "analyzing, so nothing was switched. Call switch_by_speaker again.")
+            }
+            return try finishSpeakerSwitch(a, call, try speakerInput(call))
+        }
+    }
+
+    /// SW-26 (c)'s arguments and errors, and the pairing: a named `wide` without `speakers` drops
+    /// a shared-microphone speaker on it (SW-83); `min_shot` absent is 3 s in the faces mode.
+    private func speakerCall(_ a: [String: Any]) throws -> SpeakerCall {
         let document = try target(a)
-        let settings = try speakerSettings(a)
+        var settings = try speakerSettings(a)
         let fps = document.editedProject.snapshot.canvas.fps
         let from = try intArg(a, "from").map { ReelTime.snapToFrame(Ticks($0), fps: fps) }
         let to = try intArg(a, "to").map { ReelTime.snapToFrame(Ticks($0), fps: fps) }
@@ -138,17 +189,41 @@ extension AgentServer {
             pairing = SpeakerSwitch.Pairing(speakers: speakers, wide: wide)
         } else {
             pairing = wideNamed
-                ? SpeakerSwitch.Pairing(speakers: implied.pairing.speakers, wide: wide) : nil
+                ? SpeakerSwitch.withoutWide(
+                    SpeakerSwitch.Pairing(speakers: implied.pairing.speakers, wide: wide)) : nil
+        }
+        if a["min_shot"] == nil || a["min_shot"] is NSNull,
+            SpeakerSwitch.mode(pairing ?? implied.pairing) == .faces
+        {
+            settings.minShot = FaceActivity.minShot  // SW-82
         }
         let range = from.flatMap { f in to.map { (from: f, to: $0) } }
+        return SpeakerCall(
+            document: document, settings: settings, pairing: pairing, range: range, track: track,
+            asked: document.project, scope: document.scope)
+    }
+
+    private func speakerInput(_ call: SpeakerCall) throws -> SpeakerSwitch.Input {
         guard
             let input = SpeakerSwitch.read(
-                from: document, clips: nil, pairing: pairing, range: range, settings: settings)
+                from: call.document, clips: nil, pairing: call.pairing, range: call.range,
+                settings: call.settings)
         else {
             throw ToolError(
                 message: "The project's audio plan could not be read, so Switch by Speaker "
                     + "cannot run. Try again in a moment.")
         }
+        return input
+    }
+
+    /// SW2b's sequence over `input`, main thread: Replace's track, `plan`, `edit`, then the edit
+    /// unless `apply` is false, and the answer with SW-86's `mode` and, in the faces mode, `note`.
+    private func finishSpeakerSwitch(
+        _ a: [String: Any], _ call: SpeakerCall, _ input: SpeakerSwitch.Input
+    ) throws -> String {
+        let document = call.document
+        let track = call.track
+        let snapshot = document.editedProject.snapshot
         let refused = "Switch by Speaker was refused: "
         if let track,
             let why = SpeakerSwitch.replaceRefusal(
@@ -200,7 +275,46 @@ extension AgentServer {
             "project": summary(document),
         ]
         if apply { fields["step"] = SpeakerSwitch.actionName }
+        let mode = SpeakerSwitch.mode(input.pairing)
+        fields["mode"] = mode.rawValue
+        if mode == .faces { fields["note"] = FaceActivity.hedge }
         return try jsonResult(fields)
+    }
+
+    /// Wants every request under an owner of the call's own and waits (`waitForShots`' shape);
+    /// throws naming the first media not landed when one failed, the call was stopped, or the
+    /// bound passed (SW-86).
+    private func waitForFaces(
+        _ wants: [SpeakerSwitch.FacesWant], document: ProjectDocument, stop: AgentCallCancel?
+    ) throws {
+        let lane = AnalysisLane.shared
+        let requests = wants.map(\.request)
+        let owner = lane.newOwner()
+        defer { lane.release(owner: owner) }
+        lane.want(
+            requests, owner: owner,
+            alive: { document.isOpenForAnalysis && !(stop?.isCancelled ?? false) },
+            settled: { document.packageContentsDidChangeOnDisk() })
+        let outcome = lane.wait(
+            for: requests, owner: owner,
+            deadline: Date().addingTimeInterval(AnalysisLane.callWaitLimit),
+            cancelled: { stop?.isCancelled ?? false })
+        let open = wants.first { lane.run(of: $0.request)?.outcome != .landed } ?? wants[0]
+        let media = open.media.id
+        switch outcome {
+        case .landed: return
+        case .failed(let why):
+            throw ToolError(message: "The faces analysis of media \(media) failed: \(why).")
+        case .cancelled:
+            throw ToolError(
+                message: "The faces analysis of media \(media) was stopped before it finished, "
+                    + "so nothing was switched.")
+        case .timedOut:
+            throw ToolError(
+                message: "The faces analysis of media \(media) did not finish in the "
+                    + "\(Int(AnalysisLane.callWaitLimit)) s a call waits; what it covered is "
+                    + "kept — call switch_by_speaker again to continue.")
+        }
     }
 
     /// SW-26's numbers and `crosstalk`, each refused outside its range in auto_zoom's form.

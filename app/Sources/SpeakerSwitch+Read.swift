@@ -4,7 +4,8 @@ import Foundation
 /// `AudioSync.read`: the edited project's snapshot and plan, and each
 /// microphone's loudness and speech caches, read onto the range's 10 ms grid
 /// through `ClipLevelSeries`. A missing cache file is "still being analysed",
-/// never silence.
+/// never silence. In the faces mode (SW8) it also reads each face speaker's
+/// angle through `readFaces` (`SpeakerSwitch+Faces.swift`).
 extension SpeakerSwitch {
     /// `clips` nil: the document's selection. `pairing` nil: SW-20's
     /// defaults. `range` nil: the In–Out range, else the selected angle
@@ -128,9 +129,18 @@ extension SpeakerSwitch {
                 "Speech detection is unavailable on this Mac, so Switch by Speaker cannot tell "
                     + "who is talking.")
         }
+        // SW-84: the faces mode's angles, their problems after the microphones'.
+        var faces: [FaceAngle] = []
+        if mode(pairing) == .faces {
+            let read = readFaces(
+                from: document, angles: angles, pairing: pairing, from: span.0, count: count)
+            faces = read.faces
+            problems += read.problems
+        }
         return Input(
             from: span.0, to: span.1, fps: snapshot.canvas.fps, angles: angles,
             microphones: microphones, pairing: pairing, problems: problems,
-            clipCount: ShotSplit.clipCount(document.project.snapshot), settings: settings)
+            clipCount: ShotSplit.clipCount(document.project.snapshot), settings: settings,
+            faces: faces)
     }
 }

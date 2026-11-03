@@ -230,6 +230,8 @@ CJ2a took CJ-27 for `analysis_job`.
   **Amended by CO-6 (CO0):** pending, cancelled and failed mask chunks draw the clip uncut; a
   render-substituted kind (`masks`) shows no Analyzing sheet; and a command that plans from masks
   reads only what is cached.
+  **Amended by SW-84 (SW8, 2026-11-03):** Switch by Speaker's faces mode is a third reader of the
+  store; its menu shows this sheet for missing `faces` and its tool waits (SW-85, SW-86).
 - **CJ-29 — Clip ▸ Split at Shot Changes and `split_at_shots {clips?}`.** A target is a media clip
   whose media is a video (`kind` `video`, `hasVideo`) and whose `enabled.video` is true; any other
   clip in the selection or `clips` is skipped (answered under `skipped`). The menu item validates on

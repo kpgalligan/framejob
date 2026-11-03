@@ -90,6 +90,24 @@ whole length. The four values Minimum shot, Cut, Crosstalk shows and Ignore
 bleed are remembered for the next time. Switch by Speaker works inside an open
 nest and has no keyboard shortcut.
 
+**One microphone for everyone.** When the selection holds exactly one
+microphone and two or more cameras, Switch by Speaker decides who talks from
+the cameras' pictures instead: while the microphone hears speech, the camera
+whose person's mouth moves most is shown — the largest face in each camera,
+its mouth opening and closing over half a second, at least half as much again
+as the next camera's — and when two mouths move alike it is crosstalk. It
+reads Frame Job's on-device face analysis of each camera; when a camera's
+faces have not been found yet, an **Analyzing** sheet finds them first (Stop
+leaves everything as it was, and what was found is kept), then the Switch by
+Speaker sheet opens. That sheet has one **Microphone** pop-up and lists the
+**Cameras**; there is no Ignore bleed row, and **Minimum shot** opens at 3 s
+and is not remembered. Choose a **Wide** to show it during crosstalk: the wide
+camera then takes no part in deciding who talks. The summary starts "Faces
+guess who is talking; check the cuts." — mouths that move without speaking
+(laughing, chewing, a hand over the mouth) or a face turned away can put a
+cut in the wrong place, so look through the result and fix shots with Switch
+Angle.
+
 **A limit, measured.** With heavy bleed in a noisy room (another voice 24 dB
 down under −45 dBFS of noise), a cut can come later than Cut before speech
 asks — in the worst case measured, about 35 ms before the first word instead
@@ -150,4 +168,9 @@ Three MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
   `bleed_db`, `wide_after`, `mute_cameras`, `track` to replace, `wide`, and
   `speakers` `[{mic, angle}]` to pair people by hand), plus `min_turn` (the
   shortest turn that cuts, 1 s) and `dominance_db` (8 dB), which the sheet does
-  not show. `apply: false` answers the shots without editing.
+  not show. `apply: false` answers the shots without editing. Every answer says
+  which `mode` ran, `microphones` or `faces` (one microphone for everyone), and
+  in the faces mode a `note` that the cuts are a guess; `min_shot` is 3 s there
+  unless given. Where the sheet would show the Analyzing sheet, the tool waits
+  for the faces up to 60 seconds, and past that is refused with what it found
+  kept — call it again to continue.

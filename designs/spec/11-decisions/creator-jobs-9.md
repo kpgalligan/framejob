@@ -192,6 +192,8 @@ and SW2a lands second adds it.
     clips are silent and not covered.
   - The switch trusts the placement and does not check sync (the guide says to run Synchronize
     Audio first).
+  *Amended by SW-83 (SW8, 2026-11-03):* one microphone with two or more angles pairs every angle,
+  front first, with it and no wide (the faces mode).
 - **SW-21 — A microphone is active when its voice is its own** (`SpeakerSwitch.labels`,
   `ClipLevelSeries`).
   - Energy: e(k) is `ClipLoudness.energy` (the K-weighted mean square through the clip's
@@ -300,6 +302,8 @@ and SW2a lands second adds it.
     overlaps (one piece each, the later clip taking over where two overlap, as SW-15 (d)), plus
     one split for each angle clip straddling `from` and each straddling `to`. Refused when M + N
     exceeds `RC_MAX_CLIPS`.
+  *Amended by SW-83 (SW8, 2026-11-03):* the shared-microphone refusal applies only in the
+  microphones mode; SW-84 adds the faces mode's pending and no-face refusals.
 - **SW-25 — The switch reads caches and computes nothing else.** `plan`, `labels`, `shots` and
   `defaults` read no document, file or clock; `read` is the only reader (the edited project's
   plan and snapshot, the loudness and speech caches through `MediaImporter.loadLoudness` and
@@ -307,6 +311,8 @@ and SW2a lands second adds it.
   `SpeakerSwitch+Shots.swift` and `SpeakerSwitch+Read.swift`, the series `ClipLevelSeries.swift`;
   all are probe-callable and name no `rc_*` but `ReelTime.snapToFrame` and `format`.
   `ClipLoudness.energy(_:from:to:_:)` loses its `private` so the series reuses it.
+  *Amended by SW-84 (SW8, 2026-11-03):* `readFaces` and `facesWanted` are its second and third
+  readers; `FaceActivity` and the faces mode's labels are pure.
 - **SW-27 — The proof's speech is made on the Mac, its truth measured.** F-TURNS
   (`tools/proof/creator_spike/f_turns.py`, into `tools/proof/media/creator/f_turns/`, reused
   while its manifest's `generator_sha256` equals the script's): Samantha (A) and Daniel (B) read
@@ -418,6 +424,8 @@ header, op or format change. SW-35's stream guard is not added here (SW3a has no
     `track` was named).
   - (d) The sheet never sets `min_turn` or `dominance_db`; they keep SW-21's and SW-22's
     defaults there. (e) The step and the undo name are always "Switch by Speaker".
+  *Amended by SW-86 (SW8, 2026-11-03):* the tool runs on the server thread (`creatorOffMainTools`)
+  and waits for missing faces up to 60 s; its answer gains `mode` and, in the faces mode, `note`.
 - SW-28 reserved for SW2c; SW-29 the owner's verdict on JOB-51 (owed).
 
 ## CU11b — motion blur drawn, its Transform row and Auto Zoom's Motion blur (2026-11-03)

@@ -29486,3 +29486,61 @@ make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py
 
 The recorded runs are in `designs/creator-jobs.md`'s CU3c record. JOB-21, JOB-27 and JOB-28 are
 the person checks.
+
+## Road map "creator-jobs" SW8 — Switch by Speaker with one shared microphone, from faces (`switch_faces_probe.py` P1–P6 with `switch_faces_probe.swift`; `switch_faces_proof.py` M0–M6; five mutants; `creator_spike/mouth_spike.py` SW-S3's head; spec §11 SW-80…SW-88)
+
+**`switch_faces_probe.py [--only P1,P3]`** builds `switch_faces_probe.swift` with `app/Sources`
+through `swift_build` and scores pure rows — no document, file or app:
+
+- **P1** the largest face (second in CJ-31's order) is the person, equal areas the first; its
+  gap/width the opening; a NaN gap, width 0, pts −1 and no face nil.
+- **P2** `activities`' exact population std at half 2 and half 1, the edges clipped, under two
+  values nil; `halfWidth` 2 at 10 a second, 1 at 5.
+- **P3** `label`: no speech nobody; exactly 1.5× the person, 1.49× crosstalk; at the floor 0.02
+  crosstalk, just above the person; one valid angle the person; all nil nobody.
+- **P4** SW-83's defaults with two and three cameras; `withoutWide`'s three cases, the
+  named-wide pairing planning as before SW8; a mixed shared microphone refused in SW-24's
+  sentence; `plan` over synthetic series (the wide, turn − lead snapped, crosstalk to the wide, a
+  0.5 s turn starting nothing, the wide's faces not contesting).
+- **P5** the pending and no-face refusals in order.
+- **P6** `source(atClip:)` trimmed, at speed 2 and reversed, round-tripping through
+  `clipTime(ofSource:)`; `faceSeries`' later-starting clip, nil past the media's end and off
+  every clip.
+
+Mutants (`--mutant NAME`, each on a copy of `app/Sources`; CAUGHT exits 1): ratio-removed (P3),
+voice-gate-removed (P3), first-face (P1), wide-in-contest (P4).
+
+**`switch_faces_proof.py`** drives the app over F-TURNS' cameras (`creator_spike/f_turns.py`,
+skipped by name without `say`'s voices) and ONE microphone, `mic_a_b12_f55.wav`, with canned
+`faces` (`canned_framing.write_faces`, 36-byte records: inside each of a speaker's utterances the
+mouth gap alternates 0.05/0.20 of the box per sample at width 0.5, outside 0.05; the wide two
+still faces). It launches its own instances on a scratch `CFFIXED_USER_HOME`: launch 1
+`-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600` for M0–M5, launch 2 adding
+`-RCDevSwitchSpeakerAccept YES` for M6. Packages land under `tools/proof/work/sw8/`. τ_f =
+268,400 ticks (64 ms + 250 ms + 100 ms + one frame).
+
+- **M0** `grep "Frame Job: "` of each launch's log is empty.
+- **M1** `wide` the wide, `min_shot` 2: `mode` faces, two speakers, the hedge as `note`; the
+  manifest's shots within τ_f; one undo "Switch by Speaker" gives the project back.
+- **M2** no arguments, `apply: false`: `wide` null, three speakers on the microphone, every shot
+  ≥ 3 s, nothing changed.
+- **M3** cam_b's canned faces removed: the call waits the 60 s bound and is refused in the
+  `.timedOut` sentence naming its media; nothing changed. Mutant wait-removed (M3).
+- **M4** the two-microphone selection answers `mode` microphones.
+- **M5** the menu with cam_b's faces absent shows the "Analyzing" sheet (`snapshot_ui`);
+  `cancel_sheet`; nothing changed.
+- **M6** the menu's project (dev accept) equals `switch_by_speaker {}`'s on a copy.
+
+**`creator_spike/mouth_spike.py`** checks SW-S3's rule hash, records the rate half as met by
+CJ-S2's 10.30× and 8.88×, and skips the agreement half by name while S-PC2 is absent (owed);
+`tools/proof/work/creator_spike/SW-S3/results.json`.
+
+```sh
+python3 tools/proof/switch_faces_probe.py [--only P3]
+python3 tools/proof/switch_faces_probe.py --mutant <name>
+make app && RC_PROOF_APP=release python3 tools/proof/switch_faces_proof.py
+python3 tools/proof/switch_faces_proof.py --mutant wait-removed
+python3 tools/proof/creator_spike/mouth_spike.py
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: JOB-55.

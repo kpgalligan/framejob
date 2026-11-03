@@ -13,7 +13,8 @@ run — `analysis_proof.write_canned`'s pattern, for all three kinds VR-12 reads
   at k and d2 1.5 at k + 1, so the cut rule's flash test passes.
 - `faces`: `samples.bin` (`FJFS`, version 1, 28-byte records without
   landmarks: x, y, w, h, confidence, roll, yaw), one row per sample of the
-  10-a-second grid, the sample's pts its grid tick.
+  10-a-second grid, the sample's pts its grid tick; `write_faces` writes the
+  kind alone with 36-byte records adding the mouth's gap and width (SW8).
 - `subjects`: `samples.bin` (`FJSB`, version 1, 20-byte boxes: x, y, w, h,
   confidence), every sample with no people and no salient region unless asked.
 
@@ -68,7 +69,9 @@ def shots_bytes(duration, fps, cut_frames):
     return bytes(out), n
 
 
-def faces_bytes(duration, faces_at):
+def faces_bytes(duration, faces_at, landmarks=False):
+    """With `landmarks`, 36-byte records adding each box's `gap` and `width` (the mouth's,
+    over the box's height; SW8's `switch_faces_proof.py`)."""
     n = count(duration, SAMPLES_PER_SECOND)
     rows, records = bytearray(), bytearray()
     first = 0
@@ -78,8 +81,10 @@ def faces_bytes(duration, faces_at):
         rows += struct.pack("<qII", t, first, len(boxes))
         for b in boxes:
             records += struct.pack("<7f", b["x"], b["y"], b["w"], b["h"], b["c"], 0.0, 0.0)
+            if landmarks:
+                records += struct.pack("<2f", b["gap"], b["width"])
         first += len(boxes)
-    header = b"FJFS" + struct.pack("<HHII", 1, 28, n, first)
+    header = b"FJFS" + struct.pack("<HHII", 1, 36 if landmarks else 28, n, first)
     return header + bytes(rows) + bytes(records), n
 
 
@@ -116,6 +121,19 @@ def write(package, media, copy, duration, fps, faces_at, cut_frames=(), people_a
         marker = {"canned": True, "coverage": [[0, n - 1]], "files": [file], "source": source}
         (Path(package) / "cache/analysis" / kind / f"{media}.json").write_text(
             json.dumps(marker, sort_keys=True))
+
+
+def write_faces(package, media, copy, duration, faces_at):
+    """The `faces` kind alone, with landmarks (36-byte records), canned for `media`."""
+    stat = Path(copy).stat()
+    source = {"duration": duration, "modified": round(stat.st_mtime), "size": stat.st_size}
+    data, n = faces_bytes(duration, faces_at, landmarks=True)
+    folder = Path(package) / "cache/analysis/faces" / str(media)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "samples.bin").write_bytes(data)
+    marker = {"canned": True, "coverage": [[0, n - 1]], "files": ["samples.bin"], "source": source}
+    (Path(package) / "cache/analysis/faces" / f"{media}.json").write_text(
+        json.dumps(marker, sort_keys=True))
 
 
 # ---- the scenarios (reframe_spike.py's inputs, in media seconds) ---------------

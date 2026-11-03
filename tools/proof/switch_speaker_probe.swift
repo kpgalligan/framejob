@@ -363,7 +363,8 @@ if wanted("R4") {
           d.angles == [2, 1] && d.microphones.isEmpty
             && d.pairing == S.Pairing(speakers: [], wide: nil), "\(d)")
 
-    // One camera whole (1), one detached (picture 2, sound 3): only 1 sounds.
+    // One camera whole (1), one detached (picture 2, sound 3): only 1 sounds. One microphone
+    // with two angles is SW-83's faces pairing: every angle with it, front first, no wide.
     let mixed = project([1, 2, 3], [video(1), video(2)],
                         [clip(10, track: 1, media: 1),
                          clip(20, track: 2, media: 2, audio: false, linked: 30),
@@ -371,7 +372,8 @@ if wanted("R4") {
     let m = S.defaults(selection: mixed.clips, in: mixed)
     check("R4", "a detached camera sound is never a default microphone",
           m.angles == [2, 1] && m.microphones == [1]
-            && m.pairing == S.Pairing(speakers: [S.Speaker(mic: 1, angle: 1)], wide: 2), "\(m)")
+            && m.pairing == S.Pairing(speakers: [S.Speaker(mic: 1, angle: 2),
+                                                 S.Speaker(mic: 1, angle: 1)], wide: nil), "\(m)")
 }
 
 // MARK: - R5 covering

@@ -14,6 +14,11 @@ import AppKit
 /// predicted; a refusal then stays in the summary with the sheet open. Minimum shot, Cut before
 /// speech, Crosstalk shows and Ignore bleed are remembered, written only when changed.
 ///
+/// **The one-microphone form** (SW8, spec §11 SW-85): when the implied pairing is the faces mode
+/// (one microphone, two or more angles), a Microphone popup and "Cameras:" naming every angle
+/// replace the speaker rows, Minimum shot opens at 3 s and is never remembered, there is no Ignore
+/// bleed row, and the hedge leads the summary while the chosen pairing is the faces mode.
+///
 /// **The dev accept** (`-RCDevSwitchSpeakerAccept YES`, dev tools only): the sheet presses Switch
 /// once its first edit exists, with its controls as set (AU-128's precedent).
 final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate {
@@ -24,6 +29,8 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
     private weak var document: ProjectDocument?
     private let opened: SpeakerSwitch.Settings
     private let pairing: SpeakerSwitch.Pairing
+    /// The one-microphone form (SW-85).
+    private let faces: Bool
     private let microphones: [UInt32]
     private let angles: [UInt32]
     private let names: [UInt32: String]
@@ -48,10 +55,14 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
 
     init(document: ProjectDocument) {
         self.document = document
-        self.opened = SpeakerSwitch.Settings.remembered(.standard)
         let snapshot = document.editedProject.snapshot
         let selection = document.selection.sorted().compactMap { snapshot.clip($0) }
         let implied = SpeakerSwitch.defaults(selection: selection, in: snapshot)
+        let faces = SpeakerSwitch.mode(implied.pairing) == .faces
+        var opened = SpeakerSwitch.Settings.remembered(.standard)
+        if faces { opened.minShot = FaceActivity.minShot }
+        self.opened = opened
+        self.faces = faces
         self.pairing = implied.pairing
         self.angles = implied.angles
         self.microphones = SpeakerSwitch.microphoneChoices(selection, in: snapshot)
@@ -82,7 +93,18 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
         let angleTitles = SpeakerSwitch.titles(angles, in: snapshot)
 
         var rows: [[NSView]] = []
-        for (index, speaker) in pairing.speakers.enumerated() {
+        if faces {
+            let mic = popup(
+                microphones.map { (micTitles[$0] ?? "", $0) }, selected: pairing.speakers.first?.mic,
+                none: nil)
+            mic.setAccessibilityIdentifier("switchspeaker.mic.0")
+            micPopups.append(mic)
+            let cameras = sheetUnitLabel(angles.map { angleTitles[$0] ?? "" }.joined(separator: ", "))
+            cameras.setAccessibilityIdentifier("switchspeaker.cameras")
+            rows.append([fieldLabel("Microphone:"), mic])
+            rows.append([fieldLabel("Cameras:"), cameras])
+        }
+        for (index, speaker) in pairing.speakers.enumerated() where !faces {
             let mic = popup(
                 microphones.map { (micTitles[$0] ?? "", $0) }, selected: speaker.mic,
                 none: speaker.mic == nil ? "None" : nil)
@@ -117,10 +139,12 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
         crosstalkPopup.target = self
         crosstalkPopup.action = #selector(controlChanged(_:))
         rows.append([fieldLabel("Crosstalk:"), sheetRow([sheetUnitLabel("shows"), crosstalkPopup])])
-        rows.append([
-            fieldLabel("Ignore bleed:"),
-            sheetRow([bleedField, sheetUnitLabel("dB below a speaker's own level")]),
-        ])
+        if !faces {
+            rows.append([
+                fieldLabel("Ignore bleed:"),
+                sheetRow([bleedField, sheetUnitLabel("dB below a speaker's own level")]),
+            ])
+        }
         for (box, on) in [
             (wideAfterBox, opened.wideAfter != nil),
             (muteBox, first.map(SpeakerSwitch.muteDefault) ?? true),
@@ -233,7 +257,14 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
     }
 
     private var chosenPairing: SpeakerSwitch.Pairing {
-        SpeakerSwitch.Pairing(
+        if faces {
+            // SW-85: every angle with the one microphone, less a shared speaker on the Wide.
+            let mic = micPopups.first.flatMap { track(of: $0) }
+            return SpeakerSwitch.withoutWide(SpeakerSwitch.Pairing(
+                speakers: angles.map { SpeakerSwitch.Speaker(mic: mic, angle: $0) },
+                wide: track(of: widePopup)))
+        }
+        return SpeakerSwitch.Pairing(
             speakers: zip(micPopups, cameraPopups).map {
                 SpeakerSwitch.Speaker(mic: track(of: $0), angle: track(of: $1))
             },
@@ -280,7 +311,9 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
         guard let document else { return }
         let (edit, text) = planned(document)
         self.edit = edit
-        summaryLabel.stringValue = text
+        // SW-82: the hedge leads the summary while the pairing is the faces mode.
+        summaryLabel.stringValue = SpeakerSwitch.mode(chosenPairing) == .faces
+            ? FaceActivity.hedge + (edit == nil ? "\n" : " ") + text : text
         switchButton?.isEnabled = edit != nil
         acceptIfAsked()
     }
@@ -330,7 +363,9 @@ final class SwitchSpeakerSheetController: NSViewController, NSTextFieldDelegate 
     @objc private func switchClicked(_ sender: Any?) {
         replan()
         guard let document, let edit else { return }
-        let settings = self.settings
+        var settings = self.settings
+        // SW-85: the one-microphone form's Minimum shot is never remembered.
+        if faces { settings.minShot = opened.minShot }
         dismiss(self)
         document.applyEdit(SpeakerSwitch.actionName, edit.ops)
         document.selection = edit.selection

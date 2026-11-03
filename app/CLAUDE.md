@@ -867,15 +867,21 @@ detail there.
   thread, no `scope`: the container `set_scope` has open,
   `performGroupedEdit`, the answer `{ok, step, pieces,
   transitions_removed, project}` written by hand in that key order) and
-  `switchBySpeaker` (SW2b: main thread, no `scope`, `read` →
-  `replaceRefusal` → `plan` → `edit`, `apply: false` answering without
-  editing, `performGroupedEdit` and the selection set).
+  `switchBySpeaker` (SW2b, no `scope`, `read` → `replaceRefusal` →
+  `plan` → `edit`, `apply: false` answering without editing,
+  `performGroupedEdit` and the selection set; off main since SW8,
+  spec §11 SW-86, in `creatorOffMainTools`: one main hop resolves and,
+  when the faces mode's `facesWanted` is empty, answers; else
+  `waitForFaces` wants them under the call's own owner and waits to
+  `AnalysisLane.callWaitLimit`, and a second hop refuses a changed
+  project or scope before `read` again; the answer's `mode` and, in
+  the faces mode, `note`).
   `AgentCatalog+Switch` holds the three rows, spliced in last by
   `creatorTools()`, after `switch_layout`'s.
 - `SpeakerSwitch.swift` · `SpeakerSwitch+Shots.swift` · `SpeakerSwitch+Read.swift` ·
   `ClipLevelSeries.swift` · `SpeakerSwitch+Edit.swift` · `SpeakerSwitch+Settings.swift` ·
-  `SwitchSpeakerSheetController.swift` · `EditorViewController+SwitchSpeaker.swift` — Switch by
-  Speaker's planner (road map creator-jobs SW2a, spec §11 SW-20…SW-25) and Clip ▸ Switch by
+  `SwitchSpeakerSheetController.swift` · `EditorViewController+SwitchSpeaker.swift` ·
+  `FaceActivity.swift` · `SpeakerSwitch+Faces.swift` — Switch by Speaker's planner (road map creator-jobs SW2a, spec §11 SW-20…SW-25) and Clip ▸ Switch by
   Speaker… over it (SW2b, SW-23, SW-26). `SpeakerSwitch` is pure (names no `rc_*` but
   `ReelTime.snapToFrame` and `format`): `defaults` (angles are tracks holding a selected media
   clip with a picture, a detached sound half never one; picture-less files are the microphones,
@@ -899,6 +905,11 @@ detail there.
   `-RCDevSwitchSpeakerAccept YES` (dev only) pressing Switch;
   `EditorViewController+SwitchSpeaker.swift` — `showSwitchBySpeakerSheet` and
   `validateSwitchSpeakerAction`, one line in the frozen file after `validateSwitchAngleAction`.
+  Since SW8 (spec §11 SW-80…SW-88): `FaceActivity` (pure) — the largest face's mouth opening,
+  its centred 0.5 s std and the 1.5× / floor label; `SpeakerSwitch+Faces` — the mode (one
+  microphone shared by two or more angles), `withoutWide`, the face pairing fed to the unchanged
+  `shots`, `readFaces` and `facesWanted` (the menu's Analyzing sheet, the tool's bounded wait
+  off main).
 - `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
   `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
   creator-jobs VR2a2, spec §11 VR-26, VR-28); its UI path is Clip ▸ Follow
@@ -4239,7 +4250,8 @@ free.
   `new_project_from_range` (CJ5b) and `retime_range` (CU9a); the catalog
   rows are `analysisTools() + transcriptTools() + derivedTools() +
   retimeTools()`. `switch_layout` joined `creatorOffMainTools` at CO7
-  (spec §11 CO-70): it reads the camera's cached person masks off main.
+  (spec §11 CO-70): it reads the camera's cached person masks off main;
+  `switch_by_speaker` at SW8 (spec §11 SW-86): it waits on the faces analysis.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `FRAMEJOB_DEV_TOOLS`, which Debug and Release set and

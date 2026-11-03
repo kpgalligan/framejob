@@ -11959,6 +11959,93 @@ at integration (`ai-drafted`, `low-priority`): "Switch by Speaker: cut to the wi
 - **Question for the owner:** proceed at SW-S3's middle band? *Recommended: yes, with SW-82's
   hedge.*
 
+#### SW8's record (2026-11-03)
+
+**Built.** Lane A, base `ca2d98a0` (CU3c; the lane's worktree was made at `a4869b62` and
+fast-forwarded to the integration branch's head before any edit, which brought SW2b's
+`2cc21ecd`). The owner's answer (2026-11-01): proceed at SW-S3's middle band, with SW-82's hedge.
+SW-S3's agreement arm needs S-PC2, which the owner has not recorded: skipped by name and owed,
+not a stop. Decisions SW-80…SW-88 recorded before the code in the new `creator-jobs-10.md`
+(`-9.md` is past 500 lines), with their index rows; SW-20, SW-24, SW-25, SW-26 and CJ-28 carry
+dated amendment lines. No core, FFI, header, op, format or tool-schema change. The road map said
+§7.9e for the tool; it lives in §7.9h since SW2b.
+
+- **App** (`wc -l`): new `FaceActivity.swift` 100 (SW-81, SW-82: `largest`, `opening`,
+  `halfWidth`, `activities`, `label`, the window, ratio, provisional floor, 3 s and the hedge) and
+  `SpeakerSwitch+Faces.swift` 278 (`withoutWide`, `faceSpeakers`, `mode`, `facePairing`,
+  `faceLabels`, `FaceClip` and `faceSeries`, `faceWindows`, `storedActivity`, `readFaces`,
+  `FacesWant` and `facesWanted`, `AnalysisClipTimes.source(atClip:)`); `SpeakerSwitch.swift` 290
+  (`Mode`, `FaceAngle`, `Input.faces` last with a default, `Settings.faceRatio`/`faceFloor`,
+  SW-83's defaults, `plan`'s branch, the SW-24 changes), `SpeakerSwitch+Read.swift` 146,
+  `SwitchSpeakerSheetController.swift` 374 (the one-microphone form),
+  `EditorViewController+SwitchSpeaker.swift` 81 (the Analyzing sheet first), `AgentServer+Switch.swift`
+  353 (off main, the wait), `AgentServer+CreatorJobs.swift` (`creatorOffMainTools` gains
+  `switch_by_speaker`), `AgentCatalog+Switch.swift` 218 (prose only). `labels` and `shots` in
+  `SpeakerSwitch+Shots.swift` are untouched. `make typecheck`: exit 0, the four baseline warnings.
+- **Proof:** `tools/proof/switch_faces_probe.swift` + `.py` (P1–P6, four mutants),
+  `switch_faces_proof.py` (M0–M6, one mutant), `creator_spike/mouth_spike.py` (SW-S3's head);
+  `canned_framing.py`'s `faces_bytes(…, landmarks=False)` and `write_faces` (its default bytes
+  unchanged for all four scenarios); `switch_speaker_probe.swift`'s R4 "mixed" row now expects
+  SW-83's faces pairing; `capture_spike/inventory.json`'s `showSwitchBySpeakerSheet:` row and its
+  three sites (the switch sheet, the Analyzing sheet, and the switch sheet after its landing as
+  `reached_after`); the README's SW8 section.
+- **Docs:** spec §7.9h (the faces mode, the wait, the refusals, `mode` and `note`), §7.4's file
+  map row, the spec index's cells; `docs/guide/multicam.md` ("One microphone for everyone" and
+  the tool's paragraph), `mcp.md`'s row; `docs/manual-checks.md` JOB-55.
+
+**The probes.** `switch_faces_probe.py`: `6/6 rows passed`, exit 0 (P1 the opening
+0.19999998758236617 of the larger, second face; P4's plan `[13 0–2.8 s, 11 2.8–6.8 s, 12
+6.8–11.3 s, 13 11.3–15 s]`, added 4). `switch_speaker_probe.py` whole: `6/6 rows passed`, exit 0,
+R6 21 cuts per variant, worst 75.6 ms (b12_f55, b12_f45, b18_f45, b24_f55), 42.2 ms (b18_f55),
+165.5 ms (b24_f45, SW-S4's named limit). `mouth_spike.py`: exit 0, "SW-S3 rule_sha256
+abc5ccef…f1fae matches the table", the rate met (10.30× and 8.88× against 4×), "SKIPPED the
+agreement arm: S-PC2 is not in tools/proof/media/creator/ (owed)". `spec_index_proof.py` 267/267;
+`inventory.py --check` 5/5.
+
+**The proofs, whole, against Release** (`RC_PROOF_APP=release`, after the gate's `make app`; each
+launches its own instances). `switch_faces_proof.py`: `7/7 rows passed`, exit 0 — M1 22 shots,
+worst 75.6 ms from onset − lead (τ_f 447.3 ms), `mode` faces, two speakers, the hedge, one undo
+"Switch by Speaker"; M2 20 shots, the shortest 5.80 s, three speakers, `wide` null; M3 refused
+after 66.2 s in the `.timedOut` sentence naming media 7 (cam_b); M4 `mode` microphones; M5 the
+"Analyzing" sheet, cancelled, nothing changed; M6 the menu's project equals the tool's (20
+shots); M0 empty in both launches. `switch_speaker_proof.py`: `14/14 rows passed`, exit 0 (S1
+worst 42.2 ms applied on b18_f55, 165.5 ms limited on b24_f45; S10 21 shots at 3 s, 22 at 2 s,
+the menu's project equal), the two-microphone switch unchanged by the mode split and the move
+off main.
+
+**Mutants** (the full set on the final instrument): ratio-removed (P3), voice-gate-removed (P3),
+first-face (P1) and wide-in-contest (P4), each `MUTANT … CAUGHT`, exit 1; wait-removed (M3, on a
+copy's built Release app) `MUTANT wait-removed CAUGHT: M3 failed` — refused at once with `read`'s
+"The camera on track 2 is still being analysed — its faces have not been found yet."
+
+**`make gate`:** `gate: PASS 668s` (names 1 s, typecheck 16 s, fmt and lint skipped as
+unchanged, test 422 s, app 228 s), exit 0.
+
+**Review** (`ca2d98a0..ae76478c`, verdict pass, no fix pass): every Files and Approach item done,
+the two files outside the list justified, the deviations harmless. Three nits, none taken at
+integration: (1) a call refused anyway (a bad or locked `track`, a microphone still being
+analysed) first wants faces and can wait the 60 s, the order SW-86 sets; (2) with an empty range
+the no-face refusal is added beside the empty range's own (`SpeakerSwitch.swift`, wants a
+`count > 0` test); (3) `max(0, lower)...min(grid.lastIndex, upper)` in `SpeakerSwitch+Faces.swift`
+traps on a marker range starting past the grid's last index (`AnalysisMasks.swift`'s pattern;
+the `decoded.count == grid.count` guard makes it unlikely). (2) and (3) are filed as one issue.
+
+**Integration** (onto `dbe8d1ef`, VR2b2). VR2b2 had also started `creator-jobs-10.md`: the file
+keeps VR2b2's header and VR-29, then SW8's section (231 lines), and its index row names both
+phases' decisions; the Lines cells `-9` 675, `-10` 231, `11-decisions/` 22193 in 44 files. Spec
+§7.4 keeps VR2b2's `FramingSubjects` and `FollowSubject` rows, then SW8's `SpeakerSwitch` row;
+`manual-checks.md` has JOB-31, JOB-32, then JOB-55. The CLAUDE.md edits applied: `app/CLAUDE.md`'s
+SpeakerSwitch entry (the two files and the SW8 sentence), `AgentServer+Switch`'s `switchBySpeaker`
+off main, and `switch_by_speaker` in the `creatorOffMainTools` note. `spec_index_proof.py`
+267/267, `inventory.py --check` 5/5; `make gate`: `gate: PASS 544s` (names 1 s, typecheck
+18 s, fmt and lint skipped, test 315 s, app 209 s).
+
+- **Deviations** (the notes): `readFaces` takes no `fps` (nothing it computes needs one); the
+  one-microphone form keeps SW-26's hint text; spec §7.4's file-map row and `inventory.json` were
+  edited beside the listed files (the map's entry and `make test`'s inventory check).
+- **Owed:** SW-S3's agreement arm on S-PC2, the floor's real value (then the high band drops the
+  hedge, the low band files the candidate), and JOB-55's run; the review's nits (2) and (3), filed.
+
 ### SW5 — OBS's Matroska: every audio track copied
 
 - **What a person gets:** an OBS `.mkv` with three audio tracks opens with all three, named as in

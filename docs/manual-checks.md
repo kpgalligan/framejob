@@ -168,6 +168,11 @@ the same way.
 - **Expect:** while both fit in the tall frame they are framed together; when they do not, one of them is followed (the owner's answer) and the frame does not ping-pong between them.
 - **Source:** road map creator-jobs VR2b2, spec §11 VR-29 (k), VR-24 (g) (no script judges a real two-shot).
 
+**JOB-55 — Switch by Speaker with one microphone follows who talks**
+- **Do:** On S-PC2 (two people sharing ONE microphone, a camera on each, five to ten minutes), select both cameras and the one microphone, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… (let the Analyzing sheet finish) at the defaults and press Switch. Play the Program track through.
+- **Expect:** the summary starts "Faces guess who is talking; check the cuts."; the cuts follow who talks as SW-S3 measured — each lands near the new speaker's first word, a laugh or a nod from the listener does not cut, and no shot of three seconds or more shows a listener who says nothing during it.
+- **Source:** road map creator-jobs SW8, spec §11 SW-81, SW-82, SW-88 (`switch_faces_proof.py` scores canned mouths over F-TURNS' cards, never a real face).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

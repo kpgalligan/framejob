@@ -96,13 +96,26 @@ extension AgentServer {
                     + "range's ends with their pictures off inside — and, with mute_cameras, the "
                     + "cameras' own sound off inside the range (never on a microphone's track). "
                     + "Nothing outside the range changes and the microphones are never edited. "
-                    + "Works in the container set_scope has open. Answers {ok, applied, step "
+                    + "Works in the container set_scope has open. ONE MICROPHONE FOR EVERYONE "
+                    + "(the faces mode): when one microphone is shared by two or more angles — "
+                    + "the default when the selection holds exactly one microphone — who talks "
+                    + "is decided while the microphone hears speech by whose mouth moves most "
+                    + "in each camera's on-device face analysis (the largest face; 1.5× the next "
+                    + "camera's, else crosstalk); a named wide takes no part, and min_shot "
+                    + "defaults to 3. Faces it still has to find are found first: the call "
+                    + "waits up to 60 s, and past that is refused with what it covered kept — "
+                    + "call again to continue. Answers {ok, applied, step "
                     + "(only when applied), track (the Program track; null when not applied and no "
                     + "track named), shots [{angle, start, end}], ops (the count), added (clips), "
-                    + "speakers [{mic, angle}], wide, mute_cameras, project}. Refused, nothing "
+                    + "speakers [{mic, angle}], wide, mute_cameras, mode (\"microphones\" or "
+                    + "\"faces\"), note (in the faces mode: faces guess, check the cuts), "
+                    + "project}. Refused, nothing "
                     + "changed, naming every reason at once: fewer than two angles or more than "
                     + "nine, a speaker without a microphone or an angle, one microphone for two "
-                    + "speakers, a microphone still being analysed or with no speech, a stretch "
+                    + "speakers (outside the faces mode), a microphone still being analysed or "
+                    + "with no speech, a camera whose faces are still being found or show no "
+                    + "mouth that can be read, a faces analysis that failed, was stopped or did "
+                    + "not finish within the wait, a project changed while it waited, a stretch "
                     + "no angle covers, more clips than the project may hold (raise min_shot), a "
                     + "track that cannot take the shots (locked, holding a selected clip, not in "
                     + "front of the angles, nothing in the range, or a clip that is not a piece "
@@ -123,14 +136,17 @@ extension AgentServer {
                             "additionalProperties": false,
                         ],
                         "description": "Who is who: one {mic, angle} per person, track ids. A "
-                            + "camera's detached sound may be named as a mic. Default: the pairing "
-                            + "the selection implies.",
+                            + "camera's detached sound may be named as a mic; one mic named for "
+                            + "two or more angles is the faces mode. Default: the pairing the "
+                            + "selection implies (with exactly one microphone, every angle with "
+                            + "it).",
                     ],
                     "wide": [
                         "type": ["integer", "null"],
                         "description": "The angle shown when nobody or everybody talks; null for "
                             + "none. Default: the one angle no speaker uses, when exactly one is "
-                            + "left.",
+                            + "left; none in the faces mode. Named without speakers, a speaker on "
+                            + "it who shares a microphone takes no part.",
                     ],
                     "from": [
                         "type": "integer",
@@ -144,7 +160,7 @@ extension AgentServer {
                     "min_shot": [
                         "type": "number", "minimum": 0.5, "maximum": 30,
                         "description": "Seconds: a shorter shot merges into a neighbour. "
-                            + "Default 2.",
+                            + "Default 2; 3 in the faces mode.",
                     ],
                     "min_turn": [
                         "type": "number", "minimum": 0.2, "maximum": 10,

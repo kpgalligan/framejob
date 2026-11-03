@@ -24,6 +24,20 @@ enum SpeakerSwitch {
         var bleedDB = 15.0, dominanceDB = 8.0, floorMarginDB = 6.0, voiceThreshold: Float = 0.5
         /// nil = off.
         var wideAfter: Double? = nil
+        /// The faces mode's label (SW-81): the top angle's activity over the next's, and the
+        /// floor it must exceed.
+        var faceRatio = FaceActivity.ratio, faceFloor = FaceActivity.floor
+    }
+
+    /// Who says who is talking (SW-83): each microphone its own person, or one microphone shared
+    /// by two or more angles and their faces (`SpeakerSwitch+Faces.swift`).
+    enum Mode: String { case microphones, faces }
+
+    /// One face-speaker angle's mouth activity on the range's grid (SW-81): step k's activity,
+    /// nil where none can be read. Empty: not read.
+    struct FaceAngle: Equatable {
+        let track: UInt32
+        let activity: [Double?]
     }
 
     /// A person: their microphone track and the angle track that shows them.
@@ -57,9 +71,11 @@ enum SpeakerSwitch {
         /// `ShotSplit.clipCount` of the document's project.
         let clipCount: Int
         let settings: Settings
+        /// The faces mode's angles, front first (`readFaces`); empty in the microphones mode.
+        var faces: [FaceAngle] = []
     }
 
-    /// A step's label; `person` names the microphone track.
+    /// A step's label; `person` names the microphone track (in the faces mode, the angle's).
     enum Label: Equatable { case person(UInt32), crosstalk, nobody }
     struct Shot: Equatable { let angle: UInt32; let start: Ticks; let end: Ticks }
     enum Plan: Equatable { case refused([String]); case planned(shots: [Shot], added: Int) }
@@ -98,6 +114,11 @@ enum SpeakerSwitch {
             }
         }
         let left = angles.filter { !used.contains($0) }
+        // SW-83: one microphone shared by every angle, and no wide (the faces mode).
+        if microphones.count == 1, angles.count >= 2, let mic = microphones.first {
+            return (angles, microphones,
+                    Pairing(speakers: angles.map { Speaker(mic: mic, angle: $0) }, wide: nil))
+        }
         return (angles, microphones,
                 Pairing(speakers: speakers, wide: left.count == 1 ? left.first : nil))
     }
@@ -129,10 +150,13 @@ enum SpeakerSwitch {
         if !refusals.isEmpty { return .refused(refusals) }
         let step = stepTicks
         let count = step > 0 ? Int(max(0, input.to - input.from) / step) : 0
-        let all = labels(
-            input.microphones.filter { $0.level.count == count }, settings: input.settings)
+        let faces = mode(input.pairing) == .faces
+        let all = faces
+            ? faceLabels(input)
+            : labels(input.microphones.filter { $0.level.count == count }, settings: input.settings)
         let planned = shots(
-            labels: all, from: input.from, to: input.to, fps: input.fps, pairing: input.pairing,
+            labels: all, from: input.from, to: input.to, fps: input.fps,
+            pairing: faces ? facePairing(input.pairing) : input.pairing,
             angles: input.angles, settings: input.settings)
         let added = clipsAdded(planned, angles: input.angles, from: input.from, to: input.to)
         let most = Int(RC_MAX_CLIPS)
@@ -160,7 +184,10 @@ enum SpeakerSwitch {
                     + "selected clip with a picture.")
         }
         let microphones = input.microphones.map(\.track)
-        for speaker in input.pairing.speakers {
+        let faces = mode(input.pairing) == .faces
+        // SW-83: in the faces mode a speaker on the wide takes no part.
+        for speaker in input.pairing.speakers
+        where !(faces && speaker.angle != nil && speaker.angle == input.pairing.wide) {
             guard let mic = speaker.mic, microphones.contains(mic) else {
                 let track = speaker.angle ?? speaker.mic ?? 0
                 out.append("The speaker on track \(track) has no microphone.")
@@ -171,7 +198,7 @@ enum SpeakerSwitch {
             }
         }
         var counted: [UInt32] = []
-        for mic in input.pairing.speakers.compactMap(\.mic) where !counted.contains(mic) {
+        for mic in input.pairing.speakers.compactMap(\.mic) where !faces && !counted.contains(mic) {
             counted.append(mic)
             let n = input.pairing.speakers.filter { $0.mic == mic }.count
             if n > 1 {
@@ -193,6 +220,14 @@ enum SpeakerSwitch {
                     "The microphone on track \(mic.track) has no speech between \(a) and \(b), "
                         + "so it never says who is talking.")
             }
+        }
+        // SW-84: a read angle with no step whose mouth can be read.
+        for angle in input.faces where angle.activity.count == count
+            && !angle.activity.contains(where: { $0 != nil })
+        {
+            out.append(
+                "The camera on track \(angle.track) shows no face whose mouth can be read between "
+                    + "\(a) and \(b), so it never says who is talking.")
         }
         if let gap = firstGap(input.angles, from: input.from, to: input.to) {
             out.append(

@@ -505,9 +505,10 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+SwitchSpeaker.swift `@objc func showSwitchBySpeakerSheet(`",
-    "app/Sources/EditorViewController+SwitchSpeaker.swift:22"
+    "app/Sources/EditorViewController+SwitchSpeaker.swift:37",
+    "app/Sources/EditorViewController+SwitchSpeaker.swift:43"
    ],
-   "note": "presentAsSheet(SwitchSpeakerSheetController) over two or more selected angles and a clip with sound (SW-23 (g), SW-26); beeps otherwise or with a sheet up; its Switch is an edit"
+   "note": "presentAsSheet(SwitchSpeakerSheetController) over two or more selected angles and a clip with sound (SW-23 (g), SW-26); with one microphone and faces still to find (SW8, SW-85), presentAsSheet(AnalyzingSheetController) first, the Analyzing sheet (CJ-28), whose landing presents the switch sheet (reached_after); beeps otherwise or with a sheet up; its Switch is an edit"
   },
   "showSpeedSheet:": {
    "verdict": "sheet",
@@ -1143,13 +1144,35 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+SwitchSpeaker.swift:22": {
+  "app/Sources/EditorViewController+SwitchSpeaker.swift:37": {
    "token": "presentAsSheet",
    "func": "showSwitchBySpeakerSheet",
    "reached_from": [
     "showSwitchBySpeakerSheet:"
    ],
    "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+SwitchSpeaker.swift:43": {
+   "token": "presentAsSheet",
+   "func": "showSwitchBySpeakerSheet",
+   "reached_from": [
+    "showSwitchBySpeakerSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+SwitchSpeaker.swift:60": {
+   "token": "presentAsSheet",
+   "func": "showSwitchBySpeakerSheet",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showSwitchBySpeakerSheet:",
+     "via": "app/Sources/EditorViewController+SwitchSpeaker.swift `self.presentAsSheet(SwitchSpeakerSheetController(document: document))`",
+     "gate": "app/Sources/EditorViewController+SwitchSpeaker.swift `case .landed:` — the Analyzing sheet's faces landed on the project and scope the press read"
+    }
+   ],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Audio.swift:85": {
