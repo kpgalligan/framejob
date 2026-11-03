@@ -580,9 +580,10 @@ detail there.
   `answerNumber`. `FramingAnalysis` (names no `rc_*`) is what a VR command
   analyses (VR-12): each video media clip's played window ± 1 s merged per
   media, and the requests kind-major `shots`, `faces`, `subjects`;
-  `analysis_job {clips}` and `reframe_clip`'s tool want them
-  (`requests(clips:in:project:)`, `project` the call's view, else
-  `editedProject`), and every `analysis_job` answer carries
+  `analysis_job {clips}`, `reframe_clip`'s tool and Clip ▸ Follow Subject…
+  want them (`requests(clips:in:project:)`, `project` the call's view, else
+  `editedProject`); `qualifies` is `windows`' test, lifted for Follow
+  Subject's offer; and every `analysis_job` answer carries
   `lane_queued` (`AnalysisLane.queuedTotal()`, monotonic).
   The `sound_events` kind (road map creator-jobs FC3, spec §11 FC-30…FC-34) is
   the one kind on the sound queue, and a running sound job does not count
@@ -900,8 +901,8 @@ detail there.
   `validateSwitchSpeakerAction`, one line in the frozen file after `validateSwitchAngleAction`.
 - `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
   `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
-  creator-jobs VR2a2, spec §11 VR-26, VR-28); no menu yet (Clip ▸ Follow
-  Subject… is VR2b's). `FramingSubjects` (names no `rc_*`, any thread)
+  creator-jobs VR2a2, spec §11 VR-26, VR-28); its UI path is Clip ▸ Follow
+  Subject… (VR-29, the entry below). `FramingSubjects` (names no `rc_*`, any thread)
   builds `subjects` from the store: each `faces`-grid index inside the
   windows that both the `faces` and `subjects` markers cover is one sample,
   boxes clamped into the picture and the empty ones dropped, eight a kind in
@@ -920,6 +921,28 @@ detail there.
   scope, then `editResult`, "Reframe Clip", answering `cached`.
   `AgentCatalog+Framing` holds its row, spliced in last by
   `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`.
+- `FollowSubject.swift` · `FollowSubjectSheetController.swift` ·
+  `EditorViewController+FollowSubject.swift` — Clip ▸ Follow Subject… (road map
+  creator-jobs VR2b2, spec §11 VR-29): `reframe_clip` with `replace: true` on each selected
+  clip `FramingAnalysis.qualifies` takes (lifted out of `windows`), a "Backgrounds" track at
+  index 0 as `backdrop`, removed when no copy needed it, as one undo step "Follow Subject".
+  `FollowSubject` (names no `rc_*`): `FollowSubjectSettings` (Follow and Where Empty
+  remembered as `FrameJobFollowKind` / `FrameJobFollowWhereEmpty`, written only when changed,
+  a launch argument counting; Zoom never; `op` sends `where_empty` and `subjects` only for the
+  following kinds), `targets`, `defaultZoom` (1, or 1.25 within 1 % of the canvas's aspect),
+  `subjects` (`FramingSubjects.read` over each clip's own windows, any thread), `plan` (the
+  `add_track` required, each `reframe_clip` tried through `SwitchAngle.Trial` — applied,
+  identity or refused with the core's sentence — `moreTracks` as the track count each applied
+  op added, `remove_track` when empty), `counts` (VR-27 (f) from two handles), `summary`,
+  `pendingSummary`, `rowName`. The sheet asks `FramingAnalysis.requests` at once, reads the
+  subjects off main ("Reading the analysis…"), re-plans on main at every change, commits
+  through `performGroupedEdit` on the current handle, and for a following kind with requests
+  missing remembers, dismisses and hands them to `analyze` on the main queue's next turn
+  after `viewDidDisappear`; Center never analyzes; `-RCDevFollowAccept YES` (dev only) presses
+  Follow once it is first enabled. The extension is the command, the Analyzing sheet (one row
+  per request), the changed-project refusal (at landing and after the read off main), the
+  grouped commit, refusals posted as `reframe_clip`, and `validateFollowSubjectAction`, one
+  line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -1498,7 +1521,8 @@ the key map behind it.
   box's clip's cached `faces` and `subjects` boxes at the playhead's forward
   source tick (`TimelineView.sourceTime` with the source map and
   `ReverseMirror`), placed in the layer's uncropped rect through its rotation
-  and clipped to its crop, else "Not analyzed". It NEVER calls
+  and clipped to its crop, else "Not analyzed — Clip ▸ Follow Subject…
+  analyzes it" (VR-29 (j)). It NEVER calls
   `analysisRequest`, `want` or `cacheDirectory`; it reads under
   `intendedCacheDirectory`, memoised per kind on CO-25's key (marker inode,
   size, mtime; the media, its URL, its LUT's URL), and drops the memo on an

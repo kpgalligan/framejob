@@ -146,6 +146,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Switch by Speaker… | | Cuts a Program track from the selected cameras, showing whoever talks on each microphone, as one undo step; run Synchronize Audio first ([Podcasts and several cameras](multicam.md#switch-by-speaker)) |
 | Add Action | ⌥⌘K | Adds an action at the playhead ([Motion and transitions](motion-and-transitions.md)) |
 | Auto Zoom… | | Zooms the selected screen recordings in at their clicks and typing and back out after, as ordinary actions, in one undo step ([Screen recording](screen-recording.md#auto-zoom)) |
+| Follow Subject… | | Frames each selected movie clip on its subject — faces, people or the region the eye goes to, found on this Mac — with eased moves on its action lane and a blurred copy on a Backgrounds track where it shows the whole picture, in one undo step ([Vertical and framing](vertical-and-framing.md#follow-subject)) |
 | Add Shortcut Overlays | | Shows each keyboard shortcut recorded in the selected screen recordings as keycaps at the moment it was pressed, on a "Shortcuts" track, in one undo step ([Screen recording](screen-recording.md#shortcut-overlays)) |
 | Speed Up Typing… | | Plays the typing in the selected screen recordings faster where nobody speaks and no shortcut shows, in one undo step ([Screen recording](screen-recording.md#speeding-up-typing)) |
 | Speed… | | Sets the selected clips' playback rate ([Speed](speed.md)) |
@@ -211,6 +212,7 @@ first selected clip. With nothing selected it is the front-most track. See
 | Switch by Speaker… | The selected clips with a picture sit on two or more tracks, a selected clip has its sound on, and no sheet is open; inside a nest too |
 | Add Action | A selected clip is under the playhead |
 | Auto Zoom… | Every selected clip plays a movie that has a cursor file, and no sheet is open |
+| Follow Subject… | A selected clip plays a movie, and no sheet is open; inside a nest too |
 | Add Shortcut Overlays | Every selected clip plays a movie that has a cursor file, no sheet is open, and it is not already reading the files |
 | Speed Up Typing… | Every selected clip plays a movie that has a cursor file, and no sheet is open |
 | Speed… | The selection includes a clip that plays a media file |

@@ -27754,7 +27754,8 @@ python3 tools/proof/vr2a_proof.py --mutant bound-ignored     # row 9 must fail
 scratch `CFFIXED_USER_HOME`, in one launch with `-RCDevAnalysisCanned YES`: `canned_framing.py`'s
 markers over copies of `face_fixtures.py`'s `faces_moving.mov` (row 2's copy muxed with a 440 Hz
 tone by ffmpeg, the picture stream-copied). Every project is 1080 × 1920 at 30 fps; every
-placement is read back with `get_project`. Rows 6, 7 and 9 (Follow Subject) are VR2b2's.
+placement is read back with `get_project`. Rows 6, 6b, 7, 7b, 9 and 10 (Follow Subject) and the
+second launch are VR2b2's (below).
 
 | Row | What it holds |
 |---|---|
@@ -27788,6 +27789,47 @@ scheduled before the cut splits (`cuts_split_first_then_the_head_carries_the_mov
 cd core && cargo test --release --test reframe_compose --test reframe_clip
 make app && RC_PROOF_APP=release python3 tools/proof/vr2b_proof.py
 python3 tools/proof/vr2b_proof.py --only 1,4,5              # Debug, in the loop
+```
+
+## Road map "creator-jobs" VR2b2 — Clip ▸ Follow Subject… (`vr2b_proof.py` rows 6, 6b, 7, 7b, 9, 10, Z1 per launch; three mutants; spec §11 VR-29)
+
+The same `vr2b_proof.py`, now in two launches, both `-RCDevAnalysisCanned YES` on the scratch
+`CFFIXED_USER_HOME`. Both pin the sheet's remembered keys as launch arguments (the argument
+domain: the shared Debug or Release defaults domain cannot leak a value in, and Follow writes
+nothing back because nothing changed), as `switch_speaker_proof.py` pins
+`-FrameJobSwitchSpeakerMinShot`. Launch 1 adds `-RCDevFollowAccept YES -FrameJobFollowKind
+subject -FrameJobFollowWhereEmpty fit` and runs rows 1–8 and 7b; launch 2 is
+`-FrameJobFollowKind subject -FrameJobFollowWhereEmpty center` and runs rows 9 and 10. The
+menu is driven through `perform_menu_item ["Clip", "Follow Subject…"]` after `set_selection`.
+
+| Row | What it holds |
+|---|---|
+| 6 | the canned exit (still, gone 4–6 s, back) on one 15 s clip: within 30 s one new step; `undo` answers "Follow Subject" and gives back `get_project` exactly; the menu's `clips` and `tracks` equal a twin document's after `add_track {index: 0, name: "Backgrounds"}` and `reframe_clip {follow: "subject", zoom: 1, where_empty: "fit", replace: true, backdrop}` |
+| 6b | an uncached copy (no canned markers), a 4 s clip: the Analyzing sheet (its title in `snapshot_ui`'s layout dump) comes up and closes within 300 s, then one step "Follow Subject" |
+| 7 | two canned-exit clips one after the other on one track: one new track, "Backgrounds" at index 0, holding two blurred copies; two still-face (x 600) clips: framed, the track count unchanged and no "Backgrounds" track |
+| 7b | two canned-exit clips on two tracks overlapping in time, both selected: two tracks added — the core's new numbered back-most track at index 0 (VR-25) and "Backgrounds" at index 1 — each holding one copy; one undo gives the project back |
+| 9 | `reframe_clip {follow: "subject", backdrop}` with no `where_empty` on the canned exit still makes the blurred copy while `FrameJobFollowWhereEmpty` is `center`: the tool reads no `UserDefaults` (AU-68 (f)) |
+| 10 | the canned cuts on one 25 s clip with an `ease_in_out` volume action [5, 15) s and a `linear` one [16, 24) s: `follow.summary` (polled up to 30 s past "Reading the analysis…") holds "Frames 1 clip." and "1 action re-eased at a cut.", `follow.zoom` reads 100; `cancel_sheet` leaves `get_project` unchanged |
+| Z1 | each launch's log has no `Frame Job: ` line |
+
+The mutants, each edited into the tree, a Debug app built with it (`make app-debug`), its row
+run and the file restored, every one CAUGHT (its row FAIL, exit 1):
+- **5**, the Backgrounds track kept when empty (`FollowSubject.plan`'s `if !backgrounds` made
+  `if false`): row 7's two still faces leave a "Backgrounds" track.
+- **6**, the tool's `where_empty` defaulting from `FrameJobFollowWhereEmpty`
+  (`AgentServer+Framing.swift`'s `enumArg(a, "where_empty", …)` given `?? UserDefaults…`): row 9
+  makes no copy.
+- **7**, re-eased counted without the curve test (`FollowSubject.counts`' `action.curve !=
+  .linear` dropped): row 10's summary says "2 actions re-eased at a cut.".
+
+The sheet's look is the screen `designs/screens/15i-follow-subject-sheet.md`
+(`screens.py --only 15i-follow-subject-sheet`; `FrameJobFollowKind` and
+`FrameJobFollowWhereEmpty` are pinned in `PINS`, `RCDevFollowAccept` is in `NOT_SHOWN`).
+
+```sh
+make app && RC_PROOF_APP=release python3 tools/proof/vr2b_proof.py
+python3 tools/proof/vr2b_proof.py --only 6,6b,7,7b,9,10     # Debug, in the loop
+python3 tools/proof/screens.py --only 15i-follow-subject-sheet
 ```
 
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)

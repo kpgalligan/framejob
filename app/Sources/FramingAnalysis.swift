@@ -5,8 +5,9 @@ import Foundation
 /// `margin` each side, in the order `kinds` — `shots`, `faces`, `subjects`.
 /// CJ-20 stands: nothing runs at import; a command wants these requests and
 /// waits, as Split at Shot Changes does. `reframe_clip`'s tool (VR2a2,
-/// VR-28), VR2b's Clip ▸ Follow Subject… and `analysis_job {clips}` (dev, the
-/// proof's door) call it; View ▸ Show Subjects never does (VR-13).
+/// VR-28), Clip ▸ Follow Subject… (`FollowSubject.swift`, VR-29) and
+/// `analysis_job {clips}` (dev, the proof's door) call it; View ▸ Show
+/// Subjects never does (VR-13).
 ///
 /// Names no `rc_*`; `requests` is main only (it reads the document).
 enum FramingAnalysis {
@@ -33,8 +34,8 @@ enum FramingAnalysis {
         var order: [UInt32] = []
         var found: [UInt32: [ClosedRange<Ticks>]] = [:]
         for id in clips {
-            guard let clip = snapshot.clip(id), case .media(let mediaID, _, _) = clip.source,
-                let media = snapshot.media(mediaID), media.kind == .video, media.hasVideo
+            guard let clip = snapshot.clip(id), qualifies(clip, in: snapshot),
+                case .media(let mediaID, _, _) = clip.source, let media = snapshot.media(mediaID)
             else { continue }
             let played = AnalysisClipTimes(clip: clip, media: media, map: project.sourceMap(id))
                 .window
@@ -45,6 +46,14 @@ enum FramingAnalysis {
             found[mediaID, default: []].append(lower...upper)
         }
         return order.map { MediaWindows(media: $0, windows: merged(found[$0] ?? [])) }
+    }
+
+    /// Whether `clip` is one `windows` reads: a media clip whose media is a
+    /// video with a moving picture (spec §11 VR-29 (a)).
+    static func qualifies(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
+        guard case .media(let mediaID, _, _) = clip.source, let media = snapshot.media(mediaID)
+        else { return false }
+        return media.kind == .video && media.hasVideo
     }
 
     /// Every request `kinds` need over `windows(clips:in:)` of `project` —

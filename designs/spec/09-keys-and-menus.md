@@ -153,7 +153,15 @@ Zoom on typing, Replace existing zooms and Motion blur (CU11b, §11 CU-118 (d): 
 zoomed clips given a 50 % `motion_blur`) over the selected clips' cursor files; Zoom is one
 "Auto Zoom" step of ordinary zoom actions; enabled with at least one selected clip, each a media
 clip whose media has a cursor file, and no sheet up, inside a nest too; no key equivalent; its
-mirror is `auto_zoom`), Add Shortcut Overlays (road map creator-jobs CU8, §11 CU-84: no sheet; one
+mirror is `auto_zoom`), Follow Subject… (road map creator-jobs VR2b2, §11 VR-29: a sheet with Follow
+(Subject, Faces, People, Salient Region, Center), Zoom 100–400 % (100 %, or 125 % when the
+picture is already the canvas's shape; never remembered) and Where Empty (Show Whole, Center;
+off at Center), Follow and Where Empty remembered when changed; Follow is one "Follow
+Subject" step of `reframe_clip` with `replace: true` per selected movie clip and a
+"Backgrounds" track at the back as `backdrop`, removed when no copy needed it, after the
+Analyzing sheet when an analysis is missing (never for Center); enabled with a selected clip
+of a movie with pictures and no sheet up, inside a nest too; no key equivalent; its mirror is
+`reframe_clip`), Add Shortcut Overlays (road map creator-jobs CU8, §11 CU-84: no sheet; one
 Keyboard keys clip per recorded shortcut of the selected clips' cursor files on a front
 "Shortcuts" track, bottom and dark, as one "Add Shortcut Overlays" step; enabled as Auto Zoom… is
 and while no run is reading files; an informational sheet for a refusal, nothing placed or a

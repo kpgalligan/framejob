@@ -49,6 +49,13 @@ of; text, shape, image and background clips; matte tracks that cut the track
 behind them.
 → [Canvas, layers, text and shapes](docs/guide/canvas-and-layers.md)
 
+**Vertical and framing.** Faces, people and the regions the eye goes to, found
+on your Mac and drawn over the preview by View ▸ Show Subjects; Clip ▸ Follow
+Subject… frames landscape recordings for a vertical or square canvas, easing
+onto the subject, cutting with the shots and filling the edges with a blurred
+copy, as ordinary actions in one undo step.
+→ [Vertical and framing](docs/guide/vertical-and-framing.md)
+
 **Motion and transitions.** Actions that ease any property to a new state over
 a span — Zoom to Region for screencasts — motion presets for entrances, exits
 and continuous movement, and thirteen transition styles.

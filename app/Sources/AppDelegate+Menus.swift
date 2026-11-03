@@ -322,7 +322,12 @@ extension AppDelegate {
         // Road map "creator-jobs" CU7 (spec §11 CU-76), right after Add
         // Action: the UI path `auto_zoom` names. No key equivalent.
         menu.addItem(item("Auto Zoom…", #selector(EditorViewController.showAutoZoomSheet(_:))))
-        // CU8 (spec §11 CU-84), right after Auto Zoom…: the UI path `add_shortcut_overlays`.
+        // VR2b2 (spec §11 VR-29 (i)), right after Auto Zoom… (both write moves on the action
+        // lane): the UI path `reframe_clip` names, with `replace: true`. No key equivalent.
+        menu.addItem(
+            item("Follow Subject…", #selector(EditorViewController.showFollowSubjectSheet(_:))))
+        // CU8 (spec §11 CU-84), after Auto Zoom… and Follow Subject…: the UI path
+        // `add_shortcut_overlays`.
         menu.addItem(
             item("Add Shortcut Overlays", #selector(EditorViewController.addShortcutOverlays(_:))))
         // CU9b (spec §11 CU-93), right after Add Shortcut Overlays: the UI path

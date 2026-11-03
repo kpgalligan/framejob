@@ -8,8 +8,8 @@ import AppKit
 /// `subjects`, nil while off; nothing is written to `UserDefaults`, so a new
 /// window starts with it off and a proof can drive it through
 /// `perform_menu_item` without moving the defaults. **It never starts an
-/// analysis**: an uncached clip shows "Not analyzed"; `get_media_analysis`
-/// (and, from VR2b, Clip ▸ Follow Subject…) make what it draws. No MCP tool
+/// analysis**: an uncached clip shows "Not analyzed — Clip ▸ Follow Subject…
+/// analyzes it"; `get_media_analysis` and Clip ▸ Follow Subject… make what it draws. No MCP tool
 /// mirrors it (§7.9's Preview Quality exemption, as Show Ungraded): it edits
 /// nothing, and `get_media_analysis {kind: "faces" | "subjects"}` answers
 /// what it draws. Always enabled.

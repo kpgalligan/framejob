@@ -4,8 +4,8 @@ Frame Job can find who and what is in a clip's picture: faces, people and the
 regions the eye is drawn to. It finds them on this Mac with Apple's Vision
 framework — nothing is uploaded and no key is needed — and keeps what it found
 in the project's cache, so it is found once per file. This page covers what is
-found, how to see it, and how an agent reframes a clip with it. A menu command
-for reframing (Clip ▸ Follow Subject…) arrives in a later release.
+found, how to see it, how **Clip ▸ Follow Subject…** frames the selected clips
+on it, and how an agent reframes a clip with it.
 
 ## What is found
 
@@ -22,9 +22,10 @@ Boxes are found in each sample on its own: Frame Job does not follow a person
 from one moment to the next or put names to faces.
 
 Nothing is looked at when you import a file. A file is analysed when something
-asks for it — today an agent (`get_media_analysis` with `kind: "faces"` or
-`"subjects"`, see [MCP](mcp.md)), or `reframe_clip` (below), which asks for
-the part of the file its clip plays. Analysis runs in the background and
+asks for it — **Clip ▸ Follow Subject…** (below), an agent
+(`get_media_analysis` with `kind: "faces"` or `"subjects"`, see [MCP](mcp.md)),
+or `reframe_clip` (below); Follow Subject and `reframe_clip` ask for the part of
+the file each clip plays. Analysis runs in the background and
 keeps what it has found if it is stopped; asking again continues it.
 
 ## Show Subjects
@@ -42,12 +43,56 @@ they show what the clip is showing at that moment. Select another clip to see
 its boxes; move the playhead to see another moment.
 
 When nothing has been found for the clip's picture at the playhead, the preview
-says **Not analyzed** at the clip's top-left corner. Show Subjects never starts
+says **Not analyzed — Clip ▸ Follow Subject… analyzes it** at the clip's
+top-left corner. Show Subjects never starts
 an analysis itself, so turning it on costs nothing.
 
 Show Subjects is a view of the window: it is off in a new window, it is not
 remembered between launches, and it never changes an export or a saved frame.
 Choose it again to turn it off. It has no shortcut and is always available.
+
+## Follow Subject
+
+Select the clips to frame — say landscape recordings on a 1080 × 1920 vertical
+canvas — and choose **Clip ▸ Follow Subject…**. It is offered when a selected
+clip plays a movie (inside a nest too); a still, a picture, a nest, text, a
+shape, a graphic or an adjustment clip in the selection is left alone. The
+sheet has three controls:
+
+- **Follow** — **Subject** follows a face, or where there is none a person, or
+  where there is neither the region the eye goes to; **Faces**, **People** and
+  **Salient Region** follow only that kind; **Center** holds the frame on the
+  middle of the picture for the whole clip.
+- **Zoom** — how tight the frame is, 100 to 400 %: 100 % is the scale at which
+  the picture just covers the canvas. It starts at 100 %, or at 125 % when the
+  picture is already the canvas's shape, and is not remembered.
+- **Where Empty** — what the frame shows while there is nothing to follow:
+  **Show Whole** (the whole picture) or **Center** (the middle of the
+  picture). It is off while Follow is Center.
+
+Follow and Where Empty are remembered for the next time. Under them, the sheet
+says what **Follow** will do: how many clips it frames, the tracks it adds,
+how many of the clips' actions are eased again or carry a move of the framing,
+and each clip it cannot frame, with the reason. When the clips have not been
+analysed, it says it will find the faces, people and shot changes first: Follow
+then shows the Analyzing sheet while that runs on this Mac, and frames the
+clips when it is done (Stop changes nothing). Center needs no analysis.
+
+Each clip is framed as `reframe_clip` frames it (below), starting from the
+whole picture: the clip's own positions and scales, in its base and its
+actions, are replaced, and its volume and other actions stay. Where the frame
+shows the whole picture, a blurred copy of the clip goes on a new
+**Backgrounds** track at the back, so the canvas around it is not empty; no
+track is added when no clip needs one. Where two selected clips overlap in
+time, the second copy goes on a further new track behind Backgrounds.
+
+Every move is an ordinary action on the clip's action lane: select one and drag
+the picture on the canvas to nudge where its frame ends, as with any action.
+**Edit ▸ Undo Follow Subject** takes the whole command back in one step.
+
+Follow Subject does not offer `fit` or `keep` (an agent can send them), does
+not frame stills or pictures, and does not change the canvas: set the vertical
+canvas first in the Document tab.
 
 ## Reframing a clip (for agents)
 

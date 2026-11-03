@@ -403,6 +403,14 @@
    ],
    "note": "presentAsSheet(AutoZoomSheetController) over the selected clips with cursor files (CU-76); beeps with none or a sheet up"
   },
+  "showFollowSubjectSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+FollowSubject.swift `@objc func showFollowSubjectSheet(`",
+    "app/Sources/EditorViewController+FollowSubject.swift:26"
+   ],
+   "note": "presentAsSheet(FollowSubjectSheetController) over the selected clips with a moving picture (VR-29 (a), (b)); beeps with none or a sheet up; its Follow is an edit at once when the analysis is cached or Follow is Center, else it hands off and the editor puts up the Analyzing sheet while the faces, people and shot changes are found on this Mac (CJ-28; app/Sources/EditorViewController+FollowSubject.swift:49, reached_after), whose answer is an edit (VR-29 (d))"
+  },
   "addShortcutOverlays:": {
    "verdict": "none",
    "code": [
@@ -1102,6 +1110,28 @@
     "splitAtShotChanges:"
    ],
    "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+FollowSubject.swift:26": {
+   "token": "presentAsSheet",
+   "func": "showFollowSubjectSheet",
+   "reached_from": [
+    "showFollowSubjectSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+FollowSubject.swift:49": {
+   "token": "presentAsSheet",
+   "func": "analyzeForFollow",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "showFollowSubjectSheet:",
+     "via": "app/Sources/FollowSubjectSheetController.swift `DispatchQueue.main.async { analyze(handOff.0, handOff.1) }`",
+     "gate": "app/Sources/FollowSubjectSheetController.swift `handOff = (settings, requests)` — the Follow Subject sheet's Follow with a following kind while an analysis request is missing (VR-29 (d))"
+    }
+   ],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+Audio.swift:97": {

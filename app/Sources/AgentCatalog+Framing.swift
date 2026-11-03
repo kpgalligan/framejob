@@ -9,9 +9,10 @@ extension AgentServer {
 
     func framingTools() -> [[String: Any]] {
         [
-            // No menu sends it yet: Clip ▸ Follow Subject… arrives in road map
-            // creator-jobs VR2b2. The tool fills `subjects` from the analysis
-            // cache (AgentServer+Framing.swift).
+            // UI path: Clip ▸ Follow Subject… (road map creator-jobs VR2b2, spec §11
+            // VR-29), this op with `replace: true` on each selected clip and a
+            // "Backgrounds" track as `backdrop`. The tool fills `subjects` from the
+            // analysis cache (AgentServer+Framing.swift).
             opTool(
                 "reframe_clip",
                 "Frames one clip on the current canvas — for a vertical or square version of "
@@ -48,7 +49,9 @@ extension AgentServer {
                     + "clip (a rotation, an action turning it, a spin); with backdrop "
                     + "where a copy would be made, a nest clip or a track not behind the "
                     + "clip's; last, a following kind with nothing found in the clip. Inside "
-                    + "a nest (scope) the nest's canvas is the canvas.",
+                    + "a nest (scope) the nest's canvas is the canvas. Clip ▸ Follow Subject… "
+                    + "is this op with replace: true on each selected clip and a "
+                    + "\"Backgrounds\" track as backdrop.",
                 [
                     "clip": "The clip to frame: a clip with a picture, upright.",
                     "follow": "subject, face, person or salient (follow what is found), "

@@ -387,7 +387,9 @@ and `-RCDevRetimeAccept YES`, with which the Retime Range sheet presses its
 own Apply so a proof can drive Clip ▸ Retime Range… to its edit (spec §11
 CU-90 (d)); and `-RCDevSwitchSpeakerAccept YES`, with which the Switch by
 Speaker sheet presses its own Switch once its first plan exists (spec §11
-SW-26); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
+SW-26); and `-RCDevFollowAccept YES`, with which the Follow Subject sheet
+presses its own Follow once it is first enabled (spec §11 VR-29 (h)); and
+`-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
 document with no window (`display: false`), so a proof can see the windowless
 door (spec §11 CJ-52); and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which

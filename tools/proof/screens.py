@@ -229,6 +229,8 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobSwitchSpeakerLead", 0.2),
     ("FrameJobSwitchSpeakerCrosstalk", "wide"),
     ("FrameJobSwitchSpeakerBleed", 15.0),
+    ("FrameJobFollowKind", "subject"),
+    ("FrameJobFollowWhereEmpty", "fit"),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"FrameJobInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
@@ -319,6 +321,9 @@ NOT_SHOWN = {
     "RCDevSwitchSpeakerAccept": "a dev launch default with which the Switch by Speaker sheet "
                                 "presses its own Switch (spec §11 SW-26 (b)); no screen launches "
                                 "with it",
+    "RCDevFollowAccept": "a dev launch default with which the Follow Subject sheet presses its "
+                         "own Follow once it is first enabled (spec §11 VR-29 (h)); no screen "
+                         "launches with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,

@@ -158,6 +158,16 @@ the same way.
 - **Expect:** no visible hitch or frozen frame at any cut, and the sound uninterrupted across every cut.
 - **Source:** road map creator-jobs SW2b (SW2c's question, SW-28; SW0's SW-S2 measured rebuild times, never what a person sees).
 
+**JOB-31 — Follow Subject's framing feels like a camera operator's**
+- **Do:** On a 1080 × 1920 project, put a landscape talking-head recording on the timeline (T1 or S-TH1 when it exists: one person who sways, turns, leans out of frame and comes back), select it, choose Clip ▸ Follow Subject… at Subject, 100 % and Show Whole, and press Follow. Play it through, then try Faces and 125 %.
+- **Expect:** the frame stays put while the person sways, moves only when they really move, never fidgets or trails behind them, eases out to the whole picture over the blurred copy when they leave and back once they return, and cuts with the picture at each shot change — the moves a camera operator would make.
+- **Source:** road map creator-jobs VR2b2, spec §11 VR-29 (k), VR-22, VR-23 (`vr2b_proof.py` scores the edit against canned faces, never how the framing feels).
+
+**JOB-32 — Follow Subject's two-shot**
+- **Do:** On a 1080 × 1920 project, frame a landscape two-person recording (S-PC3 when it exists: two people side by side who lean together and apart) with Clip ▸ Follow Subject… at Subject, 100 %. Play it through.
+- **Expect:** while both fit in the tall frame they are framed together; when they do not, one of them is followed (the owner's answer) and the frame does not ping-pong between them.
+- **Source:** road map creator-jobs VR2b2, spec §11 VR-29 (k), VR-24 (g) (no script judges a real two-shot).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

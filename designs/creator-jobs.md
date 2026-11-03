@@ -9224,6 +9224,83 @@ Every Z1 was empty. No issue was owed.
 summary's counts, `-RCDevFollowAccept YES`, the screen, the guide's section, proof rows 6, 7 and
 9, mutants 5 and 6, JOB-31 and JOB-32.
 
+#### VR2b2's record (2026-11-03)
+
+**Built** in lane C, base `2cc21ecd` (I's HEAD after SW2b; VR2b1 at `a4869b62` below it). No
+core, FFI, header, op, tool, `Kind` or format change (43 stands): `OP_COUNT` 70, 122 product
+tools. The owner's answers for VR2b (fill, follow one, 38 %) stand. VR-29 (a)–(k) went into a new
+`designs/spec/11-decisions/creator-jobs-10.md` (104 lines; `creator-jobs-9.md` was 599, past
+the split rule) with its index rows, committed alone before any code (`ac991862`).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/FollowSubject.swift` | 251 | new: `FollowSubjectSettings`, `FollowSubject` (targets, default zoom, subjects, plan, counts, summaries) |
+| `app/Sources/FollowSubjectSheetController.swift` | 265 | new: the sheet, the read off main, the hand-off, the dev accept |
+| `app/Sources/EditorViewController+FollowSubject.swift` | 144 | new: the command, the Analyzing sheet, the changed-project refusal, the grouped commit, the validator |
+| `app/Sources/FramingAnalysis.swift` | 103 → 112 | `qualifies` lifted out of `windows` |
+| `app/Sources/EditorViewController.swift` | 1094 → 1095 | the validator line (frozen: wiring only) |
+| `app/Sources/AppDelegate+Menus.swift` | 512 → 516 | Clip ▸ Follow Subject… after Auto Zoom… |
+| `tools/proof/vr2b_proof.py` | 400 → 653 | rows 6, 6b, 7, 7b, 9, 10, the second launch, Z1 per launch |
+
+**Deviations.** (1) Row 7b's spec text put "Backgrounds" at index 0 with the further track
+"behind it"; the core's `with_back_track` inserts its numbered track at index 0, behind
+Backgrounds, which moves to index 1. The row asserts that (index 0 the new numbered track,
+index 1 Backgrounds), and the guide says "a further new track behind Backgrounds". (2) The
+summary says "1 action carries a framing move." in the singular, VR-29 (g)'s "carry" for more
+than one. (3) The inventory's gate for the Analyzing sheet anchors on `handOff = (settings,
+requests)`: `if pending(settings) {` occurs twice in the sheet and `inventory.py` wants an anchor
+once. (4) The screen opens at 125 %: `screens.py`'s `demo` canvas (960 × 540) and `speech.mov`
+(640 × 360) share an aspect, so VR-29 (b)'s 125 % applies; its prose says so.
+
+**Measured.**
+- `make typecheck`: exit 0, 0 errors, the 4 baseline warnings. `inventory.py --check` exit 0
+  (after deviation (3)); `spec_index_proof.py` 267/267.
+- Debug: `vr2b_proof.py --only 6,6b,7,7b,9,10` 5/7 on its first run (6b and 10 read no sheet:
+  `snapshot_ui` was given a folder that did not exist; an instrument fix), then `--only 6b,10`
+  3/3. `screens.py --only 15i-follow-subject-sheet` 6/6.
+- `make gate`: "gate: PASS 622s" (names 1, typecheck 9, fmt and lint skipped unchanged, test
+  404, app 207).
+- Release (the gate's app): `RC_PROOF_APP=release vr2b_proof.py` 13/13, exit 0 (row 2: 1,440,000
+  samples each, 0 differ; both Z1 empty); `RC_PROOF_APP=release screens.py --only
+  15i-follow-subject-sheet` 6/6 (P2 pass: 82 key literals, 43 pinned, 39 not shown; both looks).
+- Mutants, three, each edited into the tree, a Debug app built with it, its row run and the
+  file restored, every one CAUGHT (exit 1): the Backgrounds track kept when empty (row 7: "1 → 2
+  tracks, names ['Backgrounds', 'Track 1']" for the stills); the tool's `where_empty` from
+  `FrameJobFollowWhereEmpty` (row 9: "0 blurred cop(ies)"); re-eased without the curve test
+  (row 10: "2 actions re-eased at a cut.").
+
+**Review** (`2cc21ecd..7aa3e0e9`, pass; three nits, fixed at integration). CU8's comment in
+`AppDelegate+Menus.swift` still put Add Shortcut Overlays "right after Auto Zoom…"; it now says
+after Auto Zoom… and Follow Subject… (516 → 517 lines). `inventory.json` had lost its final
+newline; it is back. The Show Subjects paragraph of `04.2-preview-canvas.md` was rewrapped
+(179 → 180 lines).
+
+**Integration.** `ac991862` and `7aa3e0e9` were applied onto `worktree-creator-jobs` at
+`ca2d98a0`; CU3c had landed since the lane's base. Two index files conflicted:
+- `11-decisions/README.md`: `creator-jobs-9.md`'s row kept CU3c's 667 lines and its CU-31 and
+  CU-36 clause, and gained "the series continues in `creator-jobs-10.md`";
+- `designs/spec/README.md`: the folder row is now 22047 in 44 files.
+
+No other lane had taken a `-10`, so none was renumbered, and format 43 stands. The root
+`CLAUDE.md` gained `-RCDevFollowAccept YES` among the dev launch defaults. `app/CLAUDE.md`
+gained an entry for the three new files; the `FramingSubjects.swift` entry now names its UI
+path, the `FramingAnalysis` sentence names Follow Subject and `qualifies`, and the
+`SubjectsOverlay.swift` entry carries VR-13's suffix.
+
+On the integrated tree, `make gate`'s first run passed names (1 s), typecheck (9 s) and test
+(301 s, 227 result lines, 2306 passed, 0 failed). Its app step (273 s) failed to link:
+"ld: framework 'Sparkle' not found". That happened while another lane's Release xcodebuild was
+running, and both builds resolve Sparkle from main's `build/SourcePackages`. Once that build
+had ended, the gate was run again with no edit; only app ran: "app pass 7s", "gate: PASS 8s".
+Against that Release app:
+- `RC_PROOF_APP=release vr2b_proof.py` passed 13/13, exit 0 (row 2: 1,440,000 samples each,
+  0 differ), with both Z1 empty;
+- `RC_PROOF_APP=release screens.py --only 15i-follow-subject-sheet` scored 6 pass of 6, with
+  0 new problems.
+
+**Owed.** JOB-31 and JOB-32 are person-only rows in `docs/manual-checks.md`. No issue was
+owed. VR2b is complete; VR3 is next in lane C.
+
 ### FC6 — Claude's ranking, checked, priced and cached
 
 - **What a person gets:** nothing on screen yet: the engine FC7b drives. Its decisions are the road

@@ -30,7 +30,7 @@ import AppKit
 /// stroke as the selection outline has. With neither kind covering, "Not
 /// analyzed" at the layer's top-left corner. Main only.
 final class SubjectsOverlay {
-    static let notAnalyzed = "Not analyzed"
+    static let notAnalyzed = "Not analyzed — Clip ▸ Follow Subject… analyzes it"
     /// The kinds drawn, back to front.
     static let kinds: [AnalysisKind] = [.subjects, .faces]
 

@@ -1,10 +1,11 @@
 import Foundation
 
 /// `reframe_clip` (road map "creator-jobs" VR2a2 and VR2b1, spec §11 VR-26…VR-28):
-/// the op tool whose `subjects` the app fills from the analysis cache. No menu
-/// sends it yet — Clip ▸ Follow Subject… arrives in VR2b2 — so it mirrors no UI
-/// path; every refusal is the core's sentence, and Swift copies none of
-/// VR-26's or VR-27's rules (`replace` is passed through as the caller sent it).
+/// the op tool whose `subjects` the app fills from the analysis cache. It mirrors
+/// Clip ▸ Follow Subject… (VR2b2, spec §11 VR-29: this op with `replace: true` per
+/// selected clip and a "Backgrounds" backdrop track); every refusal is the core's
+/// sentence, and Swift copies none of VR-26's or VR-27's rules (`replace` is
+/// passed through as the caller sent it). It reads no `UserDefaults` (AU-68 (f)).
 ///
 /// **Runs on the SERVER thread** (`creatorOffMainTools`), in three hops:
 /// - the first main hop resolves the arguments and TRIES the op with no

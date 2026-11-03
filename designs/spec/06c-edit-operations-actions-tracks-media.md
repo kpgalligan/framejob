@@ -102,7 +102,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   `add_blurred_background`'s nest sentence or `track {t} is not behind clip {id}'s track, so a
   backdrop there would cover it`; LAST, `clip {id} has no subjects to follow; analyze it first`. A
   result equal to the clip is an identity. Allowed inside a nest, whose canvas is the view's. One
-  undo step.
+  undo step. Its UI path is Clip ▸ Follow Subject… (§11 VR-29): this op with `replace: true` on
+  each selected movie clip and a "Backgrounds" track added at index 0 as `backdrop`, removed
+  when no copy needed it, as one undo step "Follow Subject".
 - **`add_speed_ramp {clip, shape, rate, from?, to?, curve="ease_in_out", hold=0.5}`** — A speed
   ramp preset in one step, made of ordinary Speed actions (§11 SR-23, #340): `shape` is `ramp_up`,
   `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both or neither (the
