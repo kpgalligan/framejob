@@ -14,7 +14,7 @@ use std::fs;
 use std::path::Path;
 
 use framejob_core::model::Project;
-use framejob_core::reframe::{plan_framing, FramingRequest, FramingTuning, Subjects};
+use framejob_core::reframe::{plan_framing, FramingRequest, FramingTuning, Subjects, WhereEmpty};
 use framejob_core::reframe_tracks::{
     choose_subject, Follow, SubjectBox, SubjectKind, SubjectSample,
 };
@@ -88,6 +88,7 @@ fn measure(input: &Input, tuning: &FramingTuning) -> Value {
         zoom: input.zoom,
         from_width: input.from.0,
         from_height: input.from.1,
+        where_empty: WhereEmpty::Fit,
     };
     let path = plan_framing(
         &input.project,

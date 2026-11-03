@@ -63,6 +63,8 @@ extension AgentServer {
         // AgentServer+Switch.swift (SW1, spec §11 SW-11…SW-15)
         "copy_pieces": { $0.copyPieces },
         "switch_angle": { $0.switchAngle },
+        // AgentServer+Framing.swift (VR2a2, spec §11 VR-26, VR-28)
+        "reframe_clip": { $0.reframeClip },
     ]
 
     /// The road map's tools that run off the main thread, unioned into
@@ -70,7 +72,7 @@ extension AgentServer {
     static let creatorOffMainTools: Set<String> = [
         "get_media_analysis", "split_at_shots", "get_timeline_transcript",
         "new_project_from_range", "analyze_cutout", "get_cursor_events", "auto_zoom",
-        "add_shortcut_overlays", "speed_up_typing", "switch_layout",
+        "add_shortcut_overlays", "speed_up_typing", "switch_layout", "reframe_clip",
     ]
 
     /// The road map's catalog rows, in catalog order: `get_media_analysis`
@@ -86,7 +88,8 @@ extension AgentServer {
     /// `AgentCatalog+ShortcutOverlays.swift`), then `speed_up_typing` (CU9b,
     /// `AgentCatalog+SpeedUpTyping.swift`), then the op tool `switch_layout`
     /// (CO6, `AgentCatalog+Layout.swift`), then the op tool `copy_pieces` and
-    /// `switch_angle` (SW1, `AgentCatalog+Switch.swift`).
+    /// `switch_angle` (SW1, `AgentCatalog+Switch.swift`), then the op tool
+    /// `reframe_clip` (VR2a2, `AgentCatalog+Framing.swift`).
     /// `catalogJSON()` splices them in immediately before the dev tools' rows,
     /// so the dev block still runs straight into `import_media` and the file
     /// groups stay last.
@@ -100,6 +103,7 @@ extension AgentServer {
         tools += speedUpTypingTools()
         tools += layoutTools()
         tools += switchTools()
+        tools += framingTools()
         return tools
     }
 }

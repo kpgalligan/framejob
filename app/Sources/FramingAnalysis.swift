@@ -4,9 +4,9 @@ import Foundation
 /// for each media the named clips show, the windows those clips play plus
 /// `margin` each side, in the order `kinds` — `shots`, `faces`, `subjects`.
 /// CJ-20 stands: nothing runs at import; a command wants these requests and
-/// waits, as Split at Shot Changes does. VR2b's Clip ▸ Follow Subject… and
-/// `analysis_job {clips}` (dev, the proof's door) call it; View ▸ Show
-/// Subjects never does (VR-13).
+/// waits, as Split at Shot Changes does. `reframe_clip`'s tool (VR2a2,
+/// VR-28), VR2b's Clip ▸ Follow Subject… and `analysis_job {clips}` (dev, the
+/// proof's door) call it; View ▸ Show Subjects never does (VR-13).
 ///
 /// Names no `rc_*`; `requests` is main only (it reads the document).
 enum FramingAnalysis {
@@ -47,16 +47,18 @@ enum FramingAnalysis {
         return order.map { MediaWindows(media: $0, windows: merged(found[$0] ?? [])) }
     }
 
-    /// Every request `kinds` need over `windows(clips:in:)` of the document's
-    /// open scope: kind-major in `kinds` order, then media in the windows'
-    /// order, each kind's need the windows' grid indices widened by its read
-    /// margin (`ProjectDocument.analysisRequest(kind:media:url:urls:cacheDir:need:)`);
+    /// Every request `kinds` need over `windows(clips:in:)` of `project` —
+    /// the document's open scope when nil, else the container a call named
+    /// (`reframe_clip`'s, spec §11 VR-28): kind-major in `kinds` order, then
+    /// media in the windows' order, each kind's need the windows' grid indices
+    /// widened by its read margin
+    /// (`ProjectDocument.analysisRequest(kind:media:url:urls:cacheDir:need:)`);
     /// a hit is omitted. Throws the request's own errors (a missing file, no
     /// cache folder, an unreadable file). Main thread.
-    static func requests(clips: [UInt32], in document: ProjectDocument) throws
-        -> [AnalysisRequest]
-    {
-        let project = document.editedProject
+    static func requests(
+        clips: [UInt32], in document: ProjectDocument, project: ReelProject? = nil
+    ) throws -> [AnalysisRequest] {
+        let project = project ?? document.editedProject
         let all = windows(clips: clips, in: project)
         guard !all.isEmpty else { return [] }
         let urls = document.mediaURLs()

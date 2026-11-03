@@ -12,7 +12,12 @@
 //! central — under three rules: a tier (faces over people over salient
 //! regions, for `subject`), a face's own body standing in for it while it is
 //! away, and hysteresis, so two near-equal faces do not trade the frame
-//! back and forth. All times are CLIP ticks, samples strictly increasing.
+//! back and forth. An absent primary is held [`LOSS_HOLD`] (VR2a2, spec §11
+//! VR-24 (c)): the best present track stands in, marked `lost`, and replaces
+//! the primary only once the hold has passed. All times are CLIP ticks,
+//! samples strictly increasing.
+
+use serde::{Deserialize, Serialize};
 
 use crate::time::{Ticks, TIMESCALE};
 
@@ -29,10 +34,14 @@ pub const RIVAL_MARGIN: f64 = 1.25;
 pub const RIVAL_HOLD: Ticks = 2 * TIMESCALE;
 /// A score reads the samples within this of its own, in its shot: ±1 s.
 const SCORE_SPAN: Ticks = TIMESCALE;
+/// How long an absent primary is held before another track replaces it,
+/// and how long a framing holds a lost subject (spec §11 VR-24): 1 s.
+pub const LOSS_HOLD: Ticks = TIMESCALE;
 
 /// One box, 0…1 of the upright picture from its top-left (CJ-22, VR-10),
 /// with its confidence.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubjectBox {
     pub x: f64,
     pub y: f64,
@@ -42,11 +51,15 @@ pub struct SubjectBox {
 }
 
 /// One analysed instant: its faces, people and salient regions.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubjectSample {
     pub t: Ticks,
+    #[serde(default)]
     pub faces: Vec<SubjectBox>,
+    #[serde(default)]
     pub people: Vec<SubjectBox>,
+    #[serde(default)]
     pub salient: Vec<SubjectBox>,
 }
 
@@ -75,6 +88,15 @@ pub struct Chosen {
     pub kind: Option<SubjectKind>,
     pub track: Option<u32>,
     pub subject: Option<SubjectBox>,
+    /// The chosen track's identity: a body's is its face's id (VR-21).
+    pub identity: Option<u32>,
+    /// Not its shot's first sample, and the primary identity — kept through
+    /// a loss (VR-24 (c)) — has no present track here: what is chosen, if
+    /// anything, is a stand-in.
+    pub lost: bool,
+    /// For a face or person pick: the best-scoring other present track of
+    /// its tier with another identity, its box here (VR-24 (g)).
+    pub second: Option<SubjectBox>,
 }
 
 const KINDS: [SubjectKind; 3] = [SubjectKind::Face, SubjectKind::Person, SubjectKind::Salient];
@@ -284,18 +306,33 @@ pub fn choose_subject(samples: &[SubjectSample], cuts: &[Ticks], follow: Follow)
     let identity = |n: usize| body[n].unwrap_or(tracks[n].id);
     let mut primary: Option<u32> = None;
     let mut rivals: Vec<(u32, Ticks)> = Vec::new();
+    // The first sample at which the primary had no present track (VR-24 (c)).
+    let mut absent_since: Option<Ticks> = None;
     let mut out = Vec::with_capacity(samples.len());
     for (i, sample) in samples.iter().enumerate() {
+        let first_of_shot = i == 0 || shot[i] != shot[i - 1];
         let tier = kinds
             .iter()
             .copied()
             .find(|&kind| present[i].iter().any(|&n| tracks[n].kind == kind));
         let Some(tier) = tier else {
+            // Nothing present: a shot's first sample clears the primary, any
+            // other sample counts towards its absence.
+            if first_of_shot {
+                primary = None;
+                rivals.clear();
+                absent_since = None;
+            } else if primary.is_some() {
+                absent_since.get_or_insert(sample.t);
+            }
             out.push(Chosen {
                 t: sample.t,
                 kind: None,
                 track: None,
                 subject: None,
+                identity: None,
+                lost: primary.is_some() && !first_of_shot,
+                second: None,
             });
             continue;
         };
@@ -318,7 +355,7 @@ pub fn choose_subject(samples: &[SubjectSample], cuts: &[Ticks], follow: Follow)
                 .copied()
                 .filter(|&(n, _)| Some(identity(n)) == primary),
         );
-        let first_of_shot = i == 0 || shot[i] != shot[i - 1];
+        let mut lost = false;
         let chosen = match staying {
             Some((stay, stay_score)) if !first_of_shot => {
                 let meeting: Vec<(usize, f64)> = candidates
@@ -344,17 +381,40 @@ pub fn choose_subject(samples: &[SubjectSample], cuts: &[Ticks], follow: Follow)
                     None => stay,
                 }
             }
+            // The primary absent (VR-24 (c)): the best present track stands
+            // in, the primary kept, until `LOSS_HOLD` has passed.
+            None if !first_of_shot && primary.is_some() => {
+                let since = *absent_since.get_or_insert(sample.t);
+                lost = sample.t - since < LOSS_HOLD;
+                best.0
+            }
             _ => best.0,
         };
-        if Some(identity(chosen)) != primary {
-            primary = Some(identity(chosen));
-            rivals.clear();
+        if !lost {
+            absent_since = None;
+            if Some(identity(chosen)) != primary {
+                primary = Some(identity(chosen));
+                rivals.clear();
+            }
         }
+        let second = match tracks[chosen].kind {
+            SubjectKind::Face | SubjectKind::Person => best_of(
+                &mut candidates
+                    .iter()
+                    .copied()
+                    .filter(|&(n, _)| identity(n) != identity(chosen)),
+            )
+            .and_then(|(n, _)| tracks[n].at(i)),
+            SubjectKind::Salient => None,
+        };
         out.push(Chosen {
             t: sample.t,
             kind: Some(tracks[chosen].kind),
             track: Some(tracks[chosen].id),
             subject: tracks[chosen].at(i),
+            identity: Some(identity(chosen)),
+            lost,
+            second,
         });
     }
     out

@@ -8530,6 +8530,10 @@ review's three nits stand as recorded above.
   clip's end), and with no chosen subject the window holds until VR-24 replaces that rule;
   VR-S2 runs over six canned inputs only (S-TH1, T1 and T2 do not exist yet: skipped by name and
   owed), its rule pooled over them, with a STOP arm when no setting reaches its second cap.
+- **VR2a2's decisions (recorded before code, 2026-11-03).** VR-24, VR-25, VR-26 and VR-28 are
+  settled in `designs/spec/11-decisions/creator-jobs-9.md` (new: `creator-jobs-8.md` is past the
+  ~500-line rule), with amendment lines under VR-20 and VR-21 in `creator-jobs-7.md`; the drafts
+  above stand as the road map's text.
 
 #### VR2a1's record (2026-11-02)
 
@@ -8616,6 +8620,123 @@ Release proof: VR2a1 changes no app file.
 
 **Owed.** As above: VR-S2's S-TH1, T1 and T2 rows and the headroom's first real measurement;
 JOB-31's feel. No person check; nothing filed.
+
+#### VR2a2's record (2026-11-03)
+
+**Built** in lane C. A first attempt (base `9d55f6bb`, tip `05871b96`, six commits) built, gated
+and proved everything below and stopped at VR-S2's re-run for the owner. The second attempt
+cherry-picked those six commits unchanged in code onto base `15b08bda` (I's HEAD after CO9; format
+43 in the tree, and no format, FFI or header change here) and re-verified them there. The commits,
+with their new shas:
+- `9cd941d6` (was `78e34d1f`): VR-24, VR-25, VR-26 and VR-28 in the new
+  `designs/spec/11-decisions/creator-jobs-9.md` (`-8` is past the ~500-line rule), the amendment
+  lines under VR-20 (`replace` joins with VR-27 in VR2b; shots `Round::Up`) and VR-21 (the loss
+  hold), the index rows, alone, before any code.
+- `884a4e1b` (was `db612b78`): the pure lifts — `edit_zoom.rs`'s `zoom_scale` and `zoom_offset`
+  `pub(crate)`, `edit_background.rs`'s `blurred_copy` lifted out of `add_blurred_background` with
+  `with_back_track` `pub(crate)` (its answers unchanged), `edit_canvas.rs`'s `rescale_video` lifted
+  out of `rescale`, VR-23's key loop moved whole into `reframe_path.rs` and `Frame` sized through
+  `source_size`.
+- `e12857b1` (was `88952eee`): VR-24 (`reframe_path.rs`, the chooser's three fields and
+  `LOSS_HOLD` in `reframe_tracks.rs`, `WhereEmpty`, `shows_fit`, `fixed_framing` and the shots'
+  `Round::Up` in `reframe.rs`) and the op (`edit_reframe.rs`, `reframe_cover.rs`; `edit.rs`,
+  `op_rows.rs`, `op_table.rs` with `OP_COUNT` 70 and the kinds `Follow`, `WhereEmpty`, `Subjects`,
+  `op_schema.rs`, `scope.rs`), with `core/tests/reframe_path.rs` (12) and `reframe_clip.rs` (14).
+- `9d45fe1e` (was `f3b3111d`): the tool (`AgentServer+Framing.swift`, `FramingSubjects.swift`,
+  `AgentCatalog+Framing.swift`), `ReelOps.swift`'s `FramingFollow`, `FramingWhereEmpty` and
+  `reframeClip`, `FramingAnalysis.requests(clips:in:project:)`, the creator-jobs seam, `subjects`
+  `filledByTheApp`, the prompt's "actions and zooms" group; spec §6c, §7.9a, §7.10, §7.4; the guide
+  (`vertical-and-framing.md`, `mcp.md`); `op_argument_proof.py` (122 tools, 70 ops) and
+  `op_catalog_proof.py` (70).
+- `a1d839a3` (was `5b385e36`): `canned_framing.py`, `vr2a_proof.py` and its README section.
+- `3ce80ac6` (was `05871b96`): this record, first written.
+- `d1a4c6b7`: VR-S2's ruling in `-9` and its index row, before the re-verification.
+- `c584e294`: this record, rewritten under the ruling.
+
+The eight land on the integration branch as one commit.
+
+- **Conflicts with CO9**, resolved keeping both sides: only the `Lines` cells and the `-8` row of
+  `designs/spec/11-decisions/README.md` (CO9's text, then "the series continues in
+  `creator-jobs-9.md`") and the `Lines` cells of `designs/spec/README.md`, every one recounted with
+  `wc -l` (`spec_index_proof.py` 264/264). `core/src/lib.rs`, `designs/creator-jobs.md`, §6c,
+  §7.10, §7.4, `docs/guide/mcp.md` and `tools/proof/README.md` merged without a conflict.
+  **Identity check:** `git diff --name-only 05871b96 HEAD` names none of the 38 files only the
+  first attempt changed (its 47 minus the 9 CO9 also changed), so their bytes are `05871b96`'s;
+  `core/src/lib.rs` differs from `05871b96` only by CO9's `mod video_gate;`.
+- **Sizes** (`wc -l`, re-measured on the new base): new `reframe_path.rs` 368, `reframe_cover.rs`
+  123, `edit_reframe.rs` 400; `reframe.rs` 384 → 387 (`FramingPath`'s `at` and `moves` moved to
+  `reframe_path.rs` to keep it under 400), `reframe_tracks.rs` 361 → 421, `edit_background.rs` 471
+  → 483, `edit_canvas.rs` 251 → 258, `edit_zoom.rs` 517 → 522, `op_table.rs` 257 → 269; Swift
+  `FramingSubjects.swift` 110, `AgentServer+Framing.swift` 270, `AgentCatalog+Framing.swift` 64;
+  tests `reframe_path.rs` 392, `reframe_clip.rs` 627 (test files, as `reframe.rs`' 601).
+- **VR2a1's cases changed** (VR-24 (c) replacing VR-21's "at once", each named in VR-24):
+  `a_long_step_moves_for_its_distance`, the second half of
+  `no_move_within_half_a_second_of_the_last_unless_outside` and
+  `an_exception_move_on_the_last_end_drops_its_hold_key` — each step is a jump no track links (IoU
+  under 0.3), so the new face stands in for 1 s before the move. The dropped hold key the last one
+  pinned is now `reframe_path.rs`' `a_cut_onto_a_move_end_writes_no_second_hold`.
+- **VR-S2 re-run** (once, after VR-24, in the first attempt at `05871b96`; macOS 26.5.1 (25F80),
+  Apple M2 Max, AC power, load averages 20.57 11.17 14.14 under three lanes; `rule_sha256`
+  `f55e33e6…13cce3870e7`, matching): `VERDICT STOP: no setting at dead zone 0.1 is at 8 moves a
+  minute or under`. The first arm's winner is dead zone 0.15, speed 0.8, headroom 0.38 at 1,260 of
+  1,380 (91.30 %, under the 97 % floor) and 16 moves (6.00 a minute); at dead zone 0.10 every
+  setting makes 22 moves (8.25 a minute; speed 0.3: 1,244, 0.5: 1,255, 0.8: 1,260 contained). The
+  drop is input (c), two faces: 194 → 80 of 200 contained, because VR-24 (g) now frames the pair
+  together (the union of faces 400 px apart centred) where the rule counts only the chosen face
+  inside the central 60 %, and the jump to the second pair of positions is held 1 s; (e) cuts rose
+  284 → 300 with the hard cuts, (b) exit stayed 80 of 80 with 2 moves (the ease to fit and the
+  return). **The owner's ruling, option (a) (2026-11-03), as in `-9`:** the run is confounded by
+  VR-24 (g)'s pair framing, because VR-S2's instrument counts only the chosen face inside the
+  window's central 60 % while the window now frames the pair's union. With the union off (a
+  diagnostic scratch copy, not the recorded run, at `05871b96`) the first arm answers 98.84 %
+  (1,364 of 1,380) with 16 moves. `FRAMING_TUNING` stays at VR2a1's verdict (0.15, 0.12, 0.8,
+  0.38), VR-23 and VR-S2's rule stay unamended, and nothing is re-run (the `reframe*.rs` files are
+  `05871b96`'s).
+- **Targeted** (on `15b08bda` + the cherry-picks): `cargo test --release --test reframe --test
+  reframe_path --test reframe_clip --test clip_source_time --test duck_speech --test background
+  --test hide_silent --test zoom --test edit_tests --test op_table --test op_schemas --test
+  op_nullability --test op_names --test scope` 22, 12, 14, 6, 16, 42, 15, 32, 53, 8, 10, 2, 5, 38
+  passed (CO9's `hide_silent` among them: a backdrop's `blurred_copy` keeps the gate); `cargo fmt
+  --check` and `cargo clippy --all-targets -- -D warnings` clean; `make typecheck` 0 errors and the
+  4 baseline warnings; `spec_index_proof.py` 264/264; `assistant_prompt_proof.py --probe` 14/14;
+  `vr2a_proof.py --only 1,3,8` on Debug 4/4 (rows 1, 3, 8 and Z1).
+- **`make gate`**: `gate: PASS 578s` (names 1 s, typecheck 17 s, fmt 7 s, lint 19 s, test 339 s,
+  app 193 s), under three lanes. (The first attempt, on `9d55f6bb`: `gate: PASS 476s`.)
+- **Release proof**: `RC_PROOF_APP=release python3 tools/proof/vr2a_proof.py` 10/10 (row 1 200/200
+  central; row 6 ×2 200/200 and reversed 199/199; row 9's call answered `analyzing` after 60.0 s at
+  `covered` 0.62 and applied, `cached` true, once the markers landed); on a Release instance
+  `op_argument_proof.py` 200/200 and `op_catalog_proof.py` 23/23, its log free of `Frame Job: `.
+- **Mutants** (ten): the nine core mutants re-run once on the new base, each CAUGHT by its named
+  test — the clamp removed, the cut's action at `c`, `LOSS_HOLD` 0, `RETURN_SEEN` 0, the union off,
+  every backdrop on a new track, the actions refusal removed, the cut snapped to the nearest frame,
+  the stand-in promoted at once (`tools/proof/README.md`'s VR2a2 section names each test).
+  `bound-ignored` (`vr2a_proof.py --mutant bound-ignored`, a Release copy of the tree) is cited
+  from the first attempt at `05871b96`, not re-run: its anchor `AgentServer+Framing.swift` and
+  row 9's instrument passed the identity check, and CO9 touched no `app/Sources/Analysis*` file. It
+  was CAUGHT by row 9: with no deadline the first call waited for the analysis and applied, so no
+  `analyzing` answer came and the second call was refused for the framing's own actions.
+- **Choices the decisions leave to the code**, written in VR-24: a cut's median reads the new
+  shot's samples from its own clip tick; the chooser's absence is judged in the tier it chooses
+  from; a stand-in's samples stay in VR-23's median. Also: `with_backdrop` answers a `Result` (the
+  spec's sketch answered a `Project`), its `Err` the builder's own and unreached after refusal (9);
+  `SubjectBox` and `SubjectSample` derive a `deny_unknown_fields` `Deserialize` that the strict
+  reader uses inside its object-at-every-level walk.
+- **Review** (`15b08bda..c584e294`, verdict pass): the identity claim checked independently (every
+  code and proof file differing from `05871b96` differs by CO9's own lines only) and the recounts
+  confirmed (`-7` 590, `-9` 158, §6c 322, §7.4 101, §7.10 154, §7.9a 116; `11-decisions/` 21410 in
+  43 files). One nit: §7.9a still said "sixty-four op tools", stale before this phase; corrected to
+  sixty-nine at integration.
+- **Integration** (2026-11-03): the cherry-picks applied onto `15b08bda` with no conflict (the lane's
+  base), the staged tree identical to `c584e294`. The rulebook's counts and map rows were applied
+  there: the root, `app/` and `core/CLAUDE.md` at 122 product tools and 69 op tools, thirty
+  `Kind`s, `FramingAnalysis`'s second caller, the `FramingSubjects.swift` · `AgentServer+Framing`
+  · `AgentCatalog+Framing` entry, the lifts' `pub(crate)` notes, and `reframe_path.rs`,
+  `reframe_cover.rs` and `edit_reframe.rs`. `make gate` on the integration branch: `gate: PASS
+  629s` (names 1 s, typecheck 8 s, fmt 4 s, lint 18 s, test 317 s, app 281 s).
+
+**Owed.** VR-S2's S-TH1, T1 and T2 rows, as at VR2a1. VR2b: VR-27 (`replace`, composing into
+existing ends, ramped and actioned clips), VR-29 (Clip ▸ Follow Subject…), JOB-31, JOB-32. No
+person check; nothing filed.
 
 ### FC5 — the helper's estimate, its flags, and one helper plumbing
 

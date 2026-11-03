@@ -1,8 +1,9 @@
 //! The framing planner (road map "creator-jobs" VR2a1, spec §11 VR-20,
 //! VR-22, VR-23): a clip's analysed subjects in, a [`FramingPath`] out — a
 //! similarity per instant from the canvas the clip was authored for (`Ws ×
-//! Hs`) to the current one (`W × H`). Pure; nothing here edits. VR2a2's op
-//! writes the path as the clip's base and actions.
+//! Hs`) to the current one (`W × H`). Pure; nothing here edits.
+//! `edit_reframe.rs`'s op writes the path as the clip's base and actions
+//! (`reframe_cover.rs`).
 //!
 //! **The frames.** A box is 0…1 of the upright picture from its top-left. Its
 //! point `(bx, by)` is `u = (bx·mw − mw/2, by·mh − mh/2)` px from the
@@ -21,35 +22,55 @@
 //! window lies inside the cropped rect (VR-7's covering key).
 //!
 //! **The path.** VR-21 (`reframe_tracks.rs`) chooses a subject per sample;
-//! VR-22 composes the window on it; VR-23 moves the window only when the
-//! median-filtered subject leaves a dead zone, each move a hold key and an
-//! eased key, snapped to the canvas's frames.
+//! VR-22 composes the window on it; `reframe_path.rs` writes the keys —
+//! VR-23's moves only when the median-filtered subject leaves a dead zone,
+//! each a hold key and an eased key, and VR-24's hard cuts, loss, return and
+//! two people — snapped to the canvas's frames. Where there is nothing to
+//! follow the path holds a `where_empty` state ([`WhereEmpty`]): the window on
+//! the cropped centre, or the whole cropped picture fitted (`edit_zoom.rs`'s
+//! solves at θ = 0), which [`fixed_framing`] also answers for `follow`
+//! `center` and `fit` (VR2a2).
 
-use crate::actions::ease;
 use crate::clip_source_time::{clip_time_of_source, in_played_window, Round};
+use crate::edit_zoom::{zoom_offset, zoom_scale, ZoomFit, ZoomRegion};
 use crate::model::{Clip, Curve, MediaKind, Project, Source};
 use crate::props_check::SCALE_MAX;
-use crate::reframe_tracks::median;
+use crate::reframe_path::write_keys;
 pub use crate::reframe_tracks::{
     choose_subject, Chosen, Follow, SubjectBox, SubjectKind, SubjectSample,
 };
-use crate::time::{snap_to_frame, snap_up_to_frame, Ticks, TIMESCALE};
+use crate::time::Ticks;
+use serde::{Deserialize, Serialize};
 
 /// A clip's analysed subjects in MEDIA source ticks of the forward file.
-#[derive(Debug, Clone, PartialEq)]
+/// `reframe_clip`'s `subjects` argument; its strict `Deserialize` is
+/// `edit_reframe.rs`'s.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Subjects {
     pub samples: Vec<SubjectSample>,
     pub shots: Vec<Ticks>,
 }
 
-/// What to follow, how tight (1…4 × fill), and the canvas the clip was
-/// authored for.
+/// What a framing shows where there is nothing to follow (spec §11 VR-24
+/// (h)): the whole cropped picture fitted, or the follow window on its
+/// centre.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WhereEmpty {
+    #[default]
+    Fit,
+    Center,
+}
+
+/// What to follow, how tight (1…4 × fill), the canvas the clip was
+/// authored for, and what to show with nothing to follow.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FramingRequest {
     pub follow: Follow,
     pub zoom: f64,
     pub from_width: u32,
     pub from_height: u32,
+    pub where_empty: WhereEmpty,
 }
 
 /// VR-22's and VR-23's numbers: the dead zone as shares of the window's
@@ -76,12 +97,6 @@ pub const FRAMING_TUNING: FramingTuning = FramingTuning {
 
 /// A person box's top sits this share of the window's height below its top.
 const PERSON_TOP: f64 = 0.12;
-/// The subject point's median reads ±0.5 s.
-const MEDIAN_SPAN: Ticks = TIMESCALE / 2;
-/// The shortest move: 0.4 s.
-const MOVE_MIN: f64 = 0.4;
-/// No move within 0.5 s of the last one's end…
-const MOVE_SPACING: Ticks = TIMESCALE / 2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FramingKey {
@@ -95,66 +110,37 @@ pub struct FramingKey {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FramingPath {
     pub keys: Vec<FramingKey>,
+    /// Some key holds the `fit` state (VR-24 (h)): the picture shows the
+    /// canvas around it, so VR-25's backdrop has a span to fill.
+    pub shows_fit: bool,
 }
 
-impl FramingPath {
-    /// (scale, x, y) at clip tick `t`: the segment ending at key i eases with
-    /// key i's curve (`actions::ease`); before the first key its value, after
-    /// the last its value.
-    pub fn at(&self, t: Ticks) -> (f64, f64, f64) {
-        let value = |k: &FramingKey| (k.scale, k.x, k.y);
-        let Some(first) = self.keys.first() else {
-            return (1.0, 0.0, 0.0);
-        };
-        let Some(i) = self.keys.iter().position(|k| k.t >= t) else {
-            return value(self.keys.last().expect("not empty"));
-        };
-        if i == 0 {
-            return value(first);
-        }
-        let (a, b) = (&self.keys[i - 1], &self.keys[i]);
-        let e = ease(b.curve, (t - a.t) as f64 / (b.t - a.t) as f64);
-        (
-            a.scale + (b.scale - a.scale) * e,
-            a.x + (b.x - a.x) * e,
-            a.y + (b.y - a.y) * e,
-        )
-    }
-
-    /// Keys whose (scale, x, y) differ from the previous key's.
-    pub fn moves(&self) -> usize {
-        self.keys
-            .windows(2)
-            .filter(|w| (w[0].scale, w[0].x, w[0].y) != (w[1].scale, w[1].x, w[1].y))
-            .count()
-    }
-}
-
-type Point = (f64, f64);
+pub(crate) type Point = (f64, f64);
 
 /// The geometry one plan reads: the clip's placement on the source canvas,
 /// the cropped rect, and the window.
-struct Frame {
-    anchor: Point,
-    s: f64,
-    media: Point,
-    rect: (Point, Point),
-    k: f64,
-    window: Point,
-    half_source: Point,
+pub(crate) struct Frame {
+    pub(crate) anchor: Point,
+    pub(crate) s: f64,
+    pub(crate) media: Point,
+    pub(crate) rect: (Point, Point),
+    pub(crate) k: f64,
+    pub(crate) window: Point,
+    pub(crate) half_source: Point,
+    /// The `fit` state as a key of F: `(k, dx, dy)` (VR-24 (h)).
+    pub(crate) fit: (f64, f64, f64),
 }
 
 impl Frame {
-    fn of(project: &Project, clip: &Clip, request: &FramingRequest) -> Option<Frame> {
-        let Source::Media { media, .. } = clip.source else {
-            return None;
-        };
-        let media = project.media(media)?;
+    /// The geometry of `clip`, sized through [`Project::source_size`]; `None`
+    /// for no size, a base rotation other than 0, a zoom outside 1…4, a zero
+    /// source canvas, or a crop or scale that leaves no picture.
+    pub(crate) fn of(project: &Project, clip: &Clip, request: &FramingRequest) -> Option<Frame> {
         let video = clip.video.clone().unwrap_or_default();
-        if media.kind != MediaKind::Video || !media.has_video || video.rotation != 0.0 {
+        if video.rotation != 0.0 {
             return None;
         }
-        let (mw, mh) = (f64::from(media.width), f64::from(media.height));
+        let (mw, mh) = project.source_size(clip)?;
         let zoom = request.zoom;
         let (ws, hs) = (
             f64::from(request.from_width),
@@ -186,6 +172,17 @@ impl Frame {
             f64::from(project.canvas.width),
             f64::from(project.canvas.height),
         );
+        // Fit: the cropped picture fitted at θ = 0 by `edit_zoom.rs`'s two
+        // solves, written as F so it composes like any key.
+        let whole = ZoomRegion {
+            x: 0.0,
+            y: 0.0,
+            width: cw,
+            height: ch,
+        };
+        let fit_scale = zoom_scale((w, h), &whole, ZoomFit::Fit, 0.0);
+        let (fx, fy) = zoom_offset(&video, &whole, fit_scale);
+        let kf = fit_scale / s;
         Some(Frame {
             anchor,
             s,
@@ -194,11 +191,12 @@ impl Frame {
             k,
             window: (w / k, h / k),
             half_source: (ws / 2.0, hs / 2.0),
+            fit: (kf, fx - kf * video.x, fy - kf * video.y),
         })
     }
 
     /// A box point (0…1 of the picture) on the source canvas.
-    fn point(&self, bx: f64, by: f64) -> Point {
+    pub(crate) fn point(&self, bx: f64, by: f64) -> Point {
         let (mw, mh) = self.media;
         (
             self.anchor.0 + self.s * (bx * mw - mw / 2.0),
@@ -208,7 +206,7 @@ impl Frame {
 
     /// `wc` moved so the window lies inside the cropped rect (its centre
     /// when the window is the larger).
-    fn clamp(&self, wc: Point) -> Point {
+    pub(crate) fn clamp(&self, wc: Point) -> Point {
         let ((x0, y0), (x1, y1)) = self.rect;
         let axis = |v: f64, lo: f64, hi: f64| {
             if lo > hi {
@@ -223,7 +221,25 @@ impl Frame {
         )
     }
 
-    fn key(&self, t: Ticks, wc: Point, curve: Curve) -> FramingKey {
+    /// The cropped rect's centre.
+    pub(crate) fn centre(&self) -> Point {
+        let ((x0, y0), (x1, y1)) = self.rect;
+        ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+    }
+
+    /// The `fit` state's key at `t`.
+    pub(crate) fn fit_key(&self, t: Ticks, curve: Curve) -> FramingKey {
+        let (scale, x, y) = self.fit;
+        FramingKey {
+            t,
+            scale,
+            x,
+            y,
+            curve,
+        }
+    }
+
+    pub(crate) fn key(&self, t: Ticks, wc: Point, curve: Curve) -> FramingKey {
         FramingKey {
             t,
             scale: self.k,
@@ -235,7 +251,12 @@ impl Frame {
 
     /// VR-22: the subject point of a kind's box, and the window centre's
     /// offset from it.
-    fn subject(&self, kind: SubjectKind, b: &SubjectBox, headroom: f64) -> (Point, Point) {
+    pub(crate) fn subject(
+        &self,
+        kind: SubjectKind,
+        b: &SubjectBox,
+        headroom: f64,
+    ) -> (Point, Point) {
         let (w, h) = self.window;
         match kind {
             SubjectKind::Face => {
@@ -254,7 +275,7 @@ impl Frame {
 /// The samples and shots in clip time (VR-20): kept when in the played
 /// window, ascending, one sample per clip tick (the earliest media tick's),
 /// one shot per tick, a cut at 0 or at or past the end dropped.
-fn in_clip_time(
+pub(crate) fn in_clip_time(
     clip: &Clip,
     project: &Project,
     subjects: &Subjects,
@@ -277,10 +298,17 @@ fn in_clip_time(
         .collect();
     samples.sort_by_key(|&(c, m, _)| (c, m));
     samples.dedup_by_key(|&mut (c, _, _)| c);
+    // A shot rounds UP (VR-24 (a)): its clip tick is the first that shows
+    // the new shot, where a sample's rounds down.
+    let at_up = |t: Ticks| {
+        in_played_window(clip, media, t)
+            .then(|| clip_time_of_source(clip, media, t, Round::Up))
+            .flatten()
+    };
     let mut shots: Vec<Ticks> = subjects
         .shots
         .iter()
-        .filter_map(|&t| at(t))
+        .filter_map(|&t| at_up(t))
         .filter(|&c| c > 0 && c < clip.duration)
         .collect();
     shots.sort_unstable();
@@ -292,7 +320,7 @@ fn in_clip_time(
     (samples, shots)
 }
 
-/// The planner (spec §11 VR-20…VR-23). `None` for: no such clip, not a
+/// The planner (spec §11 VR-20…VR-24). `None` for: no such clip, not a
 /// media clip of a video media, a base rotation other than 0, a media with
 /// no size, a crop or scale that leaves no picture, a zoom outside 1…4, or a
 /// zero `from_width`/`from_height`. VR2a2 refuses each by name before
@@ -305,80 +333,55 @@ pub fn plan_framing(
     tuning: &FramingTuning,
 ) -> Option<FramingPath> {
     let clip = project.clip(clip)?;
+    let Source::Media { media, .. } = clip.source else {
+        return None;
+    };
+    let media = project.media(media)?;
+    if media.kind != MediaKind::Video || !media.has_video {
+        return None;
+    }
     let frame = Frame::of(project, clip, request)?;
-    let fps = project.canvas.fps;
     let (samples, shots) = in_clip_time(clip, project, subjects);
     let chosen = choose_subject(&samples, &shots, request.follow);
-    let shot = |t: Ticks| shots.partition_point(|&c| c <= t);
-    let (ww, wh) = frame.window;
+    Some(write_keys(
+        &frame,
+        &chosen,
+        &shots,
+        clip.duration,
+        project.canvas.fps,
+        request,
+        tuning,
+    ))
+}
 
-    // Each chosen sample: its kind, subject point and offset (VR-22).
-    let points: Vec<(Ticks, SubjectKind, Point, Point)> = chosen
-        .iter()
-        .filter_map(|c: &Chosen| match (c.kind, c.subject) {
-            (Some(kind), Some(b)) => {
-                let (p, offset) = frame.subject(kind, &b, tuning.headroom);
-                Some((c.t, kind, p, offset))
-            }
-            _ => None,
-        })
-        .collect();
-    // The median over ±0.5 s of the same kind in the same shot, then the
-    // desired window centre, clamped (VR-23).
-    let filtered: Vec<(Ticks, Point, Point)> = points
-        .iter()
-        .map(|&(t, kind, _, offset)| {
-            let lo = points.partition_point(|q| q.0 < t - MEDIAN_SPAN);
-            let hi = points.partition_point(|q| q.0 <= t + MEDIAN_SPAN);
-            let near: Vec<Point> = points[lo..hi]
-                .iter()
-                .filter(|q| q.1 == kind && shot(q.0) == shot(t))
-                .map(|q| q.2)
-                .collect();
-            let mut xs: Vec<f64> = near.iter().map(|p| p.0).collect();
-            let mut ys: Vec<f64> = near.iter().map(|p| p.1).collect();
-            let fp = (median(&mut xs), median(&mut ys));
-            (t, fp, frame.clamp((fp.0 + offset.0, fp.1 + offset.1)))
-        })
-        .collect();
-
-    let mut current = match filtered.first() {
-        Some(&(_, _, desired)) => desired,
-        None => {
-            let ((x0, y0), (x1, y1)) = frame.rect;
-            ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-        }
+/// One key at 0 holding a `where_empty` state for the whole clip (spec §11
+/// VR-24 (h), VR-26): `follow` `center` (the window at fill × `zoom` on the
+/// cropped centre) and `fit` (the cropped picture fitted; `zoom` unread).
+/// `None` for no such clip, no size, a base rotation other than 0, a zoom
+/// outside 1…4, or a crop or scale that leaves no picture. Offsets are
+/// measured from the canvas's own centre, so the source canvas is the
+/// current one.
+pub fn fixed_framing(
+    project: &Project,
+    clip: u32,
+    state: WhereEmpty,
+    zoom: f64,
+) -> Option<FramingPath> {
+    let clip = project.clip(clip)?;
+    let request = FramingRequest {
+        follow: Follow::Subject,
+        zoom,
+        from_width: project.canvas.width,
+        from_height: project.canvas.height,
+        where_empty: state,
     };
-    let mut keys = vec![frame.key(0, current, Curve::Linear)];
-    let mut last_end: Option<Ticks> = None;
-    for &(t, fp, desired) in &filtered {
-        if last_end.is_some_and(|end| t < end) {
-            continue;
-        }
-        let (dx, dy) = (desired.0 - current.0, desired.1 - current.1);
-        if dx.abs() <= tuning.dead_zone_width * ww && dy.abs() <= tuning.dead_zone_height * wh {
-            continue;
-        }
-        let outside = (fp.0 - current.0).abs() > ww / 2.0 || (fp.1 - current.1).abs() > wh / 2.0;
-        if last_end.is_some_and(|end| t < end + MOVE_SPACING) && !outside {
-            continue;
-        }
-        let seconds = MOVE_MIN.max(dx.hypot(dy) / (tuning.speed * ww));
-        let length = (seconds * TIMESCALE as f64).min((clip.duration as f64) * 2.0 + 1.0);
-        let start = snap_to_frame(t, fps);
-        let mut end = snap_to_frame(t.saturating_add(length.round() as Ticks), fps);
-        if end <= start {
-            end = snap_up_to_frame(start + 1, fps);
-        }
-        if end > clip.duration {
-            continue;
-        }
-        if start > keys.last().expect("the first key").t {
-            keys.push(frame.key(start, current, Curve::Linear));
-        }
-        keys.push(frame.key(end, desired, Curve::EaseInOut));
-        current = desired;
-        last_end = Some(end);
-    }
-    Some(FramingPath { keys })
+    let frame = Frame::of(project, clip, &request)?;
+    let key = match state {
+        WhereEmpty::Center => frame.key(0, frame.centre(), Curve::Linear),
+        WhereEmpty::Fit => frame.fit_key(0, Curve::Linear),
+    };
+    Some(FramingPath {
+        keys: vec![key],
+        shows_fit: state == WhereEmpty::Fit,
+    })
 }

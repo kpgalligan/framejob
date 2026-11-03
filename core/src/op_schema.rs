@@ -167,13 +167,56 @@ fn schema_of_kind(kind: Kind) -> Value {
         | Kind::FadeShape
         | Kind::Layout
         | Kind::LayoutShape
-        | Kind::Corner => {
+        | Kind::Corner
+        | Kind::Follow
+        | Kind::WhereEmpty => {
             json!({"type": "string", "enum": kind.values()})
         }
         Kind::Groups => json!({
             "type": "array",
             "items": {"type": "string", "enum": kind.values()},
         }),
+        // `reframe_clip`'s `subjects` (spec §11 VR-26): closed at every
+        // level, as `edit_reframe.rs`'s strict reader is.
+        Kind::Subjects => {
+            let boxes = json!({
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "number"},
+                        "y": {"type": "number"},
+                        "w": {"type": "number"},
+                        "h": {"type": "number"},
+                        "c": {"type": "number"},
+                    },
+                    "required": ["x", "y", "w", "h", "c"],
+                    "additionalProperties": false,
+                },
+            });
+            json!({
+                "type": "object",
+                "properties": {
+                    "samples": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "t": {"type": "integer"},
+                                "faces": boxes,
+                                "people": boxes,
+                                "salient": boxes,
+                            },
+                            "required": ["t"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "shots": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["samples", "shots"],
+                "additionalProperties": false,
+            })
+        }
         Kind::Region => json!({
             "type": "object",
             "properties": {

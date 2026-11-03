@@ -18,7 +18,7 @@
 //!    coarser grid can land two markers on one tick, which markers may
 //!    never share.
 
-use crate::model::{CanvasBlending, CanvasOutput, Color, Project};
+use crate::model::{CanvasBlending, CanvasOutput, Color, Project, VideoProps};
 use crate::outcome::Outcome;
 use crate::props_check::{color_ok, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Fps, Ticks};
@@ -82,16 +82,23 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
     if !(width_ratio.is_finite() && height_ratio.is_finite()) {
         return;
     }
-    let scale_ratio = width_ratio.min(height_ratio);
     for clip in project.clips.iter_mut() {
         if let Some(video) = clip.video.as_mut() {
-            video.x *= width_ratio;
-            video.y *= height_ratio;
-            // Clamped to the same range `set_video` accepts, so a chain of
-            // shrinks cannot leave a scale the inspector refuses to show.
-            video.scale = (video.scale * scale_ratio).clamp(SCALE_MIN, SCALE_MAX);
+            rescale_video(video, width_ratio, height_ratio);
         }
     }
+}
+
+/// One clip's placement under [`rescale`]'s rule: `x` and `y` by their own
+/// axis's ratio, `scale` by the smaller. `reframe_clip`'s `keep` applies it
+/// to one clip's base (spec §11 VR-26).
+pub(crate) fn rescale_video(video: &mut VideoProps, width_ratio: f64, height_ratio: f64) {
+    let scale_ratio = width_ratio.min(height_ratio);
+    video.x *= width_ratio;
+    video.y *= height_ratio;
+    // Clamped to the same range `set_video` accepts, so a chain of
+    // shrinks cannot leave a scale the inspector refuses to show.
+    video.scale = (video.scale * scale_ratio).clamp(SCALE_MIN, SCALE_MAX);
 }
 
 /// Re-snaps stored picture times to the canvas's CURRENT frame grid, after

@@ -58,7 +58,7 @@ enum AssistantPrompt {
           "set_transition_style"]),
         ("actions and zooms that animate a clip",
          ["add_action", "add_zoom_action", "auto_zoom", "add_speed_ramp", "switch_layout",
-          "set_action", "set_action_end", "remove_action"]),
+          "reframe_clip", "set_action", "set_action_end", "remove_action"]),
         ("media files: import, relink, remove, copy into the project, camera log",
          ["import_media", "add_media", "relink_media", "remove_media", "set_media_color",
           "set_media_speech", "consolidate_media", "get_media_analysis", "set_media_cursor",

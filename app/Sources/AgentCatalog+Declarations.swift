@@ -315,6 +315,13 @@ extension AgentServer {
                 + "and sends the descriptor with the op, so a caller's own probe could only "
                 + "disagree with the file; the tool does not publish it and the gate refuses "
                 + "one as a stranger."),
+        AgentDeclaration(
+            .argument("subjects", of: "reframe_clip"), requirement: .filledByTheApp,
+            why: "VR-28: the tool fills the analysed faces, people, salient regions and shots "
+                + "from the analysis cache over the clip's window, waiting for them within "
+                + "CJ-25's bound, so a caller's own subjects could only disagree with the "
+                + "media; the tool does not publish it and the gate refuses one as a "
+                + "stranger."),
     ]
 
     /// One op tool's declared input: the core's published structure, each

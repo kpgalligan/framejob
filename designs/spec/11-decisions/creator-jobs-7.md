@@ -471,6 +471,8 @@ CJ-3). No owner question: the road map expects none for VR2a.
   Keys are strictly increasing in time, the first at 0, each snapped with `time::snap_to_frame` at
   the canvas rate and inside `[0, clip.duration]`; between keys the segment ending at a key eases
   with that key's curve through `actions::ease`.
+  **Amended 2026-11-03 (VR2a2, VR-26):** the op lands without `replace`, which joins with VR-27
+  in VR2b; VR-24 (a) maps shots with `Round::Up`.
 - **VR-21 — Choosing the subject** (`core/src/reframe_tracks.rs`, `choose_subject`; tracks built
   by the planner over what it reads, CJ-31, nothing stored). Per kind, a box links to the track
   whose last box is at most `LINK_GAP` (1 s) earlier with the highest IoU at least `LINK_IOU`
@@ -488,6 +490,8 @@ CJ-3). No owner question: the road map expects none for VR2a.
   `RIVAL_HOLD` (2 s); with the primary absent, the best present track at once; with nothing
   present, nothing is chosen. A shot's first sample picks the best, with no hysteresis. `face`,
   `person` and `salient` read only their own kind. Ties go to the lower track id.
+  **Amended 2026-11-03 by VR-24 (c):** with the primary absent the best present track is output
+  as a stand-in (`lost`) and the primary kept for `LOSS_HOLD` (1 s), instead of replaced at once.
 - **VR-22 — Composition** (first numbers; VR-S2's verdict below). With the window `w × h` on
   the source canvas: a face's centre on the window's vertical centre line, at `headroom × h` (0.38) from the
   window's top when `h > w`, else at the window's centre; a person (no face chosen): the box's

@@ -76,6 +76,11 @@
 //!   [`Kind::Point`] is `[f64; 2]`, its `focus`: two numbers, whose LENGTH
 //!   serde refuses like a colour's and whose members it names as `f64`
 //!   where a frame rate's are `u32`.
+//! - [`Kind::Follow`] and [`Kind::WhereEmpty`] — `FramingFollow` and
+//!   `WhereEmpty`: `reframe_clip`'s two closed vocabularies (spec §11
+//!   VR-26), members in [`Kind::values`]. [`Kind::Subjects`] is its
+//!   `subjects`, a caller-authored object the core declares at every level
+//!   and reads strictly (`edit_reframe.rs`), as [`Kind::Region`] is.
 //! - [`Kind::Region`] — `ZoomRegion`, `add_zoom_action`'s four numbers. NOT
 //!   an opaque object: it is a caller-authored object whose members the
 //!   core declares and refuses by name (`edit_zoom.rs`), so a later schema
@@ -95,7 +100,7 @@ pub use crate::op_rows::{OP_NAMES, OP_TABLE};
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 69;
+pub const OP_COUNT: usize = 70;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -170,6 +175,9 @@ pub enum Kind {
     LayoutShape,
     Corner,
     Point,
+    Follow,
+    WhereEmpty,
+    Subjects,
 }
 
 impl Kind {
@@ -217,8 +225,12 @@ impl Kind {
             ],
             LayoutShape => &["square", "rounded", "circle"],
             Corner => &["bottom_right", "bottom_left", "top_right", "top_left"],
+            Follow => &[
+                "subject", "face", "person", "salient", "center", "fit", "keep",
+            ],
+            WhereEmpty => &["fit", "center"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
-            | Color | FrameRate | Region | Point => &[],
+            | Color | FrameRate | Region | Point | Subjects => &[],
         }
     }
 }

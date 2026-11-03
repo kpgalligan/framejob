@@ -41,9 +41,12 @@ fn sample(kind: Kind) -> Value {
         | Kind::FadeShape
         | Kind::Layout
         | Kind::LayoutShape
-        | Kind::Corner => {
+        | Kind::Corner
+        | Kind::Follow
+        | Kind::WhereEmpty => {
             json!(kind.values()[0])
         }
+        Kind::Subjects => json!({"samples": [], "shots": []}),
     }
 }
 
@@ -96,11 +99,11 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 93, "optional inventory changed");
+    assert_eq!(seen.len(), 99, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }
-    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 85);
+    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 91);
 }
 
 #[test]

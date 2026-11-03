@@ -94,7 +94,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all sixty-eight op tools.
+  `AgentCatalog.opTool` prints for all sixty-nine op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -580,7 +580,9 @@ detail there.
   `answerNumber`. `FramingAnalysis` (names no `rc_*`) is what a VR command
   analyses (VR-12): each video media clip's played window ± 1 s merged per
   media, and the requests kind-major `shots`, `faces`, `subjects`;
-  `analysis_job {clips}` wants them, and every `analysis_job` answer carries
+  `analysis_job {clips}` and `reframe_clip`'s tool want them
+  (`requests(clips:in:project:)`, `project` the call's view, else
+  `editedProject`), and every `analysis_job` answer carries
   `lane_queued` (`AnalysisLane.queuedTotal()`, monotonic).
   The `sound_events` kind (road map creator-jobs FC3, spec §11 FC-30…FC-34) is
   the one kind on the sound queue, and a running sound job does not count
@@ -863,6 +865,28 @@ detail there.
   transitions_removed, project}` written by hand in that key order).
   `AgentCatalog+Switch` holds both rows, spliced in last by
   `creatorTools()`, after `switch_layout`'s.
+- `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
+  `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
+  creator-jobs VR2a2, spec §11 VR-26, VR-28); no menu yet (Clip ▸ Follow
+  Subject… is VR2b's). `FramingSubjects` (names no `rc_*`, any thread)
+  builds `subjects` from the store: each `faces`-grid index inside the
+  windows that both the `faces` and `subjects` markers cover is one sample,
+  boxes clamped into the picture and the empty ones dropped, eight a kind in
+  stored order; `shots` the pts of `AnalysisShots.cuts` over the covered
+  windows. `AgentServer+Framing` is the handler, off main
+  (`creatorOffMainTools`): a first hop resolves the arguments and tries the
+  op with no `subjects`, scoped and uncommitted; only the core's "no
+  subjects" sentence (`FramingWant.noSubjects`, pinned by
+  `core/tests/reframe_clip.rs`) leads to
+  `FramingAnalysis.requests(clips:in:project:)` over the call's view and
+  `split_at_shots`'s wait; past `AnalysisLane.callWaitLimit` the requests
+  are wanted again on that owner, held by `FramingWant` (an `NSLock` of its
+  own, done from `settled` once every request has ended; the owner never
+  released) and the answer is `analyzing {media, covered}` with no edit; the
+  subjects are read off main and the last hop refuses a changed project or
+  scope, then `editResult`, "Reframe Clip", answering `cached`.
+  `AgentCatalog+Framing` holds its row, spliced in last by
+  `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map
@@ -3885,7 +3909,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the sixty-eight op tools is `opTool`'s** and carries no
+  **Every one of the sixty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the forty-one APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -3921,7 +3945,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Frame Job: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and twenty-one
+  (kpgalligan/framejob#21): one comparison in `dispatch`, for all one hundred and twenty-two
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

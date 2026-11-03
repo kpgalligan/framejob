@@ -323,7 +323,12 @@ fn check_region(region: &ZoomRegion) -> Result<(), String> {
 /// The clamp is here rather than at the call site so that the offsets,
 /// which are computed FROM the returned value, cannot be derived from a
 /// scale the renderer will not honour.
-fn zoom_scale(canvas: (f64, f64), region: &ZoomRegion, fit: ZoomFit, rotation: f64) -> f64 {
+pub(crate) fn zoom_scale(
+    canvas: (f64, f64),
+    region: &ZoomRegion,
+    fit: ZoomFit,
+    rotation: f64,
+) -> f64 {
     let (width, height) = canvas;
     let (sin, cos) = rotation.to_radians().sin_cos();
     let (k, m) = (cos.abs(), sin.abs());
@@ -351,7 +356,7 @@ fn zoom_scale(canvas: (f64, f64), region: &ZoomRegion, fit: ZoomFit, rotation: f
 /// `crop` reaches this only through `c`, the cropped rect's centre measured
 /// from the uncropped one, which is the same expression
 /// [`crate::nest::Frame::enter`] folds a nest's crop with.
-fn zoom_offset(video: &VideoProps, region: &ZoomRegion, scale: f64) -> (f64, f64) {
+pub(crate) fn zoom_offset(video: &VideoProps, region: &ZoomRegion, scale: f64) -> (f64, f64) {
     let crop = video.crop;
     let cx = (crop.l - crop.r) / 2.0 + region.x;
     let cy = (crop.t - crop.b) / 2.0 + region.y;

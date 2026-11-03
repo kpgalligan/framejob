@@ -125,9 +125,12 @@ fn value_of(kind: Kind) -> Value {
         | Kind::FadeShape
         | Kind::Layout
         | Kind::LayoutShape
-        | Kind::Corner => {
+        | Kind::Corner
+        | Kind::Follow
+        | Kind::WhereEmpty => {
             json!(kind.values()[0])
         }
+        Kind::Subjects => json!({"samples": [], "shots": []}),
     }
 }
 
@@ -172,9 +175,12 @@ fn wrong_values(kind: Kind) -> Vec<(Value, String)> {
         | Kind::FadeShape
         | Kind::Layout
         | Kind::LayoutShape
-        | Kind::Corner => {
+        | Kind::Corner
+        | Kind::Follow
+        | Kind::WhereEmpty => {
             vec![wrong(json!(5), "expected string or map")]
         }
+        Kind::Subjects => vec![wrong(json!([1]), "expected an object, not")],
     }
 }
 

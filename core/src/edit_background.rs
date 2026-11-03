@@ -196,7 +196,7 @@ impl Project {
     /// renumbering anything above it. A track called "Background" would
     /// read better for one second and then be wrong, because the user is
     /// free to put anything else on it.
-    fn with_back_track(&self) -> (Project, u32) {
+    pub(crate) fn with_back_track(&self) -> (Project, u32) {
         let mut next = self.clone();
         let track = next.numbered_track();
         let id = track.id;
@@ -396,13 +396,27 @@ impl Project {
     /// rule, so there is nothing here to refuse quietly.
     pub fn add_blurred_background(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
+        let (mut next, track) = self.with_back_track();
+        let id = next.allocate_id();
+        let copy = self.blurred_copy(&target, id, track)?;
+        next.clips.push(copy);
+        self.finish(next)
+    }
+
+    /// The blurred copy of `target` with id `id` on track `track`: what
+    /// [`Project::add_blurred_background`] places, and what `reframe_clip`'s
+    /// backdrop places (spec §11 VR-25). `Err` for a nest, a source with no
+    /// pixel size and a clip with no video properties, in that order — the
+    /// op's own sentences.
+    pub(crate) fn blurred_copy(&self, target: &Clip, id: u32, track: u32) -> Result<Clip, String> {
+        let clip = target.id;
         if matches!(target.source, Source::Nest { .. }) {
             return Err(format!(
                 "clip {clip} shows a nest, whose own filters the flattening drops, \
                  so a blurred copy of it would come out sharp"
             ));
         }
-        let Some((source_width, source_height)) = self.source_size(&target) else {
+        let Some((source_width, source_height)) = self.source_size(target) else {
             return Err(format!(
                 "clip {clip}'s source has no pixel size, so nothing can be scaled to fill the canvas"
             ));
@@ -411,9 +425,8 @@ impl Project {
             return Err(format!("clip {clip} has no video properties"));
         };
 
-        let (mut next, track) = self.with_back_track();
-        let mut copy = target;
-        copy.id = next.allocate_id();
+        let mut copy = target.clone();
+        copy.id = id;
         copy.track = track;
         // The pair `detach_audio` sets, read the other way: this half of the
         // clip is the picture, and the sound stays with the original.
@@ -465,7 +478,6 @@ impl Project {
             motion_blur: 0.0,
             ..video
         });
-        next.clips.push(copy);
-        self.finish(next)
+        Ok(copy)
     }
 }

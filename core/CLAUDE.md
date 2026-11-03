@@ -482,14 +482,16 @@ governs a module now.
   `pub(crate)` for it. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the sixty-eight op tools in the agent catalog,
+  reader is every one of the sixty-nine op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
   `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed (twenty-seven kinds — `switch_layout` added `Layout`,
+  `Kind` is closed (thirty kinds — `reframe_clip` added `Follow`,
+  `WhereEmpty` and `Subjects`, the last a caller-authored object declared
+  and closed at every level; `switch_layout` added `Layout`,
   `LayoutShape`, `Corner` and `Point`, `[f64; 2]`; `Texts`, a list of strings, is
   `set_action_end`'s `off`), carries each vocabulary's members, and has exactly ONE
   kind per answer serde gives, because a distinction the
@@ -741,7 +743,9 @@ governs a module now.
   things it does to the rest of the document — `check_dimension` (a
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a
   size change moves every clip's `x`, `y` and `scale`, each axis by its own
-  ratio and `scale` by the smaller of the two) and `resnap` (a rate change
+  ratio and `scale` by the smaller of the two) — its per-clip body
+  `rescale_video`, `pub(crate)` for `reframe_clip`'s `keep` — and `resnap`
+  (a rate change
   normalizes top-level and each stored nest's clip times through `frame_grid.rs`
   and drops the second of two top-level markers a coarser grid lands on one tick).
 - `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
@@ -899,7 +903,9 @@ governs a module now.
   `set_action_end` so a drag is one undo step and every refusal is inherited.
   `zoom_placement` (the solve, which `zoom_patch` calls), `region_for_placement`
   (its inverse, spec §11 CU-74) and `region_size` (a region of the canvas's
-  aspect that fits to a scale) are Auto Zoom's.
+  aspect that fits to a scale) are Auto Zoom's. `zoom_scale` and
+  `zoom_offset` are `pub(crate)`: `reframe.rs`'s `fit` state solves through
+  them at θ = 0.
 - `action_class.rs` — actions classed by content, with no tag (road map
   creator-jobs CU7, spec §11 CU-73, CO-63, CJ-8 (i)): `PLACEMENT_KEYS`;
   `is_zoom` (an end's `video` exactly `scale`, `x`, `y`, no other group or a
@@ -938,6 +944,9 @@ governs a module now.
   `enabled.audio`, `audio.duck`, the transition, the actions and the label
   (each a wrong picture or a wrong sound if carried) and refuses a nest.
   Default plate colour is white: the canvas is already black.
+  `with_back_track` and `blurred_copy` (the copy alone, its three `Err`s in
+  order) are `pub(crate)`: `reframe_clip`'s backdrop (`reframe_cover.rs`)
+  builds through them.
 - `actions.rs` — action evaluation and interpolation, and `clip_state`
   (with a top-level `speed`, `speed_map.rs`'s rate in force, the inspector's
   Rate inside an action, SR-21);
@@ -1203,8 +1212,8 @@ governs a module now.
   read through it; `cursor_zoom_run.rs`'s `clip_time`, which reads past the
   clip's end (CU7/CU8), does not.
 - `reframe_tracks.rs` · `reframe.rs` — the framing planner (road map
-  "creator-jobs" VR2a1, spec §11 VR-20…VR-23), pure, no op yet (VR2a2's
-  `edit_reframe.rs` writes its path). `reframe_tracks.rs`: `SubjectBox`,
+  "creator-jobs" VR2a1, spec §11 VR-20…VR-23), pure; `edit_reframe.rs`
+  writes its path. `reframe_tracks.rs`: `SubjectBox`,
   `SubjectSample`, `Follow`, `SubjectKind`, `Chosen` and `choose_subject` —
   boxes linked into tracks per kind (`LINK_IOU` 0.3, `LINK_GAP` 1 s, every
   cut ending every track; nothing stored, CJ-31), scored by presence ×
@@ -1218,7 +1227,32 @@ governs a module now.
   VR-23's moves (median ±0.5 s, dead zone, speed, 0.5 s spacing, frame
   snapping) and `FRAMING_TUNING` (VR-S2's verdict: 0.15, 0.12, 0.8, 0.38);
   `plan_framing` answers a `FramingPath` of `(t, k, dx, dy, curve)` keys, or
-  none.
+  none. Since VR2a2 (spec §11 VR-24): `reframe_tracks.rs` holds an absent
+  primary `LOSS_HOLD` (1 s), the best present track a `lost` stand-in, and
+  `Chosen` carries `identity`, `lost` and `second`; `reframe.rs` maps shots
+  with `Round::Up`, sizes `Frame` (`pub(crate)`) through `source_size`,
+  holds `WhereEmpty`, `FramingRequest.where_empty`, `FramingPath.shows_fit`
+  and `fixed_framing` (`center`, `fit`).
+- `reframe_path.rs` — a framing path's keys (VR2a1, VR2a2, spec §11 VR-23,
+  VR-24): VR-23's moves, moved whole, and VR-24 — a hard cut at each shot
+  change (a one-frame linear segment onto the first canvas frame showing the
+  new shot, `snap_up_to_frame`, its subject's first-second median), loss
+  (`LOSS_HOLD`, then another track or `EMPTY_EASE` 0.8 s to `where_empty`),
+  return (`RETURN_SEEN` 0.6 s), two people (`PAIR_WIDEN` 1.15), the first
+  key; no move ending after the frame before the next cut; `FramingPath::at`
+  and `moves`.
+- `reframe_cover.rs` — a framing written as an edit (VR2a2, spec §11 VR-25,
+  VR-26): `framed` (key 0 composed into the base, one action per later
+  change of value, ends `{video: {scale, x, y}}`, ids in time order), `kept`
+  (`rescale_video`), `with_backdrop` (one `blurred_copy` of the whole clip on
+  the named track when unlocked, not a matte and free over the clip,
+  touching allowed, else `with_back_track`).
+- `edit_reframe.rs` — `reframe_clip` (VR2a2, spec §11 VR-26):
+  `FramingFollow`, `Reframe`, the strict `Subjects` reader (`ZoomRegion`'s
+  pattern, an object at every level), `MAX_SUBJECT_SAMPLES`,
+  `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's sentence, which the tool
+  matches), four errors and ten refusals in order, "no subjects" last so the
+  tool's trial meets every other first. Allowed inside a nest.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

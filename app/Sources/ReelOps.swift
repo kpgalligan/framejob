@@ -1026,6 +1026,22 @@ enum SpeedRampShape: String, CaseIterable {
     var holds: Bool { self == .speedDip || self == .speedBurst }
 }
 
+/// What `reframe_clip` follows, `FramingFollow` in `core/src/edit_reframe.rs`
+/// (spec §11 VR-26): the four following kinds read the analysed subjects,
+/// `center` and `fit` hold one placement, `keep` rescales from another canvas.
+enum FramingFollow: String, CaseIterable {
+    case subject, face, person, salient, center, fit, keep
+
+    /// The kinds that follow analysed subjects, and so wait for an analysis.
+    var follows: Bool { [.subject, .face, .person, .salient].contains(self) }
+}
+
+/// What a framing shows with nothing to follow, `WhereEmpty` in
+/// `core/src/reframe.rs` (spec §11 VR-24 (h)).
+enum FramingWhereEmpty: String, CaseIterable {
+    case fit, center
+}
+
 extension ReelOp {
     /// `at` is CLIP time. Refuses on an overlap with another action or a
     /// span past the clip end. The end patch starts empty.
@@ -1139,6 +1155,27 @@ extension ReelOp {
         a.put("nest", nest)
         a.put("through", through)
         return ReelOp(name: "switch_layout", args: a.values)
+    }
+
+    /// One clip framed on the current canvas (spec §11 VR-26): every nil is
+    /// omitted, so the core's defaults apply — zoom 1, `where_empty` `fit`,
+    /// the canvas as `from_*`, no backdrop. `subjects` is the analysed
+    /// samples the tool fills (`FramingSubjects`), never a caller's.
+    static func reframeClip(
+        clip: UInt32, follow: FramingFollow, zoom: Double? = nil,
+        whereEmpty: FramingWhereEmpty? = nil, fromWidth: UInt32? = nil,
+        fromHeight: UInt32? = nil, backdrop: UInt32? = nil, subjects: [String: Any]? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("follow", follow.rawValue)
+        a.put("zoom", zoom)
+        a.put("where_empty", whereEmpty?.rawValue)
+        a.put("from_width", fromWidth)
+        a.put("from_height", fromHeight)
+        a.put("backdrop", backdrop)
+        a.put("subjects", subjects)
+        return ReelOp(name: "reframe_clip", args: a.values)
     }
 
     /// Moves or re-curves an action; the same overlap checks apply.

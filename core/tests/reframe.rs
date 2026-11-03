@@ -14,7 +14,7 @@
 
 use framejob_core::model::{Curve, Project};
 use framejob_core::reframe::{
-    plan_framing, FramingPath, FramingRequest, FramingTuning, Subjects, FRAMING_TUNING,
+    plan_framing, FramingPath, FramingRequest, FramingTuning, Subjects, WhereEmpty, FRAMING_TUNING,
 };
 use framejob_core::reframe_tracks::{
     choose_subject, Follow, SubjectBox, SubjectKind, SubjectSample,
@@ -86,6 +86,7 @@ fn request(zoom: f64) -> FramingRequest {
         zoom,
         from_width: 1920,
         from_height: 1080,
+        where_empty: WhereEmpty::Fit,
     }
 }
 
@@ -167,15 +168,18 @@ fn a_short_step_moves_for_the_floor() {
 
 #[test]
 fn a_long_step_moves_for_its_distance() {
-    // 960 → 1100: 140/303.75 = 0.4609 s, 276 543 ticks, from 1 200 000 to
-    // 1 476 543, snapped to frame 74, 1 480 000.
+    // 960 → 1100: a 140 px jump is under LINK_IOU, so a new track, held as a
+    // stand-in for LOSS_HOLD (VR-24 (c), (d), replacing VR-21's "at once";
+    // the move started at 2.0 s before). At 3.0 s: 140/303.75 = 0.4609 s,
+    // 276 543 ticks, from 1 800 000 to 2 076 543, snapped to frame 104,
+    // 2 080 000.
     let path = plan(
         &tall(json!({})),
         faces(0.0, 9.9, |t| if t < 2.0 { 960.0 } else { 1100.0 }),
     );
     assert_keys(
         &path,
-        &[(0, 960.0, L), (1_200_000, 960.0, L), (1_480_000, 1100.0, E)],
+        &[(0, 960.0, L), (1_800_000, 960.0, L), (2_080_000, 1100.0, E)],
     );
 }
 
@@ -199,8 +203,11 @@ fn no_move_within_half_a_second_of_the_last_unless_outside() {
             (1_980_000, 1120.0, E),
         ],
     );
-    // → 1500 at 2.6 s is 460 px away, past the window's half (303.75): it
-    // moves at once, 460/303.75 s = 908 642 ticks, from 1 560 000 to frame 123.
+    // → 1500 at 2.6 s is 460 px away, past the window's half (303.75), and
+    // a new track: held as a stand-in for LOSS_HOLD (VR-24, replacing
+    // VR-21's "at once", which moved at 2.6 s), it moves at 3.6 s with no
+    // spacing to wait for, 460/303.75 s = 908 642 ticks, from 2 160 000 to
+    // frame 153.
     let x = |t: f64| match t {
         t if t < 2.0 => 960.0,
         t if t < 2.55 => 1040.0,
@@ -213,17 +220,20 @@ fn no_move_within_half_a_second_of_the_last_unless_outside() {
             (0, 960.0, L),
             (1_200_000, 960.0, L),
             (1_440_000, 1040.0, E),
-            (1_560_000, 1040.0, L),
-            (2_460_000, 1500.0, E),
+            (2_160_000, 1040.0, L),
+            (3_060_000, 1500.0, E),
         ],
     );
 }
 
 #[test]
 fn an_exception_move_on_the_last_end_drops_its_hold_key() {
-    // → 1500 at 2.4 s, the sample the first move ends on: its hold key would
-    // be at 1 440 000, the previous key's tick, so it is not written; the
-    // move eases from that key, 908 642 ticks, to frame 117.
+    // → 1500 at 2.4 s, the sample the first move ends on, is a new track
+    // (VR-24 replacing VR-21's "at once", under which the hold key fell on
+    // the previous key's tick and was not written): held for LOSS_HOLD, the
+    // move starts at 3.4 s with its own hold key, 908 642 ticks, to frame
+    // 147. A hold key on the previous key's tick is dropped in
+    // `a_cut_onto_a_move_end_writes_no_second_hold` (reframe_path.rs).
     let x = |t: f64| match t {
         t if t < 2.0 => 960.0,
         t if t < 2.35 => 1040.0,
@@ -236,7 +246,8 @@ fn an_exception_move_on_the_last_end_drops_its_hold_key() {
             (0, 960.0, L),
             (1_200_000, 960.0, L),
             (1_440_000, 1040.0, E),
-            (2_340_000, 1500.0, E),
+            (2_040_000, 1040.0, L),
+            (2_940_000, 1500.0, E),
         ],
     );
 }

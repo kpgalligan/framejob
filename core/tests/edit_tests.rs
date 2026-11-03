@@ -685,6 +685,8 @@ fn op_table() -> Vec<Value> {
         // Clip 46 on the front track is the camera, the nest clip 41 behind
         // it the screen, side by side at 1 s.
         json!({"op": "switch_layout", "camera": 46, "layout": "side_by_side", "at": 600000}),
+        // `core/tests/reframe_clip.rs` measures the framing.
+        json!({"op": "reframe_clip", "clip": 47, "follow": "center", "zoom": 2.0}),
         json!({"op": "set_action", "clip": 10, "action": 11, "curve": "linear"}),
         json!({"op": "set_action_end", "clip": 10, "action": 11,
                "patch": {"video": {"opacity": 0.2}}}),

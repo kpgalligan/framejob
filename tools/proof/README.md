@@ -27699,6 +27699,55 @@ python3 tools/proof/creator_spike/reframe_spike.py --selftest
 python3 tools/proof/creator_spike/reframe_spike.py                    # VR-S2, on AC
 ```
 
+## Road map "creator-jobs" VR2a2 — `reframe_clip` (`vr2a_proof.py` rows 1–9, Z1; `canned_framing.py`; `core/tests/reframe_path.rs`, `reframe_clip.rs`; ten mutants; spec §11 VR-24…VR-26, VR-28)
+
+**`canned_framing.py`** writes canned analyses (spec §11 CJ-26) for one media of a document:
+the `shots` kind's `frames.bin` (a cut as d1 1.5 at its frame and d2 1.5 at the next), the
+`faces` kind's `samples.bin` (`FJFS`, 28-byte records) and the `subjects` kind's (`FJSB`, no
+boxes unless asked), each beside a marker with `"canned": true`, full coverage and the copied
+file's identity, so a `-RCDevAnalysisCanned YES` instance frames against faces the proof chose.
+Its scenarios are `creator_spike/reframe_spike.py`'s inputs: a pan, a still, an exit and cuts at
+frames 300 and 600.
+
+**`vr2a_proof.py`** drives the built app over MCP (`proof_app.binary()`, `RC_PROOF_APP`) on a
+scratch `CFFIXED_USER_HOME`, in two launches of its own. Every project is 1080 × 1920 at 30 fps
+over copies of `face_fixtures.py`'s `faces_moving.mov`; every placement is read back with
+`get_project` and evaluated in the script (the base, then each action eased by
+`actions::ease`'s closed forms), a face's canvas position by (★) at θ = 0.
+
+| Row | What it holds |
+|---|---|
+| 1 | a canned face panning 400 → 1520 px over a 20 s clip, `follow: face`: inside the canvas's central 60 % at ≥ 98 % of samples, on the canvas at 100 %, `cached` true |
+| 2 | a magenta canvas, the canned exit with `where_empty: center`: `render_frame`'s four corners never magenta at 40 frames |
+| 3 | a still canned face: a base and no action |
+| 4 | canned cuts at frames 300 and 600: `x` held up to the frame before each cut, changed exactly at the cut's frame and held after |
+| 5 | the canned exit with a backdrop track behind: no action starts in the 1 s after the loss, the ease to fit starts exactly 1 s after it, one "Blurred Background" on the named track |
+| 6 | ×2 and reversed clips of a 60 s pan: each sample `get_media_analysis {clip, kind: faces}` places at its `clip_time` contained as in row 1 |
+| 7 | a `slide_left` arrival kept, and row 2's corners hold at 40 frames after its span |
+| 8 | the tool answers each refusal in the core's sentence (a text clip, an action, a turned clip, a matte track's clip), `zoom` 5 in the core's error, and a caller's own `subjects` as the gate's stranger |
+| 9 | in a launch with `-RCDevAnalysisHold 30` and an uncached copy: a matte-track clip refused in the core's sentence within 5 s with the lane's queued count unchanged; a plain clip's call answering `analyzing` past the 60 s bound with `get_project` unchanged; once the three kinds' markers are on disk the same call applies |
+| Z1 | each launch's log has no `Frame Job: ` line |
+
+`--mutant bound-ignored` builds a Release copy of the tree (`tree_copy.py`) whose wait has no
+deadline and runs row 9 alone; CAUGHT (exit 0) when it fails. The core's mutants, each edited into
+the tree, run against its named test and restored: the clamp removed
+(`reframe_path::every_window_key_lies_inside_the_cropped_rect`), the cut's action at `c`
+(`a_cut_is_one_linear_frame_onto_the_new_shots_median`), `LOSS_HOLD` 0
+(`a_lost_subject_is_held_a_second_then_another_is_followed`), `RETURN_SEEN` 0
+(`the_framing_returns_after_0_6_s_seen_and_not_after_0_5_s`), the union off
+(`two_faces_are_framed_together_when_the_widened_pair_fits`), every backdrop on a new track
+(`reframe_clip::an_exit_eases_to_fit_and_back_with_a_backdrop_on_the_named_track`), the actions
+refusal removed (`every_refusal_in_order`), the cut snapped to the nearest frame
+(`a_mixed_rate_cut_lands_on_the_first_frame_showing_the_new_shot`), and the stand-in promoted at
+once (`a_blink_keeps_the_primary_and_a_loss_hands_over_after_a_second`).
+
+```sh
+cd core && cargo test --release --test reframe --test reframe_path --test reframe_clip
+make app && RC_PROOF_APP=release python3 tools/proof/vr2a_proof.py
+python3 tools/proof/vr2a_proof.py --only 1,3,8              # Debug, in the loop
+python3 tools/proof/vr2a_proof.py --mutant bound-ignored     # row 9 must fail
+```
+
 ## Road map "creator-jobs" CU1a — the cursor file and its read-back (`cursor_capture_probe.py` C1–C6; five mutants; spec §11 CU-10, CU-14…CU-17)
 
 **`cursor_capture_probe.py`** builds `cursor_capture_probe.swift` from `app/Sources` with

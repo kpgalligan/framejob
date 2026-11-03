@@ -283,6 +283,7 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::AddZoomAction { .. }
         | Op::AddSpeedRamp { .. }
         | Op::SwitchLayout { .. }
+        | Op::ReframeClip { .. }
         | Op::SetAction { .. }
         | Op::SetActionEnd { .. }
         | Op::RemoveAction { .. }

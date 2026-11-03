@@ -137,8 +137,45 @@ fn expected_kind(kind: Kind) -> Value {
         | Kind::FadeShape
         | Kind::Layout
         | Kind::LayoutShape
-        | Kind::Corner => {
+        | Kind::Corner
+        | Kind::Follow
+        | Kind::WhereEmpty => {
             json!({"type": "string", "enum": kind.values()})
+        }
+        Kind::Subjects => {
+            let boxes = json!({
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "number"}, "y": {"type": "number"},
+                        "w": {"type": "number"}, "h": {"type": "number"},
+                        "c": {"type": "number"},
+                    },
+                    "required": ["x", "y", "w", "h", "c"],
+                    "additionalProperties": false,
+                },
+            });
+            json!({
+                "type": "object",
+                "properties": {
+                    "samples": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "t": {"type": "integer"},
+                                "faces": boxes, "people": boxes, "salient": boxes,
+                            },
+                            "required": ["t"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "shots": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["samples", "shots"],
+                "additionalProperties": false,
+            })
         }
         Kind::Groups => json!({
             "type": "array",
@@ -312,12 +349,12 @@ fn every_argument_is_published_as_its_kind_says() {
 /// The test above only reaches a kind some argument HAS, so this is what
 /// says none is sitting unexercised: the number of DISTINCT kinds in use is
 /// `Kind`'s whole variant count, which by the pigeonhole is every one of
-/// them. The 27 is that variant count, written here because Rust will not
+/// them. The 30 is that variant count, written here because Rust will not
 /// count an enum's arms for a test; the exhaustive matches in
 /// `op_schema.rs` and in [`expected`] are what keep it honest, since a
 /// kind added to the vocabulary does not compile until both say what it is.
 #[test]
-fn all_twenty_seven_kinds_are_carried_by_an_argument() {
+fn all_thirty_kinds_are_carried_by_an_argument() {
     let mut kinds: Vec<Kind> = Vec::new();
     for op in &OP_TABLE {
         for argument in op.arguments {
@@ -326,7 +363,7 @@ fn all_twenty_seven_kinds_are_carried_by_an_argument() {
             }
         }
     }
-    assert_eq!(kinds.len(), 27, "the kinds in use are {kinds:?}");
+    assert_eq!(kinds.len(), 30, "the kinds in use are {kinds:?}");
 }
 
 /// A closed vocabulary publishes its members and nothing else does — which

@@ -155,15 +155,17 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # the hundred-and-eighteenth; CO6's op tool switch_layout, spec §11 CO-60…CO-66, the
 # sixty-eighth op and the hundred-and-nineteenth tool; SW1's op tool copy_pieces,
 # spec §11 SW-11, the sixty-ninth op and the hundred-and-twentieth tool, and its
-# app-state switch_angle, SW-15, the hundred-and-twenty-first). D3
+# app-state switch_angle, SW-15, the hundred-and-twenty-first; VR2a2's op tool
+# reframe_clip, spec §11 VR-26, the seventieth op and the hundred-and-twenty-second
+# tool). D3
 # adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 121
-OPS = 69
+PRODUCT_TOOLS = 122
+OPS = 70
 # The core's ops with no tool, by design: AgentServer.opsWithoutTools
 # (`keep_range`, spec §11 CJ-50, applied only to a derived document).
 OPS_WITHOUT_TOOLS = {"keep_range"}
