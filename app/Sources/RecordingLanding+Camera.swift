@@ -2,7 +2,7 @@
 // (camera-recording CR3b, spec §11 CAM-10): a screen recording's
 // `(Camera).mov` files, one per segment (CAM-9), on ONE new FRONT track
 // named "Camera", each clip lined up with its screen segment by the
-// segment's measured `cameraOffset` and placed in the bottom-right corner.
+// segment's measured `cameraOffset` and laid out in the recorder's layout.
 //
 // `addCameras` is `addMicrophones`' shape, attempt for attempt: every file's
 // `add_media` in segment order, then — with the screen's starts — the track
@@ -15,12 +15,23 @@
 // every offset NEGATIVE — the camera begins 32–146 ms before the screen — so
 // the trim is the ordinary path here, not the exception it is for a voice.
 //
-// The corner is `cornerPatch`, arithmetic over the container's canvas and
-// the file's size, the precedent `CaptionStyle.size(for:)` set for a
-// Swift-side placement: a quarter of the canvas wide, a third of it tall,
-// inside the 90 % ring of View ▸ Safe Areas (`SafeGuidesView`), as
-// one `set_video {x, y, scale}` right after the clip's placement and read
-// back. Nothing else is set: the clip stays an ordinary clip a person moves.
+// The layout (road map "creator-jobs" CO8, spec §11 CO-80) is ONE
+// `switch_layout` per camera clip right after its placement: the camera and
+// its segment's screen clip at the camera clip's start, one canvas frame
+// long so both roles CUT there, in `choice.cameraLayout` (Corner by
+// default, the owner's answer, which is CAM-10 (3)'s corner to the pixel),
+// its reach bounded by `through` = the later of the screen clip's end and
+// the camera clip's, so it re-bases only a later screen clip this camera
+// overruns into — never a later segment's own screen, nor a clip placed
+// before the recording. No curve, focus or nest: no masks exist yet, so the
+// crop centres on the source. When the segment's screen minted no clip, or
+// its clip does not play at the camera's start, `cornerPatch` is the
+// fallback (CO-80 (c)): arithmetic over the container's canvas and the
+// file's size, the precedent `CaptionStyle.size(for:)` set for a Swift-side
+// placement — a quarter of the canvas wide, a third of it tall, inside the
+// 90 % ring of View ▸ Safe Areas (`SafeGuidesView`) — as one `set_video {x,
+// y, scale}`, read back. Either way the clip stays an ordinary clip a person
+// moves, and Clip ▸ Camera Layout ▸ re-lays it.
 //
 // The ops come back UNSCOPED, as every landing op does; the trial applies
 // them scoped exactly as the commit will (the base file's header).
@@ -79,7 +90,9 @@ extension RecordingLanding {
 
     /// Every segment's camera file: its `add_media` in segment order, then —
     /// when `screenStarts` is given, one per segment — ONE new FRONT track
-    /// named "Camera" and each camera clip by the floor rule, cornered. A nil
+    /// named "Camera" and each camera clip by the floor rule, laid out with
+    /// `screenClips[k]`, segment k's screen clip (nil where it minted none),
+    /// as its screen (`layOut`). A nil
     /// `screenStarts` is `place: false`: the media land and no clip or track
     /// does; a nil ENTRY lands that camera as media only. Answers one media
     /// id and one clip id PER SEGMENT, nil where the segment has no camera
@@ -91,12 +104,14 @@ extension RecordingLanding {
     /// track, the pictures' included. Its id is `next_id` off the trial at
     /// that moment, unchanged by a discarded attempt.
     static func addCameras(
-        _ result: RecordingResult, screenStarts: [Ticks?]?, scope: UInt32?,
-        to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
+        _ result: RecordingResult, screenStarts: [Ticks?]?, screenClips: [UInt32?],
+        scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp],
+        notes: inout [String]
     ) throws -> (media: [UInt32?], clips: [UInt32?]) {
         precondition(
             screenStarts.map { $0.count == result.segments.count } ?? true,
             "one screen start per segment")
+        precondition(screenClips.count == result.segments.count, "one screen clip per segment")
         var media: [UInt32?] = []
         for segment in result.segments {
             if let camera = segment.cameraDescriptor {
@@ -142,7 +157,9 @@ extension RecordingLanding {
                 clips.append(nil)
                 continue
             }
-            try corner(placed, scope: scope, to: &attempt, ops: &attemptOps)
+            try layOut(
+                placed, screen: screenClips[k], layout: result.choice.cameraLayout, scope: scope,
+                to: &attempt, ops: &attemptOps)
             trial = attempt
             ops += attemptOps
             track = on
@@ -215,11 +232,54 @@ extension RecordingLanding {
             message: "\(file.path) could not be placed clear of the previous camera clip.")
     }
 
-    /// The corner (`cornerPatch` over the CONTAINER's canvas — the nest's
-    /// inside one — and the camera file's size) as one `set_video` on
-    /// `clip`, applied and read back: the clip must report exactly the `x`,
-    /// `y` and `scale` asked, or the throw names the clip. A size the patch
-    /// cannot be made for (a dimension of 0) sets nothing.
+    /// The camera clip laid out (CO-80): ONE `switch_layout` with `screen` as its screen at the
+    /// clip's start, one frame of the CONTAINER's canvas long — the nest's inside one — in
+    /// `layout`, `through` the later of the screen clip's end and the camera clip's, applied
+    /// scoped and read back: the camera must then carry its layout action at clip time 0, or
+    /// the throw names the clip. A refusal throws "Clip N could not be laid out:
+    /// <the core's sentence>". With no screen clip, or one that does not play at the camera's
+    /// start, the fallback is `corner` (CO-80 (c)), whatever the layout.
+    private static func layOut(
+        _ clip: ClipSnapshot, screen: UInt32?, layout: RecordingCameraLayout,
+        scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp]
+    ) throws {
+        let at = clip.start
+        let container = try view(of: trial, scope: scope).snapshot
+        guard let screen, let shown = container.clips.first(where: { $0.id == screen }),
+            shown.start <= at, at < shown.end
+        else {
+            try corner(clip, scope: scope, to: &trial, ops: &ops)
+            return
+        }
+        let frame = container.canvas.fps.frameDuration
+        let choice = layout.choice
+        let op = ReelOp.switchLayout(
+            camera: clip.id, screen: screen, layout: choice.kind, shape: choice.shape,
+            corner: choice.corner, at: at, duration: frame, through: max(shown.end, clip.end))
+        switch try trial.applying(op.scoped(scope)) {
+        case .applied(let next):
+            guard try self.clip(clip.id, in: next, scope: scope).actions.contains(where: {
+                $0.start == 0
+            })
+            else {
+                throw ReelCoreError(
+                    message: "Clip \(clip.id) could not be laid out: it has no layout action "
+                        + "at its first frame.")
+            }
+            trial = next
+            ops.append(op)
+        case .refused(let why):
+            throw ReelCoreError(message: "Clip \(clip.id) could not be laid out: \(why.reason)")
+        case .identity:
+            throw ReelCoreError(
+                message: "Clip \(clip.id) could not be laid out: the layout changed nothing.")
+        }
+    }
+
+    /// The fallback corner (`cornerPatch` over the CONTAINER's canvas — the nest's inside one —
+    /// and the camera file's size) as one `set_video` on `clip`, applied and read back: the clip
+    /// must report exactly the `x`, `y` and `scale` asked, or the throw names the clip. A size
+    /// the patch cannot be made for (a dimension of 0) sets nothing.
     private static func corner(
         _ clip: ClipSnapshot, scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp]
     ) throws {

@@ -94,6 +94,40 @@ struct CameraLayoutChoice: Equatable {
     }
 }
 
+/// The recorder panel's Layout rows and `record_screen`'s `camera_layout` (road map
+/// "creator-jobs" CO8, spec §11 CO-80, CO-82): the five a camera beside the screen may land
+/// in, each corner at the bottom right. Each raw value is the key's and the tool's spelling.
+enum RecordingCameraLayout: String, CaseIterable {
+    case cornerSquare = "corner_square", cornerRounded = "corner_rounded"
+    case cornerCircle = "corner_circle", sideBySide = "side_by_side", cameraFull = "camera_full"
+
+    /// The pop-up's row title.
+    var title: String {
+        switch self {
+        case .cornerSquare: return "Corner"
+        case .cornerRounded: return "Rounded Corner"
+        case .cornerCircle: return "Circle"
+        case .sideBySide: return "Side by Side"
+        case .cameraFull: return "Camera Full"
+        }
+    }
+
+    /// The `switch_layout` vocabulary: a corner kind with its shape at the bottom right, else
+    /// the kind alone.
+    var choice: CameraLayoutChoice {
+        let corner = { (shape: CameraLayoutShape) in
+            CameraLayoutChoice(kind: .corner, shape: shape, corner: .bottomRight)
+        }
+        switch self {
+        case .cornerSquare: return corner(.square)
+        case .cornerRounded: return corner(.rounded)
+        case .cornerCircle: return corner(.circle)
+        case .sideBySide: return CameraLayoutChoice(kind: .sideBySide, shape: nil, corner: nil)
+        case .cameraFull: return CameraLayoutChoice(kind: .cameraFull, shape: nil, corner: nil)
+        }
+    }
+}
+
 /// Who is the camera and who the screen for the menu (CO-66).
 enum CameraLayoutRoles {
     /// The track a recording's camera lands on (`RecordingLanding`).

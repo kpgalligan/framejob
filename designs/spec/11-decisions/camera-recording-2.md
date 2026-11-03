@@ -205,6 +205,9 @@ close (2026-10-27); the entries moved here unchanged.
      View ▸ Safe Areas (the guide spec §4.1 names title-safe; the industry's action-safe). One
      `set_video {x, y, scale}` per clip, right after its placement; nothing else is set, and the
      clip stays an ordinary clip a person moves.
+     **Amended by CO-80** (CO8): the clip is laid out by one `switch_layout` in the recorder's
+     layout (`corner_square`, today's corner to the pixel, by default), and this `set_video` is
+     the fallback for a screen with no clip or not playing at the camera's start.
   4. **One grouped edit**, in the order pictures → cameras → microphones. `place: false` lands
      the camera media with no clip and no track. A new project lands the cameras through
      `remainderPlacement`, after the later pictures; without clip 1, as media only with its
@@ -221,6 +224,9 @@ close (2026-10-27); the entries moved here unchanged.
      and its format — for a screen recording too, when `camera` is given; (8) the Camera grant;
      then, for a screen, the Screen Recording grant and the display or window lookup; (9) the
      recording. The tool never prepares a capture or adopts one (CAM-7 (7)).
+     **Amended by CO-80** (CO8, CO-83): `camera_layout` and `camera_cutout` are admitted with
+     `camera`, need it with source screen, are strangers with voice_over, and are read after the
+     polish and before any grant.
   6. **The answer.** Per `segments[k]` and never at the top level: `camera_path`,
      `camera_duration` and `camera_offset` when that segment has a camera file;
      `camera_problem` and `camera_note` when set; `camera_media` and `camera_clip` when known.
@@ -252,6 +258,9 @@ close (2026-10-27); the entries moved here unchanged.
      `persistChoices` on every change and read by `restoreChoices`. It persists across launches,
      unlike the session-only Camera row; it is the panel's tenth `FrameJobRecording…` key, pinned
      in the harness and `screens.py`. A hot-plug writes nothing (CAM-8 (4)).
+     **Amended by CO-80** (CO8, CO-82): the Layout pop-up's and the Remove-background box's keys,
+     `FrameJobRecordingCameraLayout` and `FrameJobRecordingCameraCutout`, are the seventeenth and
+     eighteenth, pinned the same way.
   3. **A camera wanted** means Source Camera, or the box ticked with a display row or the Window
      row. Then the Camera and Format popups are live while idle (amending CAM-5 (2) and CAM-6
      (2)'s "only while idle with Source Camera"). `currentChoice()` carries `camera` (the popup's

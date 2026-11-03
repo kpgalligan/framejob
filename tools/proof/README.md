@@ -29605,7 +29605,7 @@ The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: J
 
 **Ungranted, no app.** `cu10_probe.py` builds `cu10_probe.swift` from `app/Sources` on
 `cu3c_probe.py`'s shape and exit rule R (`--sources`, `--mutant`, `--only`). The panel is
-`RecorderPanelController.shared`, never shown, under `sealed()` doors, and the sixteen
+`RecorderPanelController.shared`, never shown, under `sealed()` doors, and the eighteen
 `FrameJobRecording…` values are put back as they were.
 
 | Row | What it holds |
@@ -29647,3 +29647,58 @@ python3 tools/proof/cu10_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CU10 record. No person check: the feel is
 CU12's trial.
+
+## Road map "creator-jobs" CO8 — the camera's layout and cutout at record time (`co8_probe.py` B0, Q1–Q7 with `co8_probe.swift`; `co8_proof.py` Z0, R1, R1b, R2–R4, R6, R7; eight mutants; spec §11 CO-80…CO-84)
+
+**Ungranted, no app.** `co8_probe.py` builds `co8_probe.swift` from `app/Sources` with
+`FRAMEJOB_DEV_TOOLS` on `cu10_probe.py`'s shape and exit rule R (`--sources`, `--mutant`,
+`--only`), and runs it three times: `main`, then `write` and `read` (Q5, two processes). The
+panel is `RecorderPanelController.shared`, never shown, under `sealed()` doors, and the eighteen
+`FrameJobRecording…` values are put back as they were (by the read run for Q5's). The landing
+rows build `RecordingResult`s over media descriptors only; the core reads no file.
+
+| Row | What it holds |
+|---|---|
+| Q1 | "Layout:" with Corner, Rounded Corner, Circle, Side by Side and Camera Full (raw values as represented objects), then "Remove the camera's background when it lands" unlabelled under it, directly after the preview and before Microphone; each `controlChanged:` on the panel |
+| Q2 | the two keys absent read corner_square and off, a stale layout corner_square; each change writes; another control's change keeps them; stored values restore |
+| Q3 | both live only idle with Record the camera too beside a screen source; greyed keep their values; `applyCameraLanding` gives corner_square and off otherwise; Microphone Only, Camera and a countdown grey both |
+| Q4 | CO-83's sentences, exact: `recordingSourceKind` (voice_over, screen without camera, camera), `recordingCameraLanding` (the enum, the place sentences, layout first) and `landRecordingCamera` |
+| Q5 | a write run changes the two through the panel and saves every value; a read run restores side_by_side and on and puts every value back |
+| Q6 | two segments in side_by_side, the second without a camera: segment 1's camera and screen with one one-frame layout action at clip time 0; segment 2's screen with none and an `add_clip` twin's video |
+| Q7 | a +3 frame offset: the screen keeps its twin's video with one one-frame action at 3 frames; an overrun screen's camera lands at CAM-10 (3)'s corner with no action, no throw |
+
+`recording_probe.py`'s 5d and D3 count eighteen keys and 7c's arguments gain the two;
+`camera_recording_probe.swift`'s P3 and its box row count eighteen; its L4 expects
+`switch_layout` where each camera's `set_video` was and one one-frame layout action on each role
+clip (screen 1's at clip time `head`), and its `corner-top` mutant is caught on L5 alone, since
+`cornerPatch` is the fallback; `audio_ap6c_proof.py`'s V8 lists `land_recording`'s eighteen
+arguments.
+
+**Over MCP.** `co8_proof.py [SOCKET]`, every recording landed by `land_recording` into a fresh
+saved package (a 1920 × 1080 `testsrc` screen, a 640 × 360 camera, a silent voice, copied per
+package). R1, both doors: the camera at CAM-10 (3)'s arithmetic with the default crop, radius and
+opacity, the screen an `add_clip` twin's, one one-frame layout action at clip time 0 on each,
+ending at its base. R1b: `camera_offset` 2 frames, the screen's one action at 2 frames. R2: the
+five layouts against a twin given `switch_layout` by hand. R3, both doors: `camera_cutout`, undo
+Remove Background then Add Recording, the cutout on the camera clip alone. R4: every CO-83
+sentence through `record_screen` (before any grant) and `land_recording`, the project unchanged.
+R6: a clip placed before, after the playhead on the front track, byte-identical. R7:
+`fit_new_clips` off on a 1280 × 720 canvas, the screen the twin's.
+
+Mutants (each must fail its row): `co8_probe.py --mutant gate-ignored` (Q3),
+`cutout-without-camera` (Q4), `through-whole-recording` and `no-through` (Q6),
+`throw-on-unplayed-screen` (Q7); `co8_proof.py --mutant cutout-in-landing` (R3),
+`default-rounded` (R1) and `no-frame-duration` (R1b), each on a `tree_copy.py` copy whose app it
+builds.
+
+```sh
+make rust
+python3 tools/proof/co8_probe.py [--only Q4,Q6]
+python3 tools/proof/co8_probe.py --mutant <name>
+make app-debug && python3 tools/proof/co8_proof.py <dir>/agent.sock
+make app && RC_PROOF_APP=release python3 tools/proof/co8_proof.py
+python3 tools/proof/co8_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s CO8 record. No person check: the landing is
+measured.

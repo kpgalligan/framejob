@@ -109,7 +109,8 @@ extension RecordingLanding {
     /// **A camera beside the screen** (spec §11 CAM-10 (4)) lands after the
     /// later pictures and before the voices, by `addCameras` against each
     /// segment's picture start — clip 1's included — on ONE new track in
-    /// front of the pictures'; without clip 1, as media only with
+    /// front of the pictures', laid out with its segment's picture; without
+    /// clip 1, as media only with
     /// `unplacedNote`.
     ///
     /// **The ripples** (CU-31 (c)) go on clip 1 and the later pictures right
@@ -167,7 +168,8 @@ extension RecordingLanding {
             }
         }
         let cameras = try addCameras(
-            result, screenStarts: starts.map { segmentStarts($0, of: result) }, scope: scope,
+            result, screenStarts: starts.map { segmentStarts($0, of: result) },
+            screenClips: split(clips, of: result).segments, scope: scope,
             to: &trial, ops: &ops, notes: &notes)
         let microphones = try addMicrophones(
             voices(of: result), pictureStarts: starts,

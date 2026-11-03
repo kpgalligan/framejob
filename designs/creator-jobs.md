@@ -11331,6 +11331,84 @@ one Release instance `switch_pieces_proof.py` 6/6 (P5's five calls 0.132, 0.141,
 - **Question for the owner:** the panel's default layout? *Recommended: Corner* (today's landing);
   or Rounded Corner, the look creators expect, accepting that R1's pin moves.
 
+#### CO8's record (2026-11-03)
+
+**Landed.** Lane B, base `b5b014ca` (I's HEAD, CU10). The decisions first, CO-80…CO-84 appended to
+`creator-jobs-10.md` (353 → 444 lines) with its file row's description extended and five index
+rows after CO-73's, and one "Amended by CO-80" line each under CAM-4 (3), CAM-10 (3), CAM-10 (5)
+and CAM-11 (2). The owner's answer (2026-11-01): the panel's default layout is Corner, today's
+landing to the pixel. No core, FFI, header, op, format (43 stands) or tool-count change (123
+product tools at the base, 124 on I after VR3a); the cutout is on-device, so nothing is keyed
+(CJ-3). No toll:
+`RecorderPanelController.swift` stands at 397 lines, `AgentServer+LandRecording.swift` at 341,
+and the three new files under 400.
+
+- **The landing** (`RecordingLanding+Camera.swift`): `corner(...)` became `layOut(...)`, one
+  `ReelOp.switchLayout` per camera clip at its start, one canvas frame long, `through` =
+  max(the segment's screen clip end, the camera clip end), no curve, focus or nest, applied
+  scoped and read back (a refusal throws "Clip N could not be laid out: …"); `cornerPatch` is
+  the fallback when the segment's screen minted no clip or does not play at the camera's start.
+  `addCameras` takes `screenClips` (the main landing's pictures, the remainder's clips, split
+  per segment).
+- **The cutout** (`RecordingCutout.swift`): one grouped step "Remove Background" after the
+  landing and before Enhance Voice and the polish, from both panel branches and from
+  `landAndEnhance` (in `land`'s main hop); the tool answers `camera_cutout {clips}` or
+  `camera_cutout_error`.
+- **The panel** (`RecorderPanelController+CameraLanding.swift`, the fourteenth file): Layout and
+  "Remove the camera's background when it lands" after the preview, live only idle with the
+  camera beside the screen, the keys `FrameJobRecordingCameraLayout` and
+  `FrameJobRecordingCameraCutout` (the seventeenth and eighteenth; absent Corner and off),
+  pinned in the harness and `screens.py`.
+- **The tools:** `record_screen`'s `camera_layout` and `camera_cutout` (strangers with
+  voice_over and camera, needing `camera` with screen, the enum and the two `place` sentences
+  after the polish and before any grant); `land_recording`'s `camera`, `camera_offset`,
+  `camera_layout` and `camera_cutout` (`AgentServer+LandRecordingCamera.swift`).
+- **Instruments:** `co8_probe.py`/`.swift` and `co8_proof.py` new; the eighteen keys in
+  `recording_probe`, `camera_recording_probe`, `cu10_probe`, `cu3c_probe`, `cursor_keys_probe`
+  and `audio_ap6c_probe`; `camera_recording_probe`'s L4 expects `switch_layout` and the one-frame
+  actions (screen 2's at clip time `head`), its `corner-top` mutant now L5 alone;
+  `audio_ap6c_proof`'s V8 lists eighteen arguments; `RECORD_PROPERTIES` in `recording_proof` and
+  `camera_recording_proof` (edited, not run: they record only when granted).
+- **Documents:** `screen-recording.md` (the two rows, the remembered choices, A camera beside the
+  screen, the limit), `mcp.md`, spec §7.9d, §7.9c, §7.4, the screen catalog's recorder panel, the
+  proof README's CO8 section.
+
+**Measured** (in the lane's worktree, Debug unless named):
+- `make typecheck`: 0 errors and the 4 baseline warnings, tsc clean.
+- `co8_probe.py` 8/8 (B0, Q1–Q7); its five mutants all caught (`gate-ignored` on Q3,
+  `cutout-without-camera` on Q4, `through-whole-recording` and `no-through` on Q6,
+  `throw-on-unplayed-screen` on Q7).
+- `co8_proof.py` 8/8 on Debug; its three app mutants caught (`default-rounded` on R1,
+  `cutout-in-landing` on R3, `no-frame-duration` on R1b).
+- `recording_probe.py --only chrome,catalog,voiceover_doors` 182/182;
+  `camera_recording_probe.py --only landing,tool,panel,beside` 55/55, `--mutant corner-top`
+  caught on L5 (L4 passing); `cu10_probe` 7/7, `cu3c_probe` 8/8, `cursor_keys_probe` 7/7,
+  `audio_ap6c_probe` 5/5; `spec_index_proof` 267/267.
+- `make gate`: PASS 481 s (names, typecheck, test 290 s, app 179 s; fmt and lint skipped,
+  unchanged).
+- Release: `co8_proof.py` 8/8, `cu10_proof.py` 6/6, `audio_ap6c_proof.py` 39/39 (its own
+  instance); `screens.py --only 16-recorder-panel` 6 pass, 0 fail, new problems 0. No
+  `Frame Job: ` line in any instance's log.
+
+**Integrated** onto I after VR3 (`d78a694d`), the lane's `33bf99e4` and `ae7719df` as one
+commit. Conflicts, both intents kept: `creator-jobs-10.md` holds VR3a's section and then CO8's
+(574 lines; CO8's preface now says 124 product tools), its README row 57 carries both summaries
+at 574, and `designs/spec/README.md`'s Lines cells were recounted (§7.4 106, §7.9c 501, §7.9d
+227, `11-decisions/` 22564 in 44 files; `spec_index_proof` 270/270). `app/CLAUDE.md` took the
+three owed edits: the recorder entry's eighteen keys and `+CameraLanding`, `RecordingCutout.swift`
+and `AgentServer+LandRecordingCamera.swift` in the Recording family, and the `+Camera` landing
+laid out by `switch_layout` with `cornerPatch` the fallback. `make gate` passed on I.
+
+**Review** (verdict pass, three nits): `RecordingCutout.apply` answers the clip ids even if
+`performGroupedEdit` did not apply the step (left as is: `canCutOut` is checked first, and the
+polish has the same shape); `land_recording`'s prose line over the wrap width with "place
+false", and `record_screen`'s "Remove Background … Remove Background" repetition, both fixed at
+integration (prose only).
+
+**Owed.** No person check (the landing is measured; no JOB row). A recorded limit (CO-80 (d)):
+an Auto Zoom visit starting in a screen clip's first frame, or at a screen's mid-clip layout
+action, meets the one-frame action and is dropped and counted. Nothing to file.
+
 ### SW2a — the switch's planner and its numbers
 
 - **What a person gets:** nothing visible: the planner that decides the cuts, its readings off the

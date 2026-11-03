@@ -411,6 +411,10 @@ enum Harness {
             "FrameJobRecordingAutoZoom": true,
             "FrameJobRecordingShortcutOverlays": true,
             "FrameJobRecordingSpeedUpTyping": false,
+            // The camera's Layout and Remove-background box (road map creator-jobs CO8, spec §11
+            // CO-82), at their absent-key readings: Corner, off.
+            "FrameJobRecordingCameraLayout": "corner_square",
+            "FrameJobRecordingCameraCutout": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5

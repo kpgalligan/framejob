@@ -24,9 +24,10 @@ import ScreenCaptureKit
 /// the "Record the camera too" box (spec §11 CAM-5, CAM-6, CAM-11),
 /// `+CameraPreview.swift` the camera's live preview in `CameraPreviewWell`
 /// (CAM-7), `+Devices.swift` hot-plug: the device observers and the
-/// popups rebuilt when a device comes or goes (CAM-8), and `+Polish.swift`
-/// the "When it lands:" boxes (road map creator-jobs CU10, spec §11 CU-102).
-/// Thirteen files at the 400-line cap, and the crossing members are internal
+/// popups rebuilt when a device comes or goes (CAM-8), `+Polish.swift` the
+/// "When it lands:" boxes (road map creator-jobs CU10, spec §11 CU-102), and
+/// `+CameraLanding.swift` the camera's Layout and cutout (CO8, spec §11 CO-82).
+/// Fourteen files at the 400-line cap, and the crossing members are internal
 /// for it, the tree's rule for a class split across files.
 ///
 /// **It is an `NSPanel`, floating and NON-ACTIVATING**, and each of the four
@@ -115,7 +116,7 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `FrameJobRecording…` key (written on change,
-/// read on show); the harness pins all sixteen on `FrameJobExportChoice`'s terms.
+/// read on show); the harness pins all eighteen on `FrameJobExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held; Microphone Only and Camera persist for the
@@ -123,8 +124,8 @@ import ScreenCaptureKit
 /// the camera too" (CAM-11) is remembered across launches, and so is Record
 /// shortcuts (road map creator-jobs CU6, spec §11 CU-62), off by default, and
 /// Cursor (CU3c, spec §11 CU-36), whose `""` follows the source's default,
-/// and the three "When it lands:" boxes (CU10, spec §11 CU-102), on, on and
-/// off when never set.
+/// the three "When it lands:" boxes (CU10, spec §11 CU-102), on, on and off
+/// when never set, and the camera's Layout and cutout (CO-82), Corner and off.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -205,6 +206,8 @@ final class RecorderPanelController: NSWindowController {
     let recordShortcutsNote = NSTextField(wrappingLabelWithString: "")
     /// "When it lands:" (spec §11 CU-102 (a), `+Polish.swift`).
     let polishBoxes = RecorderPolishBoxes()
+    /// The camera's Layout and Remove-background box (spec §11 CO-82, `+CameraLanding.swift`).
+    let cameraLanding = RecorderCameraLandingControls()
     let ratePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let sizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let sizeNote = NSTextField(labelWithString: "")

@@ -21,7 +21,9 @@ import ScreenCaptureKit
 ///
 /// **The refusal ORDER is the contract** (`transcribe`'s rule): the caller's
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
-/// missing or outside 1…600, then `source` (its value; for `voice_over`
+/// missing or outside 1…600, then `source` (its value; the camera's
+/// strangers, `camera_layout` and `camera_cutout` among them, spec §11
+/// CO-83 (a); for `voice_over`
 /// the screen-only arguments given, `keys`, `cursor` and the polish's three
 /// among them, then `microphone: false`), `display` with `window`, a `rate` or `size` outside the
 /// vocabulary, a `keys` outside its vocabulary (spec §11 CU-62), a `cursor`
@@ -29,7 +31,9 @@ import ScreenCaptureKit
 /// true` without a microphone and then with `place: false` (spec §11 AU-69),
 /// `auto_zoom`, `shortcut_overlays` and `speed_up_typing` in that order, each
 /// with `place: false` and the last two without `keys: "shortcuts"` (road map
-/// creator-jobs CU10, spec §11 CU-102 (b)),
+/// creator-jobs CU10, spec §11 CU-102 (b)), a `camera_layout` outside its
+/// vocabulary and then, with `place: false`, a `camera_layout` given and a
+/// `camera_cutout: true` (CO8, spec §11 CO-83 (b)),
 /// `microphone: true` (implied by a voice-over) with the Microphone grant
 /// absent (the status WORD in the sentence), `keys: "shortcuts"` with the
 /// Input Monitoring grant absent (CU-3's sentence, read and never
@@ -139,6 +143,8 @@ extension AgentServer {
         let enhance = try recordingEnhance(a, microphone: microphone, place: place)
         // CU-102 (b): the polish on landing, after `enhance`, before any grant.
         let polish = try recordingPolish(a, place: place, keys: keys)
+        // CO-83 (b): the camera's layout and cutout, after the polish, before any grant.
+        let cameraLanding = try recordingCameraLanding(a, place: place)
         let folder = try recordingFolder(a)
         if microphone {
             let status = RecordingGrant.microphoneStatus
@@ -205,7 +211,8 @@ extension AgentServer {
             camera: cameraPick?.id, cameraFormat: cameraPick?.format, enhanceMicrophone: enhance,
             keys: keys, cursor: cursor, autoZoom: polish.contains(.autoZoom),
             shortcutOverlays: polish.contains(.shortcutOverlays),
-            speedUpTyping: polish.contains(.speedUpTyping))
+            speedUpTyping: polish.contains(.speedUpTyping), cameraLayout: cameraLanding.layout,
+            cameraCutout: cameraLanding.cutout)
 
         // 5. The recording: start, the span, stop — all waits on this thread.
         let result = try record(

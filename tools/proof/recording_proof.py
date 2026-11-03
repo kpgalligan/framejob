@@ -472,6 +472,8 @@ RECORD_PROPERTIES = {
     "keys", "cursor",
     # Road map "creator-jobs" CU10 (spec §11 CU-102): the polish on landing.
     "auto_zoom", "shortcut_overlays", "speed_up_typing",
+    # Road map "creator-jobs" CO8 (spec §11 CO-83): the camera's layout and cutout.
+    "camera_layout", "camera_cutout",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of

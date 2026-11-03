@@ -28,15 +28,16 @@ extension AgentServer {
                     + "speed_up_typing, keys, cursor and microphone: false are "
                     + "refused by name; with camera, display, window, system_audio, "
                     + "show_clicks, size, include_framejob_windows, keys, cursor, auto_zoom, "
-                    + "shortcut_overlays, speed_up_typing and rate are; "
-                    + "camera and camera_format are refused with voice_over.",
+                    + "shortcut_overlays, speed_up_typing, camera_layout, camera_cutout and "
+                    + "rate are; camera, camera_format, camera_layout and camera_cutout are "
+                    + "refused with voice_over.",
             ],
             "camera": [
                 "type": "string",
                 "description": "With source camera, which camera to record alone; with "
                     + "source screen (the default), a camera to record BESIDE the screen, "
-                    + "landing on a Camera track in front of it in the bottom-right "
-                    + "corner. A device's unique id, or its name in any case; trimmed, "
+                    + "landing on a Camera track in front of it in the layout camera_layout "
+                    + "names. A device's unique id, or its name in any case; trimmed, "
                     + "and blank means none. With source camera, absent means the "
                     + "default camera — the system's preferred camera, else the "
                     + "first built-in, else the first; with source screen, absent means "
@@ -52,6 +53,25 @@ extension AgentServer {
                     + "best — the camera's best format. A format the camera lacks is "
                     + "refused, naming its formats. Refused with source voice_over, and "
                     + "with source screen without camera.",
+            ],
+            // The recorder panel's Layout pop-up and Remove-background box (CO-80…CO-83).
+            "camera_layout": [
+                "type": "string", "enum": RecordingCameraLayout.allCases.map(\.rawValue),
+                "description": "With camera beside the screen, the layout each camera clip lands "
+                    + "in, by one switch_layout at its first frame with its segment's screen clip: "
+                    + "corner_square (default — the bottom-right corner, scaled into a quarter "
+                    + "of the canvas wide and a third of it tall), corner_rounded, corner_circle, "
+                    + "side_by_side or camera_full. Refused with place: false, with source "
+                    + "voice_over and camera, and with source screen without camera.",
+            ],
+            "camera_cutout": [
+                "type": "boolean",
+                "description": "With camera beside the screen, run Remove Background (set_video "
+                    + "cutout) on the landed camera clips right after the landing, as its own "
+                    + "undo step Remove Background, before any enhance (default false); the "
+                    + "answer gains camera_cutout {clips} or camera_cutout_error. Refused with "
+                    + "place: false, with source voice_over and camera, and with source screen "
+                    + "without camera.",
             ],
             "display": [
                 "type": "integer", "minimum": 0,

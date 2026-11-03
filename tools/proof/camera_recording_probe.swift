@@ -482,7 +482,7 @@ func besideLanding(_ request: [String: Any], probed: (String) -> MediaDescriptor
         let head = ReelTime.snapToFrame(tenth, fps: s.canvas.fps)
         let want = [
             "add_media", "add_media", "add_clip", "add_clip", "add_media", "add_media", "add_track",
-            "add_clip", "trim_start", "move_clip", "set_video", "add_clip", "set_video", "add_media",
+            "add_clip", "trim_start", "move_clip", "switch_layout", "add_clip", "switch_layout", "add_media",
             "add_media", "add_track", "add_clip", "add_clip",
         ]
         let names = p.ops.map(\.name)
@@ -490,13 +490,23 @@ func besideLanding(_ request: [String: Any], probed: (String) -> MediaDescriptor
         let picIndex = s.tracks.firstIndex { $0.id == pic0?.track } ?? -1
         let ids = (p.cameraMediaIds, p.cameraClipIds)
         let mediaIds = [file("short"), file("short2")].map { f in s.media.first { $0.path == f.path }?.id }
+        // CO-80 (b): each role clip carries ONE one-frame layout action — the cameras and
+        // screen 0 at clip time 0, screen 1 at `head`, where its camera (+1/10 s) arrives.
+        let frame = s.canvas.fps.frameDuration
+        func oneAction(_ c: ClipSnapshot?, at t: Ticks) -> Bool {
+            guard let c, c.actions.count == 1 else { return false }
+            return c.actions[0].start == t && c.actions[0].duration == frame
+        }
+        let laid =
+            oneAction(cam0, at: 0) && oneAction(cam1, at: 0) && oneAction(pic0, at: 0)
+            && oneAction(pic1, at: head)
         let placed =
             names == want && s.tracks.last?.name == "Camera" && camIndex == s.tracks.count - 1
             && picIndex >= 0 && picIndex < camIndex && cam1?.track == cam0?.track
             && cam0 != nil && cam0?.start == pic0?.start && cam0?.source.sourceIn == head
             && pic1 != nil && cam1?.start == (pic1?.start ?? 0) + head && cam1?.source.sourceIn == 0
             && cornered(cam0, "short", s.canvas) && cornered(cam1, "short2", s.canvas)
-            && ids.0 == mediaIds && ids.1 == [cam0?.id, cam1?.id]
+            && ids.0 == mediaIds && ids.1 == [cam0?.id, cam1?.id] && laid
         d.undoManager?.undo()
         let after = d.project.snapshot
         let undone = after.media.isEmpty && after.clips.isEmpty && after.tracks.count == before
@@ -504,6 +514,7 @@ func besideLanding(_ request: [String: Any], probed: (String) -> MediaDescriptor
                  "ops \(names); tracks \(s.tracks.map(\.name)) (camera at \(camIndex), pictures at "
                     + "\(picIndex)); pictures \(at(pic0)), \(at(pic1)); cameras \(at(cam0)), \(at(cam1)) "
                     + "(head \(head)); want corner \(String(describing: wantCorner(s.canvas.width, s.canvas.height, 1760, 1328))); "
+                    + "layout actions \([cam0, cam1, pic0, pic1].map { $0?.actions.map { "\($0.start)+\($0.duration)" } ?? [] }) (\(laid)); "
                     + "ids \(ids); one undo → media \(after.media.count), clips \(after.clips.count), "
                     + "tracks \(after.tracks.count) (was \(before)); notes \(p.notes)")
     } catch {
@@ -1101,7 +1112,7 @@ final class PanelGrantSpy {
 }
 
 /// CR1c (spec §11 CAM-5): `RecorderPanelController.shared`, never shown,
-/// under `PanelGrantSpy`, with the sixteen `FrameJobRecording…` values put back
+/// under `PanelGrantSpy`, with the eighteen `FrameJobRecording…` values put back
 /// as they were at the end. Neither fake id finds a device, so no camera or
 /// microphone opens.
 func panelRows(_ request: [String: Any]) {
@@ -1117,6 +1128,7 @@ func panelRows(_ request: [String: Any]) {
         RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
         RecorderPanelController.cursorKey, RecorderPanelController.autoZoomKey,
         RecorderPanelController.shortcutOverlaysKey, RecorderPanelController.speedUpTypingKey,
+        RecorderPanelController.cameraLayoutKey, RecorderPanelController.cameraCutoutKey,
     ]
     let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
@@ -1224,7 +1236,7 @@ func panelRows(_ request: [String: Any]) {
     panel.restoreChoices()
     let kept = panel.cameraSelected && panel.currentChoice().source == .camera
         && panel.selectedCameraID == "probe-camera"
-    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 16 && kept,
+    probeRow("P3", display == 777 && stored == "probe-camera" && keysNow.count == 18 && kept,
              "display key \(display) (sentinel 777), camera key \(stored ?? "nil"), \(keysNow.count) "
                 + "keys \(keysNow), the row and the camera kept through rebuildSources + "
                 + "restoreChoices \(kept)")
@@ -1734,7 +1746,7 @@ func besidePanelRows(
                && stored == true && note.contains("points"))
     let keys = recordingKeys()
     expect("\(keys.count) FrameJobRecording… keys \(keys)",
-           keys.count == 16 && keys.contains(key))
+           keys.count == 18 && keys.contains(key))
     tick(false)
     let unticked = defaults.object(forKey: key) as? Bool
     expect("unticked: key \(unticked.map { "\($0)" } ?? "absent"), camera "

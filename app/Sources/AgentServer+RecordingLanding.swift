@@ -112,7 +112,10 @@ extension AgentServer {
         }
     }
 
-    /// SERVER THREAD. `land` on main; then, when the choice asks for it,
+    /// SERVER THREAD. `land` on main, and in the same hop, when the choice
+    /// asks for it, Remove Background over the camera clips as its own step
+    /// (road map creator-jobs CO8, spec §11 CO-81, `camera_cutout` or
+    /// `camera_cutout_error`); then, when the choice asks for it,
     /// Enhance Voice over the recording's voice clips as its own step (spec
     /// §11 AU-68 (f)): `decide` polled through `onMain` every
     /// `RecordingEnhance.checkInterval`, then `enhance_voice`'s own body at
@@ -120,13 +123,26 @@ extension AgentServer {
     /// for any, the polish on landing (road map creator-jobs CU10, spec §11
     /// CU-101 (j), `polishLanded`). The answer is `land`'s with `enhance`
     /// (that body's answer) or `enhance_error`, the polish's answers or
-    /// `…_error` sentences, and `project` read again, last, when either ran.
+    /// `…_error` sentences, and `project` read again, last, when any ran.
     func landAndEnhance(_ result: RecordingResult, place: Bool) throws -> String {
         let stop = AgentLane.shared.callCancel
-        let (answer, document) = try onMain { try self.land(result, place: place) }
+        let (answer, document, cutout) = try onMain {
+            () throws -> (String, ProjectDocument, [UInt32]) in
+            let (answer, document) = try self.land(result, place: place)
+            // CO-81: Remove Background, its own step, before Enhance Voice and the polish.
+            return (answer, document, RecordingCutout.apply(result, in: document))
+        }
         let polish = !RecordingPolish.commands(of: result.choice).isEmpty
-        guard result.choice.enhanceMicrophone || polish else { return answer }
+        let wantsCutout = result.choice.cameraCutout
+        guard result.choice.enhanceMicrophone || polish || wantsCutout else { return answer }
         var fields = Self.resultObject(answer) ?? [:]
+        if wantsCutout {
+            if cutout.isEmpty {
+                fields["camera_cutout_error"] = RecordingCutout.noCameraSentence
+            } else {
+                fields["camera_cutout"] = ["clips": cutout]
+            }
+        }
         if result.choice.enhanceMicrophone {
             try enhanceLanded(result, in: document, stop: stop, into: &fields)
         }

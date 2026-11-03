@@ -164,7 +164,8 @@ series (CAM-3 on), before its code.
      camera recording records the camera alone, at the camera's own format."
      **Amended by CU-1**: `cursor` (CU3c), `keys` (CU6) and `auto_zoom`, `shortcut_overlays` and
      `speed_up_typing` (CU10) are screen-only too, refused with source `camera` in this sentence at
-     the place their phase records.
+     the place their phase records; and CO-80: `camera_layout`, `camera_cutout` (CO8), before
+     `rate` (CO-83 (a)).
   4. **The microphone.** `microphone: true` records the DEFAULT microphone, as with the screen
      source. Choosing a microphone is the panel's (CR1c).
   5. **The span** counts from segment 0's first buffer (the recorder's `heldFirstStartedAt`,

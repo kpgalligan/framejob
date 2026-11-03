@@ -10,7 +10,7 @@
 //   cu10_probe <work dir>
 //
 // The panel is `RecorderPanelController.shared`, NEVER shown, under doors that read nothing true
-// and ask nothing: no prompt, no System Settings, no camera or microphone opens. The sixteen
+// and ask nothing: no prompt, no System Settings, no camera or microphone opens. The eighteen
 // `FrameJobRecording…` values are put back as they were. The answer is one JSON object on
 // stdout, `{"rows": [...]}`, each row `{"id", "pass", "detail"}`; `cu10_probe.py` scores them.
 import AppKit
@@ -200,6 +200,7 @@ let keys = [
     RecorderPanelController.enhanceMicrophoneKey, RecorderPanelController.keysKey,
     RecorderPanelController.cursorKey, RecorderPanelController.autoZoomKey,
     RecorderPanelController.shortcutOverlaysKey, RecorderPanelController.speedUpTypingKey,
+    RecorderPanelController.cameraLayoutKey, RecorderPanelController.cameraCutoutKey,
 ]
 let polishKeys = [
     RecorderPanelController.autoZoomKey, RecorderPanelController.shortcutOverlaysKey,

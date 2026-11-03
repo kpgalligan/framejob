@@ -70,6 +70,7 @@ extension RecorderPanelController {
         enhanceMicrophoneCheckbox.isEnabled = idle && currentChoice().microphone != nil
         syncCameraControls()
         syncPolishControls()
+        syncCameraLandingControls()
     }
 
     /// The Pause / Resume button beside Stop: on screen only while a

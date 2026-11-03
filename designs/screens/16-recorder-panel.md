@@ -25,7 +25,10 @@ ticked; Format, a greyed pop-up reading "Best
 (1760×1328 at 30 fps)" — the default camera's best format, then its other
 formats as size and rate — with the same live rule; under Format, a row
 holding the camera's live preview (a 200 × 150 pt well) appears only when a
-camera is wanted, so it is absent here; Microphone "Off", with an
+camera is wanted, so it is absent here; Layout, a greyed pop-up reading "Corner" (its
+other rows Rounded Corner, Circle, Side by Side and Camera Full), and under it a greyed,
+unticked checkbox, "Remove the camera's background when it lands", both live only with "Record
+the camera too" ticked (the screen catalog pins their keys at Corner and off); Microphone "Off", with an
 empty level meter beside it, and under it a greyed, unticked checkbox, "Enhance the
 microphone when it lands", live only with a microphone chosen; System Audio, a switch that is on (blue); Cursor,
 a pop-up reading "Separate" — the pointer is kept out of the movie and drawn by Frame Job; the

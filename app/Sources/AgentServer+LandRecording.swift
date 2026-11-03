@@ -83,6 +83,8 @@ extension AgentServer {
             }
         }
         let polish = try recordingPolish(a, place: place ?? true, keys: keys ?? .off)
+        // CO8 (spec §11 CO-83 (c)): a camera beside the screen, `+LandRecordingCamera.swift`.
+        let camera = try landRecordingCamera(a, movie: movie, place: place ?? true)
         let voices = try voice.map(landRecordingProbe)
         let picture = try movie.map(landRecordingProbe)
         let destination = try onMain { try self.recordingDestination(a) }
@@ -99,6 +101,9 @@ extension AgentServer {
         choice.autoZoom = polish.contains(.autoZoom)
         choice.shortcutOverlays = polish.contains(.shortcutOverlays)
         choice.speedUpTyping = polish.contains(.speedUpTyping)
+        choice.camera = camera.map { _ in Self.landRecordingCameraID }
+        choice.cameraLayout = camera?.layout ?? .cornerSquare
+        choice.cameraCutout = camera?.cutout ?? false
         let now = Date()
         let segments =
             try picture.map {
@@ -107,7 +112,8 @@ extension AgentServer {
                         cursor,
                         RecordingSegment(
                             descriptor: $0, micDescriptor: voices[0], micOffset: 0,
-                            startedAt: now))
+                            startedAt: now, cameraDescriptor: camera?.descriptor,
+                            cameraOffset: camera?.offset ?? 0))
                 ]
             }
             ?? voices.map {
@@ -127,7 +133,7 @@ extension AgentServer {
 
     /// One fixture file, probed as `record_screen`'s settle probes its files
     /// (`mayAsk: false`); a file that will not probe is refused naming it.
-    private func landRecordingProbe(_ raw: String) throws -> MediaDescriptor {
+    func landRecordingProbe(_ raw: String) throws -> MediaDescriptor {
         let path = (raw.trimmingCharacters(in: .whitespacesAndNewlines) as NSString)
             .expandingTildeInPath
         let semaphore = DispatchSemaphore(value: 0)
@@ -244,8 +250,10 @@ extension AgentServer {
                 + "ripples as a recording does (spec CU-31); keys is its Record shortcuts, and "
                 + "auto_zoom, shortcut_overlays and speed_up_typing its When it lands boxes, run "
                 + "after the landing (and any enhance) as record_screen's are, refused as "
-                + "record_screen refuses them (spec CU-102). Each file is probed as a "
-                + "recording's are. "
+                + "record_screen refuses them (spec CU-102); camera, with movie, is that "
+                + "segment's camera file at camera_offset, landed in camera_layout and, with "
+                + "camera_cutout, cut out, as record_screen's (spec CO-83). Each file is probed "
+                + "as a recording's are. "
                 + "door tool (default) waits out a drag and lands as record_screen does, "
                 + "answering what record_screen would, enhance or enhance_error included; door "
                 + "panel hands the result to the recorder panel's recordingEnded, waits up to "
@@ -256,9 +264,10 @@ extension AgentServer {
                 + "path that will not probe, movie with other than one voice file, place with "
                 + "door panel, door panel while the recorder or the panel is not idle, "
                 + "follow_wait with door tool or outside 0…330, cursor, cursor_mode, "
-                + "show_clicks, keys, auto_zoom, shortcut_overlays or speed_up_typing without "
-                + "movie, a cursor file that does not attach (it will not "
-                + "open, or its movie_size is not the "
+                + "show_clicks, keys, auto_zoom, shortcut_overlays, speed_up_typing or camera "
+                + "without movie, camera_offset, camera_layout or camera_cutout without camera, "
+                + "camera_layout or camera_cutout: true with place: false, a cursor file that "
+                + "does not attach (it will not open, or its movie_size is not the "
                 + "movie's).",
             [
                 "voice": [
@@ -325,7 +334,8 @@ extension AgentServer {
                     "description": "door panel only: seconds to wait for the follow to end "
                         + "(default 0).",
                 ],
-            ], required: ["voice"])
+            ].merging(Self.landRecordingCameraProperties) { own, _ in own },
+            required: ["voice"])
     }
 }
 #endif

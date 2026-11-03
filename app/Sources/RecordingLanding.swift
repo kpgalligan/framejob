@@ -52,7 +52,7 @@
 // `Landed` to `RecordingLanding+Placement.swift`, and `untitled(around:)`'s
 // remainder and its undo steps' names to `RecordingLanding+Remainder.swift`.
 // A camera beside the screen (spec §11 CAM-10) — its media, ONE front track
-// named "Camera", each clip by its segment's offset and the corner rule — is
+// named "Camera", each clip by its segment's offset and the recorder's layout — is
 // `RecordingLanding+Camera.swift`, called between the pictures and the
 // microphones. The ripples a Separate recording with Show Clicks lands its
 // screen clips with (road map creator-jobs CU3c, spec §11 CU-31 (c)) are
@@ -121,7 +121,7 @@ struct RecordingLanding {
     /// **A camera beside the screen** (spec §11 CAM-10) lands between the
     /// two: each segment's `(Camera).mov` as media, then — with `place` —
     /// ONE new FRONT track named "Camera" and each camera clip at its screen
-    /// segment's start plus its `cameraOffset`, cornered (`addCameras`).
+    /// segment's start plus its `cameraOffset`, laid out (`addCameras`).
     /// The pictures → cameras → microphones order is the one grouped edit's.
     ///
     /// **A left-out segment's readable voice** (#181 item 2, spec §11
@@ -190,6 +190,7 @@ struct RecordingLanding {
         }
         let cameras = try addCameras(
             result, screenStarts: place ? segmentStarts(pictures.map { $0.at }, of: result) : nil,
+            screenClips: split(pictures.map { $0.clip?.id }, of: result).segments,
             scope: scope, to: &trial, ops: &ops, notes: &notes)
         let microphones = try addMicrophones(
             voices(of: result), pictureStarts: place ? pictures.map { $0.at } : nil,

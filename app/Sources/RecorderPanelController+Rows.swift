@@ -24,7 +24,7 @@ extension RecorderPanelController {
     func buildRows(into content: NSStackView) {
         for popup in [
             sourcePopup, cameraPopup, formatPopup, microphonePopup, ratePopup, sizePopup,
-            destinationPopup, cursorPopup,
+            destinationPopup, cursorPopup, cameraLanding.layoutPopup,
         ] {
             popup.font = DS.sans(13)
             popup.target = self
@@ -32,7 +32,7 @@ extension RecorderPanelController {
         }
         for popup in [
             sourcePopup, cameraPopup, formatPopup, ratePopup, sizePopup, destinationPopup,
-            cursorPopup,
+            cursorPopup, cameraLanding.layoutPopup,
         ] {
             popup.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
         }
@@ -43,7 +43,7 @@ extension RecorderPanelController {
         }
         for box in [
             includeFrameJobCheckbox, cameraBesideCheckbox, enhanceMicrophoneCheckbox,
-            recordShortcutsCheckbox,
+            recordShortcutsCheckbox, cameraLanding.cutoutCheckbox,
         ] + polishBoxes.all {
             box.font = DS.sans(13)
             box.target = self
@@ -88,6 +88,7 @@ extension RecorderPanelController {
         recordShortcutsNote.textColor = DS.textFaint
         recordShortcutsNote.preferredMaxLayoutWidth = Self.controlWidth
 
+        // CO-82: Layout and the Remove-background box after the preview, before Microphone;
         // CU-102 (a): "When it lands:" under the Record shortcuts note, before Rate.
         var gridRows: [[NSView]] = [
             [fieldLabel("Source:"), sourcePopup],
@@ -96,6 +97,9 @@ extension RecorderPanelController {
             [fieldLabel("Camera:"), cameraPopup],
             [fieldLabel("Format:"), formatPopup],
             [NSGridCell.emptyContentView, cameraPreview],
+        ]
+        gridRows += cameraLandingRows()
+        gridRows += [
             [fieldLabel("Microphone:"), microphoneRow],
             [NSGridCell.emptyContentView, enhanceMicrophoneCheckbox],
             [fieldLabel("System Audio:"), systemAudioSwitch],

@@ -3760,15 +3760,20 @@ free.
   live with it, the warm-up is spent before the countdown, and the press
   reads Screen Recording, then Camera, then Microphone (CR3c, spec §11
   CAM-11). The panel
-  remembers sixteen `FrameJobRecording…` keys (the Camera's, the Format's,
+  remembers eighteen `FrameJobRecording…` keys (the Camera's, the Format's,
   `FrameJobRecordingCameraBeside`, `FrameJobRecordingEnhanceMicrophone` —
   "Enhance the microphone when it lands", spec §11 AU-69 —,
   `FrameJobRecordingKeys` (Record shortcuts, CU-62),
-  `FrameJobRecordingCursor` (Cursor, CU-36) and the "When it lands:" boxes'
+  `FrameJobRecordingCursor` (Cursor, CU-36), the "When it lands:" boxes'
   `FrameJobRecordingAutoZoom`, `FrameJobRecordingShortcutOverlays` and
-  `FrameJobRecordingSpeedUpTyping` (CU-102, absent on, on, off) among them;
-  the type doc lists them), and a probe or the harness that touches them
-  handles all sixteen. The
+  `FrameJobRecordingSpeedUpTyping` (CU-102, absent on, on, off), and CO8's
+  `FrameJobRecordingCameraLayout` (a `RecordingCameraLayout` raw value; absent
+  or stale `corner_square`) and `FrameJobRecordingCameraCutout` (absent off),
+  the seventeenth and eighteenth, in `RecorderPanelController+CameraLanding.swift`
+  (the Layout pop-up and "Remove the camera's background when it lands", after
+  the preview, live only idle with the camera beside the screen; spec §11
+  CO-82) among them; the type doc lists them), and a probe or the harness that
+  touches them handles all eighteen. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
   the same two calls. **A voice-over** (the Source row "Microphone Only",
@@ -3880,8 +3885,11 @@ free.
   (`+Camera`, CR3b, spec §11 CAM-10) lands its media on ONE front Camera
   track, between the pictures and the voices: each camera at its picture's
   start minus its offset, floored and head-trimmed through the voices'
-  shared `headTrimmed`, then put in the bottom-right corner by one
-  `set_video`, read back.
+  shared `headTrimmed`, then laid out by one `switch_layout` per camera clip
+  at its start, one canvas frame long, `through` max(the segment's screen
+  clip end, the camera clip end), in `choice.cameraLayout`, read back;
+  `cornerPatch` the fallback for a screen with no clip or not playing at the
+  camera's start (spec §11 CO-80).
 - `CursorValues.swift` · `CursorCaptureBuffer.swift` · `CursorFileWriter.swift` ·
   `CursorTracks.swift` · `CursorFiles.swift` · `EditorViewController+Cursor.swift` — the
   cursor file's Swift side (road map creator-jobs CU1a, CU2,
@@ -3950,7 +3958,13 @@ free.
   Record shortcuts); `AgentServer+RecordingPolish` `record_screen`'s three
   booleans and refusals and the tool door, `polishLanded`, through each
   tool's `(document:clips:settings:)` body at the tools' defaults.
-- `AgentServer+LandRecording.swift` — the dev tool `land_recording` (spec §11
+- `RecordingCutout.swift` — the cutout follow-up (road map creator-jobs CO8,
+  spec §11 CO-81): the segments' camera paths, the open container's clips of
+  them that can be cut out and have none, one base `set_video {cutout}` each
+  as one grouped step "Remove Background", called by both panel branches and
+  `landAndEnhance` right after the landing and before Enhance Voice and the
+  polish; names no `rc_*`.
+- `AgentServer+LandRecording.swift` · `AgentServer+LandRecordingCamera.swift` — the dev tool `land_recording` (spec §11
   AU-69 (e)): fixture files landed as a finished recording through the
   panel's `recordingEnded` or `record_screen`'s landing; its `cursor` (road map
   creator-jobs CU3b, spec §11 CU-34 (d)), only with `movie`, attaches a fixture cursor
@@ -3960,6 +3974,9 @@ free.
   (CU10, spec §11 CU-102 (c)), only with `movie`, are the choice's Record shortcuts and
   "When it lands:" boxes, refused as `record_screen` refuses them; the panel door also
   waits on `RecordingPolish.isPending` and answers `polish_pending`.
+  `AgentServer+LandRecordingCamera.swift` holds its `camera`, `camera_offset`,
+  `camera_layout` and `camera_cutout` (CO8, spec §11 CO-83 (c)): a fixture camera beside
+  the screen segment's movie, only with `movie`, the other three only with `camera`.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Properties` / `Actions` / `Tracks`
@@ -3973,7 +3990,8 @@ free.
   `pauseDidChangeNotification` and frozen at its
   `finishingDidBeginNotification`; +`RecordingCamera` — `record_screen`'s
   camera, spec §11 CAM-4: its arguments, its lookup, its grant read and
-  the `camera` answer key) — the handlers, one file per group. `+Properties` is the eight property doors (`set_video` … `set_transition_duration`), a pure move out of `+Clips` (#333). `+Export` is `export`, a pure move out of `+Render` (issue batch B97); since #326 it refuses up front, enqueues on `ExportQueueController` and answers `{export_id, path, status}`. `+ExportStatus` holds `AgentExports` (the launch's in-memory records of the ids `export` returned, kept past the row's Remove) and the `export_status` and `cancel_export` handlers; `+ExportResult` builds a `done` answer from the queue's job. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  the `camera` answer key, and `recordingCameraLanding`, `camera_layout` and
+  `camera_cutout`, CO-83) — the handlers, one file per group. `+Properties` is the eight property doors (`set_video` … `set_transition_duration`), a pure move out of `+Clips` (#333). `+Export` is `export`, a pure move out of `+Render` (issue batch B97); since #326 it refuses up front, enqueues on `ExportQueueController` and answers `{export_id, path, status}`. `+ExportStatus` holds `AgentExports` (the launch's in-memory records of the ids `export` returned, kept past the row's Remove) and the `export_status` and `cancel_export` handlers; `+ExportResult` builds a `done` answer from the queue's job. `+Scopes` is `render_frame`'s scope writers (`writeScopes`: waveform, parade, vectorscope, histogram; grading-2 G2-0, G2-1). `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.

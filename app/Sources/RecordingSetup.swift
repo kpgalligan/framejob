@@ -140,6 +140,9 @@ struct RecordingChoice: Equatable {
     var autoZoom: Bool = false
     var shortcutOverlays: Bool = false
     var speedUpTyping: Bool = false
+    /// The camera beside the screen's layout and its cutout on landing (spec §11 CO-80…CO-82).
+    var cameraLayout: RecordingCameraLayout = .cornerSquare
+    var cameraCutout: Bool = false
 
     /// The cursor this recording is made with: the choice, else the source's default.
     var effectiveCursor: RecordingCursor { cursor ?? .defaultFor(source) }

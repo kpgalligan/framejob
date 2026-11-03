@@ -131,6 +131,7 @@ extension RecorderPanelController {
                         .compactMap { $0 })
                 Self.editor(of: document)?.viewStateDidChange()
                 landed(result, asNewProject: false, notes: placement.notes)
+                RecordingCutout.apply(result, in: document)  // CO-81: its own step, first
                 RecordingEnhance.follow(result, in: document)  // AU-68: after the commit
                 RecordingPolish.follow(result, in: document)  // CU-100: after it, its own steps
             } catch {
@@ -140,6 +141,7 @@ extension RecorderPanelController {
             do {
                 let (opened, notes) = try ProjectDocument.untitled(around: result)
                 landed(result, asNewProject: true, notes: notes)
+                RecordingCutout.apply(result, in: opened)  // CO-81: its own step, first
                 RecordingEnhance.follow(result, in: opened)  // AU-68: after the commit
                 RecordingPolish.follow(result, in: opened)  // CU-100: after it, its own steps
             } catch {

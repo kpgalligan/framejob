@@ -56,7 +56,10 @@ Sections and rows:
            (offsets −100 ms, +100 ms): the ops in order, the Camera track in front of the
            pictures', camera 0 at screen 0's start with `in` the snapped 100 ms head, camera 1
            at screen 1's start + 100 ms, each `video` `wantCorner`'s (the decision's formula,
-           written in the probe), the placement's camera ids, one undo removing all; L5
+           written in the probe), `switch_layout` where each camera's `set_video` was (road map
+           creator-jobs CO8, spec §11 CO-80), each camera and screen 0 with one one-frame layout
+           action at clip time 0 and screen 1 with one at clip time `head`, the placement's
+           camera ids, one undo removing all; L5
            `cornerPatch` against `wantCorner` for 1760×1328, 1920×1080 and 1080×1920 on
            1920×1080, the edges on the 0.95 line, nil for a zero dimension; L6 a 4 s camera 0
            past screen 1's start floors camera 1 at its end; L7 `place: false` → camera media, no
@@ -133,7 +136,7 @@ Sections and rows:
            and `finishTimeoutSentence(movies: [movie], camera: true)` spells 105 s with no camera
            clause.
   panel    CR1c, `RecorderPanelController.shared` never shown, `.prohibited`, a spy sealed in
-           `grantDoors` before `shared` exists, the sixteen `FrameJobRecording…` keys put back; fake
+           `grantDoors` before `shared` exists, the eighteen `FrameJobRecording…` keys put back; fake
            rows (`probe-camera`, a "None connected" row, `probe-mic`) find no device. P1 the
            Source rows end Window… (1), Camera (3), Microphone Only (2), screens + 4, and the
            Camera popup is `connected()`'s `popupTitle`s (or "None connected"); P2 Camera via
@@ -141,7 +144,7 @@ Sections and rows:
            Size, Include Frame Job windows, Rate) disabled with their values kept, Camera,
            Microphone, Record Into and Source live, the size note `cameraSizeNote(nil)`; a
            display row → the five back, Camera disabled, `camera` nil; P3 session only: the
-           display key's 777 kept, the camera key `probe-camera`, sixteen keys (thirteen before CU10, twelve before CU3c, eleven before CU6, ten before AP6 part 3, nine before CR3c), the row and camera
+           display key's 777 kept, the camera key `probe-camera`, eighteen keys (sixteen before CO8, thirteen before CU10, twelve before CU3c, eleven before CU6, ten before AP6 part 3, nine before CR3c), the row and camera
            kept through `rebuildSources()` + `restoreChoices()`; P4 `cameraStep` over four
            statuses, `cameraPaneURL`, `cameraOpenedNote(.denied)` exact; P5 the press (no camera,
            `notDetermined` and its held answer on the hidden panel, denied and restricted, the
@@ -196,7 +199,7 @@ Sections and rows:
            windows and before Camera; a display row with the box off — Camera and Format
            disabled, `camera` nil; ticked via `controlChanged` — Camera and Format live, the five
            live with their values kept, `currentChoice()` `.display` with `probe-camera` and the
-           Format popup's spelling, the size note the screen's, the key true, sixteen keys; unticked
+           Format popup's spelling, the size note the screen's, the key true, eighteen keys; unticked
            — the key false, `camera` nil; under Camera and under Microphone Only the box
            disabled with its state kept; `restoreChoices()` sets it from the key. P21 the press
            with the box ticked: "None connected" → the note, 0 screen and 0 camera reads;
@@ -329,7 +332,9 @@ for CR3c's but `beside-unprepared` (`panel,screen`) and `timeout-ceiling-by-file
   camera-track-behind  the Camera track added at index 0                       → L4
   camera-offset-ignored  a camera clip asked at its screen's start             → L4
   camera-floor-unscreened  the floor the previous camera's end only (else 0)   → L4
-  corner-top          the corner's y negated                                   → L4, L5
+  corner-top          the corner's y negated                                   → L5 (since CO8
+                      `cornerPatch` is the fallback; co8's R1 and `default-rounded` hold the
+                      landed geometry)
   remainder-camera-dropped  the remainder's `|| hasCamera` dropped             → L8
   camera-format-alone-admitted  `camera_format` without `camera` admitted      → T9
   camera-ids-unwritten  `segmentFields` writes no `camera_clip`                → T10
@@ -681,7 +686,7 @@ MUTANTS = {
         ("RecordingLanding+Camera.swift",
          "            let floor = max(screenAt, previousEnd ?? screenAt)\n",
          "            let floor = previousEnd ?? 0\n")]),
-    "corner-top": (["L4", "L5"], [
+    "corner-top": (["L5"], [
         ("RecordingLanding+Camera.swift",
          "        let y = (ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n",
          "        let y = -(ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n")]),

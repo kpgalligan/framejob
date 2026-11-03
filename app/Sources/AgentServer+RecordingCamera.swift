@@ -33,7 +33,8 @@ extension AgentServer {
     /// format's rate.
     static let cameraRefusedArguments = [
         "display", "window", "system_audio", "show_clicks", "size", "include_framejob_windows",
-        "keys", "cursor", "auto_zoom", "shortcut_overlays", "speed_up_typing", "rate",
+        "keys", "cursor", "auto_zoom", "shortcut_overlays", "speed_up_typing", "camera_layout",
+        "camera_cutout", "rate",
     ]
 
     /// `camera` (CAM-4 point 1): a device's `uniqueID` or name, trimmed; nil
@@ -56,25 +57,33 @@ extension AgentServer {
 
     /// CAM-4 points 2 and 3 with CAM-6 (6), as CAM-10 (5) amends them,
     /// called by `recordingSourceKind` right after `source`'s value: with
-    /// source `voice_over`, the given ones of `camera` and `camera_format`
-    /// are refused together in the voice-over's words; with `screen`, a
-    /// `camera_format` given without `camera` is refused (a camera beside
-    /// the screen is named by `camera`); with `camera`, the given ones of
+    /// source `voice_over`, the given ones of `camera`, `camera_format`,
+    /// `camera_layout` and `camera_cutout` (CO-83 (a)) are refused together
+    /// in the voice-over's words; with `screen`, the first of
+    /// `camera_format`, `camera_layout` and `camera_cutout` given without
+    /// `camera` is refused (a camera beside the screen is named by
+    /// `camera`); with `camera`, the given ones of
     /// `cameraRefusedArguments` (a JSON null is not given, `scalarArg`'s
     /// rule) are refused together, in that order.
     func recordingCameraStrangers(_ a: [String: Any], kind: RecordingSourceKind) throws {
         let camera = try recordingCameraArgument(a)
         let format = try recordingCameraFormatArgument(a)
-        let given = [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }
-            .map(\.0)
+        // CO-83 (a): the landing's two, given when present and not a JSON null.
+        let landing = ["camera_layout", "camera_cutout"].filter {
+            a[$0] != nil && !(a[$0] is NSNull)
+        }
+        let given =
+            [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }.map(\.0)
+            + landing
         guard kind != .voiceOver || given.isEmpty else {
             throw ToolError(
                 message: "With source voice_over, " + given.joined(separator: ", ")
                     + " cannot be given — a voice-over records the microphone alone.")
         }
-        guard kind != .screen || format == nil || camera != nil else {
+        let beside = (format != nil ? ["camera_format"] : []) + landing
+        if kind == .screen, camera == nil, let first = beside.first {
             throw ToolError(
-                message: "With source screen, camera_format needs camera — name the camera to "
+                message: "With source screen, \(first) needs camera — name the camera to "
                     + "record beside the screen.")
         }
         guard kind == .camera else { return }
@@ -85,6 +94,30 @@ extension AgentServer {
                     + " cannot be given — a camera recording records the camera alone, at the "
                     + "camera's own format.")
         }
+    }
+
+    /// `camera_layout` and `camera_cutout` (road map creator-jobs CO8, spec §11 CO-83 (b)), read
+    /// after the polish and before any grant: the enum first (`enumArg` refuses an unknown value
+    /// with the vocabulary), then with `place: false` a given layout and a true cutout, each in
+    /// its sentence. Defaults `corner_square` and false: a tool reads no `UserDefaults`. With
+    /// voice_over, or screen without camera, a given one never reaches here
+    /// (`recordingCameraStrangers`).
+    func recordingCameraLanding(_ a: [String: Any], place: Bool) throws
+        -> (layout: RecordingCameraLayout, cutout: Bool)
+    {
+        let layout = try enumArg(a, "camera_layout", RecordingCameraLayout.self)
+        let cutout = try boolArg(a, "camera_cutout") ?? false
+        if !place, layout != nil {
+            throw ToolError(
+                message: "camera_layout lays out the landed camera clips, so it needs place: "
+                    + "true.")
+        }
+        if !place, cutout {
+            throw ToolError(
+                message: "camera_cutout: true removes the landed camera clips' background, so it "
+                    + "needs place: true.")
+        }
+        return (layout ?? .cornerSquare, cutout)
     }
 
     /// CAM-3 (7) then (8), pure: the camera `wanted` names

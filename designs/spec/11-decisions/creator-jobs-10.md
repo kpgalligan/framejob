@@ -481,3 +481,94 @@ left to JOB-35.
   again."). **Owed to VR3b:** the Analyzing sheet's Stop, which makes nothing.
   **Choices left to the code:** a picture's first-frame test reads `clip_state` at its start
   for scale, x and y; the dry plan's answer is discarded.
+
+## CO8 — layout and cutout at record time (2026-11-03)
+
+Recorded before the code. With "Record the camera too" ticked, the recorder panel chooses the
+camera's layout (Corner, Rounded Corner, Circle, Side by Side, Camera Full) and whether the
+camera's background is removed when it lands; `record_screen` takes `camera_layout` and
+`camera_cutout`, and the dev tool `land_recording` lands a fixture camera with both. The owner's
+answer (2026-11-01): the panel's default layout is Corner, today's landing. No core, FFI, header,
+op, format or tool-count change (43 stands; 124 product tools); the cutout runs on-device, so
+nothing is keyed (CJ-3).
+
+- **CO-80 — The recorder offers a layout** (amends CAM-10 (3)).
+  - (a) **One `switch_layout` per camera clip.** Right after segment k's camera clip is placed,
+    the landing applies ONE `switch_layout {camera: the clip, screen: segment k's screen clip,
+    layout, shape, corner: bottom_right, at: the clip's start, duration: one frame of the
+    container's canvas, through}`. `through` is max(segment k's screen clip's end, the camera
+    clip's end), per segment and never the whole recording's end, so the reach re-bases only a
+    later screen clip this camera overruns into: never a later segment's own screen, nor a clip
+    placed before the recording. The op is built by `ReelOp.switchLayout` unscoped, applied to
+    the trial scoped as the commit is, and read back; a refusal throws "Clip N could not be laid
+    out: <the core's sentence>". It sends no `curve`, `focus` or `nest`: no masks exist at
+    landing, so the crop centres on the source (CO-70 needs them).
+  - (b) **The one-frame switch.** The one-frame `duration` makes both roles cut at `at`. The
+    camera is always cut at its clip time 0: its base and a one-frame layout action there. A
+    screen whose clip time at `at` is 0 gets the same; a screen whose clip time is t > 0 (a
+    positive `camera_offset`, or the floor after an overrunning camera) keeps its base and gets
+    one one-frame layout action at t, so it stays full until the camera arrives. `corner_square`
+    reproduces CAM-10 (3)'s geometry to the pixel (`layout.rs`'s corner is the same arithmetic).
+  - (c) **The fallback.** When segment k's screen minted no clip, or its screen clip does not
+    play at the camera clip's start (`screen.start ≤ at < screen end` fails), the camera takes
+    CAM-10 (3)'s `cornerPatch` `set_video {x, y, scale}` whatever the layout, and the landing
+    never throws for that reason: without it the core would pick another clip as the screen,
+    or refuse.
+  - (d) **A recorded limit.** An Auto Zoom visit that starts in a screen clip's first frame, or
+    at a screen's mid-clip layout action, meets that one-frame action and is dropped and counted
+    (CU-75).
+- **CO-81 — The cutout follows the landing as its own undo step "Remove Background"**
+  (AU-68's pattern, with no wait). `RecordingCutout.cameraClips` is every clip of the open
+  container whose media path is one of the segments' camera paths, that `CutoutStatus.canCutOut`
+  and has `video.cutout == nil`, in id order; `ops` is one base `set_video {cutout:
+  CutoutProps()}` per clip; `apply` commits them through `performGroupedEdit` right after the
+  landing — both branches of the panel and the tool door — before Enhance Voice and the polish
+  (CU-101 (a)), so the order is the landing, Remove Background, Enhance Voice, then the polish.
+  It is never inside the landing's step. With no camera clip the panel is quiet and the tool
+  answers `camera_cutout_error` = "No camera clip landed on the timeline, so Remove Background
+  did not run."; otherwise the answer gains `camera_cutout: {clips: [id…]}`. Not key-gated: it
+  runs on-device (CJ-3).
+- **CO-82 — The panel's rows and keys** (amends CAM-11). Two rows after the camera's preview
+  and before Microphone: "Layout:" with a pop-up of the five (`RecordingCameraLayout`, each
+  item's `representedObject` its raw value, read from `selectedItem`), and under it, unlabelled,
+  "Remove the camera's background when it lands". Both are live only while idle with
+  `cameraBesideSelected`; otherwise greyed with their values kept. `applyCameraLanding`: the
+  layout is the pop-up's with `cameraBesideSelected`, else `.cornerSquare`; the cutout is the
+  box's value and `cameraBesideSelected`. The keys `FrameJobRecordingCameraLayout` (a String;
+  absent or stale reads `corner_square`, the owner's Corner) and `FrameJobRecordingCameraCutout`
+  (a Bool, absence tested by `object(forKey:) == nil`, reads off) are the panel's seventeenth and
+  eighteenth, written on every change and restored on show, and pinned at those values in the
+  harness and `screens.py`.
+- **CO-83 — The tools' arguments** (amends CAM-4 (2), (3) and CAM-10 (5)).
+  - (a) **`recordingCameraStrangers`.** With source voice_over, the given ones of `camera,
+    camera_format, camera_layout, camera_cutout` in its one sentence; with source screen and no
+    `camera`, the first given one of `camera_format, camera_layout, camera_cutout`, as "With
+    source screen, <arg> needs camera — name the camera to record beside the screen."; with
+    source camera, both new arguments join `cameraRefusedArguments`, before `rate`.
+  - (b) **`recordingCameraLanding`** runs after `recordingPolish` and before any grant: the enum
+    first (`enumArg` refuses an unknown value with the vocabulary), then with `place: false`
+    "camera_layout lays out the landed camera clips, so it needs place: true." when the layout
+    is given and "camera_cutout: true removes the landed camera clips' background, so it needs
+    place: true." when the cutout is true. The tool's defaults are `corner_square` and false,
+    because a tool reads no `UserDefaults`.
+  - (c) **`land_recording`** takes `camera` (a path, only with `movie`: "camera cannot be given
+    without movie — a camera lands beside the screen segment's movie."), and `camera_offset`
+    (integer ticks, default 0), `camera_layout` and `camera_cutout`, each only with `camera`:
+    "<arg> cannot be given without camera — it applies to the camera's clips.". The fixture
+    camera is probed as the others are, the segment built with `cameraDescriptor` and
+    `cameraOffset`, `choice.camera` the fixed id "land_recording", and the place checks are
+    `recordingCameraLanding`'s. Its panel door builds its own choice, so the two panel keys
+    never reach it (CU-102 (c)'s rule).
+- **CO-84 — CO8's proof.** `co8_proof.py` (MCP, both doors of `land_recording`, ffmpeg fixtures
+  under `tools/proof/work/co8/`): R1 the default landing (the camera at CAM-10 (3)'s arithmetic,
+  the screen an `add_clip` twin's, one one-frame layout action at clip time 0 each); R1b a +2
+  frame `camera_offset`; R2 the five layouts against a twin given `switch_layout` by hand; R3
+  the cutout as a second step "Remove Background" on the camera clips only; R4 every CO-83
+  sentence through `record_screen` and `land_recording`, the project unchanged; R6 a clip placed
+  before the recording left byte-identical; R7 `fit_new_clips` off; Z0 the parity log clean;
+  app mutants `cutout-in-landing` (R3), `default-rounded` (R1), `no-frame-duration` (R1b).
+  `co8_probe.py` (built through `swift_build.build()`): Q1 the rows, Q2 the keys, Q3 the gates
+  and `currentChoice`, Q4 the refusals, Q5 a write run then a read run, Q6 two segments with the
+  second camera absent, Q7 a +3 frame offset and an overrun screen's fallback; probe mutants
+  `gate-ignored` (Q3), `cutout-without-camera` (Q4), `through-whole-recording` (Q6),
+  `throw-on-unplayed-screen` (Q7) and `no-through` (Q6). No JOB row: the landing is measured.
