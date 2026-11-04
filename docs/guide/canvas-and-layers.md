@@ -413,6 +413,15 @@ person masks as the menu fills it, and the answer's `focus` says what was sent
 An agent is never offered the sheet: it sends `nest: true` to nest in the same
 step. `through` stops the layout holding at a time.
 
+**In a vertical version:** **File ▸ Make Vertical Version…** keeps the camera
+layouts: each switch is made again on the new canvas at the same time, length
+and curve, Side by Side becoming Stacked on a tall canvas, and the camera and
+screen are never followed (see
+[Vertical and framing](vertical-and-framing.md#make-vertical-version)). A
+layout whose camera or screen was moved by hand after the switch is kept as
+placed and named in the summary. *Agents:* `reframe_clip {follow: "layout",
+from_width, from_height}` on the camera does the same for one camera.
+
 ### Hide while silent
 
 A camera clip can fade out while nobody is talking and fade back in just before

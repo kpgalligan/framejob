@@ -11333,6 +11333,96 @@ the merged tree: "gate: PASS 402s" (names 1, typecheck 8, fmt and lint skipped, 
 - **Question for the owner:** Side by Side becomes Stacked on a tall canvas? *Recommended: yes*
   (two-thirds of a 1080-wide frame shows a screen too small to read).
 
+#### VR5b's record (2026-11-04)
+
+**Built.** Lane C, base `1372747e` (I's HEAD; the worktree was made at `9d89c0b4` and
+fast-forwarded to it before any edit). The owner's answer (2026-11-01): Side by Side becomes
+Stacked on a tall canvas (*yes*). The decisions first, committed alone (`f9678a83`): VR-53,
+VR-54, VR-56 and the amendments of VR-26, VR-33, VR-34, VR-35 and VR-36 in a new
+`designs/spec/11-decisions/creator-jobs-12.md` (`-11.md` was at 504 lines), with their index
+rows. No FFI, header, op, tool or format change (43 stands; `OP_COUNT` 70; 124 product tools);
+`Kind::Follow` gains `layout`; nothing sent anywhere, so nothing keyed (CJ-3).
+
+- **Core** (`8e70b95e`). `edit_layout.rs`'s composition after the refusals extracted as
+  `compose_switch` (`switch_layout` calls it; `core/tests/layout.rs`' 24 tests unchanged
+  green); new `layout_recognise.rs` (`RECOGNISE_PX` 1, `RECOGNISE_RATIO` 0.001, `alike`,
+  `focus_of`, `same_source`, `recognise`) and `reframe_layout.rs` (the pairing, the closure,
+  the pieces, the four refusals, the bases by `keep`'s rescale, the replay through
+  `compose_switch` with `switch_timing`, Side by Side as Stacked on a canvas taller than wide,
+  `conjugate`); `edit_reframe.rs`'s `FramingFollow::Layout` (refusals (5)–(6) skipped, the arm
+  calling `relaid`, the module doc); `op_table.rs`'s `Follow` values gain `layout` after
+  `cursor`; `edit.rs`'s row; `lib.rs`.
+- **The toll** (`cfbe5c1d`, alone): `summary`, `pendingSummary`, `answerFields` and `counted`
+  moved verbatim from `VerticalVersion+Plan.swift` (388 → 296) to the new
+  `VerticalVersion+Summary.swift` (98); `make typecheck` green.
+- **Swift** (`1e20960b`). `FramingFollow.layout` (`follows` and `readsSubjects` false;
+  `FollowSubject.follows` and the sheets unchanged); `Treatment.relaid`; `Role.layoutCamera`,
+  `.layoutScreen`, `.layoutPiece`, class 2b in `role(of:)` after the plates and graphics and
+  before the picture test; new `VerticalVersion+Layouts.swift` (`isLayoutAction`,
+  `sameSource`, `layoutRole`, step 3b's `relay`, `layoutName`, `Relaid`, the summary line and
+  the answer's rows); `Plan.relaid`, step 3b first after `opening`, steps (3) and (4) skipping
+  what it did and the three roles; the summary's sentence and lines and the answer's `relaid`;
+  the catalog prose of `reframe_clip` and `make_vertical_version`.
+
+| File | Lines | What |
+|---|---|---|
+| `core/src/layout_recognise.rs` · `reframe_layout.rs` | 138 · 399 | new |
+| `core/src/edit_layout.rs` · `edit_reframe.rs` | 364 → 383 · 350 → 358 | |
+| `core/tests/reframe_layout.rs` · `layout.rs` | 540 (new) · 968 → 1087 | 12 · 26 tests |
+| `app/Sources/VerticalVersion+Layouts.swift` · `+Summary.swift` | 220 · 103 | new |
+| `app/Sources/VerticalVersion.swift` · `+Plan.swift` | 247 → 252 · 388 → 296 → 312 | |
+| `app/Sources/AgentCatalog+Framing.swift` | 217 → 240 | prose |
+| `tools/proof/vr5b_proof.py` · `vr5b_probe.swift` | 536 · 111 | new |
+
+**Deviations.** (1) The core's one-key test moves each crop edge on an axis the camera's crop
+has no room on (left and right in Stacked, top and bottom in Side by Side, for a 1280 × 720
+camera): on an axis with room recognition reads the crop's own centre as the focus, so a 2 px
+move of one edge leaves each edge 1 px off and is re-laid — recorded after the code in
+`creator-jobs-12.md` as (8). (2) The spec's `split_clips` is the `split` op tool. (3) R3 also
+holds the answer's `cached` true (nothing analysed: a re-laid role is never a picture to
+follow, the Constraints' rule), and `two-b-after-three` is scored on R3 and R4: with step 3b
+marking every changed clip done, the class order shows only in the analysis and in a refused
+re-lay. (4) The late-camera reference gives the screen add_clip's Fit base on 9:16 (scale
+0.5625), the base `keep`'s rescale gives it, where the core fixture's raw `{}` would be scale 1.
+
+**Measured.**
+
+- `cargo test --release --test layout --test reframe_layout --test reframe_clip --test
+  reframe_cursor --test op_schemas --test op_table --test op_nullability --test edit_tests
+  --test scope` all green (layout 26, reframe_layout 12); `make lint` exit 0; `make typecheck`
+  exit 0 with the 4 baseline warnings after the toll and at the end;
+  `swift_build.py typecheck tools/proof/vr5b_probe.swift` exit 0; `spec_index_proof.py`
+  276/276.
+- Debug: `vr5b_proof.py` 8/8 (R1–R7, Z1); `vr3_proof.py --only 3,8` 3/3; `vr5_proof.py --only
+  V4,V5` 3/3.
+- `make gate`: "gate: PASS 536s" (names 1, typecheck 8, fmt 4, lint 1, test 322, app 199; cargo
+  tests 2339 passed, 0 failed).
+- Release (the gate's app): `RC_PROOF_APP=release vr5b_proof.py` 8/8, Z1 empty (R5's three
+  frames identical, 79,588, 90,537 and 68,998 bytes); `RC_PROOF_APP=release vr3_proof.py`
+  14/14; on one Release instance `op_argument_proof.py` 203/203 and `grep "Frame Job: "`
+  empty.
+- Mutants, each once on the final instrument, each CAUGHT (exit 1): `side-by-side-kept`
+  (core: the three-switch test and three more), `duration-default` (core: the three-switch
+  test), `later-unfiltered` (core: the split-screen test), `zoom-keep-rule` (core: the zoom
+  test), `timing-camera` (core: the late-camera test), `tolerance-50` (app, Debug copy: R4 —
+  the 40 px edit re-laid, the three entries `relaid`), `two-b-after-three` (app, Debug copy: R3
+  `cached` false, R4 the screen and the half `followed`).
+
+**Review** (verdict pass, no findings): every Files item and Approach step done, the one-key
+test's crop-edge axes as deviation (1) records; the core checked against VR-53's rules (the
+pairing, the closure, the refusal order, the clamped focus, the per-axis base rescale, Side by
+Side → Stacked on `height > width`, `switch_timing`, `conjugate`) and the Swift twins against
+the Rust definitions.
+
+**Integration.** Cherry-picked onto `1372747e` with no conflict; the module-map entries for
+`layout_recognise.rs`, `reframe_layout.rs`, `edit_layout.rs`'s `compose_switch` and
+`edit_reframe.rs`'s `layout` arm (`core/CLAUDE.md`) and the VerticalVersion entry's
+`+Summary` and `+Layouts` (`app/CLAUDE.md`) applied. `make gate` on the integrated tree
+"gate: PASS 511s" (names 1, typecheck 10, fmt 4, lint 18, test 295,
+app 183).
+
+**Owed.** JOB-39 (S-ST1's, skipped by name while it does not exist). Nothing to file.
+
 ### SW1 — copy pieces to a track, and Switch Angle
 
 - **What a person gets:** Clip ▸ Switch Angle ▸ on a shot lists the camera tracks that cover it and

@@ -29883,3 +29883,46 @@ python3 tools/proof/vr5_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR5 record; JOB-36 is what only a person
 judges.
+
+## Road map "creator-jobs" VR5b — a screen and its camera re-laid in a vertical version (`vr5b_proof.py` R1–R6, Z1 with `vr5b_probe.swift` R7; seven mutants; `core/tests/reframe_layout.rs`, `core/tests/layout.rs`; spec §11 VR-53, VR-54, VR-56)
+
+**One launch** (`proof_app.py`'s app, a scratch `CFFIXED_USER_HOME`, no analysis). Each document
+is a fresh package holding `work/vr5b-media/screen.mov` on the back track and
+`work/vr5b-media/camera.mov` on a track in front (ffmpeg `testsrc` 1920 × 1080, 30 fps, 30 s,
+each), switched by `switch_layout` on the camera: Corner at 0, the middle layout at 10 s for 1 s
+`linear`, Camera Full at 20 s. The SOURCE is on 1920 × 1080 with Side by Side in the middle;
+the REFERENCES are the same switches made directly on 1080 × 1920 (Stacked in the middle) and
+1080 × 1080 (Side by Side). The probe is built through `swift_build.py` over `app/Sources` with
+`FRAMEJOB_DEV_TOOLS`.
+
+| Row | What it holds |
+|---|---|
+| R1 | the source's 9:16 copy (`make_vertical_version {shape: 9:16, path}`): per role three layout actions (ends naming all six placement keys) at the source's starts, durations and curves, each end equal to the 1080 × 1920 reference's (nine numbers, 1e-9) |
+| R2 | the 1:1 copy and the 1080 × 1080 reference, the same way, Side by Side kept |
+| R3 | in the 9:16 copy no role clip has an end exactly {scale, x, y}, no "Blurred Background", no "Backgrounds" track, both entries `relaid`, and the answer's `cached` true (nothing analysed) |
+| R4 | the screen `split` at 25 s (the half's `in` 25 s), the Side by Side camera end's x + 40 by `set_action_end`: `reframe_clip {follow: layout, from_width: 1920, from_height: 1080}` refused in VR-53's sentence naming that action; the 9:16 copy's entries for the camera, the screen and the half are `not_followed` with "its camera layout was edited by hand, so it is kept as placed", none with a framing action |
+| R5 | `render_frame` at 5, 15 and 25 s of the 9:16 copy and the reference, byte for byte |
+| R6 | the summary's first line has " Re-lays 3 camera layouts for the new canvas.", its next three lines "Re-laid: Corner at 00:00:00:00.", "Re-laid: Side by Side → Stacked at 00:00:10:00.", "Re-laid: Camera Full at 00:00:20:00.", and `relaid` the three `{camera, at, from, to, shape?}` |
+| R7 | (probe) the 16 `menuRows` × {1920 × 1080, 1080 × 1080} × {1920 × 1080, 1280 × 720 camera}: the end `switch_layout` writes is named that row by `VerticalVersion.layoutName` and `isLayoutAction`; a {scale, x, y} end is not a layout action |
+| Z1 | `grep "Frame Job: "` in the instance's log prints nothing |
+
+Mutants (`--mutant NAME`; spec §11 VR-56): `two-b-after-three` (class 2b checked after class 3;
+R3, R4) and `tolerance-50` (`RECOGNISE_PX` 50; R4) are app mutants, each in a `tree_copy.py`
+copy — whose `core/` is a real CoW copy for a core edit — built by `tree_copy.build_app`, then
+their rows run on that app; `side-by-side-kept`, `duration-default` (the replay at
+`DEFAULT_SWITCH`), `later-unfiltered` (each role's later clips `role()`'s reach),
+`zoom-keep-rule` (zoom ends by `keep`'s per-axis rule) and `timing-camera` (the switch's
+duration and curve from the camera's action) are core mutants, run as `cargo test --release
+--test reframe_layout --test layout` on a copy of `core/` and caught by the named test. Each
+anchor is asserted to occur exactly once; a run exits 1 caught, 0 survived, 2 when the control
+could not be performed.
+
+```sh
+cd core && cargo test --release --test reframe_layout --test layout
+make app-debug && python3 tools/proof/vr5b_proof.py [--only R1,R4]
+make app && RC_PROOF_APP=release python3 tools/proof/vr5b_proof.py
+python3 tools/proof/vr5b_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR5b record; JOB-39 is what only a person
+judges.

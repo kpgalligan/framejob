@@ -9,8 +9,9 @@ import Foundation
 /// VR-39).
 ///
 /// This file holds the shapes (VR-32), the settings and the classes (VR-33);
-/// `VerticalVersion+Plan.swift` the step (VR-34) and the summary (VR-35);
-/// `VerticalVersion+Layers.swift` the graphics (VR-42, VR-44, VR4b). Swift restates none
+/// `VerticalVersion+Plan.swift` the step (VR-34); `VerticalVersion+Summary.swift` the summary
+/// and the answer (VR-35, VR-36); `VerticalVersion+Layers.swift` the graphics (VR-42, VR-44,
+/// VR4b); `VerticalVersion+Layouts.swift` class 2b and step 3b (VR-53, VR-54, VR5b). Swift restates none
 /// of VR-26's refusals: a clip the core will not frame reaches `keep` through the core's own
 /// sentence. Names no `rc_*`.
 enum VerticalShape: String, CaseIterable {
@@ -58,7 +59,7 @@ enum VerticalVersion {
 
     /// What the step did to one clip, as the answer spells it.
     enum Treatment: String {
-        case followed, whole, kept, refilled, removed, resized
+        case followed, whole, kept, refilled, removed, resized, relaid
         case notFollowed = "not_followed"
     }
 
@@ -70,6 +71,9 @@ enum VerticalVersion {
         case shapePlate
         /// (2) An image or still named "Background" at the canvas's fill.
         case imagePlate
+        /// (2b) A clip laid out by Clip ▸ Camera Layout ▸ as the camera, as the screen behind
+        /// it, or a cut piece of one (VR-53 (a), `VerticalVersion+Layouts.swift`).
+        case layoutCamera, layoutScreen, layoutPiece
         /// (3) A media, still or image clip covering one axis of the canvas.
         case picture
         /// (4) A nest clip covering one axis.
@@ -198,6 +202,7 @@ enum VerticalVersion {
         default:
             break
         }
+        if let laid = layoutRole(of: clip, in: snapshot, order: order) { return laid }
         switch clip.source {
         case .media, .still, .image:
             if covers(clip, in: project) { return .picture }

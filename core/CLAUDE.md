@@ -921,11 +921,18 @@ governs a module now.
   stacked, camera full at `fill_scale`, screen only at opacity 0 — crops centred on `focus`
   and placed by `edit_zoom.rs`'s (★), `x`/`y` rounded half away from zero; the constants,
   `DEFAULT_SWITCH` 0.5 s. Capped at 400 lines.
+- `layout_recognise.rs` — a camera layout recognised from the placements it wrote (road map
+  creator-jobs VR5b, spec §11 VR-53 (b)), pure, beside `layout.rs` (at its cap):
+  `RECOGNISE_PX` 1, `RECOGNISE_RATIO` 0.001, `alike`, `focus_of` (the camera crop's
+  centre), `same_source` (kind and media or nest, `in` ignored) and `recognise` (the first
+  of corner × shapes × corners, side by side, stacked, camera full, screen only whose
+  solves on the authored canvas are `alike` the ends; `Err(Camera)` / `Err(Screen)`).
 - `edit_layout.rs` · `edit_layout_reach.rs` — `switch_layout` (CO-61, CO-62, CO-64):
   `edit_layout.rs` `LayoutSwitch`, the roles (the camera; a given screen behind it, or the
   front-most shown, non-matte picture clip behind it at `at`), the nest-clip refusal for
   rounded and circle, `nest: true` (each refused role's clips nested, refused when one is
-  laid out, then the switch on the nest clip), and the composition — a layout action at
+  laid out, then the switch on the nest clip), and the composition (`compose_switch`,
+  `pub(crate)`, `reframe_layout.rs`'s replay) — a layout action at
   `at` replaced, one running at `at` shortened, the layout action clamped to the clip and
   the next layout action or at a first frame the base plus a one-frame marker, the reach's
   bases — from `remove_action`, `set_action`, `add_action`, `set_action_end`, `set_video`
@@ -1271,15 +1278,16 @@ governs a module now.
   in time order, actions in start order; `Composed {re_eased, carried}`.
   Byte-for-byte VR2a2's writing on a clip with no actions. `pub` for the
   tests' counts.
-- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, VR5, spec §11 VR-26,
-  VR-27, VR-50, VR-51): `FramingFollow` (with `cursor`), `Reframe`,
+- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, VR5, VR5b, spec §11 VR-26,
+  VR-27, VR-50, VR-51, VR-53): `FramingFollow` (with `cursor` and `layout`), `Reframe`,
   `MAX_SUBJECT_SAMPLES`, `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's
   sentence, which the tool matches), `no_cursor_file` and `cursor_not_faces`
   (after the nest and still refusals, before the matte one), four errors and
   the refusals in order (VR-26's (7) removed by VR-27), "no subjects" last so
   the tool's trial meets every other first; `replace` (`replaced` before the
   plan for every follow but `keep`, `composed` after it); the cursor arm plans
-  through `reframe_cursor.rs`. Allowed inside a nest.
+  through `reframe_cursor.rs`, the layout arm (refusals (5)–(6) skipped, as
+  for `keep`) through `reframe_layout.rs`. Allowed inside a nest.
 - `reframe_subjects.rs` — `reframe_clip`'s `subjects` (VR2a2, VR5, spec §11
   VR-26, VR-50), a pure move out of `reframe.rs` and `edit_reframe.rs`:
   `Subjects` (with the optional `cursor`, written only when non-empty),
@@ -1297,6 +1305,11 @@ governs a module now.
   no earlier than the last move's end), VR-23's moves held by a running move,
   the 0.5 s spacing, a pending arrival and typing; `reframe_path.rs`'s `span`,
   `MOVE_MIN` and `MOVE_SPACING` (`pub(crate)` for it); no cut, no `fit`.
+- `reframe_layout.rs` — `reframe_clip {follow: layout}` (VR5b, spec §11 VR-53): the
+  pairing, the group's closure, the pieces, the refusals in order, the bases by `keep`'s
+  rescale, the replay through `edit_layout.rs`'s `compose_switch` with `switch_timing`,
+  Side by Side as Stacked on a canvas taller than wide, `conjugate` on every other moving
+  end.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

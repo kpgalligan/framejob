@@ -1,10 +1,12 @@
 import Foundation
 
-/// Make Vertical's step (spec §11 VR-34) and its summary (VR-35): `opening` is the canvas and
-/// the "Backgrounds" track, `plan` the whole step on one `SwitchAngle.Trial`, each op TRIED
-/// on the trial's handle and only its answer deciding the clip's entry. The classes are
-/// `VerticalVersion.swift`'s; step (6), the word caption tracks re-paged on the new canvas, is
-/// `CaptionRelayout`'s (VR-40 (f)). Throws only the core's invalid input. Names no `rc_*`.
+/// Make Vertical's step (spec §11 VR-34): `opening` is the canvas and the "Backgrounds" track,
+/// `plan` the whole step on one `SwitchAngle.Trial`, each op TRIED on the trial's handle and
+/// only its answer deciding the clip's entry. The classes are `VerticalVersion.swift`'s; step
+/// 3b, the camera layouts re-laid, is `VerticalVersion+Layouts.swift`'s (VR-53 (d)); step (6),
+/// the word caption tracks re-paged on the new canvas, is `CaptionRelayout`'s (VR-40 (f)); the
+/// summary is `VerticalVersion+Summary.swift`'s. Throws only the core's invalid input. Names no
+/// `rc_*`.
 extension VerticalVersion {
 
     /// What the step did to one clip, and why when it did less than asked.
@@ -31,6 +33,8 @@ extension VerticalVersion {
         let captions: CaptionRelayout.Outcome?
         /// The clips followed by their cursor, in id order (spec §11 VR-52).
         let cursor: [UInt32]
+        /// Step 3b's re-laid switches, in time order, then camera id (spec §11 VR-54).
+        let relaid: [Relaid]
     }
 
     enum Answer {
@@ -93,8 +97,19 @@ extension VerticalVersion {
         var reEased = 0
         var carried = 0
 
+        // (3b) The camera layouts re-laid first; what they changed is done (VR-53 (d)).
+        let done: Set<UInt32>
+        let layouts: [Relaid]
+        switch try relay(roles, old: old, width: size.width, height: size.height, trial: &trial) {
+        case .refused(let why): return .refused(why)
+        case .done(let changed, let made, let switches):
+            done = changed
+            layouts = switches
+            entries.merge(made) { _, new in new }
+        }
+
         // (3) Each picture, nest and other clip, from the old canvas.
-        for (id, role) in roles {
+        for (id, role) in roles where !done.contains(id) {
             guard let clip = old.clip(id), !relaid.contains(clip.track) else { continue }
             var follow = FramingFollow.keep
             var note: String?
@@ -120,7 +135,8 @@ extension VerticalVersion {
                 note = "it is a nest, so it is centred"
             case .other:
                 break
-            case .backdrop, .shapePlate, .imagePlate, .graphic:
+            case .backdrop, .shapePlate, .imagePlate, .graphic, .layoutCamera, .layoutScreen,
+                .layoutPiece:
                 continue
             }
             func op(_ follow: FramingFollow) -> ReelOp {
@@ -189,7 +205,7 @@ extension VerticalVersion {
         let newFill = { (clip: ClipSnapshot) -> Double in
             fill(old.sourceSize(of: clip) ?? .zero, width: size.width, height: size.height)
         }
-        for (id, role) in roles {
+        for (id, role) in roles where !done.contains(id) {
             guard let clip = old.clip(id) else { continue }
             let ops: [ReelOp]
             let treatment: Treatment
@@ -210,7 +226,7 @@ extension VerticalVersion {
             case .graphic:
                 ops = graphicOps(clip, from: old.canvas, width: size.width, height: size.height)
                 treatment = .resized
-            case .picture, .nest, .other:
+            case .picture, .nest, .other, .layoutCamera, .layoutScreen, .layoutPiece:
                 continue
             }
             for op in ops {
@@ -254,7 +270,7 @@ extension VerticalVersion {
                 ops: trial.ops, project: trial.project, width: size.width, height: size.height,
                 entries: entries.keys.sorted().compactMap { entries[$0] }, backgrounds: kept,
                 moreTracks: moreTracks, reEased: reEased, carried: carried,
-                captions: captions, cursor: cursor.sorted()))
+                captions: captions, cursor: cursor.sorted(), relaid: layouts))
     }
 
     /// A media picture framed with a following kind or `center`: whole only when the op added
@@ -292,97 +308,5 @@ extension VerticalVersion {
         return Entry(
             clip: clip.id, treatment: .followed,
             reason: reasons.isEmpty ? nil : reasons.joined(separator: " and "))
-    }
-
-    /// VR-35: the counts, then one line per entry with a reason; the graphic counts and lines
-    /// VR4b's (`templates`, VR-44 (d)).
-    static func summary(_ plan: Plan, templates: TemplateReport = TemplateReport()) -> String {
-        func count(_ treatment: Treatment) -> Int {
-            plan.entries.filter { $0.treatment == treatment }.count
-        }
-        var text = "Makes a \(plan.width) × \(plan.height) version."
-        let followed = count(.followed)
-        if followed > 0 { text += " Follows \(counted(followed, "clip"))." }
-        if !plan.cursor.isEmpty {
-            text += " Follows the cursor in \(counted(plan.cursor.count, "clip")), their own "
-                + "zooms and pans replaced."
-        }
-        let whole = count(.whole)
-        if whole > 0 { text += " Shows \(counted(whole, "clip")) whole on a blurred copy." }
-        let kept = count(.kept)
-        if kept > 0 { text += " Keeps \(counted(kept, "clip")) as placed." }
-        let refilled = count(.refilled)
-        if refilled > 0 { text += " Re-fills \(counted(refilled, "background"))." }
-        let removed = count(.removed)
-        if removed > 0 {
-            text += " Removes \(removed) blurred \(removed == 1 ? "copy" : "copies") the "
-                + "framing replaces."
-        }
-        text += graphicsCounts(plan, templates)
-        if plan.backgrounds { text += " Adds a Backgrounds track for the blurred copy." }
-        if plan.moreTracks > 0 {
-            text += " Adds \(plan.moreTracks) more \(plan.moreTracks == 1 ? "track" : "tracks")"
-                + " behind it where clips overlap."
-        }
-        if plan.reEased > 0 { text += " \(counted(plan.reEased, "action")) re-eased at a cut." }
-        if plan.carried > 0 {
-            text += " \(counted(plan.carried, "action")) "
-                + (plan.carried == 1 ? "carries" : "carry") + " a framing move."
-        }
-        if let relaid = plan.captions?.relaid.count, relaid > 0 {
-            text += " Re-lays \(counted(relaid, "caption track")) for the new canvas."
-        }
-        var lines = [text]
-        for entry in plan.entries {
-            guard let reason = entry.reason else { continue }
-            let why = reason.hasSuffix(".") ? String(reason.dropLast()) : reason
-            switch entry.treatment {
-            case .notFollowed: lines.append("Clip \(entry.clip) is not followed: \(why).")
-            default: lines.append("Clip \(entry.clip) is followed, but \(why).")
-            }
-        }
-        lines += (plan.captions?.kept ?? []).map(CaptionRelayout.keptLine)
-        lines += graphicsLines(templates)
-        return lines.joined(separator: "\n")
-    }
-
-    /// VR-39 (d)'s pending summary, while the analysis is still to be made.
-    static func pendingSummary(files: Int, width: Int, height: Int) -> String {
-        "Finds the faces, people and shot changes in \(counted(files, "file")) on this Mac "
-            + "first, then makes a \(width) × \(height) version."
-    }
-
-    /// The answer's keys every door shares (VR-36): `canvas`, `clips` in id order,
-    /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried`, `summary`, `graphics` and
-    /// `cursor` (VR-52).
-    static func answerFields(_ plan: Plan, templates: TemplateReport = TemplateReport())
-        -> [String: Any]
-    {
-        let clips: [[String: Any]] = plan.entries.map { entry in
-            var row: [String: Any] = [
-                "clip": Int(entry.clip), "treatment": entry.treatment.rawValue,
-            ]
-            if let reason = entry.reason { row["reason"] = reason }
-            return row
-        }
-        var fields: [String: Any] = [
-            "canvas": ["width": plan.width, "height": plan.height],
-            "clips": clips,
-            "backgrounds": plan.backgrounds,
-            "more_tracks": plan.moreTracks,
-            "re_eased": plan.reEased,
-            "moves_carried": plan.carried,
-            "summary": summary(plan, templates: templates),
-            "cursor": plan.cursor.map { Int($0) },
-            "graphics": graphicsFields(plan, templates),
-        ]
-        if let captions = plan.captions {
-            fields["captions"] = CaptionRelayout.answerFields(captions)
-        }
-        return fields
-    }
-
-    static func counted(_ n: Int, _ noun: String) -> String {
-        "\(n) \(noun)\(n == 1 ? "" : "s")"
     }
 }

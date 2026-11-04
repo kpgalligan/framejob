@@ -969,7 +969,8 @@ detail there.
   per request), the changed-project refusal (at landing and after the read off main), the
   grouped commit, refusals posted as `reframe_clip`, and `validateFollowSubjectAction`, one
   line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
-- `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `VerticalVersion+Layers.swift` ·
+- `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `VerticalVersion+Summary.swift` ·
+  `VerticalVersion+Layers.swift` · `VerticalVersion+Layouts.swift` ·
   `GraphicTemplates+Revisions.swift` · `ProjectDocument+VerticalCopy.swift` ·
   `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
   `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; its menu is the
@@ -996,9 +997,15 @@ detail there.
   snapshot's caption tracks surveyed first and skipped by step (3), `CaptionRelayout.relay`
   after step (5), a track the re-lay keeps given step (3)'s `reframe_clip` keep and a `kept`
   entry, `Plan.captions` (VR-40 (f)); counts over
-  non-`keep` entries through `FollowSubject.counts(…, replace: false)`), `summary` (VR-35),
-  `pendingSummary` (VR-39 (d)), `answerFields`, with `captions {relaid, kept}` when `captions`
-  is on. Class 5 (VR4b, spec §11 VR-42): a graphic exactly the old canvas's size, each side,
+  non-`keep` entries through `FollowSubject.counts(…, replace: false)`); `+Summary` (a pure
+  move out of `+Plan`, VR5b's toll): `summary` (VR-35), `pendingSummary` (VR-39 (d)),
+  `answerFields`, with `captions {relaid, kept}` when `captions` is on, and `counted`.
+  `+Layouts` (VR5b, spec §11 VR-53, VR-54): class 2b — `layoutCamera`, `layoutScreen`,
+  `layoutPiece` through `isLayoutAction` and `sameSource`, the core's twins — step 3b's
+  `relay` (one `reframe_clip {follow: layout}` per camera, run first after `opening`, what it
+  changed `relaid` and skipped by steps (3) and (4), the rest kept with the hand-edit reason),
+  `layoutName` (the summary's naming twin), `Plan.relaid` and the answer's `relaid`.
+  Class 5 (VR4b, spec §11 VR-42): a graphic exactly the old canvas's size, each side,
   re-sized in step (4) by `+Layers`' `graphicOps` (`set_graphic {width, height}`, the base and
   each end's named x and y by the axis ratios, scale untouched), entry `resized`. `+Layers`
   also holds VR-44: `templateSurvey` (drawn modules matched by revision against

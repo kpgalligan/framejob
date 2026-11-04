@@ -14,7 +14,8 @@ extension AgentServer {
             // UI path: Clip ▸ Follow Subject… (road map creator-jobs VR2b2, spec §11
             // VR-29), this op with `replace: true` on each selected clip and a
             // "Backgrounds" track as `backdrop`. The tool fills `subjects` from the
-            // analysis cache (AgentServer+Framing.swift).
+            // analysis cache (AgentServer+Framing.swift). `follow: layout`'s UI path is
+            // File ▸ Make Vertical Version…'s step 3b (VR-53, VerticalVersion+Layouts.swift).
             opTool(
                 "reframe_clip",
                 "Frames one clip on the current canvas — for a vertical or square version of "
@@ -29,7 +30,14 @@ extension AgentServer {
                     + "analysis, no wait): the window sits on the pointer, moves only when it "
                     + "leaves a dead zone (20 % of the window's width, 12 % of its height), "
                     + "arrives on each click outside it in a move that ends on the click's "
-                    + "frame, and holds still while the person types. center holds the window "
+                    + "frame, and holds still while the person types. layout re-lays a camera "
+                    + "clip's camera layouts (Clip ▸ Camera Layout ▸) and its screen's on the "
+                    + "current canvas: each switch, made on from_width × from_height, is "
+                    + "recognised (within 1 px and 0.001) and switched again here at the same "
+                    + "time, length and curve, Side by Side as Stacked on a canvas taller than "
+                    + "wide, the cut pieces of the recording given the new layout and any zoom "
+                    + "on them re-based so it shows the same part of the picture; it reads no "
+                    + "zoom, where_empty, backdrop, replace or subjects. center holds the window "
                     + "on the picture's centre, fit shows the whole picture for the whole clip, "
                     + "and keep rescales the clip from the canvas it was made for "
                     + "(from_width × from_height) as Change Canvas does, its actions' "
@@ -54,8 +62,13 @@ extension AgentServer {
                     + "none; a nest clip, then a still or image clip, with a following kind or "
                     + "cursor; cursor on a clip whose media has no cursor file, and subject, "
                     + "face, person or salient on one whose media has one (a recording with a "
-                    + "cursor file follows its cursor, never faces); "
-                    + "unless keep, a clip on a matte track or cut by a matte, then a turned "
+                    + "cursor file follows its cursor, never faces); for layout, a clip with no "
+                    + "camera layout, a clip laid out both as a camera and as a screen, a "
+                    + "screen layout with no camera switch in front of it, the first switch "
+                    + "not a layout Frame Job made on from_width × from_height (edited by "
+                    + "hand), each naming the clip and action; "
+                    + "unless keep or layout, a clip on a matte track or cut by a matte, then a "
+                    + "turned "
                     + "clip (a rotation, an action turning it, a spin); with backdrop "
                     + "where a copy would be made, a nest clip or a track not behind the "
                     + "clip's; last, a following kind with nothing found in the clip, or cursor "
@@ -63,21 +76,23 @@ extension AgentServer {
                     + "refused in its own sentence. Inside "
                     + "a nest (scope) the nest's canvas is the canvas. Clip ▸ Follow Subject… "
                     + "is this op with replace: true on each selected clip and a "
-                    + "\"Backgrounds\" track as backdrop.",
+                    + "\"Backgrounds\" track as backdrop. Make Vertical Version re-lays "
+                    + "camera layouts with layout.",
                 [
                     "clip": "The clip to frame: a clip with a picture, upright.",
                     "follow": "subject, face, person or salient (follow what is found), "
                         + "cursor (follow the recorded pointer of a clip whose media has a "
-                        + "cursor file), center, fit or keep.",
+                        + "cursor file), layout (re-lay a camera clip's camera layouts and "
+                        + "its screen's), center, fit or keep.",
                     "zoom": "How tight, 1–4 times the scale that fills the canvas; default 1. "
                         + "Read by the following kinds and center; refused outside 1–4.",
                     "where_empty": "What a following kind shows where there is nothing to "
                         + "follow: fit (the whole picture, the default) or center. Not read "
                         + "by cursor.",
-                    "from_width": "keep only: the width of the canvas the clip was placed "
-                        + "on. Default the current canvas's.",
-                    "from_height": "keep only: the height of the canvas the clip was placed "
-                        + "on. Default the current canvas's.",
+                    "from_width": "keep and layout only: the width of the canvas the clip "
+                        + "was placed (or laid out) on. Default the current canvas's.",
+                    "from_height": "keep and layout only: the height of the canvas the clip "
+                        + "was placed (or laid out) on. Default the current canvas's.",
                     "backdrop": "A track behind the clip's for a blurred copy of it, made "
                         + "when the framing shows the whole picture anywhere (fit, or a "
                         + "following kind's fit spans). When that track is locked, a matte or "
@@ -107,7 +122,13 @@ extension AgentServer {
                     + "recording whose media has a cursor file follows its cursor instead, "
                     + "never faces, its own zooms and pans replaced, or is shown whole on a "
                     + "blurred copy when its cursor file cannot be read; a still "
-                    + "picture or a nest is centred); a clip the core will not frame (on a "
+                    + "picture or a nest is centred); a camera and the screen behind it laid "
+                    + "out with Clip ▸ Camera Layout ▸ are re-laid, not reframed (reframe_clip "
+                    + "with follow layout, one per camera): each switch solved again for the "
+                    + "new canvas at its old time, length and curve, Side by Side becoming "
+                    + "Stacked on a tall canvas, never followed and given no blurred copy; a "
+                    + "layout edited by hand is kept as placed and listed; "
+                    + "a clip the core will not frame (on a "
                     + "matte track, rotated, spinning) and a movie whose file is missing are "
                     + "kept as placed and listed; a graphic exactly the old canvas's size is "
                     + "re-sized to the new canvas (set_graphic), its position and its action "
@@ -130,8 +151,10 @@ extension AgentServer {
                     + "the core's own sentence for the canvas, the Backgrounds track or a clip "
                     + "even keep cannot reframe. Answers {ok, canvas {width, height}, cached "
                     + "(false when an analysis ran), clips [{clip, treatment (followed, whole, "
-                    + "kept, refilled, removed, resized or not_followed), reason?}], "
-                    + "cursor [the clips followed by their cursor], backgrounds, more_tracks, "
+                    + "kept, refilled, removed, resized, relaid or not_followed), reason?}], "
+                    + "cursor [the clips followed by their cursor], relaid [{camera, at "
+                    + "(ticks), from, to (switch_layout's layout words), shape (a corner's)}] "
+                    + "in time order, backgrounds, more_tracks, "
                     + "re_eased, moves_carried, summary, captions "
                     + "{relaid, kept} (as relay_captions answers them; absent with captions "
                     + "false), graphics {resized, updated [names], listed [{name, reason}]}, "

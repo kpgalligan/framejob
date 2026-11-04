@@ -188,6 +188,11 @@ the same way.
 - **Expect:** the pointer stays in view and the frame lands on each click before it happens, moves calmly (no hunting after small motions), holds still while you type, and the text the cursor points at is readable at phone size; the auto zoom is replaced, not stacked on the framing.
 - **Source:** road map creator-jobs VR5, spec §11 VR-50, VR-52, VR-55 (how it reads on a phone, which no script can give).
 
+**JOB-39 — A screen recording and its camera, stacked, read well on a phone**
+- **Do:** When S-ST1 (a real screen recording with its camera beside it, made with Frame Job) exists, switch its camera to Side by Side with Clip ▸ Camera Layout ▸ for part of it (and a Corner elsewhere), make its 9:16 version with File ▸ Make Vertical Version… and the defaults, export it and watch it through on a phone. Skipped by name while S-ST1 does not exist.
+- **Expect:** the Side by Side part is Stacked — the screen across the top large enough to read, the camera below it showing the person's face — the Corner part keeps its corner, each switch happens when it did in the landscape edit, and nothing is followed or shown on a blurred copy.
+- **Source:** road map creator-jobs VR5b, spec §11 VR-53, VR-54, VR-56 (`vr5b_proof.py` scores the placements and the frames against a direct switch, never how they read on a phone).
+
 **JOB-55 — Switch by Speaker with one microphone follows who talks**
 - **Do:** On S-PC2 (two people sharing ONE microphone, a camera on each, five to ten minutes), select both cameras and the one microphone, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… (let the Analyzing sheet finish) at the defaults and press Switch. Play the Program track through.
 - **Expect:** the summary starts "Faces guess who is talking; check the cuts."; the cuts follow who talks as SW-S3 measured — each lands near the new speaker's first word, a laugh or a nod from the listener does not cut, and no shot of three seconds or more shows a listener who says nothing during it.

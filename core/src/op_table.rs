@@ -226,7 +226,7 @@ impl Kind {
             LayoutShape => &["square", "rounded", "circle"],
             Corner => &["bottom_right", "bottom_left", "top_right", "top_left"],
             Follow => &[
-                "subject", "face", "person", "salient", "cursor", "center", "fit", "keep",
+                "subject", "face", "person", "salient", "cursor", "layout", "center", "fit", "keep",
             ],
             WhereEmpty => &["fit", "center"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object

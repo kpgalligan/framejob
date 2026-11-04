@@ -125,7 +125,8 @@ not while a recording runs. The sheet has five controls:
   version.
 
 Under them the sheet says what **Make** will do: the new size, how many clips
-are followed, shown whole, kept as placed or re-filled, the blurred copies it
+are followed, how many camera layouts it re-lays, how many are shown whole,
+kept as placed or re-filled, the blurred copies it
 removes, the graphics it re-sizes and the graphic modules it updates, the
 tracks it adds and the actions that carry a move, then each clip that is not
 followed and why, and each graphic module left as it is and why.
@@ -146,6 +147,23 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   the tall frame is already a close-up. When the cursor file cannot be read
   (it was moved or deleted), the recording is shown whole on a blurred copy,
   and the summary says so. Center centres it as any other movie.
+- **A screen recording and its camera in camera layouts** (**Clip ▸ Camera
+  Layout ▸**, or the layout a recording landed in) keep their arrangement:
+  each switch is made again for the new canvas, at the same time, length and
+  curve — a Corner stays a Corner in the same corner, Camera Full stays
+  Camera Full, and **Side by Side becomes Stacked** on a tall canvas (the
+  screen across the top, the camera below it), so the screen is not squeezed
+  into two-thirds of a narrow frame. Side by Side stays side by side on a
+  square. The camera, the screen and the cut pieces of either are never
+  followed and get no blurred copy, and a zoom on the screen keeps showing the
+  same part of the picture. The summary lists each switch: "Re-laid: Side by
+  Side → Stacked at 00:00:10:00." When a layout was changed by hand — its
+  camera moved or resized after the switch, so it is no longer one Frame Job
+  made — the camera and its screen are kept as placed instead, and the summary
+  says "Clip 6 is not followed: its camera layout was edited by hand, so it is
+  kept as placed." A circle or panel crop is re-centred on the middle of the
+  crop it had, so a crop that had room to move may sit nearer the middle of
+  the camera picture than a switch made directly on the new canvas would.
 - **A still or a picture that fills the frame, and a nest that does**, is
   centred.
 - **A graphic exactly the old canvas's size** (a full-frame lower third or
@@ -211,6 +229,10 @@ chooses what to follow with `follow`:
 - **`center`** holds the frame on the middle of the picture for the whole clip.
 - **`fit`** shows the whole picture for the whole clip, scaled to fit the
   canvas.
+- **`layout`** re-lays a camera clip's camera layouts, and its screen's, on
+  the current canvas: each switch made on `from_width` × `from_height` is
+  recognised and switched again here, as Make Vertical Version does (above).
+  A switch edited by hand is refused, naming the clip and the action.
 - **`keep`** rescales the clip from the canvas it was placed on
   (`from_width` × `from_height`) to the current one, as `set_canvas` does with
   `rescale_clips`: its position follows each axis's change and its scale the

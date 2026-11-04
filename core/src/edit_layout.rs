@@ -202,15 +202,35 @@ impl Project {
             return self.nest_then_switch(s, &roles, &movers);
         }
 
+        let curve = s.curve.unwrap_or(Curve::EaseInOut);
+        self.compose_switch(&choice, &roles, at, duration, curve)
+    }
+
+    /// The switch composed once its refusals have passed (CO-61): every
+    /// placement solved on the project as it is, then per role the layout
+    /// action at `at` (replacing one starting there, shortening one running
+    /// there, a cut at a first frame) and the bases of `later`. Shared by
+    /// `switch_layout` and `reframe_layout.rs`'s replay (spec §11 VR-53 (b)).
+    pub(crate) fn compose_switch(
+        &self,
+        choice: &LayoutChoice,
+        roles: &[Role<'_>],
+        at: Ticks,
+        duration: Ticks,
+        curve: Curve,
+    ) -> Result<Outcome, String> {
         // Every placement is solved on the project as it is.
-        let screen_size = screen.and_then(|c| self.source_size(c));
+        let screen_size = roles
+            .iter()
+            .find(|role| role.kind == RoleKind::Screen)
+            .and_then(|role| self.source_size(role.clip));
         let mut writes: Vec<RoleWrites> = Vec::new();
-        for role in &roles {
+        for role in roles {
             let solve = |clip: &Clip, kept: Placement| -> Option<Placement> {
                 let source = self.source_size(clip)?;
                 Some(match role.kind {
-                    RoleKind::Camera => camera_placement(self, &choice, source, screen_size, &kept),
-                    RoleKind::Screen => screen_placement(self, s.layout, source),
+                    RoleKind::Camera => camera_placement(self, choice, source, screen_size, &kept),
+                    RoleKind::Screen => screen_placement(self, choice.layout, source),
                 })
             };
             let t = at - role.clip.start;
@@ -229,7 +249,6 @@ impl Project {
             writes.push((role.clip.id, t, end, bases));
         }
 
-        let curve = s.curve.unwrap_or(Curve::EaseInOut);
         let frame = self.frame();
         let mut next = self.clone();
         for (id, t, end, bases) in &writes {

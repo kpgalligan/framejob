@@ -79,7 +79,24 @@ The rules every op shares are §6a; the clip ops are §6b.
   `cursor`. `center` holds the window (fill × `zoom`) on the
   picture's centre and `fit` the whole picture; `keep` rescales the base from `from_width ×
   from_height` (the canvas when absent) by `set_canvas`'s rule, and each `x`, `y` and `scale` an
-  action's end names with it. The path F is COMPOSED into the clip (VR-27), its placement P(t)
+  action's end names with it. `layout` (§11 VR-53) re-lays a camera clip's camera layouts and its
+  screen's on the current canvas: the GROUP is the closure over pairing (a camera layout action at
+  T pairs with the layout action starting at T on the front-most track behind it holding one; a
+  laid-out clip is a screen when one on a track in front holds a layout action at one of its
+  starts) plus each switch's PIECES (a clip of the same source — kind and media or nest, `in`
+  ignored — on a role's track, starting after its action and before the track's next layout
+  action, its base within the tolerance of that action's end); each switch is recognised on
+  `from_width × from_height` (the first of corner × square, rounded, circle × the four corners,
+  `side_by_side`, `stacked`, `camera_full`, `screen_only` whose solve, `focus` the camera end's
+  crop centre, gives the camera end and the screen end within 1 px in x, y, crop and radius and
+  0.001 in scale and opacity); every member's base takes `keep`'s rescale, the group's layout
+  actions are removed and the switches composed again as `switch_layout` composes them, in time
+  order at the camera action's start, with the duration and curve of the switch's longest role
+  action not at its clip's first frame (else the camera's), `side_by_side` as `stacked` on a
+  canvas taller than wide, each role's pieces as its later clips; then every other moving end of
+  a member (`moves` and not a layout) is re-based from the placement in effect at its start to
+  the new one, r = new scale ÷ old, x′ = new x + r·(x − old x), y′ likewise, scale′ = scale·r. It
+  reads no `zoom`, `where_empty`, `backdrop`, `replace` or `subjects`. The path F is COMPOSED into the clip (VR-27), its placement P(t)
   the clip's evaluated `video`: the planner reads each sample through P at its tick and clamps
   the window inside the common cropped rect of the base and every action end, raising the zoom
   until it fits (at most `SCALE_MAX` at every placement); the base becomes F′(0)∘P(0), and an
@@ -98,7 +115,7 @@ The rules every op shares are §6a; the clip ops are §6b.
   value from the base, as VR2a2 wrote it. `backdrop`: when the framing shows `fit` anywhere, one blurred copy of the whole
   clip (`add_blurred_background`'s builder) on that track when it is unlocked, not a matte and
   free over the clip, else on a new back-most track (ids: actions, track, copy), keeping the
-  clip's actions that name `speed`, each end narrowed to `speed`. Only `keep` reads
+  clip's actions that name `speed`, each end narrowed to `speed`. Only `keep` and `layout` read
   `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds read `where_empty`, and they
   and `cursor` read `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
   {z}`; `from_width must be greater than 0, not 0` (and `from_height`); an unknown `backdrop`
@@ -109,7 +126,14 @@ The rules every op shares are §6a; the clip ops are §6b.
   media has no cursor file, `clip {id}'s media has no cursor file, so there is no cursor to
   follow; frame it with subject, center, fit or keep`, and a following kind on one whose media
   has one (§11 VR-51), `clip {id}'s media has a cursor file, so it follows the cursor, not faces;
-  frame it with cursor, center, fit or keep`; unless `keep`, a matte (`clip {id} is on a matte
+  frame it with cursor, center, fit or keep`; for `layout`, `clip {id} holds no camera layout to
+  re-lay; frame it with subject, center, fit or keep`, `clip {id} is laid out both as a camera
+  and as a screen, so its layouts cannot be re-laid; keep its clips as placed`, `clip {id}'s
+  layout action {a} at {tc} has no camera switch in front of it, so it cannot be re-laid; keep
+  its clips as placed` (the earliest), `clip {id}'s layout action {a} at {tc} is not a camera
+  layout Frame Job made on the {W} × {H} canvas, so it cannot be re-laid; keep its clips as
+  placed` (the first switch in time order; the screen's action when only its end fails), then a
+  composed op's own refusal; unless `keep` or `layout`, a matte (`clip {id} is on a matte
   track, …`, `clip {id} is cut by the matte on track {t}, …`), then a turn (`clip {id} is turned
   {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); bad
   `subjects` (over 100,000 samples, over 8 boxes of a kind, times
@@ -121,7 +145,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   result equal to the clip is an identity. Allowed inside a nest, whose canvas is the view's. One
   undo step. Its UI path is Clip ▸ Follow Subject… (§11 VR-29): this op with `replace: true` on
   each selected movie clip and a "Backgrounds" track added at index 0 as `backdrop`, removed
-  when no copy needed it, as one undo step "Follow Subject".
+  when no copy needed it, as one undo step "Follow Subject". `layout`'s is File ▸ Make Vertical
+  Version…'s step 3b (§11 VR-53 (d)).
 - **`add_speed_ramp {clip, shape, rate, from?, to?, curve="ease_in_out", hold=0.5}`** — A speed
   ramp preset in one step, made of ordinary Speed actions (§11 SR-23, #340): `shape` is `ramp_up`,
   `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both or neither (the

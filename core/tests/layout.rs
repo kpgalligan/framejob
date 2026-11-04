@@ -966,3 +966,122 @@ fn one_op_is_one_answer_and_the_input_is_untouched() {
     }
     assert_eq!(base.to_json(), text);
 }
+
+// ---- VR-53: a layout recognised and re-laid ---------------------------------
+
+/// Clip ▸ Camera Layout ▸'s sixteen rows, as `switch_layout` arguments.
+fn menu_rows() -> Vec<Value> {
+    let mut rows = Vec::new();
+    for shape in ["square", "rounded", "circle"] {
+        for corner in ["bottom_right", "bottom_left", "top_right", "top_left"] {
+            rows.push(json!({"layout": "corner", "shape": shape, "corner": corner}));
+        }
+    }
+    for layout in ["side_by_side", "stacked", "camera_full", "screen_only"] {
+        rows.push(json!({ "layout": layout }));
+    }
+    rows
+}
+
+/// `row` switched at 2 s on 1920 × 1080, the crop off-centre where it has
+/// room (circle, side by side, stacked; clamped inside the source).
+fn laid_row(row: &Value) -> Handle {
+    let mut args = row.clone();
+    args["camera"] = json!(20);
+    args["at"] = json!(2 * SEC);
+    args["focus"] = json!([100.0, 60.0]);
+    two((1920, 1080)).apply(&switch(args))
+}
+
+fn relay_same() -> Value {
+    json!({"op": "reframe_clip", "clip": 20, "follow": "layout",
+           "from_width": 1920, "from_height": 1080})
+}
+
+/// The layout action's id on `clip` at clip time `t`.
+fn action_id(project: &Value, clip: u64, t: i64) -> u64 {
+    action(project, clip, t)["id"].as_u64().unwrap()
+}
+
+#[test]
+fn every_menu_row_is_recognised_and_re_laid_the_same_on_its_own_canvas() {
+    for row in menu_rows() {
+        let laid = laid_row(&row);
+        let before = laid.value();
+        let after = match laid.try_apply(&relay_same()).unwrap() {
+            Outcome::Applied(h) => h.value(),
+            Outcome::Identity => before.clone(),
+            Outcome::Refused(why) => panic!("{row}: refused: {why}"),
+        };
+        for clip in [10, 20] {
+            same(
+                end(&after, clip, 2 * SEC),
+                end(&before, clip, 2 * SEC),
+                &format!("{row} clip {clip}"),
+            );
+        }
+    }
+}
+
+/// `layout`'s camera end with one of its nine numbers moved by `by`.
+fn moved(layout: &str, key: &str, by: f64) -> Handle {
+    let laid = laid_row(&json!({ "layout": layout }));
+    let p = laid.value();
+    let mut video = action(&p, 20, 2 * SEC)["end"]["video"].clone();
+    match key {
+        "l" | "t" | "r" | "b" => {
+            let v = video["crop"][key].as_f64().unwrap();
+            video["crop"][key] = json!(v + by);
+        }
+        _ => {
+            let v = video[key].as_f64().unwrap();
+            video[key] = json!(v + by);
+        }
+    }
+    laid.apply(&json!({"op": "set_action_end", "clip": 20,
+                       "action": action_id(&p, 20, 2 * SEC), "patch": {"video": video}}))
+}
+
+#[test]
+fn one_key_moved_past_the_tolerance_is_refused_and_inside_it_re_laid() {
+    let keys = [
+        ("x", 1.0),
+        ("y", 1.0),
+        ("l", 1.0),
+        ("t", 1.0),
+        ("r", 1.0),
+        ("b", 1.0),
+        ("corner_radius", 1.0),
+        ("scale", 0.001),
+        ("opacity", -0.001),
+    ];
+    // A crop edge is moved on an axis the camera's crop has no room on —
+    // l and r in `stacked`, t and b in `side_by_side` (a 1280 × 720 camera).
+    // On an axis with room, recognition reads the crop's own centre as the
+    // focus (CO-70), so a 2 px move of one edge is 1 px on each, within the
+    // tolerance (VR-53's limit, recorded).
+    let on = |key: &str| {
+        if matches!(key, "l" | "r") {
+            "stacked"
+        } else {
+            "side_by_side"
+        }
+    };
+    for (key, unit) in keys {
+        let past = moved(on(key), key, 2.0 * unit);
+        let id = action_id(&past.value(), 20, 2 * SEC);
+        let sentence = format!(
+            "clip 20's layout action {id} at 00:00:02:00 is not a camera layout Frame Job made on \
+             the 1920 × 1080 canvas, so it cannot be re-laid; keep its clips as placed"
+        );
+        match past.try_apply(&relay_same()).unwrap() {
+            Outcome::Refused(why) => assert_eq!(why, sentence, "{key}"),
+            other => panic!("{key} moved by {}: {other:?}", 2.0 * unit),
+        }
+        let inside = moved(on(key), key, 0.5 * unit);
+        match inside.try_apply(&relay_same()).unwrap() {
+            Outcome::Applied(_) => {}
+            other => panic!("{key} moved by {}: {other:?}", 0.5 * unit),
+        }
+    }
+}

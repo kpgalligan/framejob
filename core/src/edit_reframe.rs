@@ -9,7 +9,11 @@
 //!
 //! **What reads what.** The FOLLOWING kinds (`subject`, `face`, `person`,
 //! `salient`) plan over `subjects`; `center` and `fit` are `fixed_framing`;
-//! `keep` is `set_canvas`'s rescale on the base. Only `keep` reads `from_*`
+//! `keep` is `set_canvas`'s rescale on the base. `layout` (VR5b, spec §11
+//! VR-53) re-lays a camera's switches and its screen's on the current
+//! canvas through `reframe_layout.rs`, reading no `zoom`, `where_empty`,
+//! `backdrop`, `replace` or `subjects` and skipping refusals (5) and (6) as
+//! `keep` does. Only `keep` and `layout` read `from_*`
 //! (every other placement is measured from a canvas centre, so the source
 //! size cancels), `fit` and `keep` ignore `zoom`, and only the following
 //! kinds read `where_empty` and `subjects`; a value that cannot be read is
@@ -49,6 +53,7 @@ pub enum FramingFollow {
     Person,
     Salient,
     Cursor,
+    Layout,
     Center,
     Fit,
     Keep,
@@ -61,7 +66,7 @@ impl FramingFollow {
             Self::Face => Some(Follow::Face),
             Self::Person => Some(Follow::Person),
             Self::Salient => Some(Follow::Salient),
-            Self::Cursor | Self::Center | Self::Fit | Self::Keep => None,
+            Self::Cursor | Self::Layout | Self::Center | Self::Fit | Self::Keep => None,
         }
     }
 
@@ -199,7 +204,8 @@ impl Project {
                 _ => {}
             }
         }
-        if !keep {
+        // `layout` re-lays switches that passed CO-62 when made (VR-53 (c)).
+        if !keep && r.follow != FramingFollow::Layout {
             if let Some(why) = self.matte_refusal(clip) {
                 return Some(why);
             }
@@ -239,10 +245,12 @@ impl Project {
         let id = clip.id;
         let zoom = r.zoom.unwrap_or(1.0);
         let canvas = (self.canvas.width, self.canvas.height);
-        if r.follow == FramingFollow::Keep {
-            let from = (r.from_width, r.from_height);
-            let from = (from.0.unwrap_or(canvas.0), from.1.unwrap_or(canvas.1));
-            return self.finish(self.kept(id, from));
+        let from = (r.from_width, r.from_height);
+        let from = (from.0.unwrap_or(canvas.0), from.1.unwrap_or(canvas.1));
+        match r.follow {
+            FramingFollow::Keep => return self.finish(self.kept(id, from)),
+            FramingFollow::Layout => return self.relaid(id, from),
+            _ => {}
         }
         // VR-27 (g): the strip and the Fit base come before the plan.
         let stripped;
