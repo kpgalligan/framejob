@@ -32,7 +32,7 @@ the camera too" ticked (the screen catalog pins their keys at Corner and off); M
 empty level meter beside it, and under it a greyed, unticked checkbox, "Enhance the
 microphone when it lands", live only with a microphone chosen; System Audio, a switch that is on (blue); Cursor,
 a pop-up reading "Separate" — the pointer is kept out of the movie and drawn by Frame Job; the
-other row is "In the picture", the default for a picked window; Show
+other row is "In the picture", which lets macOS draw the pointer into the movie; Show
 Clicks, a switch that is off, and under it an unticked checkbox, "Record shortcuts", with a
 small grey note: "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete,
 Return, Tab or Esc, and when you type, never what you type. Nothing is recorded while an app

@@ -94,12 +94,14 @@ enum RecordingCursor: String, CaseIterable {
     case separate
     case inPicture = "in_picture"
 
-    /// CU-36 (b): a window or picked recording's default until the quiet-machine re-run of
-    /// CU-S2's window rows settles their anchor; that run's phase flips it to `.separate`.
-    static let windowDefault: RecordingCursor = .inPicture
+    /// CU-36 (b), (c), amended at CU0d: a window or picked recording's default. The
+    /// quiet-machine re-run of CU-S2's window rows settled their anchor as E1, so it is
+    /// `.separate`, as a display's is.
+    static let windowDefault: RecordingCursor = .separate
 
-    /// CU-36: `.separate` for a display, `windowDefault` for a window or a picked source, and
-    /// `.separate` for a voice-over or a camera alone, which have no pointer to draw.
+    /// CU-36, amended at CU0d: `.separate` for a display, `windowDefault` (`.separate`) for a
+    /// window or a picked source, and `.separate` for a voice-over or a camera alone, which have
+    /// no pointer to draw.
     static func defaultFor(_ source: RecordingSource) -> RecordingCursor {
         switch source {
         case .display: return .separate

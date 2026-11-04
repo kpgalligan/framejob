@@ -27482,7 +27482,7 @@ What the runs do to the host:
 - While the console is locked (`CGSessionScreenIsLocked`), every screen row is skipped by name.
 
 ```sh
-python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    # 17 rows; thirteen mutants, each exit 1
+python3 tools/proof/cursor_spike/cursor_spike.py --selftest                    # 19 rows; fifteen mutants, each exit 1
 python3 tools/proof/cursor_spike/cursor_spike.py --picked-owner                # S2.picked-owner alone: the grey window listed, owned by the bundle, not the presenter
 python3 tools/proof/cursor_spike/cursor_spike.py --only s4                     # then s3, s2, s1, one group per call
 python3 tools/proof/cursor_spike/cursor_spike.py --only s1,s2 --person         # the person tier, merged in (JOB-29)
@@ -29540,12 +29540,12 @@ thirteen `FrameJobRecording…` values are put back as they were.
 | Row | What it holds |
 |---|---|
 | P1 | the grid row "Cursor:" directly after System Audio and before Show Clicks; the items "Separate" and "In the picture", `representedObject` `separate` and `in_picture`; the action `controlChanged:` |
-| P2 | never chosen: a display shows Separate with `cursor` nil; a picked window (the Window row with a filter) shows In the picture after `refreshSizeNote()`; a tool's `.window` is In the picture; the Window row with no pick (`selectedScreen` nil), the popup set to In the picture by hand, is put back to Separate by `refreshSizeNote()`'s first statement |
+| P2 | never chosen: a display shows Separate with `cursor` nil; a picked window (the Window row with a filter), the popup set to In the picture by hand, shows Separate after `refreshSizeNote()`; a tool's `.window` is Separate (CU0d); the Window row with no pick (`selectedScreen` nil), the popup set to In the picture by hand, is put back to Separate by `refreshSizeNote()`'s first statement |
 | P3 | a pick writes `FrameJobRecordingCursor` and survives a source change; never chosen, `persistChoices` writes `""` whatever the popup shows; `in_picture` restores, `""` and `bogus` restore to nil |
 | P4 | greyed for Microphone Only and Camera with its value kept, their `cursor` nil; live again on a display |
-| P5 | `RecordingCursor.defaultFor`'s table, a choice beating it, `windowDefault` `.inPicture`, `RecordingChoice().cursor` nil |
+| P5 | `RecordingCursor.defaultFor`'s table, Separate for every source, a choice beating it, `windowDefault` `.separate` (CU0d), `RecordingChoice().cursor` nil |
 | P6 | `cursorNoAnchorProblem` and `cursorProblem`'s writer arm with `cursorSeparateLost` for Separate and as before In the picture; the watch-lost and nil arms the same for both |
-| P7 | `wantsRipples` only with Show Clicks, Separate and a picture; the remainder of ripples alone named "Cursor Clicks", with a voice "Add Microphone" |
+| P7 | `wantsRipples` only with Show Clicks, Separate and a picture, a picked window's default included; the remainder of ripples alone named "Cursor Clicks", with a voice "Add Microphone" |
 
 `recording_probe.py`'s section 2 is B2: 32 configuration rows, the 16 In the picture equal to
 `expected_configuration` (today's) and the 16 Separate the same but `showsCursor` and
@@ -29572,7 +29572,7 @@ the new corner within one frame of the square's. K17 now expects `in_picture` fa
 
 Mutants (each must fail its row): `recording_probe.py --mutant separate-shows-cursor --only
 configuration`, `--mutant separate-bgra --only configuration`, `--mutant voice-strangers-cursor
---only voiceover_doors`; `cu3c_probe.py --mutant window-default-separate` (P2, P5),
+--only voiceover_doors`; `cu3c_probe.py --mutant window-default-in-picture` (P2, P5, P7),
 `persist-shown-cursor` (P3), `sync-after-returns` (P2), `separate-lost-dropped` (P6); and by
 hand `ripple-write-skipped` — the `addRipples` call in `RecordingLanding.placement` removed,
 `make app-debug`, `cursor_layer_proof.py --only B3` fails, the file restored byte-identical by

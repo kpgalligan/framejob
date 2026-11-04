@@ -62,7 +62,7 @@ GROUPS = {"s1": "CU-S1", "s2": "CU-S2", "s3": "CU-S3", "s4": "CU-S4"}
 MUTANTS = ["rule-unchecked", "clicks-95", "keys-accessibility-ok", "grant-iohid-first",
            "skipped-as-measured", "inherited-grant-counted", "caret-unflipped",
            "odd-window-ignored", "dirty-128", "body-or", "owner-not-listed", "owner-same-process",
-           "owner-offscreen-ok"]
+           "owner-offscreen-ok", "perfect-mapping-last", "parked-frame-timed"]
 PICKED_OWNER = "S2.picked-owner"
 PERSON = "a person at the machine (--person; JOB-29)"
 LOCKED = ("the console is locked (CGSSessionScreenIsLocked): ScreenCaptureKit records the lock screen "
@@ -510,7 +510,10 @@ def s2_row(answer, rid):
             for m in deciders.MAPPINGS:
                 got = _m(m, p, f, ppp, fixed)
                 tip[m].append(9999.0 if got is None else round(math.hypot(got[0] - f["tip"][0], got[1] - f["tip"][1]), 3))
-    best = min(deciders.MAPPINGS, key=lambda m: deciders.p95(tip[m]) or 9999.0)
+    # A perfect mapping's p95 is 0.0; only a mapping with no value at all is ranked last.
+    best = min(deciders.MAPPINGS, key=lambda m: 9999.0 if deciders.p95(tip[m]) is None else deciders.p95(tip[m]))
+    if deciders.MUTANT == "perfect-mapping-last":
+        best = min(deciders.MAPPINGS, key=lambda m: deciders.p95(tip[m]) or 9999.0)
     move = answer["move"]
     mid = (move["t0"] + move["t1"]) / 2
     info = min(frames, key=lambda f: abs(f["arrival"] - mid)) if frames else {}
@@ -523,8 +526,16 @@ def s2_row(answer, rid):
     floor = red_floor(picture, ppp, info.get("content_scale"))
     times = {a: [] for a in deciders.ANCHORS}
     lo, hi = move["x0"] + 30, move["x0"] + move["length"] - 30
+    # A position dates a frame only while the pointer moves: a frame whose marker sits where the
+    # last counted frame's did (the pointer parked inside the move's span before it starts, or a
+    # repeated frame) is not timed, nor is the first frame after one under the red floor.
+    prev = None
     for pts, cx, cy, n in files:
         if n < floor:
+            prev = None
+            continue
+        moved, prev = prev is not None and cx != prev, cx
+        if not moved and deciders.MUTANT != "parked-frame-timed":
             continue
         x = _m_inverse_x(best, cx, info, ppp, fixed)
         if x is None:
@@ -821,6 +832,23 @@ def _s4(json_bytes, parse, state, prepare):
     return {"S4.json": js, "S4.binary": dict(js, bytes=json_bytes // 2)}
 
 
+def _s2_answer(sc_frame, file_frames):
+    """An in-memory Separate CU-S2 answer for `s2_row`: a 900 × 600 pt window at (140, 110), 2 px
+    per pt, two holds read exactly by M1 and M2 (M3 reads through `sc_frame`), E1 at 1000 s, and a
+    600 pt sweep at 400 pt/s from x 300 starting 1 s into the file."""
+    geometry = {"screen_rect": [140, 110, 900, 600], "content_rect": [0, 0, 900, 600], "content_scale": 1,
+                "scale_factor": 2}
+    holds = [[999.0, 999.4, 200, 300], [999.5, 999.9, 500, 350]]
+    frames = [dict(geometry, hold=k, red_px=2000, pts=hold[0] + j / 60, arrival=hold[0] + j / 60,
+                   display_time=hold[0] + j / 60, tip=[2 * (hold[2] - 140), 2 * (hold[3] - 110)])
+              for k, hold in enumerate(holds) for j in range(3)]
+    return {"config": "separate", "px_per_pt": 2.0, "sc_frame": sc_frame, "crosshair_hot": [7.5, 7.5],
+            "frames": frames, "holds": holds, "move": {"t0": 1001.0, "t1": 1002.5, "x0": 300, "length": 600,
+                                                        "speed": 400, "y": 400},
+            "E1": 1000.0, "file_frames": file_frames, "kind": "window", "odd": False, "configured": [1800, 1200],
+            "frame_ms": 1000 / 60, "idle": 0}
+
+
 def selftest():
     results = []
 
@@ -904,6 +932,23 @@ def selftest():
     low = tip_check(still, True, 2.0)
     check("T1", len(low) == 1 and low[0]["red_px"] == 3,
           f"floor at 2 px/pt {red_floor(True, 2.0, 1.0)}: frames under it {[f['red_px'] for f in low]}")
+
+    answer = _s2_answer([190, 110, 900, 600], [])
+    row = s2_row(answer, "T3")
+    check("T3", not row.get("failed") and row.get("anchor_mapping") == "M1" and row["tip_p95_px"]["M1"] == 0.0,
+          f"tip p95 {row.get('tip_p95_px')}: anchor_mapping={row.get('anchor_mapping')} (M1, M2 exact; M3 100 px off)")
+
+    parked = [[k / 10, 2 * (450 - 140), 0, 2000] for k in range(5)]
+    sweep = [[1.1 + k / 60, 2 * (300 + 400 * (0.1 + k / 60) - 140), 0, 2000] for k in range(20)]
+    sweep[10][3] = 10
+    answer = _s2_answer([140, 110, 900, 600], parked + sweep)
+    row = s2_row(answer, "T4")
+    counted = len(sweep) - 2
+    got = (row.get("time_err_ms") or {}).get("E1") or []
+    p95 = (row.get("time_p95_ms") or {}).get("E1")
+    check("T4", not row.get("failed") and len(got) == counted and p95 is not None and p95 <= 1.0,
+          f"5 parked frames, 19 moving with one under the floor before the 12th: {len(got)} timed "
+          f"(want {counted}), E1 p95 {p95} ms")
 
     built = bounded.run(["cargo", "build", "--release", "--offline", "--manifest-path", str(READER / "Cargo.toml")], BUILD_WALL)
     if built["rc"] != 0:

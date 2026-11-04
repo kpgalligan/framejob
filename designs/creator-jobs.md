@@ -508,6 +508,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | TX1 | TX | Agents get `get_timeline_transcript`: the timeline's words, read once per media and kept | CJ0b, CJ0c (T8), CJ0a (T9); TX-S1 at its head | A | — |
 | CU0b | CU | Nothing: CU-S1…CU-S4's verdicts | CU0a | B | — |
 | CU0c | CU | Nothing: CU-S2's picked rows performable, the grey window drawn by the scratch bundle | CU0b | B | — |
+| CU0d | CU | The window rows' quiet re-run, the instrument's two faults, Separate for window recordings | CU0c, CU3c | A | — |
 | CJ2b | CJ | Clip ▸ Split at Shot Changes; the Analyzing sheet | CJ2a, CJ0c (T5) | C | — |
 | TX2a | TX | View ▸ Transcript: the fifth inspector tab; read, follow, click to seek | TX1; TX-S2 at its head | A | — |
 | CU1a | CU | Nothing: the cursor file's format, the core's read-back, the writer | CU0b, CJ0d (T15) | B | — |
@@ -3123,7 +3124,115 @@ total is 20566 in 41 files. `spec_index_proof.py` 255/255. No `CLAUDE.md` edit a
   mapping and `separate` stay owed. #445 closes on that run. **Waived 2026-11-03** by the owner
   as not performable (CU0b's "Settled 2026-11-03"): window mapping M2 and `separate` pass from
   the automatic window rows; #445 closes citing the waiver.
-- The window rows' anchor, re-run on a quiet machine.
+- The window rows' anchor, re-run on a quiet machine. **Done at CU0d** (2026-11-04): the re-run,
+  with the instrument's two faults fixed, gave E1 for the window rows (CU0d's record).
+
+### CU0d — the window rows' quiet re-run and the flip
+
+- **What a person gets:** a window or picked-window recording's Cursor defaults to **Separate**,
+  as a display's does: the pointer and click ring are not in the movie, and Frame Job draws them.
+  In the picture stays one click away, and a stored choice is kept.
+- **Head:** the orchestrator's quiet-machine re-run of CU-S2's window rows (2026-11-04, every
+  lane idle; `~/.claude/litecode/framejob/cj-cu0d/evidence/`). It is the measurement of record:
+  this phase runs no `--only s2` and records no figure of its own from one.
+- **The instrument:** `cursor_spike.py`'s `s2_row` ranks only a mapping with no value last, and
+  times a frame only when its marker moved since the last counted frame, and not the first frame
+  after one under the red floor. Selftest rows T3 and T4 and the mutants `perfect-mapping-last`
+  and `parked-frame-timed` pin each fault. No rule, pin or decider changes.
+- **Swift:** `RecordingCursor.windowDefault = .separate`; two doc comments and `record_screen`'s
+  `cursor` description follow it.
+- **MCP mirror:** none new; `record_screen`'s absent `cursor` now means `separate` for every
+  screen source.
+- **Docs:** `screen-recording.md`, `mcp.md`, the README's screen-recording highlight, spec
+  §7.9d, `recording.md`'s CU-1 line, JOB-27, the recorder panel's screen file and the proofs'
+  README.
+- **Decisions:** no new ID (like CU0c). CU-36 (b) and (c), CU-6 and CU-12 each take an "Amended
+  at CU0d" clause, written before the code, with their index cells.
+- **Proof:** `cursor_spike.py --selftest` (19 rows) and its fifteen mutants; `cu3c_probe.py`'s
+  P2, P5 and P7 on the new default, its mutant `window-default-in-picture`.
+- **Depends on:** CU0c, CU3c. **Lane** A.
+
+#### CU0d's record (2026-11-04)
+
+**Landed.** Lane A, base `ce8eaa12` (I's HEAD, CO10b). The decisions first, committed before the
+code: CU-36 (b) and (c) in `creator-jobs-9.md`, CU-6 in `creator-jobs.md` and CU-12 in
+`creator-jobs-5.md`, each an "Amended at CU0d" clause, with their index cells, `recording.md`'s
+CU-1 line, this section and its Phases row. No ID, op, FFI, format, tool argument or `rc_*`; no
+rule, pin or decider changed (`PINNED["CU-S2"]` stays `15d61ec5…c851`).
+
+**The two faults**, as the orchestrator found them in `cursor_spike.py`'s `s2_row`:
+- (i) "`best = min(MAPPINGS, key=lambda m: p95(tip[m]) or 9999.0)` ranks a perfect mapping (p95
+  exactly 0.0, which Separate rows give) as 9999, so window-moved.separate timed its frames
+  through M3, a mapping its own tip check puts 277.8 px off (M1 and M2 were 0.0)."
+- (ii) "A frame's time is inferred from the marker's x as if the pointer were moving, but every
+  frame whose x falls inside the move's span is counted, including the frames before the move
+  starts while the pointer sits parked at a point inside the span. In window-moved.picture the 23
+  bad frames (file pts 2.457–2.837 s) all show x = 447.2 pt, unmoving; the move starts at
+  3.648 s; from the first moving frame on every error is 2–12 ms. window-odd.separate's 24 bad
+  frames are the same."
+
+**The runs of record** (the orchestrator's, 2026-11-04, every lane idle; the evidence is in
+`~/.claude/litecode/framejob/cj-cu0d/evidence/`):
+- Run 1, the instrument as it stood, `--only s2` at load 4.2/9.27/12.79
+  (`run1-quiet-unfixed.txt`): window-moved.picture E1 p95 1344 ms, window-moved.separate
+  2101 ms, window-odd.separate 3335 ms, as at load ≈ 300 the day before (1343, 2117, 3335).
+  Load was not the cause. `rule_sha256 15d61ec5…c851`.
+- Run 2, with `evidence/instrument.patch`, at load 6.78/7.49/10.92 (`run2-quiet-fixed.txt`,
+  `cu-s2-results-2026-11-04-fixed.json`): E1 p95 within the 16.7 ms frame on every measured
+  row — display-best picture 10.569 / separate 9.323 ms, display-nominal picture 4.469 /
+  separate 10.118 ms, window-moved picture 11.129 / separate 10.067 ms, window-odd picture
+  10.88 ms (8 frames) / separate 9.258 ms. `rule_sha256 15d61ec5…c851`.
+- Run 2's printed line: `VERDICT mapping_display=M2 mapping_window=owed separate=owed
+  anchor=owed e1_still_p95_ms=10.2`, because the waived picked rows count as skipped. With them
+  recorded `absent`, as the owner's waiver of 2026-11-03 has them, `deciders.decide_s2` gives
+  `mapping_display M2, mapping_window M2, separate pass, anchor E1, e1_still_p95_ms 10.2`. The
+  window rows' anchor is E1; nothing STOPs.
+
+**What changed.**
+- **The instrument.** The patch's two hunks: a mapping is ranked last only when it has no
+  value, and a frame is timed only when its marker moved since the last counted frame, and not
+  the first frame after one under the red floor. The mutants `perfect-mapping-last` (the old
+  key) and `parked-frame-timed` (every frame over the floor timed) sit inline in `s2_row`.
+  Selftest T3 (an in-memory Separate answer whose M1 and M2 are exact and M3 100 px off through
+  `sc_frame`: `anchor_mapping` M1, tip p95 0.0) and T4 (5 parked frames inside the span before
+  the move, then 20 sweep frames, one under the floor: 18 timed, E1 p95 ≤ 1.0 ms).
+  The selftest is 19 rows and fifteen mutants; this phase ran no `--only s2`.
+- **The flip.** `RecordingCursor.windowDefault = .separate`: `defaultFor` answers `.separate`
+  for every source, its `switch` unchanged. A key never chosen (`""`) and `record_screen`'s
+  absent `cursor` follow at once; a stored `in_picture` stays. `syncCursorPopup()`'s comment and
+  `record_screen`'s `cursor` description ("Absent means separate.") follow.
+- **The proof.** `cu3c_probe`'s P5 table expects Separate for window and picked; P2's picked
+  row sets the popup to In the picture by hand before `refreshSizeNote()` and expects Separate,
+  and a tool's `.window` Separate; P7's "picked, Show Clicks, default" now wants ripples. Its
+  mutant is `window-default-in-picture` (P2, P5, P7).
+- **The documents.** `screen-recording.md` (the Cursor default cells, the remembered-choices
+  sentence, the cursor file's row, the limit bullet removed), `mcp.md`, the README's
+  screen-recording highlight, spec §7.9d, JOB-27, `16-recorder-panel.md`, the proofs' README and
+  `cursor_spike/README.md`.
+
+**This phase's runs** (lane A's worktree, AC power, other lanes running):
+- `cursor_spike.py --selftest`: `selftest: 19/19 passed`. `--mutant perfect-mapping-last`: T3
+  failed, `caught`, exit 1; `--mutant parked-frame-timed`: T4 failed (24 timed, want 18),
+  `caught`, exit 1. All fifteen mutants printed `caught` and exited 1.
+- `make typecheck`: 0 errors, the 4 baseline warnings, tsc clean.
+- `cu3c_probe.py`: `scores: 8/8`. `--mutant window-default-in-picture`: P2, P5 and P7 failed,
+  exit 1; `persist-shown-cursor` (P3), `sync-after-returns` (P2) and `separate-lost-dropped`
+  (P6) each `caught`, exit 1.
+- `spec_index_proof.py`: 276/276.
+- `make gate`: `gate: PASS 531s` (names 1 s, typecheck 8 s, test 322 s, app 199 s; fmt and lint
+  skipped as unchanged).
+
+**Review.** One review (`ce8eaa12..4b9e785e`, three commits), verdict pass, T4's count and T3's
+100 px checked by hand, two nits, both resolved at integration: (1) `cu3c_probe.swift`'s header
+line for P5–P7 ran to about 150 columns, re-wrapped to the block's width (comment only); (2) this
+record's T4 clause read as 19 sweep frames, now "20 sweep frames, one under the floor".
+
+**Integration (2026-11-04).** Cherry-picked (`4b9e785e`) onto `worktree-creator-jobs` at
+`ce8eaa12`, no conflicts. No `CLAUDE.md` edit and no issue owed.
+
+**Owed.**
+- JOB-27 (S-ST4) stays the real picker path's check, on a real app window, now with Cursor at its
+  default Separate.
 
 ### CJ2b — the Analyzing sheet and Split at Shot Changes
 
@@ -6492,7 +6601,9 @@ keys, `RecordingCursor`, `+Cursor`) were applied at integration.
 
 **Owed.**
 - The quiet-machine re-run of CU-S2's window rows, and on its pass the flip of `windowDefault`
-  (CU-36 (c)); on its failure window recordings' cursor STOPs to the owner.
+  (CU-36 (c)); on its failure window recordings' cursor STOPs to the owner. **Done at CU0d**
+  (2026-11-04): the re-run passed under E1 once the instrument was fixed, and `windowDefault` is
+  `.separate` (CU0d's record).
 - JOB-21, JOB-27 and JOB-28, the person's.
 - #445 closes citing the 2026-11-03 waiver (the orchestrator's).
 - The owner's report of 2026-11-03 that CU-S2's picker window could not be selected (no

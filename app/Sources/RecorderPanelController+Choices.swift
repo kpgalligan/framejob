@@ -128,9 +128,9 @@ extension RecorderPanelController {
     }
 
     /// The Cursor popup shows the person's pick, else the screen source's
-    /// default (spec §11 CU-36): Separate for a display, In the picture for a
-    /// picked window until CU-S2's re-run. Left as it is for Microphone Only
-    /// and Camera, whose row is greyed with its value kept.
+    /// default: Separate for every screen source (spec §11 CU-36, amended at
+    /// CU0d). Left as it is for Microphone Only and Camera, whose row is
+    /// greyed with its value kept.
     func syncCursorPopup() {
         guard !voiceOverSelected, !cameraSelected else { return }
         let shown = cursorChosen ?? .defaultFor(currentChoice().source)

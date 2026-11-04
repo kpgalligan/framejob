@@ -1202,11 +1202,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** road map creator-jobs CU11b, spec §11 CU-117…CU-119 (`cu11_proof.py` MB1–MB6 score the drawing against the mean of sharp renders, never how the blur looks).
 
 **JOB-27 — A real window recording keeps its cursor on the pointer while the window moves**
-- **When:** once, and again when the window rows' anchor is settled (CU-36 (c)). This is where the real recorder's picker path is checked, since CU-S2's picked rows were waived on 2026-11-03.
-- **Do:** 1. Open a real app window (a Safari or TextEdit window). 2. File ▸ New Recording…, Source ▸ **Window…**, and pick that window in the picker; set **Cursor** to **Separate** (a picked window defaults to In the picture). 3. Press Record. Work in the window for a while: click, type, then drag the window to another place and resize it from a corner, and work in it again; Stop. 4. Play the landed clip and step through the drag and the resize.
+- **When:** once; settled at CU0d, so once is enough. This is where the real recorder's picker path is checked, since CU-S2's picked rows were waived on 2026-11-03.
+- **Do:** 1. Open a real app window (a Safari or TextEdit window). 2. File ▸ New Recording…, Source ▸ **Window…**, and pick that window in the picker; leave **Cursor** at **Separate**, its default. 3. Press Record. Work in the window for a while: click, type, then drag the window to another place and resize it from a corner, and work in it again; Stop. 4. Play the landed clip and step through the drag and the resize.
 - **Expect:** the picker offers the window and its Share button; the movie has no pointer of its own; the drawn pointer stays on the real pointer's spot in the window throughout, including during and after the drag and the resize, and lands on each click as it happens.
 - **Answer:** did the picker offer the window; did the drawn pointer stay on the pointer through the drag and the resize, and how far off or how late was it anywhere?
-- **Source:** road map "creator-jobs" CU3c (S-ST4, spec §11 CU-36 (b)); CU-S2's window rows ran on a busy machine and its picked rows were waived as not performable, so no script reaches a real picked window.
+- **Source:** road map "creator-jobs" CU3c (S-ST4, spec §11 CU-36 (b)); CU-S2's window rows passed under E1 on 2026-11-04 (CU0d) and its picked rows were waived as not performable, so no script reaches a real picked window.
 
 **JOB-28 — With two displays, a recording of one shows no cursor while the pointer is on the other**
 - **When:** once; skipped with one display.

@@ -295,7 +295,12 @@ the rest):
   anchor is E1 for display recordings; window recordings' anchor stays owed to a quiet-machine
   re-run (their rows were 1.3–3.3 s off under every anchor at load average about 30). The figures
   are in the integration worktree's `tools/proof/work/cursor_spike/cu-s2/results.json`; JOB-27
-  checks the real picker path on a real app window; CU3c's defaults are CU-36's.
+  checks the real picker path on a real app window; CU3c's defaults are CU-36's. **Amended at
+  CU0d** (2026-11-04): window recordings' anchor is E1, settled by the quiet-machine re-run (Run 2,
+  every measured row's E1 p95 within the 16.7 ms frame, window rows 9.258–11.129 ms). The rule and
+  its pin are unchanged (`rule_sha256 15d61ec5…c851` on both runs); what failed was the
+  instrument's `s2_row`, fixed at CU0d (a perfect mapping ranked last; parked frames timed).
+  Window recordings' cursor does not STOP; their default is Separate (CU-36 (c)).
 - **CU-7 — Keys are private by construction.** A key-down while ⌘ or ⌃ is held is a shortcut, stored
   with its spelled keys; every other key-down and every auto-repeat is a mark with a time and no
   identity; no character, key code or label of a typed key is ever stored, so none can reach a tool

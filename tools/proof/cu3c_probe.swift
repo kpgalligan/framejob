@@ -1,8 +1,9 @@
 // Road map creator-jobs CU3c — the recorder stops burning the pointer, the rows no grant is needed
-// for (spec §11 CU-31, CU-36): the recorder panel's Cursor row (P1), its defaults per source and
-// the Window row's early return (P2), its key (P3), its greying (P4), `RecordingCursor`'s table
-// (P5), the no-file sentences of a Separate segment (P6) and when a landing writes ripples and
-// what a new project's remainder step is called then (P7).
+// for (spec §11 CU-31, CU-36): the recorder panel's Cursor row (P1), its default, Separate for
+// every source (CU0d), and the Window row's early return (P2), its key (P3), its greying (P4),
+// `RecordingCursor`'s table, Separate throughout (P5), the no-file sentences of a Separate
+// segment (P6) and when a landing writes ripples and what a new project's remainder step is
+// called then (P7).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own `main.swift`,
 // against `libframejob_core.a`, through `swift_build.py`:
@@ -38,8 +39,8 @@ do {
     var problems: [String] = []
     let table: [(String, RecordingSource, RecordingCursor)] = [
         ("display", .display(CGMainDisplayID()), .separate),
-        ("window", .window(5), .inPicture),
-        ("picked", .picked, .inPicture),
+        ("window", .window(5), .separate),
+        ("picked", .picked, .separate),
         ("voiceOver", .voiceOver, .separate),
         ("camera", .camera, .separate),
     ]
@@ -52,13 +53,13 @@ do {
         expect(&problems, "a choice beats the default (\(name))", choice.effectiveCursor,
                choice.cursor!)
     }
-    expect(&problems, "windowDefault", RecordingCursor.windowDefault, RecordingCursor.inPicture)
+    expect(&problems, "windowDefault", RecordingCursor.windowDefault, RecordingCursor.separate)
     expect(&problems, "RecordingChoice().cursor", RecordingChoice().cursor.map { "\($0)" } ?? "nil",
            "nil")
     expect(&problems, "raw values", RecordingCursor.allCases.map(\.rawValue),
            ["separate", "in_picture"])
-    row("P5", problems, "defaultFor: display separate, window and picked in_picture, voice-over "
-        + "and camera separate; RecordingChoice().cursor nil; a choice beats the default")
+    row("P5", problems, "defaultFor: display, window, picked, voice-over and camera separate; "
+        + "windowDefault separate; RecordingChoice().cursor nil; a choice beats the default")
 }
 
 // MARK: - P6: a Separate segment's no-file sentences
@@ -125,7 +126,7 @@ do {
         ("display, Show Clicks, In the picture",
          result(display, clicks: true, cursor: .inPicture, mic: false), false),
         ("display, no Show Clicks", result(display, clicks: false, cursor: .separate, mic: false), false),
-        ("picked, Show Clicks, default", result(.picked, clicks: true, cursor: nil, mic: false), false),
+        ("picked, Show Clicks, default", result(.picked, clicks: true, cursor: nil, mic: false), true),
         ("voice-over, Show Clicks", result(.voiceOver, clicks: true, cursor: .separate, mic: false), false),
     ]
     for (name, r, want) in cases {
@@ -137,8 +138,8 @@ do {
     expect(&problems, "one segment with a voice",
            RecordingLanding.remainderActionName(
                for: result(display, clicks: true, cursor: nil, mic: true)), "Add Microphone")
-    row("P7", problems, "wantsRipples only with Show Clicks, Separate and a picture; a new "
-        + "project's remainder of ripples alone is \"Cursor Clicks\", with a voice \"Add Microphone\"")
+    row("P7", problems, "wantsRipples only with Show Clicks, Separate and a picture, a picked "
+        + "window's default Separate included; a new project's remainder of ripples alone is \"Cursor Clicks\", with a voice \"Add Microphone\"")
 }
 
 // MARK: - The panel
@@ -234,18 +235,22 @@ do {
            panel.currentChoice().cursor.map { "\($0)" } ?? "nil", "nil")
     expect(&problems, "display: effective", panel.currentChoice().effectiveCursor,
            RecordingCursor.separate)
-    // The Window row with a pick: `.picked`, whose default is In the picture.
+    // The Window row with a pick: `.picked`, whose default is Separate (CU0d). The popup is set to
+    // In the picture by hand first, so only `refreshSizeNote()`'s sync puts it back.
     let window = panel.sourcePopup.menu?.item(withTag: RecorderPanelController.windowTag)
     panel.sourcePopup.select(window)
     panel.pickedFilter = SCContentFilter()
+    if let item = popup.itemArray.first(where: { $0.representedObject as? String == "in_picture" }) {
+        popup.select(item)
+    }
     panel.refreshSizeNote()
     expect(&problems, "picked: source", "\(panel.currentChoice().source)", "\(RecordingSource.picked)")
-    expect(&problems, "picked: shown", shown(), "in_picture")
+    expect(&problems, "picked: shown", shown(), "separate")
     expect(&problems, "picked: effective", panel.currentChoice().effectiveCursor,
-           RecordingCursor.inPicture)
+           RecordingCursor.separate)
     var tool = RecordingChoice()
     tool.source = .window(5)
-    expect(&problems, "window: effective", tool.effectiveCursor, RecordingCursor.inPicture)
+    expect(&problems, "window: effective", tool.effectiveCursor, RecordingCursor.separate)
     // The Window row with no pick: `selectedScreen` nil, the source the main display.
     panel.pickedFilter = nil
     if let item = popup.itemArray.first(where: { $0.representedObject as? String == "in_picture" }) {
@@ -257,8 +262,8 @@ do {
     expect(&problems, "Window row, no pick: shown", shown(), "separate")
     pick(displayRow())
     expect(&problems, "back on a display: shown", shown(), "separate")
-    row("P2", problems, "never chosen: a display shows and records Separate, a picked window and a "
-        + "window In the picture; refreshSizeNote() resyncs the Window row's early return")
+    row("P2", problems, "never chosen: a display, a picked window and a window show and record "
+        + "Separate; refreshSizeNote() resyncs the picked row and the Window row's early return")
 }
 
 // MARK: - P3: the key

@@ -15,9 +15,10 @@ Rows:
       Audio and directly before Show Clicks; its popup's items "Separate" and "In the picture",
       their `representedObject` `separate` and `in_picture`; its action `controlChanged:`.
   P2  never chosen (the key `""`): a display row shows Separate, `cursor` nil and
-      `effectiveCursor` separate; the Window row with a pick (`.picked`) shows In the picture
-      after `refreshSizeNote()`; a tool's `.window` choice is In the picture; the Window row with
-      no pick (`selectedScreen` nil), the popup first set to In the picture by hand, is put back to
+      `effectiveCursor` separate; the Window row with a pick (`.picked`), the popup first set to
+      In the picture by hand, shows Separate after `refreshSizeNote()` and its `effectiveCursor` is
+      separate (CU0d); a tool's `.window` choice is Separate; the Window row with no pick
+      (`selectedScreen` nil), the popup first set to In the picture by hand, is put back to
       Separate by `refreshSizeNote()` (its early-return path).
   P3  a pick through the popup writes `FrameJobRecordingCursor` (`in_picture`, then `separate`)
       and survives a source change; never chosen, `persistChoices` writes `""` whatever the popup
@@ -25,19 +26,20 @@ Rows:
   P4  Microphone Only and Camera grey the popup with its value kept, their choice's `cursor` nil;
       a display row makes it live again, the pick kept.
   P5  `RecordingCursor.defaultFor`: display separate, window and picked `windowDefault`
-      (in_picture), voice-over and camera separate; a choice beats the default;
+      (separate since CU0d), voice-over and camera separate; a choice beats the default;
       `RecordingChoice().cursor` nil; the raw values.
   P6  `cursorNoAnchorProblem` and `cursorProblem`'s writer arm end with `cursorSeparateLost` for
       `separate: true` and equal today's sentences for false (and by default); the watch-lost and
       nil arms are the same for both.
   P7  `RecordingLanding.wantsRipples` true only with Show Clicks, Cursor Separate (chosen, or a
-      display's default) and a picture — false In the picture, without Show Clicks, for a picked
-      window's default and for a voice-over; `remainderActionName` of one segment with no voice and
-      no camera is `ripplesActionName`, "Cursor Clicks", and with a voice "Add Microphone" (a
+      source's default, a picked window's included since CU0d) and a picture — false In the
+      picture, without Show Clicks and for a voice-over; `remainderActionName` of one segment
+      with no voice and no camera is `ripplesActionName`, "Cursor Clicks", and with a voice "Add Microphone" (a
       row beyond the spec's six: `land_recording`'s movie always has a voice, so B3b over MCP
       cannot reach the "Cursor Clicks" name).
 
-Mutants (spec §11 CU-36 (f)): `window-default-separate` (P2, P5), `persist-shown-cursor` (P3),
+Mutants (spec §11 CU-36 (f), (c)): `window-default-in-picture` (`windowDefault` set back to
+`.inPicture`; P2, P5, P7), `persist-shown-cursor` (P3),
 `sync-after-returns` (`syncCursorPopup()` moved to `refreshSizeNote()`'s end; P2) and
 `separate-lost-dropped` (`separate:` ignored in `cursorNoAnchorProblem`; P6).
 
@@ -64,10 +66,10 @@ WALL = 120
 
 # name: (the rows it must fail, [(file, before, after), ...]) — spec §11 CU-36 (f).
 MUTANTS = {
-    "window-default-separate": (["P2", "P5"], [
+    "window-default-in-picture": (["P2", "P5", "P7"], [
         ("RecordingSetup.swift",
-         "    static let windowDefault: RecordingCursor = .inPicture\n",
-         "    static let windowDefault: RecordingCursor = .separate\n")]),
+         "    static let windowDefault: RecordingCursor = .separate\n",
+         "    static let windowDefault: RecordingCursor = .inPicture\n")]),
     "persist-shown-cursor": (["P3"], [
         ("RecorderPanelController+Choices.swift",
          "        defaults.set(cursorChosen?.rawValue ?? \"\", forKey: Self.cursorKey)\n",

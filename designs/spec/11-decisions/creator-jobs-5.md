@@ -258,7 +258,10 @@ The owner's answer: the file sits beside the movie as `<stem>.fjcursor` (CU-2, C
   2.5–6.3 ms. The window rows' re-run on a quiet machine is owed; if they still fail, window
   recordings' cursor STOPs to the owner. A landed segment with no E1 gets no file, and its
   `cursorProblem` is "The cursor file for <movie name> was not written: the screen never reported
-  its start, so its times have nothing to count from."
+  its start, so its times have nothing to count from." **Amended at CU0d** (2026-11-04): the
+  window rows' quiet-machine re-run passed under E1 (every measured row's E1 p95 within the
+  16.7 ms frame, once the instrument's two faults were fixed; CU-6, CU-36 (c)), so nothing STOPs:
+  E1 is the anchor for window and picked recordings as well.
 - **CU-13 — The frame watch rides every screen recording (amends CAM-9 (3)).**
   `ScreenFrameWatchRule.attaches(camera:cursor:)` is `camera || cursor`, and cursor is true for
   every display, window or picked recording until CU3c and CU4 give a choice. The watch feeds

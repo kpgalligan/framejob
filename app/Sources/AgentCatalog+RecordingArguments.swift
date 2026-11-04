@@ -119,8 +119,7 @@ extension AgentServer {
                 "description": "Where the pointer goes: separate — not in the movie; "
                     + "the cursor file records it and Frame Job draws it on the clip, "
                     + "where the Cursor section restyles it — or in_picture, burned into "
-                    + "the movie by the system as before. Absent means the source's "
-                    + "default: separate for a display, in_picture for a window. Refused "
+                    + "the movie by the system as before. Absent means separate. Refused "
                     + "with source voice_over and camera.",
             ],
             // The recorder panel's Include Frame Job windows checkbox.

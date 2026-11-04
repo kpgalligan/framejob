@@ -644,12 +644,38 @@ Nothing is sent anywhere, so nothing is keyed (CJ-3).
     re-run is owed. `RecordingCursor.defaultFor` answers `.separate` for `.display`,
     `windowDefault` for `.window` and `.picked`, and `.separate` for `.voiceOver` and `.camera`,
     which have no pointer to draw. `RecordingChoice.cursor` is nil for "the source's default", and
-    `effectiveCursor` is `cursor ?? .defaultFor(source)`.
+    `effectiveCursor` is `cursor ?? .defaultFor(source)`. **Amended at CU0d** (2026-11-04): the
+    re-run settled the window rows' anchor as E1, so Separate is the default for a window or
+    picked recording too: `windowDefault` is `.separate`, and `defaultFor` answers `.separate`
+    for every source, its `switch` unchanged.
   - (c) The flip. When that re-run answers an anchor for the window rows under CU-S2's pinned rule,
     the phase that records it sets `windowDefault = .separate` and amends CU-36, CU-6 and the
     guide's default cells. A key never chosen (`""`) and the tool's absent argument follow at once;
     a person's choice stays. If the re-run fails, window recordings' cursor STOPs to the owner
-    (CU-12) and the default stays.
+    (CU-12) and the default stays. **Amended at CU0d** (2026-11-04): the re-run ran with every
+    lane idle. Run 1, the instrument as it stood, at load 4.2/9.27/12.79, reproduced the loaded
+    run (window-moved.picture E1 p95 1344 ms, window-moved.separate 2101 ms,
+    window-odd.separate 3335 ms), so load was not the cause. The cause was two faults in
+    `cursor_spike.py`'s `s2_row`, not the anchor: (i) the mapping was chosen by
+    `p95(tip[m]) or 9999.0`, which ranks a perfect mapping (p95 exactly 0.0, as Separate rows
+    give) last, so window-moved.separate was timed through M3, 277.8 px off; (ii) every frame
+    whose marker fell inside the move's span was timed, including frames before the move began
+    with the pointer parked inside it. The fix ranks only a mapping with no value last, and times
+    a frame only when its marker moved since the last counted frame, and not the first frame after
+    one under the red floor (selftest rows T3 and T4, mutants `perfect-mapping-last` and
+    `parked-frame-timed`). Run 2, fixed, at load 6.78/7.49/10.92, gave E1 p95 within the
+    16.7 ms frame on every measured row: window-moved picture 11.129 / separate 10.067 ms,
+    window-odd picture 10.88 (8 frames) / separate 9.258 ms. Both runs printed `rule_sha256
+    15d61ec5…c851`. Its VERDICT line reads `mapping_display=M2 mapping_window=owed
+    separate=owed anchor=owed e1_still_p95_ms=10.2` because the waived picked rows count as
+    skipped; with them recorded `absent` (the waiver of 2026-11-03) `deciders.decide_s2` gives
+    `mapping_display M2, mapping_window M2, separate pass, anchor E1, e1_still_p95_ms 10.2`.
+    The flip is made: `windowDefault = .separate`. A key never chosen (`""`) and
+    `record_screen`'s absent `cursor` follow at once; a person's stored `in_picture` stays.
+    (f)'s first mutant is now `window-default-in-picture` (P2, P5, P7), which sets
+    `windowDefault` back to `.inPicture`. The evidence is in
+    `~/.claude/litecode/framejob/cj-cu0d/evidence/`; the record is `designs/creator-jobs.md`'s
+    "CU0d's record (2026-11-04)".
   - (d) The key. `FrameJobRecordingCursor` is the panel's thirteenth key: `""` follows the source,
     `separate` or `in_picture` is a choice. Every `persistChoices` writes it from
     `cursorChosen`, which only the popup's own change sets, never from the popup's shown row. It
