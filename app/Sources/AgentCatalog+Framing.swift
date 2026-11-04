@@ -5,7 +5,8 @@ import Foundation
 /// `switch_angle`'s. Its `subjects` is the app's to fill
 /// (`AgentCatalog+Declarations.swift`), so the row describes the eight other
 /// arguments. Then `make_vertical_version` (road map "creator-jobs" VR3a, spec §11
-/// VR-36), the tool that runs `reframe_clip` on every picture of a vertical copy.
+/// VR-36), the tool that runs `reframe_clip` on every picture of a vertical copy, and
+/// `relay_captions` (VR4a, VR-45), its caption step on its own.
 extension AgentServer {
 
     func framingTools() -> [[String: Any]] {
@@ -113,8 +114,12 @@ extension AgentServer {
                     + "even keep cannot reframe. Answers {ok, canvas {width, height}, cached "
                     + "(false when an analysis ran), clips [{clip, treatment (followed, whole, "
                     + "kept, refilled, removed or not_followed), reason?}], backgrounds, "
-                    + "more_tracks, re_eased, moves_carried, summary, project, and for a copy "
-                    + "carried {files, bytes, seconds} and saved (with path)}.",
+                    + "more_tracks, re_eased, moves_carried, summary, captions {relaid, kept} "
+                    + "(as relay_captions answers them; absent with captions false), project, "
+                    + "and for a copy carried {files, bytes, seconds} and saved (with path)}. "
+                    + "With captions (the default) each word caption track is re-paged on the "
+                    + "new canvas from its own words, as relay_captions does, and a caption "
+                    + "track it cannot re-lay is kept as placed and listed.",
                 [
                     "shape": [
                         "type": "string", "enum": VerticalShape.allCases.map(\.rawValue),
@@ -147,7 +152,39 @@ extension AgentServer {
                             + "absolute path; .framejob is added when missing. Nothing may "
                             + "exist there yet. Without it the copy opens untitled.",
                     ],
+                    "captions": [
+                        "type": "boolean",
+                        "description": "true (the default): re-page each word caption track "
+                            + "on the new canvas from its own words. false: leave the caption "
+                            + "tracks to you, kept as placed like any other clip.",
+                    ],
                 ], required: ["shape"]),
+            // UI path: File ▸ Re-lay Captions for This Canvas (road map creator-jobs VR4a,
+            // spec §11 VR-45: EditorViewController+RelayCaptions.swift). The plan is
+            // CaptionRelayout.plan; the handler AgentServer+VerticalVersion.swift.
+            tool(
+                "relay_captions",
+                "Re-lays the word captions for the current canvas — what File ▸ Re-lay "
+                    + "Captions for This Canvas does — after set_canvas, or for captions laid "
+                    + "on another canvas. It acts in the container set_scope has open (the "
+                    + "timeline, or the open nest at the nest's size). Every track named "
+                    + "Captions or Captions N holding only text clips is looked at: a track "
+                    + "whose pages are all in one caption style Frame Job makes (Highlight, "
+                    + "Pill, Karaoke, Build or One Word, with its slide, fill and dim looks; "
+                    + "recognised by the page's font and word_style) is re-paged from the "
+                    + "words its pages hold — every hand correction kept — by the same pager "
+                    + "that made them, each page staying inside its clip, then put back at "
+                    + "the same place in the stack with the same name, hidden and locked as "
+                    + "before. A track is kept as placed, and listed with its reason, when it "
+                    + "is a matte track, holds a page with no word timings (Subtitles pages "
+                    + "included), holds a page none of whose words starts inside it, holds a "
+                    + "page in a style Frame Job does not make, has pages in more than one "
+                    + "style, or would not fit (the clip ceiling). One undo step \"Re-lay "
+                    + "Captions\". Refused with nothing to re-lay: \"relay_captions found no "
+                    + "caption track it can re-lay: \" and each kept track with its reason. "
+                    + "Answers {ok, relaid [{track (the new track), replaced (the old one), "
+                    + "name, style, pages}], kept [{track, name, reason}], project}.",
+                [:]),
         ]
     }
 }

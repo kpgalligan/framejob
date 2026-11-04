@@ -588,16 +588,19 @@ section is greyed with "Word style wins; the reveal does not apply." (see
 
 Each preset sets the face, size, alignment, backdrop and position in one
 undo step. It also sets **Vertical** to middle and **Opacity** back to 100 %.
-Sizes and positions are fractions of the canvas, so a preset fits any canvas
-size. With an action selected on the action lane, a preset sets that
-action's end state, like any other field.
+Sizes are fractions of the canvas's shorter side and positions fractions of
+its width and height, so a preset fits any canvas size and a vertical canvas
+gets the same text height as a horizontal one. On a canvas taller than wide
+the Caption preset sits higher, a quarter of the height below centre, clear of
+a phone's on-screen controls. With an action selected on the action lane, a
+preset sets that action's end state, like any other field.
 
-| Preset | Face | Size (of canvas height) | Placement | Backdrop |
+| Preset | Face | Size (of the shorter side) | Placement | Backdrop |
 |---|---|---|---|---|
 | Title | Source Sans 3 Bold | 9 % | centred | none |
 | Subtitle | Source Sans 3 SemiBold | 5 % | centred, 18 % of the height below centre | none |
 | Lower Third | Source Sans 3 SemiBold | 4.5 % | left-aligned, left of centre and low | black at 55 %, padding 18, radius 6 |
-| Caption | Source Sans 3 Regular | 3.5 % | centred, near the bottom | black at 60 %, padding 12, radius 8 |
+| Caption | Source Sans 3 Regular | 3.5 % | centred, 38 % of the height below centre (a quarter on a tall canvas) | black at 60 %, padding 12, radius 8 |
 
 ## Shape clips
 

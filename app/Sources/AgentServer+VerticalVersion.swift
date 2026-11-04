@@ -146,6 +146,7 @@ extension AgentServer {
         let zoom = try doubleArg(a, "zoom") ?? 1
         let whereEmpty = try enumArg(a, "where_empty", FramingWhereEmpty.self) ?? .fit
         let copy = try boolArg(a, "copy") ?? true
+        let captions = try boolArg(a, "captions") ?? true
         let path = try stringArg(a, "path")
         guard document.scope == nil else {
             throw ToolError(
@@ -187,7 +188,7 @@ extension AgentServer {
             throw ToolError(message: error.localizedDescription)
         }
         let settings = VerticalSettings(
-            shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty)
+            shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty, captions: captions)
         let (present, missing) = VerticalVersion.analysisTargets(
             project, urls: document.mediaURLs())
         // The dry plan: the core's error for a bad argument, before any analysis. Its
@@ -218,5 +219,32 @@ extension AgentServer {
             document: document, settings: settings, copy: copy, url: url, missing: missing,
             targets: targets, requests: requests, cacheDir: cacheDir, asked: project,
             scope: document.scope)
+    }
+
+    /// `relay_captions` (road map "creator-jobs" VR4a, spec §11 VR-45): the word caption
+    /// tracks of the container `set_scope` has open re-paged on its canvas as one undo step
+    /// "Re-lay Captions" — what File ▸ Re-lay Captions for This Canvas does
+    /// (`EditorViewController+RelayCaptions.swift`). Main thread; no `scope` argument, since
+    /// dispatch reads `scope` only for op names; it plans on `editedProject` and
+    /// `performGroupedEdit` addresses the ops.
+    func relayCaptions(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let planned: (ops: [ReelOp], outcome: CaptionRelayout.Outcome)
+        do {
+            planned = try CaptionRelayout.plan(document.editedProject)
+        } catch {
+            throw ToolError(message: error.localizedDescription)
+        }
+        guard !planned.ops.isEmpty else {
+            let kept = planned.outcome.kept.map { "\"\($0.name)\": \($0.reason)" }
+            throw ToolError(
+                message: "relay_captions found no caption track it can re-lay: "
+                    + (kept.isEmpty
+                        ? "there is no track named Captions holding only text clips"
+                        : kept.joined(separator: "; ")))
+        }
+        return try editResult(
+            document, CaptionRelayout.actionName, planned.ops,
+            CaptionRelayout.answerFields(planned.outcome))
     }
 }

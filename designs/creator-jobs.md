@@ -10024,12 +10024,109 @@ arguments; `spec_index_proof.py` 267/267 on the merged tree; `make gate` on I: `
 - **Manual checks:** **JOB-34** — re-laid captions and graphics look intended on 9:16 and 1:1.
   **JOB-35** — the vertical trial (VR-38): vertical versions of T1 and T2 watched on a phone; the
   verdict is VR-38.
+- **Split (recorded before code, 2026-11-03).** VR4 is more than one pipeline, so it runs as two
+  in lane C, as VR3 did. **VR4a** (this lane's pipeline now): the toll (`CaptionLayout.swift`'s
+  `// MARK: - Words into cues` into `CaptionCues.swift`, a pure move gated alone), VR-40 (word
+  caption pages re-paged from their own words, and Make Vertical's step 6 for captions), VR-41
+  (text presets by the short side) and VR-45 (File ▸ Re-lay Captions for This Canvas and
+  `relay_captions`), with VR-46 its proof (`vr4_proof.py` rows R1–R10 and Z0, nine mutants),
+  JOB-34's captions half, settled in `designs/spec/11-decisions/creator-jobs-11.md` before the
+  code. **VR4b** (the next, after VR4a): VR-42 (a graphic the old canvas's size resized), VR-43
+  (the six templates by `Math.min(ctx.width, ctx.height)`), VR-44 (old template copies rewritten
+  in a vertical copy), the graphic counts in `make_vertical_version`'s answer, proof rows 7–9 of
+  the draft with its three graphics mutants, `graphics.md`, JOB-34's graphics half and JOB-35.
 - **Depends on:** VR3. **Lane** C.
 - **Questions for the owner:** (1) Also offer "Re-lay Captions for This Canvas" on its own?
   *Recommended: yes* (the same code; VR-45 designs it, and a no removes the item and the tool). (2)
   Re-page from the pages, or regenerate from the cached transcript? *Recommended: from the pages*
   (keeps corrections). (3) Update a project's old template copies in a vertical copy, or only list
   them? *Recommended: update* (VR-44).
+
+#### VR4's record (2026-11-03)
+
+**Landed in the lane: VR4a, the captions half (spec §11 VR-40, VR-41, VR-45, VR-46); VR4b, the
+graphics half, is still to build.** Lane C, base `8d264e99` (I's HEAD, VR3b). The lane's three
+commits: the toll alone (`CaptionLayout.swift`'s `// MARK: - Words into cues` into
+`CaptionCues.swift`, 162 lines moved line-identical, `CaptionLayout.swift` 581 → 419;
+`make typecheck` 0 errors, the 4 baseline warnings); the decisions alone (VR-40, VR-41, VR-45,
+VR-46 appended to `creator-jobs-11.md` with their index rows, the amendments of VR-34, VR-35,
+VR-36 and W-7, the Split paragraph above); then the code, the instruments and the documents. The
+owner's answers: Re-lay Captions for This Canvas is offered on its own (VR-45), and pages are
+re-paged from the pages (VR-40). No core, FFI, header, op, `Kind` or format change (43 stands,
+`OP_COUNT` 70); the product tool count goes 124 → 125 (`relay_captions`); nothing keyed. New
+files: `CaptionCues.swift` 164 lines, `CaptionRelayout.swift` 246,
+`EditorViewController+RelayCaptions.swift` 63; `TextPane.swift` 569, `CaptionLayout.swift` 449,
+`VerticalVersion+Plan.swift` 356; the frozen `EditorViewController.swift` took its one
+validator line.
+
+- **The re-page.** `CaptionPages.repage` is `build`'s pager over `normalize` with lead 0;
+  `build` is the same pager handed `lead(for: engine)` (`word_captions_probe.py` P8 and P9
+  unchanged). `CaptionRelayout`: `survey` (the caption tracks, kept with the first of five
+  reasons), `recognise` (font and `word_style` over each word style's live looks), `words(of:)`
+  (timeline ticks, only words starting inside the clip), `relay` (per clip, `place` with
+  `replacing`, tried op by op on a scratch trial, then `move_track` and the flags), `plan`,
+  `answerFields`, `keptLine`, `noticeText`.
+- **Presets by the short side.** `TextPreset.size(on:)`, `position(on:)`, `patches(on:)` and the
+  Caption row's `tallYFraction` 0.25; `place`'s Subtitles path, `TextPane.apply` and the
+  sheet's preview call them; `Plan.overTwoLines` and its report line.
+- **Make Vertical.** `VerticalSettings.captions` (default true), step (6) through `relay` with
+  the `keep` fallback for a track the re-lay keeps, `Plan.captions`, the summary's lines,
+  `captions` in `make_vertical_version`'s arguments and answer.
+- **Re-lay Captions.** File ▸ Re-lay Captions for This Canvas after Export Captions…, its
+  notice and validator; `relay_captions` on main in `AgentServer+VerticalVersion.swift`, its row
+  in `AgentCatalog+Framing.swift` after `make_vertical_version`'s; `UIMenuTable` `.plain`; the
+  inventory's selector row (verdict `none`) and the notice's site row; the assistant's search
+  topics gain it under captions.
+
+**Deviations from the spec.** (1) R10's filler is one-frame SOUND clips of a descriptor-only
+media, not text clips: a clip with a picture is tried once per clip by step (3) on a 4096-clip
+handle. (2) With no caption track at all, `relay_captions`' refusal ends "there is no track
+named Captions holding only text clips" (the spec's sentence names kept tracks, and there are
+none). (3) In the `keep` fallback the `backdrop` is the Backgrounds track only when step (5)
+kept it: the core throws for a track that is gone. (4) R8 checks the notice names "Captions 6"
+and the untimed "Captions 7": `snapshot_ui`'s layout dump keeps a label's first 200 characters,
+which cut the third kept track's line. (5) `AssistantPrompt.swift`'s captions topic gains
+`relay_captions` (F4 of `assistant_prompt_proof.py` requires every tool in a topic; the first
+gate failed there). (6) The app mutants edit the tree's `app/Sources`, build Debug, run and put
+the file back with a second build; the probe mutants edit a copy.
+
+**The runs** (lane C's worktree; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings.
+- `vr4_proof.py --only R1,R6,R10` 3/3; `word_captions_probe.py` P0–P12 all ok (its fixture
+  built first by `words_spike/fixtures.py`, `say` only); `word_captions_chrome.py` 50/50;
+  `capture_spike/inventory.py --check` 5/5; `spec_index_proof.py` 273/273;
+  `v2_menu.py --only H` 5/5 (128 rows against the inventory's 128); `op_argument_proof.py`
+  203/203; `phase9_proof.py` 253/253; `vr4_proof.py` 11/11 (R2–R9 after two instrument fixes:
+  the fixture's `set_canvas` on a canvas already 1920 × 1080, and R8's measure scoped to the
+  re-laid tracks); `vr3_proof.py` 14/14.
+- All nine mutants CAUGHT, each by its named row: `old-width` (R1), `clip-time` (R2),
+  `lead-applied` (R2), `subtitles-fallback` (R4), `apply-height` (R6), `replace-unrecognised`
+  (R5 and R8), `front-track` (R9), `all-words` (R2), `failed-unkept` (R10). `old-width` first
+  SURVIVED: its edit made the canvas 1920 × 1920, which scales the font with the budget; the
+  edit now re-pages at 1920 × 1080 and R1 catches it.
+- `make gate`: first `gate: FAIL test` (F4, the topic above), then `gate: PASS 316s` (names 1 s,
+  typecheck 8 s, fmt and lint skipped, test 123 s, app 184 s).
+- Release: `vr4_proof.py` 11/11, `vr3_proof.py` 14/14 (each launch's Z1 printed nothing),
+  `recording_probe.py --only catalog` 31/31 (125 tools, 70 core ops).
+
+**The review** passed with two nits, neither changed. (1) A page whose correction changed its
+word count ("gonna" → "going to") has no usable timings and is kept as "it holds a page with no
+word timings", though it has timings; the guide's Re-lay section names the case ("a page whose
+word count you changed"). (2) The app mutants restore the tree's `app/Sources` only in a
+`finally`, so a killed mutant run leaves a source edited; deviation (6) records it.
+
+**Integration** (2026-11-03): nothing had landed since the base, and the cherry-pick of
+`d6358ce7`, `5eb5dfda` and `9cd8c9ff` was clean. The root `CLAUDE.md` now counts one hundred and
+twenty-five product tools; `app/CLAUDE.md`'s `CaptionLayout.swift` entry names
+`CaptionCues.swift`, the Subtitles path through `TextPreset` and `overTwoLines`, the
+`CaptionPages.swift` entry `repage`, the new `CaptionRelayout.swift` ·
+`EditorViewController+RelayCaptions.swift` entry its frozen-file validator line, the `TextPane`
+paragraph `TextPreset`'s three functions, and the `VerticalVersion` entry step (6) and
+`captions`. `make gate` on I: `gate: PASS 349s` (names 1 s, typecheck 8 s, test 168 s, app
+172 s; fmt and lint reused).
+
+**Owed.** VR4b (see the Split above); JOB-34's captions half (a person at the machine, a phone).
+Nothing filed.
 
 ### FC7b — Rank: the estimate, the ranked list, its cost
 

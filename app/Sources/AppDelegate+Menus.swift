@@ -179,6 +179,12 @@ extension AppDelegate {
             item("Generate Captions…", #selector(EditorViewController.generateCaptions(_:))))
         menu.addItem(
             item("Export Captions…", #selector(EditorViewController.exportCaptions(_:))))
+        // Road map creator-jobs VR4a (spec §11 VR-45): the word caption tracks re-paged on the
+        // canvas being edited, one undo step; no key, the caption items' reason above.
+        menu.addItem(
+            item(
+                "Re-lay Captions for This Canvas",
+                #selector(EditorViewController.relayCaptions(_:))))
         menu.addItem(
             item("Consolidate Media…", #selector(EditorViewController.consolidateMedia(_:))))
         // Road map 10's G5b: a face or a picture into the package's

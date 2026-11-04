@@ -258,7 +258,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`, spec §11 CJ-13). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all one hundred and twenty-four product tools (and the dev tools,
+  stranger by name, for all one hundred and twenty-five product tools (and the dev tools,
   road map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.

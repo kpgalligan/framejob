@@ -120,6 +120,9 @@ enum CaptionLayout {
         /// it adds its own — the restyle step (road map 8 §5e). Empty
         /// unless the caller asked for it.
         let replaced: [UInt32]
+        /// Subtitles cues that measure over two lines on a canvas taller than wide (spec §11
+        /// VR-41); 0 on every other canvas and for every word style.
+        let overTwoLines: Int
 
         /// The human report: what was adjusted and what was skipped. Empty
         /// when everything landed cleanly, which is the signal to say nothing
@@ -139,6 +142,11 @@ enum CaptionLayout {
                 if problems.count > 8 {
                     lines.append("    • …and \(problems.count - 8) more.")
                 }
+            }
+            if overTwoLines > 0 {
+                lines.append(
+                    "\(overTwoLines) caption\(overTwoLines == 1 ? " wraps" : "s wrap") to more "
+                        + "than two lines on this canvas.")
             }
             return lines.joined(separator: "\n")
         }
@@ -189,7 +197,8 @@ enum CaptionLayout {
             ?? TextPreset(
                 name: "Caption", font: "SourceSans3-Regular", sizeFraction: 0.035, xFraction: 0,
                 yFraction: 0.38, align: "center",
-                backdrop: BackdropProps(color: [0, 0, 0, 0.6], padding: 12, radius: 8))
+                backdrop: BackdropProps(color: [0, 0, 0, 0.6], padding: 12, radius: 8),
+                tallYFraction: 0.25)
     }
 
     /// How much of the canvas width a caption may fill before it wraps.
@@ -309,6 +318,8 @@ enum CaptionLayout {
 
         let preset = captionPreset
         let height = Double(canvas.height)
+        let size = CGSize(width: canvas.width, height: canvas.height)
+        var overTwoLines = 0
         if style.isWordStyle {
             let base = style.size(for: CGSize(width: canvas.width, height: canvas.height))
             for cue in kept {
@@ -324,9 +335,13 @@ enum CaptionLayout {
             }
         } else {
             var base = TextPatch(
-                font: preset.font, size: (height * preset.sizeFraction).rounded(),
+                font: preset.font, size: preset.size(on: size),
                 align: preset.align, valign: "middle", backdrop: .some(preset.backdrop),
                 width: .some(Double(canvas.width) * wrapFraction))
+            if canvas.height > canvas.width {
+                overTwoLines = kept.filter { measuresOverTwoLines($0.text, preset, on: size) }
+                    .count
+            }
             let colors = CaptionStyle.speakerColors(kept.map(\.speaker))
             for (cue, color) in zip(kept, colors) {
                 base.content = cue.text
@@ -354,18 +369,33 @@ enum CaptionLayout {
         let before = Set(snapshot.clips.map { $0.id })
         let created = probed.snapshot.clips.map { $0.id }.filter { !before.contains($0) }
         guard !created.isEmpty else { throw LayoutError.refused }
+        let at = preset.position(on: size)
         ops.append(
             .setVideo(
                 clips: created,
                 patch: style.isWordStyle
                     ? VideoPatch(x: 0, y: style.yFraction * height)
-                    : VideoPatch(
-                        x: preset.xFraction * Double(canvas.width), y: preset.yFraction * height,
-                        opacity: 1)))
+                    : VideoPatch(x: at.x, y: at.y, opacity: 1)))
 
         return Plan(
             ops: ops, clips: created.count, cues: kept.count, trimmed: trimmed,
-            problems: problems, trackName: track == nil ? name : nil, replaced: replacing)
+            problems: problems, trackName: track == nil ? name : nil, replaced: replacing,
+            overTwoLines: overTwoLines)
+    }
+
+    /// Whether a Subtitles cue, as `place` writes it on `canvas` (the Caption preset, its
+    /// wrap box), measures taller than the same props holding two lines (spec §11 VR-41).
+    static func measuresOverTwoLines(
+        _ content: String, _ preset: TextPreset, on canvas: CGSize
+    ) -> Bool {
+        func props(_ text: String) -> TextProps {
+            TextProps(
+                content: text, font: preset.font, size: preset.size(on: canvas),
+                align: preset.align, valign: "middle", backdrop: preset.backdrop,
+                width: Double(canvas.width) * wrapFraction)
+        }
+        return LayerRenderers.measuredSize(for: props(content)).height
+            > LayerRenderers.measuredSize(for: props("X\nX")).height
     }
 
     /// The tracks a restyle may replace (road map 8 §5e's three rules): a
@@ -417,165 +447,3 @@ enum CaptionLayout {
     }
 }
 
-// MARK: - Words into cues
-
-/// The five cue rules, and the ONLY place they live: at most two lines, at
-/// most 42 characters a line, at most six seconds a cue, at least a frame
-/// between cues, and never two speakers in one cue. Recognised words in,
-/// `CaptionLayout.Cue`s out.
-///
-/// **It is beside `CaptionLayout` and it is not part of it.** `CaptionImporter`
-/// must never reach this: a SubRip file supplies its own line breaks and its
-/// own cue lengths, and re-wrapping what somebody already wrote would change
-/// every caption file that imports correctly today and break the export's
-/// round trip. Only a producer that has to INVENT line breaks — the
-/// transcriber — calls it. It sits in this file rather than in
-/// `Transcriber.swift` because that file is already at the size where the
-/// engine is all it should hold, and because everything here is arithmetic
-/// over values with no `Speech` in it at all: hand it a word list with times
-/// and it is testable with no recogniser, no grant and no machine.
-///
-/// **The rules are the producer's, so the layout's trim pass never fires on a
-/// transcript.** The frame of gap is the point: `CaptionLayout.place` cuts an
-/// overlapping cue back to abut its successor, and a transcript that arrived
-/// needing that would be a transcript whose captions had been silently
-/// retimed. Snapping cannot undo it either — a whole frame subtracted from a
-/// time survives being rounded to the frame grid — so a cue built here is a
-/// cue that lands.
-enum CaptionCues {
-
-    /// One recognised word, already mapped to PROJECT time by whoever
-    /// recognised it. `end` is one tick past its last, like every other span
-    /// in this app.
-    struct Word: Equatable {
-        let text: String
-        let start: Ticks
-        let end: Ticks
-        /// Who said it, when the producer knows — AssemblyAI's `speaker`
-        /// with `speaker_labels` on (road map 6 §5f). Nil everywhere else,
-        /// which is what keeps every existing caller and the harness's
-        /// `cues` mode byte-identical to what they were: the fifth rule
-        /// compares nil to nil and never fires.
-        let speaker: String?
-
-        init(text: String, start: Ticks, end: Ticks, speaker: String? = nil) {
-            self.text = text
-            self.start = start
-            self.end = max(start, end)
-            self.speaker = speaker
-        }
-    }
-
-    /// Two lines is what a viewer reads without looking away from the
-    /// picture, and 42 characters is the line length every broadcast caption
-    /// guideline lands on; six seconds is about as long as one screenful of
-    /// words stays useful. The fifth rule has no constant: a speaker change
-    /// is a change, and there is no threshold to tune.
-    static let maxLines = 2
-    static let maxCharacters = 42
-    static let maxLength: Ticks = ReelTime.ticks(seconds: 6)
-
-    /// Words into cues. `frame` is the canvas frame duration — the gap.
-    ///
-    /// A word too long for a line of its own is left over-long rather than
-    /// broken: a hyphen inserted in the middle of a word is a worse caption
-    /// than a wide one, and the clip carries `text.width` anyway, so CoreText
-    /// soft-wraps it on the canvas. For the same reason the hard `"\n"` this
-    /// puts between the two lines is advisory: it is a break CoreText will
-    /// honour, inside a box that may add more.
-    ///
-    /// Each cue carries its words' speaker with `media`, the transcript's
-    /// own, so `place` can colour it (spec §11 R6-22).
-    static func build(
-        from words: [Word], frame: Ticks, clip: UInt32? = nil, media: UInt32? = nil
-    ) -> [CaptionLayout.Cue] {
-        var raw: [(start: Ticks, end: Ticks, lines: [String], speaker: String?)] = []
-        var lines: [String] = []
-        var start: Ticks = 0
-        var end: Ticks = 0
-        var speaker: String?
-
-        func flush() {
-            guard !lines.isEmpty else { return }
-            raw.append((start, end, lines, speaker))
-            lines = []
-        }
-
-        for word in words.sorted(by: { $0.start < $1.start }) {
-            let text = word.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            guard !lines.isEmpty else {
-                lines = [text]
-                start = word.start
-                end = word.end
-                speaker = word.speaker
-                continue
-            }
-            // The fifth rule (road map 6 §5f): a word whose speaker differs
-            // from the open cue's flushes it, so no cue ever carries two
-            // voices. It is tested BEFORE placement rather than inside the
-            // placement test, because a speaker change that happened to fit
-            // the line and the six seconds would otherwise be placed and the
-            // rule would never fire. One break, never an empty cue: the flush
-            // is followed by opening a new cue on this word, exactly as the
-            // length and the line rules do.
-            if word.speaker != speaker {
-                flush()
-                lines = [text]
-                start = word.start
-                end = word.end
-                speaker = word.speaker
-                continue
-            }
-            var placed = false
-            // The six-second rule is tested against the word's END, because a
-            // cue is on screen until its last word has been said.
-            if word.end - start <= maxLength {
-                let last = lines[lines.count - 1]
-                if last.count + 1 + text.count <= maxCharacters {
-                    lines[lines.count - 1] = last + " " + text
-                    placed = true
-                } else if lines.count < maxLines {
-                    lines.append(text)
-                    placed = true
-                }
-            }
-            if placed {
-                end = max(end, word.end)
-            } else {
-                flush()
-                lines = [text]
-                start = word.start
-                end = word.end
-                speaker = word.speaker
-            }
-        }
-        flush()
-
-        // The gap. A cue ends a frame before the next one starts, or where its
-        // last word ended, whichever is earlier. A pair of cues that starts
-        // less than two frames apart cannot have both — recognised words do
-        // not do that, but if one ever did, the cue is left short and
-        // `CaptionLayout.place` reports and drops it by the rule it already
-        // has, rather than being silently dropped here.
-        for index in raw.indices.dropLast() {
-            raw[index].end = min(raw[index].end, raw[index + 1].start - frame)
-        }
-
-        return raw.map { entry in
-            CaptionLayout.Cue(
-                start: entry.start, end: entry.end, text: entry.lines.joined(separator: "\n"),
-                tag: tag(at: entry.start, clip: clip),
-                speaker: entry.speaker.map { CaptionLayout.Speaker(media: media, label: $0) })
-        }
-    }
-
-    /// How a cue names itself in a problem message. A transcript has no line
-    /// numbers, so it says where in the timeline it came from and, when the
-    /// producer knew, which clip.
-    private static func tag(at start: Ticks, clip: UInt32?) -> String {
-        let when = String(format: "%.1f s", ReelTime.seconds(start))
-        guard let clip = clip else { return "caption at \(when)" }
-        return "clip \(clip) at \(when)"
-    }
-}

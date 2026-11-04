@@ -139,6 +139,13 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   follows its subject (the framing makes a new one where it is needed), and
   otherwise re-filled to cover the new canvas; a **background** plate
   (**Clip ▸ Add Background**) is re-filled too.
+- **Word captions are re-paged** for the narrow frame from the words their
+  pages hold, every correction kept, as **File ▸ Re-lay Captions for This
+  Canvas** does (see [Captions](captions.md#re-lay-captions-for-a-new-canvas)).
+  A caption track it cannot re-lay — Subtitles, a page with no word timings,
+  a style Frame Job does not make, or pages that would not fit — is kept as
+  placed, and the summary names it and why: "Caption track "Captions 2" is
+  kept as placed: it holds a page with no word timings."
 
 When the movies have not been analysed, the sheet says it will find the faces,
 people and shot changes first: **Make** then shows the Analyzing sheet while

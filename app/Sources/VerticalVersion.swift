@@ -43,6 +43,9 @@ struct VerticalSettings: Equatable {
     /// Times the scale that fills the canvas, 1–4 (the core refuses outside).
     var zoom: Double
     var whereEmpty: FramingWhereEmpty
+    /// Whether step (6) re-pages the word caption tracks (spec §11 VR-40 (f)); the sheet
+    /// passes the default, `make_vertical_version` its `captions`.
+    var captions = true
 }
 
 enum VerticalVersion {

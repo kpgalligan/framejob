@@ -225,6 +225,7 @@ APP_STATE_TOOLS = {
     "switch_angle",
     "switch_by_speaker",
     "make_vertical_version",
+    "relay_captions",
 }
 
 # The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence

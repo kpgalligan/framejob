@@ -448,21 +448,18 @@ final class TextPane: InspectorPaneView {
 
     private func apply(_ preset: TextPreset) {
         let canvas = binding.canvas
-        let height = Double(canvas.height)
-        let text = TextPatch(
-            font: preset.font, size: (height * preset.sizeFraction).rounded(),
-            align: preset.align, valign: "middle",
-            backdrop: .some(preset.backdrop))
-        let video = VideoPatch(
-            x: preset.xFraction * Double(canvas.width), y: preset.yFraction * height, opacity: 1)
-        binding.apply(preset.name, binding.ops(text: text) + binding.ops(video: video))
+        let patches = preset.patches(on: CGSize(width: canvas.width, height: canvas.height))
+        binding.apply(
+            preset.name, binding.ops(text: patches.text) + binding.ops(video: patches.video))
     }
 }
 
 // MARK: - Presets
 
 /// One text preset (§4.3). Sizes and positions are FRACTIONS of the canvas so
-/// a preset means the same thing on a 4K canvas as on a vertical one.
+/// a preset means the same thing on a 4K canvas as on a vertical one: a size
+/// of the canvas's SHORT side, a position of its width and height (spec §11
+/// VR-41), so a tall canvas gets the line height a wide one has.
 struct TextPreset {
     let name: String
     let font: String
@@ -471,6 +468,33 @@ struct TextPreset {
     let yFraction: Double
     let align: String
     let backdrop: BackdropProps?
+    /// Of H, on a canvas taller than wide, in place of `yFraction` (the Caption
+    /// row's 0.25, VR-41); nil keeps `yFraction` on every canvas.
+    var tallYFraction: Double? = nil
+
+    /// The font size on `canvas`: `sizeFraction` of `min(W, H)`. On a canvas at
+    /// least as wide as tall that is H, so the old `H × sizeFraction` is kept to the bit.
+    func size(on canvas: CGSize) -> Double {
+        (sizeFraction * Double(min(canvas.width, canvas.height))).rounded()
+    }
+
+    /// Where the box's centre sits on `canvas`.
+    func position(on canvas: CGSize) -> (x: Double, y: Double) {
+        let y = canvas.height > canvas.width ? tallYFraction ?? yFraction : yFraction
+        return (xFraction * Double(canvas.width), y * Double(canvas.height))
+    }
+
+    /// Text ▸ Presets' two patches: the face, size, alignment and backdrop, and where the
+    /// box sits at full opacity.
+    func patches(on canvas: CGSize) -> (text: TextPatch, video: VideoPatch) {
+        let at = position(on: canvas)
+        return (
+            TextPatch(
+                font: font, size: size(on: canvas), align: align, valign: "middle",
+                backdrop: .some(backdrop)),
+            VideoPatch(x: at.x, y: at.y, opacity: 1)
+        )
+    }
 
     static let all: [TextPreset] = [
         TextPreset(
@@ -486,7 +510,8 @@ struct TextPreset {
         TextPreset(
             name: "Caption", font: "SourceSans3-Regular", sizeFraction: 0.035, xFraction: 0,
             yFraction: 0.38, align: "center",
-            backdrop: BackdropProps(color: [0, 0, 0, 0.6], padding: 12, radius: 8)),
+            backdrop: BackdropProps(color: [0, 0, 0, 0.6], padding: 12, radius: 8),
+            tallYFraction: 0.25),
     ]
 }
 

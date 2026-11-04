@@ -26,7 +26,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 144 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
 | [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 364 | The Clip tab's sections: every video section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 244 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
-| [`04.3d-inspector-clip-sections-audio-text-shape.md`](04.3d-inspector-clip-sections-audio-text-shape.md) | 246 | The Clip tab's audio, text and shape sections (continues §4.3b). |
+| [`04.3d-inspector-clip-sections-audio-text-shape.md`](04.3d-inspector-clip-sections-audio-text-shape.md) | 247 | The Clip tab's audio, text and shape sections (continues §4.3b). |
 | [`04.3e-inspector-transcript-tab.md`](04.3e-inspector-transcript-tab.md) | 152 | The inspector's Transcript tab (road map "creator-jobs" TX2a, TX2b, TX3a, TX1b, TX3b): the timeline's words in paragraphs, the bar (Words from, Language, the status with Stop or Read, the notes), the highlight that follows the playhead, a click to seek, the keys, selecting words as the in/out range and deleting them as one "Delete Words" (where a cut falls, the refusals), pause tokens shortened as one "Delete Pause", the reading on this Mac and the rebuilds. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 281 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
@@ -62,12 +62,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9f-agent-transcript.md`](07.9f-agent-transcript.md) | 105 | The timeline transcript, `get_timeline_transcript`: what is read (the plan's audio segments, nested ones with `path` and `origin`), on-device starts moved to their sound (TX1b), the answer (words with clip, track, editability, identity and the tab's `cut_start`/`cut_end`; `pauses` with their cuts; `media`, `no_words`, `notes`), the window and `tracks`, paging at 2,000 words, and the whole-file fill (§11 TX-10…TX-18, TX-30, TX-33, TX-34). |
 | [`07.9g-agent-behind-subject.md`](07.9g-agent-behind-subject.md) | 38 | Text Behind Subject's tool, `text_behind_subject`: the planner it runs (the pick, the new track above the mattes, the title, the cutout that keeps the background), its answer and its refusals (§11 CO-53, CO-54). |
 | [`07.9h-agent-switch.md`](07.9h-agent-switch.md) | 118 | `copy_pieces`'s tool and Switch Angle's, `switch_angle`: the empty-list refusal, covering, the re-pick's sequence tried one op at a time, the held edge, the answer and the refusals (§11 SW-11…SW-15); `switch_by_speaker`: its arguments, ranges and defaults, errors, refusals, the ops and the answer (§11 SW-23, SW-26); its faces mode, off-main wait and `mode`/`note` (§11 SW-80…SW-86). |
-| [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 81 | `make_vertical_version`: its arguments, the size, the step's classes and order, the treatments and reasons, the copy, the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37). |
+| [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 114 | `make_vertical_version`: its arguments, the size, the step's classes and order, the caption step (6), the treatments and reasons, the copy, the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 155 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 320 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 325 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 22678 in 45 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 22851 in 45 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

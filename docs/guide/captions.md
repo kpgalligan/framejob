@@ -157,7 +157,7 @@ The **Subtitles** style makes classic two-line cues, built by these rules:
 
 A word too long for a line is left whole rather than hyphenated, and wraps inside the caption box.
 
-Each cue uses the **Caption** text preset: Source Sans 3 Regular at 3.5% of the canvas height, centred, on a 60% black backdrop, wrapping at 80% of the canvas width, with its box centred 38% of the frame height below the middle.
+Each cue uses the **Caption** text preset: Source Sans 3 Regular at 3.5% of the canvas's shorter side, centred, on a 60% black backdrop, wrapping at 80% of the canvas width, with its box centred 38% of the frame height below the middle. On a canvas taller than wide (9:16, 4:5) the box sits higher, a quarter of the frame height below the middle, and on 1080 × 1920 the text is 38 px and wraps at 864 px. On a wide or square canvas nothing changed. When cues on a tall canvas wrap to more than two lines, the report after importing or generating says so: "N captions wrap to more than two lines on this canvas."
 
 ## Caption styles
 
@@ -165,7 +165,7 @@ The five word caption styles make the large, one-row captions used in shorts and
 
 | Style | Typeface | Case | How the spoken word shows | Position |
 |---|---|---|---|---|
-| **Subtitles** | Source Sans 3 Regular | As written | — (two-line cues, above) | 38% of the frame height below centre |
+| **Subtitles** | Source Sans 3 Regular | As written | — (two-line cues, above) | 38% of the frame height below centre; a quarter on a tall canvas |
 | **Highlight** | Montserrat Black, black outline | UPPERCASE | Turns yellow and pops to 112% | A quarter of the frame height below centre |
 | **Pill** | Montserrat ExtraBold | UPPERCASE | Sits on a violet pill | A quarter of the frame height below centre |
 | **Karaoke** | Montserrat ExtraBold | As written | Words turn yellow as they are said and stay yellow; words still to come are dimmed white. Up to two lines | 28% of the frame height below centre |
@@ -215,6 +215,20 @@ A style is fixed when the captions are generated. To change it, generate again w
 The old tracks are removed and the new one takes their place at the front, all in one undo step. With AssemblyAI the cached transcript is reused, so nothing is uploaded and nothing is billed.
 
 **Replace** is live only for a word style, and only when there is a track it may replace. That means a track named **Captions** or **Captions N** that holds only text clips, each of which overlaps a clip being transcribed. Tracks outside the run's scope are left alone.
+
+## Re-lay captions for a new canvas
+
+Word captions are paged for the canvas they were made on. After you change the canvas size (on the Document tab, or an agent's `set_canvas`), choose **File ▸ Re-lay Captions for This Canvas** to page them again for the new width.
+
+- Every track named **Captions** or **Captions N** that holds only text clips is looked at. A track whose pages are all in one of the five word styles Frame Job makes, with its looks, is re-paged from the words its pages hold. Every correction you typed is kept, and nothing is transcribed again.
+- Each page is re-paged inside its own clip: a page you split, trimmed or moved keeps its words where they are, and pages are never merged across clips. Words cut off by a trim stay cut off.
+- The new pages go on a track with the same name, in the same place in the track stack, hidden and locked if the old one was.
+- A track is **kept as placed** when it is a matte track, holds a page with no word timings (Subtitles, or a page whose word count you changed), holds a page none of whose words starts inside it, holds a page in a style Frame Job does not make, has pages in more than one style, or the new pages would not fit in the project. A sheet after the edit names each kept track and why. Nothing appears when every track was re-laid.
+- It is one undo step, **Re-lay Captions**.
+
+The item is greyed out with no caption track it can re-lay, while a sheet is open, and while a recording runs. Inside a nest it works on the nest's tracks at the nest's size. **File ▸ Make Vertical Version…** does the same for the vertical copy (see [Vertical versions](vertical-and-framing.md)).
+
+*Agents:* `relay_captions` does the same in the container `set_scope` has open. It answers the tracks re-laid (`relaid`: the new track, the track it replaced, its name, style and page count) and the tracks kept with their reasons (`kept`). With nothing it can re-lay it is refused, naming each kept track and its reason.
 
 ## Editing captions
 
@@ -277,6 +291,7 @@ No MCP tool can read or change the key or the region. Only a person sets them, h
 - Speaker colours apply only to the Subtitles style.
 - Changing the number of words on a word caption page drops its word timing. To time it again, generate again.
 - A style cannot be switched on a placed track. Restyle by generating again with Replace.
+- Re-lay Captions re-pages only word caption tracks in a style Frame Job makes. A Subtitles track keeps its cues as placed; generate again on the new canvas to re-wrap it.
 
 ## For agents
 
@@ -285,6 +300,7 @@ No MCP tool can read or change the key or the region. Only a person sets them, h
 | `import_captions` | File ▸ Import Captions… |
 | `transcribe` | File ▸ Generate Captions… |
 | `export_captions` | File ▸ Export Captions… |
+| `relay_captions` | File ▸ Re-lay Captions for This Canvas |
 | `get_transcript` | Reads one clip's words with their timeline times, from the cached transcript or this Mac's recogniser. It never uses the network and edits nothing. Used for cutting by transcript ([Remove Silences and Remove Filler Words](cleanup-tools.md)). |
 
 In the built-in [Assistant](assistant.md), `transcribe` with `engine: "assemblyai"` is withheld, because audio leaves the Mac only when a person chooses that in the sheet. `export_captions` asks before it writes a file. The full reference is [MCP](mcp.md).

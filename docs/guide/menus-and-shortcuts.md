@@ -58,6 +58,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Import Captions… | | Reads a caption file onto a caption track ([Captions](captions.md)) |
 | Generate Captions… | | Makes captions from speech |
 | Export Captions… | | Writes a caption track out as a file |
+| Re-lay Captions for This Canvas | | Re-pages the word caption tracks for the current canvas, every correction kept ([Captions](captions.md#re-lay-captions-for-a-new-canvas)) |
 | Consolidate Media… | | Copies the project's media into the project package |
 | Add Font to Graphics… | | Adds a font that graphics can use ([Graphics](graphics.md)) |
 | Add Image to Graphics… | | Adds a picture that graphics can use |
@@ -68,7 +69,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Save Frame… | ⌥⌘E | Saves the frame under the playhead as a PNG, JPEG or HEIC still |
 
 *Agents:* `new_project`, `open_project`, `save_project`, `close_project`,
-`import_media`, `import_captions`, `transcribe`, `export_captions`,
+`import_media`, `import_captions`, `transcribe`, `export_captions`, `relay_captions`,
 `consolidate_media`, `import_graphic_font`, `import_graphic_asset`,
 `rename_graphic`, `delete_graphic`, `restore_graphic`, `export`,
 `render_frame` (Save Frame…'s writer) and `record_screen`.
@@ -80,6 +81,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Make Vertical Version… | The project has a clip, no nest is open and no recording is running |
 | Generate Captions… | Some clip plays sound from a media file forwards, with its audio on |
 | Export Captions… | The project has a caption track: a track whose clips are all text clips |
+| Re-lay Captions for This Canvas | The timeline (or the open nest) has a word caption track Frame Job can re-lay, no sheet is open and no recording is running |
 | Consolidate Media… | The project has media |
 | Rename Graphic… | The project has graphics and no nest is open |
 | Delete Graphic… | The project has graphics |

@@ -35,6 +35,7 @@ extension UIMenu {
         "importCaptions:": .sheet,
         "generateCaptions:": .sheet,
         "exportCaptions:": .sheet,
+        "relayCaptions:": .plain,
         "consolidateMedia:": .sheet,
         "addGraphicFont:": .sheet,
         "addGraphicImage:": .sheet,

@@ -3,7 +3,8 @@ import Foundation
 /// Make Vertical's step (spec §11 VR-34) and its summary (VR-35): `opening` is the canvas and
 /// the "Backgrounds" track, `plan` the whole step on one `SwitchAngle.Trial`, each op TRIED
 /// on the trial's handle and only its answer deciding the clip's entry. The classes are
-/// `VerticalVersion.swift`'s. Throws only the core's invalid input. Names no `rc_*`.
+/// `VerticalVersion.swift`'s; step (6), the word caption tracks re-paged on the new canvas, is
+/// `CaptionRelayout`'s (VR-40 (f)). Throws only the core's invalid input. Names no `rc_*`.
 extension VerticalVersion {
 
     /// What the step did to one clip, and why when it did less than asked.
@@ -26,6 +27,8 @@ extension VerticalVersion {
         let moreTracks: Int
         let reEased: Int
         let carried: Int
+        /// Step (6)'s caption tracks, re-laid and kept; nil with `captions` false.
+        let captions: CaptionRelayout.Outcome?
     }
 
     enum Answer {
@@ -76,6 +79,9 @@ extension VerticalVersion {
             backgrounds = track
         }
         let roles = classify(project)
+        // Step (6)'s survey is of the OLD snapshot, so step (3) leaves its tracks alone.
+        let survey = settings.captions ? CaptionRelayout.survey(old) : nil
+        let relaid = Set(survey?.recognised.map(\.track) ?? [])
         var entries: [UInt32: Entry] = [:]
         var framed: Set<UInt32> = []
         var moreTracks = 0
@@ -84,7 +90,7 @@ extension VerticalVersion {
 
         // (3) Each picture, nest and other clip, from the old canvas.
         for (id, role) in roles {
-            guard let clip = old.clip(id) else { continue }
+            guard let clip = old.clip(id), !relaid.contains(clip.track) else { continue }
             var follow = FramingFollow.keep
             var note: String?
             switch role {
@@ -201,11 +207,34 @@ extension VerticalVersion {
         if !kept, let why = try trial.require(.removeTrack(track: backgrounds)) {
             return .refused("Make Vertical was refused at remove_track: \(why)")
         }
+
+        // (6) The word caption tracks re-paged on the new canvas; a track the re-lay keeps
+        // takes step (3)'s `keep`, so no clip is left without a reframe or an entry.
+        var captions: CaptionRelayout.Outcome?
+        if let survey {
+            var outcome = try CaptionRelayout.relay(survey.recognised, on: &trial)
+            let unlaid = Set(outcome.kept.map(\.track))
+            for (id, _) in roles {
+                guard let clip = old.clip(id), unlaid.contains(clip.track) else { continue }
+                let op = ReelOp.reframeClip(
+                    clip: id, follow: .keep, zoom: settings.zoom,
+                    fromWidth: UInt32(old.canvas.width), fromHeight: UInt32(old.canvas.height),
+                    backdrop: kept ? backgrounds : nil)
+                if let why = try trial.require(op) {
+                    return .refused(
+                        "Make Vertical was refused at reframe_clip for clip \(id): \(why)")
+                }
+                entries[id] = Entry(clip: id, treatment: .kept, reason: nil)
+            }
+            outcome.kept = survey.kept + outcome.kept
+            captions = outcome
+        }
         return .plan(
             Plan(
                 ops: trial.ops, project: trial.project, width: size.width, height: size.height,
                 entries: entries.keys.sorted().compactMap { entries[$0] }, backgrounds: kept,
-                moreTracks: moreTracks, reEased: reEased, carried: carried))
+                moreTracks: moreTracks, reEased: reEased, carried: carried,
+                captions: captions))
     }
 
     /// A media picture framed with a following kind or `center`: whole only when the op added
@@ -274,6 +303,9 @@ extension VerticalVersion {
             text += " \(counted(plan.carried, "action")) "
                 + (plan.carried == 1 ? "carries" : "carry") + " a framing move."
         }
+        if let relaid = plan.captions?.relaid.count, relaid > 0 {
+            text += " Re-lays \(counted(relaid, "caption track")) for the new canvas."
+        }
         var lines = [text]
         for entry in plan.entries {
             guard let reason = entry.reason else { continue }
@@ -283,6 +315,7 @@ extension VerticalVersion {
             default: lines.append("Clip \(entry.clip) is followed, but \(why).")
             }
         }
+        lines += (plan.captions?.kept ?? []).map(CaptionRelayout.keptLine)
         return lines.joined(separator: "\n")
     }
 
@@ -302,7 +335,7 @@ extension VerticalVersion {
             if let reason = entry.reason { row["reason"] = reason }
             return row
         }
-        return [
+        var fields: [String: Any] = [
             "canvas": ["width": plan.width, "height": plan.height],
             "clips": clips,
             "backgrounds": plan.backgrounds,
@@ -311,6 +344,10 @@ extension VerticalVersion {
             "moves_carried": plan.carried,
             "summary": summary(plan),
         ]
+        if let captions = plan.captions {
+            fields["captions"] = CaptionRelayout.answerFields(captions)
+        }
+        return fields
     }
 
     private static func counted(_ n: Int, _ noun: String) -> String {

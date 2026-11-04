@@ -962,7 +962,8 @@ detail there.
   `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
   `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; its menu is the
   entry below). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
-  4:5, 1:1) and `size(from:)` (VR-32), `VerticalSettings`, `classify` (VR-33's first match per
+  4:5, 1:1) and `size(from:)` (VR-32), `VerticalSettings` (with `captions`, default true,
+  VR-45 (d)), `classify` (VR-33's first match per
   top-level clip with a picture, on the OLD snapshot: a "Blurred Background" with its partner
   in front, a shape or image plate, a picture covering one axis and centred or covering on the
   other, a nest by the same test, other), `mediaPictures`, `analysisTargets` (the media
@@ -973,12 +974,17 @@ detail there.
   answered as the refusal), `plan` (VR-34 on one `SwitchAngle.Trial`: `reframe_clip` per
   picture, nest and other clip from the old canvas, a refused op retried as `keep`, a refused
   `keep` stopping; whole only with a blurred copy added and a constant F; the backdrops removed
-  or re-filled and the plates re-filled; Backgrounds removed when empty; counts over
+  or re-filled and the plates re-filled; Backgrounds removed when empty; step (6): the OLD
+  snapshot's caption tracks surveyed first and skipped by step (3), `CaptionRelayout.relay`
+  after step (5), a track the re-lay keeps given step (3)'s `reframe_clip` keep and a `kept`
+  entry, `Plan.captions` (VR-40 (f)); counts over
   non-`keep` entries through `FollowSubject.counts(…, replace: false)`), `summary` (VR-35),
-  `pendingSummary` (VR-39 (d)), `answerFields`. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
+  `pendingSummary` (VR-39 (d)), `answerFields`, with `captions {relaid, kept}` when `captions`
+  is on. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
   source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
   unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
-  tool, off main (`creatorOffMainTools`): hop 1's refusals in order and a dry plan with no
+  tool, off main (`creatorOffMainTools`): hop 1's refusals in order, `captions` read with
+  `boolArg`, and a dry plan with no
   subjects, `FramingAnalysis.requests` on the source over the present media pictures,
   `waitForAnalysis`, the subjects read off main, the last hop's project check, then
   `editResult` in place or the copy, saved through `save(_:to:operation:)` with `path`; its
@@ -1929,7 +1935,13 @@ the key map behind it.
   `binding.ops(textContent:)` (`WordProps.swift`). On a word-styled page the
   Animation section's three rows are greyed with W-5's sentence, and a styled
   page left untimed carries the Content footnote; nothing in the inspector
-  writes `word_style` (W-10).
+  writes `word_style` (W-10). `TextPreset` (`TextPane.swift`) measures by the
+  short side (spec §11 VR-41): `size(on:)` is `sizeFraction × min(W, H)`
+  rounded, `position(on:)` `(xFraction × W, y × H)` with the Caption row's
+  `tallYFraction` 0.25 on a canvas taller than wide, and `patches(on:)` Text ▸
+  Presets' two patches; `CaptionLayout.place`'s Subtitles path, `TextPane.apply`
+  and the Generate Captions sheet's Subtitles preview call them, so landscape
+  and square output is byte-identical.
 - Pitfalls, each measured: **a section factory is not a section until
   `makeSections()` calls it** — nothing type-checks the omission, and two
   phases shipped a section invisible in the app; `editedList` — a write of a
@@ -2974,9 +2986,10 @@ the key map behind it.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in
 free.
-- `CaptionLayout.swift` — placement ONLY (snap, abut, drop sub-frame
+- `CaptionLayout.swift` · `CaptionCues.swift` — placement ONLY (snap, abut, drop sub-frame
   cues, a new front-most track), shared by every producer, and
-  `CaptionCues` at its foot — the FIVE cue rules (≤ 2 lines, ≤ 42
+  `CaptionCues` in its own file (a pure move, road map creator-jobs
+  VR4a's toll) — the FIVE cue rules (≤ 2 lines, ≤ 42
   characters, ≤ 6 s, a frame between cues, and never two speakers in
   one cue), used only by a producer that must INVENT line breaks. An
   SRT brings its own. `Word.speaker` defaults to nil, so every caller
@@ -2984,8 +2997,10 @@ free.
   `place` takes a `CaptionStyle` and the run's `CaptionLooks` (`looks:`,
   `.none` by default, handed to `pagePatch`; spec §11 W-15): `.subtitles` is the
   Caption-preset
-  path, byte for byte for a cue with no speaker (a speaker's cue adds its
-  palette `color`, spec §11 R6-22); a word style writes
+  path through `TextPreset.size(on:)` and `position(on:)` (VR-41), byte for byte
+  for a cue with no speaker (a speaker's cue adds its
+  palette `color`, spec §11 R6-22), and `Plan.overTwoLines` counts its cues over
+  two lines on a canvas taller than wide, with a report line; a word style writes
   `CaptionStyle.pagePatch` per page — the pager's own props at the page's size (a shrunk one or the
   style's), its wrap `width`, and the cue's `words` in CLIP time — at the
   style's `y`. `replacing` removes caption tracks WITH
@@ -3065,11 +3080,32 @@ free.
   `LayerRenderers.measuredSize`), the balance step once per width
   break, the clause preference, shrink-then-wrap for a lone word, and
   page timing that abuts under `breakGap` and never passes the span.
+  `build` runs the pager with the engine's lead and `repage` with lead 0
+  over a placed clip's own words (spec §11 VR-40 (d)).
   `cues(...)` is what both engines call: `.subtitles` goes to
   `CaptionCues.build`, untouched. `samplePage` is `cues(...)`'s first page
   over a span past the words' hold — the sheet's preview page, a real one,
   balance step included. Pauses are word gaps and punctuation;
   `SilenceDetector`/`MediaSpeech` are not consulted.
+- `CaptionRelayout.swift` · `EditorViewController+RelayCaptions.swift` — word
+  caption pages re-paged from their own words on the current canvas (road map
+  creator-jobs VR4a, spec §11 VR-40, VR-45). `CaptionRelayout` (names no
+  `rc_*`): `survey` (caption-named tracks of text clips; kept for a matte, no
+  word timings, no word starting inside, a style Frame Job does not make, more
+  than one style, in that order), `recognise` (font and `word_style` over each
+  word style's live looks), `words(of:)` (timeline ticks, only words starting
+  inside the clip), `relay` (per clip `repage`, `place` with `replacing` tried op
+  by op on a scratch `SwitchAngle.Trial`, a `LayoutError` or refusal keeping the
+  track, then `move_track` to the old index and the old hidden and locked),
+  `plan`, `answerFields`, `keptLine`, `noticeText`. The extension is File ▸
+  Re-lay Captions for This Canvas (`plan(document.editedProject)`, one undo step
+  "Re-lay Captions" through `performGroupedEdit`, then an informational sheet
+  naming kept tracks) and `validateRelayCaptionsAction`, one line in the frozen
+  file after `validateFollowSubjectAction` (a recognised track in
+  `editedProject`, no sheet, no recording; allowed inside a nest). Its tool
+  `relay_captions` is in `AgentServer+VerticalVersion.swift`, on main, with no
+  `scope` key; its row in `AgentCatalog+Framing.swift` after
+  `make_vertical_version`'s.
 - `CaptionImporter.swift` (SubRip grammar) · `CaptionExporter.swift` (`.srt` /
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`

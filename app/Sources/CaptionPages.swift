@@ -157,8 +157,29 @@ enum CaptionPages {
         from words: [CaptionCues.Word], span: Range<Ticks>, frame: Ticks, request: Request,
         engine: TranscriptionEngine, rules: Rules = .standard, clip: UInt32? = nil
     ) -> [CaptionLayout.Cue] {
+        page(
+            normalize(words, lead: lead(for: engine), span: span, frame: frame), span: span,
+            request: request, rules: rules, clip: clip)
+    }
+
+    /// One placed clip's words paged again on `request`'s canvas (spec §11 VR-40 (d)): the
+    /// same pager as `build`, with lead 0 — the engine's lead was applied once, when the pages
+    /// were made — and `span` the clip's window, so a page never leaves its clip.
+    static func repage(
+        _ words: [CaptionCues.Word], span: Range<Ticks>, frame: Ticks, request: Request,
+        clip: UInt32?
+    ) -> [CaptionLayout.Cue] {
+        page(
+            normalize(words, lead: 0, span: span, frame: frame), span: span, request: request,
+            rules: .standard, clip: clip)
+    }
+
+    /// The pager over normalized tokens, each page within `span`.
+    private static func page(
+        _ tokens: [CaptionCues.Word], span: Range<Ticks>, request: Request, rules: Rules,
+        clip: UInt32?
+    ) -> [CaptionLayout.Cue] {
         let style = request.style
-        let tokens = normalize(words, lead: lead(for: engine), span: span, frame: frame)
         guard !tokens.isEmpty else { return [] }
         let base = style.size(for: request.canvas)
         let budget = rules.widthBudget * Double(request.canvas.width)

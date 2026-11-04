@@ -210,7 +210,7 @@ extension TranscribeSheetController {
             let preset = CaptionLayout.captionPreset
             return TextProps(
                 content: cue.text, font: preset.font,
-                size: (Double(canvas.height) * preset.sizeFraction).rounded(),
+                size: preset.size(on: canvas),
                 align: preset.align, valign: "middle", backdrop: preset.backdrop,
                 width: Double(canvas.width) * CaptionLayout.wrapFraction)
         }

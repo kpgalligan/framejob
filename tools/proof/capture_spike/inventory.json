@@ -154,6 +154,13 @@
    ],
    "note": "NSSavePanel.beginSheetModal; beeps with no text track"
   },
+  "relayCaptions:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+RelayCaptions.swift `@objc func relayCaptions(`"
+   ],
+   "note": "an edit at once on the container being edited (VR-45); no sheet of its own — an informational alert sheet only when a caption track is kept as placed (reached_from, reached_after); beeps with no document, a sheet up or a recording running"
+  },
   "consolidateMedia:": {
    "verdict": "sheet",
    "code": [
@@ -1265,6 +1272,21 @@
      "selector": "addShortcutOverlays:",
      "via": "app/Sources/EditorViewController+ShortcutOverlays.swift `self?.placeShortcutOverlays(document, ids, read, asked: asked, scope: scope)`",
      "gate": "app/Sources/EditorViewController+ShortcutOverlays.swift `showShortcutOverlayNotice(ShortcutOverlays.droppedSentence(run.plan.dropped))` — a refusal, the changed-project sentence, nothing placed, or a press dropped (spec §11 CU-84); reached_from when a selected clip's cursor file is missing"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+RelayCaptions.swift:49": {
+   "token": "beginSheetModal",
+   "func": "showRelayCaptionsNotice",
+   "reached_from": [
+    "relayCaptions:"
+   ],
+   "reached_after": [
+    {
+     "selector": "relayCaptions:",
+     "via": "app/Sources/EditorViewController+RelayCaptions.swift `document.performGroupedEdit(CaptionRelayout.actionName, planned.ops)`",
+     "gate": "app/Sources/EditorViewController+RelayCaptions.swift `if let text = CaptionRelayout.noticeText(planned.outcome) {` — a caption track kept as placed, with its reason (spec §11 VR-45 (b)); reached_from when nothing can be re-laid or the plan throws"
     }
    ],
    "other_caller": ""

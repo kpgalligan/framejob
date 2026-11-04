@@ -173,6 +173,11 @@ the same way.
 - **Expect:** faces stay framed; titles and pictures-in-picture stay legible and inside the frame; the blurred copies read as deliberate, not as a mistake; the 1080p source's ×1.78 enlargement is acceptable, and the 4K source is visibly sharper.
 - **Source:** road map creator-jobs VR3b, spec §11 VR-39 (k), VR-32 (`vr3_proof.py` scores placements, never how the version looks on a phone).
 
+**JOB-34 — Re-laid captions look intended on 9:16 and 1:1** (its captions half; road map creator-jobs VR4b adds graphics)
+- **Do:** Take a landscape edit with word captions in two styles (for example Highlight with Fill and Pill with Slide, from File ▸ Generate Captions…) and one Subtitles track. Choose File ▸ Make Vertical Version… at 9:16 and press Make; on the landscape project again, change the canvas to 1080 × 1080 on the Document tab and choose File ▸ Re-lay Captions for This Canvas. Play both through and watch the 9:16 export on a phone.
+- **Expect:** every word caption page fits the narrow frame on its row, reads as made for it (no orphan word on a page of its own where the landscape page had none), stays on the words it times, keeps any word you corrected by hand, and sits where that style sits; the Subtitles track is named as kept in the summary or the sheet, and its cues are where the canvas change put them; the text presets (Text ▸ Presets ▸ Caption) on the 9:16 copy sit a quarter of the height below centre.
+- **Source:** road map creator-jobs VR4a, spec §11 VR-40, VR-41, VR-45, VR-46 (`vr4_proof.py` scores the pages' timing, measure and placement, never how they look on a phone).
+
 **JOB-55 — Switch by Speaker with one microphone follows who talks**
 - **Do:** On S-PC2 (two people sharing ONE microphone, a camera on each, five to ten minutes), select both cameras and the one microphone, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… (let the Analyzing sheet finish) at the defaults and press Switch. Play the Program track through.
 - **Expect:** the summary starts "Faces guess who is talking; check the cuts."; the cuts follow who talks as SW-S3 measured — each lands near the new speaker's first word, a laugh or a nod from the listener does not cut, and no shot of three seconds or more shows a listener who says nothing during it.

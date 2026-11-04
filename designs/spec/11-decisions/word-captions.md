@@ -77,6 +77,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the pager measures and the sheet previews, and `pagePatch`, built from it,
   is what `place` writes — so the committed page is the measured one (W4b
   residue, §10.10).
+  **Amended 2026-11-03, by VR-41** (road map "creator-jobs" VR4a): on a
+  canvas taller than wide, the Subtitles cue builder's size is 3.5 % of the
+  short side and its line 25 % of H below centre, through `TextPreset`'s
+  functions (`size(on:)`, `position(on:)`); landscape and square output is
+  byte-identical. A word caption page is re-paged from its own words by the
+  same pager with lead 0 (VR-40).
 - **W-8 — The minimum is macOS 26, and the on-device engine is
   `SpeechTranscriber`** (road map 8 §4 W-8, §5f; built by W2, §10.6).
   `SpeechAnalyzer` + `SpeechTranscriber` replace `SFSpeechRecognizer`

@@ -165,7 +165,7 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # first time. Every older script keeps its floor. It counts PRODUCT tools:
 # road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
 # Distribution one, so section 1 counts them apart.
-PRODUCT_TOOLS = 124
+PRODUCT_TOOLS = 125
 OPS = 70
 # The core's ops with no tool, by design: AgentServer.opsWithoutTools
 # (`keep_range`, spec §11 CJ-50, applied only to a derived document).

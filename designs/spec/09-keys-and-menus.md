@@ -85,7 +85,12 @@ and no recording, no key), Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,
-and none of them takes a key equivalent), Consolidate Media… (M3),
+and none of them takes a key equivalent), Re-lay Captions for This Canvas
+(§11 VR-45 — directly after Export Captions…, no key; on only with a word
+caption track `CaptionRelayout.survey` recognises in the container being
+edited, no sheet and no recording; one undo step "Re-lay Captions", then an
+informational sheet naming each caption track kept as placed), Consolidate
+Media… (M3),
 Rename Graphic…, Delete Graphic… and Restore Graphic Version… (issue batch
 B84, §11 G-30 — a separator group of their own under the two Add … to
 Graphics… items named below; each puts up one small sheet with a pop-up of

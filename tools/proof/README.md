@@ -29742,3 +29742,55 @@ python3 tools/proof/co8_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CO8 record. No person check: the landing is
 measured.
+
+## Road map "creator-jobs" VR4a — captions re-paged, presets by the short side, Re-lay Captions (`vr4_proof.py` R1–R10, Z0 with `vr4_probe.swift`; nine mutants; spec §11 VR-40, VR-41, VR-45, VR-46)
+
+**One driver, two instruments.** `vr4_proof.py` builds `vr4_probe.swift` from `app/Sources`
+with `FRAMEJOB_DEV_TOOLS` through `swift_build.py` (no app) and runs it three ways: `main`
+answers R1, R6 and R10; `pages` writes R4's five styles' pages as `CaptionPages.build` +
+`CaptionLayout.place` lay them on 1920 × 1080 (Highlight + Fill, Pill + Slide, Karaoke, Build,
+One Word), which the driver sends as op tools; `measure <project> [names]` measures the pages of
+a `get_project` project, each line alone in its recognised style at its size, as `CaptionPages`
+measures it. The app rows run over MCP on one instance (`proof_app.py`'s app, a scratch
+`CFFIXED_USER_HOME`).
+
+**The fixture** (`src.framejob`, 1920 × 1080, 30 fps, saved), eight caption tracks back to front:
+"Captions" Highlight + Fill (one page `split` mid-page, one `trim_start`-ed past its first word,
+one word corrected by `set_text`); "Captions 2" Pill + Slide; "Captions 3" Karaoke, hidden and
+locked; "Captions 4" Build; "Captions 5" One Word; "Captions 6" Highlight pages set in Anton (a
+style Frame Job does not make); "Captions 7" Pill + Slide with one page left untimed (its word
+count changed, `words: []`); "Captions 8" Subtitles from `import_captions`. Copies A–D of the
+saved package are opened for the row groups.
+
+| Row | What it holds |
+|---|---|
+| R1 | (probe) the five styles laid on 1920 × 1080, `set_canvas` 1080 × 1920 with no rescale, `CaptionRelayout.plan` applied: five tracks re-laid, more pages than before, every line ≤ 0.86 × 1080 (a lone word carrying `width` excepted) |
+| R2 | copy A after `set_canvas` and the menu: "Captions" re-laid (no old clip id left); the sorted (timeline start, token) list over its pages equals the source's over the words starting inside each source page, with no duplicate; every new page inside one source page's window and every word inside its page |
+| R3 | the corrected word at its start |
+| R4 | "Captions" … "Captions 5" re-laid, each page's font and `word_style` (looks included) the source's; "Captions 6" kept with its clip ids and Anton |
+| R5 | "Captions 7" and "Captions 8" keep their clip ids, kept with "it holds a page with no word timings"; in Make Vertical (copy C) each of their clips `kept` and its scale × 0.5625 (`keep`'s rescale) |
+| R6 | (probe) Text ▸ Presets, `place`'s Subtitles ops and the sheet's preview equal the old formula, spelt out, on 1920 × 1080 and 1080 × 1080; Caption on 1080 × 1920 size 38, wrap 864, y 480 at the three sites; `overTwoLines` 1 for a long cue on 1080 × 1920 with its report sentence, 0 on 1920 × 1080 and for a word style |
+| R7 | copy C `make_vertical_version {shape: 9:16, copy: false}`: `captions.relaid` the five, `captions.kept` the other three, one undo "Make Vertical" giving the source back; copy D with `captions: false`: no `captions` key, every caption clip `kept` |
+| R8 | copy A: one undo "Re-lay Captions" back to the `set_canvas` project, redo again; the re-laid tracks measure within 0.86 × 1080 (`measure`); the notice (`snapshot_ui`, whose dump keeps a label's first 200 characters) names "Captions 6" and the untimed "Captions 7" with its reason; copy B's `relay_captions` gives the same `get_project`; on a project with no caption track the item is disabled |
+| R9 | every re-laid track at its old index with its name; "Captions 3" still hidden and locked |
+| R10 | (probe) the project filled to `RC_MAX_CLIPS` with one-frame sound clips of a descriptor-only media (a clip with a picture would be tried once per clip by Make Vertical's step 3 on a 4096-clip handle): Make Vertical keeps the Highlight track with `tooMany`'s sentence, gives each of its pages `reframe_clip` keep and a `kept` entry, and its ops apply |
+| Z0 | `grep "Frame Job: "` in the instance's log prints nothing |
+
+Mutants (`--mutant NAME`; spec §11 VR-46): a probe mutant (`old-width` R1, `apply-height` R6,
+`failed-unkept` R10) edits a copy of `app/Sources` and builds the probe from it; an app mutant
+(`clip-time`, `lead-applied`, `all-words` R2; `subtitles-fallback` R4; `replace-unrecognised`
+R5 and R8; `front-track` R9) edits the TREE's `app/Sources`, runs `make app-debug`, runs its rows
+on that Debug app, then puts the file back and runs `make app-debug` again (so an interrupted
+app-mutant run leaves the tree edited: `git diff app/Sources` shows it). Each edit's `before`
+text is asserted to occur exactly once; a mutant run exits 1 caught, 0 survived, 2 when the
+control could not be performed.
+
+```sh
+python3 tools/proof/vr4_proof.py --only R1,R6,R10           # the probe alone, no app
+make app-debug && python3 tools/proof/vr4_proof.py [--only R2,R8]
+make app && RC_PROOF_APP=release python3 tools/proof/vr4_proof.py
+python3 tools/proof/vr4_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR4a record; JOB-34 (its captions half) is
+what only a person judges.
