@@ -28,11 +28,11 @@ use crate::reframe::{
     in_clip_time, Frame, FramingPath, FramingRequest, WhereEmpty, FRAMING_TUNING,
 };
 use crate::reframe_path::{write_keys, PAIR_WIDEN};
-use crate::reframe_speaker_match::{covered, faces_of, matched, median_box};
 pub use crate::reframe_speaker_match::{
-    pearson, speaker_match, sure, SpeakerFace, SpeakerMatch, ACTIVITY_SPAN, FACE_SHARE,
-    MAX_SPEAKERS, SPEAKER_AGREEMENT,
+    clip_speaker_match, pearson, speaker_match, sure, SpeakerFace, SpeakerMatch, ACTIVITY_SPAN,
+    FACE_SHARE, MAX_SPEAKERS, SPEAKER_AGREEMENT,
 };
+use crate::reframe_speaker_match::{clip_turns, covered, faces_of, matched, median_box};
 use crate::reframe_subjects::{Subjects, Turn};
 use crate::reframe_tracks::{centre, Chosen, Follow, SubjectKind};
 use crate::time::{Ticks, TIMESCALE};
@@ -279,16 +279,7 @@ pub fn plan_speaker_framing(
             })
             .collect();
     }
-    let turns: Vec<Turn> = subjects
-        .turns
-        .iter()
-        .map(|u| Turn {
-            from: (u.from - c.start).clamp(0, c.duration),
-            to: (u.to - c.start).clamp(0, c.duration),
-            mic: u.mic,
-        })
-        .filter(|u| u.from < u.to)
-        .collect();
+    let turns = clip_turns(c, &subjects.turns);
     let faces = faces_of(&samples);
     let plural = |n: usize| if n == 1 { "face" } else { "faces" };
     let Some(found) = matched(&samples, &faces, &turns, mics) else {

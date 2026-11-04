@@ -20,8 +20,8 @@ a new untitled project, "<name> (9:16)", and the project behind the sheet does n
 unticked, it is one undo step "Make Vertical" on this project.
 
 Under the bold title "Make Vertical Version", a muted hint: "Makes a version of the timeline for
-a tall or square canvas. Each full-frame movie clip follows its subject with eased moves, stills
-and nests are centred, and everything else is kept as placed, with a blurred copy behind a clip
+a tall or square canvas. Each full-frame movie clip follows its subject with eased moves (with
+Speaker, whoever is talking on the ticked microphones), stills and nests are centred, and everything else is kept as placed, with a blurred copy behind a clip
 where it shows the whole picture. With Make a copy it opens as a new project and this one does
 not change. One undo step." Then a grid, each row with its right-aligned label:
 
@@ -29,12 +29,23 @@ not change. One undo step." Then a grid, each row with its right-aligned label:
   from the fixture's 960 × 540 canvas, "9:16 (540 × 960)" (shown), "4:5 (540 × 676)" and
   "1:1 (540 × 540)"; from 1920 × 1080, 1080 × 1920, 1080 × 1350 and 1080 × 1080. A 1080 × 1920
   canvas would offer only 4:5 and 1:1.
-- "Follow:" — a pop-up of Subject, Faces, People, Salient Region and Center; Subject here
-  (pinned by `FrameJobFollowKind`, the key Follow Subject's sheet shares).
+- "Follow:" — a pop-up of Subject, Faces, People, Salient Region, Speaker and Center; Subject
+  here (pinned by `FrameJobFollowKind`, the key Follow Subject's sheet shares; a stored Speaker
+  opens this sheet on Speaker and Follow Subject's on Subject).
 - "Zoom:" — a whole-number field and "%", always opening at 100, the fill.
 - "Where Empty:" — a pop-up of Show Whole and Center; Show Whole here (pinned by
   `FrameJobFollowWhereEmpty`). It is dimmed while Follow is Center.
 - a "Make a copy" checkbox, ticked whenever the sheet opens.
+
+With Follow on Speaker (not shown: the catalog pins Subject; `vr6b_proof.py`'s Q6 reads its
+layout dump), a second grid follows under the first, its labels in the same column:
+"Microphones:" — one checkbox per track holding a sound file, named by the track ("Mic A",
+"Mic B"), the first four ticked; "Faces:" — one row per ticked microphone, the track's name and
+a pop-up of "Choose a face" and each face found, "Face 1 (42 % across)"; then a muted note, "Each
+microphone is matched to the face that talks with it; change one if it is wrong." when the
+pop-ups are preset from a sure match, else "The faces do not show clearly who is on each
+microphone: choose each microphone's face." with every pop-up on "Choose a face". Make stays off
+until two to four microphones are ticked and each has a face of its own.
 
 Under the grid, one muted summary says what Make would do. The fixture's movie does not fill
 the frame on either side, so no clip is a full-frame picture and nothing is to be analysed: here

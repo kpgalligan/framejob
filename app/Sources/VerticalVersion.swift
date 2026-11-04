@@ -40,7 +40,7 @@ enum VerticalShape: String, CaseIterable {
 /// What the step is asked for (VR-36's arguments, VR3b's sheet).
 struct VerticalSettings: Equatable {
     var shape: VerticalShape
-    /// One of `FollowSubject.follows`.
+    /// One of `VerticalVersion.follows`.
     var follow: FramingFollow
     /// Times the scale that fills the canvas, 1–4 (the core refuses outside).
     var zoom: Double
@@ -48,6 +48,12 @@ struct VerticalSettings: Equatable {
     /// Whether step (6) re-pages the word caption tracks (spec §11 VR-40 (f)); the sheet
     /// passes the default, `make_vertical_version` its `captions`.
     var captions = true
+    /// `follow: speaker`'s microphones (spec §11 VR-64 (a)): 2–4 clip ids, each standing for
+    /// its track; read only with `speaker`.
+    var mics: [UInt32] = []
+    /// One face number per microphone in `mics`' order, or nil for the core's own match; read
+    /// only with `speaker`.
+    var micFaces: [UInt32]? = nil
 }
 
 enum VerticalVersion {
@@ -56,6 +62,27 @@ enum VerticalVersion {
     static let backgroundsName = FollowSubject.backgroundsName
     /// The name `add_blurred_background` and `reframe_clip`'s backdrop give a copy.
     static let blurredName = "Blurred Background"
+    /// The sheet's Follow pop-up and the tool's `follow`, in order (spec §11 VR-66 (a)): Follow
+    /// Subject's list with Speaker before Center.
+    static let follows: [FramingFollow] = [.subject, .face, .person, .salient, .speaker, .center]
+
+    /// Whether `follow` analyses the media pictures (VR-64 (c)): the following kinds and
+    /// `speaker`, which frames its other pictures on their faces.
+    static func analyses(_ follow: FramingFollow) -> Bool {
+        follow.follows || follow == .speaker
+    }
+
+    /// The Make Vertical sheet's opening Follow and Where Empty (VR-66 (a)): VR-29 (c)'s key
+    /// read against `follows`, so a stored `speaker` opens Speaker here while Follow Subject's
+    /// sheet reads it as Subject; any other value is Subject. Where Empty as
+    /// `FollowSubjectSettings.remembered`; Zoom is never remembered, so 1.
+    static func remembered(_ defaults: UserDefaults) -> FollowSubjectSettings {
+        var settings = FollowSubjectSettings.remembered(defaults, zoom: 1)
+        let kind = defaults.string(forKey: FollowSubjectSettings.followKey)
+            .flatMap(FramingFollow.init(rawValue:))
+        settings.follow = kind.flatMap { follows.contains($0) ? $0 : nil } ?? .subject
+        return settings
+    }
 
     /// What the step did to one clip, as the answer spells it.
     enum Treatment: String {

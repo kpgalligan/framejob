@@ -1327,7 +1327,12 @@ governs a module now.
   when a later one starts after a chain's last box, a quarter of the samples, at most four by
   sample count, numbered left to right by median centre), the mouth's population std over the
   span, `pearson`, `sure`, the greatest-sum injective assignment (ties lexicographic),
-  `speaker_match` and `median_box`. `reframe_speaker.rs` (re-exporting the match):
+  `speaker_match` and `median_box`. Since VR6b (spec §11 VR-65) `reframe_speaker_match.rs`
+  also holds `clip_turns` (the turns in clip ticks, clamped to `[0, duration]`, an empty one
+  dropped — a pure move out of `plan_speaker_framing`, which calls it) and
+  `clip_speaker_match` (`in_clip_time`'s samples, `clip_turns`, the faces and `matched`), both
+  re-exported by `reframe_speaker.rs` (`clip_speaker_match`); `rc_project_speaker_match`
+  answers it. `reframe_speaker.rs` (re-exporting the match):
   `SPEAKER_HOLD` 2 s, `mics_refusal` (VR-60 (d)'s subject-free sentences in order, asked by
   `edit_reframe.rs` after (5)–(6)), the segments (cut at the turns' bounds: one microphone its
   face, none the previous segment's, two or more the pair — the face framed and the first other
@@ -1414,6 +1419,8 @@ governs a module now.
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
   `rc_speed_limits` is its answer for the speed range and the audio ceiling;
   `rc_project_source_map` (`ffi_query.rs`, SR-20) a clip's source map;
+  `rc_project_speaker_match` (`ffi_query.rs`, VR-65) the face-to-microphone match `follow:
+  speaker` would make on a clip, for Make Vertical's sheet;
   `rc_normalise_color` (`ffi.rs`) is the colour grammar's (G-25).
   `ffi_agent.rs` has one slot, one listener per process: `SOCKET`
   (`rc_agent_socket_start` / `_release`; MC4 deleted the TCP pair and its

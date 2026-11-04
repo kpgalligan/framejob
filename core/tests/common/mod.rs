@@ -56,7 +56,7 @@ use framejob_core::ffi_edit::rc_project_apply;
 use framejob_core::ffi_query::{
     rc_export_settings, rc_export_sizes, rc_project_clip_state, rc_project_composition_plan,
     rc_project_duration, rc_project_frame_recipe, rc_project_frame_recipe_opts,
-    rc_project_snap_candidates, rc_project_source_map,
+    rc_project_snap_candidates, rc_project_source_map, rc_project_speaker_match,
 };
 use framejob_core::model::Project;
 
@@ -483,6 +483,15 @@ impl Handle {
     pub fn source_map(&self, clip: u32) -> Option<Value> {
         take_string(unsafe { rc_project_source_map(self.ptr, clip) })
             .map(|text| parse_json(&text, "rc_project_source_map"))
+    }
+
+    /// The face-to-microphone match on `clip` (spec §11 VR-65), `args` as
+    /// `{"mics": [...], "subjects": {...}}`; `None` where the export answers
+    /// NULL.
+    pub fn speaker_match(&self, clip: u32, args: &Value) -> Option<Value> {
+        let text = cstring(&args.to_string());
+        take_string(unsafe { rc_project_speaker_match(self.ptr, clip, text.as_ptr()) })
+            .map(|text| parse_json(&text, "rc_project_speaker_match"))
     }
 
     /// Snap candidates, with the dragged clips excluded.

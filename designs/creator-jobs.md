@@ -13009,6 +13009,81 @@ beyond a frame; P0 empty). No issue was owed.
 README highlight, `menus-and-shortcuts.md`, the screen and JOB-37. VR-S3's S-PC3 arm and
 `SPEAKER_AGREEMENT`'s re-measurement once S-PC3 exists.
 
+#### VR6b's record (2026-11-04)
+
+**What landed** (spec §11 VR-64…VR-68, `creator-jobs-12.md`), the decisions committed alone
+first. The core: `clip_turns` moved verbatim out of `plan_speaker_framing` into
+`reframe_speaker_match.rs` (`reframe_speaker.rs` 397 → 388 lines) beside the new
+`clip_speaker_match`, and `rc_project_speaker_match` in `ffi_query.rs` with its header entry, its
+NULL-sweep line and `core/tests/speaker_match_ffi.rs`. The Swift: `ReelCore+Framing.swift`
+(`ReelProject.speakerMatch`, the export's one caller), `FramingSpeaker.Refusal` (`reframe_clip`'s
+answers byte-identical), `VerticalVersion.follows` / `analyses` / `remembered` and
+`VerticalSettings.mics` / `micFaces`, `VerticalVersion+Speaker.swift` (the microphones, the speaker
+clips, `withTurns`, the sheet's reading), the plan's speaker → face → keep chain and
+`Plan.speaker`, the summary's sentence and the answer's `speaker`, the tool's `mics`,
+`mic_faces` and refusals, the catalog, `VerticalSpeakerPicker.swift`, the sheet's Follow Speaker
+and `restoring`, and the editor's re-present. The documents: spec §7.1, §7.4, §7.9i, §7.10, the
+guide, `mcp.md`, the menus row, the README highlight, 15j's prose, JOB-37; `vr6b_proof.py`,
+`vr6b_probe.swift` and the proof README's section. The menu inventory's
+`showVerticalVersionSheet:` site moved with `presentVerticalSheet`. No op, op-table, tool count
+(124), `Kind` or format (43) change.
+
+**Deviations.** With the analysis missing the sheet's Make also needs two to four ticked
+microphones and a speaker clip (VR-66 (d)'s conditions but the faces), and with no speaker clip
+the sheet shows VR-66 (c)'s sentence before anything is analysed. The sheet reads its settings
+again after a ticked set's first `offer`, so a preset enables Make on the same refresh (Q5 found
+the stale read on Debug). The tool reads `mics: []` as no `mics`. Q7's fixture holds W and the
+two microphones only (no S).
+
+**Measured.** `cargo test --release --test speaker_match_ffi`: 5 passed (with `reframe_speaker`
+14, `reframe_clip` 15 and `model_tests` 31 in the same run). `make lint` and `make typecheck` (0
+errors, the 4 baseline warnings) clean. `vr6b_proof.py` on Debug: Q1–Q4 5/5 rows and Q8 1/1; Q6 and Q7
+passed and Q5 failed (Make never enabled) until the re-read fix, then Q5 passed; `vr6_proof.py`
+7/7. `make gate`: the first run failed at test (`capture_spike/inventory.py
+--check`, the moved `presentAsSheet` site); after the inventory's update "gate: PASS 270s" (names
+1, test 80, app 189). Against that Release app: `vr6b_proof.py` 9/9 rows (Q1's 20 cut actions of
+W equal to the reference's `reframe_clip {speaker}`, `speaker [{5, [9, 7], [1, 2]}]`; Q2 `[2, 1]`;
+Q3's reason "it follows its faces, not who is talking, because clip 5's faces do not show which
+microphone is whose: …"; Q4's four sentences; Q5 in place, W equal to the reference and to Q1's;
+Q6's dump; Q7 the Analyzing sheet gone after 33.4 s and the sheet again with both Faces rows; Q8;
+Z0 empty on both launches), `vr6_proof.py` 7/7, `vr3_proof.py` 14/14 and `screens.py --only
+15j-make-vertical-sheet` 6/6 (light and dark, 0 new problems).
+
+**Mutants**, each once on the final instrument (a `tree_copy.py` copy's Debug app, Q8's probe
+from the copy's sources): all eight CAUGHT — `every-picture-speaker` (Q1: S framed `speaker`,
+refused for no `mics` and followed on its faces with the reason), `turns-unfilled` (Q1: `speaker`
+[], W refused "no turn of its microphones inside it"), `mic-faces-dropped` (Q2: W unequal to the
+`[2, 1]` reference), `speaker-retried-keep` (Q3: W kept, unequal to the face reference),
+`preset-transposed` (Q5: W made with `[2, 1]`), `preset-when-unsure` (Q6: Make pressed, the step
+made), `handoff-committed` (Q7: the step made after the analysis, no sheet again),
+`remembered-ignores-speaker` (Q8: a stored `speaker` opened Subject, and Subject chosen then wrote
+nothing, leaving `speaker`).
+
+**Review.** Two reviews. The first (`b77437e0..74cf5e96`) found one blocker: a cached ready
+reading skipped `picker.offer`, so a microphone unticked and ticked back (A, B, C → A, B → A, B,
+C) left the Faces pop-ups with no faces and Make off until the sheet was reopened. Fixed in
+`17885fa4`: `readings` caches each ready reading with the reference's microphones named back as
+the ticked ones and offers it again on a cache hit, `offer`'s `offeredFor` guard keeping a
+choice made (`VerticalVersionSheetController.swift` 433 → 439 lines); typecheck at the baseline,
+"gate: PASS 529s" (test 329, app 190) and `vr6b_proof.py` 9/9 against Release (Q7's Analyzing
+sheet gone after 40.0 s). No row drives the untick and re-tick path: the dev tools click no
+checkbox. The other proofs and the mutants were not re-run, none of them reaching the changed
+lines. The second review (`b77437e0..17885fa4`) passed with no findings.
+
+**Integration (2026-11-04).** Cherry-picked (`3d7a966d`, `c49d1e85`, `74cf5e96`, `17885fa4`)
+onto `worktree-creator-jobs` at `b77437e0`, the phase's own base, with no conflict, so the code
+is byte-identical to `17885fa4`'s; format 43 stands. `core/CLAUDE.md`'s `reframe_speaker.rs` ·
+`reframe_speaker_match.rs` entry names `clip_turns` and `clip_speaker_match` and its FFI entry
+`rc_project_speaker_match`; `app/CLAUDE.md`'s `ReelCore.swift` entry names
+`ReelCore+Framing.swift`, the framing entry `FramingSpeaker.Refusal`, and the two Vertical
+entries `VerticalVersion+Speaker.swift`, `VerticalSpeakerPicker.swift` and what VR6b added.
+`make gate` on the integrated tree printed "gate: PASS 479s" (names 1, typecheck 9, fmt 4, lint
+12, test 275, app 178); the Release proofs stand from `17885fa4`, whose code this is. Nothing was
+filed.
+
+**Owed.** JOB-37 (S-PC3 does not exist yet); VR-S3's S-PC3 arm and `SPEAKER_AGREEMENT`'s
+re-measurement once it does.
+
 ### SW6 — a channel as a source
 
 - **What a person gets:** on a recorder's many-channel file, or a wireless kit's two-person stereo

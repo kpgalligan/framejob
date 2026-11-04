@@ -114,10 +114,11 @@ not while a recording runs. The sheet has five controls:
 - **Shape** — **9:16**, **4:5** or **1:1**, each with the size it makes. The
   new canvas keeps the old short side: from 1920 × 1080 they are 1080 × 1920,
   1080 × 1350 and 1080 × 1080. A shape the canvas already has is not offered.
-- **Follow**, **Zoom** and **Where Empty** — as in Follow Subject (above).
-  Follow and Where Empty are the same remembered choice as Follow Subject's;
-  Zoom always starts at 100 %, the scale at which a picture just covers the new
-  canvas.
+- **Follow**, **Zoom** and **Where Empty** — as in Follow Subject (above),
+  and Follow has one more choice here, **Speaker** (below). Follow and Where
+  Empty are the same remembered choice as Follow Subject's (Speaker, which
+  Follow Subject does not offer, opens Follow Subject on Subject); Zoom always
+  starts at 100 %, the scale at which a picture just covers the new canvas.
 - **Make a copy** — ticked whenever the sheet opens. With it, the vertical
   version opens as a new untitled project, named after this one with the shape
   — "Interview (9:16)" — and this project does not change; save the copy when
@@ -139,6 +140,16 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   frame shows the whole picture, a blurred copy of it goes behind on a new
   **Backgrounds** track at the back. A movie whose file is missing is kept as
   placed.
+- **With Follow Speaker, a wide shot of two to four people** that plays
+  beside their microphones — a sound file each, on its own track, recorded
+  with the shot (use **Clip ▸ Synchronize Audio** first) — cuts to whoever
+  is talking, as Switch by Speaker reads the microphones, so the two agree.
+  Each change of speaker is a cut, held at least 2 s, so a short reply does
+  not cut away and back; two people talking at once are framed together when
+  they fit, and while nobody talks the last speaker stays. Every other movie
+  clip follows its faces. A shot whose faces cannot be framed by who is
+  talking (it changes shot, say) follows its faces instead, and the summary
+  says why.
 - **A screen recording with its cursor file** follows the pointer instead of
   a face: the frame sits on the pointer and moves only when it strays from
   the middle of the frame, arrives on each click — the move ends on the
@@ -195,9 +206,36 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   of your own that sizes itself by the canvas's height is named too, and
   never rewritten.
 
+### Follow Speaker: who is on each microphone
+
+With **Speaker** chosen the sheet shows two more rows:
+
+- **Microphones** — a checkbox for each track holding a sound file (a track
+  of a recorder's or a lavalier's file, not a camera), named by the track,
+  the first four ticked. Tick the ones that belong to the people in the shot:
+  two to four.
+- **Faces** — one row per ticked microphone, with a pop-up of the faces Frame
+  Job found in the longest such shot, numbered left to right with where each
+  is across the picture: "Face 1 (42 % across)". Frame Job matches each
+  microphone to the face whose mouth moves while it talks. When the match is
+  clear the pop-ups are already set, and the note under them says "Each
+  microphone is matched to the face that talks with it; change one if it is
+  wrong."; check each row names that microphone's person. When the faces do
+  not show who is whose — mouths too still or too small to read — each
+  pop-up says **Choose a face** and the note asks you to choose: pick each
+  microphone's face yourself.
+
+**Make** is offered once two to four microphones are ticked, a shot plays
+beside two of them and every ticked microphone has a face of its own. When a
+microphone is still being measured (just imported), the sheet says so in
+Switch by Speaker's words; choose the command again in a moment.
+
 When the movies have not been analysed, the sheet says it will find the faces,
 people and shot changes first: **Make** then shows the Analyzing sheet while
-that runs on this Mac, and makes the version when it is done. **Stop** makes
+that runs on this Mac, and makes the version when it is done. With **Speaker**
+the sheet comes back once the analysis is done, with your choices kept, so you
+can confirm who is on each microphone; nothing is made until you press
+**Make** there. **Stop** makes
 nothing: no project opens and this one does not change. What was found is kept
 in this project's cache (and carried into the copy), so making another shape
 afterwards needs no analysis. **Center** needs no analysis.
@@ -238,8 +276,9 @@ chooses what to follow with `follow`:
   whose — mouths too still or too small to read — the call is refused,
   naming where each face is across the picture; name each microphone's face
   with `mic_faces`, in `mics`' order, and call it again. A clip that changes
-  shot is refused: split it at its shot changes first. There is no menu for
-  it yet.
+  shot is refused: split it at its shot changes first. **File ▸ Make Vertical
+  Version…**'s Follow **Speaker** (above) is its menu: it frames each such
+  shot with this, its microphones and their faces confirmed on the sheet.
 - **`center`** holds the frame on the middle of the picture for the whole clip.
 - **`fit`** shows the whole picture for the whole clip, scaled to fit the
   canvas.

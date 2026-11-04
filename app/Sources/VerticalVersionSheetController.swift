@@ -28,8 +28,17 @@ struct VerticalHandOff {
 ///
 /// Shape (the sizes `VerticalVersion.offered` lists), Follow, Zoom (100–400 %, opening at 100 %,
 /// never remembered), Where Empty (off while Follow is Center), Make a copy (ticked, never
-/// remembered), then the summary. Follow and Where Empty are VR-29 (c)'s two keys, through
-/// `FollowSubjectSettings`. At `viewDidAppear` the sheet splits the media pictures by
+/// remembered), then the summary. Follow and Where Empty are VR-29 (c)'s two keys, opened from
+/// `VerticalVersion.remembered` (so a stored Speaker opens here) and written through
+/// `FollowSubjectSettings.remember`.
+///
+/// **Speaker** (road map creator-jobs VR6b, spec §11 VR-66) shows `VerticalSpeakerPicker`: the
+/// microphone tracks, the ticked ones' Face pop-ups and a note. Its reading
+/// (`VerticalVersion.speakerReading`: the turns, then the core's match on the reference clip) is
+/// made on main and cached per ticked set only when ready; a refused one is read again at each
+/// refresh. Make passes the ticked `mics` and the confirmed `micFaces`. A sheet presented again
+/// after its analysis (`restoring`) opens on the hand-off's shape, follow, zoom, where empty,
+/// copy and ticked microphones. At `viewDidAppear` the sheet splits the media pictures by
 /// `analysisTargets` and asks `FramingAnalysis.requests` what is missing. With nothing missing it
 /// reads the subjects off main ("Reading the analysis…", Make disabled) and plans on main at
 /// every change; with something missing a following kind shows the pending summary. Center
@@ -45,7 +54,10 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     static let devAcceptKey = "RCDevVerticalAccept"
     /// Its value that unticks Make a copy before pressing Make.
     static let devAcceptInPlace = "in-place"
-    private static let followTitles = ["Subject", "Faces", "People", "Salient Region", "Center"]
+    /// `VerticalVersion.follows`' titles, in its order.
+    private static let followTitles = [
+        "Subject", "Faces", "People", "Salient Region", "Speaker", "Center",
+    ]
     private static let whereEmpties: [(String, FramingWhereEmpty)] = [
         ("Show Whole", .fit), ("Center", .center),
     ]
@@ -53,6 +65,14 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     private weak var document: ProjectDocument?
     private let make: (VerticalHandOff) -> Void
     private let opened: FollowSubjectSettings
+    /// The hand-off this sheet is presented again from, after its analysis (VR-66 (e)).
+    private let restoring: VerticalHandOff?
+    private let picker: VerticalSpeakerPicker
+    /// Speaker's ready readings, per ticked set, each with the reference's microphones named
+    /// back as the ticked ones, so a set ticked again is offered its match again (VR-66 (c)).
+    private var readings: [[UInt32]: (read: VerticalVersion.SpeakerReading, mics: [UInt32])] = [:]
+    /// The subjects with their turns the current Speaker plan read.
+    private var speakerSubjects: [UInt32: [String: Any]]?
     private let shapes: [VerticalShape]
     private let canvas: CanvasSnapshot
     private var present: [UInt32] = []
@@ -77,13 +97,28 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     private let summaryLabel = NSTextField(wrappingLabelWithString: "")
     private var makeButton: NSButton?
 
-    init(document: ProjectDocument, make: @escaping (VerticalHandOff) -> Void) {
+    init(
+        document: ProjectDocument, restoring: VerticalHandOff? = nil,
+        make: @escaping (VerticalHandOff) -> Void
+    ) {
         self.document = document
         self.make = make
-        self.opened = FollowSubjectSettings.remembered(.standard, zoom: 1)
+        self.opened = VerticalVersion.remembered(.standard)
+        self.restoring = restoring
         self.canvas = document.project.snapshot.canvas
         self.shapes = VerticalVersion.offered(canvas)
+        let ticked = restoring.map(\.settings.mics).flatMap { $0.isEmpty ? nil : $0 }
+        let relay = PickerRelay()
+        self.picker = VerticalSpeakerPicker(
+            microphones: VerticalVersion.microphones(document.project), ticked: ticked,
+            onChange: { relay.changed?() })
         super.init(nibName: nil, bundle: nil)
+        relay.changed = { [weak self] in self?.refresh() }
+    }
+
+    /// The picker's change, handed to the sheet once it exists.
+    private final class PickerRelay {
+        var changed: (() -> Void)?
     }
 
     @available(*, unavailable)
@@ -98,12 +133,14 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
             let size = shape.size(from: canvas)
             shapePopup.addItem(withTitle: "\(shape.rawValue) (\(size.width) × \(size.height))")
         }
-        shapePopup.selectItem(at: 0)
+        let start = restoring?.settings
+        shapePopup.selectItem(at: start.flatMap { shapes.firstIndex(of: $0.shape) } ?? 0)
         for title in Self.followTitles { followPopup.addItem(withTitle: title) }
-        followPopup.selectItem(at: FollowSubject.follows.firstIndex(of: opened.follow) ?? 0)
+        followPopup.selectItem(
+            at: VerticalVersion.follows.firstIndex(of: start?.follow ?? opened.follow) ?? 0)
         for (title, _) in Self.whereEmpties { whereEmptyPopup.addItem(withTitle: title) }
-        whereEmptyPopup.selectItem(
-            at: Self.whereEmpties.firstIndex { $0.1 == opened.whereEmpty } ?? 0)
+        let empty = start?.whereEmpty ?? opened.whereEmpty
+        whereEmptyPopup.selectItem(at: Self.whereEmpties.firstIndex { $0.1 == empty } ?? 0)
         for (popup, id) in [
             (shapePopup, "vertical.shape"), (followPopup, "vertical.follow"),
             (whereEmptyPopup, "vertical.whereEmpty"),
@@ -122,12 +159,12 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         zoomField.formatter = formatter
         zoomField.delegate = self
         zoomField.alignment = .right
-        zoomField.integerValue = 100
+        zoomField.integerValue = Int(((start?.zoom ?? 1) * 100).rounded())
         zoomField.widthAnchor.constraint(equalToConstant: 64).isActive = true
         zoomField.setAccessibilityIdentifier("vertical.zoom")
         DSField.style(zoomField)
 
-        copyBox.state = .on
+        copyBox.state = (restoring?.copy ?? true) ? .on : .off
         copyBox.font = DS.sans(13)
         copyBox.target = self
         copyBox.action = #selector(controlChanged(_:))
@@ -154,13 +191,15 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         view = makeSheetView(
             title: "Make Vertical Version",
             hint: "Makes a version of the timeline for a tall or square canvas. Each full-frame "
-                + "movie clip follows its subject with eased moves, stills and nests are "
+                + "movie clip follows its subject with eased moves (with Speaker, whoever is "
+                + "talking on the ticked microphones), stills and nests are "
                 + "centred, and everything else is kept as placed, with a blurred copy behind a "
                 + "clip where it shows the whole picture. With Make a copy it opens as a new "
                 + "project and this one does not change. One undo step.",
-            content: sheetColumn([grid, summaryLabel]),
+            content: sheetColumn([grid, picker.view, summaryLabel]),
             buttonRow: makeButtonRow(cancel: cancel, apply: make))
-        whereEmptyPopup.isEnabled = opened.follow != .center
+        whereEmptyPopup.isEnabled = follow.follow != .center
+        picker.view.isHidden = follow.follow != .speaker
     }
 
     /// VR-39 (d): the targets and the requests, once, on the project and scope the hand-off
@@ -222,43 +261,68 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     private var follow: FollowSubjectSettings {
         let range = FollowSubjectSettings.zoomRange
         let percent = Double(zoomField.integerValue)
-        let follow = FollowSubject.follows[max(0, followPopup.indexOfSelectedItem)]
+        let follow = VerticalVersion.follows[max(0, followPopup.indexOfSelectedItem)]
         let empty = Self.whereEmpties[max(0, whereEmptyPopup.indexOfSelectedItem)].1
         return FollowSubjectSettings(
             follow: follow, zoom: min(max(percent / 100, range.lowerBound), range.upperBound),
             whereEmpty: empty)
     }
 
-    /// The step's settings: the chosen shape and the follow controls.
+    /// The step's settings: the chosen shape and the follow controls, with Speaker the ticked
+    /// microphones and their confirmed faces.
     private func settings(_ follow: FollowSubjectSettings) -> VerticalSettings? {
         guard !shapes.isEmpty else { return nil }
         let shape = shapes[min(max(0, shapePopup.indexOfSelectedItem), shapes.count - 1)]
+        let speaker = follow.follow == .speaker
         return VerticalSettings(
-            shape: shape, follow: follow.follow, zoom: follow.zoom, whereEmpty: follow.whereEmpty)
+            shape: shape, follow: follow.follow, zoom: follow.zoom, whereEmpty: follow.whereEmpty,
+            mics: speaker ? picker.mics : [], micFaces: speaker ? picker.micFaces : nil)
     }
 
-    /// Whether Make hands the analysis on: a following kind with requests missing.
+    /// Whether Make hands the analysis on: an analysing follow with requests missing.
     private func pending(_ follow: FollowSubjectSettings) -> Bool {
-        follow.follow.follows && requestError == nil && !requests.isEmpty
+        VerticalVersion.analyses(follow.follow) && requestError == nil && !requests.isEmpty
     }
 
     /// Says what Make would do and enables it: the request error, the pending summary,
     /// "Reading the analysis…", or the plan made on main over the document's current handle.
     private func refresh() {
         let follow = self.follow
+        let analysing = VerticalVersion.analyses(follow.follow)
+        let speaker = follow.follow == .speaker
         whereEmptyPopup.isEnabled = follow.follow != .center
+        picker.view.isHidden = !speaker
+        speakerSubjects = nil
         var enabled = false
         if let settings = settings(follow) {
-            if follow.follow.follows, let requestError {
+            let ticked = (2...VerticalSpeakerPicker.mostMicrophones).contains(settings.mics.count)
+            if analysing, let requestError {
                 summaryLabel.stringValue = requestError
+            } else if speaker, let document,
+                VerticalVersion.speakerClips(document.project, settings: settings, missing: missing)
+                    .isEmpty
+            {
+                summaryLabel.stringValue = VerticalVersion.noSpeakerClipSheet
             } else if pending(follow) {
                 let size = settings.shape.size(from: canvas)
                 summaryLabel.stringValue = VerticalVersion.pendingSummary(
                     files: Set(requests.map(\.media.id)).count, width: size.width,
-                    height: size.height)
-                enabled = true
-            } else if follow.follow.follows, subjects == nil {
+                    height: size.height, speaker: speaker)
+                enabled = !speaker || ticked
+            } else if analysing, subjects == nil {
                 summaryLabel.stringValue = FollowSubjectSheetController.reading
+            } else if speaker {
+                switch reading(settings) {
+                case .refused(let why):
+                    summaryLabel.stringValue = why
+                case .ready(let read, _, _):
+                    // Read again: the reading's first offer may have preset the faces.
+                    let confirmed = self.settings(follow) ?? settings
+                    speakerSubjects = read
+                    let (made, text) = planned(confirmed)
+                    summaryLabel.stringValue = text
+                    enabled = made && ticked && confirmed.micFaces != nil
+                }
             } else {
                 let (made, text) = planned(settings)
                 summaryLabel.stringValue = text
@@ -269,14 +333,46 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         acceptIfAsked()
     }
 
+    /// VR-66 (c): the ticked set's reading, a ready one cached and offered to the picker at every
+    /// refresh (`offer` presets a set once, so a repeat does nothing until the set is ticked
+    /// again and its rows rebuilt); a refused one read again at every refresh.
+    private func reading(_ settings: VerticalSettings) -> VerticalVersion.SpeakerReading {
+        let key = settings.mics
+        if let cached = readings[key] {
+            if case .ready(_, _, let match) = cached.read { picker.offer(match, mics: cached.mics) }
+            return cached.read
+        }
+        guard let document else { return .refused("") }
+        var unconfirmed = settings
+        unconfirmed.micFaces = nil
+        let read = VerticalVersion.speakerReading(
+            document: document, project: document.project, settings: unconfirmed,
+            subjects: subjects ?? [:], missing: missing)
+        guard case .ready(_, let reference, let match) = read else { return read }
+        // The reference's own microphones named back as the ticked ones, track by track.
+        let snapshot = document.project.snapshot
+        let own = VerticalVersion.speakerClips(
+            document.project, settings: unconfirmed, missing: missing
+        ).first { $0.clip == reference }?.mics ?? []
+        let byTrack = Dictionary(
+            key.compactMap { id in snapshot.clip(id).map { ($0.track, id) } },
+            uniquingKeysWith: { first, _ in first })
+        let mics = own.map { snapshot.clip($0).flatMap { byTrack[$0.track] } ?? $0 }
+        readings[key] = (read, mics)
+        picker.offer(match, mics: mics)
+        return read
+    }
+
     /// `VerticalVersion.plan` on the document's current handle: whether it makes anything, and
     /// its summary or the refusal.
     private func planned(_ settings: VerticalSettings) -> (Bool, String) {
         guard let document else { return (false, "") }
         do {
+            let read = settings.follow == .speaker
+                ? (speakerSubjects ?? [:])
+                : VerticalVersion.analyses(settings.follow) ? (subjects ?? [:]) : [:]
             switch try VerticalVersion.plan(
-                document.project, settings: settings,
-                subjects: settings.follow.follows ? (subjects ?? [:]) : [:], missing: missing)
+                document.project, settings: settings, subjects: read, missing: missing)
             {
             case .plan(let plan):
                 let report = VerticalVersion.templateReport(
@@ -329,13 +425,14 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         guard makeButton?.isEnabled == true, let asked else { return }
         let follow = self.follow
         guard let settings = settings(follow) else { return }
-        let following = follow.follow.follows
+        let following = VerticalVersion.analyses(follow.follow)
         let analyzing = pending(follow)
         follow.remember(changedFrom: opened, in: .standard)
+        let read = follow.follow == .speaker ? speakerSubjects : subjects
         handOff = VerticalHandOff(
             settings: settings, copy: copyBox.state == .on, targets: following ? present : [],
             cursor: following ? cursor : [], missing: missing, requests: analyzing ? requests : [],
-            subjects: analyzing || !following ? [:] : (subjects ?? [:]), asked: asked,
+            subjects: analyzing || !following ? [:] : (read ?? [:]), asked: asked,
             scope: askedScope)
         dismiss(self)
     }

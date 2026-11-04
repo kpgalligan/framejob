@@ -44,7 +44,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 421 | The action ops (the zoom action, the camera layout switch, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
-| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 226 | The `rc_*` exports and their contracts. |
+| [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 227 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 325 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 460 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
@@ -62,12 +62,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9f-agent-transcript.md`](07.9f-agent-transcript.md) | 105 | The timeline transcript, `get_timeline_transcript`: what is read (the plan's audio segments, nested ones with `path` and `origin`), on-device starts moved to their sound (TX1b), the answer (words with clip, track, editability, identity and the tab's `cut_start`/`cut_end`; `pauses` with their cuts; `media`, `no_words`, `notes`), the window and `tracks`, paging at 2,000 words, and the whole-file fill (§11 TX-10…TX-18, TX-30, TX-33, TX-34). |
 | [`07.9g-agent-behind-subject.md`](07.9g-agent-behind-subject.md) | 39 | Text Behind Subject's tool, `text_behind_subject`: the planner it runs (the pick, the new track above the mattes, the title, the cutout that keeps the background), its answer and its refusals (§11 CO-53, CO-54). |
 | [`07.9h-agent-switch.md`](07.9h-agent-switch.md) | 118 | `copy_pieces`'s tool and Switch Angle's, `switch_angle`: the empty-list refusal, covering, the re-pick's sequence tried one op at a time, the held edge, the answer and the refusals (§11 SW-11…SW-15); `switch_by_speaker`: its arguments, ranges and defaults, errors, refusals, the ops and the answer (§11 SW-23, SW-26); its faces mode, off-main wait and `mode`/`note` (§11 SW-80…SW-86). |
-| [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 156 | `make_vertical_version`: its arguments, the size, the step's classes and order, a canvas-size graphic re-sized, the caption step (6), the treatments and reasons, the copy and its old template copies updated (§11 VR-42, VR-44), the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
+| [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 178 | `make_vertical_version`: its arguments, the size, the step's classes and order, a canvas-size graphic re-sized, the caption step (6), the treatments and reasons, the copy and its old template copies updated (§11 VR-42, VR-44), the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 161 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 325 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 23594 in 46 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 23728 in 46 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

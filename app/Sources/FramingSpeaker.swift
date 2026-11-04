@@ -9,10 +9,19 @@ import Foundation
 /// track named back as its microphone's clip id.
 ///
 /// `read`'s problems (still being analysed, no speech detection) and SW-24's
-/// no-speech sentence refuse, in SW-24's words. A microphone `read` drops —
-/// its sound off — gets no turn and no refusal here: the core names it
-/// (VR-60 (d)). Main thread (it reads the document); names no `rc_*`.
+/// no-speech sentence refuse, in SW-24's words, as a `Refusal` carrying the
+/// bare sentence: `reframe_clip` prefixes it "reframe_clip was refused: ",
+/// `make_vertical_version` "make_vertical_version was refused: " and Make
+/// Vertical's sheet shows it as it is (road map creator-jobs VR6b, spec §11
+/// VR-64 (d), VR-66 (c)). A microphone `read` drops — its sound off — gets
+/// no turn and no refusal here: the core names it (VR-60 (d)). Main thread
+/// (it reads the document); names no `rc_*`.
 enum FramingSpeaker {
+    /// Why nobody's turns could be read: SW-24's sentence, with no prefix.
+    struct Refusal: Error {
+        let sentence: String
+    }
+
     /// `[{from, to, mic}]` in the open container's timeline ticks, `mic` a clip
     /// id of `mics`.
     static func turns(document: ProjectDocument, clip: ClipSnapshot, mics: [UInt32]) throws
@@ -32,14 +41,12 @@ enum FramingSpeaker {
                 pairing: SpeakerSwitch.Pairing(speakers: speakers, wide: nil),
                 range: (clip.start, clip.end), settings: SpeakerSwitch.Settings())
         else {
-            throw AgentServer.ToolError(
-                message: "reframe_clip was refused: the project's plan could not be read, so "
-                    + "nobody's turns could be.")
+            throw Refusal(
+                sentence: "the project's plan could not be read, so nobody's turns could be.")
         }
         let problems = input.problems + SpeakerSwitch.silentMicrophones(input)
         guard problems.isEmpty else {
-            throw AgentServer.ToolError(
-                message: "reframe_clip was refused: " + problems.joined(separator: " "))
+            throw Refusal(sentence: problems.joined(separator: " "))
         }
         return SpeakerSwitch.turns(input).compactMap { turn in
             clipOf[turn.mic].map { ["from": turn.from, "to": turn.to, "mic": Int($0)] }

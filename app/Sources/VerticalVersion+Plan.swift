@@ -5,7 +5,8 @@ import Foundation
 /// only its answer deciding the clip's entry. The classes are `VerticalVersion.swift`'s; step
 /// 3b, the camera layouts re-laid, is `VerticalVersion+Layouts.swift`'s (VR-53 (d)); step (6),
 /// the word caption tracks re-paged on the new canvas, is `CaptionRelayout`'s (VR-40 (f)); the
-/// summary is `VerticalVersion+Summary.swift`'s. Throws only the core's invalid input. Names no
+/// summary is `VerticalVersion+Summary.swift`'s; `follow: speaker`'s clips and turns are
+/// `VerticalVersion+Speaker.swift`'s (VR-64). Throws only the core's invalid input. Names no
 /// `rc_*`.
 extension VerticalVersion {
 
@@ -35,6 +36,8 @@ extension VerticalVersion {
         let cursor: [UInt32]
         /// Step 3b's re-laid switches, in time order, then camera id (spec §11 VR-54).
         let relaid: [Relaid]
+        /// The clips framed by who is talking, in id order (spec §11 VR-64 (f)).
+        let speaker: [SpeakerFraming]
     }
 
     enum Answer {
@@ -69,9 +72,11 @@ extension VerticalVersion {
 
     /// VR-34 on `project`, the top-level timeline. `missing`: media pictures whose media has
     /// no URL in `document.mediaURLs()` (kept, not followed). `subjects` per clip, read by the
-    /// following kinds only: the analysis's, or for a picture whose media has a cursor file
-    /// its cursor's (`FramingCursor`, VR-51), followed by `cursor` with `replace: true`, or
-    /// shown whole (`fit`) when it is absent.
+    /// following kinds and `speaker` only: the analysis's, or for a picture whose media has a
+    /// cursor file its cursor's (`FramingCursor`, VR-51), followed by `cursor` with `replace:
+    /// true`, or shown whole (`fit`) when it is absent. With `speaker` a speaker clip's subjects
+    /// carry their `turns` (`withTurns`, VR-64 (d)); it is framed `speaker` with its own
+    /// microphones, every other analysed picture `face`, a refused `speaker` retried as `face`.
     static func plan(
         _ project: ReelProject, settings: VerticalSettings, subjects: [UInt32: [String: Any]],
         missing: Set<UInt32>
@@ -93,6 +98,9 @@ extension VerticalVersion {
         var entries: [UInt32: Entry] = [:]
         var framed: Set<UInt32> = []
         var cursor: [UInt32] = []
+        let speakers = speakerClips(project, settings: settings, missing: missing)
+        let speakerOf = Dictionary(uniqueKeysWithValues: speakers.map { ($0.clip, $0) })
+        var speaker: [SpeakerFraming] = []
         var moreTracks = 0
         var reEased = 0
         var carried = 0
@@ -116,13 +124,15 @@ extension VerticalVersion {
             switch role {
             case .picture:
                 if case .media = clip.source {
-                    if settings.follow.follows, missing.contains(id) {
+                    if analyses(settings.follow), missing.contains(id) {
                         note = "its media file is missing, so it is kept as placed"
-                    } else if settings.follow.follows, old.media(for: clip)?.cursor != nil {
+                    } else if analyses(settings.follow), old.media(for: clip)?.cursor != nil {
                         follow = subjects[id] == nil ? .fit : .cursor
                         if follow == .fit {
                             note = "its cursor file could not be read, so it is shown whole"
                         }
+                    } else if settings.follow == .speaker {
+                        follow = speakerOf[id] == nil ? .face : .speaker
                     } else {
                         follow = settings.follow
                     }
@@ -140,41 +150,43 @@ extension VerticalVersion {
                 continue
             }
             func op(_ follow: FramingFollow) -> ReelOp {
-                .reframeClip(
+                let own = follow == .speaker ? speakerOf[id] : nil
+                var read = follow.readsSubjects ? subjects[id] : nil
+                if follow != .speaker { read?["turns"] = nil }
+                return .reframeClip(
                     clip: id, follow: follow, zoom: settings.zoom,
-                    whereEmpty: follow.follows ? settings.whereEmpty : nil,
+                    whereEmpty: analyses(follow) ? settings.whereEmpty : nil,
                     fromWidth: UInt32(old.canvas.width), fromHeight: UInt32(old.canvas.height),
                     backdrop: backgrounds, replace: follow == .cursor ? true : nil,
-                    subjects: follow.readsSubjects ? subjects[id] : nil)
+                    mics: own?.mics, micFaces: own?.micFaces, subjects: read)
             }
             let prior = trial.project
             var next = prior
             var used = follow
             var refusedWhy: String?
-            switch try prior.applying(op(follow)) {
-            case .applied(let made):
-                next = made
-                trial.ops.append(op(follow))
-            case .identity:
-                break
-            case .refused(let refusal):
-                guard follow != .keep else {
-                    return .refused(
-                        "Make Vertical was refused at reframe_clip for clip \(id): "
-                            + refusal.reason)
-                }
-                refusedWhy = refusal.reason
-                used = .keep
-                switch try prior.applying(op(.keep)) {
+            var speakerWhy: String?
+            // VR-34's retry, VR-64 (c)'s first: speaker → face → keep, a refused keep stopping.
+            tried: while true {
+                switch try prior.applying(op(used)) {
                 case .applied(let made):
                     next = made
-                    trial.ops.append(op(.keep))
+                    trial.ops.append(op(used))
+                    break tried
                 case .identity:
-                    break
-                case .refused(let again):
-                    return .refused(
-                        "Make Vertical was refused at reframe_clip for clip \(id): "
-                            + again.reason)
+                    break tried
+                case .refused(let refusal):
+                    guard used != .keep else {
+                        return .refused(
+                            "Make Vertical was refused at reframe_clip for clip \(id): "
+                                + refusal.reason)
+                    }
+                    if used == .speaker {
+                        speakerWhy = refusal.reason
+                        used = .face
+                    } else {
+                        refusedWhy = refusal.reason
+                        used = .keep
+                    }
                 }
             }
             trial.project = next
@@ -184,6 +196,12 @@ extension VerticalVersion {
                 continue
             }
             if used == .cursor { cursor.append(id) }
+            if used == .speaker, let own = speakerOf[id] {
+                let matched = own.micFaces ?? subjects[id].flatMap {
+                    project.speakerMatch(clip: id, mics: own.mics, subjects: $0)?.assignment
+                }
+                speaker.append(SpeakerFraming(clip: id, mics: own.mics, faces: matched ?? []))
+            }
             if used != .keep {
                 framed.insert(id)
                 let counted = FollowSubject.counts(
@@ -195,6 +213,14 @@ extension VerticalVersion {
                 entries[id] = Entry(clip: id, treatment: .notFollowed, reason: note)
             } else if role == .other {
                 entries[id] = Entry(clip: id, treatment: .kept, reason: nil)
+            } else if let speakerWhy {
+                // VR-64 (c): followed on its faces, saying why not by who is talking.
+                let base = followedEntry(clip, prior: prior, next: next)
+                let reasons = [
+                    "it follows its faces, not who is talking, because " + speakerWhy, base.reason,
+                ].compactMap { $0 }
+                entries[id] = Entry(
+                    clip: id, treatment: .followed, reason: reasons.joined(separator: " and "))
             } else {
                 entries[id] = followedEntry(clip, prior: prior, next: next)
             }
@@ -270,7 +296,8 @@ extension VerticalVersion {
                 ops: trial.ops, project: trial.project, width: size.width, height: size.height,
                 entries: entries.keys.sorted().compactMap { entries[$0] }, backgrounds: kept,
                 moreTracks: moreTracks, reEased: reEased, carried: carried,
-                captions: captions, cursor: cursor.sorted(), relaid: layouts))
+                captions: captions, cursor: cursor.sorted(), relaid: layouts,
+                speaker: speaker.sorted { $0.clip < $1.clip }))
     }
 
     /// A media picture framed with a following kind or `center`: whole only when the op added

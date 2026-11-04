@@ -193,6 +193,11 @@ the same way.
 - **Expect:** the pointer stays in view and the frame lands on each click before it happens, moves calmly (no hunting after small motions), holds still while you type, and the text the cursor points at is readable at phone size; the auto zoom is replaced, not stacked on the framing.
 - **Source:** road map creator-jobs VR5, spec §11 VR-50, VR-52, VR-55 (how it reads on a phone, which no script can give).
 
+**JOB-37 — A two-shot's vertical version follows whoever is talking**
+- **Do:** When S-PC3 (two people in one wide shot, a microphone each) exists, put the wide and both microphones on a 1920 × 1080 timeline (Clip ▸ Synchronize Audio first), choose File ▸ Make Vertical Version… at 9:16 with Follow Speaker and both microphones ticked, and check each Faces row names that microphone's person. Make, then play the copy and its export through on a phone. Skipped by name while S-PC3 does not exist.
+- **Expect:** each change of speaker cuts to the person now talking near their first word, a reply under 2 s does not cut away and back, both are framed together when both talk and fit, silence keeps the last speaker, the sheet's match was right or said it could not tell, and the framing agrees with Switch by Speaker about who is talking.
+- **Source:** road map creator-jobs VR6b, spec §11 VR-60, VR-61, VR-64, VR-66 (no script judges a real two-shot; VR-S3's S-PC3 arm owed).
+
 **JOB-39 — A screen recording and its camera, stacked, read well on a phone**
 - **Do:** When S-ST1 (a real screen recording with its camera beside it, made with Frame Job) exists, switch its camera to Side by Side with Clip ▸ Camera Layout ▸ for part of it (and a Corner elsewhere), make its 9:16 version with File ▸ Make Vertical Version… and the defaults, export it and watch it through on a phone. Skipped by name while S-ST1 does not exist.
 - **Expect:** the Side by Side part is Stacked — the screen across the top large enough to read, the camera below it showing the person's face — the Corner part keeps its corner, each switch happens when it did in the landscape edit, and nothing is followed or shown on a blurred copy.

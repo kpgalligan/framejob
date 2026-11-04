@@ -463,6 +463,17 @@ char *rc_project_clip_state(const RcProject *p, uint32_t clip, int64_t t);
  * media is gone. */
 char *rc_project_source_map(const RcProject *p, uint32_t clip);
 
+/* The face-to-microphone match `reframe_clip {follow: speaker}` would make on
+ * `clip` (spec §11 VR-65), for Make Vertical's sheet to confirm. `args_json` is
+ * {"mics":[id,…],"subjects":{…}}, `subjects` as reframe_clip reads them (its
+ * strict reader and check_subjects). Compact JSON
+ * {"faces":[{"face":1,"x":0.42,"samples":600},…],"agreement":[[r,…],…]
+ * ([mic][face]),"assignment":[face per mic],"sure":bool}; with fewer faces than
+ * mics {"faces":[],"agreement":[],"assignment":[],"sure":false}. NULL for a NULL
+ * project or args, an unknown clip, a clip that is not a media clip, malformed
+ * or failing args, or mics empty or over 4. Free with rc_string_free. */
+char *rc_project_speaker_match(const RcProject *p, uint32_t clip, const char *args_json);
+
 /* Snap candidates for a timeline drag: a JSON object with sorted tick
  * arrays. `exclude_clips_json` is a JSON array of clip ids to omit (the
  * clips being dragged), or NULL for none. */

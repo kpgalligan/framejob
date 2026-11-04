@@ -16,8 +16,9 @@ extension AgentServer {
             // "Backgrounds" track as `backdrop`. The tool fills `subjects` from the
             // analysis cache (AgentServer+Framing.swift). `follow: layout`'s UI path is
             // File ▸ Make Vertical Version…'s step 3b (VR-53, VerticalVersion+Layouts.swift).
-            // `follow: speaker` (VR6a, spec §11 VR-60) has no menu yet (VR6b); its turns are
-            // read as Clip ▸ Switch by Speaker… reads them (FramingSpeaker.swift).
+            // `follow: speaker`'s UI path (VR6a, spec §11 VR-60) is File ▸ Make Vertical
+            // Version…'s Follow Speaker (VR6b, VR-66); its turns are read as Clip ▸ Switch by
+            // Speaker… reads them (FramingSpeaker.swift).
             opTool(
                 "reframe_clip",
                 "Frames one clip on the current canvas — for a vertical or square version of "
@@ -133,7 +134,8 @@ extension AgentServer {
                 ]),
             // UI path: File ▸ Make Vertical Version… (road map creator-jobs VR3b, spec §11
             // VR-39: EditorViewController+VerticalVersion.swift and
-            // VerticalVersionSheetController.swift), spec §11 VR-30…VR-37. The step is
+            // VerticalVersionSheetController.swift; Follow Speaker and its Microphones and
+            // Faces rows VR6b, VR-66), spec §11 VR-30…VR-37, VR-64. The step is
             // VerticalVersion.plan; the copy is ProjectDocument.verticalCopy; the handler
             // AgentServer+VerticalVersion.swift.
             tool(
@@ -147,7 +149,13 @@ extension AgentServer {
                     + "follow, shown whole on a blurred copy where nothing is found; a screen "
                     + "recording whose media has a cursor file follows its cursor instead, "
                     + "never faces, its own zooms and pans replaced, or is shown whole on a "
-                    + "blurred copy when its cursor file cannot be read; a still "
+                    + "blurred copy when its cursor file cannot be read; with follow speaker, a "
+                    + "movie clip of two to four people playing beside two or more of the "
+                    + "microphones in mics is framed on whoever is talking (reframe_clip's "
+                    + "follow speaker with the microphones under it, their faces from "
+                    + "mic_faces or matched by Frame Job), falling back to following its "
+                    + "faces with the reason when that is refused, and every other movie clip "
+                    + "follows its faces; a still "
                     + "picture or a nest is centred); a camera and the screen behind it laid "
                     + "out with Clip ▸ Camera Layout ▸ are re-laid, not reframed (reframe_clip "
                     + "with follow layout, one per camera): each switch solved again for the "
@@ -175,10 +183,15 @@ extension AgentServer {
                     + "nothing made: inside a nest; path without copy; a path another open "
                     + "project holds or where anything exists; a shape the canvas already has; "
                     + "the core's own sentence for the canvas, the Backgrounds track or a clip "
-                    + "even keep cannot reframe. Answers {ok, canvas {width, height}, cached "
+                    + "even keep cannot reframe; with follow speaker, no mics, a clip id in "
+                    + "mics that is not a clip, no movie clip playing beside two of the "
+                    + "microphones, and a microphone still being analysed or never speaking "
+                    + "(Switch by Speaker's sentences). Answers {ok, canvas {width, height}, cached "
                     + "(false when an analysis ran), clips [{clip, treatment (followed, whole, "
                     + "kept, refilled, removed, resized, relaid or not_followed), reason?}], "
-                    + "cursor [the clips followed by their cursor], relaid [{camera, at "
+                    + "cursor [the clips followed by their cursor], speaker [{clip, mics, "
+                    + "mic_faces}] (the clips framed on whoever is talking, each with its "
+                    + "microphones and the face of each), relaid [{camera, at "
                     + "(ticks), from, to (switch_layout's layout words), shape (a corner's)}] "
                     + "in time order, backgrounds, more_tracks, "
                     + "re_eased, moves_carried, summary, captions "
@@ -201,11 +214,24 @@ extension AgentServer {
                     ],
                     "follow": [
                         "type": "string",
-                        "enum": FollowSubject.follows.map(\.rawValue),
+                        "enum": VerticalVersion.follows.map(\.rawValue),
                         "description": "What a movie clip follows: subject (the default), face, "
-                            + "person or salient, or center to hold the picture's centre. A "
-                            + "screen recording with a cursor file follows its cursor with any "
-                            + "of the first four, and is centred with center.",
+                            + "person or salient, speaker (whoever is talking, from mics; the "
+                            + "other movie clips follow their faces), or center to hold the "
+                            + "picture's centre. A screen recording with a cursor file follows "
+                            + "its cursor with any but center, and is centred with center.",
+                    ],
+                    "mics": [
+                        "type": "array", "items": ["type": "integer"],
+                        "description": "speaker only, and required with it: two to four clip "
+                            + "ids, each a clip of a sound file on its own track standing for "
+                            + "that track as one person's microphone.",
+                    ],
+                    "mic_faces": [
+                        "type": "array", "items": ["type": "integer"],
+                        "description": "speaker only: each microphone's face number, in mics' "
+                            + "order (faces numbered 1… left to right across the picture); "
+                            + "absent, Frame Job matches them.",
                     ],
                     "zoom": [
                         "type": "number",

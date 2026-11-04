@@ -1,7 +1,8 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_frame_recipe_opts`, `rc_project_clip_state`,
-//! `rc_project_source_map`, `rc_project_snap_candidates`, `rc_snap_resolve`,
+//! `rc_project_source_map`, `rc_project_speaker_match`,
+//! `rc_project_snap_candidates`, `rc_snap_resolve`,
 //! `rc_op_names`, `rc_op_schemas`, `rc_speed_limits` and the three
 //! `rc_export_*` queries in the header).
 //!
@@ -30,9 +31,11 @@ use crate::export;
 use crate::ffi_util::{
     fallible_op, handle_get, handle_json, out_string, quiet_string, read_cstr, read_opt_cstr,
 };
-use crate::model::Project;
+use crate::model::{Project, Source};
 use crate::op_schema;
 use crate::recipe::RecipeOptions;
+use crate::reframe_speaker::clip_speaker_match;
+use crate::reframe_subjects::{check_subjects, Subjects};
 use crate::snap;
 use crate::time::Ticks;
 
@@ -147,6 +150,60 @@ pub unsafe extern "C" fn rc_project_source_map(p: *const Project, clip: u32) -> 
     unsafe {
         handle_json(p, |project| {
             project.source_map(clip).map(|map| map.to_string())
+        })
+    }
+}
+
+/// The face-to-microphone match `reframe_clip {follow: speaker}` would make
+/// on `clip` (spec §11 VR-65), for Make Vertical's sheet to confirm:
+/// `args_json` is `{"mics": [id, …], "subjects": {…}}`, `subjects` read as
+/// `reframe_clip` reads them (its strict reader and `check_subjects`). The
+/// answer, compact: `{"faces": [{"face": 1, "x": 0.42, "samples": 600}, …],
+/// "agreement": [[r, …], …]` (`[mic][face]`), `"assignment": [face per mic],
+/// "sure": bool}`; with fewer faces than microphones `{"faces": [],
+/// "agreement": [], "assignment": [], "sure": false}`. NULL for a NULL
+/// project or args, an unknown clip, a clip that is not a media clip,
+/// malformed or failing args, or `mics` empty or over 4.
+///
+/// # Safety
+/// `p` must be NULL or a valid handle from this library that has not been
+/// freed; `args_json` must be NULL or a valid NUL-terminated C string. The
+/// returned string is freed with [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_project_speaker_match(
+    p: *const Project,
+    clip: u32,
+    args_json: *const c_char,
+) -> *mut c_char {
+    unsafe {
+        handle_json(p, |project| {
+            // Read inside the closure, under handle_json's one catch_unwind.
+            let text = read_cstr(args_json, "args_json").ok()?;
+            let args: Value = serde_json::from_str(&text).ok()?;
+            let mics: Vec<u32> = serde_json::from_value(args.get("mics")?.clone()).ok()?;
+            if mics.is_empty() || mics.len() > 4 {
+                return None;
+            }
+            let subjects: Subjects = serde_json::from_value(args.get("subjects")?.clone()).ok()?;
+            check_subjects(&subjects).ok()?;
+            let c = project.clip(clip)?;
+            if !matches!(c.source, Source::Media { .. }) {
+                return None;
+            }
+            let answer = match clip_speaker_match(project, c, &subjects, &mics) {
+                Some(found) => serde_json::json!({
+                    "faces": found.faces.iter().map(|f| serde_json::json!({
+                        "face": f.face, "x": f.x, "samples": f.samples,
+                    })).collect::<Vec<_>>(),
+                    "agreement": found.agreement,
+                    "assignment": found.assignment,
+                    "sure": found.sure,
+                }),
+                None => serde_json::json!({
+                    "faces": [], "agreement": [], "assignment": [], "sure": false,
+                }),
+            };
+            Some(answer.to_string())
         })
     }
 }

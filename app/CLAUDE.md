@@ -32,7 +32,10 @@ detail there.
   (`rc_cursor_open`, `rc_cursor_free`: a cursor file's open, which is its check, spec
   §11 CU-9, CU-15; road map creator-jobs CU1a; and `query`, `rc_cursor_query`'s one
   JSON request, CU2, spec §11 CU-25, and the static `query(_:tracks:project:)`, the
-  same call over n tracks with a project (`plan_zooms`, CU-70)) — and `ReelCore+Graphics.swift` the graphics engine's
+  same call over n tracks with a project (`plan_zooms`, CU-70)) — `ReelCore+Framing.swift`
+  holds `SpeakerMatch` and `ReelProject.speakerMatch` (`rc_project_speaker_match`, road map
+  creator-jobs VR6b, spec §11 VR-65: the face-to-microphone match Make Vertical's sheet
+  confirms) — and `ReelCore+Graphics.swift` the graphics engine's
   wrappers (below), with `ReelGraphicPackage` (`rc_graphic_package_write`, G-46; `read`,
   `rc_graphic_package_read`, G-47), `GraphicLibrary.usage()` (`rc_graphic_library_usage`)
   and `GraphicLibrary.imageCache(limit:)` (`rc_graphic_image_cache`, G-39) — both pure moves
@@ -971,7 +974,9 @@ detail there.
   `FramingSpeaker` (main, names no `rc_*`) `follow: speaker`'s `turns` — `SpeakerSwitch.read`
   over the `mics` clips (each its track's speaker, no angle, no wide, the framed clip's span,
   `Settings()`), `SpeakerSwitch.turns`, each track named back as its clip id, `read`'s
-  problems and `silentMicrophones` refusing as "reframe_clip was refused: …"; a microphone
+  problems and `silentMicrophones` thrown as a `FramingSpeaker.Refusal` (the bare sentence; the
+  handler answers "reframe_clip was refused: …", `make_vertical_version` "make_vertical_version
+  was refused: …" and Make Vertical's sheet shows it as it is, VR6b); a microphone
   `read` drops gets no turn and the core names it. The handler passes `mics` and `mic_faces`,
   refuses `speaker` addressed to a container other than the open one, and adds the turns on
   its last hop.
@@ -1004,7 +1009,7 @@ detail there.
   line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
 - `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `VerticalVersion+Summary.swift` ·
   `VerticalVersion+Layers.swift` · `VerticalVersion+Layouts.swift` ·
-  `GraphicTemplates+Revisions.swift` · `ProjectDocument+VerticalCopy.swift` ·
+  `VerticalVersion+Speaker.swift` · `GraphicTemplates+Revisions.swift` · `ProjectDocument+VerticalCopy.swift` ·
   `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
   `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; its menu is the
   entry below). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
@@ -1048,7 +1053,18 @@ detail there.
   `graphicsLines`; `verticalCopy` answers the template report and `make_vertical_version`'s
   answer always has `graphics {resized, updated, listed}`; the sheet surveys once at
   `viewDidAppear`. `graphic/tests/vertical_templates.rs`' trap fails `make test` until a new
-  text of one of the six is a row. `ProjectDocument+VerticalCopy`: `verticalCopy` (the
+  text of one of the six is a row. Since VR6b (spec §11 VR-64): `follows` (Speaker before
+  Center), `analyses` (`follows || speaker`, every following-kind test of the plan and the
+  tool), `remembered` (the sheet's opening Follow and Where Empty, a stored `speaker` kept) and
+  `VerticalSettings.mics` / `micFaces`; `+Speaker` (names no `rc_*`) the microphone tracks
+  (`microphones`), the speaker clips and each one's own microphones (`speakerClips`),
+  `withTurns` (main; `FramingSpeaker.turns` per speaker clip) and the sheet's `speakerReading`
+  (the turns, then `ReelProject.speakerMatch` on the longest speaker clip); `+Plan` frames a
+  speaker clip `speaker`, every other analysed picture `face`, a refused `speaker` retried as
+  `face` with its reason and `Plan.speaker`; `+Summary`'s " Follows whoever is talking in N
+  clip(s).", `pendingSummary(…speaker:)` and the answer's `speaker`; the tool's `mics` /
+  `mic_faces`, its three refusals and the turns on the last hop.
+  `ProjectDocument+VerticalCopy`: `verticalCopy` (the
   derived door handed the source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
   unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
   tool, off main (`creatorOffMainTools`): hop 1's refusals in order, `captions` read with
@@ -1058,7 +1074,8 @@ detail there.
   `editResult` in place or the copy, saved through `save(_:to:operation:)` with `path`; its
   row in `AgentCatalog+Framing.swift`, after `reframe_clip`'s; the assistant's ask-first row
   only with `path`.
-- `VerticalVersionSheetController.swift` · `EditorViewController+VerticalVersion.swift` — File ▸
+- `VerticalVersionSheetController.swift` · `VerticalSpeakerPicker.swift` ·
+  `EditorViewController+VerticalVersion.swift` — File ▸
   Make Vertical Version… (road map creator-jobs VR3b, spec §11 VR-39), the menu door over VR3a's
   step and copy. The sheet: Shape (`VerticalVersion.offered`, each titled "9:16 (1080 × 1920)"),
   Follow, Zoom (100 %, never remembered), Where Empty (off while Follow is Center) and Make a copy
@@ -1079,7 +1096,15 @@ detail there.
   `document.project`, `verticalCopy(…, path: nil, display: true)` or
   `performGroupedEdit("Make Vertical", …)`), refusals posted as `set_canvas`, and
   `validateVerticalVersionAction`, one line in the frozen file after `validateNewFromRangeAction`
-  (a clip, no nest, no sheet, no recording).
+  (a clip, no nest, no sheet, no recording). Since VR6b (spec §11 VR-66): Follow lists Speaker,
+  the sheet opens from `VerticalVersion.remembered`; `VerticalSpeakerPicker` (names no `rc_*`)
+  is the Microphones and Faces block shown with Speaker — a checkbox per microphone track, the
+  first four ticked; a Faces row per ticked one, its pop-up "Choose a face" and the core's
+  faces, preset only by a sure match, once per ticked set; the note; `micFaces` nil until each
+  has its own face. The reading is made on main and cached per ticked set only when ready, with
+  the reference's microphones, and a cached reading is offered again at every refresh; Make
+  passes `mics` and the confirmed `micFaces`. A Speaker hand-off whose Analyzing sheet landed
+  presents the sheet again (`restoring`), never making.
 - `TimelineTranscript.swift` · `TimelineTranscript+Rules.swift` ·
   `TranscriptFill.swift` · `AgentServer+TimelineTranscript.swift` ·
   `AgentCatalog+Transcript.swift` — the timeline transcript (road map

@@ -29988,3 +29988,46 @@ python3 tools/proof/vr6_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR6a record; JOB-37 (VR6b) is what only a
 person judges.
+
+## Road map "creator-jobs" VR6b — Make Vertical follows the speaker (`vr6b_proof.py` Z0, Q1–Q7 with `vr6b_probe.swift` Q8; `core/tests/speaker_match_ffi.rs`; eight mutants; spec §11 VR-64…VR-68)
+
+**Two launches** (`proof_app.py`'s app, a scratch `CFFIXED_USER_HOME` — the sheet writes the
+Follow key) over F-TURNS (`creator_spike/f_turns.py`; exit 2 without `say`'s Samantha and Daniel
+skips every row but Q8 by name). Each document is a fresh package on a 1920 × 1080, 30 fps
+canvas: `cam_wide.mov` W on "Wide" at 0, `mic_a_b12_f55.wav` on "Mic A" and `mic_b_b12_f55.wav`
+on "Mic B" at 0, and `cam_b.mov` S on "Wide" after the microphones' span. W's analyses are
+`vr6_proof.py`'s canned two faces with landmarks (face 1 at x 0.42, face 2 at 0.58); S's one
+still face at 0.5. Each microphone's `cache/loudness` and `cache/speech` `complete.json` is
+waited for before a row reads it. The expected framing is a REFERENCE document built the same
+way and framed by hand with the tools the step is made of — `set_canvas {1080, 1920,
+rescale_clips: false}`, `add_track {0, "Backgrounds"}`, `reframe_clip {W, …, zoom 1,
+where_empty fit, from 1920 × 1080, backdrop}` — compared on W's `video` and `actions`.
+
+| Row | What it holds |
+|---|---|
+| Z0 | each launch's `grep "Frame Job: "` prints nothing |
+| Q1 | launch 1 (`-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`): `make_vertical_version {shape: "9:16", follow: speaker, mics: [A, B], copy: false}` answers `speaker [{W, [A, B], [1, 2]}]`, W and S `followed` with no reason, " Follows whoever is talking in 1 clip."; W equals the reference's `reframe_clip {speaker, mics [A, B]}`; one undo "Make Vertical" gives the project back |
+| Q2 | `mic_faces: [2, 1]`: answered `[2, 1]`; W equals the reference with `mic_faces [2, 1]` and differs from Q1's |
+| Q3 | constant mouths: W `followed`, its reason starting "it follows its faces, not who is talking, because clip W's faces do not show"; `speaker` []; W equals a reference `follow: face` |
+| Q4 | nothing made, each in its sentence: no `mics`; `mics: [A]` (no speaker clip); an unknown id (`clipArg`'s "No clip has id 99999."); Mic A's `cache/loudness/<id>.*` removed ("make_vertical_version was refused: " + SW-24's "still being analysed") |
+| Q5 | launch 2 (`-RCDevAnalysisCanned YES -FrameJobFollowKind speaker -RCDevVerticalAccept in-place`): File ▸ Make Vertical Version… on Q1's fixture; within 60 s the canvas is 1080 × 1920 in place, W equals the reference (and Q1's W when Q1 ran); undo "Make Vertical" |
+| Q6 | the menu on Q3's fixture: nothing made for 10 s; the sheet's layout dump shows "Mic A", "Mic B", two `vertical.face.*` pop-ups on "Choose a face" and the not-sure note; `cancel_sheet` |
+| Q7 | W's analysis not canned (and no S): the Analyzing sheet within 60 s, gone within 300 s, then within 30 s the Make Vertical sheet again, Follow "Speaker", the Faces rows of Mic A and Mic B shown (both ticked); `cancel_sheet`, nothing made |
+| Q8 | `vr6b_probe.swift`, built through `swift_build.build` over `app/Sources` (a build failure is a scored failure) and run under the scratch home on a suite of its own: key `speaker` → `VerticalVersion.remembered` Speaker, `FollowSubjectSettings.remembered` Subject; Subject chosen writes `subject`; key `cursor` → Subject |
+
+Mutants (`--mutant NAME`; spec §11 VR-68), each anchor asserted to occur once, exit 1 caught, 0
+survived, 2 when the control could not be performed; each edits a `tree_copy.py` copy and runs
+its row on the copy's app (`tree_copy.build_app`), Q8's on a probe built from the copy's
+sources: `every-picture-speaker` (Q1), `speaker-retried-keep` (Q3), `mic-faces-dropped` (Q2),
+`preset-when-unsure` (Q6), `preset-transposed` (Q5), `handoff-committed` (Q7),
+`turns-unfilled` (Q1), `remembered-ignores-speaker` (Q8).
+
+```sh
+cd core && cargo test --release --test speaker_match_ffi
+make app-debug && python3 tools/proof/vr6b_proof.py [--only Q1,Q5]
+make app && RC_PROOF_APP=release python3 tools/proof/vr6b_proof.py
+python3 tools/proof/vr6b_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR6b record; JOB-37 is what only a person
+judges.

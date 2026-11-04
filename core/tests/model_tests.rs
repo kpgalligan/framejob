@@ -54,7 +54,7 @@ use framejob_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
-    rc_project_source_map, rc_snap_resolve, rc_speed_limits,
+    rc_project_source_map, rc_project_speaker_match, rc_snap_resolve, rc_speed_limits,
 };
 use framejob_core::ffi_webm::{
     rc_webm_add_packet, rc_webm_add_video_with_alpha, rc_webm_end_track, rc_webm_finish,
@@ -2025,6 +2025,11 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
 
     assert!(unsafe { rc_project_source_map(ptr::null(), 1) }.is_null());
     cover("rc_project_source_map");
+
+    let args = cstring(r#"{"mics":[2,3],"subjects":{"samples":[],"shots":[]}}"#);
+    assert!(unsafe { rc_project_speaker_match(ptr::null(), 1, args.as_ptr()) }.is_null());
+    assert!(unsafe { rc_project_speaker_match(live.as_ptr(), 1, ptr::null()) }.is_null());
+    cover("rc_project_speaker_match");
 
     // A NULL exclude list means "exclude nothing", so only the project may
     // be NULL here.

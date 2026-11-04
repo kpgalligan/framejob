@@ -452,3 +452,132 @@ microphones automatically, the sheet confirming (the sheet is VR6b's).
   `speaker_match`, the four constants and the median box — are `reframe_speaker_match.rs`,
   re-exported by `reframe_speaker.rs`, which keeps the hold, the segments, `mics_refusal` (VR-60
   (d)'s subject-free sentences, out of `edit_reframe.rs`) and `plan_speaker_framing`.
+
+## VR6b — Make Vertical follows the speaker (2026-11-04)
+
+Recorded before the code. VR6a gave agents `reframe_clip {follow: speaker}`; VR6b puts it in File ▸
+Make Vertical Version… and `make_vertical_version`: a wide shot of two to four people beside their
+microphones cuts to whoever is talking, the faces matched to the microphones automatically and
+the sheet confirming (the owner's answer of 2026-11-01). One FFI export (`rc_project_speaker_match`,
+a query); no op, op-table, tool count (124), `Kind` or format change (43 stands). Nothing is sent
+anywhere, so nothing is keyed (CJ-3).
+
+- **VR-64 — `make_vertical_version`'s `follow: speaker`.**
+  (a) **Arguments.** `mics`, 2–4 clip ids, each standing for its TRACK as a microphone;
+  `mic_faces`, optional, one face number per microphone in `mics`' order. Both are read only with
+  `speaker` and ignored otherwise (VR-60 (a)'s rule).
+  (b) **Speaker clips.** A class-3 media picture (VR-33) whose file is present and whose media has
+  no cursor file, not on a microphone's track, whose span overlaps a clip with audio on at least
+  two microphone tracks. Its own `mics`: per microphone in order, the media clip with audio on
+  that track with the greatest overlap with it (ties: the earlier start, then the lower id); a
+  track with none is left out, with its `mic_faces` entry.
+  (c) **Step (3) with `speaker`.** Every `settings.follow.follows` test in the plan and the tool
+  (`VerticalVersion+Plan.swift`'s missing and cursor branches, `AgentServer+VerticalVersion.swift`'s
+  targets and `cursor`) becomes `VerticalVersion.analyses` (`follows || speaker`), so a missing
+  picture is kept with its note and a picture whose media has a cursor file follows its cursor (or
+  is shown whole) exactly as under the other analysing follows. A speaker clip gets `reframe_clip
+  {follow: speaker, mics, mic_faces, zoom, where_empty, from_*, backdrop}` with its subjects; every
+  remaining present, analysed (non-cursor) media picture gets `face`. A refused speaker framing is
+  retried as `face`, its entry `followed` with the reason "it follows its faces, not who is
+  talking, because " + the core's sentence, joined with `followedEntry`'s reasons by " and "; a
+  refused `face` is retried as `keep` (VR-34), its entry `not_followed` with the face's sentence.
+  (d) **Turns.** `withTurns` fills each speaker clip's `subjects.turns` through
+  `FramingSpeaker.turns` on the last main hop (the sheet's refresh, the tool's last hop); a
+  `FramingSpeaker.Refusal` refuses the tool "make_vertical_version was refused: " + its sentence,
+  nothing made.
+  (e) **Refusals**, after VR-36's, in order: the `follow` sentence names speaker ("follow must be
+  subject, face, person, salient, speaker or center, not X."); `follow: speaker` without `mics`:
+  "make_vertical_version's follow speaker needs mics: two to four clips, one on each microphone's
+  track."; an unknown id: `clipArg`'s error; no speaker clip: "make_vertical_version found no
+  full-frame movie clip playing beside two of the microphones in mics, so nobody is framed by who
+  is talking." The count, a repeat, a microphone that is not one and `mic_faces`' shape are the
+  core's (VR-60 (d)) and reach the entry's reason; Swift restates none.
+  (f) **The answer** gains `speaker [{clip, mics, mic_faces}]`, one per speaker-framed clip in id
+  order, `mic_faces` the given ones or `clip_speaker_match`'s assignment; the summary adds
+  " Follows whoever is talking in N clip(s)." after the cursor sentence.
+
+- **VR-65 — The match crosses the FFI.** `rc_project_speaker_match(p, clip, args_json)`
+  (`ffi_query.rs`, no `err_out`, no handle): `args_json` is `{"mics": [id, …], "subjects": {…}}`,
+  `subjects` read by `reframe_clip`'s strict reader and `check_subjects`; the answer, compact, is
+  `{"faces": [{"face", "x", "samples"}, …], "agreement": [[r, …], …]` (`[mic][face]`),
+  `"assignment": [face per mic], "sure": bool}`, and with fewer faces than microphones the empty
+  answer (`faces`, `agreement`, `assignment` [] and `sure` false); NULL for a NULL project or
+  args, an unknown clip, a clip that is not a media clip, malformed or failing args, or `mics`
+  empty or over 4. `reframe_speaker_match.rs` gains `clip_turns` (`plan_speaker_framing`'s turn
+  clamp, a pure move: timeline → clip ticks, clamped to `[0, duration]`, empty dropped) and
+  `clip_speaker_match` (`in_clip_time`'s samples, `clip_turns`, `faces_of`, `matched`), so the
+  sheet shows the core's own assignment and face places; Swift computes none.
+  `ReelCore+Framing.swift`'s `ReelProject.speakerMatch` is its one caller.
+
+- **VR-66 — The sheet.**
+  (a) **Follow**: Subject, Faces, People, Salient Region, Speaker, Center
+  (`VerticalVersion.follows`). Speaker is remembered in VR-29 (c)'s key; Follow Subject's sheet
+  reads a stored `speaker` as Subject (its rule for a value outside its list) and gains no Speaker.
+  The sheet's `opened`, fresh and restoring alike, is `VerticalVersion.remembered(.standard)`
+  (`FollowSubjectSettings` with `follow` the key's value when in `follows`, else `subject`; Where
+  Empty as `FollowSubjectSettings.remembered`; zoom 1), so `remember(changedFrom:)` compares
+  against what Follow showed and Subject chosen after a stored `speaker` is written.
+  (b) **With Speaker**: "Microphones:" one checkbox per `VerticalVersion.microphones` track (a
+  track holding a clip `SpeakerSwitch.playsSound` takes whose media has no video, front to back,
+  titled by the track's name, its `clip` the earliest such clip), the first four ticked; "Faces:"
+  one row per ticked microphone, the track's name and a pop-up of "Choose a face" and "Face N
+  (X % across)" per face found; then a muted note.
+  (c) **The reading.** The reference clip is the longest speaker clip (ties: the lower id).
+  `speakerReading` (main) fills the turns (`withTurns`) and asks the match on the reference clip
+  with its own microphones; only a `.ready` reading is cached, per ticked set, and a `.refused`
+  one is read again at each `refresh()`, so a loudness cache landing while the sheet is open
+  clears it. `.refused` shows its sentence (SW-24's, or with no speaker clip "No full-frame movie
+  clip plays beside two of the ticked microphones, so nobody can be framed by who is talking."),
+  Make off.
+  (d) **The confirmation.** A `sure` match presets the pop-ups to its assignment, the note "Each
+  microphone is matched to the face that talks with it; change one if it is wrong."; not sure, or
+  no match, leaves them on "Choose a face", the note "The faces do not show clearly who is on each
+  microphone: choose each microphone's face." The preset is made once per ticked set. Make is off
+  until 2–4 microphones are ticked, a speaker clip exists and every ticked microphone has a face,
+  each its own. Make passes `mics`, `micFaces` (always the confirmed faces) and the subjects with
+  their turns.
+  (e) **Analysis missing.** The pending summary reads "Finds the faces, people and shot changes in
+  N files on this Mac first, then asks you to confirm who is on each microphone, then makes a W × H
+  version."; after the Analyzing sheet lands, the editor presents the sheet again from the
+  hand-off (`restoring`): its shape, follow, zoom, where empty, copy and ticked microphones.
+  Nothing is made until Make there. `-RCDevVerticalAccept` presses each sheet's Make once it is
+  first enabled.
+
+- **VR-67 — The documents.** `docs/guide/vertical-and-framing.md`'s Make Vertical section gains
+  Follow Speaker for people and the `speaker` bullet loses "There is no menu for it yet."; the
+  README's Vertical and framing highlight names whoever is talking; `menus-and-shortcuts.md`'s Make
+  Vertical row lists Speaker; `15j-make-vertical-sheet`'s prose lists Speaker and the Microphones
+  and Faces rows (no new screen: the catalog pins Follow to Subject, and the proof's Q6 dump stands
+  for the Speaker block); JOB-37 between JOB-36 and JOB-39; spec §7.1, §7.4, §7.9i and §7.10.
+
+- **VR-68 — VR6b's proof.** `core/tests/speaker_match_ffi.rs` (the two-face answer equals
+  `speaker_match` on the in-clip samples; a clip at a timeline offset and a ×2 clip map turns as
+  `plan_speaker_framing` does, not sure exactly when it refuses the weak match; fewer faces → the
+  empty answer; NULL for a NULL project, an unknown clip, a text clip, malformed args, `mics` []
+  and five mics). `tools/proof/vr6b_proof.py` over F-TURNS (`f_turns.py`, exit 2 skips by name) on
+  a 1920 × 1080 30 fps canvas — `cam_wide.mov` W with VR6a's two canned faces and landmarks, Mic A
+  and Mic B at 0, a second movie S after the microphones' span with one canned face — rows Z0 and
+  Q1–Q8 (launch 1 `-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`: Q1 the tool with `mics`,
+  W equal to a reference document's `set_canvas`, `add_track` and `reframe_clip {speaker}`; Q2
+  `mic_faces: [2, 1]`; Q3 constant mouths retried as `face`; Q4 the four refusals; launch 2
+  `-RCDevAnalysisCanned YES -FrameJobFollowKind speaker -RCDevVerticalAccept in-place`: Q5 the menu
+  in place, W equal to Q1's; Q6 the not-sure sheet's dump; Q7 an uncanned analysis, the sheet
+  presented again with both microphones ticked; Q8 `vr6b_probe.swift`, the remembered key read
+  back), expected values from a reference `reframe_clip` or the manifest, never the code under
+  test, under a scratch `CFFIXED_USER_HOME`. Eight mutants, each once on the final instrument:
+  every present picture a speaker clip (Q1); a refused speaker retried as `keep` (Q3); `micFaces`
+  not passed (Q2); the picker presetting when not sure (Q6); the picker's preset transposed (Q5); a
+  Speaker hand-off committed after the analysis instead of presented again (Q7); `withTurns`
+  filling nothing (Q1); `remembered` ignoring `.speaker` (Q8).
+
+### Amendments recorded by VR6b
+
+- **VR-29 (c)**: the Follow key may hold `speaker`, written only by Make Vertical's sheet; Follow
+  Subject's sheet reads it as `subject`.
+- **VR-34** (3): the speaker branch, the speaker → face → keep chain and `Plan.speaker` (VR-64 (c),
+  (f)); `where_empty` is sent to `speaker` as to the following kinds.
+- **VR-35**: VR-64 (f)'s sentence.
+- **VR-36**: `follow` gains `speaker`; the arguments `mics` and `mic_faces`; VR-64 (e)'s refusals;
+  the answer's `speaker`.
+- **VR-39**: Follow gains Speaker with its Microphones and Faces rows (VR-66); `opened` is
+  `VerticalVersion.remembered`; a Speaker hand-off that analysed presents the sheet again.

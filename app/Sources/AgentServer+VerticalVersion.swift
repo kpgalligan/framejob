@@ -21,6 +21,12 @@ import Foundation
 /// A media picture whose media has a cursor file (`analysisTargets`' `cursor`, spec §11 VR-51)
 /// is never analysed: its cursor is read off main beside the analysis's subjects
 /// (`FramingCursor.subjects`), and the plan follows it with `replace: true` (VR-52).
+///
+/// `follow: speaker` (road map creator-jobs VR6b, spec §11 VR-64) takes `mics` and `mic_faces`,
+/// analyses as a following kind does, and frames each speaker clip (`VerticalVersion.speakerClips`)
+/// on whoever is talking: the last main hop fills their turns (`VerticalVersion.withTurns`,
+/// Switch by Speaker's reading), a `FramingSpeaker.Refusal` refusing the call, and the answer
+/// carries `speaker`. Its UI path is the sheet's Follow Speaker.
 extension AgentServer {
 
     /// What the first main hop resolves.
@@ -84,8 +90,19 @@ extension AgentServer {
                     message: "the project changed while make_vertical_version read the "
                         + "analysis, so nothing was made. Call make_vertical_version again.")
             }
+            // VR-64 (d): who talks when, read on this hop from the microphones' caches.
+            var filled = subjects
+            do {
+                filled = try VerticalVersion.withTurns(
+                    subjects,
+                    speaker: VerticalVersion.speakerClips(
+                        document.project, settings: call.settings, missing: call.missing),
+                    document: document)
+            } catch let refusal as FramingSpeaker.Refusal {
+                throw ToolError(message: "make_vertical_version was refused: " + refusal.sentence)
+            }
             let plan = try self.verticalPlan(
-                document.project, call.settings, subjects: subjects, missing: call.missing)
+                document.project, call.settings, subjects: filled, missing: call.missing)
             guard call.copy else {
                 // In place nothing is written: the old template copies are listed (VR-44 (c)).
                 let survey = VerticalVersion.templateSurvey(
@@ -159,11 +176,11 @@ extension AgentServer {
         let shape = try requiredEnumArg(a, "shape", VerticalShape.self)
         var follow = FramingFollow.subject
         if let raw = try stringArg(a, "follow") {
-            guard let kind = FramingFollow(rawValue: raw), FollowSubject.follows.contains(kind)
+            guard let kind = FramingFollow(rawValue: raw), VerticalVersion.follows.contains(kind)
             else {
                 throw ToolError(
-                    message: "follow must be subject, face, person, salient or center, not "
-                        + "\(raw).")
+                    message: "follow must be subject, face, person, salient, speaker or center, "
+                        + "not \(raw).")
             }
             follow = kind
         }
@@ -211,10 +228,29 @@ extension AgentServer {
         } catch {
             throw ToolError(message: error.localizedDescription)
         }
+        // VR-64 (a), (e): the microphones, read only with speaker.
+        var mics: [UInt32] = []
+        var micFaces: [UInt32]?
+        if follow == .speaker {
+            guard let given = try numbersArg(a, "mics"), !given.isEmpty else {
+                throw ToolError(
+                    message: "make_vertical_version's follow speaker needs mics: two to four "
+                        + "clips, one on each microphone's track.")
+            }
+            for id in given { _ = try clipArg(["clip": Int(id)], "clip", document) }
+            mics = given
+            micFaces = try numbersArg(a, "mic_faces")
+        }
         let settings = VerticalSettings(
-            shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty, captions: captions)
+            shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty, captions: captions,
+            mics: mics, micFaces: micFaces)
         let (present, missing, cursor) = VerticalVersion.analysisTargets(
             project, urls: document.mediaURLs())
+        if follow == .speaker,
+            VerticalVersion.speakerClips(project, settings: settings, missing: missing).isEmpty
+        {
+            throw ToolError(message: VerticalVersion.noSpeakerClip)
+        }
         // The dry plan: the core's error for a bad argument, before any analysis. Its
         // refusal and its plan are discarded.
         do {
@@ -223,7 +259,8 @@ extension AgentServer {
         } catch {
             throw ToolError(message: error.localizedDescription)
         }
-        let targets = follow.follows ? present : []
+        let analysed = VerticalVersion.analyses(follow)
+        let targets = analysed ? present : []
         var requests: [AnalysisRequest] = []
         var cacheDir: URL?
         if !targets.isEmpty {
@@ -241,7 +278,7 @@ extension AgentServer {
         }
         return VerticalCall(
             document: document, settings: settings, copy: copy, url: url, missing: missing,
-            targets: targets, cursor: follow.follows ? cursor : [],
+            targets: targets, cursor: analysed ? cursor : [],
             requests: requests, cacheDir: cacheDir, asked: project, scope: document.scope)
     }
 

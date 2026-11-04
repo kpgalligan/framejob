@@ -17,6 +17,9 @@ extension VerticalVersion {
             text += " Follows the cursor in \(counted(plan.cursor.count, "clip")), their own "
                 + "zooms and pans replaced."
         }
+        if !plan.speaker.isEmpty {
+            text += " Follows whoever is talking in \(counted(plan.speaker.count, "clip"))."
+        }
         if !plan.relaid.isEmpty {
             text += " Re-lays \(counted(plan.relaid.count, "camera layout")) for the new canvas."
         }
@@ -60,15 +63,19 @@ extension VerticalVersion {
         return lines.joined(separator: "\n")
     }
 
-    /// VR-39 (d)'s pending summary, while the analysis is still to be made.
-    static func pendingSummary(files: Int, width: Int, height: Int) -> String {
+    /// VR-39 (d)'s pending summary, while the analysis is still to be made; with `speaker` it
+    /// says the sheet comes back to confirm the microphones' faces (VR-66 (e)).
+    static func pendingSummary(files: Int, width: Int, height: Int, speaker: Bool = false)
+        -> String
+    {
         "Finds the faces, people and shot changes in \(counted(files, "file")) on this Mac "
-            + "first, then makes a \(width) × \(height) version."
+            + "first, " + (speaker ? "then asks you to confirm who is on each microphone, " : "")
+            + "then makes a \(width) × \(height) version."
     }
 
     /// The answer's keys every door shares (VR-36): `canvas`, `clips` in id order,
     /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried`, `summary`, `graphics`,
-    /// `cursor` (VR-52) and `relaid` (VR-54).
+    /// `cursor` (VR-52), `relaid` (VR-54) and `speaker` (VR-64 (f)).
     static func answerFields(_ plan: Plan, templates: TemplateReport = TemplateReport())
         -> [String: Any]
     {
@@ -89,6 +96,12 @@ extension VerticalVersion {
             "summary": summary(plan, templates: templates),
             "cursor": plan.cursor.map { Int($0) },
             "relaid": relaidFields(plan.relaid),
+            "speaker": plan.speaker.map { framed -> [String: Any] in
+                [
+                    "clip": Int(framed.clip), "mics": framed.mics.map { Int($0) },
+                    "mic_faces": framed.faces.map { Int($0) },
+                ]
+            },
             "graphics": graphicsFields(plan, templates),
         ]
         if let captions = plan.captions {

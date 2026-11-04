@@ -16,9 +16,15 @@
 //!   greatest sum, ties to the smallest face list; [`sure`] when every pair
 //!   reaches [`SPEAKER_AGREEMENT`], provisional until S-PC3 (VR-62).
 //!
-//! All times are CLIP ticks.
+//! - **Across the FFI** (VR-65): [`clip_turns`] (the turns of a clip, in
+//!   its ticks) and [`clip_speaker_match`], what `rc_project_speaker_match`
+//!   answers, so Make Vertical's sheet shows the core's own match.
+//!
+//! All times are CLIP ticks, but for [`clip_speaker_match`]'s arguments.
 
-use crate::reframe_subjects::Turn;
+use crate::model::{Clip, Project};
+use crate::reframe::in_clip_time;
+use crate::reframe_subjects::{Subjects, Turn};
 use crate::reframe_tracks::{
     centre, iou, link, median, SubjectBox, SubjectKind, SubjectSample, LINK_IOU,
 };
@@ -293,6 +299,36 @@ pub fn speaker_match(
     mics: &[u32],
 ) -> Option<SpeakerMatch> {
     matched(samples, &faces_of(samples), turns, mics)
+}
+
+/// The turns of `clip`, from container timeline ticks to its own: each
+/// clamped to `[0, duration]`, an empty one dropped (VR-61 (e)'s input).
+pub(crate) fn clip_turns(clip: &Clip, turns: &[Turn]) -> Vec<Turn> {
+    turns
+        .iter()
+        .map(|u| Turn {
+            from: (u.from - clip.start).clamp(0, clip.duration),
+            to: (u.to - clip.start).clamp(0, clip.duration),
+            mic: u.mic,
+        })
+        .filter(|u| u.from < u.to)
+        .collect()
+}
+
+/// The match `follow: speaker` would make on `clip` (VR-65): `subjects` as
+/// `reframe_clip` takes them (media source ticks, turns in timeline ticks)
+/// through `in_clip_time` and [`clip_turns`], then the faces and
+/// [`matched`]; `None` when fewer faces are found than there are
+/// microphones.
+pub fn clip_speaker_match(
+    project: &Project,
+    clip: &Clip,
+    subjects: &Subjects,
+    mics: &[u32],
+) -> Option<SpeakerMatch> {
+    let (samples, _) = in_clip_time(clip, project, subjects);
+    let turns = clip_turns(clip, &subjects.turns);
+    matched(&samples, &faces_of(&samples), &turns, mics)
 }
 
 /// The median box of a face over the samples in `[a, b)`, else over all.

@@ -10,7 +10,9 @@ import AppKit
 /// `performGroupedEdit` (Follow Subject's shape), and only onto the project handle and scope the
 /// sheet read: a changed project is refused before anything is made, again when the Analyzing
 /// sheet lands, and again after the subjects are read off main. Stop is the Analyzing sheet's
-/// own and makes nothing. Every refusal beeps and puts its sentence at the inspector's foot
+/// own and makes nothing. A Speaker hand-off is not made after its analysis lands: the sheet is
+/// presented again from it, so a person confirms each microphone's face before Make (road map
+/// creator-jobs VR6b, spec §11 VR-66 (e)). Every refusal beeps and puts its sentence at the inspector's foot
 /// (spec §11 CI-10).
 extension EditorViewController {
 
@@ -21,8 +23,13 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
+        presentVerticalSheet(document: document, restoring: nil)
+    }
+
+    /// The sheet, fresh or presented again from a Speaker hand-off whose analysis landed.
+    private func presentVerticalSheet(document: ProjectDocument, restoring: VerticalHandOff?) {
         presentAsSheet(
-            VerticalVersionSheetController(document: document) {
+            VerticalVersionSheetController(document: document, restoring: restoring) {
                 [weak self, weak document] handOff in
                 guard let self, let document else { return }
                 self.analyzeForVertical(handOff, document: document)
@@ -75,6 +82,15 @@ extension EditorViewController {
             let file = request?.media.name ?? name
             refuseVertical("The \(kind) analysis of “\(file)” failed: \(why).", document: document)
         case .landed:
+            if handOff.settings.follow == .speaker {
+                // VR-66 (e): the faces are confirmed on the sheet, never made here.
+                guard view.window?.attachedSheet == nil else {
+                    NSSound.beep()
+                    return
+                }
+                presentVerticalSheet(document: document, restoring: handOff)
+                return
+            }
             guard let cacheDir = document.cacheDirectory else {
                 refuseVertical(
                     ProjectDocument.AnalysisRequestError.noCache.localizedDescription,

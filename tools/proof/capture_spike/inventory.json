@@ -76,9 +76,9 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController+VerticalVersion.swift `@objc func showVerticalVersionSheet(`",
-    "app/Sources/EditorViewController+VerticalVersion.swift:24"
+    "app/Sources/EditorViewController+VerticalVersion.swift:31"
    ],
-   "note": "presentAsSheet(VerticalVersionSheetController) over the top-level timeline (VR-39 (a), (b)); beeps inside a nest, with a sheet up, while recording or with no clip; its Make hands off, and the editor opens the copy's window (ProjectDocument.verticalCopy) or applies the step in place when the analysis is cached or Follow is Center, else puts up the Analyzing sheet while the faces, people and shot changes are found on this Mac (CJ-28; app/Sources/EditorViewController+VerticalVersion.swift:52, reached_after), whose answer is the copy or the edit (VR-39 (f), (g))"
+   "note": "presentAsSheet(VerticalVersionSheetController) over the top-level timeline (VR-39 (a), (b)); beeps inside a nest, with a sheet up, while recording or with no clip; its Make hands off, and the editor opens the copy's window (ProjectDocument.verticalCopy) or applies the step in place when the analysis is cached or Follow is Center, else puts up the Analyzing sheet while the faces, people and shot changes are found on this Mac (CJ-28; app/Sources/EditorViewController+VerticalVersion.swift:59, reached_after), whose answer is the copy or the edit (VR-39 (f), (g)), or, for Follow Speaker, this sheet presented again from the hand-off (VR-66 (e); app/Sources/EditorViewController+VerticalVersion.swift:31, reached_after)"
   },
   "openDocument:": {
    "verdict": "framework",
@@ -1150,16 +1150,22 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+VerticalVersion.swift:24": {
+  "app/Sources/EditorViewController+VerticalVersion.swift:31": {
    "token": "presentAsSheet",
-   "func": "showVerticalVersionSheet",
+   "func": "presentVerticalSheet",
    "reached_from": [
     "showVerticalVersionSheet:"
    ],
-   "reached_after": [],
+   "reached_after": [
+    {
+     "selector": "showVerticalVersionSheet:",
+     "via": "app/Sources/EditorViewController+VerticalVersion.swift `presentVerticalSheet(document: document, restoring: handOff)`",
+     "gate": "app/Sources/EditorViewController+VerticalVersion.swift `if handOff.settings.follow == .speaker {` — a Follow Speaker hand-off whose Analyzing sheet landed: the sheet presented again to confirm each microphone's face (VR-66 (e))"
+    }
+   ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+VerticalVersion.swift:52": {
+  "app/Sources/EditorViewController+VerticalVersion.swift:59": {
    "token": "presentAsSheet",
    "func": "analyzeForVertical",
    "reached_from": [],

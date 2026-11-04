@@ -136,8 +136,12 @@ extension AgentServer {
             if call.follow == .speaker, filled != nil,
                 let shown = document.editedProject.snapshot.clip(call.clip)
             {
-                filled?["turns"] = try FramingSpeaker.turns(
-                    document: document, clip: shown, mics: call.mics ?? [])
+                do {
+                    filled?["turns"] = try FramingSpeaker.turns(
+                        document: document, clip: shown, mics: call.mics ?? [])
+                } catch let refusal as FramingSpeaker.Refusal {
+                    throw ToolError(message: "reframe_clip was refused: " + refusal.sentence)
+                }
             }
             return try self.editResult(
                 document, FramingWant.actionName, [call.op(subjects: filled)],
@@ -211,8 +215,9 @@ extension AgentServer {
     }
 
     /// `mics` / `mic_faces` (VR-60 (a)): nil when absent, else whole numbers the core
-    /// checks itself (an unknown microphone, a 0, a repeat).
-    private func numbersArg(_ a: [String: Any], _ key: String) throws -> [UInt32]? {
+    /// checks itself (an unknown microphone, a 0, a repeat). `make_vertical_version` reads
+    /// its own two through it (VR-64 (a)).
+    func numbersArg(_ a: [String: Any], _ key: String) throws -> [UInt32]? {
         guard let raw = a[key], !(raw is NSNull) else { return nil }
         guard let list = raw as? [Any] else {
             throw ToolError(message: "\(key) must be a list of whole numbers.")
