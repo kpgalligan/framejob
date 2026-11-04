@@ -17,6 +17,17 @@ extension SpeakerSwitch {
 
     /// One label per step. Every microphone's series must be the same length.
     static func labels(_ microphones: [Microphone], settings: Settings) -> [Label] {
+        activeSets(microphones, settings: settings).map { active in
+            switch active.count {
+            case 0: return .nobody
+            case 1: return .person(active[0])
+            default: return .crosstalk
+            }
+        }
+    }
+
+    /// The microphone tracks active on each step (SW-21), a dominant one alone.
+    static func activeSets(_ microphones: [Microphone], settings: Settings) -> [[UInt32]] {
         let count = microphones.map(\.level.count).min() ?? 0
         let threshold = settings.voiceThreshold
         // P and F per microphone; a microphone with no speech is never active.
@@ -31,7 +42,7 @@ extension SpeakerSwitch {
             guard let p = percentile(speech, 0.9) else { return nil }
             return (p, percentile(quiet, 0.1) ?? -.infinity)
         }
-        var out: [Label] = []
+        var out: [[UInt32]] = []
         out.reserveCapacity(count)
         for k in 0..<count {
             var active: [(track: UInt32, over: Double)] = []
@@ -50,11 +61,7 @@ extension SpeakerSwitch {
             {
                 active = [top]
             }
-            switch active.count {
-            case 0: out.append(.nobody)
-            case 1: out.append(.person(active[0].track))
-            default: out.append(.crosstalk)
-            }
+            out.append(active.map(\.track))
         }
         return out
     }
@@ -109,21 +116,8 @@ extension SpeakerSwitch {
         guard to > from, let front = angles.first?.track else { return [] }
         let wide = pairing.wide.flatMap { w in angles.contains { $0.track == w } ? w : nil }
 
-        // (a) a short stretch between two crosstalk runs is crosstalk, then a short nobody
-        // between two equal labels takes the label; (b) turns.
-        var turns = bridgingCrosstalk(runs(labels), under: ticks(settings.bridge))
-        var index = 1
-        while index + 1 < turns.count {
-            let gap = turns[index]
-            if gap.label == .nobody, turns[index - 1].label == turns[index + 1].label,
-                Ticks(gap.end - gap.start) * step < ticks(settings.bridge)
-            {
-                turns[index - 1].end = turns[index + 1].end
-                turns.removeSubrange(index...(index + 1))
-            } else {
-                index += 1
-            }
-        }
+        // (a), (b): the turns.
+        let turns = bridgedRuns(labels, settings: settings)
 
         // (c), (d), (e): the starts.
         var starts: [(angle: UInt32, start: Ticks)] = []
@@ -180,6 +174,27 @@ extension SpeakerSwitch {
         // (g) every uncovered piece handed on; (h) the merges.
         let covered = handOff(tiled, angles: angles, wide: wide)
         return merged(covered, angles: angles, minShot: ticks(settings.minShot))
+    }
+
+    /// SW-22 (a): a short stretch between two crosstalk runs is crosstalk, then a short nobody
+    /// between two equal labels takes the label; (b) the runs left are the turns.
+    static func bridgedRuns(_ labels: [Label], settings: Settings) -> [Run] {
+        let step = stepTicks
+        let bridge = Ticks((settings.bridge * Double(ReelTime.perSecond)).rounded())
+        var turns = bridgingCrosstalk(runs(labels), under: bridge)
+        var index = 1
+        while index + 1 < turns.count {
+            let gap = turns[index]
+            if gap.label == .nobody, turns[index - 1].label == turns[index + 1].label,
+                Ticks(gap.end - gap.start) * step < bridge
+            {
+                turns[index - 1].end = turns[index + 1].end
+                turns.removeSubrange(index...(index + 1))
+            } else {
+                index += 1
+            }
+        }
+        return turns
     }
 
     /// Starts to shots tiling `[starts[0].start, to)`, empty ones dropped.

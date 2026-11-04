@@ -56,8 +56,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   nests the moving role's clips first and lays out the nest clip, refused `clip {id} is already
   laid out; a nest would lay it out twice.` when one is. One undo step.
 - **`reframe_clip {clip, follow, zoom=1, where_empty="fit", from_width?, from_height?, backdrop?,
-  replace=false, subjects?}`** — Frames one clip on the current canvas (road map creator-jobs
-  VR2a2 and VR2b1, §11 VR-20…VR-27). `follow` `subject` (faces, then people, then salient regions), `face`, `person` or
+  replace=false, mics?, mic_faces?, subjects?}`** — Frames one clip on the current canvas (road
+  map creator-jobs VR2a2, VR2b1 and VR6a, §11 VR-20…VR-27, VR-60, VR-61). `follow` `subject` (faces, then people, then salient regions), `face`, `person` or
   `salient` follows the analysed `subjects` — `{samples: [{t, faces?, people?, salient?: [{x, y, w,
   h, c}]}], shots: [t]}` in forward-media SOURCE ticks, boxes 0–1 of the upright picture from its
   top-left, read strictly (an object at every level, a stray, missing or wrong-typed member an
@@ -76,7 +76,28 @@ The rules every op shares are §6a; the clip ops are §6b.
   starts VR-23's move unless one runs, it is within 0.5 s of the last move's end with the
   pointer in the window, it would end after a pending arrival's start, or the point is `typing`;
   no cut and no `fit`, so `where_empty` and `backdrop` never act. A face follow never reads
-  `cursor`. `center` holds the window (fill × `zoom`) on the
+  `cursor`. `speaker` (§11 VR-60, VR-61) frames a wide shot on whoever speaks: `mics`, 2–4 clip
+  ids (each a media clip whose media has audio, on its own track, not the clip), say whose turn
+  it is through `subjects.turns`, `[{from, to, mic}]` in CONTAINER timeline ticks (`mic` one of
+  `mics`; each `from` < `to`, the starts never going back; crosstalk turns share a span), and
+  each face box's optional `mouth` (its mouth gap ÷ width, finite and ≥ 0, a face's only) says
+  whose mouth moves; the tool fills both. The faces are the clip's face tracks (VR-21's
+  linking) chained across gaps (a later track's first box overlapping a chain's last at IoU ≥
+  0.3), each in at least a quarter of the samples, at most four by sample count, numbered 1…
+  left to right by median centre. A face's activity is its mouth's population standard
+  deviation over ±0.25 s; a microphone's agreement with a face is Pearson's r between that
+  activity and "a turn of the microphone covers the sample" (0 when undefined); the assignment
+  is the injective microphones → faces map with the greatest sum (ties to the lowest face
+  numbers), sure when every pair agrees at least 0.2 (provisional, VR-62); `mic_faces` (each
+  microphone's face number, in `mics`' order) replaces it unchecked. The turns' bounds cut the
+  clip into segments: one microphone frames its face, none holds the previous segment's (the
+  first labelled one's at the start), two or more frame the pair — the face already framed and
+  the first other in `mics` order — when both median boxes, widened 1.15, fit the window, else
+  the face already framed; equal neighbours coalesce, and the earliest segment under 2 s joins
+  the one before it (the first, the one after) until none is short. Each segment start after 0
+  is a hard cut (VR-24 (b)'s, on the first frame at or after it, onto the face's first-second
+  median), VR-23's moves within; `zoom`, `where_empty`, `backdrop` and `replace` read as for
+  `face`. Only `speaker` reads `mics` and `mic_faces`. `center` holds the window (fill × `zoom`) on the
   picture's centre and `fit` the whole picture; `keep` rescales the base from `from_width ×
   from_height` (the canvas when absent) by `set_canvas`'s rule, and each `x`, `y` and `scale` an
   action's end names with it. `layout` (§11 VR-53) re-lays a camera clip's camera layouts and its
@@ -116,12 +137,12 @@ The rules every op shares are §6a; the clip ops are §6b.
   clip (`add_blurred_background`'s builder) on that track when it is unlocked, not a matte and
   free over the clip, else on a new back-most track (ids: actions, track, copy), keeping the
   clip's actions that name `speed`, each end narrowed to `speed`. Only `keep` and `layout` read
-  `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds read `where_empty`, and they
-  and `cursor` read `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
+  `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds and `speaker` read
+  `where_empty`, and they, `speaker` and `cursor` read `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
   {z}`; `from_width must be greater than 0, not 0` (and `from_height`); an unknown `backdrop`
-  track. **Refused**, in order: `clip {id} is a {text|shape|graphic|adjustment} clip, with no
+  track; for `speaker`, an unknown clip in `mics`. **Refused**, in order: `clip {id} is a {text|shape|graphic|adjustment} clip, with no
   picture to frame; only keep reframes it`; `clip {id}'s media has no picture to frame`, `clip
-  {id}'s crop or scale leaves no picture to frame`; with a following kind or `cursor` `clip {id}
+  {id}'s crop or scale leaves no picture to frame`; with a following kind, `cursor` or `speaker` `clip {id}
   shows a nest, …` then `clip {id} shows a still picture, …`, then `cursor` on a media clip whose
   media has no cursor file, `clip {id}'s media has no cursor file, so there is no cursor to
   follow; frame it with subject, center, fit or keep`, and a following kind on one whose media
@@ -135,18 +156,37 @@ The rules every op shares are §6a; the clip ops are §6b.
   placed` (the first switch in time order; the screen's action when only its end fails), then a
   composed op's own refusal; unless `keep` or `layout`, a matte (`clip {id} is on a matte
   track, …`, `clip {id} is cut by the matte on track {t}, …`), then a turn (`clip {id} is turned
-  {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); bad
+  {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); for
+  `speaker` (§11 VR-60 (d)), `follow speaker needs two to four microphone clips in mics, not
+  {n}`, `clip {m} is named twice in mics`, `clip {id} is the clip being framed, so it cannot be
+  one of its microphones` or `clip {m} has no sound from a media file, so it cannot be a
+  microphone`, `clip {m}'s sound is off, so it never says who is talking; turn its sound on or
+  leave it out of mics`, `clips {a} and {b} are both on track {t}; each microphone needs its own
+  track`, then `mic_faces needs one face number for each of the {n} microphones in mics, not
+  {k}`, `mic_faces names face 0; faces are numbered from 1`, `mic_faces names face {f} twice;
+  each microphone needs its own face`; bad
   `subjects` (over 100,000 samples, over 8 boxes of a kind, times
-  not strictly increasing, a value outside 0…1, a size ≤ 0; over 100,000 cursor points, cursor
-  times not strictly increasing, a cursor `x` or `y` outside 0…1, each naming `cursor[i]`); when a copy would be made,
+  not strictly increasing, a value outside 0…1, a size ≤ 0, a `mouth` on a people or salient
+  box or not finite and ≥ 0; over 100,000 cursor points, cursor
+  times not strictly increasing, a cursor `x` or `y` outside 0…1, each naming `cursor[i]`; over
+  100,000 turns, a turn's `from` ≥ `to`, a turn starting before the one before it, each naming
+  `turns[i]`); when a copy would be made,
   `add_blurred_background`'s nest sentence or `track {t} is not behind clip {id}'s track, so a
   backdrop there would cover it`; LAST, `clip {id} has no subjects to follow; analyze it first`
-  (for `cursor`, no `subjects` or no cursor point in the played window). A
+  (for `cursor`, no `subjects` or no cursor point in the played window); then, for `speaker`,
+  `subjects turns[{i}] names clip {m}, which is not one of mics`, `clip {id} changes shot at
+  {tc}; follow speaker frames one wide shot — split the clip at its shot changes first`, `clip
+  {id} shows {n} face(s) for {m} microphones; follow speaker needs a face for each microphone`,
+  `mic_faces names face {f}, but clip {id} shows only {n} face(s)`, `clip {id} has no turn of
+  its microphones inside it, so there is no speaker to follow`, and with no `mic_faces` a match
+  that is not sure, `clip {id}'s faces do not show which microphone is whose: the best match
+  agrees only {a} (under 0.2); name each microphone's face with mic_faces, in mics' order — face
+  1 at {x} % across the picture, face 2 at {x} %` (each face's median centre). A
   result equal to the clip is an identity. Allowed inside a nest, whose canvas is the view's. One
   undo step. Its UI path is Clip ▸ Follow Subject… (§11 VR-29): this op with `replace: true` on
   each selected movie clip and a "Backgrounds" track added at index 0 as `backdrop`, removed
   when no copy needed it, as one undo step "Follow Subject". `layout`'s is File ▸ Make Vertical
-  Version…'s step 3b (§11 VR-53 (d)).
+  Version…'s step 3b (§11 VR-53 (d)). `speaker` has no menu yet (road map VR6b).
 - **`add_speed_ramp {clip, shape, rate, from?, to?, curve="ease_in_out", hold=0.5}`** — A speed
   ramp preset in one step, made of ordinary Speed actions (§11 SR-23, #340): `shape` is `ramp_up`,
   `ramp_down`, `speed_dip` or `speed_burst`; `from` and `to` are CLIP time, both or neither (the

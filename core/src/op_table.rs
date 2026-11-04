@@ -78,7 +78,7 @@
 //!   where a frame rate's are `u32`.
 //! - [`Kind::Follow`] and [`Kind::WhereEmpty`] — `FramingFollow` and
 //!   `WhereEmpty`: `reframe_clip`'s two closed vocabularies (spec §11
-//!   VR-26), members in [`Kind::values`]. [`Kind::Subjects`] is its
+//!   VR-26; `speaker` after `layout`, VR-60), members in [`Kind::values`]. [`Kind::Subjects`] is its
 //!   `subjects`, a caller-authored object the core declares at every level
 //!   and reads strictly (`edit_reframe.rs`), as [`Kind::Region`] is.
 //! - [`Kind::Region`] — `ZoomRegion`, `add_zoom_action`'s four numbers. NOT
@@ -226,7 +226,8 @@ impl Kind {
             LayoutShape => &["square", "rounded", "circle"],
             Corner => &["bottom_right", "bottom_left", "top_right", "top_left"],
             Follow => &[
-                "subject", "face", "person", "salient", "cursor", "layout", "center", "fit", "keep",
+                "subject", "face", "person", "salient", "cursor", "layout", "speaker", "center",
+                "fit", "keep",
             ],
             WhereEmpty => &["fit", "center"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object

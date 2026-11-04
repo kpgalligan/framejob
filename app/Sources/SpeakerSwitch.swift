@@ -211,16 +211,7 @@ enum SpeakerSwitch {
         let count = stepTicks > 0 ? Int(max(0, input.to - input.from) / stepTicks) : 0
         let a = ReelTime.format(input.from, fps: input.fps, frames: true)
         let b = ReelTime.format(input.to, fps: input.fps, frames: true)
-        for mic in input.microphones where mic.voice.count == count {
-            let speaks = mic.voice.indices.contains {
-                mic.covered[$0] && mic.voice[$0] >= input.settings.voiceThreshold
-            }
-            if !speaks {
-                out.append(
-                    "The microphone on track \(mic.track) has no speech between \(a) and \(b), "
-                        + "so it never says who is talking.")
-            }
-        }
+        out += silentMicrophones(input)
         // SW-84: a read angle with no step whose mouth can be read.
         for angle in input.faces where angle.activity.count == count
             && !angle.activity.contains(where: { $0 != nil })
@@ -234,6 +225,25 @@ enum SpeakerSwitch {
                 "No angle has a picture between "
                     + "\(ReelTime.format(gap.from, fps: input.fps, frames: true)) and "
                     + "\(ReelTime.format(gap.to, fps: input.fps, frames: true)).")
+        }
+        return out
+    }
+
+    /// SW-24's no-speech sentences: each read microphone with no speech step inside the range.
+    static func silentMicrophones(_ input: Input) -> [String] {
+        var out: [String] = []
+        let count = stepTicks > 0 ? Int(max(0, input.to - input.from) / stepTicks) : 0
+        let a = ReelTime.format(input.from, fps: input.fps, frames: true)
+        let b = ReelTime.format(input.to, fps: input.fps, frames: true)
+        for mic in input.microphones where mic.voice.count == count {
+            let speaks = mic.voice.indices.contains {
+                mic.covered[$0] && mic.voice[$0] >= input.settings.voiceThreshold
+            }
+            if !speaks {
+                out.append(
+                    "The microphone on track \(mic.track) has no speech between \(a) and \(b), "
+                        + "so it never says who is talking.")
+            }
         }
         return out
     }

@@ -26,6 +26,12 @@ import Foundation
 /// subjects" the first hop finds the media's cursor file (`AutoZoom.cursorFiles`, its
 /// sentences the refusal), and the file is opened and read off main
 /// (`FramingCursor.read`) in place of the analysis; the answer's `cached` is true.
+///
+/// `follow: speaker` (VR6a, spec §11 VR-60 (c)) waits for the analysis as a following
+/// kind does; its `mics` and `mic_faces` are passed through, a call addressed to a
+/// container other than the open one is refused before the trial, and the last main
+/// hop adds `turns` to the subjects (`FramingSpeaker.turns`, Switch by Speaker's reading
+/// of the microphones, its refusals SW-24's).
 extension AgentServer {
 
     /// What the first main hop resolves.
@@ -39,6 +45,8 @@ extension AgentServer {
         let fromHeight: UInt32?
         let backdrop: UInt32?
         let replace: Bool?
+        let mics: [UInt32]?
+        let micFaces: [UInt32]?
         /// The analysis to read, or nil when the trial needs none.
         let reading: FramingReading?
         /// The cursor file to read for `follow: cursor`, or nil.
@@ -50,7 +58,16 @@ extension AgentServer {
             .reframeClip(
                 clip: clip, follow: follow, zoom: zoom, whereEmpty: whereEmpty,
                 fromWidth: fromWidth, fromHeight: fromHeight, backdrop: backdrop,
-                replace: replace, subjects: subjects)
+                replace: replace, mics: mics, micFaces: micFaces, subjects: subjects)
+        }
+
+        /// The same call reading `reading` or `cursor` instead.
+        func with(reading: FramingReading?, cursor: CursorReading?) -> FramingCall {
+            FramingCall(
+                document: document, clip: clip, follow: follow, zoom: zoom,
+                whereEmpty: whereEmpty, fromWidth: fromWidth, fromHeight: fromHeight,
+                backdrop: backdrop, replace: replace, mics: mics, micFaces: micFaces,
+                reading: reading, cursor: cursor, asked: asked, scope: scope)
         }
     }
 
@@ -114,8 +131,16 @@ extension AgentServer {
                     message: "the project changed while reframe_clip read the clip's analysis, "
                         + "so nothing was framed. Call reframe_clip again.")
             }
+            // VR-60 (c): who speaks when, read on this hop from the microphones' caches.
+            var filled = subjects
+            if call.follow == .speaker, filled != nil,
+                let shown = document.editedProject.snapshot.clip(call.clip)
+            {
+                filled?["turns"] = try FramingSpeaker.turns(
+                    document: document, clip: shown, mics: call.mics ?? [])
+            }
             return try self.editResult(
-                document, FramingWant.actionName, [call.op(subjects: subjects)],
+                document, FramingWant.actionName, [call.op(subjects: filled)],
                 ["cached": cached])
         }
     }
@@ -135,9 +160,15 @@ extension AgentServer {
             document: document, clip: clip.id, follow: follow, zoom: try doubleArg(a, "zoom"),
             whereEmpty: try enumArg(a, "where_empty", FramingWhereEmpty.self),
             fromWidth: try sideArg(a, "from_width"), fromHeight: try sideArg(a, "from_height"),
-            backdrop: backdrop, replace: try boolArg(a, "replace"), reading: nil, cursor: nil,
-            asked: document.project, scope: document.scope)
+            backdrop: backdrop, replace: try boolArg(a, "replace"),
+            mics: try numbersArg(a, "mics"), micFaces: try numbersArg(a, "mic_faces"),
+            reading: nil, cursor: nil, asked: document.project, scope: document.scope)
         let scope = effectiveScope(document)
+        if follow == .speaker, scope != document.scope {
+            throw ToolError(
+                message: "reframe_clip was refused: follow speaker reads its microphones on the "
+                    + "open timeline; open that nest first with set_scope")
+        }
         let trial: ReelEdit
         do {
             trial = try document.project.applying(call.op(subjects: nil).scoped(scope))
@@ -160,13 +191,9 @@ extension AgentServer {
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
-            return FramingCall(
-                document: document, clip: call.clip, follow: follow, zoom: call.zoom,
-                whereEmpty: call.whereEmpty, fromWidth: call.fromWidth,
-                fromHeight: call.fromHeight, backdrop: backdrop, replace: call.replace,
+            return call.with(
                 reading: nil,
-                cursor: CursorReading(media: media, windows: entry.windows, files: files),
-                asked: call.asked, scope: call.scope)
+                cursor: CursorReading(media: media, windows: entry.windows, files: files))
         }
         guard let cacheDir = document.cacheDirectory else {
             throw ToolError(message: ProjectDocument.AnalysisRequestError.noCache.localizedDescription)
@@ -177,13 +204,25 @@ extension AgentServer {
         } catch {
             throw ToolError(message: error.localizedDescription)
         }
-        return FramingCall(
-            document: document, clip: call.clip, follow: follow, zoom: call.zoom,
-            whereEmpty: call.whereEmpty, fromWidth: call.fromWidth, fromHeight: call.fromHeight,
-            backdrop: backdrop, replace: call.replace,
+        return call.with(
             reading: FramingReading(
                 media: media, windows: entry.windows, cacheDir: cacheDir, requests: requests),
-            cursor: nil, asked: call.asked, scope: call.scope)
+            cursor: nil)
+    }
+
+    /// `mics` / `mic_faces` (VR-60 (a)): nil when absent, else whole numbers the core
+    /// checks itself (an unknown microphone, a 0, a repeat).
+    private func numbersArg(_ a: [String: Any], _ key: String) throws -> [UInt32]? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        guard let list = raw as? [Any] else {
+            throw ToolError(message: "\(key) must be a list of whole numbers.")
+        }
+        return try list.map { value in
+            guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                let n = Self.whole(number), n >= 0, n <= Int(UInt32.max)
+            else { throw ToolError(message: "\(key) must be a list of whole numbers.") }
+            return UInt32(n)
+        }
     }
 
     /// A whole number of pixels for `from_width` / `from_height`, nil when

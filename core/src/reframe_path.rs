@@ -145,6 +145,7 @@ fn point_of(frame: &Frame, c: &Chosen, headroom: f64) -> Option<(SubjectKind, Po
             w: x1 - x0,
             h: y1 - y0,
             c: b.c,
+            mouth: None,
         })
     });
     let (p, offset) = frame.subject(c.t, kind, &pair.unwrap_or(b), headroom);

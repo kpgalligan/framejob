@@ -16,6 +16,8 @@ extension AgentServer {
             // "Backgrounds" track as `backdrop`. The tool fills `subjects` from the
             // analysis cache (AgentServer+Framing.swift). `follow: layout`'s UI path is
             // File ▸ Make Vertical Version…'s step 3b (VR-53, VerticalVersion+Layouts.swift).
+            // `follow: speaker` (VR6a, spec §11 VR-60) has no menu yet (VR6b); its turns are
+            // read as Clip ▸ Switch by Speaker… reads them (FramingSpeaker.swift).
             opTool(
                 "reframe_clip",
                 "Frames one clip on the current canvas — for a vertical or square version of "
@@ -37,7 +39,18 @@ extension AgentServer {
                     + "time, length and curve, Side by Side as Stacked on a canvas taller than "
                     + "wide, the cut pieces of the recording given the new layout and any zoom "
                     + "on them re-based so it shows the same part of the picture; it reads no "
-                    + "zoom, where_empty, backdrop, replace or subjects. center holds the window "
+                    + "zoom, where_empty, backdrop, replace or subjects. speaker frames a wide "
+                    + "shot of two to four people on whoever is talking, each with a "
+                    + "microphone clip of their own (mics): who talks when is read from the "
+                    + "microphones exactly as Switch by Speaker reads it, and each microphone "
+                    + "is matched to the face whose mouth moves with it (analysed on this Mac; "
+                    + "faces numbered 1… left to right); each change of speaker is a hard cut, "
+                    + "held at least 2 s, two people talking at once framed together when they "
+                    + "fit, and nobody talking holds the last speaker. When the faces do not "
+                    + "show which microphone is whose, the call is refused naming each face's "
+                    + "place across the picture: name them with mic_faces. A clip that changes "
+                    + "shot is refused (split it at its shot changes first), and so is a call "
+                    + "addressed to a nest that is not the open one. center holds the window "
                     + "on the picture's centre, fit shows the whole picture for the whole clip, "
                     + "and keep rescales the clip from the canvas it was made for "
                     + "(from_width × from_height) as Change Canvas does, its actions' "
@@ -72,7 +85,13 @@ extension AgentServer {
                     + "clip (a rotation, an action turning it, a spin); with backdrop "
                     + "where a copy would be made, a nest clip or a track not behind the "
                     + "clip's; last, a following kind with nothing found in the clip, or cursor "
-                    + "with no recorded point in it. A missing or unreadable cursor file is "
+                    + "with no recorded point in it; for speaker, after the matte and turn "
+                    + "refusals, mics not two to four clips, a clip named twice, the clip itself "
+                    + "or a clip with no sound of a media file as a microphone, a microphone "
+                    + "whose sound is off, two on one track, a wrong mic_faces, a microphone "
+                    + "still being analysed or never speaking (Switch by Speaker's sentences), "
+                    + "fewer faces than microphones, no speech inside the clip, and the faces "
+                    + "not showing who is whose. A missing or unreadable cursor file is "
                     + "refused in its own sentence. Inside "
                     + "a nest (scope) the nest's canvas is the canvas. Clip ▸ Follow Subject… "
                     + "is this op with replace: true on each selected clip and a "
@@ -83,7 +102,8 @@ extension AgentServer {
                     "follow": "subject, face, person or salient (follow what is found), "
                         + "cursor (follow the recorded pointer of a clip whose media has a "
                         + "cursor file), layout (re-lay a camera clip's camera layouts and "
-                        + "its screen's), center, fit or keep.",
+                        + "its screen's), speaker (cut to whoever is talking, from mics), "
+                        + "center, fit or keep.",
                     "zoom": "How tight, 1–4 times the scale that fills the canvas; default 1. "
                         + "Read by the following kinds and center; refused outside 1–4.",
                     "where_empty": "What a following kind shows where there is nothing to "
@@ -104,6 +124,12 @@ extension AgentServer {
                         + "every other key stay) and fit the picture to the canvas, so the "
                         + "framing replaces the clip's own moves. Default false: the framing "
                         + "is composed into them. Not read by keep.",
+                    "mics": "speaker only: two to four clip ids, each a clip of a sound file "
+                        + "(or a detached camera sound) on its own track, one per person in the "
+                        + "shot, whose turns say who is talking. Not the clip being framed.",
+                    "mic_faces": "speaker only: each microphone's face number, in mics' order "
+                        + "(faces are numbered 1… left to right across the picture), when the "
+                        + "faces do not show who is whose; absent, Frame Job matches them.",
                 ]),
             // UI path: File ▸ Make Vertical Version… (road map creator-jobs VR3b, spec §11
             // VR-39: EditorViewController+VerticalVersion.swift and

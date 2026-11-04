@@ -12925,6 +12925,90 @@ off main, and `switch_by_speaker` in the `creatorOffMainTools` note. `spec_index
 - **Question for the owner:** match faces to mics automatically with the sheet confirming, or always
   ask? *Recommended: automatically, the sheet confirming.*
 
+**Split (recorded before code, 2026-11-04).** VR6 runs as two pipelines. **VR6a** (spec §11
+VR-60…VR-63, `creator-jobs-12.md`): `reframe_clip`'s `follow: speaker` for agents — `mics` and
+`mic_faces` (the draft's `pairs` as one face number per microphone, in `mics`' order), the tool's
+`subjects.turns` read through `SpeakerSwitch` exactly as Switch by Speaker reads them and each
+face's `mouth`, the match, the cuts held 2 s, the refusal naming each face — and VR-S3's runnable
+arm (the two-face moving still as the no-speech control; S-PC3's arm owed). **VR6b** (VR-64
+onward): `make_vertical_version`'s `mics`, Make Vertical's sheet Follow "Speaker" with its
+microphone picker and the face-to-mic confirmation, the guide's section for people, the README
+highlight, `menus-and-shortcuts.md`, the screen and JOB-37. The planner is a new
+`reframe_speaker.rs`, not `reframe.rs` (at 450).
+
+#### VR6a's record (2026-11-04)
+
+**What landed** (spec §11 VR-60…VR-63, `creator-jobs-12.md`), in commits made alone where the
+rules ask: the decisions first; the toll, a pure move — `SubjectBox` and `SubjectSample` out of
+`reframe_tracks.rs` (421, past its cap; 395 after) into `reframe_subjects.rs`, re-exported —
+then visibility only (`Track`'s `id`, `kind`, `boxes` and `at`, `link`, `iou`, `shots_of`,
+`centre` `pub(crate)`); the core — `reframe_subjects.rs`'s `mouth`, `Turn` and `turns` with the
+strict reader and the checks, `reframe_speaker.rs` (397: `SPEAKER_HOLD`, `mics_refusal`, the
+segments, `plan_speaker_framing`) and `reframe_speaker_match.rs` (291: the faces, activity,
+`pearson`, `sure`, the assignment, `speaker_match`), `edit_reframe.rs`'s `FramingFollow::Speaker`,
+`Reframe.mics`/`mic_faces` and the wiring, the op row, `Kind::Follow`'s member, the schema, the
+op's semantics row; the Swift pure moves (`activeSets`, `bridgedRuns`, `silentMicrophones`);
+then `SpeakerSwitch+Turns.swift`, `FramingSpeaker.swift`, `FramingSubjects`' `mouth`, the
+builder, the handler and the catalog; `vr6_proof.py`, `speaker_spike.py` and
+`core/tests/speaker_spike.rs`; the spec, the guide and `mcp.md`. No FFI, header, format (43),
+op count (70), tool count (124) or `Kind` change.
+
+**Measured.** `cargo test --release --test reframe_speaker`: 14 passed. VR-S3 (the rule's hash
+matched): S-PC3's arm skipped by name, owed; the still arm's figures are VR-62's "Recorded after
+the code" (600 samples, the four agreements −0.0145, −0.1181, 0.0145, 0.1181, none at 0.2);
+`SPEAKER_AGREEMENT` 0.2 stays provisional until S-PC3. `vr6_proof.py`: 7/7 rows on Debug, then
+7/7 against Release after the gate's `make app` — P1's 20 cut keys each within a frame of
+`switch_by_speaker`'s 20 shot starts after its first person shot (no key beyond a frame), 21
+segments framed as P2 asks, P3, P4 (refused naming "face 1 at 42 % across the picture, face 2
+at 58 %", then `mic_faces: [2, 1]`), P5 and P6's seven sentences. `vr2a_proof.py` 10/10 and
+`vr5_proof.py` 8/8 against Release; `switch_speaker_probe.py` 6/6 and `switch_faces_probe.py`
+6/6; `make gate` PASS in 511 s (test 301 s, app 188 s; three lanes running).
+
+**Mutants**, each once on the final instrument: `mouth-unfilled` (P1), `lead-dropped` (P1),
+`assignment-transposed` (P3), `both-never-kept` (P1) and `sure-ignored` (P4) CAUGHT;
+`hold-removed` CAUGHT by `core/tests/reframe_speaker.rs` (rc 101) and SURVIVED P1 — a recorded
+limit of F-TURNS: after the minimum turn every turn it holds lasts more than 2 s, so no segment
+is short enough for the hold to act on.
+
+**Owed.** VR-S3's S-PC3 arm and the threshold's re-measurement (S-PC3 does not exist yet);
+VR6b (VR-64 onward); JOB-37 with VR6b.
+
+#### VR6's record (2026-11-04)
+
+VR6a's reviews and landing; what it built and measured is VR6a's record above. VR6b is still to
+come.
+
+**Review.** Two reviews. The first (`ce8eaa12..d50f97e3`) found one should-fix: the match's
+activity window and its turn coverage were quadratic (every box against every box of a face,
+every sample against every turn), so a long two-shot would hold the main hop for seconds. It was
+fixed in `42db4d99`: each window is two forward-only indices and the coverage one forward walk
+over each microphone's sorted turns, the answers byte-identical (the spike's `metrics.json`
+compared on the earlier input), pinned by `a_long_clip_matches_in_linear_time` (100,000
+samples, 2,000 turns, under 5 s; the file in 0.25 s, 15 passed). Its two nits were left: the
+doubled `activeSets` call, and "reframe_clip: reframe_clip was refused: …" on the tool's own
+refusals (VR6b may drop the inner prefix). The second review (`ce8eaa12..42db4d99`) passed with
+three nits: two fixed at integration as comments only — `speaker_match`'s doc states that the
+samples must ascend by `t`, and `activities`' doc no longer says "as before" — and the third,
+the Release proof not re-run on the fixed core, is closed by the landing run below.
+
+**Integration (2026-11-04).** Cherry-picked (`2265fec1`, `b237b490`, `08fb6a2a`, `323c24a1`,
+`a1f7b097`, `47b86780`, `d50f97e3`, `42db4d99`) onto `worktree-creator-jobs` at `e064dd8d`
+(CU0d had landed since the base). One conflict: `designs/spec/README.md`'s `11-decisions/`
+Lines cell, set to `wc -l`'s 23594 in 46 files; no format, op-count or tool-count change, format
+43 stands. `core/CLAUDE.md` gained the `reframe_speaker.rs` · `reframe_speaker_match.rs` entry,
+and its `reframe_subjects.rs`, `edit_reframe.rs`, `reframe_tracks.rs` · `reframe.rs` and
+`op_table.rs` entries were updated; `app/CLAUDE.md`'s SpeakerSwitch entry names
+`SpeakerSwitch+Turns.swift` and the moved helpers, and its framing entry `FramingSpeaker.swift`
+and the face's `mouth`. `make gate` on the integrated tree printed "gate: PASS 478s" (names 1,
+typecheck 8, fmt 3, lint 15, test 277, app 173). Against that Release app,
+`RC_PROOF_APP=release vr6_proof.py` passed 7/7 (P1's 20 cut keys against 20 shot starts, none
+beyond a frame; P0 empty). No issue was owed.
+
+**Owed.** VR6b (VR-64 onward): `make_vertical_version`'s `mics`, Make Vertical's Follow
+"Speaker" with its microphone picker and the face-to-mic confirmation, the guide's section, the
+README highlight, `menus-and-shortcuts.md`, the screen and JOB-37. VR-S3's S-PC3 arm and
+`SPEAKER_AGREEMENT`'s re-measurement once S-PC3 exists.
+
 ### SW6 — a channel as a source
 
 - **What a person gets:** on a recorder's many-channel file, or a wireless kit's two-person stereo

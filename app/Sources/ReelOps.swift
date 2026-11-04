@@ -1032,13 +1032,14 @@ enum SpeedRampShape: String, CaseIterable {
 /// (VR-53), `center` and `fit` hold one placement, `keep` rescales from another
 /// canvas.
 enum FramingFollow: String, CaseIterable {
-    case subject, face, person, salient, cursor, layout, center, fit, keep
+    case subject, face, person, salient, cursor, layout, speaker, center, fit, keep
 
     /// The kinds that follow analysed subjects, and so wait for an analysis.
     var follows: Bool { [.subject, .face, .person, .salient].contains(self) }
 
-    /// The kinds that read `subjects`: the following kinds and `cursor`.
-    var readsSubjects: Bool { follows || self == .cursor }
+    /// The kinds that read `subjects`: the following kinds, `cursor` and `speaker`
+    /// (spec §11 VR-60).
+    var readsSubjects: Bool { follows || self == .cursor || self == .speaker }
 }
 
 /// What a framing shows with nothing to follow, `WhereEmpty` in
@@ -1170,7 +1171,7 @@ extension ReelOp {
         clip: UInt32, follow: FramingFollow, zoom: Double? = nil,
         whereEmpty: FramingWhereEmpty? = nil, fromWidth: UInt32? = nil,
         fromHeight: UInt32? = nil, backdrop: UInt32? = nil, replace: Bool? = nil,
-        subjects: [String: Any]? = nil
+        mics: [UInt32]? = nil, micFaces: [UInt32]? = nil, subjects: [String: Any]? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
@@ -1181,6 +1182,8 @@ extension ReelOp {
         a.put("from_height", fromHeight)
         a.put("backdrop", backdrop)
         a.put("replace", replace)
+        a.put("mics", mics)
+        a.put("mic_faces", micFaces)
         a.put("subjects", subjects)
         return ReelOp(name: "reframe_clip", args: a.values)
     }

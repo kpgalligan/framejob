@@ -17,8 +17,7 @@
 //! the primary only once the hold has passed. All times are CLIP ticks,
 //! samples strictly increasing.
 
-use serde::{Deserialize, Serialize};
-
+pub use crate::reframe_subjects::{SubjectBox, SubjectSample};
 use crate::time::{Ticks, TIMESCALE};
 
 /// The least IoU at which a box continues a track.
@@ -37,31 +36,6 @@ const SCORE_SPAN: Ticks = TIMESCALE;
 /// How long an absent primary is held before another track replaces it,
 /// and how long a framing holds a lost subject (spec §11 VR-24): 1 s.
 pub const LOSS_HOLD: Ticks = TIMESCALE;
-
-/// One box, 0…1 of the upright picture from its top-left (CJ-22, VR-10),
-/// with its confidence.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SubjectBox {
-    pub x: f64,
-    pub y: f64,
-    pub w: f64,
-    pub h: f64,
-    pub c: f64,
-}
-
-/// One analysed instant: its faces, people and salient regions.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SubjectSample {
-    pub t: Ticks,
-    #[serde(default)]
-    pub faces: Vec<SubjectBox>,
-    #[serde(default)]
-    pub people: Vec<SubjectBox>,
-    #[serde(default)]
-    pub salient: Vec<SubjectBox>,
-}
 
 /// What a framing follows: `Subject` reads every kind in its tiers, the
 /// others only their own kind.
@@ -101,15 +75,15 @@ pub struct Chosen {
 
 const KINDS: [SubjectKind; 3] = [SubjectKind::Face, SubjectKind::Person, SubjectKind::Salient];
 
-struct Track {
-    id: u32,
-    kind: SubjectKind,
+pub(crate) struct Track {
+    pub(crate) id: u32,
+    pub(crate) kind: SubjectKind,
     /// (sample index, box), ascending.
-    boxes: Vec<(usize, SubjectBox)>,
+    pub(crate) boxes: Vec<(usize, SubjectBox)>,
 }
 
 impl Track {
-    fn at(&self, i: usize) -> Option<SubjectBox> {
+    pub(crate) fn at(&self, i: usize) -> Option<SubjectBox> {
         self.boxes
             .binary_search_by_key(&i, |b| b.0)
             .ok()
@@ -125,7 +99,7 @@ fn boxes_of(sample: &SubjectSample, kind: SubjectKind) -> &[SubjectBox] {
     }
 }
 
-fn iou(a: &SubjectBox, b: &SubjectBox) -> f64 {
+pub(crate) fn iou(a: &SubjectBox, b: &SubjectBox) -> f64 {
     let w = (a.x + a.w).min(b.x + b.w) - a.x.max(b.x);
     let h = (a.y + a.h).min(b.y + b.h) - a.y.max(b.y);
     if w <= 0.0 || h <= 0.0 {
@@ -140,7 +114,7 @@ fn iou(a: &SubjectBox, b: &SubjectBox) -> f64 {
     }
 }
 
-fn centre(b: &SubjectBox) -> (f64, f64) {
+pub(crate) fn centre(b: &SubjectBox) -> (f64, f64) {
     (b.x + b.w / 2.0, b.y + b.h / 2.0)
 }
 
@@ -162,7 +136,7 @@ pub(crate) fn median(values: &mut [f64]) -> f64 {
 }
 
 /// Each sample's shot: the number of cuts at or before it.
-fn shots_of(samples: &[SubjectSample], cuts: &[Ticks]) -> Vec<usize> {
+pub(crate) fn shots_of(samples: &[SubjectSample], cuts: &[Ticks]) -> Vec<usize> {
     let mut cuts = cuts.to_vec();
     cuts.sort_unstable();
     samples
@@ -175,7 +149,7 @@ fn shots_of(samples: &[SubjectSample], cuts: &[Ticks]) -> Vec<usize> {
 /// within one faces, then people, then salient regions), and each sample's
 /// present tracks. Only a track still open — its last box in the same shot
 /// and at most [`LINK_GAP`] earlier — is a candidate.
-fn link(
+pub(crate) fn link(
     samples: &[SubjectSample],
     shot: &[usize],
     kinds: &[SubjectKind],

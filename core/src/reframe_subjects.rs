@@ -11,6 +11,13 @@
 //! false when absent — which `follow: cursor` frames on
 //! (`reframe_cursor.rs`). A face follow never reads it (VR-51).
 //!
+//! **The speaker's facts** (VR6a, spec §11 VR-60 (b)): a face box's
+//! `mouth`, optional, is its mouth's gap over its width (SW-81's opening),
+//! and `turns`, optional, are who speaks when — `{from, to, mic}` in
+//! CONTAINER timeline ticks, `mic` a clip id of `reframe_clip`'s `mics` —
+//! which `follow: speaker` frames on (`reframe_speaker.rs`). Both are the
+//! tool's to fill; no other follow reads them.
+//!
 //! **`subjects` is read strictly**, as `ZoomRegion` is: an object at every
 //! level, a stray, missing or wrong-typed member named by its path. Its
 //! VALUES are refusals (VR-26 (8)): a cached sample is a fact, not a typo.
@@ -21,8 +28,35 @@ use serde_json::Value;
 
 use crate::edit_reframe::{MAX_SUBJECT_BOXES, MAX_SUBJECT_SAMPLES};
 use crate::export::describe;
-use crate::reframe_tracks::SubjectSample;
 use crate::time::Ticks;
+
+/// One box, 0…1 of the upright picture from its top-left (CJ-22, VR-10),
+/// with its confidence.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectBox {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub c: f64,
+    /// A face's mouth gap over its width (VR-60 (b)); absent when unread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mouth: Option<f64>,
+}
+
+/// One analysed instant: its faces, people and salient regions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectSample {
+    pub t: Ticks,
+    #[serde(default)]
+    pub faces: Vec<SubjectBox>,
+    #[serde(default)]
+    pub people: Vec<SubjectBox>,
+    #[serde(default)]
+    pub salient: Vec<SubjectBox>,
+}
 
 /// One recorded cursor point (spec §11 VR-50): media source ticks of the
 /// forward file, 0…1 of the upright picture.
@@ -38,6 +72,16 @@ pub struct CursorPoint {
     pub typing: bool,
 }
 
+/// One speaker turn (VR-60 (b)): `[from, to)` in container timeline ticks,
+/// `mic` the clip id of the microphone speaking.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Turn {
+    pub from: Ticks,
+    pub to: Ticks,
+    pub mic: u32,
+}
+
 /// A clip's analysed subjects in MEDIA source ticks of the forward file.
 /// `reframe_clip`'s `subjects` argument; its strict `Deserialize` is below.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -47,11 +91,14 @@ pub struct Subjects {
     /// The recorded cursor (VR-50), empty when absent.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cursor: Vec<CursorPoint>,
+    /// Who speaks when (VR-60 (b)), empty when absent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub turns: Vec<Turn>,
 }
 
 impl<'de> Deserialize<'de> for Subjects {
     /// `{samples: [{t, faces?, people?, salient?: [{x, y, w, h, c}]}], shots,
-    /// cursor?: [{t, x, y, click?, typing?}]}`.
+    /// cursor?: [{t, x, y, click?, typing?}], turns?: [{from, to, mic}]}`.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -60,6 +107,8 @@ impl<'de> Deserialize<'de> for Subjects {
             shots: Vec<Ticks>,
             #[serde(default)]
             cursor: Vec<CursorPoint>,
+            #[serde(default)]
+            turns: Vec<Turn>,
         }
         let bad =
             |at: &str, what: String| de::Error::custom(format!("bad value at \"{at}\": {what}"));
@@ -86,10 +135,13 @@ impl<'de> Deserialize<'de> for Subjects {
                 return Err(bad(&at, format!("expected an object, not {}", describe(v))));
             }
         }
-        let points = value["cursor"].as_array().into_iter().flatten().enumerate();
-        for (i, point) in points {
-            if !point.is_object() {
-                let at = format!("subjects.cursor[{i}]");
+        for (list, name) in [(&value["cursor"], "cursor"), (&value["turns"], "turns")] {
+            let points = list.as_array().into_iter().flatten().enumerate();
+            for (i, point) in points {
+                if point.is_object() {
+                    continue;
+                }
+                let at = format!("subjects.{name}[{i}]");
                 return Err(bad(
                     &at,
                     format!("expected an object, not {}", describe(point)),
@@ -104,12 +156,14 @@ impl<'de> Deserialize<'de> for Subjects {
             samples: read.samples,
             shots: read.shots,
             cursor: read.cursor,
+            turns: read.turns,
         })
     }
 }
 
-/// VR-26 (8): the samples' count, order, box counts and values; then the
-/// cursor's count, order and values (VR-50).
+/// VR-26 (8): the samples' count, order, box counts and values (a `mouth`
+/// only on a face, finite and at least 0, VR-60 (d)); then the cursor's
+/// count, order and values (VR-50); then the turns'.
 pub(crate) fn check_subjects(subjects: &Subjects) -> Result<(), String> {
     let n = subjects.samples.len();
     if n > MAX_SUBJECT_SAMPLES {
@@ -154,10 +208,54 @@ pub(crate) fn check_subjects(subjects: &Subjects) -> Result<(), String> {
                         ));
                     }
                 }
+                if let Some(mouth) = b.mouth {
+                    if kind != "faces" {
+                        return Err(format!(
+                            "subjects sample {i}'s {kind}[{j}] has a mouth; only a face box has \
+                             one"
+                        ));
+                    }
+                    if !(mouth.is_finite() && mouth >= 0.0) {
+                        return Err(format!(
+                            "subjects sample {i}'s faces[{j}].mouth is {mouth}; a mouth opening \
+                             must be a number of at least 0"
+                        ));
+                    }
+                }
             }
         }
     }
-    check_cursor(&subjects.cursor)
+    check_cursor(&subjects.cursor)?;
+    check_turns(&subjects.turns)
+}
+
+/// VR-60 (d)'s turn refusals: the count, each turn's span, and starts that
+/// never go back (crosstalk turns share a span, so equal starts stand).
+fn check_turns(turns: &[Turn]) -> Result<(), String> {
+    let n = turns.len();
+    if n > MAX_SUBJECT_SAMPLES {
+        return Err(format!(
+            "subjects holds {n} turns, more than {MAX_SUBJECT_SAMPLES}"
+        ));
+    }
+    let mut previous: Option<Ticks> = None;
+    for (i, turn) in turns.iter().enumerate() {
+        if turn.from >= turn.to {
+            return Err(format!(
+                "subjects turns[{i}] runs from {} to {}; a turn must end after it starts",
+                turn.from, turn.to
+            ));
+        }
+        if let Some(p) = previous.filter(|&p| turn.from < p) {
+            return Err(format!(
+                "subjects turns[{i}] starts at {}, before the one before it ({p}); turns must \
+                 be in time order",
+                turn.from
+            ));
+        }
+        previous = Some(turn.from);
+    }
+    Ok(())
 }
 
 /// VR-50's three refusals, each naming `cursor[i]`.

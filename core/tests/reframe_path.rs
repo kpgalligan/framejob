@@ -57,6 +57,7 @@ fn face_w(cx: f64, w: f64, h: f64) -> SubjectBox {
         w,
         h,
         c: 0.9,
+        mouth: None,
     }
 }
 
@@ -93,6 +94,7 @@ fn plan_with(
         samples: s,
         shots,
         cursor: vec![],
+        turns: vec![],
     };
     plan_framing(p, 3, &subjects, &request, &TUNING).expect("a path")
 }

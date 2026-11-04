@@ -520,6 +520,8 @@ fn under_replace_the_counts_and_their_recount_agree() {
             from_height: None,
             backdrop: None,
             replace: Some(true),
+            mics: None,
+            mic_faces: None,
             subjects: None,
         })
         .unwrap();

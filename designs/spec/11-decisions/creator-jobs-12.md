@@ -302,3 +302,153 @@ are 124 product tools, and nothing is sent anywhere, so nothing is keyed (CJ-3).
 - The road map named the manual check JOB-65; JOB-65 is CO9's since, so this one is **JOB-66**.
 - S4 is rewritten: CO10a's "equal to off, each call under 10 s" no longer holds for a cut picture,
   which now waits for its masks.
+
+## VR6a — a two-shot follows the speaker (2026-11-04)
+
+Recorded before the code. VR6 is split (the road map's VR6, "Split (recorded before code)"):
+**VR6a** gives agents `reframe_clip`'s `follow: speaker` — a wide two-person clip framed on the
+face whose microphone is speaking, turns read exactly as Switch by Speaker reads them, faces
+matched to microphones automatically and refused, naming each face, when the match is weak —
+and VR-S3's runnable arm; **VR6b** (VR-64 onward) puts it in Make Vertical's sheet and
+`make_vertical_version`. No FFI, header, op, tool or `Kind` change and no format change (43
+stands; `OP_COUNT` 70; 124 product tools); `Kind::Follow` gains a member. Nothing is sent
+anywhere, so nothing is keyed (CJ-3). The owner's answer of 2026-11-01: faces are matched to
+microphones automatically, the sheet confirming (the sheet is VR6b's).
+
+- **VR-60 — `follow: speaker`.**
+  (a) **Arguments.** `mics`, 2–4 clip ids, each a media clip whose media has audio, on its own
+  track, not the framed clip; `mic_faces`, optional, each microphone's face number in `mics`'
+  order. Both are read only by `speaker`; another follow ignores them.
+  (b) **What the app fills.** `subjects.turns` (`[{from, to, mic}]`, container timeline ticks,
+  `mic` a clip id of `mics`) and a face box's `mouth` (its mouth gap ÷ its mouth width, SW-81's
+  opening, absent when either is unread, the width ≤ 0 or the gap < 0) are the tool's;
+  `subjects` stays `filledByTheApp`. Nothing is written to `media.speech` or to any cache.
+  (c) **The tool's turns** (`FramingSpeaker.turns`, `SpeakerSwitch+Turns.swift`). The tool reads
+  `SpeakerSwitch.read(clips: mics, pairing: each mic's track as a speaker with no angle, no
+  wide, range: the framed clip's span, settings: Settings())`, then `turns` — SW-21's labels and
+  SW-22 (a)–(e) as `shots` applies them, on labels, not angles: the crosstalk bridge, then the
+  nobody bridge; the first turn from the range's start; a person run of at least `minTurn`
+  starts that microphone's turn at `snap(onset − lead)`; a crosstalk run of at least
+  `crosstalkMin` starts one turn per microphone active at any of its crosstalk steps; nobody and
+  shorter runs hold; each turn ends at the next start, so the turns tile the range (crosstalk
+  turns share one span). `read`'s `problems` and `silentMicrophones` (SW-24's no-speech sentence,
+  moved out of `refusals`) refuse as `"reframe_clip was refused: " + joined`, SW-24's own
+  sentences. A call whose scope differs from the document's open scope is refused: "follow
+  speaker reads its microphones on the open timeline; open that nest first with set_scope". The
+  turns are added to `subjects` on the last main hop. A microphone `read` drops (its sound off)
+  gets no turn and no refusal of the tool's own: the core names it, (d).
+  (d) **The core's refusals**, after VR-26's (1)–(2), the nest and still refusals and VR-51's
+  (`speaker` reads subjects), and (5)–(6), in this order: `mics` absent or not 2–4 ("follow
+  speaker needs two to four microphone clips in mics, not N"); a clip named twice ("clip C is
+  named twice in mics"); a microphone with no sound from a media file, or the framed clip ("clip
+  C has no sound from a media file, so it cannot be a microphone" / "clip C is the clip being
+  framed, so it cannot be one of its microphones"); a microphone whose sound is off ("clip C's
+  sound is off, so it never says who is talking; turn its sound on or leave it out of mics" —
+  `SpeakerSwitch.read` drops such a track silently, so the core names it; a detached camera
+  sound with its sound on stays a valid microphone, SW-20); two microphones on one track ("clips
+  A and B are both on track T; each microphone needs its own track"); `mic_faces` not one per
+  microphone, a 0, or a face named twice; bad `subjects` (a turn `from ≥ to`, turns' `from`
+  decreasing, over 100,000 turns, a `mouth` not finite or below 0, a `mouth` on a people or
+  salient box); no subjects (LAST of the subject-free refusals, VR-28's trial); then a turn
+  naming a clip not in `mics`, a shot change inside the played window ("clip C changes shot at
+  TC; follow speaker frames one wide shot — split the clip at its shot changes first", TC by
+  `layout_timecode`), fewer faces than microphones, a `mic_faces` number past the faces found, no
+  turn inside the clip, and — with no `mic_faces` — a match that is not `sure`: "clip C's faces
+  do not show which microphone is whose: the best match agrees only A (under 0.2); name each
+  microphone's face with mic_faces, in mics' order — face 1 at X % across the picture, face 2 at
+  …". An unknown microphone id is an `Err` (`require_clip`).
+
+- **VR-61 — Speaker changes are cuts, held 2 s; the match.**
+  (a) **Faces.** `reframe_tracks.rs`'s `link` over the in-clip samples' faces (its `Track`'s
+  `pub(crate)` fields and `at`, reused, not copied); tracks chained when a later one starts after
+  a chain's last box and its first box has `iou` ≥ `LINK_IOU` with that box (the best IoU wins);
+  a chain present in at least `FACE_SHARE` (0.25) of the samples is a face; at most
+  `MAX_SPEAKERS` (4) by sample count; numbered 1… left to right by median centre x (ties: the
+  earlier first sample).
+  (b) **Activity.** The population standard deviation of a face's `mouth` over its samples
+  within ±`ACTIVITY_SPAN` (0.25 s, SW-81's 0.5 s window), at least two values.
+  (c) **Agreement**(mic, face): Pearson's r between the activity and 1/0 "a turn of the
+  microphone covers the sample" over the face's samples with an activity; 0 when undefined.
+  (d) **Assignment.** The injective microphones → faces map with the greatest summed agreement,
+  ties to the lexicographically smallest face list; `sure` when every assigned agreement is at
+  least `SPEAKER_AGREEMENT` (0.2, PROVISIONAL, VR-62). `mic_faces` replaces it, unchecked.
+  (e) **Segments** over clip ticks [0, duration), cut at the turns' bounds: one microphone → its
+  face; none → the previous segment's label (the first labelled one's at the start); two or more
+  → Both(current, other) — current the previous segment's face when among them, else the first
+  in `mics` order; other the first other in `mics` order — kept only when both faces' median
+  boxes over the segment, each widened by `PAIR_WIDEN`, fit the window, else current's face.
+  Equal neighbours coalesce, then SW-22 (h)'s merge at `SPEAKER_HOLD` (2 s): the earliest segment
+  shorter than the hold joins the one before it (the first, the one after) until none is short.
+  (f) **The path.** Every segment start after 0 is a cut through `reframe_path.rs`'s
+  `write_keys`, passed as its `shots` (a cut's key on `snap_up` of its start, on its face's
+  first-second median); one `Chosen` per sample: kind Face, `subject` the segment's face's box
+  (none when the face is absent there: VR-24's loss to `where_empty`), `second` Both's other
+  box, else none, `identity` the face number, `lost` false. Within a segment VR-23's moves at
+  `FRAMING_TUNING`; `zoom`, `where_empty`, `backdrop` and `replace` read as for `face`.
+
+- **VR-62 — VR-S3** (`tools/proof/creator_spike/speaker_spike.py`). `rule.check_rule("VR-S3")`
+  first. S-PC3 absent: "SKIPPED the S-PC3 arm: S-PC3 is not in tools/proof/media/creator/
+  (owed)"; present, it is not run by this head and is owed, as `mouth_spike.py` does. The still
+  arm: `face_fixtures.py`'s `subjects_moving.mov` through `faces_spike.swift run` at the `faces`
+  kind's settings (rate, read size and devices as `AnalysisFaces` pins them), boxes with
+  `mouth`, synthetic turns A [0, 4 s), B [4, 8 s) … alternating over the clip, "true" = face 1 ↔
+  A and face 2 ↔ B; `core/tests/speaker_spike.rs` (`#[ignore]`, reading
+  `FRAMEJOB_SPEAKER_SPIKE`'s folder) writes the four agreements; `rule.write_results`. A still's
+  mouths never move, so this arm is the no-speech control and cannot supply true pairs; the
+  rule's midpoint needs S-PC3. The road map drafts no figure, so `SPEAKER_AGREEMENT` is 0.2,
+  provisional, re-measured on S-PC3 (owed); the control's figures are recorded, and a control
+  |r| ≥ 0.2 is recorded as such, not acted on.
+
+- **VR-63 — VR6a's proof.** `core/tests/reframe_speaker.rs`: the segments (nobody holds, the
+  first label back to 0, Both kept when it fits and current's face when not, three
+  microphones), the hold (a 1.9 s segment merges into the one before, the first into the one
+  after, 2.0 s stands), the cuts on `snap_up` of each start, faces chained across a 3 s gap and
+  numbered left to right, `FACE_SHARE` at its edge, the activity window, Pearson against hand
+  values, the assignment and its tie, `sure` at 0.19 and 0.2, `mic_faces` overriding, every
+  VR-60 (d) refusal's sentence and order (the sound-off microphone before "no subjects"), a ×2
+  and a reversed clip's turns and samples. `tools/proof/vr6_proof.py` over F-TURNS (`f_turns.py`,
+  exit 2 skips by name) on a 1080 × 1920 30 fps canvas, `cam_wide.mov` the two-shot with canned
+  shots, subjects and faces with landmarks (face 1 at x 0.42, face 2 at 0.58, y 0.4; each mouth
+  alternating 0.05/0.20 of width 0.5 inside its speaker's utterances, 0.05 outside), Mic A
+  `mic_a_b12_f55.wav` and Mic B `mic_b_b12_f55.wav` at 0: **P0** every log's `Frame Job: ` grep
+  empty; **P1** `{follow: speaker, mics: [A, B]}` applied, one undo "Reframe Clip", its cut keys
+  equal, each within one frame (20,000 ticks), to the shot starts of `switch_by_speaker {apply:
+  false, min_shot: 2}` over the same microphones with F-TURNS' Wide, Cam B and Cam A angles (a
+  second document) from its first person shot on (cam_a → face 1, cam_b → face 2, wide → both);
+  **P2** at each segment's middle the evaluated placement puts the speaker's face (or the pair's
+  union) inside the window's central 60 % across; **P3** mouths swapped between the faces → B's
+  segments frame face 1; **P4** mouths constant → refused naming face 1 at 42 % and face 2 at
+  58 %, nothing changed, then `mic_faces: [2, 1]` applies and A's segments frame face 2; **P5**
+  `get_project`'s `media` byte-identical before and after P1; **P6** the refusals in their
+  sentences: `mics: [A]`, `[A, A]`, the two-shot as a microphone, `mic_faces: [1]`, a canned cut
+  inside the clip, Mic A's loudness cache removed (SW-24's "still being analysed"), Mic B's sound
+  switched off with `mic_faces: [1, 2]` given (the sound-off sentence naming Mic B, nothing
+  changed). Canned analyses (CJ-26, `-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`); the
+  expected numbers from F-TURNS' manifest or from `switch_by_speaker`'s answer, never from the
+  code under test. Six mutants, each once on the final instrument: the hold removed (a core test
+  and P1); the assignment transposed (P3); Both never kept (P1); `sure` ignored (P4); `mouth` not
+  filled by `FramingSubjects` (P1); `lead` dropped in `SpeakerSwitch.turns` (P1).
+
+### Amendments recorded by VR6a
+
+- **VR-20**: `reframe_clip`'s arguments gain `mics` and `mic_faces` after `replace`, before
+  `subjects`; `subjects` gains `turns` and a face box's `mouth` (VR-60 (b)).
+- **VR-26**: `follow` gains `speaker` (after `layout`), which reads `subjects` like a following
+  kind and adds VR-60 (d)'s refusals in their place in the order; "no subjects" stays last of the
+  subject-free refusals.
+
+### Recorded after the code
+
+- **VR-62's figures** (2026-11-04, macOS 25F80, Apple M2 Max, on AC; the rule's hash matched
+  the table): S-PC3's arm skipped by name (owed). The still arm read `subjects_moving.mov` at
+  720, 10 a second, both requests on the Neural Engine: 600 samples, 1,200 boxes with a
+  `mouth`, two faces (each in all 600 samples, median centres 0.4425 and 0.5061), fifteen 4 s
+  turns. Agreements `[mic][face]`: A–1 −0.0145, A–2 −0.1181, B–1 0.0145, B–2 0.1181 — the
+  "true" pairs −0.0145 and 0.1181, the swapped −0.1181 and 0.0145; none at or over 0.2, so the
+  control would be refused as not sure, as it should. `SPEAKER_AGREEMENT` stays 0.2,
+  provisional, re-measured on S-PC3 (owed).
+- **The match is its own module.** `reframe_speaker.rs` and its match passed the 400-line cap
+  for a new file together, so VR-61 (a)–(d) — the faces, activity, agreement, assignment,
+  `speaker_match`, the four constants and the median box — are `reframe_speaker_match.rs`,
+  re-exported by `reframe_speaker.rs`, which keeps the hold, the segments, `mics_refusal` (VR-60
+  (d)'s subject-free sentences, out of `edit_reframe.rs`) and `plan_speaker_framing`.

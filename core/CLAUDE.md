@@ -489,7 +489,8 @@ governs a module now.
   `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed (thirty kinds — `reframe_clip` added `Follow`,
+  `Kind` is closed (thirty kinds — `reframe_clip` added `Follow` (its members end `layout`,
+  `speaker`, `center`, `fit`, `keep`),
   `WhereEmpty` and `Subjects`, the last a caller-authored object declared
   and closed at every level; `switch_layout` added `Layout`,
   `LayoutShape`, `Corner` and `Point`, `[f64; 2]`; `Texts`, a list of strings, is
@@ -1222,8 +1223,8 @@ governs a module now.
   clip's end (CU7/CU8), does not.
 - `reframe_tracks.rs` · `reframe.rs` — the framing planner (road map
   "creator-jobs" VR2a1, spec §11 VR-20…VR-23), pure; `edit_reframe.rs`
-  writes its path. `reframe_tracks.rs`: `SubjectBox`,
-  `SubjectSample`, `Follow`, `SubjectKind`, `Chosen` and `choose_subject` —
+  writes its path. `reframe_tracks.rs`: `SubjectBox` and `SubjectSample`
+  (`reframe_subjects.rs`'s since VR6a, re-exported), `Follow`, `SubjectKind`, `Chosen` and `choose_subject` —
   boxes linked into tracks per kind (`LINK_IOU` 0.3, `LINK_GAP` 1 s, every
   cut ending every track; nothing stored, CJ-31), scored by presence ×
   median area × centrality over ±1 s of the shot, faces > people > salient,
@@ -1246,7 +1247,9 @@ governs a module now.
   each sample's point through the placement in force at its tick
   (`Frame.placed`), the window clamped inside the common cropped rect of the
   base and every action end, `k` raised until it fits and held at
-  `SCALE_MAX` over every placement; `FramingPath.cuts`.
+  `SCALE_MAX` over every placement; `FramingPath.cuts`. Since VR6a `Track`
+  (`id`, `kind`, `boxes`, `at`), `link`, `iou`, `shots_of` and `centre` are
+  `pub(crate)` for `reframe_speaker_match.rs`.
 - `reframe_path.rs` — a framing path's keys (VR2a1, VR2a2, spec §11 VR-23,
   VR-24): VR-23's moves, moved whole, and VR-24 — a hard cut at each shot
   change (a one-frame linear segment onto the first canvas frame showing the
@@ -1278,23 +1281,29 @@ governs a module now.
   in time order, actions in start order; `Composed {re_eased, carried}`.
   Byte-for-byte VR2a2's writing on a clip with no actions. `pub` for the
   tests' counts.
-- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, VR5, VR5b, spec §11 VR-26,
-  VR-27, VR-50, VR-51, VR-53): `FramingFollow` (with `cursor` and `layout`), `Reframe`,
-  `MAX_SUBJECT_SAMPLES`, `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's
+- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, VR5, VR5b, VR6a, spec §11 VR-26,
+  VR-27, VR-50, VR-51, VR-53, VR-60): `FramingFollow` (with `cursor`, `layout` and `speaker`),
+  `Reframe` (with `mics` and `mic_faces`, read only by `speaker`; an unknown microphone an
+  `Err`), `MAX_SUBJECT_SAMPLES`, `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's
   sentence, which the tool matches), `no_cursor_file` and `cursor_not_faces`
   (after the nest and still refusals, before the matte one), four errors and
   the refusals in order (VR-26's (7) removed by VR-27), "no subjects" last so
   the tool's trial meets every other first; `replace` (`replaced` before the
   plan for every follow but `keep`, `composed` after it); the cursor arm plans
   through `reframe_cursor.rs`, the layout arm (refusals (5)–(6) skipped, as
-  for `keep`) through `reframe_layout.rs`. Allowed inside a nest.
-- `reframe_subjects.rs` — `reframe_clip`'s `subjects` (VR2a2, VR5, spec §11
-  VR-26, VR-50), a pure move out of `reframe.rs` and `edit_reframe.rs`:
-  `Subjects` (with the optional `cursor`, written only when non-empty),
-  `CursorPoint` (`{t, x, y, click, typing}`), the strict reader
-  (`ZoomRegion`'s pattern, an object at every level, each `cursor[i]` too) and
-  `check_subjects` (VR-26 (8), then the cursor's count, strictly increasing
-  times and 0…1 values, each naming `cursor[i]`).
+  for `keep`) through `reframe_layout.rs`. Allowed inside a nest. `speaker` reads `subjects`
+  (no `following`): `reframe_speaker.rs`'s `mics_refusal` after (5)–(6) and before `subjects`'
+  values, its planner after "no subjects".
+- `reframe_subjects.rs` — `reframe_clip`'s `subjects` (VR2a2, VR5, VR6a, spec §11 VR-26,
+  VR-50, VR-60), a pure move out of `reframe.rs` and `edit_reframe.rs`: `SubjectBox` (with the
+  optional `mouth`, a face's mouth gap ÷ width, written only when set) and `SubjectSample`
+  (moved from `reframe_tracks.rs` by VR6a's toll and re-exported there), `Subjects` (with the
+  optional `cursor` and `turns`, each written only when non-empty), `CursorPoint` (`{t, x, y,
+  click, typing}`), `Turn` (`{from, to, mic}`, container timeline ticks), the strict reader
+  (`ZoomRegion`'s pattern, an object at every level, each `cursor[i]` and `turns[i]` too) and
+  `check_subjects` (VR-26 (8), a `mouth` only on a face, finite and ≥ 0, then the cursor's
+  count, strictly increasing times and 0…1 values, each naming `cursor[i]`, then the turns'
+  count, `from < to` and starts never going back, each naming `turns[i]`).
 - `reframe_cursor.rs` — `follow: cursor` (road map "creator-jobs" VR5, spec
   §11 VR-50), pure: `CURSOR_TUNING` (0.20, 0.12, 0.8, no headroom),
   `cursor_in_clip_time` (the points in the played window through
@@ -1310,6 +1319,23 @@ governs a module now.
   rescale, the replay through `edit_layout.rs`'s `compose_switch` with `switch_timing`,
   Side by Side as Stacked on a canvas taller than wide, `conjugate` on every other moving
   end.
+- `reframe_speaker.rs` · `reframe_speaker_match.rs` — `reframe_clip {follow: speaker}` (road
+  map "creator-jobs" VR6a, spec §11 VR-60, VR-61), pure. `reframe_speaker_match.rs` the match
+  (VR-61 (a)–(d)): `ACTIVITY_SPAN` ±0.25 s, `FACE_SHARE` 0.25, `MAX_SPEAKERS` 4,
+  `SPEAKER_AGREEMENT` 0.2 (provisional until S-PC3, VR-62), `SpeakerFace`, `SpeakerMatch`, the
+  faces (`reframe_tracks.rs`'s `link` over the face kind, tracks chained by `iou` ≥ `LINK_IOU`
+  when a later one starts after a chain's last box, a quarter of the samples, at most four by
+  sample count, numbered left to right by median centre), the mouth's population std over the
+  span, `pearson`, `sure`, the greatest-sum injective assignment (ties lexicographic),
+  `speaker_match` and `median_box`. `reframe_speaker.rs` (re-exporting the match):
+  `SPEAKER_HOLD` 2 s, `mics_refusal` (VR-60 (d)'s subject-free sentences in order, asked by
+  `edit_reframe.rs` after (5)–(6)), the segments (cut at the turns' bounds: one microphone its
+  face, none the previous segment's, two or more the pair — the face framed and the first other
+  in `mics` order — when both widened median boxes fit the window, else the face framed;
+  coalesced, the earliest short segment into the one before it, the first into the one after)
+  and `plan_speaker_framing` (VR-60 (d)'s `Err` sentences in order after "no subjects", one
+  `Chosen` per sample, each segment start a cut through `reframe_path.rs`'s `write_keys`).
+  The two are one concern cut in two because together they pass the 400-line cap.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

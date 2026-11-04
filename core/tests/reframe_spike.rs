@@ -35,6 +35,7 @@ fn boxes(value: &Value) -> Vec<SubjectBox> {
             w: b["w"].as_f64().unwrap(),
             h: b["h"].as_f64().unwrap(),
             c: b["c"].as_f64().unwrap(),
+            mouth: None,
         })
         .collect()
 }
@@ -82,6 +83,7 @@ fn read(path: &Path) -> Input {
             samples,
             shots,
             cursor: vec![],
+            turns: vec![],
         },
     }
 }

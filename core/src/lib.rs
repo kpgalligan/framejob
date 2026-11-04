@@ -179,6 +179,8 @@ pub mod reframe_cover;
 pub mod reframe_cursor;
 mod reframe_layout;
 pub mod reframe_path;
+pub mod reframe_speaker;
+mod reframe_speaker_match;
 pub mod reframe_subjects;
 pub mod reframe_tracks;
 pub mod scope;

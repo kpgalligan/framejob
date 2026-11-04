@@ -226,6 +226,20 @@ chooses what to follow with `follow`:
   click's frame, and holds still while you type. It needs no analysis and
   never waits; `where_empty` and `backdrop` do nothing with it, since the
   frame never shows the whole picture.
+- **`speaker`** frames a wide shot of two to four people on whoever is
+  talking, each with a microphone of their own: name the microphone clips in
+  `mics` (a sound file each, or a camera's detached sound, each on its own
+  track). Who talks when is read from those microphones exactly as **Clip ▸
+  Switch by Speaker…** reads it, so the two agree; each microphone is matched
+  to the face whose mouth moves while it talks (faces are numbered 1, 2, …
+  from left to right). Each change of speaker is a cut, held at least 2 s;
+  two people talking at once are framed together when they fit, and while
+  nobody talks the last speaker stays. When the faces do not show who is
+  whose — mouths too still or too small to read — the call is refused,
+  naming where each face is across the picture; name each microphone's face
+  with `mic_faces`, in `mics`' order, and call it again. A clip that changes
+  shot is refused: split it at its shot changes first. There is no menu for
+  it yet.
 - **`center`** holds the frame on the middle of the picture for the whole clip.
 - **`fit`** shows the whole picture for the whole clip, scaled to fit the
   canvas.
@@ -240,7 +254,7 @@ chooses what to follow with `follow`:
 
 `zoom` (1 to 4, default 1) is how tight the frame is: 1 is the scale at which
 the picture just covers the canvas. `center` and the four following kinds read
-it, and so does `cursor`; `fit` and `keep` do not.
+it, and so do `cursor` and `speaker`; `fit` and `keep` do not.
 
 When it follows, the frame:
 
@@ -283,11 +297,14 @@ the same frames.
 The tool analyses the part of the file the clip plays, if it has not been
 analysed, and waits up to a minute. If that is not enough it changes nothing,
 says how much is done, and keeps analysing: ask again to apply. `center`,
-`fit` and `keep` need no analysis.
+`fit` and `keep` need no analysis. `speaker` also needs its microphones'
+loudness and speech, which Frame Job measures when a file is added; while
+they are still being measured it is refused in Switch by Speaker's words —
+try again in a moment.
 
 Not every clip can be framed. A clip on a matte track or cut by one and a
-rotated or spinning clip are refused, and — for the following kinds and
-`cursor` — so are a nest, a still or a picture. A recording whose media has a
+rotated or spinning clip are refused, and — for the following kinds,
+`cursor` and `speaker` — so are a nest, a still or a picture. A recording whose media has a
 cursor file is refused by the following kinds (it follows its cursor, never
 faces), and `cursor` is refused on a clip whose media has none. Each refusal
 says why. `keep` frames any of them,

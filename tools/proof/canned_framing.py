@@ -105,14 +105,16 @@ def subjects_bytes(duration, people_at=None):
 
 # ---- the markers ---------------------------------------------------------------
 
-def write(package, media, copy, duration, fps, faces_at, cut_frames=(), people_at=None):
+def write(package, media, copy, duration, fps, faces_at, cut_frames=(), people_at=None,
+          landmarks=False):
     """The three kinds' canned markers and payloads for `media` (whose file is
-    `copy`) in `package`'s `cache/analysis/`."""
+    `copy`) in `package`'s `cache/analysis/`; with `landmarks`, the faces' 36-byte
+    records (each box's `gap` and `width`, VR6a's `vr6_proof.py`)."""
     stat = Path(copy).stat()
     source = {"duration": duration, "modified": round(stat.st_mtime), "size": stat.st_size}
     for kind, (data, n), file in (
         ("shots", shots_bytes(duration, fps, cut_frames), "frames.bin"),
-        ("faces", faces_bytes(duration, faces_at), "samples.bin"),
+        ("faces", faces_bytes(duration, faces_at, landmarks), "samples.bin"),
         ("subjects", subjects_bytes(duration, people_at), "samples.bin"),
     ):
         folder = Path(package) / "cache/analysis" / kind / str(media)

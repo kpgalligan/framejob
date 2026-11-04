@@ -29934,3 +29934,57 @@ python3 tools/proof/vr5b_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR5b record; JOB-39 is what only a person
 judges.
+
+## Road map "creator-jobs" VR6a — a two-shot follows the speaker (`vr6_proof.py` P0–P6; `core/tests/reframe_speaker.rs`; `creator_spike/speaker_spike.py` with `core/tests/speaker_spike.rs`; six mutants; spec §11 VR-60…VR-63)
+
+**One launch** (`proof_app.py`'s app, a scratch `CFFIXED_USER_HOME`, `-RCDevAnalysisCanned YES
+-RCDevAnalysisHold 3600`) over F-TURNS (`creator_spike/f_turns.py`, reused while its generator
+hash holds; exit 2 without `say`'s Samantha and Daniel skips every row by name). Each framing
+document is a fresh package on a 1080 × 1920, 30 fps canvas: `cam_wide.mov` on "Wide",
+`mic_a_b12_f55.wav` on "Mic A" and `mic_b_b12_f55.wav` on "Mic B", all at 0. The wide's
+`shots`, `faces` and `subjects` are canned (`canned_framing.write(…, landmarks=True)`, the
+faces' 36-byte records): face 1 centred at x 0.42, face 2 at 0.58, y 0.4, each mouth's gap
+alternating 0.05/0.20 of width 0.5 inside its speaker's utterances, 0.05 outside. A second
+document (1920 × 1080) holds F-TURNS' Wide, Cam B and Cam A angles with the same microphones
+for `switch_by_speaker`. A cut key is a one-frame action's end; the placement at t is the last
+ended action's end, else the base; a face is inside the window's central 60 % across within 324
+px of the canvas's centre.
+
+| Row | What it holds |
+|---|---|
+| P0 | `grep "Frame Job: "` in the instance's log prints nothing |
+| P1 | `{follow: speaker, mics: [A, B]}` applies; its cut keys equal, each within one frame (20,000 ticks), the shot starts of `switch_by_speaker {apply: false, min_shot: 2}` from its first person shot on; one undo "Reframe Clip" gives the project back |
+| P2 | at each segment's middle: cam_a's segments put face 1 inside and face 2 outside, cam_b's the reverse, the wide's both inside |
+| P3 | the mouths swapped between the faces: B's segments frame face 1 |
+| P4 | the mouths constant: refused, nothing changed, the sentence naming "face 1 at 42 % across the picture, face 2 at 58 %"; then `mic_faces: [2, 1]` applies and A's segments frame face 2 |
+| P5 | `get_project`'s `media` byte-identical before and after P1 |
+| P6 | refused in their sentences, nothing changed: `mics: [A]`, `[A, A]`, the two-shot as a microphone, `mic_faces: [1]` (P1's document); a canned cut at frame 300 ("changes shot at 00:00:10:00"), Mic A's `cache/loudness/<id>.*` removed (SW-24's "still being analysed"), Mic B's sound off with `mic_faces: [1, 2]` (the sound-off sentence naming Mic B) |
+
+Mutants (`--mutant NAME`; spec §11 VR-63), each anchor asserted to occur once, exit 1 caught, 0
+survived, 2 when the control could not be performed: `mouth-unfilled` (FramingSubjects writes
+no `mouth`; P1) and `lead-dropped` (`SpeakerSwitch.turns` without the lead; P1) are app
+mutants in a `tree_copy.py` copy built by `tree_copy.build_app`; `hold-removed` (P1),
+`assignment-transposed` (P3), `both-never-kept` (P1) and `sure-ignored` (P4) are core mutants:
+the tree's own `core/src/reframe_speaker.rs` is edited (a copy links the tree's core), `cargo
+test --release --test reframe_speaker` runs and its result is printed, `make app-debug` builds
+the tree's app and the row runs on it; the file is restored by its SHA-256 (rebuild after).
+
+VR-S3's head (`speaker_spike.py`): `rule.check_rule("VR-S3")`; S-PC3's arm skipped by name
+while `tools/proof/media/creator/S-PC3/` is absent (owed); the still arm runs
+`face_fixtures.py`'s `subjects_moving.mov` through `faces_spike.swift run` at 720 and 10 a
+second on the Neural Engine, writes `work/creator_spike/VR-S3/input.json` (the clamped boxes
+with `mouth`, alternating 4 s turns A, B, …) and runs the ignored
+`core/tests/speaker_spike.rs`, whose `metrics.json` holds the faces, the four agreements, the
+assignment and `sure`; `rule.write_results`. A still's mouths never move, so the arm is the
+no-speech control; `SPEAKER_AGREEMENT` 0.2 stays provisional until S-PC3.
+
+```sh
+cd core && cargo test --release --test reframe_speaker
+python3 tools/proof/creator_spike/speaker_spike.py
+make app-debug && python3 tools/proof/vr6_proof.py [--only P1,P4]
+make app && RC_PROOF_APP=release python3 tools/proof/vr6_proof.py
+python3 tools/proof/vr6_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR6a record; JOB-37 (VR6b) is what only a
+person judges.

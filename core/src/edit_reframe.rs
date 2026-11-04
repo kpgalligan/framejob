@@ -22,6 +22,14 @@
 //! `where_empty`; a face follow never reads the cursor, and a clip whose
 //! media has a cursor file is never followed by faces (VR-51).
 //!
+//! `speaker` (VR6a, spec §11 VR-60, VR-61) frames a wide shot on whoever
+//! speaks: it reads `subjects` (its faces' `mouth` and its `turns`) and
+//! `mics`, `mic_faces`, `zoom`, `where_empty`, `backdrop` and `replace` as
+//! `face` does, and plans through `reframe_speaker.rs`; its subject-free
+//! refusals (the microphones', `mic_faces`') come here after (5)–(6) and
+//! before `subjects`' values, and the rest are the planner's sentences after
+//! "no subjects". No other follow reads `mics` or `mic_faces`.
+//!
 //! **Why "no subjects" is refused LAST.** The tool fills `subjects` from the
 //! analysis cache (VR-28) and first tries the op without them: every other
 //! refusal must answer that trial, so only a clip that could be framed waits
@@ -41,6 +49,7 @@ use crate::reframe::{
     fixed_framing, in_clip_time, plan_framing, FramingRequest, Subjects, WhereEmpty, FRAMING_TUNING,
 };
 use crate::reframe_cursor::{cursor_in_clip_time, plan_cursor_framing};
+use crate::reframe_speaker::{mics_refusal, plan_speaker_framing};
 use crate::reframe_subjects::check_subjects;
 use crate::reframe_tracks::Follow;
 
@@ -54,6 +63,7 @@ pub enum FramingFollow {
     Salient,
     Cursor,
     Layout,
+    Speaker,
     Center,
     Fit,
     Keep,
@@ -66,13 +76,16 @@ impl FramingFollow {
             Self::Face => Some(Follow::Face),
             Self::Person => Some(Follow::Person),
             Self::Salient => Some(Follow::Salient),
-            Self::Cursor | Self::Layout | Self::Center | Self::Fit | Self::Keep => None,
+            Self::Cursor | Self::Layout | Self::Speaker | Self::Center | Self::Fit | Self::Keep => {
+                None
+            }
         }
     }
 
-    /// The kinds that read `subjects`: the following kinds and `cursor`.
+    /// The kinds that read `subjects`: the following kinds, `cursor` and
+    /// `speaker`.
     fn reads_subjects(self) -> bool {
-        self.following().is_some() || self == Self::Cursor
+        self.following().is_some() || matches!(self, Self::Cursor | Self::Speaker)
     }
 }
 
@@ -91,6 +104,8 @@ pub struct Reframe {
     pub from_height: Option<u32>,
     pub backdrop: Option<u32>,
     pub replace: Option<bool>,
+    pub mics: Option<Vec<u32>>,
+    pub mic_faces: Option<Vec<u32>>,
     pub subjects: Option<Subjects>,
 }
 
@@ -133,6 +148,11 @@ impl Project {
         }
         if let Some(track) = r.backdrop {
             self.require_track(track)?;
+        }
+        if r.follow == FramingFollow::Speaker {
+            for &mic in r.mics.iter().flatten() {
+                self.require_clip(mic)?;
+            }
         }
         match self.refusal(&clip, r) {
             Some(why) => Ok(Outcome::Refused(why)),
@@ -213,6 +233,12 @@ impl Project {
                 return Some(why);
             }
         }
+        if r.follow == FramingFollow::Speaker {
+            let (mics, faces) = (r.mics.as_deref(), r.mic_faces.as_deref());
+            if let Some(why) = mics_refusal(self, id, mics, faces) {
+                return Some(why);
+            }
+        }
         if following {
             if let Some(Err(why)) = r.subjects.as_ref().map(check_subjects) {
                 return Some(why);
@@ -263,6 +289,18 @@ impl Project {
         let path = match (r.follow, r.follow.following()) {
             (FramingFollow::Center, _) => fixed_framing(source, id, WhereEmpty::Center, zoom),
             (FramingFollow::Fit, _) => fixed_framing(source, id, WhereEmpty::Fit, 1.0),
+            (FramingFollow::Speaker, _) => {
+                let Some(subjects) = &r.subjects else {
+                    return Ok(Outcome::Refused(no_subjects(id)));
+                };
+                let mics = r.mics.as_deref().unwrap_or(&[]);
+                let empty = r.where_empty.unwrap_or_default();
+                let faces = r.mic_faces.as_deref();
+                match plan_speaker_framing(source, id, subjects, mics, faces, zoom, empty) {
+                    Ok(path) => Some(path),
+                    Err(why) => return Ok(Outcome::Refused(why)),
+                }
+            }
             (FramingFollow::Cursor, _) => {
                 let Some(subjects) = &r.subjects else {
                     return Ok(Outcome::Refused(no_subjects(id)));

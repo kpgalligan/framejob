@@ -150,7 +150,7 @@ fn expected_kind(kind: Kind) -> Value {
                     "properties": {
                         "x": {"type": "number"}, "y": {"type": "number"},
                         "w": {"type": "number"}, "h": {"type": "number"},
-                        "c": {"type": "number"},
+                        "c": {"type": "number"}, "mouth": {"type": "number"},
                     },
                     "required": ["x", "y", "w", "h", "c"],
                     "additionalProperties": false,
@@ -182,6 +182,18 @@ fn expected_kind(kind: Kind) -> Value {
                                 "click": {"type": "boolean"}, "typing": {"type": "boolean"},
                             },
                             "required": ["t", "x", "y"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "turns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": {"type": "integer"}, "to": {"type": "integer"},
+                                "mic": {"type": "integer"},
+                            },
+                            "required": ["from", "to", "mic"],
                             "additionalProperties": false,
                         },
                     },

@@ -897,8 +897,8 @@ detail there.
   the faces mode, `note`).
   `AgentCatalog+Switch` holds the three rows, spliced in last by
   `creatorTools()`, after `switch_layout`'s.
-- `SpeakerSwitch.swift` · `SpeakerSwitch+Shots.swift` · `SpeakerSwitch+Read.swift` ·
-  `ClipLevelSeries.swift` · `SpeakerSwitch+Edit.swift` · `SpeakerSwitch+Settings.swift` ·
+- `SpeakerSwitch.swift` · `SpeakerSwitch+Shots.swift` · `SpeakerSwitch+Turns.swift` ·
+  `SpeakerSwitch+Read.swift` · `ClipLevelSeries.swift` · `SpeakerSwitch+Edit.swift` · `SpeakerSwitch+Settings.swift` ·
   `SwitchSpeakerSheetController.swift` · `EditorViewController+SwitchSpeaker.swift` ·
   `FaceActivity.swift` · `SpeakerSwitch+Faces.swift` — Switch by Speaker's planner (road map creator-jobs SW2a, spec §11 SW-20…SW-25) and Clip ▸ Switch by
   Speaker… over it (SW2b, SW-23, SW-26). `SpeakerSwitch` is pure (names no `rc_*` but
@@ -928,9 +928,14 @@ detail there.
   its centred 0.5 s std and the 1.5× / floor label; `SpeakerSwitch+Faces` — the mode (one
   microphone shared by two or more angles), `withoutWide`, the face pairing fed to the unchanged
   `shots`, `readFaces` and `facesWanted` (the menu's Analyzing sheet, the tool's bounded wait
-  off main).
-- `FramingSubjects.swift` · `FramingCursor.swift` · `AgentServer+Framing.swift` ·
-  `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
+  off main). Since VR6a (spec §11 VR-60 (c)): `activeSets` (SW-21's active tracks per step,
+  which `labels` maps), `bridgedRuns` (SW-22 (a), which `shots` calls) and `silentMicrophones`
+  (SW-24's no-speech sentences, which `refusals` calls), pure moves; `+Turns` — `Turn` (`mic` a
+  TRACK) and `turns`: SW-22 (a)–(e) on the labels, a person run ≥ `minTurn` that microphone's
+  turn, a crosstalk run ≥ `crosstalkMin` one per microphone active in it, each at
+  `snap(onset − lead)`, the first from the range's start, each ending at the next start.
+- `FramingSubjects.swift` · `FramingCursor.swift` · `FramingSpeaker.swift` ·
+  `AgentServer+Framing.swift` · `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
   creator-jobs VR2a2, spec §11 VR-26, VR-28); its UI path is Clip ▸ Follow
   Subject… (VR-29, the entry below). `FramingSubjects` (names no `rc_*`, any thread)
   builds `subjects` from the store: each `faces`-grid index inside the
@@ -960,7 +965,16 @@ detail there.
   `follow: cursor` the handler's first hop finds the cursor file (its sentences the refusal) and
   the file is read off main in place of the analysis, `cached: true`, no wait.
   `AgentCatalog+Framing` holds its row and `make_vertical_version`'s, spliced in last by
-  `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`.
+  `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`. Since VR6a (spec
+  §11 VR-60): each face box carries `mouth` (`FramingSubjects.mouth`: gap ÷ width when both
+  are finite, the width above 0 and the gap ≥ 0; only `follow: speaker` reads it);
+  `FramingSpeaker` (main, names no `rc_*`) `follow: speaker`'s `turns` — `SpeakerSwitch.read`
+  over the `mics` clips (each its track's speaker, no angle, no wide, the framed clip's span,
+  `Settings()`), `SpeakerSwitch.turns`, each track named back as its clip id, `read`'s
+  problems and `silentMicrophones` refusing as "reframe_clip was refused: …"; a microphone
+  `read` drops gets no turn and the core names it. The handler passes `mics` and `mic_faces`,
+  refuses `speaker` addressed to a container other than the open one, and adds the turns on
+  its last hop.
 - `FollowSubject.swift` · `FollowSubjectSheetController.swift` ·
   `EditorViewController+FollowSubject.swift` — Clip ▸ Follow Subject… (road map
   creator-jobs VR2b2, spec §11 VR-29): `reframe_clip` with `replace: true` on each selected

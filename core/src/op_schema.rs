@@ -189,6 +189,7 @@ fn schema_of_kind(kind: Kind) -> Value {
                         "w": {"type": "number"},
                         "h": {"type": "number"},
                         "c": {"type": "number"},
+                        "mouth": {"type": "number"},
                     },
                     "required": ["x", "y", "w", "h", "c"],
                     "additionalProperties": false,
@@ -224,6 +225,19 @@ fn schema_of_kind(kind: Kind) -> Value {
                                 "typing": {"type": "boolean"},
                             },
                             "required": ["t", "x", "y"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "turns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": {"type": "integer"},
+                                "to": {"type": "integer"},
+                                "mic": {"type": "integer"},
+                            },
+                            "required": ["from", "to", "mic"],
                             "additionalProperties": false,
                         },
                     },
