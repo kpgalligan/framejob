@@ -9,7 +9,8 @@ import Foundation
 /// VR-39).
 ///
 /// This file holds the shapes (VR-32), the settings and the classes (VR-33);
-/// `VerticalVersion+Plan.swift` the step (VR-34) and the summary (VR-35). Swift restates none
+/// `VerticalVersion+Plan.swift` the step (VR-34) and the summary (VR-35);
+/// `VerticalVersion+Layers.swift` the graphics (VR-42, VR-44, VR4b). Swift restates none
 /// of VR-26's refusals: a clip the core will not frame reaches `keep` through the core's own
 /// sentence. Names no `rc_*`.
 enum VerticalShape: String, CaseIterable {
@@ -57,7 +58,7 @@ enum VerticalVersion {
 
     /// What the step did to one clip, as the answer spells it.
     enum Treatment: String {
-        case followed, whole, kept, refilled, removed
+        case followed, whole, kept, refilled, removed, resized
         case notFollowed = "not_followed"
     }
 
@@ -73,7 +74,9 @@ enum VerticalVersion {
         case picture
         /// (4) A nest clip covering one axis.
         case nest
-        /// (5) VR4's full-frame graphics, until VR4, and (6) everything else.
+        /// (5) A graphic exactly the canvas's size, each side (VR-42 (a)).
+        case graphic
+        /// (6) Everything else.
         case other
     }
 
@@ -179,6 +182,12 @@ enum VerticalVersion {
             if clip.name == "Background", centred, let size = snapshot.sourceSize(of: clip) {
                 let fill = fill(size, width: canvas.width, height: canvas.height)
                 if abs(video.scale - fill) <= 1e-6 * fill { return .imagePlate }
+            }
+        case .graphic:
+            if let graphic = clip.graphic, graphic.width == canvas.width,
+                graphic.height == canvas.height
+            {
+                return .graphic
             }
         default:
             break

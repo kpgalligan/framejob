@@ -15,7 +15,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const cx = props.x * ctx.width;
   const cy = props.y * ctx.height;
   const r = 110 * u;

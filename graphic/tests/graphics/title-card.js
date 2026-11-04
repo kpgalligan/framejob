@@ -15,7 +15,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const width = ctx.width * 0.8;
   const size = fitText(props.title, width, { family: "Anton", weight: 400 }, { min: 24 * u, max: 220 * u });
   const fadeIn = interpolate(frame, [0, 18], [0, 1], { easing: Easing.inOutSine, clamp: true });

@@ -58,6 +58,8 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     private var requestError: String?
     private var subjects: [UInt32: [String: Any]]?
     private var asked: ReelProject?
+    /// VR-44 (b)'s survey of the project's graphic modules, made once at `viewDidAppear`.
+    private var templates = VerticalVersion.TemplateSurvey()
     private var askedScope: UInt32?
     private var accepted = false
     /// Set by Make: handed to `make` after disappearing.
@@ -168,6 +170,7 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         let targets = VerticalVersion.analysisTargets(project, urls: document.mediaURLs())
         present = targets.present
         missing = targets.missing
+        templates = VerticalVersion.templateSurvey(project, store: document.graphicStore)
         do {
             requests = try FramingAnalysis.requests(clips: present, in: document, project: project)
         } catch {
@@ -263,7 +266,10 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
                 document.project, settings: settings,
                 subjects: settings.follow.follows ? (subjects ?? [:]) : [:], missing: missing)
             {
-            case .plan(let plan): return (!plan.ops.isEmpty, VerticalVersion.summary(plan))
+            case .plan(let plan):
+                let report = VerticalVersion.templateReport(
+                    templates, copy: copyBox.state == .on)
+                return (!plan.ops.isEmpty, VerticalVersion.summary(plan, templates: report))
             case .refused(let why): return (false, why)
             }
         } catch {

@@ -119,8 +119,9 @@ not while a recording runs. The sheet has five controls:
 
 Under them the sheet says what **Make** will do: the new size, how many clips
 are followed, shown whole, kept as placed or re-filled, the blurred copies it
-removes, the tracks it adds and the actions that carry a move, then each clip
-that is not followed and why.
+removes, the graphics it re-sizes and the graphic modules it updates, the
+tracks it adds and the actions that carry a move, then each clip that is not
+followed and why, and each graphic module left as it is and why.
 
 Each clip with a picture on the top-level timeline is treated by what it is:
 
@@ -132,7 +133,12 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   placed.
 - **A still or a picture that fills the frame, and a nest that does**, is
   centred.
-- **Everything else is kept as placed** — titles, graphics, shapes, a
+- **A graphic exactly the old canvas's size** (a full-frame lower third or
+  title card) is re-sized to the new canvas, so it lays itself out again on
+  the narrow frame; its position and its actions' positions shrink and stretch
+  with the two sides, and its scale stays as it was (see
+  [Motion graphics](graphics.md#in-a-vertical-version)).
+- **Everything else is kept as placed** — titles, other graphics, shapes, a
   picture-in-picture — moved and scaled from the old canvas to the new one as
   the Document tab's canvas change does when it rescales clips.
 - **A blurred copy** already behind a clip is removed when that clip now
@@ -146,6 +152,15 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   a style Frame Job does not make, or pages that would not fit — is kept as
   placed, and the summary names it and why: "Caption track "Captions 2" is
   kept as placed: it holds a page with no word timings."
+- **Older copies of the bundled Lower third, Title card, Callout, Bar chart,
+  Counter and Kinetic type** in the project, from before those templates
+  measured themselves by the short side, are rewritten with the current
+  template in the copy, the old text kept as the module's previous version.
+  Applied in place they are left as they are, and the summary names each:
+  "Graphic module "intro" is left as it is: it is an older copy of the bundled
+  template "lower-third"; Make Vertical updates it only in a copy." A module
+  of your own that sizes itself by the canvas's height is named too, and
+  never rewritten.
 
 When the movies have not been analysed, the sheet says it will find the faces,
 people and shot changes first: **Make** then shows the Analyzing sheet while

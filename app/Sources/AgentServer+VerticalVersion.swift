@@ -38,7 +38,11 @@ extension AgentServer {
     /// The last main hop's answer: in place, the finished answer; a copy, the document.
     private enum VerticalOutcome {
         case applied(String)
-        case copied((document: ProjectDocument, carried: DerivedCarry.Report))
+        case copied(
+            (
+                document: ProjectDocument, carried: DerivedCarry.Report,
+                templates: VerticalVersion.TemplateReport
+            ))
     }
 
     func makeVerticalVersion(_ a: [String: Any]) throws -> String {
@@ -75,21 +79,34 @@ extension AgentServer {
             }
             let plan = try self.verticalPlan(
                 document.project, call.settings, subjects: subjects, missing: call.missing)
-            fields.merge(VerticalVersion.answerFields(plan)) { _, new in new }
             guard call.copy else {
+                // In place nothing is written: the old template copies are listed (VR-44 (c)).
+                let survey = VerticalVersion.templateSurvey(
+                    document.project, store: document.graphicStore)
+                fields.merge(
+                    VerticalVersion.answerFields(
+                        plan, templates: VerticalVersion.templateReport(survey, copy: false))
+                ) { _, new in new }
                 return .applied(
                     try self.editResult(document, VerticalVersion.actionName, plan.ops, fields))
             }
             do {
-                return .copied(
-                    try ProjectDocument.verticalCopy(
-                        from: document, plan: plan, shape: call.settings.shape, path: call.url,
-                        display: Self.derivedDisplay))
+                let made = try ProjectDocument.verticalCopy(
+                    from: document, plan: plan, shape: call.settings.shape, path: call.url,
+                    display: Self.derivedDisplay)
+                // The copy's own report: what it updated and what it listed.
+                fields.merge(VerticalVersion.answerFields(plan, templates: made.templates)) {
+                    _, new in new
+                }
+                return .copied(made)
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
         }
-        let made: (document: ProjectDocument, carried: DerivedCarry.Report)
+        let made: (
+            document: ProjectDocument, carried: DerivedCarry.Report,
+            templates: VerticalVersion.TemplateReport
+        )
         switch outcome {
         case .applied(let answer): return answer
         case .copied(let copy): made = copy

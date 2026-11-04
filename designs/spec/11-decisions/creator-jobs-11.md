@@ -273,3 +273,114 @@ VR4b. (2) `relay_captions` takes no `scope` argument (VR-45 (c)). (3) Its spec t
 where VR3a put `make_vertical_version`, not §7.9e. (4) The kept reasons gain "it holds a page none
 of whose words starts inside it" and "it is a matte track", and a recognised track the re-lay
 keeps is reframed by `keep` (VR-40 (a), (f)). (5) Nine mutants, the graphics three VR4b's.
+
+## VR4b — graphics re-laid (2026-11-03)
+
+Recorded before the code. VR4b is the second half of VR4's split (VR4a's paragraph above): a
+graphic the old canvas's size re-sized, the six road-map-10 templates measured by the short side,
+a project's own old copies of them updated in a vertical copy, `make_vertical_version`'s graphic
+counts, JOB-34's graphics half and JOB-35. No core, FFI, header, op, tool, `Kind` or format change
+(43 stands; `OP_COUNT` 70; 125 product tools); nothing is sent anywhere, so nothing is keyed
+(CJ-3). **The owner's answer of 2026-11-01 for VR4 (3):** a project's old template copies are
+updated in a vertical copy, not only listed — VR-44.
+
+- **VR-42 — A graphic the size of the old canvas becomes the size of the new one**
+  (`VerticalVersion.swift`'s class 5, `VerticalVersion+Layers.swift`'s `graphicOps`).
+  (a) **Class 5** (VR-33): a top-level clip whose source is `graphic` and whose graphic's
+  `width` and `height` are EXACTLY the old canvas's W and H, each side compared, never the area
+  (a 1080 × 1920 graphic on a 1920 × 1080 canvas is not class 5). It is tested in `role(of:)`'s
+  first switch, after the backdrop test; every other graphic is class 6 and takes `keep` as
+  before.
+  (b) **The ops**, in step (4) (VR-34), each through `trial.require`, with rx = W′/W and
+  ry = H′/H: `set_graphic {width: W′, height: H′}`; when the base x or y is non-zero,
+  `set_video {x: x·rx, y: y·ry}`; for each action whose end's `video` names x or y,
+  `set_action_end {video: {the named keys only, x·rx and y·ry}}` (no schema: the patch names no
+  `graphic`). Scale, on the base and in every end, is never touched: the graphic is now the
+  canvas's size, so its scale means what it meant. Step (3) skips class 5. A refusal answers
+  "Make Vertical was refused at <op> for clip C: <reason>" and nothing is made. The entry is
+  `resized`, with no reason.
+  (c) Top-level clips only (VR-33): a nest's graphics are untouched. `set_canvas` still never
+  re-lays out a graphic; only Make Vertical re-sizes one (amends **G-7**).
+- **VR-43 — The six road-map-10 templates measure by the short side** (`lower-third`,
+  `title-card`, `callout`, `bar-chart`, `counter`, `kinetic-type` in `graphic/tests/graphics/`).
+  Each one's unit line `const u = ctx.height / 1080;` becomes `const u =
+  Math.min(ctx.width, ctx.height) / 1080;` and nothing else changes. On a canvas at least as wide
+  as tall `Math.min(w, h)` is `h`, so every landscape and square render is byte-identical
+  (`graphic/tests/pins.rs` and `sandbox.rs` pass with no `GRAPHIC_REPIN`). The six stay in
+  `common::FIXTURES`, outside G-44's title-safe tests (they enter from off-frame).
+  `docs/graphics-api.md` recommends the same line. If a template with only its unit line changed
+  still draws text outside a 1080 × 1920 frame, its fix is a branch on `ctx.height > ctx.width`
+  that leaves every landscape and square value unchanged, recorded as a deviation.
+- **VR-44 — A project's own copy of an old bundled template is brought up to date in a vertical
+  copy** (`GraphicTemplates+Revisions.swift`, `VerticalVersion+Layers.swift`,
+  `ProjectDocument+VerticalCopy.swift`).
+  (a) **The table**, `GraphicTemplates.shippedRevisions`: the SHA-256 (lowercase hex) of every
+  text of the six the app has bundled → its stem — each file at 601f4ee3 (G1c, unchanged through
+  b0091535, G5b, the first bundling), at b71e20b5 (G-45's `meta`) and VR-43's text: 18 rows. The
+  current text is in the table too, so a module already current is matched and skipped by its
+  digest, and a test can hold the table to the tree. `measuresByHeight` is the regex
+  `ctx\.height\s*/\s*1080\b` over a module's text.
+  (b) **The survey** (`templateSurvey`, main): over `DerivedCarry.drawnGraphicNames` of the
+  project, each name's scanned module. It is **outdated** when its revision is a table row for
+  stem S and differs from the SHA-256 of the readable bundled `GraphicTemplates/<S>.js` — matched
+  by revision, never by name. It **sizes by height** when no table row matches and
+  `measuresByHeight` is true. No store: an empty survey.
+  (c) **In a copy** (`verticalCopy`, after the unchanged-copy guard): each outdated module is
+  rewritten with the bundled text through `GraphicStore.write(name:source:)`, then ONE
+  `rescan()`, whose pass keeps the replaced text in the module's history (`keepReplaced`, G-29);
+  a write that throws lists the module, "it could not be updated: <description>". Its doors are
+  every door of the copy: File ▸ Make Vertical Version…, `make_vertical_version` and, later,
+  FC9's short. **In place** (`copy: false`) nothing is written (a module write is not part of the
+  step's undo, G-3) and each outdated module is listed, "it is an older copy of the bundled
+  template "<S>"; Make Vertical updates it only in a copy". Both list each module that sizes by
+  height, "it sizes itself by the canvas's height, so it may not fit the narrow frame". Nothing
+  else is rewritten: a module matching no row, and the seventeen G-44 templates (already by the
+  short side).
+  (d) **The report** (`TemplateReport`): `updated` (names) and `listed` (`{name, reason}`), both
+  by name. The sheet shows the predicted report (`templateReport(survey, copy:)`, the survey made
+  once at `viewDidAppear`), the tool the one the copy made, or in place the predicted one.
+- **VR-47 — VR4b's proof** (`vr4b_proof.py`; `graphic/tests/vertical_templates.rs`). **G1**
+  `portrait_text_inside_the_frame`: each of the six with its default props at 1080 × 1920,
+  frames 0, ⌊d/2⌋ and d−1, parsed by usvg over a font database holding exactly the bundled
+  faces, the group opacities multiplied down the tree; a text node whose accumulated opacity is
+  above 0 and whose stroke bounding box meets the frame lies inside [24, W−24] × [24, H−24].
+  **G2** `landscape_and_square_unchanged`: each shipped text is the new text with the unit line
+  put back, its SHA-256 the b71e20b5 digest; both drawn at 1920 × 1080 and 1080 × 1080 at every
+  fifth frame and the last, BGRA byte-identical. **The trap**
+  `revision_table_holds_every_current_template`: each of the six's current digest is a row of
+  `GraphicTemplates+Revisions.swift` mapped to its stem. **G3** in place: one undo step "Make
+  Vertical", a canvas-size graphic `resized` to 1080 × 1920 with its base and end x and y by the
+  axis ratios and its scale unchanged, a 1080 × 1920 graphic (same area) and a 640 × 360 one
+  `kept`, the summary's "Re-sizes 2 graphics". **G4** a copy: `graphics.updated` the two old
+  copies, the module sizing by height listed, the copy's modules the tree's text with the old
+  one kept, the source's modules byte-unchanged, a current one not updated. **G5** in place: none
+  updated, the old copies listed with the in-place reason. **G6** (no app) the table's rows per
+  stem are exactly the digests of the file at b0091535 and every later commit touching it, and
+  of the working file. **Z0** the parity grep. Six mutants, each caught by its row:
+  `graphic-area` (G3), `unit-line-left` (G1), `matched-by-name` (G4), `scale-by-keep` (G3),
+  `in-place-rewrite` (G5), `current-outdated` (G4). **JOB-34**, its graphics half: re-sized
+  graphics and updated templates look intended on 9:16 and 1:1. **JOB-35**: the vertical trial,
+  VR-38's verdict.
+
+**The answer and the summary** (VR-35, VR-36 as amended here). The summary adds, after " Removes
+… ", " Re-sizes N graphic[s] to the new canvas." and " Updates N graphic module[s] to the
+current template.", each only when non-zero, and after the caption lines one line per listed
+module, `Graphic module "<name>" is left as it is: <reason>.` `make_vertical_version`'s answer
+always has `graphics {resized, updated, listed [{name, reason}]}`, and `clips[].treatment` may be
+`resized`.
+
+**Amendments recorded by VR4b.**
+- **VR-33** (5): built — a graphic exactly the old canvas's size is class 5 (VR-42 (a)).
+- **VR-34**: step (4) gains class 5's ops (VR-42 (b)); step (6)'s graphics are VR-42 and VR-44.
+- **VR-35**: the graphic counts and lines above.
+- **VR-36**: treatment `resized`, and the answer key `graphics`.
+- **G-7**: Make Vertical re-sizes a graphic whose size is the old canvas to the new canvas, as an
+  explicit `set_graphic`; `set_canvas` still never re-lays out a graphic (VR-42).
+
+**Deviations from the road map's draft, recorded before the code.** (1) VR-42's ends compose x
+and y by `keep`'s axis ratios and leave scale as it is (the draft's "composed by keep" would apply
+keep's min-ratio scale and shrink a graphic that already fills the new canvas). (2) The table
+holds the current text too, so a module already current is skipped by digest and the trap can
+check it. (3) G1 skips a text wholly outside the frame or at opacity 0 (lower-third's frame 0,
+the outros' last frames). (4) The proof is VR-47 (`vr4b_proof.py`), not rows 7–9 of
+`vr4_proof.py`; six mutants, not three.

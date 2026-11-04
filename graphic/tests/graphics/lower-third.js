@@ -17,7 +17,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const size = props.size * u;
   const sub = size * 0.5;
   const titleFont = { family: "Montserrat", size, weight: 800 };

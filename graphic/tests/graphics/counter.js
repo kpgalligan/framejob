@@ -16,7 +16,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const end = Math.max(1, Math.round(ctx.durationInFrames * 0.7));
   const value = interpolate(frame, [0, end], [props.from, props.to], { easing: Easing.outExpo, clamp: true });
   const text = props.prefix + formatNumber(value);

@@ -10128,6 +10128,73 @@ paragraph `TextPreset`'s three functions, and the `VerticalVersion` entry step (
 **Owed.** VR4b (see the Split above); JOB-34's captions half (a person at the machine, a phone).
 Nothing filed.
 
+#### VR4b's record (2026-11-03)
+
+**Landed in the lane: VR4b, the graphics half (spec §11 VR-42, VR-43, VR-44, VR-47).** Lane C,
+base `30bc28a3` (I's HEAD, VR4a). Two commits: the decisions alone (VR-42, VR-43, VR-44, VR-47
+appended to `creator-jobs-11.md` with their index rows, the amendments of VR-33, VR-34, VR-35,
+VR-36 and G-7, G-7's amendment line in `graphics.md`); then the code, the instruments and the
+documents. The owner's answer 3 (update the old template copies in a vertical copy) is VR-44. No
+core, FFI, header, op, tool, `Kind` or format change (43 stands, `OP_COUNT` 70, 125 product
+tools); nothing keyed. New files: `VerticalVersion+Layers.swift` 164 lines,
+`GraphicTemplates+Revisions.swift` 51, `graphic/tests/vertical_templates.rs` 230,
+`tools/proof/vr4b_proof.py` 531; `VerticalVersion.swift` 241, `VerticalVersion+Plan.swift` 371,
+`VerticalVersionSheetController.swift` 330, `AgentServer+VerticalVersion.swift` 267,
+`ProjectDocument+VerticalCopy.swift` 42, `AgentCatalog+Framing.swift` 199. No frozen file touched.
+
+- **Class 5 and its re-size.** `Role.graphic` (a graphic exactly W × H, each side) in
+  `role(of:)`'s first switch; step (3) skips it; step (4) runs `graphicOps` (`set_graphic
+  {width, height}`, the base x and y and each end's named x and y by the axis ratios, scale
+  untouched) through `trial.require`, entry `resized`.
+- **The six templates.** Only the unit line changed, `Math.min(ctx.width, ctx.height) / 1080`;
+  G1 passed with no branch, so no template needed VR-43's fallback. `pins.rs` and `sandbox.rs`
+  passed with no `GRAPHIC_REPIN`.
+- **Old template copies.** `GraphicTemplates.shippedRevisions` (18 rows), `measuresByHeight`;
+  `templateSurvey`, `templateReport`, `updateTemplates`; `verticalCopy` updates the copy's
+  modules after the grouped edit and answers the report; the tool merges the copy's report, or
+  in place the predicted one; the sheet surveys once at `viewDidAppear` and passes the
+  predicted report for Make a copy's state. The answer's `graphics`, the summary's "Re-sizes …"
+  and "Updates …" sentences and `Graphic module "<name>" is left as it is: <reason>.` lines.
+
+**Deviations from the spec.** (1) G1's font database also maps G-6's three generics
+(`set_serif_family` and the rest), as `Library::new` does, so `sans-serif` text resolves to a
+bundled face and is counted rather than dropped. (2) `templateSurvey` takes a defaulted
+`bundled:` directory (the app's `GraphicTemplates.bundledDirectory`). (3) G4 saves copy Y at a
+`path` so the copy is addressed by it. (4) The index rows of VR-33…VR-36 and G-7 in
+`11-decisions/README.md` name their amendments, as VR4a's did for VR-34. (5)
+`VerticalVersion.counted` lost `private` so `+Layers` shares it. (6) G6 also scores
+`vertical_templates`' trap. (7) `VerticalVersion.swift`'s header comment points to `+Layers`.
+
+**The runs** (lane C's worktree; Debug unless said):
+- `make typecheck`: 0 errors, the 4 baseline warnings.
+- `cd graphic && cargo test --release --test vertical_templates --test pins --test sandbox
+  --test templates --test reference`: 3, 1, 19, 7 and 5 passed; `cargo fmt --check` clean.
+- `spec_index_proof.py` 273/273.
+- `vr4b_proof.py` 7/7 (G1–G6, Z0); `vr4_proof.py --only R5,R7` 3/3; `vr3_proof.py` 14/14.
+- All six mutants CAUGHT, each by its named row: `unit-line-left` (G1: bar-chart's title at
+  [357, 1523] × [162, 293] past the 1056 edge), `graphic-area` (G3: C `resized`),
+  `scale-by-keep` (G3: A's end scale 0.675), `matched-by-name` (G4: `updated` callout and
+  lower-third, intro listed by height), `current-outdated` (G4: title-card updated),
+  `in-place-rewrite` (G5: callout and intro rewritten in place).
+- `make gate`: `gate: PASS 524s` (names 1 s, typecheck 8 s, fmt 4 s, lint 19 s, test 296 s, app
+  196 s).
+- Release: `vr4b_proof.py` 7/7, `vr3_proof.py` 14/14 (each launch's Z0/Z1 printed nothing).
+
+**The review** passed with two nits, neither changed: (1) one re-wrapped string line in
+`make_vertical_version`'s description (`AgentCatalog+Framing.swift`) runs past the wrap width
+its neighbours keep; (2) `templateSurvey`'s `current: [String: String?]` cache stores an
+unreadable bundled file as `.some(nil)`, correct but subtle to read.
+
+**Integration** (2026-11-03): nothing had landed since the base, and the cherry-pick of
+`ce796011` and `f13d9c61` was clean. `app/CLAUDE.md`'s `VerticalVersion` entry names
+`VerticalVersion+Layers.swift` and `GraphicTemplates+Revisions.swift`, class 5 and VR-44's
+functions and the trap; `graphic/CLAUDE.md`'s bundled-templates paragraph names the six's unit
+line and `tests/vertical_templates.rs`. `make gate` on I: `gate: PASS 388s` (names 1 s,
+typecheck 9 s, fmt 4 s, lint 2 s, test 194 s, app 177 s).
+
+**Owed.** JOB-34's graphics half and JOB-35, the vertical trial whose verdict is VR-38 (a person
+at the machine, a phone; JOB-35 waits for T1 and T2). Nothing filed.
+
 ### FC7b — Rank: the estimate, the ranked list, its cost
 
 - **What a person gets:** under the candidates the window says what Rank sends and what it will

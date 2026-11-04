@@ -5,15 +5,20 @@ import AppKit
 /// every cache and analysis is carried), named "<source> (<shape>)", with the step applied
 /// there as its one undo step, "Make Vertical". The source is never edited and gains no undo
 /// step. Its doors are `make_vertical_version` (`AgentServer+VerticalVersion.swift`) and File ▸
-/// Make Vertical Version… (`EditorViewController+VerticalVersion.swift`, VR3b).
+/// Make Vertical Version… (`EditorViewController+VerticalVersion.swift`, VR3b). In the copy,
+/// and only there, the project's own older copies of the bundled templates are rewritten with
+/// the current text (VR-44 (c), `VerticalVersion+Layers.swift`).
 extension ProjectDocument {
 
-    /// The copy, and what was carried. Main only. A copy the step did not change is closed,
-    /// its package at `path` removed, and the call refused.
+    /// The copy, what was carried and the template report. Main only. A copy the step did not
+    /// change is closed, its package at `path` removed, and the call refused.
     static func verticalCopy(
         from source: ProjectDocument, plan: VerticalVersion.Plan, shape: VerticalShape,
         path: URL?, display: Bool
-    ) throws -> (document: ProjectDocument, carried: DerivedCarry.Report) {
+    ) throws -> (
+        document: ProjectDocument, carried: DerivedCarry.Report,
+        templates: VerticalVersion.TemplateReport
+    ) {
         assert(Thread.isMainThread)
         let made = try derived(
             from: source, handle: source.project, range: nil, path: path, display: display,
@@ -26,6 +31,12 @@ extension ProjectDocument {
             throw ReelCoreError(
                 message: "Make Vertical did not apply to the copy, so nothing was made.")
         }
-        return made
+        var templates = VerticalVersion.TemplateReport()
+        if let store = made.document.graphicStore {
+            let survey = VerticalVersion.templateSurvey(made.document.project, store: store)
+            templates = VerticalVersion.updateTemplates(
+                survey, in: store, from: GraphicTemplates.bundledDirectory)
+        }
+        return (made.document, made.carried, templates)
     }
 }

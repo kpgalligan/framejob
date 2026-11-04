@@ -147,6 +147,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the format `LayerRenderers` already uploads, so tiny-skia's RGBA is
   swizzled once, in Rust, and nowhere else. The maximum side is 8192, the
   renderer's own cap.
+  **Amended 2026-11-03, by VR-42** (road map "creator-jobs" VR4b): Make
+  Vertical re-sizes a graphic whose size is the old canvas to the new
+  canvas, as an explicit `set_graphic`; `set_canvas` still never re-lays out
+  a graphic.
 - **G-8 — A failing graphic shows its error in preview, answers it to the
   agent, and stops an export** (road map 10 §4, 2026-09-25). In PREVIEW a
   module that does not compile, or a frame that throws or times out, draws

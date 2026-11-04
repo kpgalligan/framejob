@@ -110,7 +110,7 @@ extension VerticalVersion {
                 note = "it is a nest, so it is centred"
             case .other:
                 break
-            case .backdrop, .shapePlate, .imagePlate:
+            case .backdrop, .shapePlate, .imagePlate, .graphic:
                 continue
             }
             func op(_ follow: FramingFollow) -> ReelOp {
@@ -173,31 +173,40 @@ extension VerticalVersion {
             }
         }
 
-        // (4) The backdrops and the plates, at the new canvas.
+        // (4) The backdrops and the plates, at the new canvas; a canvas-size graphic re-sized
+        // to it (VR-42).
         let newFill = { (clip: ClipSnapshot) -> Double in
             fill(old.sourceSize(of: clip) ?? .zero, width: size.width, height: size.height)
         }
         for (id, role) in roles {
             guard let clip = old.clip(id) else { continue }
-            let op: ReelOp
+            let ops: [ReelOp]
             let treatment: Treatment
             switch role {
             case .backdrop(let partner) where framed.contains(partner):
-                op = .delete(clips: [id])
+                ops = [.delete(clips: [id])]
                 treatment = .removed
             case .backdrop, .imagePlate:
-                op = .setVideo(clips: [id], patch: VideoPatch(x: 0, y: 0, scale: newFill(clip)))
+                ops = [.setVideo(clips: [id], patch: VideoPatch(x: 0, y: 0, scale: newFill(clip)))]
                 treatment = .refilled
             case .shapePlate:
-                op = .setShape(
-                    clips: [id],
-                    patch: ShapePatch(width: Double(size.width), height: Double(size.height)))
+                ops = [
+                    .setShape(
+                        clips: [id],
+                        patch: ShapePatch(width: Double(size.width), height: Double(size.height))),
+                ]
                 treatment = .refilled
+            case .graphic:
+                ops = graphicOps(clip, from: old.canvas, width: size.width, height: size.height)
+                treatment = .resized
             case .picture, .nest, .other:
                 continue
             }
-            if let why = try trial.require(op) {
-                return .refused("Make Vertical was refused at \(op.name) for clip \(id): \(why)")
+            for op in ops {
+                if let why = try trial.require(op) {
+                    return .refused(
+                        "Make Vertical was refused at \(op.name) for clip \(id): \(why)")
+                }
             }
             entries[id] = Entry(clip: id, treatment: treatment, reason: nil)
         }
@@ -274,8 +283,9 @@ extension VerticalVersion {
             reason: reasons.isEmpty ? nil : reasons.joined(separator: " and "))
     }
 
-    /// VR-35: the counts, then one line per entry with a reason.
-    static func summary(_ plan: Plan) -> String {
+    /// VR-35: the counts, then one line per entry with a reason; the graphic counts and lines
+    /// VR4b's (`templates`, VR-44 (d)).
+    static func summary(_ plan: Plan, templates: TemplateReport = TemplateReport()) -> String {
         func count(_ treatment: Treatment) -> Int {
             plan.entries.filter { $0.treatment == treatment }.count
         }
@@ -293,6 +303,7 @@ extension VerticalVersion {
             text += " Removes \(removed) blurred \(removed == 1 ? "copy" : "copies") the "
                 + "framing replaces."
         }
+        text += graphicsCounts(plan, templates)
         if plan.backgrounds { text += " Adds a Backgrounds track for the blurred copy." }
         if plan.moreTracks > 0 {
             text += " Adds \(plan.moreTracks) more \(plan.moreTracks == 1 ? "track" : "tracks")"
@@ -316,6 +327,7 @@ extension VerticalVersion {
             }
         }
         lines += (plan.captions?.kept ?? []).map(CaptionRelayout.keptLine)
+        lines += graphicsLines(templates)
         return lines.joined(separator: "\n")
     }
 
@@ -326,8 +338,10 @@ extension VerticalVersion {
     }
 
     /// The answer's keys every door shares (VR-36): `canvas`, `clips` in id order,
-    /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried` and `summary`.
-    static func answerFields(_ plan: Plan) -> [String: Any] {
+    /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried`, `summary` and `graphics`.
+    static func answerFields(_ plan: Plan, templates: TemplateReport = TemplateReport())
+        -> [String: Any]
+    {
         let clips: [[String: Any]] = plan.entries.map { entry in
             var row: [String: Any] = [
                 "clip": Int(entry.clip), "treatment": entry.treatment.rawValue,
@@ -342,7 +356,8 @@ extension VerticalVersion {
             "more_tracks": plan.moreTracks,
             "re_eased": plan.reEased,
             "moves_carried": plan.carried,
-            "summary": summary(plan),
+            "summary": summary(plan, templates: templates),
+            "graphics": graphicsFields(plan, templates),
         ]
         if let captions = plan.captions {
             fields["captions"] = CaptionRelayout.answerFields(captions)
@@ -350,7 +365,7 @@ extension VerticalVersion {
         return fields
     }
 
-    private static func counted(_ n: Int, _ noun: String) -> String {
+    static func counted(_ n: Int, _ noun: String) -> String {
         "\(n) \(noun)\(n == 1 ? "" : "s")"
     }
 }

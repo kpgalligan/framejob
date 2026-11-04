@@ -332,6 +332,36 @@ The size is the module's drawing surface, the `ctx.width` and `ctx.height` it
 sees, so text and shapes stay sharp at any size. Scaling the clip in the
 Picture sub-tab scales that drawn picture.
 
+Changing the canvas never changes a graphic's size. Make Vertical Version is
+the one exception, below.
+
+### In a vertical version
+
+File ▸ Make Vertical Version… (see
+[Vertical versions and framing](vertical-and-framing.md)) treats graphics like
+this:
+
+- **A graphic exactly the old canvas's size** (say 1920 × 1080 on a 1920 × 1080
+  canvas) is re-sized to the new canvas, 1080 × 1920 for 9:16, so the module
+  lays itself out again on the tall frame. Its position, and the positions its
+  actions move it to, shrink and stretch with the two sides; its scale stays
+  as it was. Any other graphic, including one with the same area but another
+  shape, is kept as placed, rescaled from the old canvas like a title.
+- **The bundled Lower third, Title card, Callout, Bar chart, Counter and
+  Kinetic type templates** measure themselves by the canvas's short side, so
+  they fit a tall frame and draw exactly as before on a landscape or square
+  one.
+- **Older copies of those six in the project**, inserted before they measured
+  by the short side, are recognised by their text (not their name) and, in the
+  copy Make a copy opens, rewritten with the current template. Your earlier
+  text is kept as the module's previous version (File ▸ Restore Graphic
+  Version… brings it back), and the project you started from never changes.
+  Applied in place, without Make a copy, nothing is rewritten and the summary
+  lists each one instead.
+- **A module of your own that sizes itself by the canvas's height**
+  (`ctx.height / 1080`) is listed in the summary, since it may not fit the
+  narrow frame. It is never rewritten.
+
 ### Timeline
 
 A graphic has a timeline of its own, counted from its first frame. This

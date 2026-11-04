@@ -15,7 +15,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const values = props.values.split(",").map((v) => Number(v.trim())).filter((v) => isFinite(v));
   const labels = props.labels.split(",").map((l) => l.trim());
   const top = Math.max(1, ...values);

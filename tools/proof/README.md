@@ -29794,3 +29794,49 @@ python3 tools/proof/vr4_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR4a record; JOB-34 (its captions half) is
 what only a person judges.
+
+## Road map "creator-jobs" VR4b — graphics re-laid in a vertical version (`vr4b_proof.py` G1–G6, Z0; `graphic/tests/vertical_templates.rs`; six mutants; spec §11 VR-42, VR-43, VR-44, VR-47)
+
+**Two instruments and one app.** G1 and G2 are `graphic/tests/vertical_templates.rs`'s
+`portrait_text_inside_the_frame` and `landscape_and_square_unchanged`, run by the driver through
+`cargo test --release --test vertical_templates` and scored per test; G6 reads
+`GraphicTemplates+Revisions.swift`'s rows against `git show` of each of the six templates at
+b0091535 and every later commit touching it, and the same binary's trap,
+`revision_table_holds_every_current_template`. G3–G5 run over MCP on one instance
+(`proof_app.py`'s app, a scratch `CFFIXED_USER_HOME`).
+
+**The fixture** (`src.framejob`, 1920 × 1080, 30 fps, saved), each clip on a track of its own:
+module "intro" = 601f4ee3's `lower-third.js` (`write_graphic`), clip A at 1920 × 1080 with base
+x 40 and one action ending `{x: 100, y: -50, scale: 1.2}`; "title-card" by `insert_graphic`
+(the current template), clip B at the canvas's size; "lower-third" = b71e20b5's text with
+`title`'s default changed (no shipped digest, sizes by height), clip C at 1080 × 1920; "callout"
+= b71e20b5's text, clip D at 640 × 360. Copy X (in place) and copy Y (a copy saved at a path)
+are opened from the saved package.
+
+| Row | What it holds |
+|---|---|
+| G1 | each of the six at 1080 × 1920, frames 0, ⌊d/2⌋ and d−1, default props: every text node with opacity above 0 that meets the frame lies inside it inset by 24 px (usvg over the bundled faces only) |
+| G2 | each of the six: the shipped text is the new text with the unit line put back (its SHA-256 b71e20b5's), and both draw byte-identical BGRA at 1920 × 1080 and 1080 × 1080, every fifth frame and the last |
+| G3 | copy X `make_vertical_version {shape: 9:16, copy: false}`: one undo "Make Vertical"; A and B `resized` to 1080 × 1920; A's base x 22.5, y 0, scale unchanged, its end x 56.25, y −88.9, scale 1.2; C and D `kept`, C still 1080 × 1920 with its scale × 0.5625; "Re-sizes 2 graphics" in the summary; `graphics.resized` 2 |
+| G4 | copy Y, a copy at a path: `graphics.updated` ["callout", "intro"], `listed` lower-third with the height reason; in the copy `get_graphic`'s intro and callout sources are the tree's `lower-third.js` and `callout.js`, intro's `kept` holds 601f4ee3's digest; copy Y's four modules byte-unchanged; title-card untouched |
+| G5 | G3's answer: `updated` empty; intro and callout listed with the in-place reason, lower-third with the height reason; copy X's modules byte-unchanged |
+| G6 | (no app) the table's rows per stem are exactly the history's digests and the working file's; the trap passes |
+| Z0 | `grep "Frame Job: "` in the instance's log prints nothing |
+
+Mutants (`--mutant NAME`; spec §11 VR-47): `unit-line-left` (G1) reverts `bar-chart.js`'s unit
+line in the TREE, runs G1 and puts it back in a `finally`; the app mutants (`graphic-area` G3,
+`scale-by-keep` G3, `matched-by-name` G4, `current-outdated` G4, `in-place-rewrite` G5) edit the
+TREE's `app/Sources`, run `make app-debug`, run their row on that Debug app, then put the file
+back and run `make app-debug` again (an interrupted run leaves the tree edited: `git diff` shows
+it). Each edit's `before` text is asserted to occur exactly once; a mutant run exits 1 caught, 0
+survived, 2 when the control could not be performed.
+
+```sh
+python3 tools/proof/vr4b_proof.py --only G1,G2,G6            # no app
+make app-debug && python3 tools/proof/vr4b_proof.py [--only G3,G4]
+make app && RC_PROOF_APP=release python3 tools/proof/vr4b_proof.py
+python3 tools/proof/vr4b_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR4b record; JOB-34's graphics half and
+JOB-35 are what only a person judges.

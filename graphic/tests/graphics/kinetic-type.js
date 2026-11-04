@@ -15,7 +15,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const font = { family: "Montserrat", size: 110 * u, weight: 900 };
   const lines = wrapText(props.text, ctx.width * 0.8, font);
   const space = measureText("a a", font).width - measureText("aa", font).width;

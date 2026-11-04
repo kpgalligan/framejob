@@ -66,7 +66,9 @@ export function render(frame, props, ctx) {
 | `canvas` | `{width, height}`, the project's canvas |
 
 Write every coordinate in terms of `ctx.width` and `ctx.height` (or a unit
-such as `const u = ctx.height / 1080`) so the graphic draws at any size.
+such as `const u = Math.min(ctx.width, ctx.height) / 1080`) so the graphic
+draws at any size. That unit is the same as `ctx.height / 1080` on a
+landscape canvas, and it keeps a portrait one from drawing 1.78 times too big.
 
 ## The schema
 
@@ -491,7 +493,7 @@ export const meta = { name: "Slide in", durationInFrames: 90 };
 export const schema = { text: { type: "string", default: "Hello" } };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const x = interpolate(frame, [0, 18], [-ctx.width / 2, ctx.width / 2],
     { easing: Easing.outCubic, clamp: true });
   return svg(ctx, `<text x="${x}" y="${ctx.height / 2}" text-anchor="middle"
@@ -510,7 +512,7 @@ export const schema = {
 };
 
 export function render(frame, props, ctx) {
-  const u = ctx.height / 1080;
+  const u = Math.min(ctx.width, ctx.height) / 1080;
   const rows = props.items.split("\n").filter((s) => s.trim()).map((item, i) => {
     const t = spring({ frame: frame - i * 6, fps: ctx.fps, damping: 16 });
     const y = 300 * u + i * 110 * u;

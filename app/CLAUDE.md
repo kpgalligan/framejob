@@ -958,7 +958,8 @@ detail there.
   per request), the changed-project refusal (at landing and after the read off main), the
   grouped commit, refusals posted as `reframe_clip`, and `validateFollowSubjectAction`, one
   line in the frozen file after `validateSwitchSpeakerAction` (allowed inside a nest).
-- `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `ProjectDocument+VerticalCopy.swift` ·
+- `VerticalVersion.swift` · `VerticalVersion+Plan.swift` · `VerticalVersion+Layers.swift` ·
+  `GraphicTemplates+Revisions.swift` · `ProjectDocument+VerticalCopy.swift` ·
   `AgentServer+VerticalVersion.swift` — Make Vertical's step, its copy and
   `make_vertical_version` (road map creator-jobs VR3a, spec §11 VR-30…VR-37; its menu is the
   entry below). `VerticalVersion` (names no `rc_*`): `VerticalShape` (9:16,
@@ -980,8 +981,18 @@ detail there.
   entry, `Plan.captions` (VR-40 (f)); counts over
   non-`keep` entries through `FollowSubject.counts(…, replace: false)`), `summary` (VR-35),
   `pendingSummary` (VR-39 (d)), `answerFields`, with `captions {relaid, kept}` when `captions`
-  is on. `ProjectDocument+VerticalCopy`: `verticalCopy` (the derived door handed the
-  source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
+  is on. Class 5 (VR4b, spec §11 VR-42): a graphic exactly the old canvas's size, each side,
+  re-sized in step (4) by `+Layers`' `graphicOps` (`set_graphic {width, height}`, the base and
+  each end's named x and y by the axis ratios, scale untouched), entry `resized`. `+Layers`
+  also holds VR-44: `templateSurvey` (drawn modules matched by revision against
+  `GraphicTemplates+Revisions.swift`'s `shippedRevisions`, every bundled text of the six
+  road-map-10 templates; `measuresByHeight`), `templateReport`, `updateTemplates` (the copy
+  only, `GraphicStore.write` then one `rescan()`), `graphicsFields`, `graphicsCounts`,
+  `graphicsLines`; `verticalCopy` answers the template report and `make_vertical_version`'s
+  answer always has `graphics {resized, updated, listed}`; the sheet surveys once at
+  `viewDidAppear`. `graphic/tests/vertical_templates.rs`' trap fails `make test` until a new
+  text of one of the six is a row. `ProjectDocument+VerticalCopy`: `verticalCopy` (the
+  derived door handed the source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
   unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
   tool, off main (`creatorOffMainTools`): hop 1's refusals in order, `captions` read with
   `boolArg`, and a dry plan with no

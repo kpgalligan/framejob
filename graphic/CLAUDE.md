@@ -141,6 +141,13 @@ The crate's record is road map 10 §10.4.
   1080×1920 and 1080×1080, with defaults, every combination of `enum` options
   and every `string` long (`tests/templates/long_text.rs` must name each), a
   card's background static, the last frame bare, no warning, no `NaN`.
+  The six `common::FIXTURES` measure by
+  `Math.min(ctx.width, ctx.height) / 1080` (spec §11 VR-43);
+  `tests/vertical_templates.rs` holds them inside a 1080×1920 frame inset
+  by 24 px, byte-identical to their shipped text at 1920×1080 and
+  1080×1080, and holds `app/Sources/GraphicTemplates+Revisions.swift`'s
+  table to their current text — an edit of one of the six adds its digest
+  there.
 
 ## Dependencies, and why each
 
