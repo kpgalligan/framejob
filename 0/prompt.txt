@@ -1,0 +1,19 @@
+We need to compact this thread
+
+---
+
+/compact
+
+---
+
+We're low on disk space. Clean anything not currently needed.
+
+---
+
+<task-notification>
+<task-id>bylrj0xwy</task-id>
+<tool-use-id>toolu_0177cLXxmukKcotfgjbZds3h</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-audio-updates/9bb0487d-a352-45e3-9da8-07b6f4762c27/tasks/bylrj0xwy.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait until no builds run and load is low" completed (exit code 0)</summary>
+</task-notification>
