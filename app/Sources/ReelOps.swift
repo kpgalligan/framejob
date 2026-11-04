@@ -1028,12 +1028,16 @@ enum SpeedRampShape: String, CaseIterable {
 
 /// What `reframe_clip` follows, `FramingFollow` in `core/src/edit_reframe.rs`
 /// (spec §11 VR-26): the four following kinds read the analysed subjects,
-/// `center` and `fit` hold one placement, `keep` rescales from another canvas.
+/// `cursor` the recorded cursor (VR-50), `center` and `fit` hold one placement,
+/// `keep` rescales from another canvas.
 enum FramingFollow: String, CaseIterable {
-    case subject, face, person, salient, center, fit, keep
+    case subject, face, person, salient, cursor, center, fit, keep
 
     /// The kinds that follow analysed subjects, and so wait for an analysis.
     var follows: Bool { [.subject, .face, .person, .salient].contains(self) }
+
+    /// The kinds that read `subjects`: the following kinds and `cursor`.
+    var readsSubjects: Bool { follows || self == .cursor }
 }
 
 /// What a framing shows with nothing to follow, `WhereEmpty` in

@@ -89,7 +89,11 @@ fn plan_with(
         from_height: 1080,
         where_empty: empty,
     };
-    let subjects = Subjects { samples: s, shots };
+    let subjects = Subjects {
+        samples: s,
+        shots,
+        cursor: vec![],
+    };
     plan_framing(p, 3, &subjects, &request, &TUNING).expect("a path")
 }
 

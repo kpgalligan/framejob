@@ -78,7 +78,11 @@ fn read(path: &Path) -> Input {
             doc["from"][1].as_u64().unwrap() as u32,
         ),
         zoom: doc["zoom"].as_f64().unwrap(),
-        subjects: Subjects { samples, shots },
+        subjects: Subjects {
+            samples,
+            shots,
+            cursor: vec![],
+        },
     }
 }
 

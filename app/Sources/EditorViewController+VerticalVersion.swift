@@ -82,9 +82,12 @@ extension EditorViewController {
                 return
             }
             let targets = handOff.targets
+            let cursor = handOff.cursor
             let asked = handOff.asked
             DispatchQueue.global(qos: .userInitiated).async { [weak self, weak document] in
-                let subjects = FollowSubject.subjects(targets, in: asked, cacheDir: cacheDir)
+                var subjects = FollowSubject.subjects(targets, in: asked, cacheDir: cacheDir)
+                // A cursor beside the analysis (spec §11 VR-51).
+                subjects.merge(FramingCursor.subjects(cursor, in: asked)) { _, new in new }
                 DispatchQueue.main.async {
                     guard let self, let document else { return }
                     guard document.project === handOff.asked, document.scope == handOff.scope

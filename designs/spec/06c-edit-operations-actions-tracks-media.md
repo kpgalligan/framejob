@@ -65,7 +65,18 @@ The rules every op shares are §6a; the clip ops are §6b.
   at each shot change (a one-frame linear segment onto the new shot's first-second median), a lost
   subject held 1 s then another followed or an 0.8 s ease to `where_empty` (`fit`, the whole
   picture; `center`, the window on the picture's centre), a return after 0.6 s seen, two people
-  framed together when both widened boxes fit. `center` holds the window (fill × `zoom`) on the
+  framed together when both widened boxes fit. `cursor` (§11 VR-50) follows `subjects.cursor`,
+  `[{t, x, y, click?, typing?}]` in the same ticks and frame (`click` and `typing` false when
+  absent; `samples` and `shots` still required), with `reframe_cursor.rs`'s planner: the points
+  in the played window, one per clip tick; the window centred on the point clamped into the
+  picture, no headroom; the first key on the first point; a dead zone ±0.20 of the window's width
+  and ±0.12 of its height (0.8 window widths a second, a move at least 0.4 s); a down click
+  outside it ARRIVES — a move ending on the click's frame, planned back from it and started no
+  earlier than the last move's end, so a running move shortens it; any other point outside it
+  starts VR-23's move unless one runs, it is within 0.5 s of the last move's end with the
+  pointer in the window, it would end after a pending arrival's start, or the point is `typing`;
+  no cut and no `fit`, so `where_empty` and `backdrop` never act. A face follow never reads
+  `cursor`. `center` holds the window (fill × `zoom`) on the
   picture's centre and `fit` the whole picture; `keep` rescales the base from `from_width ×
   from_height` (the canvas when absent) by `set_canvas`'s rule, and each `x`, `y` and `scale` an
   action's end names with it. The path F is COMPOSED into the clip (VR-27), its placement P(t)
@@ -88,19 +99,25 @@ The rules every op shares are §6a; the clip ops are §6b.
   clip (`add_blurred_background`'s builder) on that track when it is unlocked, not a matte and
   free over the clip, else on a new back-most track (ids: actions, track, copy), keeping the
   clip's actions that name `speed`, each end narrowed to `speed`. Only `keep` reads
-  `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds read `where_empty` and
-  `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
+  `from_*`; `fit` and `keep` ignore `zoom`; only the following kinds read `where_empty`, and they
+  and `cursor` read `subjects`. **Errors**, in order: an unknown clip; `zoom must be between 1 and 4 times fill, not
   {z}`; `from_width must be greater than 0, not 0` (and `from_height`); an unknown `backdrop`
   track. **Refused**, in order: `clip {id} is a {text|shape|graphic|adjustment} clip, with no
   picture to frame; only keep reframes it`; `clip {id}'s media has no picture to frame`, `clip
-  {id}'s crop or scale leaves no picture to frame`; with a following kind `clip {id} shows a nest,
-  …` then `clip {id} shows a still picture, …`; unless `keep`, a matte (`clip {id} is on a matte
+  {id}'s crop or scale leaves no picture to frame`; with a following kind or `cursor` `clip {id}
+  shows a nest, …` then `clip {id} shows a still picture, …`, then `cursor` on a media clip whose
+  media has no cursor file, `clip {id}'s media has no cursor file, so there is no cursor to
+  follow; frame it with subject, center, fit or keep`, and a following kind on one whose media
+  has one (§11 VR-51), `clip {id}'s media has a cursor file, so it follows the cursor, not faces;
+  frame it with cursor, center, fit or keep`; unless `keep`, a matte (`clip {id} is on a matte
   track, …`, `clip {id} is cut by the matte on track {t}, …`), then a turn (`clip {id} is turned
   {r}°, …`, `clip {id}'s action {a} turns it, …`, `clip {id} spins in its motion, …`); bad
   `subjects` (over 100,000 samples, over 8 boxes of a kind, times
-  not strictly increasing, a value outside 0…1, a size ≤ 0); when a copy would be made,
+  not strictly increasing, a value outside 0…1, a size ≤ 0; over 100,000 cursor points, cursor
+  times not strictly increasing, a cursor `x` or `y` outside 0…1, each naming `cursor[i]`); when a copy would be made,
   `add_blurred_background`'s nest sentence or `track {t} is not behind clip {id}'s track, so a
-  backdrop there would cover it`; LAST, `clip {id} has no subjects to follow; analyze it first`. A
+  backdrop there would cover it`; LAST, `clip {id} has no subjects to follow; analyze it first`
+  (for `cursor`, no `subjects` or no cursor point in the played window). A
   result equal to the clip is an identity. Allowed inside a nest, whose canvas is the view's. One
   undo step. Its UI path is Clip ▸ Follow Subject… (§11 VR-29): this op with `replace: true` on
   each selected movie clip and a "Backgrounds" track added at index 0 as `backdrop`, removed

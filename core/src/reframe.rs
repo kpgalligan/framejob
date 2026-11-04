@@ -44,20 +44,12 @@ use crate::edit_zoom::{zoom_offset, zoom_scale, ZoomFit, ZoomRegion};
 use crate::model::{Clip, Curve, MediaKind, Project, Source};
 use crate::props_check::SCALE_MAX;
 use crate::reframe_path::write_keys;
+pub use crate::reframe_subjects::Subjects;
 pub use crate::reframe_tracks::{
     choose_subject, Chosen, Follow, SubjectBox, SubjectKind, SubjectSample,
 };
 use crate::time::Ticks;
 use serde::{Deserialize, Serialize};
-
-/// A clip's analysed subjects in MEDIA source ticks of the forward file.
-/// `reframe_clip`'s `subjects` argument; its strict `Deserialize` is
-/// `edit_reframe.rs`'s.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Subjects {
-    pub samples: Vec<SubjectSample>,
-    pub shots: Vec<Ticks>,
-}
 
 /// What a framing shows where there is nothing to follow (spec §11 VR-24
 /// (h)): the whole cropped picture fitted, or the follow window on its

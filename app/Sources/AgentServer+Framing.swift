@@ -21,6 +21,11 @@ import Foundation
 /// - the subjects are read off main (`FramingSubjects`), and the last main hop
 ///   refuses a changed project or scope, then applies one op as one undo step,
 ///   "Reframe Clip".
+///
+/// `follow: cursor` (VR5, spec §11 VR-50 (i)) never waits: after the trial's "no
+/// subjects" the first hop finds the media's cursor file (`AutoZoom.cursorFiles`, its
+/// sentences the refusal), and the file is opened and read off main
+/// (`FramingCursor.read`) in place of the analysis; the answer's `cached` is true.
 extension AgentServer {
 
     /// What the first main hop resolves.
@@ -36,6 +41,8 @@ extension AgentServer {
         let replace: Bool?
         /// The analysis to read, or nil when the trial needs none.
         let reading: FramingReading?
+        /// The cursor file to read for `follow: cursor`, or nil.
+        let cursor: CursorReading?
         let asked: ReelProject
         let scope: UInt32?
 
@@ -45,6 +52,13 @@ extension AgentServer {
                 fromWidth: fromWidth, fromHeight: fromHeight, backdrop: backdrop,
                 replace: replace, subjects: subjects)
         }
+    }
+
+    /// The clip's media, its windows and its cursor file (VR-50 (i)).
+    private struct CursorReading {
+        let media: MediaSnapshot
+        let windows: [ClosedRange<Ticks>]
+        let files: [UInt32: URL]
     }
 
     /// The clip's media, its windows, the cache folder and what is missing.
@@ -79,6 +93,19 @@ extension AgentServer {
             subjects = FramingSubjects.read(
                 media: reading.media, windows: reading.windows, cacheDir: reading.cacheDir)
         }
+        if let cursor = call.cursor {
+            do {
+                guard let track = try AutoZoom.readTracks(cursor.files)[cursor.media.id] else {
+                    throw ToolError(message: "Media \(cursor.media.id)'s cursor file was not read.")
+                }
+                subjects = try FramingCursor.read(
+                    track, media: cursor.media, windows: cursor.windows)
+            } catch let error as ToolError {
+                throw error
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+        }
         let cached = call.reading?.requests.isEmpty ?? true
         return try onMain {
             let document = call.document
@@ -108,7 +135,7 @@ extension AgentServer {
             document: document, clip: clip.id, follow: follow, zoom: try doubleArg(a, "zoom"),
             whereEmpty: try enumArg(a, "where_empty", FramingWhereEmpty.self),
             fromWidth: try sideArg(a, "from_width"), fromHeight: try sideArg(a, "from_height"),
-            backdrop: backdrop, replace: try boolArg(a, "replace"), reading: nil,
+            backdrop: backdrop, replace: try boolArg(a, "replace"), reading: nil, cursor: nil,
             asked: document.project, scope: document.scope)
         let scope = effectiveScope(document)
         let trial: ReelEdit
@@ -124,6 +151,23 @@ extension AgentServer {
         guard let entry = FramingAnalysis.windows(clips: [clip.id], in: view).first,
             let media = view.snapshot.media(entry.media)
         else { return call }
+        if follow == .cursor {
+            // VR-50 (i): the cursor file in place of the analysis; never a wait.
+            guard let shown = view.snapshot.clip(clip.id) else { return call }
+            let files: [UInt32: URL]
+            do {
+                files = try AutoZoom.cursorFiles([shown], in: view.snapshot)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
+            return FramingCall(
+                document: document, clip: call.clip, follow: follow, zoom: call.zoom,
+                whereEmpty: call.whereEmpty, fromWidth: call.fromWidth,
+                fromHeight: call.fromHeight, backdrop: backdrop, replace: call.replace,
+                reading: nil,
+                cursor: CursorReading(media: media, windows: entry.windows, files: files),
+                asked: call.asked, scope: call.scope)
+        }
         guard let cacheDir = document.cacheDirectory else {
             throw ToolError(message: ProjectDocument.AnalysisRequestError.noCache.localizedDescription)
         }
@@ -139,7 +183,7 @@ extension AgentServer {
             backdrop: backdrop, replace: call.replace,
             reading: FramingReading(
                 media: media, windows: entry.windows, cacheDir: cacheDir, requests: requests),
-            asked: call.asked, scope: call.scope)
+            cursor: nil, asked: call.asked, scope: call.scope)
     }
 
     /// A whole number of pixels for `from_width` / `from_height`, nil when

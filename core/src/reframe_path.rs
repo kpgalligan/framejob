@@ -45,9 +45,9 @@ pub const PAIR_WIDEN: f64 = 1.15;
 /// The subject point's median reads ±0.5 s.
 const MEDIAN_SPAN: Ticks = TIMESCALE / 2;
 /// The shortest move: 0.4 s.
-const MOVE_MIN: f64 = 0.4;
+pub(crate) const MOVE_MIN: f64 = 0.4;
 /// No move within 0.5 s of the last one's end…
-const MOVE_SPACING: Ticks = TIMESCALE / 2;
+pub(crate) const MOVE_SPACING: Ticks = TIMESCALE / 2;
 
 impl FramingPath {
     /// (scale, x, y) at clip tick `t`: the segment ending at key i eases with
@@ -360,7 +360,7 @@ pub(crate) fn write_keys(
 
 /// A move of `seconds` from sample `t`, snapped (VR-23): at least a frame,
 /// and `None` when it would end past the clip.
-fn span(t: Ticks, seconds: f64, duration: Ticks, fps: Fps) -> Option<(Ticks, Ticks)> {
+pub(crate) fn span(t: Ticks, seconds: f64, duration: Ticks, fps: Fps) -> Option<(Ticks, Ticks)> {
     let length = (seconds * TIMESCALE as f64).min((duration as f64) * 2.0 + 1.0);
     let start = snap_to_frame(t, fps);
     let mut end = snap_to_frame(t.saturating_add(length.round() as Ticks), fps);

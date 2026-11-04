@@ -29840,3 +29840,46 @@ python3 tools/proof/vr4b_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR4b record; JOB-34's graphics half and
 JOB-35 are what only a person judges.
+
+## Road map "creator-jobs" VR5 — screen recordings follow the cursor (`vr5_proof.py` V1–V7, Z1; `core/tests/reframe_cursor.rs`; six mutants; spec §11 VR-50, VR-51, VR-52, VR-55)
+
+**One launch** (`proof_app.py`'s app, a scratch `CFFIXED_USER_HOME`, `-RCDevAnalysisCanned YES
+-RCDevFollowAccept YES -FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`). Each document
+is a fresh package on a 1920 × 1080 30 fps canvas holding one clip of its own copy of
+`work/vr5-media/screen.mov` (ffmpeg `testsrc` 1920 × 1080, 30 fps, 20 s), with a v1 cursor file
+beside the copy (`cursor_body`, `cu7_proof.py`'s shape at 1920 × 1080): x 400 → 1100 over 0–8 s,
+1100 to 9.9 s, 1700 from 10.0 s (a down click), 300 from 14.0 s (a down click), 300 → 600 over
+16–18 s under typed marks every 0.2 s, 600 to 20 s; y 540 throughout. The script's docstring
+has the derivation each row's bound rests on; placements are evaluated from `get_project` as
+`vr2a_proof.py` does.
+
+| Row | What it holds |
+|---|---|
+| V1 | the 9:16 copy (`make_vertical_version {shape: 9:16, path}`): every 10 Hz sample of `get_cursor_events {clip, kinds: [path], smoothing: 0.5}` in 0.5–8 s, placed through the copy's clip, is on the canvas and within the central 60 % of its width |
+| V2 | `reframe_clip {follow: cursor, zoom: 2}` on a 16:9 scratch and the 9:16 copy: for each click an action ends on its frame and the window's centre there is the click's clamped point (1440 / 480 at zoom 2; 1616.25 / 303.75 in the copy), ±1e-6 |
+| V3 | canned panning faces on the media (`canned_framing.write`, `pan`): the copy's clip `video` and `actions` equal V1's copy's, and `reframe_clip {follow: face}` is refused with VR-51's sentence |
+| V4 | `auto_zoom` on the clip first: the auto zoom's scales are gone from the copy (every end's scale the base's), the answer's `cursor` is `[clip]` and the summary has "Follows the cursor in 1 clip, their own zooms and pans replaced." |
+| V5 | the `.fjcursor` deleted after import: the entry is `not_followed` with "its cursor file could not be read, so it is shown whole", and Backgrounds holds exactly one "Blurred Background" |
+| V6 | in the copy no framing action starts inside (16 s, 18 s) and one starts at or after 18 s |
+| V7 | a fresh document with no canned analysis: Clip ▸ Follow Subject… on the clip; polled 10 s by `snapshot_ui`, `follow.summary` holds "Clip N: " and VR-51's sentence, no "Analyzing" view is seen, `cache/analysis/` holds no file for the media; after `cancel_sheet` `get_project` is unchanged and the undo top is not "Follow Subject" |
+| Z1 | `grep "Frame Job: "` in the instance's log prints nothing |
+
+Mutants (`--mutant NAME`; spec §11 VR-55): `dead-zone-face` (the cursor's dead zone at 0.15) and
+`typing-ignored` are core mutants, run as `cargo test --release --test reframe_cursor` on a copy
+of `core/` (caught by `a_step_inside_the_dead_zone_moves_nothing` and
+`a_typing_stretch_holds_the_window_and_the_move_follows_it`); `faces-allowed` (V3) and
+`clicks-ignored` (V2) edit the core and `replace-off` (V4) and `analysed-every-target` (V7) the
+app, each in a `tree_copy.py` copy — whose `core/` is made a real CoW copy for a core edit, so
+the tree is never edited — built by `tree_copy.build_app`, then their row run on that app. Each
+anchor is asserted to occur exactly once; a run exits 1 caught, 0 survived, 2 when the control
+could not be performed.
+
+```sh
+cd core && cargo test --release --test reframe_cursor
+make app-debug && python3 tools/proof/vr5_proof.py [--only V1,V7]
+make app && RC_PROOF_APP=release python3 tools/proof/vr5_proof.py
+python3 tools/proof/vr5_proof.py --mutant <name>
+```
+
+The recorded runs are in `designs/creator-jobs.md`'s VR5 record; JOB-36 is what only a person
+judges.

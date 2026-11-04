@@ -29,6 +29,8 @@ extension VerticalVersion {
         let carried: Int
         /// Step (6)'s caption tracks, re-laid and kept; nil with `captions` false.
         let captions: CaptionRelayout.Outcome?
+        /// The clips followed by their cursor, in id order (spec §11 VR-52).
+        let cursor: [UInt32]
     }
 
     enum Answer {
@@ -63,7 +65,9 @@ extension VerticalVersion {
 
     /// VR-34 on `project`, the top-level timeline. `missing`: media pictures whose media has
     /// no URL in `document.mediaURLs()` (kept, not followed). `subjects` per clip, read by the
-    /// following kinds only.
+    /// following kinds only: the analysis's, or for a picture whose media has a cursor file
+    /// its cursor's (`FramingCursor`, VR-51), followed by `cursor` with `replace: true`, or
+    /// shown whole (`fit`) when it is absent.
     static func plan(
         _ project: ReelProject, settings: VerticalSettings, subjects: [UInt32: [String: Any]],
         missing: Set<UInt32>
@@ -84,6 +88,7 @@ extension VerticalVersion {
         let relaid = Set(survey?.recognised.map(\.track) ?? [])
         var entries: [UInt32: Entry] = [:]
         var framed: Set<UInt32> = []
+        var cursor: [UInt32] = []
         var moreTracks = 0
         var reEased = 0
         var carried = 0
@@ -98,6 +103,11 @@ extension VerticalVersion {
                 if case .media = clip.source {
                     if settings.follow.follows, missing.contains(id) {
                         note = "its media file is missing, so it is kept as placed"
+                    } else if settings.follow.follows, old.media(for: clip)?.cursor != nil {
+                        follow = subjects[id] == nil ? .fit : .cursor
+                        if follow == .fit {
+                            note = "its cursor file could not be read, so it is shown whole"
+                        }
                     } else {
                         follow = settings.follow
                     }
@@ -114,12 +124,12 @@ extension VerticalVersion {
                 continue
             }
             func op(_ follow: FramingFollow) -> ReelOp {
-                let following = follow.follows
-                return .reframeClip(
+                .reframeClip(
                     clip: id, follow: follow, zoom: settings.zoom,
-                    whereEmpty: following ? settings.whereEmpty : nil,
+                    whereEmpty: follow.follows ? settings.whereEmpty : nil,
                     fromWidth: UInt32(old.canvas.width), fromHeight: UInt32(old.canvas.height),
-                    backdrop: backgrounds, subjects: following ? subjects[id] : nil)
+                    backdrop: backgrounds, replace: follow == .cursor ? true : nil,
+                    subjects: follow.readsSubjects ? subjects[id] : nil)
             }
             let prior = trial.project
             var next = prior
@@ -157,10 +167,11 @@ extension VerticalVersion {
                 entries[id] = Entry(clip: id, treatment: .notFollowed, reason: refusedWhy)
                 continue
             }
+            if used == .cursor { cursor.append(id) }
             if used != .keep {
                 framed.insert(id)
                 let counted = FollowSubject.counts(
-                    before: prior, after: next, clip: id, replace: false)
+                    before: prior, after: next, clip: id, replace: used == .cursor)
                 reEased += counted.reEased
                 carried += counted.carried
             }
@@ -243,7 +254,7 @@ extension VerticalVersion {
                 ops: trial.ops, project: trial.project, width: size.width, height: size.height,
                 entries: entries.keys.sorted().compactMap { entries[$0] }, backgrounds: kept,
                 moreTracks: moreTracks, reEased: reEased, carried: carried,
-                captions: captions))
+                captions: captions, cursor: cursor.sorted()))
     }
 
     /// A media picture framed with a following kind or `center`: whole only when the op added
@@ -292,6 +303,10 @@ extension VerticalVersion {
         var text = "Makes a \(plan.width) × \(plan.height) version."
         let followed = count(.followed)
         if followed > 0 { text += " Follows \(counted(followed, "clip"))." }
+        if !plan.cursor.isEmpty {
+            text += " Follows the cursor in \(counted(plan.cursor.count, "clip")), their own "
+                + "zooms and pans replaced."
+        }
         let whole = count(.whole)
         if whole > 0 { text += " Shows \(counted(whole, "clip")) whole on a blurred copy." }
         let kept = count(.kept)
@@ -338,7 +353,8 @@ extension VerticalVersion {
     }
 
     /// The answer's keys every door shares (VR-36): `canvas`, `clips` in id order,
-    /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried`, `summary` and `graphics`.
+    /// `backgrounds`, `more_tracks`, `re_eased`, `moves_carried`, `summary`, `graphics` and
+    /// `cursor` (VR-52).
     static func answerFields(_ plan: Plan, templates: TemplateReport = TemplateReport())
         -> [String: Any]
     {
@@ -357,6 +373,7 @@ extension VerticalVersion {
             "re_eased": plan.reEased,
             "moves_carried": plan.carried,
             "summary": summary(plan, templates: templates),
+            "cursor": plan.cursor.map { Int($0) },
             "graphics": graphicsFields(plan, templates),
         ]
         if let captions = plan.captions {

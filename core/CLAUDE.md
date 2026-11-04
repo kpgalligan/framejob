@@ -1222,8 +1222,9 @@ governs a module now.
   median area × centrality over ±1 s of the shot, faces > people > salient,
   a face's body (`BODY_SHARE` 0.8) carrying it while it is away, a rival
   needing `RIVAL_MARGIN` 1.25 for `RIVAL_HOLD` 2 s. `reframe.rs`: `Subjects`
-  (media source ticks) into clip time through `clip_source_time.rs` (sorted,
-  de-duplicated), boxes onto the source canvas by the media's displayed size
+  (`reframe_subjects.rs`'s, re-exported; media source ticks) into clip time
+  through `clip_source_time.rs` (sorted, de-duplicated), boxes onto the
+  source canvas by the media's displayed size
   and (★) at θ = 0, the window `W/k × H/k` (`k·s` = zoom × `fill_scale`, at
   most `SCALE_MAX`) clamped inside the cropped rect, VR-22's composition,
   VR-23's moves (median ±0.5 s, dead zone, speed, 0.5 s spacing, frame
@@ -1270,14 +1271,32 @@ governs a module now.
   in time order, actions in start order; `Composed {re_eased, carried}`.
   Byte-for-byte VR2a2's writing on a clip with no actions. `pub` for the
   tests' counts.
-- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, spec §11 VR-26, VR-27):
-  `FramingFollow`, `Reframe`, the strict `Subjects` reader (`ZoomRegion`'s
-  pattern, an object at every level), `MAX_SUBJECT_SAMPLES`,
-  `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's sentence, which the tool
-  matches), four errors and the refusals in order (VR-26's (7) removed by
-  VR-27), "no subjects" last so the tool's trial meets every other first;
-  `replace` (`replaced` before the plan for every follow but `keep`,
-  `composed` after it). Allowed inside a nest.
+- `edit_reframe.rs` — `reframe_clip` (VR2a2, VR2b1, VR5, spec §11 VR-26,
+  VR-27, VR-50, VR-51): `FramingFollow` (with `cursor`), `Reframe`,
+  `MAX_SUBJECT_SAMPLES`, `MAX_SUBJECT_BOXES`, `no_subjects` (refusal 10's
+  sentence, which the tool matches), `no_cursor_file` and `cursor_not_faces`
+  (after the nest and still refusals, before the matte one), four errors and
+  the refusals in order (VR-26's (7) removed by VR-27), "no subjects" last so
+  the tool's trial meets every other first; `replace` (`replaced` before the
+  plan for every follow but `keep`, `composed` after it); the cursor arm plans
+  through `reframe_cursor.rs`. Allowed inside a nest.
+- `reframe_subjects.rs` — `reframe_clip`'s `subjects` (VR2a2, VR5, spec §11
+  VR-26, VR-50), a pure move out of `reframe.rs` and `edit_reframe.rs`:
+  `Subjects` (with the optional `cursor`, written only when non-empty),
+  `CursorPoint` (`{t, x, y, click, typing}`), the strict reader
+  (`ZoomRegion`'s pattern, an object at every level, each `cursor[i]` too) and
+  `check_subjects` (VR-26 (8), then the cursor's count, strictly increasing
+  times and 0…1 values, each naming `cursor[i]`).
+- `reframe_cursor.rs` — `follow: cursor` (road map "creator-jobs" VR5, spec
+  §11 VR-50), pure: `CURSOR_TUNING` (0.20, 0.12, 0.8, no headroom),
+  `cursor_in_clip_time` (the points in the played window through
+  `clip_source_time.rs`, one per clip tick, `click` and `typing` OR'ed) and
+  `plan_cursor_framing` — the window clamped on the point (`Frame::point`,
+  `Frame::clamp`), the first key on the first point, a down click outside the
+  dead zone arriving in a move that ends on its frame (planned back from it,
+  no earlier than the last move's end), VR-23's moves held by a running move,
+  the 0.5 s spacing, a pending arrival and typing; `reframe_path.rs`'s `span`,
+  `MOVE_MIN` and `MOVE_SPACING` (`pub(crate)` for it); no cut, no `fit`.
 - `audio_track.rs` — a track's own terms on its sound (format 35, spec §11
   AU-103, AU-104): `track_gain` (the fader clamped to 0…4, a factor each
   `audio.rs` stage multiplies after the mute) and `Voice::track_pans` (the

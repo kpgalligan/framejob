@@ -121,7 +121,8 @@ final class FollowSubjectSheetController: NSViewController, NSTextFieldDelegate 
         guard !asked, let document else { return }
         asked = true
         do {
-            requests = try FramingAnalysis.requests(clips: clipIDs, in: document)
+            requests = try FramingAnalysis.requests(
+                clips: FollowSubject.analysed(clipIDs, in: document.editedProject), in: document)
         } catch {
             requestError = error.localizedDescription
         }

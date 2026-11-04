@@ -13,22 +13,21 @@
 //! (every other placement is measured from a canvas centre, so the source
 //! size cancels), `fit` and `keep` ignore `zoom`, and only the following
 //! kinds read `where_empty` and `subjects`; a value that cannot be read is
-//! an `Err` whatever the follow.
+//! an `Err` whatever the follow. `cursor` (VR5, spec §11 VR-50) plans over
+//! `subjects.cursor` with `reframe_cursor.rs`'s planner and reads no
+//! `where_empty`; a face follow never reads the cursor, and a clip whose
+//! media has a cursor file is never followed by faces (VR-51).
 //!
 //! **Why "no subjects" is refused LAST.** The tool fills `subjects` from the
 //! analysis cache (VR-28) and first tries the op without them: every other
 //! refusal must answer that trial, so only a clip that could be framed waits
 //! for an analysis. [`no_subjects`] is the sentence both sides know.
 //!
-//! **`subjects` is read strictly**, as `ZoomRegion` is: an object at every
-//! level, a stray, missing or wrong-typed member named by its path. Its
-//! VALUES are refusals (VR-26 (8)): a cached sample is a fact, not a typo.
+//! **`subjects` is read strictly** (`reframe_subjects.rs`, its reader and
+//! [`check_subjects`]).
 
-use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::export::describe;
 use crate::model::{
     Action, Clip, DuringMotion, EdgeMotion, MediaKind, Project, Source, VideoProps,
 };
@@ -37,8 +36,9 @@ use crate::recipe_matte::matte_target;
 use crate::reframe::{
     fixed_framing, in_clip_time, plan_framing, FramingRequest, Subjects, WhereEmpty, FRAMING_TUNING,
 };
-use crate::reframe_tracks::{Follow, SubjectSample};
-use crate::time::Ticks;
+use crate::reframe_cursor::{cursor_in_clip_time, plan_cursor_framing};
+use crate::reframe_subjects::check_subjects;
+use crate::reframe_tracks::Follow;
 
 /// What a framing follows (VR-26).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +48,7 @@ pub enum FramingFollow {
     Face,
     Person,
     Salient,
+    Cursor,
     Center,
     Fit,
     Keep,
@@ -60,8 +61,13 @@ impl FramingFollow {
             Self::Face => Some(Follow::Face),
             Self::Person => Some(Follow::Person),
             Self::Salient => Some(Follow::Salient),
-            Self::Center | Self::Fit | Self::Keep => None,
+            Self::Cursor | Self::Center | Self::Fit | Self::Keep => None,
         }
+    }
+
+    /// The kinds that read `subjects`: the following kinds and `cursor`.
+    fn reads_subjects(self) -> bool {
+        self.following().is_some() || self == Self::Cursor
     }
 }
 
@@ -89,100 +95,20 @@ pub fn no_subjects(clip: u32) -> String {
     format!("clip {clip} has no subjects to follow; analyze it first")
 }
 
-impl<'de> Deserialize<'de> for Subjects {
-    /// `{samples: [{t, faces?, people?, salient?: [{x, y, w, h, c}]}], shots}`.
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct SubjectsIn {
-            samples: Vec<SubjectSample>,
-            shots: Vec<Ticks>,
-        }
-        let bad =
-            |at: &str, what: String| de::Error::custom(format!("bad value at \"{at}\": {what}"));
-        let value = Value::deserialize(deserializer)?;
-        if !value.is_object() {
-            return Err(de::Error::custom(format!(
-                "expected an object, not {}",
-                describe(&value)
-            )));
-        }
-        // serde would read a list into a struct member by member.
-        let samples = value["samples"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .enumerate();
-        for (i, sample) in samples {
-            let boxes = ["faces", "people", "salient"].into_iter().flat_map(|kind| {
-                let list = sample[kind].as_array().into_iter().flatten().enumerate();
-                list.map(move |(j, b)| (format!("subjects.samples[{i}].{kind}[{j}]"), b))
-            });
-            let here = std::iter::once((format!("subjects.samples[{i}]"), sample));
-            if let Some((at, v)) = here.chain(boxes).find(|(_, v)| !v.is_object()) {
-                return Err(bad(&at, format!("expected an object, not {}", describe(v))));
-            }
-        }
-        let read: SubjectsIn = serde_path_to_error::deserialize(value).map_err(|e| {
-            let at = crate::patch::path_under("subjects", &e.path().to_string());
-            bad(&at, e.inner().to_string())
-        })?;
-        Ok(Subjects {
-            samples: read.samples,
-            shots: read.shots,
-        })
-    }
+/// VR-50 (h): `cursor` on a media clip whose media has no cursor file.
+pub fn no_cursor_file(clip: u32) -> String {
+    format!(
+        "clip {clip}'s media has no cursor file, so there is no cursor to follow; frame it with \
+         subject, center, fit or keep"
+    )
 }
 
-/// VR-26 (8): the samples' count, order, box counts and values.
-fn check_subjects(subjects: &Subjects) -> Result<(), String> {
-    let n = subjects.samples.len();
-    if n > MAX_SUBJECT_SAMPLES {
-        return Err(format!(
-            "subjects holds {n} samples, more than {MAX_SUBJECT_SAMPLES}"
-        ));
-    }
-    let mut previous: Option<Ticks> = None;
-    for (i, sample) in subjects.samples.iter().enumerate() {
-        if let Some(p) = previous.filter(|&p| sample.t <= p) {
-            return Err(format!(
-                "subjects sample {i} is at {}, not after the one before it ({p}); sample \
-                 times must be strictly increasing",
-                sample.t
-            ));
-        }
-        previous = Some(sample.t);
-        for (kind, list) in [
-            ("faces", &sample.faces),
-            ("people", &sample.people),
-            ("salient", &sample.salient),
-        ] {
-            if list.len() > MAX_SUBJECT_BOXES {
-                return Err(format!(
-                    "subjects sample {i} holds {} {kind}, more than {MAX_SUBJECT_BOXES}",
-                    list.len()
-                ));
-            }
-            for (j, b) in list.iter().enumerate() {
-                for (key, v) in [("x", b.x), ("y", b.y), ("w", b.w), ("h", b.h), ("c", b.c)] {
-                    if !(0.0..=1.0).contains(&v) {
-                        return Err(format!(
-                            "subjects sample {i}'s {kind}[{j}].{key} is {v}, outside 0…1"
-                        ));
-                    }
-                }
-                for (key, v) in [("w", b.w), ("h", b.h)] {
-                    if v <= 0.0 {
-                        return Err(format!(
-                            "subjects sample {i}'s {kind}[{j}].{key} is {v}; a box's size must \
-                             be greater than 0"
-                        ));
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
+/// VR-51: a following kind on a media clip whose media has a cursor file.
+pub fn cursor_not_faces(clip: u32) -> String {
+    format!(
+        "clip {clip}'s media has a cursor file, so it follows the cursor, not faces; frame it \
+         with cursor, center, fit or keep"
+    )
 }
 
 impl Project {
@@ -209,11 +135,12 @@ impl Project {
         }
     }
 
-    /// Refusals (1)–(6) and (8) of VR-26, in order ((7) removed by VR-27).
+    /// Refusals (1)–(6) and (8) of VR-26, in order ((7) removed by VR-27),
+    /// VR-50's and VR-51's after the nest and still refusals.
     fn refusal(&self, clip: &Clip, r: &Reframe) -> Option<String> {
         let id = clip.id;
         let keep = r.follow == FramingFollow::Keep;
-        let following = r.follow.following().is_some();
+        let following = r.follow.reads_subjects();
         let kind = match clip.source {
             Source::Text => "text",
             Source::Shape => "shape",
@@ -259,6 +186,15 @@ impl Project {
                         "clip {id} shows a still picture, which has no subjects to follow; frame \
                          it with center, fit or keep"
                     ))
+                }
+                Source::Media { media, .. } => {
+                    let cursor = self.media(media).is_some_and(|m| m.cursor.is_some());
+                    if r.follow == FramingFollow::Cursor && !cursor {
+                        return Some(no_cursor_file(id));
+                    }
+                    if r.follow != FramingFollow::Cursor && cursor {
+                        return Some(cursor_not_faces(id));
+                    }
                 }
                 _ => {}
             }
@@ -319,6 +255,12 @@ impl Project {
         let path = match (r.follow, r.follow.following()) {
             (FramingFollow::Center, _) => fixed_framing(source, id, WhereEmpty::Center, zoom),
             (FramingFollow::Fit, _) => fixed_framing(source, id, WhereEmpty::Fit, 1.0),
+            (FramingFollow::Cursor, _) => {
+                let Some(subjects) = &r.subjects else {
+                    return Ok(Outcome::Refused(no_subjects(id)));
+                };
+                plan_cursor_framing(source, id, &subjects.cursor, zoom)
+            }
             (_, Some(follow)) => {
                 let Some(subjects) = &r.subjects else {
                     return Ok(Outcome::Refused(no_subjects(id)));
@@ -356,6 +298,11 @@ impl Project {
         }
         if let (Some(_), Some(subjects)) = (r.follow.following(), &r.subjects) {
             if in_clip_time(clip, self, subjects).0.is_empty() {
+                return Ok(Outcome::Refused(no_subjects(id)));
+            }
+        }
+        if let (FramingFollow::Cursor, Some(subjects)) = (r.follow, &r.subjects) {
+            if cursor_in_clip_time(clip, self, &subjects.cursor).is_empty() {
                 return Ok(Outcome::Refused(no_subjects(id)));
             }
         }

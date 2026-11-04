@@ -910,7 +910,7 @@ detail there.
   microphone shared by two or more angles), `withoutWide`, the face pairing fed to the unchanged
   `shots`, `readFaces` and `facesWanted` (the menu's Analyzing sheet, the tool's bounded wait
   off main).
-- `FramingSubjects.swift` · `AgentServer+Framing.swift` ·
+- `FramingSubjects.swift` · `FramingCursor.swift` · `AgentServer+Framing.swift` ·
   `AgentCatalog+Framing.swift` — the op tool `reframe_clip` (road map
   creator-jobs VR2a2, spec §11 VR-26, VR-28); its UI path is Clip ▸ Follow
   Subject… (VR-29, the entry below). `FramingSubjects` (names no `rc_*`, any thread)
@@ -932,6 +932,14 @@ detail there.
   released) and the answer is `analyzing {media, covered}` with no edit; the
   subjects are read off main and the last hop refuses a changed project or
   scope, then `editResult`, "Reframe Clip", answering `cached`.
+  `FramingCursor` (names no `rc_*` but through `ReelCursor`, any thread; road map creator-jobs
+  VR5, spec §11 VR-50 (i)) builds `follow: cursor`'s `subjects`: CU-25's `path` per window at
+  `smoothing` 0.5 and step `max(60_000, ⌈Σ window lengths ÷ 90_000⌉)`, each down click a
+  `click: true` point at its own `t` (a path point there dropped), a point inside a typing
+  stretch `typing: true`, positions ÷ the media's size clamped to 0…1; `subjects(_:in:)` per clip
+  over `AutoZoom.cursorFiles` / `readTracks`, a missing or unreadable file omitted. For
+  `follow: cursor` the handler's first hop finds the cursor file (its sentences the refusal) and
+  the file is read off main in place of the analysis, `cached: true`, no wait.
   `AgentCatalog+Framing` holds its row and `make_vertical_version`'s, spliced in last by
   `creatorTools()`, after `switch_angle`'s; `subjects` is `filledByTheApp`.
 - `FollowSubject.swift` · `FollowSubjectSheetController.swift` ·
@@ -943,7 +951,10 @@ detail there.
   remembered as `FrameJobFollowKind` / `FrameJobFollowWhereEmpty`, written only when changed,
   a launch argument counting; Zoom never; `op` sends `where_empty` and `subjects` only for the
   following kinds), `targets`, `defaultZoom` (1, or 1.25 within 1 % of the canvas's aspect),
-  `subjects` (`FramingSubjects.read` over each clip's own windows, any thread), `plan` (the
+  `analysed` (the targets whose media has no cursor file, spec §11 VR-51: the sheet's
+  `FramingAnalysis.requests` are over it; a cursor clip stays a target and is listed with the
+  core's VR-51 sentence), `subjects` (`FramingSubjects.read` over each `analysed` clip's own
+  windows, any thread), `plan` (the
   `add_track` required, each `reframe_clip` tried through `SwitchAngle.Trial` — applied,
   identity or refused with the core's sentence — `moreTracks` as the track count each applied
   op added, `remove_track` when empty), `counts` (VR-27 (f) from two handles; `replace: false`
@@ -968,8 +979,14 @@ detail there.
   top-level clip with a picture, on the OLD snapshot: a "Blurred Background" with its partner
   in front, a shape or image plate, a picture covering one axis and centred or covering on the
   other, a nest by the same test, other), `mediaPictures`, `analysisTargets` (the media
-  pictures split by whether their media has a URL, `present` and `missing`: the tool's first
-  hop and the sheet both read it, VR-39 (d)), `offered` (the shapes whose VR-32 size differs
+  pictures split by whether their media has a URL, `present` and `missing`, and the present
+  ones whose media has a cursor file in `cursor`, never analysed, spec §11 VR-51: the tool's
+  first hop and the sheet both read it, VR-39 (d)); a cursor picture is planned
+  `follow: cursor` with `replace: true` when its cursor was read (`FramingCursor.subjects`,
+  merged beside the analysis's subjects by the tool, the sheet and `finishVertical`), else
+  `fit` with the backdrop and "its cursor file could not be read, so it is shown whole";
+  `Plan.cursor`, the summary's "Follows the cursor in N clip(s), their own zooms and pans
+  replaced." and the answer's `cursor` (VR-52); `offered` (the shapes whose VR-32 size differs
   from the canvas, the sheet's Shape pop-up), `motionNote`, `fill`; `+Plan`:
   `opening` (`set_canvas` with no rescale and "Backgrounds" at 0, the core's error for either
   answered as the refusal), `plan` (VR-34 on one `SwitchAngle.Trial`: `reframe_clip` per

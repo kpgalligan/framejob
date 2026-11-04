@@ -10490,6 +10490,72 @@ and the Media pane's find band), filed as an issue.
   becoming stacked on a tall canvas) instead of the screen following the cursor full-frame?
   *Recommended: yes* — built in VR5b, once CO6 exists.
 
+#### VR5's record (2026-11-03)
+
+**Landed.** Lane C, base `f146c920` (the worktree was made from main's `9d89c0b4` and
+fast-forwarded to the integration head before any edit). Three commits: the decisions alone
+(VR-50, VR-51, VR-52, VR-55, `creator-jobs-11.md` 386 → 504, with their index rows); the pure
+move of `Subjects`, its strict reader and `check_subjects` into `reframe_subjects.rs`
+(`reframe.rs` 458 → 450 re-exporting it, `edit_reframe.rs` 403 → 303; `cargo test --release
+--test reframe_clip --test reframe --test reframe_path --test reframe_compose --test op_schemas
+--test op_table` green after it); then the feature. The owner's answers stand: a cursor-followed
+clip's 16:9 auto zooms are replaced (VR-52), and a screen with its camera is VR5b's. No format,
+FFI, header or `Kind` change; `OP_COUNT` 70 and the product tool count unchanged.
+
+- **New files** (`wc -l`): `core/src/reframe_subjects.rs` 188, `core/src/reframe_cursor.rs` 213,
+  `core/tests/reframe_cursor.rs` 458 (16 tests), `app/Sources/FramingCursor.swift` 117,
+  `tools/proof/vr5_proof.py` 644.
+- **Changed:** `edit_reframe.rs` 350, `reframe_path.rs` (`span`, `MOVE_MIN`, `MOVE_SPACING`
+  `pub(crate)`), `op_table.rs` (`cursor` after `salient`), `op_schema.rs` and
+  `core/tests/op_schemas.rs` (the optional `cursor`), `edit.rs`'s row; the six `Subjects`
+  literals in `core/tests/reframe.rs`, `reframe_path.rs` and `reframe_spike.rs`;
+  `ReelOps.swift` (`FramingFollow.cursor`, `readsSubjects`), `AgentServer+Framing.swift` 323,
+  `AgentCatalog+Framing.swift`, `VerticalVersion.swift` (`analysisTargets.cursor`),
+  `VerticalVersion+Plan.swift` 388, `FollowSubject.swift` 286 (`analysed`),
+  `FollowSubjectSheetController.swift` 266, `AgentServer+VerticalVersion.swift`,
+  `VerticalVersionSheetController.swift` 342, `EditorViewController+VerticalVersion.swift`.
+- **Documents:** `vertical-and-framing.md`, `mcp.md`, spec §6c, §7.4, §7.9a, §7.9i, §7.10 and
+  the spec README's cells, `docs/manual-checks.md` (JOB-36), `tools/proof/README.md`'s VR5
+  section.
+
+**Verification.** `cargo test --release --test reframe_cursor --test reframe_clip --test reframe
+--test reframe_path --test op_schemas --test op_table --test op_nullability --test edit_tests`
+all ok; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` clean; `make
+typecheck` exit 0 with exactly the four baseline warnings; `spec_index_proof.py` 273/273.
+Debug (`make app-debug`): `vr5_proof.py` 8/8 (V1's farthest sample 0.202 W from the centre,
+75 samples; V6's first move after the stretch at 18.1 s); `vr3_proof.py --only 3,8` 2/2,
+`vr2a_proof.py --only 8` 2/2, `vr2b_proof.py --only 6b` 3/3. `make gate`: "gate: PASS 560s"
+(names 1, typecheck 8, fmt 4, lint 11, test 347, app 189). Release
+(`RC_PROOF_APP=release`): `vr5_proof.py` 8/8 with the same figures; `vr2a_proof.py` 10/10;
+`vr2b_proof.py` 13/13; `vr3_proof.py`'s first whole run 13/14 — row 13 counted "-1 windows
+opened" (a window of an earlier row closing after the count was taken; the row's own claims
+held) — then `--only 13` passed and a second whole run 14/14. Three lanes shared the machine
+(load average 22 at the end).
+
+**Mutants**, each once on the final instrument, all six CAUGHT: `dead-zone-face` and
+`typing-ignored` (core copies: `a_step_inside_the_dead_zone_moves_nothing`,
+`a_typing_stretch_holds_the_window_and_the_move_follows_it` failed); `replace-off` (V4: ends
+at scale 3.556 in the copy), `analysed-every-target` (V7: the Analyzing sheet seen, six
+analysis files), `faces-allowed` (V3: the face follow answered an identity, not VR-51's
+refusal), `clicks-ignored` (V2: no action ending on the 14 s click at zoom 2), each on a
+Debug app built by `tree_copy.build_app` in a copy (a real `core/` copy for the two core
+edits).
+
+**Review** (verdict pass, three nits). The guide's "an eighth of its height" for
+`CURSOR_TUNING`'s 0.12 now reads "20 % of the frame's width (12 % of its height)", and the
+123-column `VerticalCall(…)` line in `AgentServer+VerticalVersion.swift` is wrapped, both at
+integration. The third — `typing-ignored` scored by its core test alone, not by V6 as well —
+stands as the mutants paragraph above records it.
+
+**Integration.** Cherry-picked onto `f146c920` with no conflict; the module-map entries for
+`reframe_subjects.rs`, `reframe_cursor.rs` and `edit_reframe.rs` (`core/CLAUDE.md`) and for
+`FramingCursor.swift`, `analysisTargets`' `cursor` and `FollowSubject.analysed`
+(`app/CLAUDE.md`) applied. `make gate` on the integrated tree "gate: PASS 561s" (names 1,
+typecheck 8, fmt 4, lint 36, test 330, app 181).
+
+**Owed.** JOB-36 (S-ST2's vertical version on a phone, skipped by name until S-ST2 exists).
+Nothing to file.
+
 ### FC8a — Make Short from a range
 
 - **What a person gets:** File ▸ Make Short from Range… asks for a folder, a caption style (a word

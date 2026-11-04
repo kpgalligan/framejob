@@ -17,6 +17,10 @@ import Foundation
 ///   `analyzing` and nothing is made; the subjects are read off main from the source's cache;
 /// - the last main hop refuses a changed project or scope, plans on the current handle and
 ///   applies in place or opens the copy; with `path` the copy is saved on the server thread.
+///
+/// A media picture whose media has a cursor file (`analysisTargets`' `cursor`, spec §11 VR-51)
+/// is never analysed: its cursor is read off main beside the analysis's subjects
+/// (`FramingCursor.subjects`), and the plan follows it with `replace: true` (VR-52).
 extension AgentServer {
 
     /// What the first main hop resolves.
@@ -29,6 +33,8 @@ extension AgentServer {
         let missing: Set<UInt32>
         /// The media pictures whose subjects are read: the following kinds' only.
         let targets: [UInt32]
+        /// The media pictures whose cursor is read (VR-51): the following kinds' only.
+        let cursor: [UInt32]
         let requests: [AnalysisRequest]
         let cacheDir: URL?
         let asked: ReelProject
@@ -69,6 +75,7 @@ extension AgentServer {
         if let cacheDir = call.cacheDir, !call.targets.isEmpty {
             subjects = FollowSubject.subjects(call.targets, in: call.asked, cacheDir: cacheDir)
         }
+        subjects.merge(FramingCursor.subjects(call.cursor, in: call.asked)) { _, new in new }
         var fields: [String: Any] = ["cached": call.requests.isEmpty]
         let outcome: VerticalOutcome = try onMain {
             let document = call.document
@@ -206,7 +213,7 @@ extension AgentServer {
         }
         let settings = VerticalSettings(
             shape: shape, follow: follow, zoom: zoom, whereEmpty: whereEmpty, captions: captions)
-        let (present, missing) = VerticalVersion.analysisTargets(
+        let (present, missing, cursor) = VerticalVersion.analysisTargets(
             project, urls: document.mediaURLs())
         // The dry plan: the core's error for a bad argument, before any analysis. Its
         // refusal and its plan are discarded.
@@ -234,8 +241,8 @@ extension AgentServer {
         }
         return VerticalCall(
             document: document, settings: settings, copy: copy, url: url, missing: missing,
-            targets: targets, requests: requests, cacheDir: cacheDir, asked: project,
-            scope: document.scope)
+            targets: targets, cursor: follow.follows ? cursor : [],
+            requests: requests, cacheDir: cacheDir, asked: project, scope: document.scope)
     }
 
     /// `relay_captions` (road map "creator-jobs" VR4a, spec §11 VR-45): the word caption

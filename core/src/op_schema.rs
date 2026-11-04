@@ -212,6 +212,21 @@ fn schema_of_kind(kind: Kind) -> Value {
                         },
                     },
                     "shots": {"type": "array", "items": {"type": "integer"}},
+                    "cursor": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "t": {"type": "integer"},
+                                "x": {"type": "number"},
+                                "y": {"type": "number"},
+                                "click": {"type": "boolean"},
+                                "typing": {"type": "boolean"},
+                            },
+                            "required": ["t", "x", "y"],
+                            "additionalProperties": false,
+                        },
+                    },
                 },
                 "required": ["samples", "shots"],
                 "additionalProperties": false,

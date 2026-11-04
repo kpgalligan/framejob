@@ -24,7 +24,12 @@ extension AgentServer {
                     + "moves only when it leaves a dead zone, cuts hard at each shot change, "
                     + "holds a lost subject for 1 s and then follows another or eases over "
                     + "0.8 s to where_empty, returns once a subject has been seen for 0.6 s, "
-                    + "and frames two people together when both fit. center holds the window "
+                    + "and frames two people together when both fit. cursor follows a screen "
+                    + "recording's recorded pointer (its media's cursor file, read at once; no "
+                    + "analysis, no wait): the window sits on the pointer, moves only when it "
+                    + "leaves a dead zone (20 % of the window's width, 12 % of its height), "
+                    + "arrives on each click outside it in a move that ends on the click's "
+                    + "frame, and holds still while the person types. center holds the window "
                     + "on the picture's centre, fit shows the whole picture for the whole clip, "
                     + "and keep rescales the clip from the canvas it was made for "
                     + "(from_width × from_height) as Change Canvas does, its actions' "
@@ -46,22 +51,29 @@ extension AgentServer {
                     + "call reframe_clip again to apply. Refused, nothing changed, in this "
                     + "order: a follow other than keep on a text, shape, graphic or "
                     + "adjustment clip; a clip with no picture, or a crop or scale leaving "
-                    + "none; a nest clip, then a still or image clip, with a following kind; "
+                    + "none; a nest clip, then a still or image clip, with a following kind or "
+                    + "cursor; cursor on a clip whose media has no cursor file, and subject, "
+                    + "face, person or salient on one whose media has one (a recording with a "
+                    + "cursor file follows its cursor, never faces); "
                     + "unless keep, a clip on a matte track or cut by a matte, then a turned "
                     + "clip (a rotation, an action turning it, a spin); with backdrop "
                     + "where a copy would be made, a nest clip or a track not behind the "
-                    + "clip's; last, a following kind with nothing found in the clip. Inside "
+                    + "clip's; last, a following kind with nothing found in the clip, or cursor "
+                    + "with no recorded point in it. A missing or unreadable cursor file is "
+                    + "refused in its own sentence. Inside "
                     + "a nest (scope) the nest's canvas is the canvas. Clip ▸ Follow Subject… "
                     + "is this op with replace: true on each selected clip and a "
                     + "\"Backgrounds\" track as backdrop.",
                 [
                     "clip": "The clip to frame: a clip with a picture, upright.",
                     "follow": "subject, face, person or salient (follow what is found), "
-                        + "center, fit or keep.",
+                        + "cursor (follow the recorded pointer of a clip whose media has a "
+                        + "cursor file), center, fit or keep.",
                     "zoom": "How tight, 1–4 times the scale that fills the canvas; default 1. "
                         + "Read by the following kinds and center; refused outside 1–4.",
                     "where_empty": "What a following kind shows where there is nothing to "
-                        + "follow: fit (the whole picture, the default) or center.",
+                        + "follow: fit (the whole picture, the default) or center. Not read "
+                        + "by cursor.",
                     "from_width": "keep only: the width of the canvas the clip was placed "
                         + "on. Default the current canvas's.",
                     "from_height": "keep only: the height of the canvas the clip was placed "
@@ -91,7 +103,10 @@ extension AgentServer {
                     + "1080 × 1080). Each top-level clip with a picture is treated by what it "
                     + "is: a clip that fills the old frame on one side is reframed with "
                     + "reframe_clip from the old canvas (a movie clip follows its subject with "
-                    + "follow, shown whole on a blurred copy where nothing is found; a still "
+                    + "follow, shown whole on a blurred copy where nothing is found; a screen "
+                    + "recording whose media has a cursor file follows its cursor instead, "
+                    + "never faces, its own zooms and pans replaced, or is shown whole on a "
+                    + "blurred copy when its cursor file cannot be read; a still "
                     + "picture or a nest is centred); a clip the core will not frame (on a "
                     + "matte track, rotated, spinning) and a movie whose file is missing are "
                     + "kept as placed and listed; a graphic exactly the old canvas's size is "
@@ -116,7 +131,8 @@ extension AgentServer {
                     + "even keep cannot reframe. Answers {ok, canvas {width, height}, cached "
                     + "(false when an analysis ran), clips [{clip, treatment (followed, whole, "
                     + "kept, refilled, removed, resized or not_followed), reason?}], "
-                    + "backgrounds, more_tracks, re_eased, moves_carried, summary, captions "
+                    + "cursor [the clips followed by their cursor], backgrounds, more_tracks, "
+                    + "re_eased, moves_carried, summary, captions "
                     + "{relaid, kept} (as relay_captions answers them; absent with captions "
                     + "false), graphics {resized, updated [names], listed [{name, reason}]}, "
                     + "project, and for a copy carried {files, bytes, seconds} and saved (with "
@@ -138,7 +154,9 @@ extension AgentServer {
                         "type": "string",
                         "enum": FollowSubject.follows.map(\.rawValue),
                         "description": "What a movie clip follows: subject (the default), face, "
-                            + "person or salient, or center to hold the picture's centre.",
+                            + "person or salient, or center to hold the picture's centre. A "
+                            + "screen recording with a cursor file follows its cursor with any "
+                            + "of the first four, and is centred with center.",
                     ],
                     "zoom": [
                         "type": "number",

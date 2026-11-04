@@ -92,6 +92,13 @@ Every move is an ordinary action on the clip's action lane: select one and drag
 the picture on the canvas to nudge where its frame ends, as with any action.
 **Edit ▸ Undo Follow Subject** takes the whole command back in one step.
 
+A screen recording Frame Job made, with its cursor file, is not followed by
+faces — a face on a screen is not what the viewer is looking at. Follow Subject
+leaves it unanalysed and lists it under the summary with the reason: "Clip 3:
+clip 3's media has a cursor file, so it follows the cursor, not faces; frame it
+with cursor, center, fit or keep." **File ▸ Make Vertical Version…** (below)
+follows its cursor instead.
+
 Follow Subject does not offer `fit` or `keep` (an agent can send them), does
 not frame stills or pictures, and does not change the canvas: set the vertical
 canvas first in the Document tab, or let **File ▸ Make Vertical Version…**
@@ -131,6 +138,14 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   frame shows the whole picture, a blurred copy of it goes behind on a new
   **Backgrounds** track at the back. A movie whose file is missing is kept as
   placed.
+- **A screen recording with its cursor file** follows the pointer instead of
+  a face: the frame sits on the pointer and moves only when it strays from
+  the middle of the frame, arrives on each click — the move ends on the
+  click's frame, so the click lands in view — and holds still while you type.
+  Any zoom and pan of its own (say **Clip ▸ Auto Zoom…**'s) is replaced, since
+  the tall frame is already a close-up. When the cursor file cannot be read
+  (it was moved or deleted), the recording is shown whole on a blurred copy,
+  and the summary says so. Center centres it as any other movie.
 - **A still or a picture that fills the frame, and a nest that does**, is
   centred.
 - **A graphic exactly the old canvas's size** (a full-frame lower third or
@@ -186,6 +201,13 @@ chooses what to follow with `follow`:
 - **`subject`** follows a face; where there is none, a person; where there is
   neither, a salient region.
 - **`face`**, **`person`** and **`salient`** follow only that kind.
+- **`cursor`** follows a screen recording's recorded pointer, from its media's
+  cursor file: the frame sits on the pointer, moves only when it strays more
+  than 20 % of the frame's width (12 % of its height) from the middle,
+  arrives on each click outside that in a move that ends on the
+  click's frame, and holds still while you type. It needs no analysis and
+  never waits; `where_empty` and `backdrop` do nothing with it, since the
+  frame never shows the whole picture.
 - **`center`** holds the frame on the middle of the picture for the whole clip.
 - **`fit`** shows the whole picture for the whole clip, scaled to fit the
   canvas.
@@ -196,7 +218,7 @@ chooses what to follow with `follow`:
 
 `zoom` (1 to 4, default 1) is how tight the frame is: 1 is the scale at which
 the picture just covers the canvas. `center` and the four following kinds read
-it; `fit` and `keep` do not.
+it, and so does `cursor`; `fit` and `keep` do not.
 
 When it follows, the frame:
 
@@ -242,7 +264,10 @@ says how much is done, and keeps analysing: ask again to apply. `center`,
 `fit` and `keep` need no analysis.
 
 Not every clip can be framed. A clip on a matte track or cut by one and a
-rotated or spinning clip are refused, and — for the following kinds — so are a
-nest, a still or a picture. Each refusal says why. `keep` frames any of them,
+rotated or spinning clip are refused, and — for the following kinds and
+`cursor` — so are a nest, a still or a picture. A recording whose media has a
+cursor file is refused by the following kinds (it follows its cursor, never
+faces), and `cursor` is refused on a clip whose media has none. Each refusal
+says why. `keep` frames any of them,
 rescaling the clip's position and scale, and every position and scale its
 actions set, from the canvas it was made for.

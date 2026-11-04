@@ -7,10 +7,13 @@ struct VerticalHandOff {
     let copy: Bool
     /// `present` for a following kind, [] for Center.
     let targets: [UInt32]
+    /// `analysisTargets`' `cursor` for a following kind, [] for Center (spec §11 VR-51).
+    let cursor: [UInt32]
     let missing: Set<UInt32>
     /// The missing analyses; [] when none or Center.
     let requests: [AnalysisRequest]
-    /// What the sheet read; [:] when `requests` is non-empty or Center.
+    /// What the sheet read, the cursor's beside the analysis's; [:] when `requests` is
+    /// non-empty or Center.
     let subjects: [UInt32: [String: Any]]
     /// `document.project` when `analysisTargets` ran (`viewDidAppear`).
     let asked: ReelProject
@@ -53,6 +56,7 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
     private let shapes: [VerticalShape]
     private let canvas: CanvasSnapshot
     private var present: [UInt32] = []
+    private var cursor: [UInt32] = []
     private var missing: Set<UInt32> = []
     private var requests: [AnalysisRequest] = []
     private var requestError: String?
@@ -170,6 +174,7 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         let targets = VerticalVersion.analysisTargets(project, urls: document.mediaURLs())
         present = targets.present
         missing = targets.missing
+        cursor = targets.cursor
         templates = VerticalVersion.templateSurvey(project, store: document.graphicStore)
         do {
             requests = try FramingAnalysis.requests(clips: present, in: document, project: project)
@@ -177,14 +182,21 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
             requestError = error.localizedDescription
         }
         if requestError == nil, requests.isEmpty {
-            if let cacheDir = document.cacheDirectory, !present.isEmpty {
-                let clips = present
+            // The cache folder is needed only for the analysed pictures; a cursor is read
+            // from its own file (VR-51).
+            let cacheDir = present.isEmpty ? nil : document.cacheDirectory
+            let clips = cacheDir == nil ? [] : present
+            let cursorClips = cursor
+            if clips.isEmpty, cursorClips.isEmpty {
+                subjects = [:]
+            } else {
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                    let read = FollowSubject.subjects(clips, in: project, cacheDir: cacheDir)
+                    var read = cacheDir.map {
+                        FollowSubject.subjects(clips, in: project, cacheDir: $0)
+                    } ?? [:]
+                    read.merge(FramingCursor.subjects(cursorClips, in: project)) { _, new in new }
                     DispatchQueue.main.async { self?.didRead(read) }
                 }
-            } else {
-                subjects = [:]
             }
         }
         refresh()
@@ -322,7 +334,7 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
         follow.remember(changedFrom: opened, in: .standard)
         handOff = VerticalHandOff(
             settings: settings, copy: copyBox.state == .on, targets: following ? present : [],
-            missing: missing, requests: analyzing ? requests : [],
+            cursor: following ? cursor : [], missing: missing, requests: analyzing ? requests : [],
             subjects: analyzing || !following ? [:] : (subjects ?? [:]), asked: asked,
             scope: askedScope)
         dismiss(self)

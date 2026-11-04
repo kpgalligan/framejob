@@ -94,13 +94,24 @@ enum FollowSubject {
         return abs(picture / canvas - 1) <= 0.01 ? 1.25 : 1
     }
 
+    /// The targets whose media has no cursor file — the ones Follow Subject analyses (spec §11
+    /// VR-51). A clip whose media has one stays a target, so the core's VR-51 sentence is
+    /// listed as its refusal, but it is never requested or read.
+    static func analysed(_ clips: [UInt32], in project: ReelProject) -> [UInt32] {
+        let snapshot = project.snapshot
+        return clips.filter { id in
+            snapshot.clip(id).flatMap { snapshot.media(for: $0) }?.cursor == nil
+        }
+    }
+
     /// Each clip's `subjects`, read from the store over that clip's own windows, as
-    /// `reframe_clip`'s tool reads them. Reads files only: any thread.
+    /// `reframe_clip`'s tool reads them; a clip whose media has a cursor file is skipped
+    /// (`analysed`, VR-51). Reads files only: any thread.
     static func subjects(_ clips: [UInt32], in project: ReelProject, cacheDir: URL)
         -> [UInt32: [String: Any]]
     {
         var out: [UInt32: [String: Any]] = [:]
-        for clip in clips {
+        for clip in analysed(clips, in: project) {
             guard let entry = FramingAnalysis.windows(clips: [clip], in: project).first,
                 let media = project.snapshot.media(entry.media)
             else { continue }

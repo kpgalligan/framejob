@@ -106,16 +106,22 @@ enum VerticalVersion {
 
     /// VR-37's analysis targets: the media pictures (`mediaPictures(classify(project), …)`),
     /// split by whether their media has a URL in `urls` (`document.mediaURLs()`); `missing` are
-    /// kept, not followed. The tool's first hop and the sheet both read it (VR-39 (d)).
+    /// kept, not followed. A present one whose media has a cursor file is in `cursor`, never
+    /// analysed: it follows its cursor (spec §11 VR-51). The tool's first hop and the sheet
+    /// both read it (VR-39 (d)).
     static func analysisTargets(_ project: ReelProject, urls: [UInt32: URL])
-        -> (present: [UInt32], missing: Set<UInt32>)
+        -> (present: [UInt32], missing: Set<UInt32>, cursor: [UInt32])
     {
         let snapshot = project.snapshot
         let pictures = mediaPictures(classify(project), in: snapshot)
         let missing = Set(pictures.filter { id in
             snapshot.clip(id)?.source.mediaID.map { urls[$0] == nil } ?? false
         })
-        return (pictures.filter { !missing.contains($0) }, missing)
+        let found = pictures.filter { !missing.contains($0) }
+        let cursor = found.filter { id in
+            snapshot.clip(id).flatMap { snapshot.media(for: $0) }?.cursor != nil
+        }
+        return (found.filter { !cursor.contains($0) }, missing, cursor)
     }
 
     /// VR-32's "not offered": `VerticalShape.allCases` whose size differs from `canvas`, in case

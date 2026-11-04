@@ -94,6 +94,7 @@ fn plan(p: &Project, samples: Vec<SubjectSample>) -> FramingPath {
     let subjects = Subjects {
         samples,
         shots: vec![],
+        cursor: vec![],
     };
     plan_framing(p, 3, &subjects, &request(1.0), &TUNING).expect("a path")
 }
@@ -278,6 +279,7 @@ fn headroom_in_a_tall_window_and_centred_in_a_wide_one() {
     let subjects = Subjects {
         samples: still,
         shots: vec![],
+        cursor: vec![],
     };
     // Zoom 2 on the tall canvas: k = 32/9, the window 303.75 × 540; the face
     // (y 432) 0.38 × 540 below its top puts the centre at 496.8, y = k·43.2.
@@ -319,6 +321,7 @@ fn a_persons_top_sits_twelve_percent_below_the_windows() {
     let subjects = Subjects {
         samples,
         shots: vec![],
+        cursor: vec![],
     };
     let mut req = request(2.0);
     req.follow = Follow::Person;
@@ -416,6 +419,7 @@ fn every_no_path_arm() {
     let samples = || Subjects {
         samples: faces(0.0, 1.0, |_| 960.0),
         shots: vec![],
+        cursor: vec![],
     };
     let ask = |p: &Project, clip: u32, req: FramingRequest| {
         plan_framing(p, clip, &samples(), &req, &TUNING)

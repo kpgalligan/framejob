@@ -183,6 +183,11 @@ the same way.
 - **Expect:** a verdict, recorded as spec §11 VR-38: whether the framing, the whole-shot treatment, the captions and the graphics are what you would post as they are, and whether re-making the copy after a master edit costs you anything (which may withdraw CJ0a's question 8's yes before VR7a starts).
 - **Source:** road map creator-jobs VR4b, spec §11 VR-38, VR-47 (the trial's verdict, which no script can give).
 
+**JOB-36 — A screen recording's vertical version is readable on a phone**
+- **Do:** When S-ST2 (a real screen recording made with Frame Job, its cursor file beside it, with clicks and typing) exists, make its 9:16 version with File ▸ Make Vertical Version… and the defaults, export it and watch it through on a phone, then run the same with Clip ▸ Auto Zoom… applied first. Skipped by name while S-ST2 does not exist.
+- **Expect:** the pointer stays in view and the frame lands on each click before it happens, moves calmly (no hunting after small motions), holds still while you type, and the text the cursor points at is readable at phone size; the auto zoom is replaced, not stacked on the framing.
+- **Source:** road map creator-jobs VR5, spec §11 VR-50, VR-52, VR-55 (how it reads on a phone, which no script can give).
+
 **JOB-55 — Switch by Speaker with one microphone follows who talks**
 - **Do:** On S-PC2 (two people sharing ONE microphone, a camera on each, five to ten minutes), select both cameras and the one microphone, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… (let the Analyzing sheet finish) at the defaults and press Switch. Play the Program track through.
 - **Expect:** the summary starts "Faces guess who is talking; check the cuts."; the cuts follow who talks as SW-S3 measured — each lands near the new speaker's first word, a laugh or a nod from the listener does not cut, and no shot of three seconds or more shows a listener who says nothing during it.
