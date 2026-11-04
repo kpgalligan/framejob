@@ -98,8 +98,9 @@ final class ClipPane: InspectorPaneView {
             matteNote == nil ? "-" : "matte",
             // Whether every clip has a look adds or removes Look's Amount row.
             videoPane.allLooked ? "look" : "-",
-            // Whether every clip can be cut out adds or removes Background (CO-30 (a)).
-            videoPane.allCutoutable ? "cutout" : "-",
+            // Whether every clip can be cut out adds or removes Background (CO-30 (a)), and
+            // whether every clip is a picture its Subject row (CO-108).
+            videoPane.allCutoutable ? (videoPane.allPictures ? "cutout-image" : "cutout") : "-",
             // Whether the selection can be put behind a subject adds or removes Behind Subject
             // (CO-55).
             videoPane.allBehindable ? "behind" : "-",

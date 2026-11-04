@@ -171,6 +171,7 @@ extension AgentServer {
             let request = entry.request
             var row: [String: Any] = [
                 "role": entry.role.rawValue, "owner": entry.owner, "media": Int(request.media.id),
+                "kind": request.kind.rawValue,
                 "ranges": request.ranges.map { [$0.lowerBound, $0.upperBound] },
                 "wanted": lane.requests(of: entry.owner).contains(request),
             ]
@@ -211,11 +212,11 @@ extension AgentServer {
                 + "owner wanted has ended. Answers {ok, now (process uptime), wanted: "
                 + "{project, media, hit}, lane_queued (requests the lane queued since "
                 + "launch), jobs: [{project, media, kind, ranges, queued_at, "
-                + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, ranges, "
-                + "wanted, outcome, error, queued_at, started_at, ended_at}]}: every job a dev "
-                + "owner wanted since launch, and every want a cutout made (role document, "
-                + "export or frame; wanted while that owner wants it now). Without media it "
-                + "targets no document.",
+                + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, kind, "
+                + "ranges, wanted, outcome, error, queued_at, started_at, ended_at}]}: every "
+                + "job a dev owner wanted since launch, and every want a cutout made (role "
+                + "document, export or frame; wanted while that owner wants it now). Without "
+                + "media it targets no document.",
             [
                 "media": [
                     "type": "integer", "description": "The media whose window to want.",

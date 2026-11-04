@@ -1,6 +1,7 @@
 import AppKit
 
-// Where a cut-out clip's person masks stand (road map creator-jobs CO3, spec §11 CO-30, CO-31):
+// Where a cut-out clip's masks stand (road map creator-jobs CO3, spec §11 CO-30, CO-31; a
+// picture's, CO10b, CO-108):
 // the Background section's Status and Analyze Now, Clip ▸ Remove Background's targets, toggle
 // and checkmark, and `analyze_cutout`'s answer, centroid included. Names no `rc_*` (CJ-8 (l)):
 // the plans and snapshots come through `ReelProject`, the windows and the need rule are
@@ -14,6 +15,8 @@ enum CutoutState: Equatable {
     case analyzing(Double)
     case ready
     case noPerson
+    /// A picture cut by its foreground whose mask found none (spec §11 CO-108).
+    case noSubject
     /// The reason, in the Status read-out's words.
     case failed(String)
 
@@ -60,16 +63,21 @@ enum CutoutStatus {
         let owner: Int?
         /// The document's cache folder, when the status read one.
         let cacheDir: URL?
+        /// The analysis kind of the clip's masks (`CutoutWants.kind(of:)`, CO-106).
+        var kind: AnalysisKind = .masks
     }
 
     // MARK: - Which clips
 
-    /// A media or still clip of a video file with pictures (CO-30 (a)).
+    /// A media or still clip of a video file with pictures (CO-30 (a)), or an image clip of a
+    /// picture (CO-108).
     static func canCutOut(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
         switch clip.source {
         case .media, .still:
             guard let media = snapshot.media(for: clip) else { return false }
             return media.kind == .video && media.hasVideo
+        case .image:
+            return snapshot.media(for: clip)?.kind == .image
         default:
             return false
         }
@@ -112,6 +120,7 @@ enum CutoutStatus {
         let handles = document.scope == nil
             ? [document.project] : [document.project, document.editedProject]
         let owner = document.maskOwner
+        var kind = AnalysisKind.masks
         func answer(
             _ state: CutoutState, media: MediaSnapshot? = nil, need: [ClosedRange<Int>] = [],
             coverage: [ClosedRange<Int>] = [], frames: Int = 0, covered: Int = 0,
@@ -119,14 +128,15 @@ enum CutoutStatus {
         ) -> Detail {
             var error: String?
             if case .failed(let why) = state {
-                error = "Clip \(clip)'s person masks could not be made: \(why)."
+                let noun = kind == .foreground ? "foreground" : "person"
+                error = "Clip \(clip)'s \(noun) masks could not be made: \(why)."
             }
             return Detail(
                 status: CutoutClipStatus(
                     clip: clip, media: media?.id, state: state, frames: frames, covered: covered,
                     subjectFound: found, error: error),
                 media: media, need: need, coverage: coverage, pack: pack, owner: owner,
-                cacheDir: cache)
+                cacheDir: cache, kind: kind)
         }
         let found = handles.lazy.compactMap { handle in
             (handle.snapshot.clips + handle.snapshot.nests.flatMap(\.clips)).first {
@@ -136,10 +146,19 @@ enum CutoutStatus {
         guard let snapshot = found, snapshot.video?.cutout != nil else { return answer(.off) }
         guard let id = snapshot.source.mediaID, let media = document.project.snapshot.media(id)
         else { return answer(.noPicture) }
-        let grid = AnalysisGrid(media: media)
+        kind = CutoutWants.kind(of: snapshot)
+        let grid = kind.grid(of: media)
         var windows: [CutoutWindow] = []
         var hull: ClosedRange<Ticks>?
-        for handle in handles {
+        // A picture's one window `[0, 1)`, one frame (CO-106, CO-108).
+        let picture: Bool
+        if case .image = snapshot.source { picture = true } else { picture = false }
+        for handle in handles where picture {
+            windows += CutoutWants.imageWindows(snapshot: handle.snapshot, range: nil)
+                .filter { $0.clip == clip && $0.media == id }
+        }
+        if picture, !windows.isEmpty { hull = 0...1 }
+        for handle in handles where !picture {
             guard let plan = handle.plan else { continue }
             windows += CutoutWants.windows(plan: plan, snapshot: handle.snapshot, range: nil)
                 .filter { $0.clip == clip && $0.media == id }
@@ -157,15 +176,17 @@ enum CutoutStatus {
         let url = mediaURL(for: media)
         let cacheDir = document.intendedCacheDirectory
         let stamp = url.flatMap { url in
-            cacheDir.flatMap { Self.stamp(media: media, url: url, cacheDir: $0, in: document) }
+            cacheDir.flatMap {
+                Self.stamp(media: media, url: url, cacheDir: $0, in: document, kind: kind)
+            }
         }
         var coverage: [ClosedRange<Int>] = []
         var packURL: URL?
         if let stamp, let cacheDir,
-            let marker = AnalysisStore.readMarker(.masks, media: id, in: cacheDir),
+            let marker = AnalysisStore.readMarker(kind, media: id, in: cacheDir),
             marker.answers(for: stamp), let file = marker.files.first
         {
-            let payload = AnalysisStore.payloadURL(.masks, media: id, file: file, in: cacheDir)
+            let payload = AnalysisStore.payloadURL(kind, media: id, file: file, in: cacheDir)
             if FileManager.default.fileExists(atPath: payload.path) {
                 coverage = AnalysisStore.merged(marker.ranges)
                 packURL = payload
@@ -180,8 +201,9 @@ enum CutoutStatus {
                 subject = CutoutLookup.subjectFound(
                     pack: pack, window: hull, coverage: coverage, grid: grid)
             }
+            let none: CutoutState = kind == .foreground ? .noSubject : .noPerson
             return answer(
-                subject ? .ready : .noPerson, media: media, need: need, coverage: coverage,
+                subject ? .ready : none, media: media, need: need, coverage: coverage,
                 frames: frames, covered: covered, found: subject, pack: packURL, cache: cacheDir)
         }
         func failed(_ why: String) -> Detail {
@@ -192,7 +214,7 @@ enum CutoutStatus {
         guard url != nil else { return failed("the media file is missing") }
         guard let cacheDir else { return failed("no cache folder") }
         guard stamp != nil else { return failed("the media file cannot be read") }
-        let requests = ownerRequests(owner, media: id, cacheDir: cacheDir)
+        let requests = ownerRequests(owner, media: id, cacheDir: cacheDir, kind: kind)
         let uncovered = need.flatMap { AnalysisStore.missingRanges($0, covered: coverage) }
         for request in requests {
             guard case .failed(let why)? = AnalysisLane.shared.run(of: request)?.outcome,
@@ -209,13 +231,15 @@ enum CutoutStatus {
             covered: covered, pack: packURL, cache: cacheDir)
     }
 
-    /// `owner`'s masks requests of media `media` in `cacheDir`; none without an owner. Any
+    /// `owner`'s requests of `kind` of media `media` in `cacheDir`; none without an owner. Any
     /// thread.
-    static func ownerRequests(_ owner: Int?, media: UInt32, cacheDir: URL) -> [AnalysisRequest] {
+    static func ownerRequests(
+        _ owner: Int?, media: UInt32, cacheDir: URL, kind: AnalysisKind = .masks
+    ) -> [AnalysisRequest] {
         guard let owner else { return [] }
         let folder = cacheDir.standardizedFileURL
         return AnalysisLane.shared.requests(of: owner).filter {
-            $0.kind == .masks && $0.media.id == media && $0.cacheDir.standardizedFileURL == folder
+            $0.kind == kind && $0.media.id == media && $0.cacheDir.standardizedFileURL == folder
         }
     }
 
@@ -236,6 +260,7 @@ enum CutoutStatus {
             return "Analyzing \(min(99, max(0, Int((progress * 100).rounded(.down))))) %"
         case .ready: return "Ready"
         case .noPerson: return "No person found"
+        case .noSubject: return "No subject found"
         case .failed(let why): return "Failed: \(why)"
         }
     }
@@ -342,6 +367,7 @@ enum CutoutStatus {
 
     private struct StampKey: Hashable {
         let folder: String
+        let kind: AnalysisKind
         let media: UInt32
         let url: URL
     }
@@ -354,20 +380,22 @@ enum CutoutStatus {
 
     private static var stamps: [StampKey: StampEntry] = [:]
 
-    /// The stamp `ProjectDocument.analysisRequest` would make for `media` at `url`: its asset
-    /// read only when the media, its URL or its LUT's URL changed. Main thread.
+    /// The stamp of `kind` `ProjectDocument.analysisRequest` would make for `media` at `url`:
+    /// its asset read only when the media, its URL or its LUT's URL changed. Main thread.
     static func stamp(
-        media: MediaSnapshot, url: URL, cacheDir: URL, in document: ProjectDocument
+        media: MediaSnapshot, url: URL, cacheDir: URL, in document: ProjectDocument,
+        kind: AnalysisKind = .masks
     ) -> AnalysisStamp? {
         let lutID = media.color?.lut
         let lut = lutID.flatMap { document.project.snapshot.media($0) }.flatMap(mediaURL(for:))
-        let key = StampKey(folder: cacheDir.standardizedFileURL.path, media: media.id, url: url)
+        let key = StampKey(
+            folder: cacheDir.standardizedFileURL.path, kind: kind, media: media.id, url: url)
         if let entry = stamps[key], entry.media == media, entry.lut == lut { return entry.stamp }
         var urls = [media.id: url]
         if let lutID, let lut { urls[lutID] = lut }
         let (input, fullRange) = ProjectDocument.analysisInput(media: media, url: url, urls: urls)
         let stamp = AnalysisStamp.make(
-            kind: .masks, media: media, url: url, input: input, fullRange: fullRange)
+            kind: kind, media: media, url: url, input: input, fullRange: fullRange)
         stamps[key] = StampEntry(media: media, lut: lut, stamp: stamp)
         return stamp
     }

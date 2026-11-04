@@ -6,7 +6,8 @@ import Foundation
 // CO-20; `foreground` format 41, CO-100) and of the recipe layer's `cutout`
 // key (CO-21, its image arm CO-101). Nothing here draws:
 // the compositor draws `RecipeCutout` through `Compositor+Cutout.swift` since
-// road map creator-jobs CO2a2 (spec §11 CO-24…CO-27).
+// road map creator-jobs CO2a2 (spec §11 CO-24…CO-27), an image arm's since
+// CO10b (CO-107).
 // Every decode is lenient, the core's defaults standing in for a key that
 // does not read, as the other snapshot types do, but for the mask's `kind`
 // and `media`, without which there is no mask to look up.
@@ -100,8 +101,8 @@ struct CutoutPatch: Codable, Equatable {
 }
 
 /// Where a recipe cutout's masks come from: a media's pack (CO-3), or an
-/// image clip's picture (CO-101), whose masks CO10b makes; until then an
-/// `image` mask draws uncut (CO-102).
+/// image clip's picture (CO-101), drawn since CO10b from its one mask of the
+/// kind its subject asks (`masks` or `foreground`, spec §11 CO-105, CO-107).
 enum RecipeCutoutMaskKind: String, Codable, CaseIterable {
     case media, image
 }

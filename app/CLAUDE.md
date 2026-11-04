@@ -195,7 +195,8 @@ detail there.
   `VideoPatch.cutout`; its `dictionary` writes all five keys), `CutoutPatch` (the sparse
   write `VideoPatch.cutoutPart` carries — written under `cutout` only when `cutout` is nil,
   never decoded — so a Background, Edge or Feather row writes its own key alone, CO3),
-  `RecipeCutoutMaskKind` (`media`, and `image`, which nothing draws until CO10b),
+  `RecipeCutoutMaskKind` (`media`, and `image`, drawn since CO10b from the
+  picture's one mask, CO-107),
   `RecipeCutoutMask` (`kind` and `media` required; `subject` lenient,
   `person` when absent, CO-101) and `RecipeCutout` (the recipe layer's
   `cutout`, `mask` required; `subjectCopy`, CO-51); `RecipeLayer.videoProps` passes no cutout — the recipe's is a draw
@@ -496,8 +497,8 @@ detail there.
   alone (#108).
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
-  `AnalysisShots.swift` · `AnalysisMasks.swift` · `MaskPack.swift` ·
-  `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
+  `AnalysisShots.swift` · `AnalysisMasks.swift` · `AnalysisMasks+Image.swift` ·
+  `MaskPack.swift` · `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
   `AnalysisSampleJob.swift` · `AnalysisSubjects.swift` · `AnalysisSubjects+Samples.swift` ·
   `FramingAnalysis.swift` ·
   `SoundEvents.swift` · `AnalysisSoundEvents.swift` · `AnalysisClipTimes.swift` ·
@@ -546,6 +547,15 @@ detail there.
   clip's played window (a pure move, CO1's toll), and
   `AgentServer+AnalysisMasks` holds the answer's `mask_size`, `frames`,
   `subject_found` and `runs`, never pixels.
+  A picture's masks (road map creator-jobs CO10b, spec §11 CO-105):
+  `AnalysisMasks+Image` is `runImage`, one mask per image media and subject
+  kind — the `masks` kind's person request for `person`, the `foreground`
+  kind's `VNGenerateForegroundInstanceMaskRequest` (revision 1, pinned to the
+  GPU, refused on another device) for `foreground` — on the picture as
+  `LayerRenderers.image` decodes it, one frame `(0, 0, 0)` published covering
+  `0...0`; `analysisInput` reads a non-video direct; `get_media_analysis`
+  lists and accepts `AnalysisKind.mediaAnalysisKinds`, every kind but
+  `foreground`.
   The `faces` kind (road map creator-jobs CJ3, spec §11 CJ-30…CJ-35):
   `AnalysisFaces` reads at long side 720 through the standard arms
   (direct, or converted for a converting media) and, per analysed frame,
@@ -627,11 +637,15 @@ detail there.
   `AnalysisLane.openRequests(kind:cacheDir:)` — every owner's queued and
   running requests: a running one meeting the need kept, a queued one only
   when wholly inside it, an ended one never — the requests (kept plus one
-  remainder per media with a miss), and the dev log `analysis_job`'s
+  remainder per media with a miss), a cut picture's one `[0, 1)` window of
+  its kind (`imageWindows`, `kind(of:)`, CO-106), and `wants`, the keep rule
+  and the requests once per kind (`masks` first), which the document, the
+  export and the frame want in one `want`, and the dev log `analysis_job`'s
   `mask_wants` reads. `AnalysisStore.publishFile` posts
   `.analysisDidPublish` (`kind`, `media`, the standardized `cacheDir`) on
   main after each publish; `EditorViewController+Cutout.swift` refreshes the
-  paused frame for a `masks` publish in its document's cache folder.
+  paused frame for a `masks` or `foreground` publish in its document's cache
+  folder.
   `ProjectDocument.analysisRequest`'s static form (`…need:`, `nonisolated`)
   is what the wants call off main; `analysisInput` is `nonisolated` for it.
   Remove Background in the inspector and the menus (road map creator-jobs
@@ -641,12 +655,15 @@ detail there.
   `[project, editedProject]`), the needed and stored indices for the
   analysis's stamp (memoised per cache folder, media and URL, main only),
   CO-26's subject over the clip's hull, then in order off → no picture →
-  ready or no person (before any failure) → failed (no file, no cache
+  ready, no person or — a foreground picture — no subject (`noSubject`,
+  before any failure) → failed (no file, no cache
   folder, no stamp, or a `.failed` run of `maskOwner`'s requests meeting the
   clip's needed, uncovered indices) → analysing with `progress`
   `(C_out + f·R_in)/N` over the running request's ranges; it also holds
   `words`, Clip ▸ Remove Background's `canCutOut`, `toggleOps` and
-  `menuState`, and `centroid` (any thread). `CutoutStatus+Memo.swift` is the
+  `menuState`, and `centroid` (any thread). Since CO10b a picture is a
+  cut-out clip (`canCutOut`), its frames 1, its `Detail.kind` the kind its
+  subject asks. `CutoutStatus+Memo.swift` is the
   Background section's held Status (held through a live gesture and while
   the handles and `ReverseSource` resolution are unchanged) and its 0.5 s
   main-run-loop ticker while analysing or failed, which re-reads only the
@@ -656,8 +673,9 @@ detail there.
   `CutoutWants.queue`): `retry` clears a `.failed` or `.cancelled` outcome
   of the owner's requests that are neither running nor queued, and
   reconciles. `AgentServer+Cutout.swift` is `analyze_cutout` (off main: one
-  main hop that refuses — a named image clip too, and image clips are left out of the default
-  set until CO10b, spec §11 CO-103 — and calls `analyzeMasksNow()`, then
+  main hop that refuses and calls `analyzeMasksNow()` — pictures answered like
+  any cut-out clip since CO10b, CO-103 lifted, `no_subject` their found-false
+  state — then
   `CutoutWants.queue.sync {}`, then polls every 0.25 s up to `wait` or Stop,
   never a timeout refusal; the centroid is read off main);
   `AgentCatalog+Cutout.swift` holds its row, spliced in by
@@ -669,7 +687,8 @@ detail there.
   no `rc_*`) is the pure planner both doors run — the candidates at a time,
   the pick order, the new "Behind Subject" track's index above the run of
   matte tracks in front of the clip's track, min(4 s, the rest), three or
-  four ops, the three refusal sentences, and `isCutBySubject`.
+  four ops, the three refusal sentences (a video file or a picture since
+  CO10b, CO-108), and `isCutBySubject`.
   `EditorViewController+BehindSubject.swift` is Insert ▸ Text Behind Subject
   (`applyEdit`, then `selectClips(addedSince:)`), with its validator arm
   `validateBehindSubjectAction` one line in the frozen file after
@@ -1273,8 +1292,8 @@ the key map behind it.
 - `EditorViewController+Graphics` refreshes the paused frame on
   `.projectGraphicsDidChange` for its own document.
 - `EditorViewController+Cutout` refreshes the paused frame on
-  `.analysisDidPublish` for a `masks` publish in its own document's cache
-  folder (spec §11 CO-22 (d)); its observer is one statement in the frozen
+  `.analysisDidPublish` for a `masks` or `foreground` publish in its own
+  document's cache folder (spec §11 CO-22 (d), CO-107); its observer is one statement in the frozen
   file's `viewDidLoad`, beside `cursorTrackDidLand`'s. It also holds Clip ▸
   Remove Background (`toggleRemoveBackground`, one undo step "Remove
   Background", one base `set_video` per clip, `CutoutStatus.toggleOps`),
@@ -1858,8 +1877,11 @@ the key map behind it.
   CO-30), registered right after Chroma Key in `ClipPane.makeSections()` when
   every selected clip `allCutoutable` (`ClipPane.structureSignature` carries
   it): Remove background (base `set_video` only, ⊘ inside an action: on gives
-  the clips without one the defaults, off writes null to all), Background,
-  Edge and Feather (enabled while `allCutOut`, each writing its own key
+  the clips without one the defaults, off writes null to all), Subject
+  (Person, Foreground; only when `allPictures`, enabled while `allCutOut`, the
+  base cutout written whole per clip, ⊘ inside an action, mixed when the
+  subjects differ, undo "Cutout Subject"; `structureSignature`'s cell
+  `cutout-image`, CO-108), Background, Edge and Feather (enabled while `allCutOut`, each writing its own key
   through `VideoPatch.cutoutPart`, which animates), Status read through the
   pane's `cutoutMemo` (`CutoutStatus.Memo`, kept on `ClipPane`, whose
   `onChange` refreshes the pane), and Analyze Now; +`Cursor` — the Picture sub-tab's Cursor

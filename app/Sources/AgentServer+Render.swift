@@ -224,8 +224,12 @@ extension AgentServer {
             text += " " + (try Self.writeScopes(
                 scopes, vectorscopeZoom: vectorscopeZoom, signal: signal, of: image, beside: url))
         }
-        // A cut-out clip whose masks were not ready within the wait (spec §11 CO-22 (f)).
-        for sentence in Exporter.cutoutSentences(rendered.uncut) {
+        // A cut-out clip whose masks were not ready within the wait (spec §11 CO-22 (f)); a
+        // picture cut by its foreground names its foreground masks (CO-106).
+        let foreground = Set(
+            (project.snapshot.clips + project.snapshot.nests.flatMap(\.clips))
+                .filter { CutoutWants.kind(of: $0) == .foreground }.map(\.id))
+        for sentence in Exporter.cutoutSentences(rendered.uncut, foreground: foreground) {
             text += " " + sentence
         }
         text += " Written to \(url.path)."

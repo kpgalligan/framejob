@@ -1,8 +1,9 @@
 import Foundation
 
-/// The export's and the offline frame's wait for the person masks they draw (road map
-/// creator-jobs CO2b, spec §11 CO-6, CO-22 (e), (f)), in `withRampAudio`'s shape: wanted on the
-/// lane before the build, so no frame is composed while a mask it draws is still being made.
+/// The export's and the offline frame's wait for the masks they draw (road map creator-jobs
+/// CO2b, spec §11 CO-6, CO-22 (e), (f); a picture's, CO10b, CO-106), in `withRampAudio`'s
+/// shape: wanted on the lane before the build, so no frame is composed while a mask it draws is
+/// still being made.
 /// Both share every owner's open masks jobs by CO-22 (c)'s keep rule rather than queueing a
 /// second one behind the document's.
 ///
@@ -29,10 +30,11 @@ extension Exporter {
     }
 
     /// Blocks until every mask the export's range draws is cached (CO-22 (e)): the windows of
-    /// `plan`'s cut-out clips over `settings`' range, wanted under the export's own owner — the
-    /// open jobs it shares plus the remainder — and waited on with no deadline but `cancelled`.
-    /// No cache folder, an unreadable media or a failed job throws `cutoutFailed` naming the
-    /// first window's clip of that media; a media still missing after a second landing too.
+    /// `plan`'s cut-out clips over `settings`' range, and of the cut pictures meeting it (CO-106),
+    /// wanted under the export's own owner — the open jobs it shares plus the remainder, kind by
+    /// kind — and waited on with no deadline but `cancelled`. No cache folder, an unreadable
+    /// media or a failed job throws `cutoutFailed` naming the first window's clip of that media
+    /// and kind (`foreground:` from that kind); a media still missing after a second landing too.
     /// Never main.
     static func waitForMasks(
         plan: CompositionPlan, urls: [UInt32: URL], settings: ExportSettings, key: Int,
@@ -40,36 +42,34 @@ extension Exporter {
     ) throws {
         guard let project = RecipeSource.shared.project(for: key) else { return }
         let snapshot = project.snapshot
-        let windows = CutoutWants.windows(
-            plan: plan, snapshot: snapshot,
-            range: settings.start..<(settings.start + max(settings.duration, 0)))
+        let range = settings.start..<(settings.start + max(settings.duration, 0))
+        let windows = CutoutWants.windows(plan: plan, snapshot: snapshot, range: range)
+            + CutoutWants.imageWindows(snapshot: snapshot, range: range)
         guard let first = windows.first(where: { urls[$0.media] != nil }) else { return }
-        func clip(of media: UInt32) -> UInt32 {
-            windows.first { $0.media == media }?.clip ?? first.clip
+        func clip(of media: UInt32, kind: AnalysisKind) -> UInt32 {
+            windows.first { $0.media == media && $0.kind == kind }?.clip ?? first.clip
         }
         guard let cacheDir = ReverseSource.shared.resolution(for: key).cache else {
             throw ExportError.cutoutFailed(
-                clip: first.clip, message: "the project has no cache folder to keep the analysis in")
+                clip: first.clip, message: "the project has no cache folder to keep the analysis in",
+                foreground: first.kind == .foreground)
         }
         let owner = maskOwner(for: key)
         var landings = 0
         while true {
-            let previous = AnalysisLane.shared.openRequests(kind: .masks, cacheDir: cacheDir)
-            let kept = CutoutWants.kept(
-                previous: previous,
-                need: CutoutWants.needs(windows: windows, snapshot: snapshot, urls: urls),
-                state: CutoutWants.state)
-            let (requests, failures) = CutoutWants.requests(
-                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir,
-                keeping: kept)
+            let (requests, failures) = CutoutWants.wants(
+                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir)
             if let failure = failures.first {
-                throw ExportError.cutoutFailed(clip: failure.clip, message: failure.message)
+                let kind = windows.first { $0.clip == failure.clip }?.kind ?? .masks
+                throw ExportError.cutoutFailed(
+                    clip: failure.clip, message: failure.message, foreground: kind == .foreground)
             }
             guard let missing = requests.first else { return }
             if landings >= 2 {
                 throw ExportError.cutoutFailed(
-                    clip: clip(of: missing.media.id),
-                    message: "its masks do not cover the frames it plays")
+                    clip: clip(of: missing.media.id, kind: missing.kind),
+                    message: "its masks do not cover the frames it plays",
+                    foreground: missing.kind == .foreground)
             }
             AnalysisLane.shared.want(requests, owner: owner, alive: { true }, settled: nil)
             #if FRAMEJOB_DEV_TOOLS
@@ -85,7 +85,9 @@ extension Exporter {
                     if case .failed? = AnalysisLane.shared.run(of: $0)?.outcome { return true }
                     return false
                 } ?? missing
-                throw ExportError.cutoutFailed(clip: clip(of: failed.media.id), message: why)
+                throw ExportError.cutoutFailed(
+                    clip: clip(of: failed.media.id, kind: failed.kind), message: why,
+                    foreground: failed.kind == .foreground)
             case .cancelled, .timedOut:
                 throw ExportError.cancelled
             }
@@ -100,10 +102,17 @@ extension Exporter {
         if let owner { AnalysisLane.shared.release(owner: owner) }
     }
 
+    /// A media's masks of one kind: the frame wait's stamps and uncovered set are keyed by it.
+    private struct MaskKey: Hashable {
+        let kind: AnalysisKind
+        let media: UInt32
+    }
+
     /// Waits up to `limit` for the masks the recipe at `t` draws (CO-22 (f)) under a fresh owner,
     /// polling the store every `AnalysisLane.pollInterval` until each is covered, one of its
     /// requests failed, or the limit; answers the clips drawn uncut, ascending — an unreadable
-    /// media's at once, every one with no cache folder. Never main: it blocks.
+    /// media's at once, every one with no cache folder. A cut picture's masks are waited for by
+    /// their kind beside the movies' (CO-106). Never main: it blocks.
     static func waitForFrameMasks(
         project: ReelProject, urls: [UInt32: URL], key: Int, at t: Ticks,
         options: RecipeOptions, limit: TimeInterval
@@ -112,30 +121,35 @@ extension Exporter {
             .filter { urls[$0.media] != nil }
         guard !windows.isEmpty else { return [] }
         let snapshot = project.snapshot
-        func clips(of media: Set<UInt32>) -> [UInt32] {
-            Array(Set(windows.filter { media.contains($0.media) }.map(\.clip))).sorted()
+        func clips(of keys: Set<MaskKey>) -> [UInt32] {
+            Array(Set(windows.filter { keys.contains(MaskKey(kind: $0.kind, media: $0.media)) }
+                .map(\.clip))).sorted()
         }
         guard let cacheDir = ReverseSource.shared.resolution(for: key).cache else {
-            return clips(of: Set(windows.map(\.media)))
+            return clips(of: Set(windows.map { MaskKey(kind: $0.kind, media: $0.media) }))
         }
-        let needs = CutoutWants.needs(windows: windows, snapshot: snapshot, urls: urls)
-        let kept = CutoutWants.kept(
-            previous: AnalysisLane.shared.openRequests(kind: .masks, cacheDir: cacheDir),
-            need: needs, state: CutoutWants.state)
-        let (requests, failures) = CutoutWants.requests(
-            windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir, keeping: kept)
+        var needs: [MaskKey: [ClosedRange<Int>]] = [:]
+        for kind in Set(windows.map(\.kind)) {
+            let byMedia = CutoutWants.needs(
+                windows: windows.filter { $0.kind == kind }, snapshot: snapshot, urls: urls)
+            for (media, need) in byMedia { needs[MaskKey(kind: kind, media: media)] = need }
+        }
+        let (requests, failures) = CutoutWants.wants(
+            windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir)
         let unreadable = Set(failures.compactMap { failure in
-            windows.first { $0.clip == failure.clip }?.media
+            windows.first { $0.clip == failure.clip }.map { MaskKey(kind: $0.kind, media: $0.media) }
         })
         guard !requests.isEmpty else { return clips(of: unreadable) }
         // Each waited media's stamp, made once by its request; the polls only look up.
-        var stamps: [UInt32: AnalysisStamp] = [:]
-        for request in requests { stamps[request.media.id] = request.stamp }
-        func uncovered() -> Set<UInt32> {
-            Set(stamps.filter { media, stamp in
-                (needs[media] ?? []).contains {
+        var stamps: [MaskKey: AnalysisStamp] = [:]
+        for request in requests {
+            stamps[MaskKey(kind: request.kind, media: request.media.id)] = request.stamp
+        }
+        func uncovered() -> Set<MaskKey> {
+            Set(stamps.filter { key, stamp in
+                (needs[key] ?? []).contains {
                     if case .hit = AnalysisStore.lookup(
-                        .masks, media: media, stamp: stamp, need: $0, in: cacheDir)
+                        key.kind, media: key.media, stamp: stamp, need: $0, in: cacheDir)
                     {
                         return false
                     }
@@ -163,11 +177,12 @@ extension Exporter {
         return clips(of: missing.union(unreadable))
     }
 
-    /// `render_frame`'s sentence for each clip drawn uncut (CO-22 (f)), ascending.
-    static func cutoutSentences(_ uncut: [UInt32]) -> [String] {
+    /// `render_frame`'s sentence for each clip drawn uncut (CO-22 (f)), ascending: a picture
+    /// cut by its foreground (in `foreground`) names its foreground masks (CO-106).
+    static func cutoutSentences(_ uncut: [UInt32], foreground: Set<UInt32> = []) -> [String] {
         uncut.sorted().map {
-            "Clip \($0) is drawn uncut: its person masks were not ready within "
-                + "\(Int(frameCutoutWait)) s."
+            "Clip \($0) is drawn uncut: its \(foreground.contains($0) ? "foreground" : "person") "
+                + "masks were not ready within \(Int(frameCutoutWait)) s."
         }
     }
 }

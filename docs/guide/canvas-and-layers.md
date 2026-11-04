@@ -167,7 +167,7 @@ Picture's sections, in order:
 | Transform | every clip that draws |
 | Behind Subject | every clip that draws but an adjustment or nest clip, at the top level |
 | Crop, Corner Radius, Chroma Key | video, image and still clips |
-| Background | clips of a video file, and freeze frames of one |
+| Background | clips of a video file, freeze frames of one, and image clips |
 | Cursor | clips of a movie whose cursor file the picture doesn't already show ([The cursor](screen-recording.md#the-cursor)) |
 | Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included |
 
@@ -255,14 +255,16 @@ Chroma Key removes a background colour, such as a green screen.
 ### Remove Background
 
 The Background section, right after Chroma Key, keeps the person in a clip of a
-video file and makes the rest transparent, so whatever is on the tracks behind
-shows through. No green screen is needed: the person is found in every frame
-on this Mac (Vision's person segmentation), with no upload and no key. **Clip ▸
-Remove Background** turns it on or off for the selected clips too.
+video file or a picture and makes the rest transparent, so whatever is on the
+tracks behind shows through. No green screen is needed: the person is found in
+every frame on this Mac (Vision's person segmentation), with no upload and no
+key. **Clip ▸ Remove Background** turns it on or off for the selected clips
+too.
 
 | Row | What it does | Default |
 |---|---|---|
 | Remove background | Turns it on. Turning it on gives each selected clip without it the defaults; turning it off removes it from all of them | off |
+| Subject | Only when every selected clip is a picture: **Person** keeps the person; **Foreground** keeps the photo's foreground subject — a person, a pet, an object — whatever it is (below) | Person |
 | Background | **Remove** draws the person alone; **Keep** draws the whole picture | Remove |
 | Edge | Pulls the outline in (below 0) or pushes it out (above 0), −1 to 1 | 0 |
 | Feather | How soft the outline is, 0–100 % | 0 % |
@@ -277,10 +279,17 @@ sure. Where the mask fades from background to person across a band of pixels,
 Edge +1 or −1 moves the outline about three eighths of that band's width, and
 raising Edge never removes anything a lower Edge kept.
 
-Background, Edge and Feather are dimmed until every selected clip has Remove
-Background on. With an action selected they animate like any other row
-(Background switches at the action's end); the checkbox and **Reset** always
-change the clip itself, and their gutter shows ⊘.
+Subject, Background, Edge and Feather are dimmed until every selected clip has
+Remove Background on. With an action selected Background, Edge and Feather
+animate like any other row (Background switches at the action's end); the
+checkbox, Subject and **Reset** always change the clip itself, and their gutter
+shows ⊘. Subject reads mixed when the selected pictures differ.
+
+A picture's mask is made from the picture itself, once, as the preview draws
+it: Person uses the same person segmentation as a video, and Foreground uses
+Vision's foreground instance mask, which keeps every foreground subject it
+finds. A picture is one frame, so its Status goes straight from Analyzing to
+Ready.
 
 The masks are made as soon as Remove Background is on, for the frames the clip
 plays, and kept in the project's cache, so they are never made twice. Until a
@@ -291,6 +300,8 @@ every mask it draws. Status reads:
 - **Ready** — every frame the clip plays has its mask.
 - **No person found** — every frame was looked at and no person is in the
   clip, so it draws whole.
+- **No subject found** — a picture with Subject **Foreground** was looked at
+  and no foreground subject was found, so it draws whole.
 - **Failed:** and the reason — the media file is missing, cannot be read, or
   the masks could not be written. Fix the cause and press **Analyze Now**.
 - **No picture to analyze** — the clip plays no frame of its file.
@@ -298,19 +309,19 @@ every mask it draws. Status reads:
 
 ### Text behind the subject
 
-A title, shape, picture or graphic can sit behind the person in a camera clip:
-the person stands in front of it while the room stays behind it. **Insert ▸
-Text Behind Subject** does it in one step at the playhead:
+A title, shape, picture or graphic can sit behind the person in a camera clip
+or a photo: the person stands in front of it while the room stays behind it.
+**Insert ▸ Text Behind Subject** does it in one step at the playhead:
 
-- It picks the clip of a video file playing at the playhead on a shown track
-  that is not a matte track: the front-most selected one, else the front-most
+- It picks the clip of a video file or picture playing at the playhead on a
+  shown track that is not a matte track: the front-most selected one, else the front-most
   with Remove Background on, else the front-most.
 - It adds a track named "Behind Subject" directly above that clip's track
   (above any matte tracks in front of it), and on it a title with the Title
   preset, from the playhead for 4 seconds or to the clip's end if sooner.
 - The title is put behind the subject. If the clip had no Remove Background,
-  it is turned on with **Keep** background, so the camera picture stays whole
-  and the person still hides the title.
+  it is turned on with **Keep** background and Subject **Person**, so the
+  camera picture or photo stays whole and the person still hides the title.
 - The new title is selected; one **Undo** takes it all back.
 
 The item is greyed while a nest is open and when no such clip plays at the
@@ -675,7 +686,9 @@ You import an image the same way as a movie (see
 [Projects and media](projects-and-media.md)), and it lands as a 5-second clip.
 An image has no length of its own, so you can trim it to any duration. Image
 clips have everything on the Picture tab, Crop, Corner Radius and Chroma Key
-included, and a Color tab for grading.
+included, and a Color tab for grading. Remove Background works on a picture too,
+keeping its person or its foreground subject (see
+[Remove Background](#remove-background)).
 
 When the Document tab's **Fit new clips to canvas** option is on, a new clip whose picture
 is bigger than the canvas starts at Fit scale. Otherwise it starts at 100 %,

@@ -28778,37 +28778,45 @@ RC_PROOF_APP=release python3 tools/proof/co5_proof.py --mutant NAME
 
 The recorded runs are in `designs/creator-jobs.md`'s CO5 record.
 
-## Road map "creator-jobs" CO10a — a picture's cutout in the model and the recipe (`co10_proof.py` S2–S5, Z1; four mutants by hand; `core/tests/cutout_image.rs`, `schema_v41.rs`; spec §11 CO-100…CO-104)
+## Road map "creator-jobs" CO10a/CO10b — a picture's cutout (`co10_proof.py` S1–S6, Z1; seven mutants by `--mutant`; `core/tests/cutout_image.rs`, `schema_v41.rs`; spec §11 CO-100…CO-109)
 
-**`co10_proof.py`** drives the app `proof_app` chooses (or `--app PATH`) in one launch on a
-scratch `CFFIXED_USER_HOME` (`tools/proof/work/co10`), with `-RCDevAnalysisHold 3600` so a cut
-media clip's wanted masks (CO-22) are never made: no row reads a mask. Its media are a copy of
-`media/A.mov` and a 64 × 48 RGB PNG the script writes with `zlib` and `struct`, on a 640 × 360,
-30 fps canvas. Nothing draws an image's mask until CO10b (CO-102); its docstring is the full row
-list.
+**`co10_proof.py`** drives the app `proof_app` chooses (or `--app PATH`) in two launches on one
+scratch `CFFIXED_USER_HOME` (`tools/proof/work/co10`). Its media are a copy of `media/A.mov`, a
+64 × 48 RGB PNG the script writes with `zlib` and `struct`, and a copy of `cutout_spike.FLEX` (a
+256 × 256 person photo) as `person.jpg`; its docstring is the full row list. Launch H holds every
+analysis job (`-RCDevAnalysisHold 3600`), so no mask is ever made, on 640 × 360, 30 fps
+canvases; launch U holds none, on a canvas of the photo's own size with a green background.
 
-| Row | What it holds |
-|---|---|
-| S2 | `set_video {cutout: {subject: "foreground"}}` on a media clip and on a `freeze_frame` still: each answers `set_video: ` and its sentence exactly, `get_project` unchanged |
-| S3 | an image clip's `{subject: "foreground"}` reads back all five keys, `{edge: 0.25}` merges, `null` removes the key |
-| S4 | `render_frame` at 0.5 s and 2 s with the image clip's cutout on byte-identical to it off, each call under 10 s (no 30 s mask wait) |
-| S5 | a cut image clip and a cut media clip: `analyze_cutout {clips: [image], wait: 0}` answers CO-103's image sentence exactly, `analyze_cutout {wait: 0}` rows for the media clip only, and with the media clip's cutout removed the empty-set sentence exactly |
-| Z1 | no `Frame Job: ` line in the launch's log |
+| Row | Launch | What it holds |
+|---|---|---|
+| S1 | U | the photo uncut is under 1 % green (r ≤ 2, g ≥ 253, b ≤ 2); S1a `{cutout: {}}`: `analyze_cutout {wait: 60}` `ready`, frames 1, covered 1, `subject_found`, the render ≥ 20 % green and ≥ 1 % not green and within ±2 of the uncut render; S1b `{subject: "foreground"}` the same, the `foreground` marker's `vision.request` `foreground_instance_mask` and its pack's `FJMP` footer the photo's size (a missing photo: a scored failure naming the path) |
+| S2 | H | `set_video {cutout: {subject: "foreground"}}` on a media clip and on a `freeze_frame` still: each answers `set_video: ` and its sentence exactly, `get_project` unchanged |
+| S3 | H | an image clip's `{subject: "foreground"}` reads back all five keys, `{edge: 0.25}` merges, `null` removes the key |
+| S4 | H | one `render_frame` with an image clip's `foreground` cutout answers in 25–45 s (a client bound of 90 s) with "Clip N is drawn uncut: its foreground masks were not ready within 30 s.", its PNG byte-identical to the cutout off |
+| S5 | H | a cut media clip at 0 and a cut image clip at 1 s: `analyze_cutout {clips: [image], wait: 0}` one row `analyzing`, frames 1, covered 0; `analyze_cutout {wait: 0}` the media row then the image row |
+| S6 | H | `text_behind_subject {clip: image, at}` answers `cutout_added: true`, the image's cutout `background: keep` with subject `person` |
+| Z1 | both | no `Frame Job: ` line in either launch's log |
 
-The four mutants are run by hand (each anchor replaced once, the file restored byte-identical by
-SHA-256): M1 `foreground-on-media` (`check_cutout_clip`'s foreground refusal removed), M2
-`image-refused` (`Source::Image` refused again) and M3 `arm-no-subject` (`layer_cutout`'s image
-arm without `subject`), each caught by `cargo test --release --test cutout_image`; M4
-`analyze-image` (`AgentServer+Cutout.swift`'s default-set filter removed), caught by `make
-app-debug && python3 tools/proof/co10_proof.py --only S5`.
+`--mutant NAME` builds a `tree_copy.py` copy with CO10b's decision broken (the proof's
+configuration), runs only the mutant's rows and Z1, and prints CAUGHT (exit 1) or SURVIVED (exit
+0); a control it could not perform exits 2. The tree's own file is hashed by SHA-256 before and
+after. The seven: `foreground-in-masks` (a picture's foreground mask published under the `masks` kind; S1),
+`image-draw-off` (the compositor's image branch returns the placeholder; S1), `frame-wait-no-images`
+(`frameWindows` takes no image layer; S4), `noun-person` (`cutoutSentences` always "person"; S4),
+`analyze-image-refused` (`analyze_cutout` refuses a named image clip again; S5),
+`picture-not-cuttable` (`canCutOut` refuses an image clip; S6) and `subject-ignored` (the
+foreground job runs the person request, whose mask is Vision's own 512 × 384; S1's footer).
+CO10a's four mutants were by hand: M1 `foreground-on-media`, M2 `image-refused` and M3
+`arm-no-subject`, each caught by `cargo test --release --test cutout_image`, and M4
+`analyze-image`, whose S5 row CO10b rewrote.
 
 ```sh
 cd core && cargo test --release --test cutout_image --test schema_v41
-make app-debug && python3 tools/proof/co10_proof.py [--only IDS] [--app PATH]
+make app-debug && python3 tools/proof/co10_proof.py [--only IDS] [--mutant NAME] [--app PATH]
 RC_PROOF_APP=release python3 tools/proof/co10_proof.py
 ```
 
-The recorded runs are in `designs/creator-jobs.md`'s CO10a record.
+The recorded runs are in `designs/creator-jobs.md`'s CO10a and CO10b records.
 
 ## Road map "creator-jobs" TX1b — word starts moved to their sound (`word_onset_proof.py` U0–U10, Z1, O1–O7, C1, C2; nine mutants; `word_onsets.py`; spec §11 TX-15…TX-19)
 

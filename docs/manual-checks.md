@@ -148,6 +148,11 @@ the same way.
 - **Expect:** the camera stays through short breaths between words, fades out in a real pause and is fully back just before you speak again, never cutting off the first word; the fade reads as smooth at the default and as a cut at 0; the teal line on the clip matches what plays.
 - **Source:** road map creator-jobs CO9, spec §11 CO-90, CO-91, CO-95 (`co9_proof.py` scores the gate's numbers on a white camera, never how the fade looks over a real face).
 
+**JOB-66 — A portrait photo's cutout stays on the hair**
+- **Do:** Add a portrait photo of a person with loose hair as an image clip over a contrasting colour, turn on Remove Background with Subject **Person**, and look at the outline at Edge −0.5, 0 and 0.5; then set Subject to **Foreground** and look again at the three Edges.
+- **Expect:** with both subjects the outline stays on the hair and the person — no halo of the old background around the head, no bites out of the hair or shoulders — pulling in at −0.5 and out at 0.5 without jumping; Foreground keeps anything the person holds as well.
+- **Source:** road map creator-jobs CO10b, spec §11 CO-105, CO-107, CO-109 (`co10_proof.py` scores the cut's shares of a 256 × 256 photo, never how its edge looks on hair).
+
 **JOB-51 — Switch by Speaker on a real episode**
 - **Do:** On a real two-person episode of ten minutes or more (S-PC1 when it exists: a camera and a microphone each, and a wide if one was filmed), select every camera and microphone clip, run Clip ▸ Synchronize Audio, then Clip ▸ Switch by Speaker… at the defaults and press Switch. Play the Program track through.
 - **Expect:** each cut lands just before the new speaker's first word; a short reply ("right", "sure") does not cut; the wide shows while both talk at once; no shot ever shows a listener who says nothing during it. Your verdict is spec §11 SW-29.

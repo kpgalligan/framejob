@@ -19,7 +19,8 @@ final class CutoutPack {
 }
 
 /// What the compositor keeps to draw a cutout (road map creator-jobs CO2a2, spec §11 CO-24…CO-27):
-/// the lookup's plan per recipe key, the packs per (cache folder, media), the stamps they are
+/// the lookup's plan per recipe key, the packs per (cache folder, kind, media) — a picture's
+/// `masks` or `foreground` (CO10b, CO-107) — the stamps they are
 /// checked against, which clip windows found a subject, and the masks' textures.
 ///
 /// **A request reads at most one `stat`** per cut-out layer, of the media's marker: the marker,
@@ -44,6 +45,12 @@ final class CutoutMasks {
 
     private struct PackKey: Hashable {
         let folder: String
+        let kind: AnalysisKind
+        let media: UInt32
+    }
+
+    private struct StampKey: Hashable {
+        let kind: AnalysisKind
         let media: UInt32
     }
 
@@ -94,7 +101,7 @@ final class CutoutMasks {
     private let device: MTLDevice
     private var plans: [Int: PlanEntry] = [:]
     private var packs: [PackKey: PackEntry] = [:]
-    private var stamps: [UInt32: StampEntry] = [:]
+    private var stamps: [StampKey: StampEntry] = [:]
     private var founds = LRUCache<FoundKey, FoundEntry>(limit: 256)
     private var textures = LRUCache<TextureKey, TextureEntry>(limit: CutoutMasks.limit)
     private(set) var uploads = 0
@@ -113,24 +120,27 @@ final class CutoutMasks {
         return plan
     }
 
-    /// `media`'s pack in `cacheDir` when its marker answers for the stamp the analysis would
-    /// make over `url` (`urls` names a LUT Camera Log's file) and the pack reads; nil otherwise
-    /// (spec §11 CO-25).
-    func pack(media: MediaSnapshot, url: URL, cacheDir: URL, urls: [UInt32: URL]) -> CutoutPack? {
-        let marker = AnalysisStore.markerURL(.masks, media: media.id, in: cacheDir)
+    /// `media`'s pack of `kind` in `cacheDir` when its marker answers for the stamp the analysis
+    /// would make over `url` (`urls` names a LUT Camera Log's file) and the pack reads; nil
+    /// otherwise (spec §11 CO-25; a picture's `foreground`, CO-107).
+    func pack(
+        kind: AnalysisKind = .masks, media: MediaSnapshot, url: URL, cacheDir: URL,
+        urls: [UInt32: URL]
+    ) -> CutoutPack? {
+        let marker = AnalysisStore.markerURL(kind, media: media.id, in: cacheDir)
         let signature = Self.signature(of: marker)
-        let key = PackKey(folder: cacheDir.standardizedFileURL.path, media: media.id)
+        let key = PackKey(folder: cacheDir.standardizedFileURL.path, kind: kind, media: media.id)
         if let entry = packs[key], entry.signature == signature, entry.url == url,
             entry.media == media
         {
             return entry.pack
         }
         var answer: CutoutPack?
-        if signature != nil, let read = AnalysisStore.readMarker(.masks, media: media.id, in: cacheDir),
-            let stamp = stamp(media: media, url: url, urls: urls), read.answers(for: stamp),
-            let file = read.files.first,
+        if signature != nil, let read = AnalysisStore.readMarker(kind, media: media.id, in: cacheDir),
+            let stamp = stamp(kind: kind, media: media, url: url, urls: urls),
+            read.answers(for: stamp), let file = read.files.first,
             let pack = try? MaskPack(
-                contentsOf: AnalysisStore.payloadURL(.masks, media: media.id, file: file, in: cacheDir)),
+                contentsOf: AnalysisStore.payloadURL(kind, media: media.id, file: file, in: cacheDir)),
             pack.width > 0, pack.height > 0
         {
             answer = CutoutPack(pack: pack, coverage: read.ranges, grid: AnalysisGrid(media: media))
@@ -175,17 +185,20 @@ final class CutoutMasks {
         return texture
     }
 
-    /// The stamp `ProjectDocument.analysisRequest` would make for `media` at `url` — its asset
-    /// read only when the media, its URL or its LUT's URL changed (CO-25).
-    private func stamp(media: MediaSnapshot, url: URL, urls: [UInt32: URL]) -> AnalysisStamp? {
+    /// The stamp of `kind` `ProjectDocument.analysisRequest` would make for `media` at `url` —
+    /// its asset read only when the media, its URL or its LUT's URL changed (CO-25).
+    private func stamp(kind: AnalysisKind, media: MediaSnapshot, url: URL, urls: [UInt32: URL])
+        -> AnalysisStamp?
+    {
         let lut = media.color?.lut.flatMap { urls[$0] }
-        if let entry = stamps[media.id], entry.url == url, entry.lut == lut, entry.media == media {
+        let key = StampKey(kind: kind, media: media.id)
+        if let entry = stamps[key], entry.url == url, entry.lut == lut, entry.media == media {
             return entry.stamp
         }
         let (input, fullRange) = ProjectDocument.analysisInput(media: media, url: url, urls: urls)
         let stamp = AnalysisStamp.make(
-            kind: .masks, media: media, url: url, input: input, fullRange: fullRange)
-        stamps[media.id] = StampEntry(url: url, lut: lut, media: media, stamp: stamp)
+            kind: kind, media: media, url: url, input: input, fullRange: fullRange)
+        stamps[key] = StampEntry(url: url, lut: lut, media: media, stamp: stamp)
         return stamp
     }
 

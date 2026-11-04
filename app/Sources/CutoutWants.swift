@@ -4,14 +4,18 @@ import Foundation
 // a cut-out clip plays, the grid indices CO-24's lookup can ask of each, which open masks jobs a
 // caller shares, and the requests it wants. Names no `rc_*` (CJ-8 (l)): the plan and the snapshot
 // come through `ReelProject`. The document (`ProjectDocument+Masks.swift`), an export and a frame
-// (`Exporter+Masks.swift`) are its three callers.
+// (`Exporter+Masks.swift`) are its three callers. A cut picture's one window, of the kind its
+// subject asks, is windowed apart from the plan's segments (road map creator-jobs CO10b, spec §11
+// CO-106).
 
-/// One window of a cut-out clip, in FORWARD source ticks of its media, `[lower, upper)`.
+/// One window of a cut-out clip, in FORWARD source ticks of its media, `[lower, upper)`, and the
+/// analysis kind its masks are: `masks`, or a foreground picture's `foreground` (CO-106).
 struct CutoutWindow: Equatable {
     let clip: UInt32
     let media: UInt32
     let lower: Ticks
     let upper: Ticks
+    var kind: AnalysisKind = .masks
 }
 
 /// Who wanted a request (the dev log's `role`).
@@ -86,19 +90,59 @@ enum CutoutWants {
         return out
     }
 
+    /// The analysis kind of `clip`'s masks (CO-106): `foreground` exactly when it is an image
+    /// clip whose BASE cutout's subject is `foreground`; else `masks`.
+    static func kind(of clip: ClipSnapshot) -> AnalysisKind {
+        guard case .image = clip.source, clip.video?.cutout?.subject == .foreground else {
+            return .masks
+        }
+        return .foreground
+    }
+
+    /// One window `[0, 1)` of its image per cut picture — an image clip, top-level or nested,
+    /// whose BASE `video.cutout` is set — of the kind `kind(of:)` answers (CO-106). A top-level
+    /// clip is taken when `[start, start + duration)` meets `range` (nil: always); a nested one
+    /// always.
+    static func imageWindows(snapshot: ProjectSnapshot, range: Range<Ticks>?) -> [CutoutWindow] {
+        func taken(_ clip: ClipSnapshot) -> Bool {
+            guard let range else { return true }
+            return clip.start < range.upperBound && range.lowerBound < clip.start + clip.duration
+        }
+        let clips = snapshot.clips.filter(taken) + snapshot.nests.flatMap(\.clips)
+        var out: [CutoutWindow] = []
+        for clip in clips where clip.video?.cutout != nil {
+            guard case .image(let media) = clip.source else { continue }
+            let window = CutoutWindow(
+                clip: clip.id, media: media, lower: 0, upper: 1, kind: kind(of: clip))
+            if !out.contains(window) { out.append(window) }
+        }
+        return out
+    }
+
     /// The windows a frame at `t` draws cut out: the recipe layers with `background` remove, a
     /// media mask and a composition-track source, each through the segment covering `t` (of the
-    /// mask's media), over `[t, t + 1)`.
+    /// mask's media), over `[t, t + 1)`; and the layers with an image mask of their own picture,
+    /// each as `[0, 1)` of the kind its subject asks (CO-106).
     static func frameWindows(project: ReelProject, at t: Ticks, options: RecipeOptions)
         -> [CutoutWindow]
     {
         let layers = project.recipe(at: t, options: options)?.layers ?? []
+        var out: [CutoutWindow] = []
+        for layer in layers {
+            guard let cutout = layer.cutout, cutout.background == .remove,
+                cutout.mask.kind == .image, case .image(let media) = layer.source,
+                media == cutout.mask.media
+            else { continue }
+            let window = CutoutWindow(
+                clip: layer.clip, media: media, lower: 0, upper: 1,
+                kind: cutout.mask.subject == .foreground ? .foreground : .masks)
+            if !out.contains(window) { out.append(window) }
+        }
         let cut = layers.filter {
             $0.cutout?.background == .remove && $0.cutout?.mask.kind == .media
         }
-        guard !cut.isEmpty else { return [] }
+        guard !cut.isEmpty else { return out }
         let plan = CutoutPlan(project: project)
-        var out: [CutoutWindow] = []
         for layer in cut {
             guard let cutout = layer.cutout, case .track(let track) = layer.source,
                 let segment = plan.covering(track: track, at: t), segment.media == cutout.mask.media
@@ -177,13 +221,15 @@ enum CutoutWants {
 
     // MARK: - Requests
 
-    /// What a caller wants: per media with a file and a miss, the `keeping` requests of that media
-    /// plus a new request holding the needed, uncovered indices outside their ranges. A media
-    /// whose stamp cannot be made is a failure named by its first window's clip.
+    /// What a caller wants of `kind`: per media with a file and a miss, the `keeping` requests of
+    /// that media plus a new request holding the needed, uncovered indices outside their ranges.
+    /// A media whose stamp cannot be made is a failure named by its first window's clip. Only
+    /// the windows of `kind` count.
     static func requests(
         windows: [CutoutWindow], snapshot: ProjectSnapshot, urls: [UInt32: URL], cacheDir: URL,
-        keeping: [AnalysisRequest]
+        keeping: [AnalysisRequest], kind: AnalysisKind = .masks
     ) -> (requests: [AnalysisRequest], failures: [CutoutWantFailure]) {
+        let windows = windows.filter { $0.kind == kind }
         let needs = needs(windows: windows, snapshot: snapshot, urls: urls)
         var order: [UInt32] = []
         for window in windows where needs[window.media] != nil && !order.contains(window.media) {
@@ -198,7 +244,7 @@ enum CutoutWants {
             let missing: AnalysisRequest?
             do {
                 missing = try ProjectDocument.analysisRequest(
-                    kind: .masks, media: media, url: url, urls: urls, cacheDir: cacheDir,
+                    kind: kind, media: media, url: url, urls: urls, cacheDir: cacheDir,
                     need: need)
             } catch {
                 let clip = windows.first { $0.media == id }?.clip ?? 0
@@ -215,9 +261,32 @@ enum CutoutWants {
                 missing.ranges.flatMap { AnalysisStore.missingRanges($0, covered: taken) })
             if !rest.isEmpty {
                 requests.append(AnalysisRequest(
-                    kind: .masks, cacheDir: cacheDir, media: missing.media, url: missing.url,
+                    kind: kind, cacheDir: cacheDir, media: missing.media, url: missing.url,
                     stamp: missing.stamp, input: missing.input, ranges: rest))
             }
+        }
+        return (requests, failures)
+    }
+
+    /// What a caller wants of every kind its `windows` hold (CO-106): the keep rule over that
+    /// kind's open requests and `requests`, once per kind present, `masks` first — one list, so
+    /// the caller wants both kinds in one `AnalysisLane.want`, which replaces an owner's set.
+    static func wants(
+        windows: [CutoutWindow], snapshot: ProjectSnapshot, urls: [UInt32: URL], cacheDir: URL
+    ) -> (requests: [AnalysisRequest], failures: [CutoutWantFailure]) {
+        var requests: [AnalysisRequest] = []
+        var failures: [CutoutWantFailure] = []
+        for kind in [AnalysisKind.masks, .foreground] {
+            let windows = windows.filter { $0.kind == kind }
+            guard !windows.isEmpty else { continue }
+            let kept = Self.kept(
+                previous: AnalysisLane.shared.openRequests(kind: kind, cacheDir: cacheDir),
+                need: needs(windows: windows, snapshot: snapshot, urls: urls), state: state)
+            let made = Self.requests(
+                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir,
+                keeping: kept, kind: kind)
+            requests += made.requests
+            failures += made.failures
         }
         return (requests, failures)
     }

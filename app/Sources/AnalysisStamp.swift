@@ -24,6 +24,14 @@ enum AnalysisKind: String, Codable, CaseIterable {
     /// (spec §11 VR-10, VR-11; road map VR1): `AnalysisSubjects`, on its own
     /// sample grid.
     case subjects
+    /// A picture's foreground instance mask (spec §11 CO-105; road map CO10b):
+    /// `AnalysisMasks.runImage`, one frame per image media, the `masks`
+    /// pack's layout. Never a movie's.
+    case foreground
+
+    /// The kinds `get_media_analysis` lists and accepts: every kind but
+    /// `foreground`, which is a picture's and `analyze_cutout`'s (CO-105).
+    static let mediaAnalysisKinds: [AnalysisKind] = allCases.filter { $0 != .foreground }
 
     /// The kind's version: a change to what it stores bumps it, and every
     /// marker of the old version is a miss (Vision request revisions go in
@@ -35,13 +43,14 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .faces: return 1
         case .soundEvents: return SoundEvents.tableVersion
         case .subjects: return 1
+        case .foreground: return 1
         }
     }
 
     /// Whether the kind decodes sound (the sound queue) rather than pictures.
     var usesSoundQueue: Bool {
         switch self {
-        case .shots, .masks, .faces, .subjects: return false
+        case .shots, .masks, .faces, .subjects, .foreground: return false
         case .soundEvents: return true
         }
     }
@@ -57,6 +66,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .faces: return AnalysisFaces.device
         case .soundEvents: return SoundEvents.device
         case .subjects: return AnalysisSubjects.device
+        case .foreground: return AnalysisMasks.foregroundDevice
         }
     }
 
@@ -69,6 +79,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .faces: return AnalysisFaces.parameters
         case .soundEvents: return SoundEvents.parameters
         case .subjects: return AnalysisSubjects.parameters
+        case .foreground: return AnalysisMasks.foregroundParameters
         }
     }
 
@@ -76,7 +87,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var margin: Int {
         switch self {
         case .shots: return AnalysisShots.margin
-        case .masks, .faces, .soundEvents, .subjects: return 0
+        case .masks, .faces, .soundEvents, .subjects, .foreground: return 0
         }
     }
 
@@ -84,7 +95,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     var files: [String] {
         switch self {
         case .shots: return [AnalysisShots.payloadName]
-        case .masks: return [MaskPack.fileName]
+        case .masks, .foreground: return [MaskPack.fileName]
         case .faces: return [AnalysisFaces.payloadName]
         case .soundEvents: return [SoundEvents.payloadName]
         case .subjects: return [AnalysisSubjects.payloadName]
@@ -99,6 +110,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
         case .masks: return AnalysisMasks.vision
         case .faces: return AnalysisFaces.vision
         case .subjects: return AnalysisSubjects.vision
+        case .foreground: return AnalysisMasks.foregroundVision
         }
     }
 
@@ -108,7 +120,7 @@ enum AnalysisKind: String, Codable, CaseIterable {
     /// its own, `AnalysisSubjects.rate` (VR-11).
     func grid(of media: MediaSnapshot) -> AnalysisGrid {
         switch self {
-        case .shots, .masks: return AnalysisGrid(media: media)
+        case .shots, .masks, .foreground: return AnalysisGrid(media: media)
         case .faces:
             return AnalysisGrid(samplesPerSecond: AnalysisFaces.rate, duration: media.duration)
         case .soundEvents:

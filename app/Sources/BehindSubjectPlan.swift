@@ -8,8 +8,9 @@ import Foundation
 /// (`AgentServer+BehindSubject.swift`) — and both are top-level only.
 ///
 /// - **Candidates at `at`:** top-level clips playing at `at` (start ≤ at <
-///   end) that `CutoutStatus.canCutOut`, with their video on, on a track
-///   neither hidden nor a matte track.
+///   end) that `CutoutStatus.canCutOut` — of a video file, or a picture
+///   (spec §11 CO-108) — with their video on, on a track neither hidden nor
+///   a matte track.
 /// - **The pick:** the named clip; else the front-most selected candidate;
 ///   else the front-most candidate with a base cutout; else the front-most.
 /// - **The track:** a new "Behind Subject" track directly above the clip's
@@ -19,8 +20,9 @@ import Foundation
 /// - **The ops:** `add_track`, `add_text_clip` (the Title preset) at `at`
 ///   for min(4 s, the clip's rest), `set_video {behind_subject: true}` on the
 ///   title and, only when the clip has no base cutout, `set_video {cutout:
-///   {background: keep}}` on it. A new track's id is `next_id` from before
-///   the op, the title's the one after it (`generatedClipOps`' contract).
+///   {background: keep}}` on it (a person's, a picture's too). A new track's
+///   id is `next_id` from before the op, the title's the one after it
+///   (`generatedClipOps`' contract).
 enum BehindSubjectPlan {
     /// The undo step's name, both doors'.
     static let actionName = "Text Behind Subject"
@@ -53,12 +55,12 @@ enum BehindSubjectPlan {
         var sentence: String {
             switch self {
             case .noClip(let at):
-                return "No clip of a video file plays at \(at) on a shown track that is not a "
-                    + "matte track, so there is no one to put the title behind."
+                return "No clip of a video file or picture plays at \(at) on a shown track that "
+                    + "is not a matte track, so there is no one to put the title behind."
             case .cannotHold(let id):
                 return "Clip \(id) cannot have a title put behind its subject: it must be a "
-                    + "clip of a video file on the timeline, on a shown track that is not a "
-                    + "matte track."
+                    + "clip of a video file or a picture on the timeline, on a shown track that "
+                    + "is not a matte track."
             case .notAt(let id, let at):
                 return "Clip \(id) does not play at \(at): pass an at inside it."
             }

@@ -7227,6 +7227,78 @@ at integration.
 **Owed.** CO10b (CO-102), in its own pipeline after this lands. Nothing filed: CO10b is planned
 work, not residue.
 
+#### CO10b's record (2026-11-04)
+
+**Landed.** Lane C, base `9d89c0b4` (I's HEAD, CO8). CO-105…CO-109 were written in the lane as
+a new `designs/spec/11-decisions/creator-jobs-12.md`, with their index rows, in their own commit
+before the code; VR5b had made that file meanwhile, so at integration they are appended to it
+after VR5b's entries and the file's index row names both; their
+"Amendments recorded by CO10b" amend CO-22 (a), (e), (f), CO-24, CO-30 (a), (c), CO-31 (a), (b),
+CO-53's sentences, CO-102, CO-103 (lifted) and CO-104's S4 and S5. The owner's answer of
+2026-11-01 — pictures in this road map, built last in CO — stands (CO-102). No core, FFI, header,
+op, tool-count or format change (format 43, 124 product tools); nothing is keyed (CJ-3).
+
+| File | Lines | What |
+|---|---|---|
+| `app/Sources/AnalysisMasks+Image.swift` (new) | 140 | `runImage`: one decode (`MediaImporter.decodeImage` at `maxTextureSide`), the person request or `VNGenerateForegroundInstanceMaskRequest` rev 1 on a `cgImage` handler, pinned and refused on another device (`ForegroundMaskError.device`), the scaled mask stored as bytes, one frame published; the `foreground` kind's device, vision stamp and parameters |
+| `AnalysisStamp.swift` · `AnalysisLane.swift` · `ProjectDocument+Analysis.swift` | 270 · 402 · 96 | `AnalysisKind.foreground` and its arms, `mediaAnalysisKinds`; `.masks` on an image and `.foreground` run `runImage`; `analysisInput` `(nil, false)` for a non-video |
+| `CutoutWants.swift` · `ProjectDocument+Masks.swift` · `Exporter+Masks.swift` · `ExporterErrors.swift` | 321 · 96 · 188 · 166 | `CutoutWindow.kind`, `kind(of:)`, `imageWindows`, the image arm of `frameWindows`, `requests(…kind:)`, `wants`; the document's want adds the image windows; the waits kind by kind, keyed by (kind, media), `cutoutFailed(…foreground:)`, `cutoutSentences(_:foreground:)` |
+| `CutoutMasks.swift` · `Compositor+Cutout.swift` · `EditorViewController+Cutout.swift` · `CutoutStatus+Memo.swift` | 213 · 86 · — · — | packs and stamps keyed by kind; `imageCutoutMask`; both publish filters take `foreground` |
+| `CutoutStatus.swift` · `VideoPane+Cutout.swift` · `ClipPane.swift` | 402 · 168 · — | `canCutOut` on pictures, frames 1, `noSubject`, the foreground error noun, `Detail.kind`; `allPictures` and the Subject row; `cutout-image` |
+| `AgentServer+Cutout.swift` · `BehindSubjectPlan.swift` · the catalogs (`+Cutout`, `+VideoPatch`, `+BehindSubject`, `+Render`, `+Analysis`) · `AgentServer+Render.swift` · `AgentServer+Analysis.swift` · `AgentServer+AnalysisJob.swift` · `EditorViewController+SaveFrame.swift` · `SubjectsOverlay.swift` · `CutoutProps.swift` | — | CO-103's refusals gone, `no_subject`; the picture sentences; the descriptions (CO-108); `get_media_analysis` over `mediaAnalysisKinds`; `mask_wants`' `kind`; Save Frame's noun through an `UncutFrameNote` (the inventory's two anchored call lines kept); comments |
+| `tools/proof/co10_proof.py` · `co5_probe.swift` · `screens.py` · `designs/screens/05k-clip-background-picture.md` | 610 · — · — · new | S1–S6 and Z1 over two launches and `--mutant`; P1's two sentences; the `cutout_picture` fixture and its screen |
+
+- **Deviations from the spec.** (1) The `foreground-in-masks` mutant first broke
+  `CutoutWants.kind(of:)` (always `masks`) and SURVIVED: S1b's `render_frame` waits for the frame's
+  masks by the recipe's own subject (`frameWindows`), which made the foreground mask anyway, and
+  `analyze_cutout` then read S1a's person pack. The mutant now does what its name says — the
+  foreground job publishes under the `masks` kind — and is caught (a measured finding of the
+  instrument, not a defect: the document's want of a foreground picture is not separately
+  observed by any row). (2) The screen's `expect` reads the Subject row's label, not "Foreground":
+  `snapshot_ui`'s layout dump carries no popup title. (3) With no observation, a person mask's
+  all-zero size is the decoded picture's, since Vision's own size is unknown then.
+
+**Measured.**
+
+- `make typecheck` exit 0 with exactly the 4 baseline warnings; `swift_build.py typecheck` of
+  `co5_probe.swift`, `co2b_probe.swift`, `co3_probe.swift` each exit 0 (one at a time: together
+  they are not one program); `spec_index_proof.py` 273/273; `name_residue.py` exit 0.
+- Debug: `co10_proof.py` 7/7 (S4's call 30.0 s); `co5_proof.py --only P1` 1/1; `co3_proof.py`
+  10/10; `co2b_proof.py` 14/14 (its W3 30.2 s); `screens.py --only 05k-clip-background-picture`
+  6 pass, 0 new problems.
+- `make gate`: PASS 502 s (names 1, typecheck 8, fmt 3, lint 17, test 291, app 181).
+- `RC_PROOF_APP=release co10_proof.py`: 7/7. S4's call 30.1 s; S1a 0.7939 green and 0.1630 kept,
+  its `masks` pack 512 × 384 (Vision's own size); S1b 0.7143 green and 0.2769 kept, the
+  `foreground` pack 256 × 256 (the photo's); Z1 empty in both logs.
+- Mutants, each once on the final instrument through `--mutant` (Debug tree copies, the tree's
+  files unchanged by SHA-256 every time), all CAUGHT: `foreground-in-masks` (S1b: analysing,
+  no green, no marker, no pack), `image-draw-off` (S1a and S1b 0 green), `frame-wait-no-images`
+  (S4 0.0 s, no sentence), `noun-person` (S4 the person sentence), `analyze-image-refused` (S5 the
+  refusal), `picture-not-cuttable` (S6 the refusal) and `subject-ignored` (S1b's footer 512 × 384).
+- At integration, the phase's three commits (`8f53487d`, `83f2219f`, `5c6426e5`) cherry-picked
+  onto VR5b; three conflicts, all in the spec's indexes: `creator-jobs-12.md` (add/add, resolved
+  by appending CO10b's section after VR5b's), its row in `11-decisions/README.md` (Lines 304, the
+  summary naming both phases) and the `11-decisions/` total in `designs/spec/README.md`
+  (23405 in 46 files); `spec_index_proof.py` 276/276. Format 43 stood. `make gate` PASS 369 s
+  (names 1, typecheck 8, fmt and lint skipped, test 173, app 187); `RC_PROOF_APP=release
+  co10_proof.py` 7/7 again on the integrated tree (S4's call 30.1 s, S1a 0.7939 green, S1b
+  0.7143, Z1 empty in both logs).
+
+**Review.** One round (`9d89c0b4..5c6426e5`): every Files and Approach item done, pass, with two
+nits. (1) No row catches `CutoutWants.kind(of:)` answering `masks` for a foreground picture (the
+first `foreground-in-masks` form, which survived; deviation 1): an export would then wait for
+the person pack while the compositor draws the foreground one, and no row exports a picture —
+optional, recorded here as the instrument's known blind spot. (2) `analysis_job`'s re-wrapped
+description left a stray `+ "job a dev "` fragment — re-flowed at integration, the string
+unchanged. The `CLAUDE.md` edits the notes owed (`app/CLAUDE.md`'s analysis and cutout entry:
+`AnalysisMasks+Image.swift` and a picture's masks, `imageWindows` / `kind(of:)` / `wants`, the
+`foreground` publish, `noSubject` and pictures in `CutoutStatus`, `analyze_cutout` with CO-103
+lifted, Behind Subject's sentences; the editor's `+Cutout` entry; the Background section's
+Subject row; `RecipeCutoutMaskKind.image` drawn) were applied at integration.
+
+**Owed.** JOB-66 (a person's look at a portrait photo's cutout on hair, both subjects, three
+Edges). Nothing filed.
+
 ### TX8 — CJ-5's closing trial run
 
 - **What a person gets:** a recorded verdict on whether the tab does a real edit, and the residue as

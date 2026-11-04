@@ -70,9 +70,11 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import time
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -376,6 +378,8 @@ FIXTURES = {
                  "clips": ["tone"], "media": ["toneA.m4a"], "sound": ["tone"]},
     "cutout": {"path": os.path.join(FIXTURE_DIR, "Cutout.framejob"),
                "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
+    "cutout_picture": {"path": os.path.join(FIXTURE_DIR, "CutoutPicture.framejob"),
+                       "clips": ["picture"]},
     "layout": {"path": os.path.join(FIXTURE_DIR, "Layout.framejob"),
                "clips": ["screen", "camera"], "media": ["speech.mov"],
                "sound": ["screen", "camera"]},
@@ -546,6 +550,8 @@ def build_fixture(mcp, name):
             ids = _cutout_ops(mcp, path)
         elif name == "layout":
             ids = _layout_ops(mcp, path)
+        elif name == "cutout_picture":
+            ids = _cutout_picture_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -764,6 +770,46 @@ def _cutout_ops(mcp, path):
         raise FixtureError(f"building cutout: the project holds {len(clips)} clips, not 1")
     ids = {"video": clips[0]["id"]}
     _call(mcp, "set_video", path, clips=[ids["video"]], patch={"cutout": {}})
+    return ids
+
+
+def _picture_png(path, width=320, height=180):
+    """A `width` × `height` 8-bit RGB PNG at `path`: a red-to-blue ramp across, green down,
+    written with `zlib` and `struct`."""
+    rows = b"".join(
+        b"\x00" + bytes(v for x in range(width)
+                        for v in (x * 255 // (width - 1), y * 255 // (height - 1),
+                                  255 - x * 255 // (width - 1)))
+        for y in range(height))
+
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    with open(path, "wb") as handle:
+        handle.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header)
+                     + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def _cutout_picture_ops(mcp, path):
+    """Road map "creator-jobs" CO10b (spec §11 CO-108): one track, "Picture", holding a
+    320 × 180 RGB PNG written into `FIXTURE_DIR`, with Remove Background on and its subject
+    the foreground (`set_video {cutout: {subject: "foreground"}}`) — the Background section's
+    Subject pop-up and its Status, which reads "Analyzing 0 %" under the launches' analysis
+    hold (05k)."""
+    picture = os.path.join(FIXTURE_DIR, "picture.png")
+    _picture_png(picture)
+    _call(mcp, "set_track", path, track=1, name="Picture")
+    image = _call(mcp, "import_media", path, path=picture)
+    _call(mcp, "add_clip", path, media=_media_id(image), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(
+            f"building cutout_picture: the project holds {len(clips)} clips, not 1")
+    ids = {"picture": clips[0]["id"]}
+    _call(mcp, "set_video", path, clips=[ids["picture"]],
+          patch={"cutout": {"subject": "foreground"}})
     return ids
 
 

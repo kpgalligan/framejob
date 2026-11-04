@@ -156,3 +156,149 @@ camera's crop has no room on — left and right in Stacked, top and bottom in Si
 as the focus (VR-53 (b)), so a 2 px move of one edge re-centres the solve by 1 px and leaves
 each edge 1 px off, inside `RECOGNISE_PX`: such an end is re-laid as a CO-70 focus — a recorded
 limit of the tolerance, not a refusal.
+
+## CO10b — Remove Background and Behind Subject on pictures (2026-11-04)
+
+Recorded before the code. CO10b is the second half of CO10's split (CO-102): CO10a settled the
+model, the recipe's image arm and the mirror (CO-100…CO-104, `creator-jobs-5.md`); this phase makes
+an image clip's masks, waits for them, draws them, and lets the UI and the tools treat pictures as
+cut-out clips. The owner's answer of 2026-11-01 for CO10 stands: pictures are in this road map,
+built last in CO. No core, FFI, header, op, tool-count or format change: format 43 stands, there
+are 124 product tools, and nothing is sent anywhere, so nothing is keyed (CJ-3).
+
+- **CO-105 — A picture's masks.** One mask per image media and subject kind, in CJ-22's store: the
+  `masks` kind for `person` (`AnalysisMasks.vision` and `parameters` unchanged — a media id is
+  either a movie or an image, so the two never share a marker) and a new kind `foreground`
+  (`cache/analysis/foreground/<media>.json` and `/masks.pack`, version 1, the picture queue, margin
+  0, files `[masks.pack]`, grid `AnalysisGrid(media:)`) for `foreground`. Its stamp's `vision` is
+  `{request: "foreground_instance_mask", quality: "none", revision: 1, rate: "one", read_size:
+  "image"}`, its device the one a fresh request pinned to the GPU reads back
+  (`AnalysisMasks.foregroundDevice`), and its parameters `request`, `revision`, `output`
+  `scaled_one_component_8`, `rate` `one`, `read_size` `image_8192`, `found` (as `masks`),
+  `compression` `lzfse` and `pack_version`. The job (`AnalysisMasks.runImage`,
+  `AnalysisMasks+Image.swift`) decodes the file through `MediaImporter.decodeImage(url,
+  maxPixelSize: LayerRenderers.maxTextureSide)`, the decode every `LayerRenderers.image` arm
+  draws from, upright; a nil decode throws "the picture could not be decoded". Progress is 0, then
+  1 after Vision; a cancel before Vision answers false. Each request is fresh and pinned, performed
+  on `VNImageRequestHandler(cgImage:options: [:])`, and refused when its device is not the
+  stamp's: `MaskError.device` for person, `ForegroundMaskError.device` ("the foreground mask
+  request ran on <named>, not <foregroundDevice>") for foreground.
+  - Person: `VNGeneratePersonSegmentationRequest` `.balanced`, revision 1, 8-bit, at Vision's own
+    size.
+  - Foreground: `VNGenerateForegroundInstanceMaskRequest` revision 1, its observation's
+    `generateScaledMaskForImage(forInstances: allInstances, from:)` at the read size (the decoded
+    picture's), each float stored as `UInt8(clamp((v·255).rounded(), 0, 255))`.
+  - No observation, or no instance: an all-zero mask at the read size (for person, with no
+    observation, the decoded picture's size).
+  - The mask is LZFSE'd, `found` is `MaskPack.found`, and the pack holds one frame `(pts 0,
+    index 0, slot 0)`, published through `AnalysisStore.publishFile(kind: request.kind, covered:
+    [0...0], files: [masks.pack])`.
+  - `analysisInput` answers `(nil, false)` for a media that is not a video, with no asset made:
+    a picture is read direct.
+  - `get_media_analysis` lists and accepts the kinds of `AnalysisKind.mediaAnalysisKinds` only
+    (every kind but `foreground`), in its `kind` enum and its check; an image is still refused
+    there ("no moving picture"). A picture's masks are `analyze_cutout`'s.
+- **CO-106 — The wants.** A cut image clip, top-level or nested, whose BASE cutout is set gets one
+  window `[0, 1)` of its image (`CutoutWants.imageWindows`), its kind `CutoutWants.kind(of:)` —
+  `foreground` exactly when the clip's source is an image and its base cutout's subject is
+  `foreground`, else `masks`. Its need is `0...0`.
+  - Top-level clips are taken when `[start, start + duration)` meets the range (none: always);
+    nested ones are always taken.
+  - `frameWindows` adds the recipe layers with `background` remove, `mask.kind` image and source
+    `.image(mask.media)`, as `(layer.clip, media, 0, 1, kind)`, the kind from the mask's subject.
+  - `CutoutWants.wants` runs the keep rule and `requests` once per kind present (`masks` first),
+    each over `AnalysisLane.openRequests(kind:)`. Its three callers — the document's one owner
+    (`ensureMasks()`, which adds the image windows), the export (`waitForMasks`) and the frame
+    (`waitForFrameMasks`) — want both kinds in one `want`, since `want` replaces an owner's set.
+  - The export's and the frame's waits go kind by kind: stamps and the uncovered set are keyed by
+    (kind, media), and every `cutoutFailed` names the failing window's clip and, from its kind,
+    `foreground:` — "Clip N's foreground masks could not be made: <why>." for a foreground
+    window, the person sentence byte for byte otherwise.
+  - `render_frame`'s uncut sentence for a foreground picture is "Clip N is drawn uncut: its
+    foreground masks were not ready within 30 s."; every other clip keeps its sentence. Save
+    Frame's sheet reads "<names> drawn whole: the <noun> were not ready within 30 seconds.", the
+    noun "person masks" when no uncut clip is a foreground picture, "foreground masks" when every
+    one is, and "masks" otherwise.
+  - `analysis_job`'s `mask_wants` rows carry `kind`.
+- **CO-107 — The draw.** `cutoutMask`'s `.image` branch requires `background` remove, `mask.kind`
+  image, a layer source `.image(m)` with `m == mask.media`, a project, a cache folder and a URL.
+  It looks up `CutoutMasks.pack(kind: subject == foreground ? .foreground : .masks, …)` — the
+  packs and the stamp memo keyed by kind too — then `found(pack, clip: layer.clip, window:
+  0...1)` and `CutoutLookup.slot(… sourceTick: 0, pivot: nil)`, and binds the mask at
+  `texture(4)` with the media branch's uniforms. The shader is unchanged: the mask is in display
+  orientation, as the decode is. A publish of either kind refreshes the paused frame
+  (`EditorViewController+Cutout`) and the Background section's Memo. The media branch and
+  `CutoutLookup` are unchanged.
+- **CO-108 — The UI and the tools.**
+  - `CutoutStatus.canCutOut` takes an `.image` clip of a media whose kind is `image`, so Clip ▸
+    Remove Background, the Background section and Behind Subject's candidates take pictures.
+  - Status: an image's frames are 1, its windows `imageWindows`'. A found-false pack answers
+    `no_person` for person and the new `CutoutState.noSubject` ("No subject found";
+    `analyze_cutout`'s `no_subject`) for foreground; a failure's sentence names "foreground
+    masks" for a foreground picture. `Detail` carries its kind; `ownerRequests` and `stamp` take
+    it.
+  - The Background section gets **Subject** (Person, Foreground) right after its checkbox, shown
+    only when every selected clip is a picture (`allPictures`) and enabled while `allCutOut`. It
+    writes per clip `VideoPatch(cutout: .some(the base cutout with that subject))` through
+    `binding.ops(video:for:)`, so the write lands on the base and the row is ⊘ inside an action,
+    as the checkbox is; it reads mixed when the base subjects differ; undo name "Cutout Subject".
+    `ClipPane.structureSignature`'s cutout cell is `cutout-image` when `allPictures`. Analyze
+    Now's tooltip reads "Make this clip's masks now, again after a failure".
+  - `analyze_cutout` drops CO-103: a named image clip is answered, and the default set is every
+    cut clip of the open scope in timeline order.
+  - Descriptions: `set_video`'s `cutout` drops "kept but not drawn yet" and says an image's masks
+    are made from its picture (person segmentation, or for `foreground` the foreground instance
+    mask) as soon as it is set, with `analyze_cutout` answering where they stand;
+    `analyze_cutout` adds pictures, `no_subject` and a picture's one frame; `text_behind_subject`
+    says "a clip of a video file or a picture"; `render_frame` says "A clip with set_video cutout
+    waits up to 30 s for its masks (a picture with subject foreground, its foreground masks; any
+    other, its person masks); past that …".
+  - Behind Subject's two sentences: "No clip of a video file or picture plays at T on a shown
+    track that is not a matte track, so there is no one to put the title behind." and "Clip N
+    cannot have a title put behind its subject: it must be a clip of a video file or a picture on
+    the timeline, on a shown track that is not a matte track." A planned cutout stays
+    `{background: keep}` (person) on a picture too.
+- **CO-109 — CO10b's proof, its mutants and JOB-66.** `co10_proof.py` over two launches. Launch
+  H (`-RCDevAnalysisHold 3600`): S2 and S3 as CO-104; S4 one `render_frame` with a `foreground`
+  image cutout answers in 25–45 s with that clip's foreground uncut sentence, its PNG byte-equal
+  to the cutout-off PNG; S5 `analyze_cutout {clips: [image], wait: 0}` answers a row `analyzing`,
+  frames 1, covered 0, and `{wait: 0}` the media and image rows in timeline order; S6
+  `text_behind_subject {clip: image, at}` answers `cutout_added: true` and the image's cutout reads
+  `background: keep`. Launch U (no hold): S1 a copy of `cutout_spike.FLEX` as `person.jpg` (missing:
+  a scored failure naming the path) on a canvas of its own size with background `[0, 1, 0, 1]`;
+  uncut, under 1 % green (r ≤ 2, g ≥ 253, b ≤ 2); S1a `{cutout: {}}` — `analyze_cutout {wait: 60}`
+  `ready`, frames 1, covered 1, `subject_found` true, the render ≥ 20 % green and ≥ 1 % of its
+  pixels not green and within ±2 of the uncut render; S1b `{subject: "foreground"}` the same, and
+  `cache/analysis/foreground/<m>.json`'s stamp `vision.request` `foreground_instance_mask` and
+  its pack's `FJMP` footer the media's width × height. Z1: both logs free of `Frame Job: `. Seven
+  mutants, each once on the final instrument, files restored by SHA-256: `foreground-in-masks`
+  (S1b), `image-draw-off` (S1a), `frame-wait-no-images` (S4), `noun-person` (S4),
+  `analyze-image-refused` (S5), `picture-not-cuttable` (S6) and `subject-ignored` (the foreground
+  job runs the person request; S1b's footer). **JOB-66** — a portrait photo's cutout on hair:
+  Remove Background with Person, then Foreground, at Edge −0.5, 0 and 0.5; the outline stays on
+  the hair and the person.
+
+### Amendments recorded by CO10b
+
+- **CO-22** (a) the windows add a cut picture's one window `[0, 1)` (CO-106); (e) the export's
+  wait covers both kinds and names a foreground window's failure in its own sentence; (f) the
+  frame's wait and its sentences take a picture's foreground masks, and Save Frame's noun follows
+  the uncut clips' kinds.
+- **CO-24** — an image layer's mask is the pack's one frame at source tick 0, with no pivot.
+- **CO-30** (a) a picture can be cut out; (c) the Status's words add "No subject found", and the
+  section adds the Subject row for pictures.
+- **CO-31** (a) a picture's frames are 1 and its found-false foreground state is `no_subject`;
+  (b) the named-image refusal and the default set's exclusion are gone.
+- **CO-53** — the two refusal sentences name "a video file or picture" / "a clip of a video file
+  or a picture".
+- **CO-102** — an image clip's cutout is drawn now; the "drawn uncut" half is CO10a's history.
+- **CO-103** — lifted, both refusals.
+- **CO-104** — S4 and S5 are rewritten by CO-109 (an image's cutout now waits and is analysed).
+
+### Deviations
+
+- The road map's S1 used "a pencils still" for `foreground`; no pencils still exists in the tree,
+  so S1 uses the one person photo (`cutout_spike.FLEX`) for both subjects.
+- The road map named the manual check JOB-65; JOB-65 is CO9's since, so this one is **JOB-66**.
+- S4 is rewritten: CO10a's "equal to off, each call under 10 s" no longer holds for a cut picture,
+  which now waits for its masks.

@@ -208,7 +208,7 @@ extension EditorViewController {
             } else {
                 result = .failure(SaveFrameError.noFrame)
             }
-            let uncut = Self.uncutNames(rendered.uncut, in: project.snapshot)
+            let uncut = Self.uncutNote(rendered.uncut, in: project.snapshot)
             DispatchQueue.main.async { self?.frameSaved(result, in: window, uncut: uncut) }
         }
     }
@@ -220,7 +220,9 @@ extension EditorViewController {
     /// window that asked. The whole path mutates nothing, so there is no undo
     /// step to group and none of `performGroupedEdit`'s off-event machinery
     /// applies.
-    func frameSaved(_ result: Result<URL, Error>, in window: NSWindow, uncut: [String] = []) {
+    func frameSaved(
+        _ result: Result<URL, Error>, in window: NSWindow, uncut: UncutFrameNote = UncutFrameNote()
+    ) {
         guard case .failure(let error) = result else {
             if !uncut.isEmpty { showUncutFrameNote(uncut, in: window) }
             return
@@ -229,28 +231,43 @@ extension EditorViewController {
         alert.beginSheetModal(for: window, completionHandler: nil)
     }
 
+    /// What the sheet after a save that drew cut-out clips whole says (CO-22 (f)): the uncut
+    /// clips' media file names, and the noun of their masks (CO-106).
+    struct UncutFrameNote {
+        var names: [String] = []
+        var noun = "person masks"
+        var isEmpty: Bool { names.isEmpty }
+    }
+
     /// The sheet after a save that drew cut-out clips whole (CO-22 (f)).
-    private func showUncutFrameNote(_ names: [String], in window: NSWindow) {
+    private func showUncutFrameNote(_ note: UncutFrameNote, in window: NSWindow) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "Saved without Remove Background"
-        alert.informativeText = names.joined(separator: ", ")
-            + " drawn whole: the person masks were not ready within 30 seconds."
+        alert.informativeText = note.names.joined(separator: ", ")
+            + " drawn whole: the \(note.noun) were not ready within 30 seconds."
         alert.beginSheetModal(for: window, completionHandler: nil)
     }
 
-    /// The uncut clips' names for the sheet: each one's media file name, in
-    /// order, each once.
-    private static func uncutNames(_ clips: [UInt32], in snapshot: ProjectSnapshot) -> [String] {
+    /// The uncut clips' names for the sheet — each one's media file name, in order, each once —
+    /// and the noun: "person masks" when no uncut clip is a foreground picture, "foreground
+    /// masks" when every one is, "masks" otherwise (`CutoutWants.kind(of:)`, CO-106).
+    private static func uncutNote(_ clips: [UInt32], in snapshot: ProjectSnapshot)
+        -> UncutFrameNote
+    {
         let all = snapshot.clips + snapshot.nests.flatMap(\.clips)
-        var names: [String] = []
+        var note = UncutFrameNote()
+        var foreground = 0, uncut = 0
         for id in clips {
-            guard let clip = all.first(where: { $0.id == id }),
-                let name = snapshot.media(for: clip)?.name, !names.contains(name)
+            guard let clip = all.first(where: { $0.id == id }) else { continue }
+            uncut += 1
+            if CutoutWants.kind(of: clip) == .foreground { foreground += 1 }
+            guard let name = snapshot.media(for: clip)?.name, !note.names.contains(name)
             else { continue }
-            names.append(name)
+            note.names.append(name)
         }
-        return names
+        if foreground > 0 { note.noun = foreground == uncut ? "foreground masks" : "masks" }
+        return note
     }
 
     // MARK: - Validation

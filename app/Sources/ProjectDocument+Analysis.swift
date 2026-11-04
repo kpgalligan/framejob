@@ -78,10 +78,12 @@ extension ProjectDocument {
 
     /// The converted reader's input (CJ-23, CJ-S3 (c)): the media's converting
     /// Camera Log or PQ peak, else its track's HLG or PQ transfer; nil reads
-    /// direct. `fullRange` as a converted filmstrip records it.
+    /// direct. `fullRange` as a converted filmstrip records it. A media that is not a video —
+    /// a picture's masks (spec §11 CO-105) — reads direct, with no asset made.
     nonisolated static func analysisInput(
         media: MediaSnapshot, url: URL, urls: [UInt32: URL]
     ) -> (input: ThumbnailInput?, fullRange: Bool) {
+        guard media.kind == .video else { return (nil, false) }
         var assets: [UInt32: AVURLAsset] = [:]
         let track = CompositionBuilder.assetTrack(
             at: url, key: media.id, mediaType: .video, assets: &assets)

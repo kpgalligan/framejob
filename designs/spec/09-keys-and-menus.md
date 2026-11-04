@@ -202,7 +202,7 @@ are any, then None — §11 GR-8 [b]; a LUT item is named by its file less
 on one only some carry; for the selected clips that take a grade, off when
 none do; no key equivalent; undo "Look"; §11 GR-7), Remove Background (road map
 creator-jobs CO3, §11 CO-30 (e): enabled when the selection in the open scope holds a media
-or still clip of a video file with pictures; checked when every such clip has Remove
+or still clip of a video file with pictures, or an image clip (CO10b, §11 CO-108); checked when every such clip has Remove
 Background on, a dash when some do; all on turns every one off, otherwise the ones without
 it on, each clip's own values kept; one undo step "Remove Background"; no key equivalent, the
 owner's answer; its mirrors are `set_video`'s `cutout` and `analyze_cutout`), Camera Layout ▸
@@ -311,7 +311,7 @@ there is nothing to cover (no range, no selection and an empty timeline);
 Road map creator-jobs CO5 puts **Text Behind Subject** last in Insert, with no
 key equivalent: a title (the Title preset) on a new "Behind Subject" track
 directly above the cut-out clip at the playhead — the front-most selected clip
-of a video file there, else the front-most with Remove Background, else the
+of a video file or picture there, else the front-most with Remove Background, else the
 front-most, on a shown track that is not a matte track — and above any matte
 tracks in front of it, at the playhead for 4 s or the clip's rest, already
 behind the person; a clip with no cutout is given one that keeps its

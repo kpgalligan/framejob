@@ -353,6 +353,11 @@ final class AnalysisLane: @unchecked Sendable {
                 finished = try AnalysisShots.run(
                     request, cancelled: cancelled,
                     progress: { [self] fraction in setProgress(fraction, of: request) })
+            case .masks where request.media.kind == .image, .foreground:
+                // A picture's one mask, by its subject's kind (spec §11 CO-105).
+                finished = try AnalysisMasks.runImage(
+                    request, cancelled: cancelled,
+                    progress: { [self] fraction in setProgress(fraction, of: request) })
             case .masks:
                 finished = try AnalysisMasks.run(
                     request, cancelled: cancelled,

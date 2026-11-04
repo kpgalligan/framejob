@@ -5,14 +5,26 @@ import AppKit
 /// clip's — a base `set_video` whatever is selected, so inside an action they are ⊘ — and
 /// Background, Edge and Feather write a sparse `cutoutPart`, which an action animates (an end
 /// gets only the row's own key). Status reads the pane's `CutoutStatus.Memo`; Analyze Now asks
-/// the editor's `analyzeCutoutNow` (the wants made again, then a failed run retried).
+/// the editor's `analyzeCutoutNow` (the wants made again, then a failed run retried). With every
+/// selected clip a picture, Subject (Person, Foreground) follows the checkbox: the clip's, like
+/// it (road map creator-jobs CO10b, spec §11 CO-108).
 extension VideoPane {
 
-    /// Every selected clip can be cut out: a media or still clip of a video file with pictures.
+    /// Every selected clip can be cut out: a media or still clip of a video file with pictures,
+    /// or an image clip of a picture (CO-108).
     var allCutoutable: Bool {
         let clips = binding.clips
         return !clips.isEmpty
             && clips.allSatisfy { CutoutStatus.canCutOut($0, in: binding.snapshot) }
+    }
+
+    /// Every selected clip is an image clip — the Subject row's gate (CO-108).
+    var allPictures: Bool {
+        let clips = binding.clips
+        return !clips.isEmpty && clips.allSatisfy {
+            if case .image = $0.source { return true }
+            return false
+        }
     }
 
     /// Every selected video clip has a BASE cutout — Background, Edge and Feather's gate.
@@ -87,8 +99,30 @@ extension VideoPane {
                 binding.edited()
             },
             enabled: analyzable, onEdit: {})
-        analyze.toolTip = "Make this clip's person masks now, again after a failure"
+        analyze.toolTip = "Make this clip's masks now, again after a failure"
         let backgrounds = CutoutBackground.allCases
+        let subjects = CutoutSubject.allCases
+        // The clip's subject, written whole on the BASE through `structural(video:for:)` —
+        // a cutout's presence goes there, so the row is ⊘ inside an action (CO-108).
+        func subjectOps(_ index: Int) -> [ReelOp] {
+            guard subjects.indices.contains(index) else { return [] }
+            return binding.videoClips.compactMap { clip -> [ReelOp]? in
+                guard var base = clip.video?.cutout else { return nil }
+                base.subject = subjects[index]
+                return binding.ops(video: VideoPatch(cutout: .some(base)), for: clip)
+            }.flatMap { $0 }
+        }
+        let subjectRow: [NSView] = allPictures
+            ? [
+                inspectorPopupRow(
+                    "Subject", binding, name: "Cutout Subject", items: ["Person", "Foreground"],
+                    read: { subjects.firstIndex(of: cut().subject) ?? 0 },
+                    ops: subjectOps,
+                    mixed: {
+                        Set(binding.videoClips.compactMap { $0.video?.cutout?.subject }).count > 1
+                    },
+                    enabled: enabled)
+            ] : []
         return InspectorSection(
             id: "video.cutout", title: "Background",
             summary: {
@@ -103,6 +137,7 @@ extension VideoPane {
                     writes: offOps(),
                     default: InspectorRowDefault(
                         name: "Remove Background", differs: anyOn, ops: offOps)),
+            ] + subjectRow + [
                 inspectorPopupRow(
                     "Background", binding, name: "Cutout Background", items: ["Remove", "Keep"],
                     read: { backgrounds.firstIndex(of: cut().background) ?? 0 },

@@ -92,8 +92,10 @@ extension AgentServer {
                     + "the clip whose part of its media to analyse.")
         }
         let name = try requiredString(a, "kind")
-        guard let kind = AnalysisKind(rawValue: name) else {
-            let kinds = AnalysisKind.allCases.map(\.rawValue).joined(separator: ", ")
+        // A picture's foreground masks are `analyze_cutout`'s, not this tool's (spec §11 CO-105).
+        guard let kind = AnalysisKind(rawValue: name), AnalysisKind.mediaAnalysisKinds.contains(kind)
+        else {
+            let kinds = AnalysisKind.mediaAnalysisKinds.map(\.rawValue).joined(separator: ", ")
             throw ToolError(message: "kind must be one of \(kinds).")
         }
         let document = try target(a)
@@ -182,7 +184,7 @@ extension AgentServer {
         ]
         switch call.kind {
         case .shots: result.merge(try shotsFields(call)) { _, kind in kind }
-        case .masks: result.merge(try masksFields(call)) { _, kind in kind }
+        case .masks, .foreground: result.merge(try masksFields(call)) { _, kind in kind }
         case .faces: result.merge(try facesFields(call)) { _, kind in kind }
         case .soundEvents: result.merge(try soundEventsFields(call)) { _, kind in kind }
         case .subjects: result.merge(try subjectsFields(call)) { _, kind in kind }

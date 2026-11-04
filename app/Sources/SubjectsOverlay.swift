@@ -208,7 +208,7 @@ final class SubjectsOverlay {
                     (rect($0.x, $0.y, $0.width, $0.height), Style.person)
                 }
             }
-        case .shots, .masks, .soundEvents:
+        case .shots, .masks, .soundEvents, .foreground:
             return nil
         }
     }

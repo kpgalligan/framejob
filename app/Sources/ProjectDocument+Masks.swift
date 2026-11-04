@@ -1,6 +1,7 @@
 import Foundation
 
-/// The document's wants of person masks (road map creator-jobs CO2b, spec §11 CO-22 (a)–(c)):
+/// The document's wants of masks (road map creator-jobs CO2b, spec §11 CO-22 (a)–(c); a
+/// picture's, CO10b, CO-106):
 /// after every edit, at the open, when a reverse lands and when a ramp settles —
 /// `ensureRampAudio()` ends with `ensureMasks()` — the analysed ranges its cut-out clips' windows
 /// need are wanted at once (CO-15), under one lane owner per document, so `ProjectDocument.swift`
@@ -46,22 +47,19 @@ extension ProjectDocument {
         CutoutWants.queue.async { [weak self] in
             var windows: [CutoutWindow] = []
             for handle in handles {
-                guard let plan = handle.plan else { continue }
-                for window in CutoutWants.windows(plan: plan, snapshot: handle.snapshot, range: nil)
-                where !windows.contains(window) {
+                // A cut picture's one window beside the plan's segments (spec §11 CO-106).
+                let image = CutoutWants.imageWindows(snapshot: handle.snapshot, range: nil)
+                let planned = handle.plan.map {
+                    CutoutWants.windows(plan: $0, snapshot: handle.snapshot, range: nil)
+                } ?? []
+                for window in planned + image where !windows.contains(window) {
                     windows.append(window)
                 }
             }
-            let previous = AnalysisLane.shared.openRequests(kind: .masks, cacheDir: cacheDir)
-            let kept = CutoutWants.kept(
-                previous: previous,
-                need: CutoutWants.needs(windows: windows, snapshot: snapshot, urls: urls),
-                state: CutoutWants.state)
-            let (requests, failures) = CutoutWants.requests(
-                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir,
-                keeping: kept)
+            let (requests, failures) = CutoutWants.wants(
+                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir)
             for failure in failures {
-                NSLog("ProjectDocument: clip %u's person masks cannot be made: %@", failure.clip,
+                NSLog("ProjectDocument: clip %u's masks cannot be made: %@", failure.clip,
                     failure.message)
             }
             AnalysisLane.shared.want(

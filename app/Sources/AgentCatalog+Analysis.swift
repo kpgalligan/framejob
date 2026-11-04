@@ -105,7 +105,7 @@ extension AgentServer {
                             + "clip plays — exactly one of media and clip.",
                     ],
                     "kind": [
-                        "type": "string", "enum": AnalysisKind.allCases.map(\.rawValue),
+                        "type": "string", "enum": AnalysisKind.mediaAnalysisKinds.map(\.rawValue),
                         "description": "What to find: shots, the hard cuts; masks, a person's "
                             + "masks' runs; faces, every face per sample (box, roll, yaw, "
                             + "mouth); sound_events, laughter, applause, cheering, crowd, "

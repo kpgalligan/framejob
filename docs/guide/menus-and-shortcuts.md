@@ -228,10 +228,10 @@ first selected clip. With nothing selected it is the front-most track. See
 | Transition ▸ items | A kind: a selected clip has room for a transition. **None**: something is selected |
 | Motion ▸ items | A selected clip shows a picture |
 | Look ▸ items | A selected clip shows a picture from a file, or is an adjustment clip |
-| Remove Background | A selected clip plays a video file, or is a freeze frame of one |
+| Remove Background | A selected clip plays a video file, is a freeze frame of one, or is a picture |
 | Camera Layout ▸ items | Two selected clips with a picture on different tracks, one selected clip with a picture, or — with none selected — a clip at the playhead on a track named "Camera"; the camera contains the playhead and no sheet is open |
 | Switch Angle ▸ items | Exactly one clip is selected, its track is not locked, it is not linked to a detached sound, the item's track still covers it with video clips, and no sheet is open; **No Covering Angle** never |
-| Text Behind Subject | No nest is open, and a clip of a video file plays at the playhead, with its picture on, on a shown track that is not a matte track |
+| Text Behind Subject | No nest is open, and a clip of a video file or a picture plays at the playhead, with its picture on, on a shown track that is not a matte track |
 | Add Background ▸ | Always |
 | Add Blurred Background | Exactly one clip is selected and it has a picture size: a video, image, still, shape or graphic clip. Dimmed for a nest, text, adjustment or audio-only clip |
 | Rename…, Label ▸ | Something is selected |

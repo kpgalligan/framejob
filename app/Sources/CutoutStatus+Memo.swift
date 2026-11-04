@@ -10,9 +10,10 @@ extension CutoutStatus {
     /// a window, a 0.5 s timer on the main run loop re-reads only the lane: each of the owner's
     /// requests' runs (outcome and `endedAt`) and the running job's progress. A changed run — a
     /// job ending, `AnalysisLane.retry` clearing a failure, a re-run failing again — or a `masks`
-    /// `.analysisDidPublish` for the document's cache folder recomputes the status: `onChange`
-    /// when its state changed, else the read-out refreshed alone. Otherwise an analysing status
-    /// takes the new progress from the held ranges. One per `ClipPane`; main only.
+    /// or `foreground` `.analysisDidPublish` for the document's cache folder recomputes the
+    /// status: `onChange` when its state changed, else the read-out refreshed alone. Otherwise an
+    /// analysing status takes the new progress from the held ranges. One per `ClipPane`; main
+    /// only.
     final class Memo {
         /// The pane's refresh, when a tick changed the state.
         var onChange: (() -> Void)?
@@ -102,7 +103,8 @@ extension CutoutStatus {
         /// Each of the owner's requests of the held media: its ranges, outcome and end.
         private static func runs(of detail: Detail) -> String {
             guard let media = detail.media, let cacheDir = detail.cacheDir else { return "" }
-            return CutoutStatus.ownerRequests(detail.owner, media: media.id, cacheDir: cacheDir)
+            return CutoutStatus.ownerRequests(
+                detail.owner, media: media.id, cacheDir: cacheDir, kind: detail.kind)
                 .map { request -> String in
                     let run = AnalysisLane.shared.run(of: request)
                     return "\(request.ranges)|\(String(describing: run?.outcome))|"
@@ -111,7 +113,8 @@ extension CutoutStatus {
         }
 
         private func didPublish(_ note: Notification) {
-            guard note.userInfo?["kind"] as? String == AnalysisKind.masks.rawValue,
+            guard [AnalysisKind.masks.rawValue, AnalysisKind.foreground.rawValue]
+                .contains(note.userInfo?["kind"] as? String ?? ""),
                 let folder = note.userInfo?["cacheDir"] as? String,
                 document?.intendedCacheDirectory?.standardizedFileURL.path == folder
             else { return }
@@ -141,7 +144,8 @@ extension CutoutStatus {
                 let cacheDir = held.cacheDir
             else { return }
             let running = CutoutStatus.runningRequest(
-                CutoutStatus.ownerRequests(held.owner, media: media.id, cacheDir: cacheDir))
+                CutoutStatus.ownerRequests(
+                    held.owner, media: media.id, cacheDir: cacheDir, kind: held.kind))
             let fraction = running.flatMap { AnalysisLane.shared.progress(of: $0) } ?? 0
             let progress = CutoutStatus.progress(
                 need: held.need, covered: held.coverage, running: running?.ranges,
@@ -154,7 +158,7 @@ extension CutoutStatus {
                     frames: status.frames, covered: status.covered,
                     subjectFound: status.subjectFound, error: status.error),
                 media: held.media, need: held.need, coverage: held.coverage, pack: held.pack,
-                owner: held.owner, cacheDir: held.cacheDir)
+                owner: held.owner, cacheDir: held.cacheDir, kind: held.kind)
             readout.refresh()
         }
     }

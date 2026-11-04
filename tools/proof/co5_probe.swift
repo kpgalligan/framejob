@@ -140,14 +140,15 @@ do {
     let none = refusal(hiddenMatte, at: second)
     row(
         "P1",
-        none == "No clip of a video file plays at 600000 on a shown track that is not a matte "
-            + "track, so there is no one to put the title behind.",
+        none == "No clip of a video file or picture plays at 600000 on a shown track that is not "
+            + "a matte track, so there is no one to put the title behind.",
         "noClip (a clip on a hidden track and one on a matte track): \(none ?? "nil")")
     let hold = refusal(hiddenMatte, at: second, clip: 12)
     row(
         "P1",
         hold == "Clip 12 cannot have a title put behind its subject: it must be a clip of a "
-            + "video file on the timeline, on a shown track that is not a matte track.",
+            + "video file or a picture on the timeline, on a shown track that is not a matte "
+            + "track.",
         "cannotHold (a clip on a hidden track): \(hold ?? "nil")")
     let notAt = refusal(hiddenMatte, at: second, clip: 11)
     row(

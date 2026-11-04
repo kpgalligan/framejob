@@ -14,7 +14,9 @@ import AppKit
 extension EditorViewController {
     @objc func analysisDidPublish(_ note: Notification) {
         guard let document = document,
-            note.userInfo?["kind"] as? String == AnalysisKind.masks.rawValue,
+            // A picture's foreground masks too (spec §11 CO-107).
+            [AnalysisKind.masks.rawValue, AnalysisKind.foreground.rawValue]
+                .contains(note.userInfo?["kind"] as? String ?? ""),
             let folder = note.userInfo?["cacheDir"] as? String,
             document.intendedCacheDirectory?.standardizedFileURL.path == folder
         else { return }
