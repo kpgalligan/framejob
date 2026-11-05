@@ -123,6 +123,11 @@ the same way.
 - **Expect:** playback goes round until you stop it, and the sound plays across each wrap.
 - **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
 
+**PB-16 — A package whose project.json is a folder shows a message, and the app stays open**
+- **Do:** 1. With a project open, make a copy of a saved `.framejob` package. In Terminal, replace the copy's `project.json` with a folder of that name. 2. Choose File ▸ Open… and pick the copy. 3. Double-click the copy in the Finder.
+- **Expect:** each time an alert reads "`<name>` does not contain a readable project.json.", Frame Job stays running and the other window stays open.
+- **Source:** #482; `docs_bugs_b2_proof.py` P1–P7 score `open_project`, whose refusal shows no alert: the proof cannot show this alert without putting a window in front of you.
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.

@@ -590,7 +590,7 @@ See [Audio](audio.md) and [Remove Silences and Remove Filler Words](cleanup-tool
 | Tool | What it does |
 |---|---|
 | `transcribe` | Speech to caption clips (**File ▸ Generate Captions…**), on this Mac or with AssemblyAI. The AssemblyAI engine needs your AssemblyAI key unless every file is already transcribed. |
-| `import_captions` | An `.srt` file as text clips (**File ▸ Import Captions…**). |
+| `import_captions` | An `.srt` or `.vtt` file as text clips (**File ▸ Import Captions…**). |
 | `export_captions` | One text track as `.srt` or `.vtt` (**File ▸ Export Captions…**). |
 | `get_transcript` | One clip's spoken words with timeline times; never uploads anything. |
 | `get_timeline_transcript` | Every heard word of the timeline (or the open nest) in timeline order, nested clips included, each with its clip, track, whether it can be cut, a stable identity and the `cut_start`/`cut_end` the Transcript tab would cut it by (cut a run with one `ripple_delete_ranges` from its first word's `cut_start` to its last word's `cut_end`), and every pause over 1 s between two words of one clip with the `cut_start`/`cut_end` the tab would shorten it by (one `ripple_delete_ranges` keeps 0.2 s each end); each file read once on this Mac and kept, in pages of 2,000 words; never uploads anything. |

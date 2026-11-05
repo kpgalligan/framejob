@@ -96,7 +96,7 @@ Filler Words cuts the ums and uhs on their own timings. Both preview the cuts
 and make them as one undo step.
 → [Remove Silences and Remove Filler Words](docs/guide/cleanup-tools.md)
 
-**Captions.** Import SubRip, export SubRip or WebVTT; generate captions on this Mac
+**Captions.** Import and export SubRip or WebVTT; generate captions on this Mac
 or with AssemblyAI, as two-line subtitles or word-by-word captions in five
 styles. Every caption is an ordinary text clip.
 → [Captions and transcription](docs/guide/captions.md)

@@ -65,11 +65,9 @@ A damaged project, or one holding values out of range, fails to open with a mess
 
 | The message says | What it means |
 | --- | --- |
-| "*name* does not contain a readable project.json." | The edit file inside the package can't be read as text. |
+| "*name* does not contain a readable project.json." | The edit file inside the package is missing, is a folder or a broken link, or can't be read as text. |
 | "project json is not valid json: …" | The edit file is damaged. |
 | "project json does not match the schema: …" | The edit file holds something Frame Job can't read as a project. |
-
-If `project.json` inside the package is a folder or a link rather than a file, there's no message: Frame Job quits unexpectedly as it opens the package. The package isn't changed. Put a real `project.json` back, or open a backup copy.
 
 Filmstrips, waveforms and the like inside the package are never needed to open it. A missing or damaged one is made again. See [Troubleshooting](/reference/troubleshooting/).
 

@@ -1,12 +1,12 @@
 ---
 title: "Import captions"
-description: "Bring a SubRip (.srt) caption file onto the timeline as text clips, and see what Frame Job copes with, removes and reports along the way."
+description: "Bring a SubRip (.srt) or WebVTT (.vtt) caption file onto the timeline as text clips, and see what Frame Job copes with, removes and reports along the way."
 ---
 
 import { Steps } from '@astrojs/starlight/components';
 import AtAGlance from '@components/AtAGlance.astro';
 
-Import Captions reads a SubRip (`.srt`) file onto a new caption track, one text clip per caption, as a single undo step. Use it when someone has already written the captions.
+Import Captions reads a SubRip (`.srt`) or WebVTT (`.vtt`) file onto a new caption track, one text clip per caption, as a single undo step. Use it when someone has already written the captions.
 
 <AtAGlance menu="File ▸ Import Captions…" tools="import_captions" />
 
@@ -16,7 +16,7 @@ Import Captions reads a SubRip (`.srt`) file onto a new caption track, one text 
 
 1. Choose **File ▸ Import Captions…**. It has no keyboard shortcut, and it's available whenever the project window has no sheet open.
 
-2. Pick the file. The open panel reads "Choose a SubRip (.srt) caption file." It accepts `.srt` and any plain-text file, so a SubRip file saved as `.txt` imports too.
+2. Pick the file. The open panel reads "Choose a SubRip (.srt) or WebVTT (.vtt) caption file." It accepts `.srt`, `.vtt` and any plain-text file, so a caption file saved as `.txt` imports too.
 
 </Steps>
 
@@ -26,7 +26,7 @@ A clean import shows no message. If there's anything to tell you, an alert appea
 
 ## File variations it copes with
 
-Real SubRip files vary, and Frame Job copes with these variations rather than turning the file away:
+Real caption files vary, and Frame Job copes with these variations rather than turning the file away:
 
 - A UTF-8 byte-order mark.
 - Windows (CRLF) or old Mac (bare CR) line endings.
@@ -34,7 +34,7 @@ Real SubRip files vary, and Frame Job copes with these variations rather than tu
 - A comma or a dot before the milliseconds.
 - The `MM:SS` and `SS` shorthands, and up to nine digits after the seconds.
 - Position settings after the end time, which are ignored.
-- Text in UTF-8, or in UTF-16 with a byte-order mark.
+- Text in UTF-8, in UTF-16 with a byte-order mark, or in Windows-1252 or Latin-1.
 
 ## What happens to the text
 
@@ -85,9 +85,9 @@ If not one caption in a file can be read, Frame Job imports nothing and the proj
 
 A caption file comes in through this command, not as media.
 
-Import has a SubRip reader and no WebVTT one, but the open panel still lets you pick a `.vtt` file, such as one you [exported](/captions/export-captions/), and its cues come through that reader as captions. The alert always appears for one, because it lists the `WEBVTT` header and any `NOTE` or `STYLE` blocks as skipped entries, each with “no “-->” timing line in this entry”. Those blocks aren't captions, so no words are missing. Cue settings and styling are lost, and a time tag inside a cue, such as `<00:00:03.500>`, stays in the text.
+A WebVTT file, such as one you [exported](/captions/export-captions/), is known by its first line, `WEBVTT`, whatever its name. That header and any `NOTE`, `STYLE` or `REGION` blocks aren't captions, so they're left out without a message. A time tag inside a cue, such as `<00:00:03.500>`, is removed. Cue settings and styling are lost.
 
-Save a caption file as UTF-8 before you import it. A file in an older encoding such as Windows-1252 or Latin-1 is fine with no accented letters in it, but with them the import usually stops with “No captions could be read”. French, Spanish and Italian text almost always stops there. Text with enough letters such as ß or Ø can get through, and in those two encodings its letters read correctly. A file in any other older encoding that gets through comes out with the wrong letters.
+A file in any other older encoding comes out with the wrong letters.
 
 ## With an agent
 

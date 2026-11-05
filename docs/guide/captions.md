@@ -1,12 +1,12 @@
 # Captions and transcription
 
-Frame Job brings captions in from a SubRip file, writes them from the speech in your clips, and writes a caption track back out as `.srt` or `.vtt`. Speech is recognised either **on this Mac**, with nothing uploaded, or by **AssemblyAI** in the cloud, using your own API key. Captions come out as two-line subtitles or as large word-by-word captions in one of five styles, where each word lights up as it is said. Every caption is an ordinary text clip, so it plays in the preview, burns into an export, and can be dragged, trimmed and restyled like any other clip.
+Frame Job brings captions in from a SubRip or WebVTT file, writes them from the speech in your clips, and writes a caption track back out as `.srt` or `.vtt`. Speech is recognised either **on this Mac**, with nothing uploaded, or by **AssemblyAI** in the cloud, using your own API key. Captions come out as two-line subtitles or as large word-by-word captions in one of five styles, where each word lights up as it is said. Every caption is an ordinary text clip, so it plays in the preview, burns into an export, and can be dragged, trimmed and restyled like any other clip.
 
 All three commands are in the **File** menu, next to each other:
 
 | Command | What it does |
 |---|---|
-| **File ▸ Import Captions…** | Reads a SubRip (`.srt`) file onto a new caption track. |
+| **File ▸ Import Captions…** | Reads a SubRip (`.srt`) or WebVTT (`.vtt`) file onto a new caption track. |
 | **File ▸ Generate Captions…** | Transcribes the speech in your clips onto a new caption track. |
 | **File ▸ Export Captions…** | Writes one caption track out as SubRip (`.srt`) or WebVTT (`.vtt`). |
 
@@ -29,9 +29,9 @@ The caption commands work on the timeline you have open. With a nest opened, **I
 
 A project holds at most 4,096 clips. A caption run that would go over that limit is refused before anything changes, and the message says how many more clips would fit.
 
-## Import a SubRip file
+## Import a caption file
 
-Choose **File ▸ Import Captions…** and pick a `.srt` file. The open panel reads "Choose a SubRip (.srt) caption file." and accepts `.srt` and any text file, so a SubRip file saved as `.txt` imports too. A `.vtt` file goes through the same SubRip reader: its cues import, and its `WEBVTT` header and any `NOTE` or `STYLE` blocks are reported as skipped entries. Each cue becomes one text clip in the **Caption** preset, on a new track called **Captions** (or the next free number). The import is a single undo step, **Import Captions**.
+Choose **File ▸ Import Captions…** and pick a `.srt` or `.vtt` file. The open panel reads "Choose a SubRip (.srt) or WebVTT (.vtt) caption file." and accepts `.srt`, `.vtt` and any text file, so a caption file saved as `.txt` imports too. Each cue becomes one text clip in the **Caption** preset, on a new track called **Captions** (or the next free number). The import is a single undo step, **Import Captions**.
 
 The reader copes with the variations real caption files have:
 
@@ -40,11 +40,11 @@ The reader copes with the variations real caption files have:
 - a comma or a dot before the milliseconds, the `MM:SS` and `SS` shorthands, and any number of fraction digits
 - position settings after the end time, which are ignored
 - `<i>`, `<b>`, `<u>` and `<font>` tags and `{\an8}`-style overrides, which are removed, plus the common HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&#39;`, `&nbsp;`)
-- text in UTF-8, or in UTF-16 with a byte-order mark
+- text in UTF-8, in UTF-16 with a byte-order mark, or in Windows-1252 or Latin-1 (a file in any other older encoding comes out with the wrong letters)
 
 The file's own line breaks are kept. Long lines also wrap inside the caption box.
 
-**Malformed entries are reported, not dropped silently.** If a block has no `-->` timing line, has a time that cannot be read, ends at or before its start, or has no text, it is skipped. When the import finishes, an alert lists what was skipped by line number (the first eight, then "…and N more"), along with how many captions were shortened to fit. A clean import shows no alert. A file in which no cue can be read is refused, and the message gives the first few reasons. That is usually what happens to a Windows-1252 or Latin-1 file with accented letters: save it as UTF-8 and import it again.
+**Malformed entries are reported, not dropped silently.** If a block has no `-->` timing line, has a time that cannot be read, ends at or before its start, or has no text, it is skipped. When the import finishes, an alert lists what was skipped by line number (the first eight, then "…and N more"), along with how many captions were shortened to fit. A clean import shows no alert. A file in which no cue can be read is refused, and the message gives the first few reasons.
 
 *Agents:* `import_captions` (`path`, plus an optional existing `track`; reports what landed and, under `skipped`, each malformed entry by line).
 
@@ -280,7 +280,7 @@ No MCP tool can read or change the key or the region. Only a person sets them, h
 
 ## Limits
 
-- **Import has only a SubRip reader.** A `.vtt` file's cues come through it, but its `WEBVTT` header and `NOTE` and `STYLE` blocks are reported as skipped, so a `.vtt` import always ends in the alert. Its cue settings and styling are lost, and a time tag inside a cue, such as `<00:00:03.500>`, stays in the text.
+- **A WebVTT file keeps its words and times.** It is known by its first line, `WEBVTT`, whatever its name. That header and any `NOTE`, `STYLE` or `REGION` blocks are left out without a message, and a time tag inside a cue, such as `<00:00:03.500>`, is removed. Its cue settings and styling are lost.
 - Captions are burned-in text clips, not a switchable subtitle stream in the exported movie.
 - A clip played in reverse, a clip with its audio switched off, and a clip whose media is missing or silent cannot be transcribed.
 - **On this Mac** needs the language's speech model installed from the sheet's Download row. Speakers, Vocabulary and Transcribe again are AssemblyAI only.

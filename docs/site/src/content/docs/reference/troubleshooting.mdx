@@ -68,11 +68,9 @@ A project that can't be read fails with a message naming the problem, and Frame 
 
 | Message | What to do |
 | --- | --- |
-| "*name* does not contain a readable project.json." | The project file inside the package is damaged. Open a backup copy if you have one. |
+| "*name* does not contain a readable project.json." | The project file inside the package is missing, is a folder or a broken link, or is damaged. Open a backup copy if you have one. |
 | "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it" | A newer Frame Job saved it. [Update Frame Job](/getting-started/updates/). |
 | "too many clips: 5000 (max 4096)", or the same for tracks, markers or media | The file is past one of the [project limits](/reference/limits/#project-size). |
-
-If Frame Job quits unexpectedly as it opens a package, check that `project.json` inside it is a file. A folder or a link in its place gives no message. Open a backup copy if you have one.
 
 Files that have moved don't stop a project opening, and neither does a damaged `cache/` folder. For moved files, see [Clips show a slate](#clips-show-a-slate). Also see [Open a project](/projects/open-a-project/).
 

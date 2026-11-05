@@ -67,7 +67,8 @@ extension MediaImporter {
 
     /// Still-image types ImageIO decodes and AVFoundation would refuse.
     /// Probed with ImageIO and imported as `kind: image` (§7.7).
-    static let imageTypes: [UTType] = [.png, .jpeg, .heic, .heif, .tiff, .gif, .bmp, .webP]
+    static let imageTypes: [UTType] =
+        [.png, .jpeg, .heic, .heif, .tiff, .gif, .bmp, .webP, UTType(importedAs: "public.avif")]
 
     /// Whether `url` is a still picture rather than a movie. Type-based, not
     /// extension-based, so a `.heic` written by a camera and a `.jpeg` with

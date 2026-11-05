@@ -746,7 +746,7 @@ back-most track** and selects it.
 | Command | What it puts there |
 |---|---|
 | **Clip ▸ Add Background ▸ Solid Color** | A canvas-sized white rectangle named "Background", starting at 0 and as long as the timeline. White because the canvas is already black. Recolour it in the Shape tab's Fill row, or turn on Gradient for a full-canvas ramp |
-| **Clip ▸ Add Background ▸ Image…** | A picture you choose (the panel offers only image files, AVIF among them, which does not import as a still; see [What Frame Job reads](projects-and-media.md#what-frame-job-reads)), scaled to fill the canvas, as long as the timeline. The picture joins the Media tab in the same undo step, or is reused if it is already there. If it can't be read, an alert says so and nothing is added |
+| **Clip ▸ Add Background ▸ Image…** | A picture you choose (the panel offers only image files; see [What Frame Job reads](projects-and-media.md#what-frame-job-reads)), scaled to fill the canvas, as long as the timeline. The picture joins the Media tab in the same undo step, or is reused if it is already there. If it can't be read, an alert says so and nothing is added |
 | **Clip ▸ Add Blurred Background** | A copy of the one selected clip, playing exactly the same frames, scaled to fill the canvas, centred, uncropped and blurred at full strength. It is muted so the sound doesn't play twice, and is named "Blurred Background". This is the usual backdrop for a screen recording or a vertical video that doesn't fill the frame |
 
 Limits:

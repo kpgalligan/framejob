@@ -121,12 +121,16 @@ extension AgentServer {
     /// (spec §11 MC-5); nil otherwise. Both refusals that would have gone on
     /// to the ffmpeg step count: AVFoundation's (`ImportError`) and, for a
     /// WebM or Matroska file, a codec the built-in copy cannot carry
-    /// (`ContainerRewrapError.unsupported`, spec §11 #216-R).
+    /// (`ContainerRewrapError.unsupported`, spec §11 #216-R). A folder, or a
+    /// link to one, is neither: ffmpeg could not convert it under any policy.
     static func neverAsksSentence(for error: any Error, url: URL) -> String? {
         let invites =
             (error as? MediaImporter.ImportError)?.invitesFFmpeg
             ?? (error as? ContainerRewrapError)?.invitesFFmpeg ?? false
-        guard invites, !MediaImporter.isImage(url), FFmpegRewrap.policy == .ask,
+        let isFolder =
+            (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]))?
+            .isDirectory == true
+        guard invites, !isFolder, !MediaImporter.isImage(url), FFmpegRewrap.policy == .ask,
             FFmpegRewrap.tools() != nil
         else { return nil }
         return "An installed ffmpeg could convert it, but a tool call never asks "
@@ -139,9 +143,9 @@ extension AgentServer {
     /// `import_captions` — File ▸ Import Captions… (`CaptionImporter`, which
     /// also carries the reasoning for why a caption is a text clip).
     ///
-    /// Runs on the main thread like every other op tool: parsing an SRT is
-    /// reading a text file, not probing a movie, so there is nothing to wait
-    /// for and nothing to keep off main.
+    /// Runs on the main thread like every other op tool: parsing a caption
+    /// file is reading a text file, not probing a movie, so there is nothing
+    /// to wait for and nothing to keep off main.
     ///
     /// The result reports what was SKIPPED as well as what landed — a
     /// caption file with three malformed entries would otherwise import

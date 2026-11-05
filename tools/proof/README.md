@@ -30171,3 +30171,27 @@ make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c2_proof.py
 python3 tools/proof/docs_bugs_c2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c2_proof.py --base-sources <its app/Sources>
 ```
+
+## Docs bugs b2 — caption files, AVIF stills, an unreadable project.json (`docs_bugs_b2_proof.py`, `docs_bugs_b2_probe.swift`; nine mutants by `--mutant`; spec §11 #467, #498, #487)
+
+#467, #482, #498, #487 and #497's agent sentence. **`docs_bugs_b2_proof.py`** makes its own fixtures
+under `work/docs-bugs-b2/` (ffmpeg with libsvtav1, and `sips`) on a scratch `CFFIXED_USER_HOME`. The
+E, V, A and F rows run in one instance, and text is read back through `get_project`. A2 and A3 each
+launch with their own ffmpeg setting. The P rows launch an instance each and send `open_project` to a
+package the app saved, then damaged; on a Debug build lldb is attached first, so an abort stops under
+the debugger and no crash report window appears, and a Release run scores a dead instance as a
+failure. `-NSOpen` is never used, because on the fix its alert would reach the screen: that alert is
+`docs/manual-checks.md` PB-16. An attach makes `Popen.poll` answer 0, so these rows ask `ps`, and
+end the instance by its pid.
+
+**`docs_bugs_b2_probe.swift`** runs what MCP cannot send: a Media tab drop through `MediaPane` on a
+private pasteboard, and `importCaptionsCommand()` and `addImageBackground(nil)` whole, `NSOpenPanel`
+and `NSAlert.runModal` replaced in its own process and its window 20,000 pt off every display. It
+names only symbols the base has, so it builds over `--base-sources`.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b2_proof.py [--only E1,V3,P1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b2_proof.py
+python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
+```

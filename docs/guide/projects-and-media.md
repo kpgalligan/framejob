@@ -150,10 +150,10 @@ Every marker in the project, with its name, **Chapter**, **Go** and **Delete**. 
 | Movies | MOV, MP4, M4V and other containers macOS plays: H.264, HEVC, ProRes, MJPEG and MPEG-4 video; VP9 Profile 0 and 2 in MP4; AV1 on an M3 or later Mac. |
 | WebM and Matroska | `.webm` and `.mkv` with VP9, AV1, H.264 or HEVC video and Opus, Vorbis or AAC sound (see below). |
 | Sound | M4A (AAC, ALAC), MP3, WAV and AIFF everywhere. Other formats macOS plays, such as CAF and FLAC, import when dropped on the Media tab. |
-| Pictures | PNG, JPEG and HEIC everywhere. TIFF, GIF, BMP, HEIF and WebP also import when dropped on the Media tab. An AVIF does not import as a still: Frame Job shows "Could not read *file*.", or, with ffmpeg installed, offers to convert it to a one-frame H.264 movie (8-bit, no transparency). |
+| Pictures | PNG, JPEG and HEIC everywhere. TIFF, GIF, BMP, HEIF, WebP and AVIF also import when dropped on the Media tab. |
 | LUTs | `.cube` 3D LUTs, applied as a clip's look or as a file's Camera Log. See [Color grading](color-grading.md). |
 
-Caption files (`.srt`) are not media: bring them in with **File ▸ Import Captions…**. See [Captions](captions.md).
+Caption files (`.srt`, `.vtt`) are not media: bring them in with **File ▸ Import Captions…**. See [Captions](captions.md).
 
 ### Add Media
 
@@ -302,4 +302,4 @@ The command is off when the project has no media.
 - A project holds at most 4,096 clips and 64 tracks (counting those inside nests), 1,024 markers and 1,024 media files, with nests up to 8 deep.
 - The Add Media… and Open panels list movies, M4A, MP3, WAV, AIFF, PNG, JPEG, HEIC and (Add Media… only) `.cube`. The other sound and picture formats under [What Frame Job reads](#what-frame-job-reads) import only by a drop on the Media tab, or through `import_media`.
 - `.cube` files are imported, not opened: File ▸ Open… does not take one, and a `.cube` dropped on the window or the Dock is not imported. Use Add Media… or a drop on the Media tab.
-- A project file that is damaged or out of range fails to open with a message naming the problem; the package is not rewritten. A package saved by a newer Frame Job reports "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it". A package with no `project.json` fails with macOS's own no-such-file message, and a `project.json` that is not text reports "*name* does not contain a readable project.json." A `project.json` that is a folder or a link rather than a file shows no message: Frame Job quits unexpectedly as it opens the package.
+- A project file that is damaged or out of range fails to open with a message naming the problem; the package is not rewritten. A package saved by a newer Frame Job reports "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it". A package whose `project.json` is missing, is a folder or a broken link, or is not text reports "*name* does not contain a readable project.json."

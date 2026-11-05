@@ -988,3 +988,13 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     from its oracle and 10.49/1023 below its no-peak clip; under `gainmap-peak-dropped` 9.59/1023
     from its oracle and 0.50/1023 below the clip, so the per-band check, the bands' order and the
     peak check all fail.
+- **#487 — AVIF is the ninth still type.** `MediaImporter.imageTypes` gains
+  `public.avif`, so `isImage` routes it to `probeImage` and it comes in as
+  `kind: image` on every door that reaches `probe`, with no ffmpeg question. It
+  joins TIFF, GIF, BMP, HEIF and WebP: a Media tab drop, `import_media` or Add
+  Background. `ProjectDocument.mediaTypeIdentifiers` and `project.yml` are
+  unchanged, so File ▸ Add Media…, File ▸ Open and `open_project` keep refusing it
+  as they refuse a TIFF. HD-12 and HD-19 already write of an AVIF as a still.
+  Bytes ImageIO cannot parse answer `Could not read x.avif.`. **Accepted:**
+  `probeImage` reads only the header, so an AVIF cut short whose header survives
+  imports as a still, and draws black or wrong.

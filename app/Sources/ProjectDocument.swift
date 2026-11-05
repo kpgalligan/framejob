@@ -528,8 +528,8 @@ final class ProjectDocument: NSDocument {
     /// draw a slate, and `missingMedia` feeds the Relink… offer.
     private func readPackage(at url: URL) throws {
         let jsonURL = url.appendingPathComponent(Self.projectFileName)
-        let wrapper = try FileWrapper(url: jsonURL, options: .immediate)
-        guard let data = wrapper.regularFileContents,
+        // Not `FileWrapper`: on a folder it raises an Objective-C exception (#482).
+        guard let data = try? Data(contentsOf: jsonURL),
               let text = String(data: data, encoding: .utf8)
         else {
             throw ReelCoreError(

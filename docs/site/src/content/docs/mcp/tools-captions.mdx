@@ -18,7 +18,7 @@ These tools make captions and read speech. Four of them work with caption tracks
 | To | Use | Changes the project |
 | --- | --- | --- |
 | Turn speech into captions | [`transcribe`](#transcribe) | Yes, one undo step, unless `place` is false |
-| Bring in an `.srt` file | [`import_captions`](#import_captions) | Yes, one undo step |
+| Bring in an `.srt` or `.vtt` file | [`import_captions`](#import_captions) | Yes, one undo step |
 | Write a track out as `.srt` or `.vtt` | [`export_captions`](#export_captions) | No |
 | Page word captions again for a new canvas | [`relay_captions`](#relay_captions) | Yes, one undo step |
 | Read one clip's words | [`get_transcript`](#get_transcript) | No |
@@ -184,7 +184,7 @@ It needs a word style and `place` true. A style is only a display choice, so wit
 
 ## `import_captions`
 
-Reads a SubRip (`.srt`) file and lays it out as text clips, one for each cue, on a new track of its own. It does what [**File ▸ Import Captions…**](/captions/import-captions/) does, and that page has what the reader copes with.
+Reads a SubRip (`.srt`) or WebVTT (`.vtt`) file and lays it out as text clips, one for each cue, on a new track of its own. It does what [**File ▸ Import Captions…**](/captions/import-captions/) does, and that page has what the reader copes with.
 
 They're ordinary text clips in the Caption preset, so they burn in on export with no further step. Times snap to the frame grid, and a cue that overlapped the next one is shortened to meet it.
 
@@ -192,7 +192,7 @@ They're ordinary text clips in the Caption preset, so they burn in on export wit
 
 | Argument | Type | Required | What it does |
 | --- | --- | --- | --- |
-| `path` | string | Yes | The absolute or `~` path to the `.srt` file. |
+| `path` | string | Yes | The absolute or `~` path to the `.srt` or `.vtt` file. |
 | `track` | integer | No | Put the captions on this existing track instead of a new one, which the menu can't do. Cues that would overlap something there are dropped, so it's safer to leave this out. |
 | `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
 

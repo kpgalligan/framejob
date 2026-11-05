@@ -69,8 +69,9 @@ extension AgentServer {
         return [
             tool(
                 "import_captions",
-                "Reads a SubRip (.srt) caption file and lays it out as TEXT CLIPS, one per cue, "
-                    + "on a new track of its own — File ▸ Import Captions…. They are ordinary "
+                "Reads a SubRip (.srt) or WebVTT (.vtt) caption file and lays it out as TEXT "
+                    + "CLIPS, one per cue, on a new track of its own — File ▸ Import Captions…. "
+                    + "They are ordinary "
                     + "text clips in the Caption preset, so they render in the preview, in "
                     + "render_frame and in an export (burn-in) with no further step, and any of "
                     + "them can be retimed with move_clip or restyled with set_text. Times snap "
@@ -80,7 +81,7 @@ extension AgentServer {
                 [
                     "path": [
                         "type": "string",
-                        "description": "Absolute or ~ path to the .srt file.",
+                        "description": "Absolute or ~ path to the .srt or .vtt file.",
                     ],
                     "track": [
                         "type": "integer",

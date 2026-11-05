@@ -9171,15 +9171,15 @@
     {
      "id": "import-captions",
      "name": "Import Captions",
-     "summary": "File ▸ Import Captions… reads a SubRip (.srt) file onto a new caption track, one text clip per cue, as a single undo step.",
+     "summary": "File ▸ Import Captions… reads a SubRip (.srt) or WebVTT (.vtt) file onto a new caption track, one text clip per cue, as a single undo step.",
      "page": "captions/import-captions",
      "anchor": "import-captions",
      "where": "File ▸ Import Captions…"
     },
     {
      "id": "import-tolerated-variations",
-     "name": "SubRip file variations it copes with",
-     "summary": "Frame Job copes with common SubRip variations, such as old line endings, a missing index line, short times and UTF-16 text.",
+     "name": "Caption file variations it copes with",
+     "summary": "Frame Job copes with common caption file variations, such as old line endings, a missing index line, short times, and UTF-16, Windows-1252 or Latin-1 text.",
      "page": "captions/import-captions",
      "anchor": "file-variations-it-copes-with",
      "where": "File ▸ Import Captions…"
@@ -20550,7 +20550,7 @@
     {
      "id": "ref-formats-pictures",
      "name": "Pictures",
-     "summary": "PNG, JPEG and HEIC everywhere; TIFF, GIF, BMP, HEIF and WebP import when dropped on the Media tab.",
+     "summary": "PNG, JPEG and HEIC everywhere; TIFF, GIF, BMP, HEIF, WebP and AVIF import when dropped on the Media tab.",
      "page": "reference/file-formats",
      "anchor": "pictures",
      "where": "File ▸ Add Media…",
@@ -20604,7 +20604,7 @@
     {
      "id": "ref-formats-not-media",
      "name": "Caption files are not media",
-     "summary": "An .srt comes in through File ▸ Import Captions…, not as media.",
+     "summary": "An .srt or a .vtt comes in through File ▸ Import Captions…, not as media.",
      "page": "reference/file-formats",
      "anchor": "caption-files",
      "where": "File ▸ Import Captions…"
@@ -20708,7 +20708,7 @@
     {
      "id": "ref-limits-captions",
      "name": "Captions and transcription",
-     "summary": "AssemblyAI takes files up to 10 hours long and 1,000 Vocabulary terms, and caption import reads SubRip only.",
+     "summary": "AssemblyAI takes files up to 10 hours long and 1,000 Vocabulary terms, and caption import reads SubRip and WebVTT.",
      "page": "reference/limits",
      "anchor": "captions"
     },

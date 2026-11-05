@@ -414,3 +414,37 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ids cannot be recovered, and a retry needs the originating account's or
   region's key. Source: `archive/roadmap-6.md` §10.10, §10.20.
   Treating a 404 as deleted is not decided here.
+- **#467 — A caption file is read as UTF-16 only after a byte-order mark;
+  every other file that is not UTF-8 is Windows-1252, then Latin-1.**
+  Foundation's `.utf16` takes a file with no mark and reads it two bytes to
+  a letter, so an SRT in French, Spanish or Italian came back as other
+  characters and answered "No captions could be read"; only a byte that made
+  the pairs invalid stopped it, which is why some single-byte files imported
+  and others did not. `CaptionImporter.text(of:)` tries UTF-8, then UTF-16
+  when the data starts `FF FE` or `FE FF`, then Windows-1252, then Latin-1.
+  **Accepted:** a UTF-16 file with no mark is not read in either byte order.
+  Some of them used to read by luck; no page ever promised it, and such a
+  file read as Windows-1252 holds a NUL in every second byte, so no `-->` is
+  found and it answers the "No captions could be read" sentence. A file in
+  any other older encoding comes out with the wrong letters; its timing lines
+  are ASCII, so it still imports.
+- **#498 — Import Captions reads WebVTT's header, blocks and time tags;
+  everything else stays SubRip's grammar.** A file is WebVTT by its contents,
+  never its extension: the first non-blank line is `WEBVTT` alone or followed
+  by a space or a tab. Only then:
+  (a) in the first block, every line before the first line holding `-->` is
+  dropped without a Problem, all of them when it has none, so a header with
+  `Kind:` lines and a cue with no blank line after it both read. What remains
+  parses as a cue.
+  (b) A later block with no `-->` whose first line is `NOTE`, `STYLE` or
+  `REGION`, alone or followed by a space or tab, is dropped without a Problem.
+  (c) Any other block with no `-->` stays a Problem, so a broken cue is still
+  reported (the rule at the top of `CaptionImporter`).
+  (d) A `<…>` whose body starts with an ASCII digit is removed: a cue time tag
+  is the only such thing WebVTT allows. `<v Kevin>` and `<c.yellow>` already
+  go as tags.
+  A file without the header parses exactly as it did: a `NOTE` block is a
+  Problem and `<00:00:03.500>` stays text. Cue settings, regions and styling
+  are lost, as a SubRip file's are (the model has one plain string a clip,
+  spec §5.2). The panel lists the type beside `.srt`, and its message and
+  `import_captions` say WebVTT.

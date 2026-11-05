@@ -3218,10 +3218,10 @@ free.
   `relay_captions` is in `AgentServer+VerticalVersion.swift`, on main, with no
   `scope` key; its row in `AgentCatalog+Framing.swift` after
   `make_vertical_version`'s.
-- `CaptionImporter.swift` (SubRip grammar) · `CaptionExporter.swift` (`.srt` /
-  `.vtt` from one all-text track, never guessed; a popup built from
-  `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
-  REMOVES a same-titled row).
+- `CaptionImporter.swift` (SubRip grammar, and WebVTT's header, blocks and time
+  tags) · `CaptionExporter.swift` (`.srt` / `.vtt` from one all-text track,
+  never guessed; a popup built from `NSMenuItem`s carrying `representedObject`,
+  because `addItem(withTitle:)` REMOVES a same-titled row).
 - `CloudTranscriber.swift` (+`Report`, +`Media`) — `TranscriptionEngine` (`apple` |
   `assemblyai`, persisted under `FrameJobCaptionEngine`) and the cloud engine
   over the SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its

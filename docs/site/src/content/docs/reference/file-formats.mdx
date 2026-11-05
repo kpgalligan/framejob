@@ -21,7 +21,7 @@ This page lists what Frame Job can bring in, and which way in takes which file. 
 | [Movies](#movies) | MOV, MP4, M4V and other containers macOS plays |
 | [WebM and Matroska](#webm-and-matroska) | `.webm` and `.mkv` |
 | [Sound](#sound) | M4A, MP3, WAV and AIFF, plus CAF, FLAC and other formats macOS plays |
-| [Pictures](#pictures) | PNG, JPEG and HEIC, plus TIFF, GIF, BMP, HEIF and WebP |
+| [Pictures](#pictures) | PNG, JPEG and HEIC, plus TIFF, GIF, BMP, HEIF, WebP and AVIF |
 | [LUTs](#luts) | `.cube` 3D LUTs |
 
 Some of these only come in by a drop on the Media tab. See [Which way in](#which-way-in).
@@ -89,9 +89,7 @@ This applies to MP3 files. An MP3 track inside a `.mov`, `.mp4` or `.m4a` isn't 
 
 ## Pictures
 
-PNG, JPEG and HEIC come in every way. TIFF, GIF, BMP, HEIF and WebP come in only by a drop on the Media tab, or as a background through **Clip ▸ Add Background ▸ Image…**.
-
-An AVIF picture doesn't import as a still. Frame Job shows "Could not read *file*." When ffmpeg is installed, it [offers to convert the file](/projects/ffmpeg-conversion/) instead, and the picture comes in as a one-frame H.264 movie, 8-bit with no transparency. To use an AVIF as a still, save it as a PNG or HEIC first.
+PNG, JPEG and HEIC come in every way. TIFF, GIF, BMP, HEIF, WebP and AVIF come in only by a drop on the Media tab, or as a background through **Clip ▸ Add Background ▸ Image…**.
 
 A picture imports as a still with no length of its own, so a clip of it can run any duration. Its transparency and EXIF orientation are honoured.
 
@@ -119,9 +117,7 @@ A `.cube` is imported, not opened. **File ▸ Open…** doesn't take one, and on
 
 ## Caption files
 
-An `.srt` isn't media. Bring it in with **File ▸ Import Captions…**. See [Import captions](/captions/import-captions/).
-
-Import has a SubRip reader and no WebVTT one. WebVTT can be [exported](/captions/export-captions/), and a `.vtt` file's cues do come in through the SubRip reader, with its header and any `NOTE` or `STYLE` blocks listed as skipped entries. See [Good to know](/captions/import-captions/#good-to-know).
+An `.srt` or a `.vtt` isn't media. Bring it in with **File ▸ Import Captions…**. See [Import captions](/captions/import-captions/). A WebVTT file's header and any `NOTE`, `STYLE` or `REGION` blocks are left out without a message. See [Good to know](/captions/import-captions/#good-to-know).
 
 ## Timelines from other editors
 
@@ -137,7 +133,7 @@ The **Add Media…** and **File ▸ Open…** panels list fewer types than a dro
 | M4A, MP3, WAV and AIFF | Yes | Yes | Yes |
 | PNG, JPEG and HEIC | Yes | Yes | Yes |
 | `.cube` LUTs | Yes | No | Yes |
-| TIFF, GIF, BMP, HEIF and WebP | No | No | Yes |
+| TIFF, GIF, BMP, HEIF, WebP and AVIF | No | No | Yes |
 | CAF, FLAC and other sound macOS plays | No | No | Yes |
 
 A drop on the Media tab has no type filter, so any file is tried, and an agent's import takes the same files. **File ▸ Add Media…** and a drop on the Media tab add to the open project, and **File ▸ Open…** makes a new untitled project around the file. See [Import media](/projects/import-media/) and [Drop files to open them](/projects/open-a-project/#drop-files-to-open-them).
