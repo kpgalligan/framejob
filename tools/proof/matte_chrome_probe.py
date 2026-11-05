@@ -131,7 +131,7 @@ MUTANTS = {
         "            guard let track = tracks.first(where: { $0.id == clip.track })\n",
         ["NT"]),
     "hit-skips-matte": (
-        "CanvasSessions.swift",
+        "CanvasLayerBox.swift",
         "        recipe.layers.compactMap { layer in\n",
         "        recipe.layers.filter { $0.matte?.into == nil }.compactMap { layer in\n",
         ["HT"]),
