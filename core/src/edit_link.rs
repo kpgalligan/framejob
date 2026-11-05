@@ -44,6 +44,13 @@ fn is_linked_sound(clip: &Clip) -> bool {
     clip.linked.is_some() && !clip.enabled.video
 }
 
+/// The half of a linked pair that shows the picture: linked, its picture on,
+/// its audio off. Read off the clip alone, since a pair inside a nest is out
+/// of `Project::clip`'s reach (spec §11 AU-157).
+pub(crate) fn is_linked_picture(clip: &Clip) -> bool {
+    clip.linked.is_some() && clip.enabled.video && !clip.enabled.audio
+}
+
 /// AU-94's sentence: `clip`'s rate may not change while it is linked to
 /// `partner`. Written once for `linked_rate_refusal` and `retime_range`
 /// (spec §11 CU-90 (b)).

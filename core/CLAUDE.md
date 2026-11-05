@@ -621,6 +621,7 @@ governs a module now.
   `roll`: the partner whose same edge coincided follows unless `alone`);
   `linked_rate_refusal` (speed, direction and speed-naming actions refused;
   its sentence `linked_rate_sentence`, which `retime_range` shares);
+  `is_linked_picture`, the half `duckers` skips (spec §11 AU-157);
   and the one op, `attach_audio`. The shift's half is `edit_time.rs`'s
   `shifted`.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve

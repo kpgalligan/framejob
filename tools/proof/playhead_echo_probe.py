@@ -40,6 +40,20 @@ all rest at 0.5 s. `pause·1` (a CONTROL): after play·1's mid-play pause the
 document, the timeline and the player agree and the last report is the
 player's tick — the paused guard must not drop the pause's own callback.
 
+Issue #466 added `loopend·1`–`·11`, through the real `editor.toggleLoop(nil)`: a
+loop at the timeline's end. D is the document's duration where the block
+starts, because earlier rows move clip 4 and a loop one frame short of the end
+wraps on any tree. A fall is a report over 0.5 s below the one before it.
+"Rests on D" is rate 0, the document == the player tick, both within one
+frame of D (a played-through transport may rest off the end tick), and "no
+report past D" holds to the same frame.
+`loopend·1` [B] range D − 1 s to D, 8 s from D − 1 s; `·2` [B] the same at
+×2, 6 s; `·3` Loop on, reverse from 1 s; `·4` Loop off before the end; `·5` [B]
+`loopRange` past the item; `·6` and `·7` `loopRange` wholly past the item,
+played into it and played again; `·8` [B] Loop on 0.3 s into a play; `·9` and
+`·10` [B] `setRate(1)` with `loopRange` past the item, parked on D by a seek and
+by playing in; `·11` `setRate(-1)` parked there.
+
 Needs `ffmpeg`, `swiftc`, `xcrun metal` and
 `core/target/release/libframejob_core.a`. No port. Run from anywhere:
 
@@ -212,6 +226,30 @@ def rests(s, t):
     return s["playhead"] == t and s["playerTicks"] == t
 
 
+def falls(log):
+    return sum(1 for x, y in zip(log, log[1:]) if y < x - TICKS // 2)
+
+
+def rests_on_d(a, s):
+    return (s["rate"] == 0 and s["playhead"] == s["playerTicks"]
+            and abs(s["playhead"] - s["duration"]) <= a["frame"]
+            and abs(s["playerTicks"] - s["duration"]) <= a["frame"])
+
+
+def none_past_d(a, s):
+    """The player's clock overruns the end tick by a fraction of a frame, on every tree."""
+    return all(t <= s["duration"] + a["frame"] for t in s["log"])
+
+
+def loopend_detail(key):
+    def detail(a):
+        s = a[key]
+        return {"falls": falls(s["log"]), "rate": s["rate"], "playhead": s["playhead"],
+                "playerTicks": s["playerTicks"], "duration": s["duration"],
+                "highest": max(s["log"], default=None)}
+    return detail
+
+
 def rows():
     sec = TICKS
     yield ("refresh·1", "", "at 1 s, opacity 0.5 leaves the built plan unchanged",
@@ -311,6 +349,47 @@ def rows():
            "player tick",
            lambda a: a["end2"]["rate"] == 0
            and a["end2"]["playhead"] == a["end2"]["playerTicks"], lambda a: a["end2"])
+    yield ("loopend·1", "B", "range D − 1 s to D, Loop on, played 8 s from D − 1 s: ≥ 3 falls, "
+           "rate 1",
+           lambda a: falls(a["loopend1"]["log"]) >= 3 and a["loopend1"]["rate"] == 1,
+           loopend_detail("loopend1"))
+    yield ("loopend·2", "B", "the same at ×2, 6 s: ≥ 3 falls, rate 2",
+           lambda a: falls(a["loopend2"]["log"]) >= 3 and a["loopend2"]["rate"] == 2,
+           loopend_detail("loopend2"))
+    yield ("loopend·3", "M", "Loop on, reverse from 1 s, 3 s: no rise in the log, ends at 0 "
+           "with rate 0",
+           lambda a: all(y <= x for x, y in zip(a["loopend3"]["log"], a["loopend3"]["log"][1:]))
+           and a["loopend3"]["rate"] == 0 and rests(a["loopend3"], 0),
+           loopend_detail("loopend3"))
+    yield ("loopend·4", "", "Loop on then off before the end: rests on D",
+           lambda a: rests_on_d(a, a["loopend4"]), loopend_detail("loopend4"))
+    yield ("loopend·5", "B", "a loop starting at D − 1 s and running 2 s past the item: ≥ 3 "
+           "falls, rate 1",
+           lambda a: falls(a["loopend5"]["log"]) >= 3 and a["loopend5"]["rate"] == 1,
+           loopend_detail("loopend5"))
+    yield ("loopend·6", "", "a loop wholly past the item, played from D − 1 s: rests on D, no "
+           "report past D",
+           lambda a: rests_on_d(a, a["loopend6"]) and none_past_d(a, a["loopend6"]),
+           loopend_detail("loopend6"))
+    yield ("loopend·7", "", "… played again parked there: rests on D, no report past D",
+           lambda a: rests_on_d(a, a["loopend7"]) and none_past_d(a, a["loopend7"]),
+           loopend_detail("loopend7"))
+    yield ("loopend·8", "B", "Loop on 0.3 s into a play of a range ending at D: ≥ 3 falls, rate 1",
+           lambda a: falls(a["loopend8"]["log"]) >= 3 and a["loopend8"]["rate"] == 1,
+           loopend_detail("loopend8"))
+    yield ("loopend·9", "B", "parked on D by a seek, a loop running past the item, setRate(1), 8 s: ≥ 3 "
+           "falls, rate 1, no report past D",
+           lambda a: falls(a["loopend9"]["log"]) >= 3 and a["loopend9"]["rate"] == 1
+           and none_past_d(a, a["loopend9"]), loopend_detail("loopend9"))
+    yield ("loopend·10", "B", "the same, parked by playing into the end: ≥ 3 falls, rate 1, no "
+           "report past D",
+           lambda a: falls(a["loopend10"]["log"]) >= 3 and a["loopend10"]["rate"] == 1
+           and none_past_d(a, a["loopend10"]), loopend_detail("loopend10"))
+    yield ("loopend·11", "", "parked on D, a loop running past the item, setRate(-1), 0.3 s: "
+           "rate -1, every report within 0.5 s of D",
+           lambda a: a["loopend11"]["rate"] == -1 and a["loopend11"]["log"]
+           and min(a["loopend11"]["log"]) > a["loopend11"]["duration"] - TICKS // 2,
+           loopend_detail("loopend11"))
     yield ("short·1", "", "playhead 5 s, clip 4 deleted: after the settle the document == the "
            "player tick", lambda a: a["short"]["playhead"] == a["short"]["playerTicks"],
            lambda a: a["short"])

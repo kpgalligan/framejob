@@ -2216,7 +2216,7 @@ the key map behind it.
   the Camera Log section reads.
 
 **Playback and rendering.**
-- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`) — one
+- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`, +`Loop`) — one
   `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
   (hdr H-3's pure move); `+PreviewQuality` holds `previewComposition`,
@@ -2224,7 +2224,13 @@ the key map behind it.
   player's item through the internal `currentItem` (road map "creator-jobs"
   SW0's toll; `player` stays private). `recompose()` re-colours the player's copy of the
   composition without a rebuild (`previewComposition(…, sdrVersion:)`, the
-  way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14. **Only a seek someone ASKED for reports a time**:
+  way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14.
+  `+Loop` holds `loopEnd` (nil for a loop starting at or past the item's end,
+  which stops there) and `itemPlayedToEnd()`: while `loopEnd` is set and the
+  transport is not reversing, `actionAtItemEnd` is `.none`
+  (`syncItemEndAction`), and the periodic observer or the item-end
+  notification wraps it, the notification alone for a loop running past the
+  item (#466). **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
   swap and re-seek, the paused refresh's round trip — go through `startSeek`
   silently and report once, only if they come to rest off the last reported

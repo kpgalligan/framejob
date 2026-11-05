@@ -20,7 +20,7 @@ Select one or more clips and press <kbd>⌥⌘D</kbd>. **Clip ▸ Detach Audio**
 
 Each selected clip splits in two, as one undo step named "Detach Audio":
 
-- The original clip keeps its picture, and its audio is switched off.
+- The original clip keeps its picture, and its audio is switched off. Any ducking it had goes to the new clip.
 - A new clip appears on the track directly below. It plays only sound, from the same file, with the same in point, length and speed, and it keeps the original's audio settings and actions.
 
 If the clip is already on the bottom track, Frame Job adds a new track underneath for the sound. Otherwise the sound always goes on the next track down, so make room there first, or drag the sound to another track afterwards.
@@ -54,7 +54,7 @@ Each half of a linked pair shows a link symbol after its kind symbol, in the cli
 
 A clip whose audio is off shows no waveform and no fade handles. A clip with its picture and its sound both off is drawn dimmed. The picture half of a linked pair has no Sound sub-tab, so select the sound half to change anything about the sound. See [Turn a clip's picture or sound off](/editing/enable-picture-and-sound/).
 
-The picture half keeps any ducking it had, and it lowers its own sound too. Turn ducking off before you detach a clip. See [Ducking](/audio/ducking/#good-to-know).
+Ducking lives on the sound half, so turn it on or off there. The picture half never ducks. See [Ducking](/audio/ducking/#good-to-know).
 
 ## What stays in sync
 

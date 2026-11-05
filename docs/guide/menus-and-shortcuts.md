@@ -482,7 +482,7 @@ controls:
 | Button | Where | What it does |
 |---|---|---|
 | Add Shape | Timeline bar | Opens a menu of **Rectangle**, **Ellipse**, **Line** and **Arrow**. The shape is added at the playhead. No menu item does this. **Clip ▸ Add Background ▸ Solid Color** also makes a shape clip, but only a canvas-sized rectangle on a new track behind everything |
-| Loop | Toolbar, beside the transport buttons | Turns looping on and off. Playback repeats the in/out range when one is set. With no range, or a range that ends at the end of the timeline, it goes back to the start of the loop and stops there |
+| Loop | Toolbar, beside the transport buttons | Turns looping on and off. Playback repeats the in/out range when one is set, and the whole timeline when none is |
 | − / + (Zoom Out / Zoom In) | Timeline bar | Zooms the timeline out or in |
 | Timeline Zoom slider | Timeline bar | Sets the timeline zoom |
 | Fit Timeline | Timeline bar | The same as **View ▸ Fit Timeline** (⇧Z) |

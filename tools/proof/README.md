@@ -3161,9 +3161,22 @@ deselected action span that holds 1 s and not 0 under a structural edit
 4 s during a live drag, with `revealPlayhead`'s band read off the clip view
 (reveal·1–3), play, a structural edit mid-play and the loop wrap (play·1,
 play·2, loop·1), the end-parked refresh and playing into the end (end·1,
-end·2), and clip 4 deleted under a 5 s playhead (short·1, short·2). No row
-reads a picture, so every row is scored whatever the console state; the
-first printed line names it.
+end·2), a loop at the timeline's end (loopend·1–11, #466), and clip 4 deleted
+under a 5 s playhead (short·1, short·2). No row reads a picture, so every row
+is scored whatever the console state; the first printed line names it.
+
+The `loopend` rows go through the real `editor.toggleLoop(nil)` and name no
+fixed second: D is the document's duration where the block starts, because
+earlier rows move clip 4 and a loop one frame short of the end wraps on any
+tree. A fall is a report over 0.5 s below the one before it. "Rests on D" is
+rate 0, the document == the player tick, both within one frame of D, and "no
+report past D" holds to the same frame: the player's clock overran the end
+tick by up to 351 ticks at rest and 10070 going round at ×2 on these runs. The
+frame is 20000 ticks. `loopend·9` and `·10` press L parked at the end of a loop
+running past the item, by a seek and by playing in; `·11` presses J there. Over
+f3697497's `app/Sources`, 28/34: `loopend·1`, `·2`, `·5`, `·8`, `·9` and `·10`
+fail (1, 1, 0, 1, 0 and 0 falls, rate 0) and the rest pass. `loopend·3`, the
+reverse row, passes on both trees and is marked M. 34/34 at the fix.
 
 **20/20** at the fix, console unlocked. Made to fail over 4f18f0b's
 `app/Sources` (`git archive 4f18f0b app/Sources | tar -x -C
@@ -30092,3 +30105,33 @@ make app-debug && python3 tools/proof/docs_bugs_c1_proof.py [--only Q1,N1]
 make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c1_proof.py
 python3 tools/proof/docs_bugs_c1_proof.py --mutant <name>
 ```
+
+## Docs bugs b1 — Loop at the timeline's end and ducking after Detach Audio (`docs_bugs_b1_proof.py` L1–L5, D1–D6, Z1; `playhead_echo_probe.py` `loopend·1`–`·11`; `core/tests/link_edges.rs`)
+
+#466: a loop ending at the item's end could stop there, because the item ended with `.pause` in
+force before the periodic observer heard the last tick; a run might go round once more first, so a
+row watching one pass proves nothing. `Playback.syncItemEndAction()` holds `.none` while `loopEnd`
+is set and the transport is not reversing, and the periodic observer or the item-end notification,
+whichever hears it first, wraps it (`Playback+Loop.swift`); only the notification can for a loop
+running past the item. An item that has ended posts no second end, so `play()` and `setRate` seek
+a loop parked at its end themselves: without `setRate`'s seek `loopend·10` ran to the loop's raw
+end, 4840032 against a D of 3640000. #468: Detach Audio left the duck on both halves (spec §11 AU-157).
+
+`python3 tools/proof/docs_bugs_b1_proof.py [--only L1,D3,…] [--app PATH]` makes its media under
+`work/docs-bugs-b1/` with ffmpeg and drives one launch on a scratch home; its docstring has the
+rows. The L rows take three 24 s trials each, about six minutes in all. The D rows are one document
+in order, so `--only` runs the whole chain and scores what it names.
+
+| Run | Result |
+|---|---|
+| The fix, Debug | 12/12: every L trial 4 wraps, still moving; D1 voice 1.000, music 0.200 |
+| The frozen base app | 4/12: L1 wraps 1, 1, 1; L2 1, 2, 2; L3 1, 2, 2; L5 `to` 0.0, 0.0, 0.0; D1 voice 0.200, music 0.040; D2, D3 and D5 fail; the controls L4, D4, D6 and Z1 pass |
+
+Eleven mutants, each by hand and reverted: `syncItemEndAction` always `.pause` (L1, `loopend·1`);
+`itemPlayedToEnd` returning at once (`loopend·5`; L1 and `loopend·1` pass, the periodic observer
+wrapping them); the sync ignoring the rate's sign (`loopend·3`); no `didSet` (`loopend·8`);
+`loopEnd` ignoring the item's end (`loopend·5`); `loopEnd` kept for a loop starting past the item
+(`loopend·6`, `·7`); detach keeping the duck (D2, `detach_leaves_the_duck_on_the_sound_half_alone`);
+`duckers` keeping a linked picture (D5, `a_stale_duck_on_a_picture_half_ducks_nothing`);
+`is_linked_picture` dropping `enabled.video` (`a_sound_half_switched_off_still_ducks`); `setRate`
+with no seek (`loopend·10`); `setRate`'s seek at any rate (`loopend·11`).

@@ -217,8 +217,8 @@ With **Speech**, the others go down only while this clip's speech plays: the att
 - **Relinking** the clip's file to a shorter one keeps the speech that still fits, and relinking it to a file with no sound forgets it.
 
 - **Overlapping duckers multiply.** Where two ducking clips overlap, their levels multiply: two at 50 % give 25 %.
-- **A silent ducking clip still ducks.** Ducking is read from the clip's place on the timeline, so a ducking clip that is muted, silenced by a solo, or has its audio switched off still lowers the others. Turn ducking off to stop it. A clip with its audio switched off has no Sound tab, so for the picture half of a linked pair, attach the pair first.
-- **A detached clip ducks from both halves.** Detach Audio leaves ducking on the picture as well as the sound. The picture lowers its own sound along with everything else, and the music is lowered by both halves: at 20 %, the voice plays at 20 % and the music at 4 %. Turning ducking off on the sound half leaves the picture ducking. To duck from a detached clip, turn ducking off before you detach, then turn it on for the sound half.
+- **A silent ducking clip still ducks.** Ducking is read from the clip's place on the timeline, so a ducking clip that is muted, silenced by a solo, or has its audio switched off still lowers the others. Turn ducking off to stop it. A clip with its audio switched off has no Sound tab, so you can't do that there. The picture half of a linked pair is the exception: it never ducks.
+- **Detaching moves ducking to the sound.** After Detach Audio the duck is on the sound half alone: at 20 %, the voice stays at full level and the music plays at 20 %. Turn ducking off on the sound half and it's off.
 - **Inside a nest**, a ducking clip lowers the rest of the project over the part of it that plays. Ducking on the nest clip itself lowers it over the nest's whole length.
 
 *Agents:* `set_audio` with `duck: {level, attack, release, mode, pre_roll, hold}`, or `duck: null` to turn it off. `mode: "speech"` is Duck by Speech and saves the file's speech in the same step; `set_media_speech` (`media`, `spans`) sets a file's speech spans directly, and `get_project` shows them as `media[].speech`.
@@ -446,7 +446,7 @@ The section summary reads "centre", "mono" or the pan position. Reset sets the p
 
 **Clip ▸ Detach Audio** (⌥⌘D), or the **Detach Audio** button in the Mix section, splits each selected clip's sound onto a clip of its own on the track below. If the clip is already on the bottom track, Frame Job adds a new track underneath for it.
 
-- The original clip keeps its picture, and its audio is switched off. It keeps any ducking it had, and it lowers its own sound too, so turn ducking off before you detach a clip ([Ducking](#ducking)).
+- The original clip keeps its picture, and its audio is switched off. Any ducking it had goes to the new clip ([Ducking](#ducking)).
 - The new clip plays only sound. It has the same file, in point, length and speed as the original, and it keeps the original's audio settings and actions.
 - The two clips stay **linked**. Each shows a link symbol after its kind icon, and selecting one draws a dashed ring around the other.
 

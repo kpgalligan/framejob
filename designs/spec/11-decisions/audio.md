@@ -1679,3 +1679,13 @@ recorded before its code, continuing AU-109's block.
   (the stage at any buffer size, `ExportMixRead` against the single read, a nest bus, the tap's
   ×E/÷E at 48 and 44.1 kHz, the leads and the footer); ten mutants, each killed by a named row or
   `core/tests/track_dynamics.rs`; manual check SE-40.
+- **AU-157 — A linked pair's duck belongs to its sound half.** `detach_audio` drops `audio.duck`
+  from the picture half, and `duckers` skips a linked clip whose picture is on and whose audio is
+  off, so a pair saved earlier, or a duck pasted or set on the picture half, ducks nothing. An
+  unlinked clip with its audio off, and a linked sound half switched off, still duck: a duck is
+  otherwise a fact about the timeline. Decides what `edit_background.rs` left open. Before this
+  the picture half kept its copy, so the pair ducked the mix twice and pushed its own sound down
+  to the duck level (#468). `attach_audio` takes the sound's whole group, so nothing is lost on
+  the way back. `is_linked_picture` reads the clip alone, not its partner, because a pair inside
+  a nest is out of `Project::clip`'s reach. No format change: the read rule makes a stale duck
+  inert, and `set_audio` on a picture half still applies.

@@ -11,6 +11,8 @@
 //! Ducking is by clip EXTENT by default: a ducking clip ducks for as long
 //! as it is on the timeline whether or not it is making a sound, which is
 //! what makes the result predictable from the picture of the timeline alone.
+//! The one exception is a linked pair, whose duck belongs to its sound half:
+//! the picture half never ducks (spec §11 AU-157).
 //! A duck in `speech` mode (format 29, spec §11 AU-110, AU-112) ducks over
 //! its media's saved speech spans instead; `audio_duck_speech.rs` turns
 //! those into project-time spans and this module's extent curve is applied
@@ -23,6 +25,7 @@ use std::iter::once;
 
 use crate::audio::{covers, Side};
 use crate::audio_duck_speech::speech_gain;
+use crate::edit_link::is_linked_picture;
 use crate::model::{Duck, DuckMode, Project};
 use crate::nest::Instance;
 use crate::time::Ticks;
@@ -137,6 +140,10 @@ impl Project {
     /// A speech duck's spans are measured from the clip's ORIGIN (its first
     /// frame in project time) and kept to the part that plays, `start` to
     /// `end` (`audio_duck_speech.rs`).
+    ///
+    /// A linked picture half is skipped, whatever duck it carries: a pair
+    /// saved before the duck moved to the sound half, or one pasted or set
+    /// there since, ducks nothing (spec §11 AU-157).
     pub(crate) fn duckers(&self, instances: &[Instance<'_>]) -> Vec<Ducker> {
         let mut out: Vec<Ducker> = Vec::new();
         for instance in instances {
@@ -147,6 +154,9 @@ impl Project {
                     continue;
                 }
                 if let Some(duck) = clip.audio.and_then(|a| a.duck) {
+                    if is_linked_picture(clip) {
+                        continue;
+                    }
                     let spans = (duck.mode == DuckMode::Speech)
                         .then(|| self.speech_spans(clip, origin, (start, end), &duck));
                     out.push(Ducker {

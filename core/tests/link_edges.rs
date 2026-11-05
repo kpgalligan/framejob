@@ -1,13 +1,14 @@
 //! The named edge cases of linked pairs (spec §11 AU-91, AU-93): two
 //! consecutive detached shots, a J-cut near 0, the shift floor's refusal in
-//! each op that shifts, and what `delete` and `ripple_delete` take.
+//! each op that shifts, what `delete` and `ripple_delete` take, and whose
+//! duck a pair's is (AU-157).
 //!
 //! Every pair here is made by `detach_audio` itself, so the link under test
 //! is the one the product writes.
 
 mod common;
 
-use common::{at, by_id, int, Handle};
+use common::{array, at, by_id, int, num, Handle};
 use serde_json::{json, Value};
 
 const SEC: i64 = 600_000;
@@ -224,4 +225,127 @@ fn a_split_of_both_consecutive_pairs_at_their_cut_changes_nothing() {
         pairs.try_apply(&json!({"op": "split", "clips": [10, 12], "at": 5 * SEC})),
         Ok(common::Outcome::Identity)
     ));
+}
+
+// ---- whose duck a pair's is (spec §11 AU-157) -------------------------------
+
+const VOICE: u32 = 10;
+const SOUND: u32 = 100;
+const BED: u32 = 20;
+/// Inside the voice's 2–12 s, past its attack.
+const DUCKED: i64 = 6 * SEC;
+
+fn duck() -> Value {
+    json!({"level": 0.2, "attack": 300_000, "release": 600_000})
+}
+
+fn set_duck(clip: u32, duck: Value) -> Value {
+    json!({"op": "set_audio", "clips": [clip], "patch": {"duck": duck}})
+}
+
+/// The voice (clip 10, 2–12 s, ducking) on track 3 over a 20 s bed (clip 20)
+/// on track 1, with track 2 empty for its sound.
+fn ducking() -> Handle {
+    project(vec![
+        shot(BED, 1, 0, 20 * SEC, 0),
+        shot(VOICE, 3, 2 * SEC, 10 * SEC, 0),
+    ])
+    .apply(&set_duck(VOICE, duck()))
+}
+
+/// The gain the plan gives `clip` at `t`: its composition audio track's ramp
+/// there, from the right.
+fn gain(handle: &Handle, clip: u32, t: i64) -> f64 {
+    let plan = handle.plan();
+    let track = array(&plan, "/audio_tracks")
+        .iter()
+        .find(|track| {
+            array(track, "/segments")
+                .iter()
+                .any(|s| s["clip"] == json!(clip))
+        })
+        .unwrap_or_else(|| panic!("no audio track carries clip {clip}: {plan}"));
+    for ramp in array(track, "/ramps") {
+        let (start, duration) = (int(ramp, "/start"), int(ramp, "/duration"));
+        if start <= t && t < start + duration {
+            let (from, to) = (num(ramp, "/from"), num(ramp, "/to"));
+            return from + (to - from) * ((t - start) as f64 / duration as f64);
+        }
+    }
+    panic!("no ramp covers {t}: {track}");
+}
+
+#[test]
+fn detach_leaves_the_duck_on_the_sound_half_alone() {
+    let pair = detach(ducking(), &[VOICE]).value();
+    assert!(
+        clip(&pair, 10)["audio"]["duck"].is_null(),
+        "the picture keeps no duck: {}",
+        clip(&pair, 10)
+    );
+    assert_eq!(num(clip(&pair, 100), "/audio/duck/level"), 0.2);
+    assert_eq!(int(clip(&pair, 100), "/audio/duck/attack"), 300_000);
+}
+
+#[test]
+fn a_detached_ducker_keeps_its_sound_and_ducks_the_bed_once() {
+    let attached = ducking();
+    assert_eq!(gain(&attached, VOICE, DUCKED), 1.0);
+    assert_eq!(gain(&attached, BED, DUCKED), 0.2);
+    let pair = detach(attached, &[VOICE]);
+    assert_eq!(gain(&pair, SOUND, DUCKED), 1.0, "its own sound is whole");
+    assert_eq!(gain(&pair, BED, DUCKED), 0.2, "the bed is ducked once");
+}
+
+#[test]
+fn attach_keeps_the_sound_halfs_duck() {
+    let back = detach(ducking(), &[VOICE]).apply(&json!({"op": "attach_audio", "clip": VOICE}));
+    assert_eq!(num(clip(&back.value(), 10), "/audio/duck/level"), 0.2);
+    assert_eq!(gain(&back, VOICE, DUCKED), 1.0);
+    assert_eq!(gain(&back, BED, DUCKED), 0.2);
+}
+
+#[test]
+fn a_stale_duck_on_a_picture_half_ducks_nothing() {
+    let stale = detach(ducking(), &[VOICE]).apply(&set_duck(VOICE, duck()));
+    assert_eq!(num(clip(&stale.value(), 10), "/audio/duck/level"), 0.2);
+    assert_eq!(gain(&stale, SOUND, DUCKED), 1.0);
+    assert_eq!(gain(&stale, BED, DUCKED), 0.2);
+
+    // With the sound's own duck off, the picture's is all there is.
+    let alone = stale.apply(&set_duck(SOUND, Value::Null));
+    assert_eq!(gain(&alone, SOUND, DUCKED), 1.0);
+    assert_eq!(gain(&alone, BED, DUCKED), 1.0);
+}
+
+#[test]
+fn a_stale_duck_inside_a_nest_ducks_nothing() {
+    // `nest` takes the pair whole. `Project::clip` cannot see into the nest
+    // from the flattened timeline, which is why the rule reads the clip alone.
+    let nested = detach(ducking(), &[VOICE])
+        .apply(&set_duck(VOICE, duck()))
+        .apply(&set_duck(SOUND, Value::Null))
+        .apply(&json!({"op": "nest", "clips": [VOICE]}));
+    let plain = nested.value();
+    assert_eq!(array(&plain, "/nests").len(), 1);
+    assert_eq!(
+        array(&plain, "/nests/0/clips").len(),
+        2,
+        "the pair is inside"
+    );
+    assert_eq!(gain(&nested, BED, DUCKED), 1.0);
+}
+
+#[test]
+fn a_sound_half_switched_off_still_ducks() {
+    let quiet = detach(ducking(), &[VOICE])
+        .apply(&json!({"op": "set_enabled", "clip": SOUND, "audio": false}));
+    assert_eq!(gain(&quiet, BED, DUCKED), 0.2);
+}
+
+#[test]
+fn an_unlinked_clip_with_its_audio_off_still_ducks() {
+    let quiet = ducking().apply(&json!({"op": "set_enabled", "clip": VOICE, "audio": false}));
+    assert!(clip(&quiet.value(), 10).get("linked").is_none());
+    assert_eq!(gain(&quiet, BED, DUCKED), 0.2);
 }

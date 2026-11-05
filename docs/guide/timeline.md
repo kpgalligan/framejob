@@ -287,11 +287,10 @@ play: Play beeps.
 ### Loop
 
 Turn on **Loop** in the toolbar to loop playback. With an in/out range set it
-loops the range; otherwise the loop is the whole timeline. A loop that ends at
-the end of the timeline doesn't repeat by itself: it jumps to its start and
-stops, and you press play to go round again. Pressing play at or past the end
-of the loop starts again from the loop's start. Loop is set per window and
-isn't saved.
+loops the range; otherwise the loop is the whole timeline. Playback goes round
+until you stop it, and a loop that ends at the end of the timeline goes round
+like any other. Pressing play at or past the end of the loop starts again from
+the loop's start. Loop is set per window and isn't saved.
 
 ### What you'll notice after an edit
 

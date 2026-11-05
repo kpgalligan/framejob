@@ -1768,7 +1768,7 @@
     {
      "id": "timeline-loop",
      "name": "Loop playback",
-     "summary": "The Loop button repeats the in/out range. With no range, playback goes back to the start of the timeline and stops there.",
+     "summary": "The Loop button repeats the in/out range, or the whole timeline when there's no range.",
      "page": "timeline/loop",
      "anchor": "turn-loop-on",
      "where": "Toolbar transport: Loop"

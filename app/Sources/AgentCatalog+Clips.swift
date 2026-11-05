@@ -434,8 +434,9 @@ extension AgentServer {
                     + "video — ⌥⌘D. The two are LINKED (`linked` names the other): moves, "
                     + "splits, ripples, nests and copies keep them in step in time; trim_start "
                     + "or trim_end with alone: true on the sound makes a J- or L-cut; speed and "
-                    + "reverse are refused until attach_audio. Refused, saying why, for a "
-                    + "non-media clip, media with no audio, or audio already detached.",
+                    + "reverse are refused until attach_audio. Ducking stays with the sound; the "
+                    + "picture's is dropped. Refused, saying why, for a non-media clip, media "
+                    + "with no audio, or audio already detached.",
                 ["clip": clipDescription]),
             opTool(
                 "attach_audio",

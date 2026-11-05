@@ -23,7 +23,7 @@ Splits a clip's sound onto its own clip on the track below. It's **Clip ▸ Deta
 | `scope` | integer | No | Look the clip up inside this nest. |
 | `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
 
-The original keeps its picture with its audio switched off. The new clip plays the sound with its video switched off. When the clip is on the bottom track, a new track is added under it.
+The original keeps its picture with its audio switched off, and loses its `audio.duck`: ducking stays with the sound. The new clip plays the sound with its video switched off. When the clip is on the bottom track, a new track is added under it.
 
 The two are linked, and each names the other under `linked`. Moves, splits, ripples, nests and copies keep them in step. To make a [J-cut or L-cut](/audio/j-and-l-cuts/), use `trim_start` or `trim_end` with `alone: true` on the sound. Speed and reverse edits are refused until [`attach_audio`](#attach_audio).
 

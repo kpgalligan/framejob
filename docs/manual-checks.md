@@ -118,6 +118,11 @@ the same way.
 - **Expect:** each drag plays the speech under the playhead in short pieces, words recognisable at a slow drag, with no clicks or pops between pieces; the music under it is heard as well. Dragging left plays each piece forwards. On the hold, the sound stops within about a tenth of a second and stays silent; nothing plays after the mouse-up. A single click plays one short piece. With the track muted the speech is not heard; at 25 % it is quieter. The level meter does not move while scrubbing. Play, the arrow keys and the marker click play no scrub sound (playback plays as before).
 - **Source:** road map "audio" AP13 (spec §11 AU-130…AU-136; `scrub_audio_probe.py` scores the scheduler, the window, the reader and the queue, never the sound on the Mac's output).
 
+**PB-15 — Loop goes round at the timeline's end, with its sound**
+- **Do:** 1. Put one clip with sound alone on a timeline. 2. Click **Loop** in the toolbar. 3. Press Home, then Space, and watch at least three passes.
+- **Expect:** playback goes round until you stop it, and the sound plays across each wrap.
+- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.
@@ -629,6 +634,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the quiet sentences come up and the loud ones come down, each from its first word, so the voice sits at a steady level; the room noise in the pauses does not swell up while nobody speaks; a phrase after a pause starts at its own level with no audible glide, jump or pumping rise into it; a 1 s response follows changes inside a sentence more closely, a 4 s one is gentler; the preview sounds the same after a seek as from the start, and the export sounds like the preview. The section reads "Ride the level", Target, Max Boost, Max Cut, Response, "Aims at … LUFS" and Loudness, nothing cut off.
 - **Answer:** does the levelled voice sound even and natural: pauses not swelling, and a phrase after a pause at its level with no audible glide?
 - **Source:** road map "audio" AP6 part 2 (spec §11 AU-66, AU-67); `tools/proof/audio_ap6b_proof.py` measures the speech's loudness range, each segment's start against its settled gain, the pauses' gain, the meter against the export, Enhance's rule and repeatability, and an action's target (P1–P8), not how it sounds.
+
+**SE-42 — A detached ducker keeps its voice and ducks the music once**
+- **Do:** 1. Put music on the bottom track and a clip with a voice on a track above it, with an empty track between. 2. Select the voice and tick **Duck other audio** in its Sound tab. 3. Press ⌥⌘D. 4. Play across the voice.
+- **Expect:** the voice stays at full level, and the music sits at 20 % under it.
+- **Source:** #468 (spec §11 AU-157); `docs_bugs_b1_proof.py` D1–D6 read the levels from exports through the op the checkbox sends and the Clip menu, never the real checkbox, the key or the sound.
 
 ## Speed ramps
 
