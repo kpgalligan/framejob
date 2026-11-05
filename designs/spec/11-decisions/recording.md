@@ -202,6 +202,18 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   does not reach it (Settings' precedent); `record_screen`'s span is wall
   clock and a pause is a person's act; and `perform_menu_item` reaches the
   item in a Release build.
+- **#478 — File ▸ New Recording… reads Stop Recording whenever pressing it
+  would stop** (2026-11-05). The title and the action are one rule,
+  `AppDelegate.newRecordingStops`: the panel's phase `.recording`, `.paused`
+  or `.starting`, else the recorder recording, which is the arms
+  `newRecording` routes by. The title used to read the recorder alone, so
+  between a press of Record and the capture's start (`.starting`, the
+  recorder not yet handed the attempt) the item read New Recording… and
+  abandoned the attempt when chosen. The rule reads
+  `RecorderPanelController.built`, the panel once `shared` has built it, so
+  validating the File menu never builds the panel; a panel not built is
+  idle. The window is usually milliseconds, so a real ⌥⌘N in it is
+  `docs/manual-checks.md` REC-20.
 - **A voice-over is a recording with no picture** (#99, owner-approved
   2026-10-02). It is the same recorder machine with no stream: the
   microphone alone, through the `AVCaptureSession` the screen recorder

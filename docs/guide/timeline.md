@@ -109,9 +109,8 @@ for it (see [Editing](editing.md)).
 **Remove Track** removes an empty track at once. If the track still holds
 clips it asks first ("The track still holds 3 clips, which will be removed
 with it.") with **Remove** and **Cancel**. The last track can't be removed:
-the context menu greys the item out, and **Track ▸ Remove Track** beeps and
-says why at the foot of the inspector, after the alert if that track holds
-clips. **Remove Empty Tracks** always keeps at least one track.
+the context menu and **Track ▸ Remove Track** both grey the item out. **Remove
+Empty Tracks** always keeps at least one track.
 
 The **Track** menu works on the *current track*: the first selected clip's
 track, or the front-most track when nothing is selected. Besides the commands
@@ -389,8 +388,9 @@ its time, its name, **Chapter**, **Go** and **Delete**. With none it says
 "No markers. Press M to add one."
 
 A new marker is called `Marker N` and is red. Two markers can't share a frame,
-so M on a frame that already has a marker shows an alert and adds nothing,
-and a drag onto another marker's frame doesn't move it. **Next Marker** and
+so M on a frame that already has a marker beeps, says which marker is there
+at the foot of the inspector, and adds nothing, and a drag onto another
+marker's frame doesn't move it. **Next Marker** and
 **Previous Marker** pause playback and jump; they beep when there is no marker
 further in that direction, and are dimmed when the project has no markers.
 

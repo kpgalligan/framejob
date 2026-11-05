@@ -16,7 +16,8 @@
 //!    refuses; `remove_empty_tracks` keeps the back-most.
 //! 2. **Two markers never share a tick.** A marker is how the user names a
 //!    moment, and two at one moment is a UI the timeline cannot draw. The
-//!    op that would create the collision is an `Err` naming the time.
+//!    op that would create the collision is refused, naming the marker
+//!    that holds the time ([`marker_taken`]).
 //! 3. **One media entry per path.** Re-importing a file already in the
 //!    project changes nothing; the clips reference the entry that is
 //!    already there.
@@ -69,6 +70,14 @@ pub(crate) const MEDIA_KEYS: [&str; 13] = [
 /// same id space and are swept alongside the timeline's.
 fn uses_media(clip: &Clip, media: u32) -> bool {
     clip.source.media() == Some(media)
+}
+
+/// A marker on a tick another holds (invariant 2, spec §11 #472): refused,
+/// naming the holder, so `add_marker` and `set_marker` say it once.
+fn marker_taken(holder: u32, at: Ticks) -> Outcome {
+    Outcome::Refused(format!(
+        "marker {holder} is already at {at} ticks; two markers may not share a frame"
+    ))
 }
 
 /// The clips of a `with_clips` refusal, as English (deepening D2·3).
@@ -362,7 +371,7 @@ impl Project {
     /// (spec §6).
     ///
     /// The default name is `Marker <count + 1>` and the default colour is
-    /// `"red"`. `Err` when another marker already holds the tick: two
+    /// `"red"`. Refused when another marker already holds the tick: two
     /// markers may not share a time, and moving the existing one is the
     /// caller's decision, not this op's.
     pub fn add_marker(
@@ -374,7 +383,7 @@ impl Project {
     ) -> Result<Outcome, String> {
         let at = self.snapped(at).max(0);
         if let Some(existing) = self.markers.iter().find(|m| m.time == at) {
-            return Err(format!("marker {} is already at {at} ticks", existing.id));
+            return Ok(marker_taken(existing.id, at));
         }
 
         let mut next = self.clone();
@@ -399,7 +408,7 @@ impl Project {
 
     /// Sets any subset of a marker's fields; an omitted argument keeps its
     /// value. A new time is snapped and clamped to 0 like `add_marker`'s,
-    /// and collides with another marker the same way (`Err`).
+    /// and collides with another marker the same way (refused).
     ///
     /// An empty `name` is allowed: it clears the label, which is how a
     /// marker becomes a plain mark.
@@ -417,7 +426,7 @@ impl Project {
             Some(given) => {
                 let at = self.snapped(given).max(0);
                 if let Some(other) = self.markers.iter().find(|m| m.id != marker && m.time == at) {
-                    return Err(format!("marker {} is already at {at} ticks", other.id));
+                    return Ok(marker_taken(other.id, at));
                 }
                 Some(at)
             }

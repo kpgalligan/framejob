@@ -11,7 +11,7 @@ The project's frame rate sets the grid that every edit lands on. A new project r
 
 ## Choose a rate
 
-In the **Frame Rate** section of the [Document tab](/projects/document-tab/), choose a rate from **Rate**: **24**, **23.976**, **25**, **30**, **29.97**, **50**, **60** or **Match First Clip**.
+In the **Frame Rate** section of the [Document tab](/projects/document-tab/), choose a rate from **Rate**: **24**, **23.976**, **25**, **30**, **29.97**, **50**, **60** or **Match First Clip**. The last item, **Custom**, is what the popup shows for a rate it [doesn't list](#rates-the-popup-doesnt-list).
 
 The change is one undo step. See [what it does to the timeline](#what-a-rate-change-does).
 
@@ -19,7 +19,7 @@ The change is one undo step. See [what it does to the timeline](#what-a-rate-cha
 
 **Match First Clip** takes the rate of the earliest clip on the timeline whose file has video. It beeps if there isn't one.
 
-It sets the rate once, and later changes to the timeline don't move it. The popup then shows that rate, if it [lists it](#rates-the-popup-doesnt-list). A picture counts as having video here, and it reads as 30 fps.
+It sets the rate once, and later changes to the timeline don't move it. The popup then shows that rate, or **Custom** if it [doesn't list it](#rates-the-popup-doesnt-list). A picture counts as having video here, and it reads as 30 fps.
 
 ## Footage at a different rate
 
@@ -34,11 +34,9 @@ A project can run at a rate the popup doesn't have, because a file's rate is kep
 - A file at 24, 23.976, 25, 30, 29.97, 48, 50, 60 or 59.94 fps keeps that exact rate.
 - Any other rate is kept to three decimals, so a 47.3 fps recording stays at 47.3 and doesn't become 48. Screen recordings often have odd rates.
 
-:::caution
-At a rate it doesn't list, **Rate** shows **24**. The **Frame rate** row at the top of the Document tab shows the real rate, so trust that one.
-:::
+At a rate it doesn't list, **Rate** shows **Custom**, with the check beside it. The **Frame rate** row at the top of the Document tab shows the real rate. Choosing **Custom** beeps and changes nothing.
 
-Choosing a popup item changes the rate. **Match First Clip** brings the file's own rate back.
+Choosing any other item changes the rate. **Match First Clip** brings the file's own rate back.
 
 ## What a rate change does
 

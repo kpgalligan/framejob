@@ -1215,6 +1215,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Answer:** does a real voice-over land enhanced and sound right, with the processing one undo away from the recording?
 - **Source:** road map "audio" AP6 part 3 (spec §11 AU-68, AU-69); `tools/proof/audio_ap6c_proof.py` drives both doors with `land_recording` over fixture files and `audio_ap6c_probe.py` the box, not a live recording or how it sounds.
 
+**REC-20 — ⌥⌘N while the panel reads Starting… stops the recording**
+- **Do:** 1. File ▸ New Recording…, choose a display in Source, and press Record. 2. As the countdown ends and the Record button reads **Starting…**, open the File menu and look at the item under New Project (a slow first start, such as the first recording after a launch, gives the most time); then press ⌥⌘N. 3. Do it again, pressing ⌥⌘N a moment later, just as the panel leaves the screen.
+- **Expect:** in step 2 the item reads **Stop Recording**, never New Recording…. If the press came before the recording began, the panel stays up, back at Record, with the note "Stopped before the recording began; nothing was recorded." and nothing lands. In step 3 the recording ends as soon as it has begun and what it captured lands as usual.
+- **Source:** spec §11 #478; `tools/proof/docs_bugs_a4_proof.py` N1–N5 reach the title and the stop through `docs_bugs_a4_probe.swift` with the phase written by hand, not a real start or a real key.
+
 **JOB-20 — A real recording's clicks are all in its cursor file**
 - **Do:** 1. File ▸ New Recording…, choose a display, and press Record. 2. Click exactly ten times, counting them, in another app's window (a TextEdit document, say), with a pause in the middle: press Pause from the menu-bar item after the fifth click, wait, Resume, and click five more times; scroll a little in each stretch. 3. Stop. 4. In Terminal, for each `.fjcursor` file beside the two movies in `~/Movies/Frame Job Recordings/`, run `python3 -c "import json,sys; c=json.load(open(sys.argv[1]))['clicks']; print(sum(c['down']), len(c['t']))" <file>`.
 - **Expect:** two `.fjcursor` files, each named after its movie. The first number for the two files adds up to 10 (five each), and each file's second number is twice its first (a down and an up per click). Neither the recording's note nor the panel says anything about the cursor.

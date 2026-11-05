@@ -60,15 +60,16 @@ pub enum Outcome {
     /// op hands on), a locked track (`edit_time.rs`'s `locked_track`, at
     /// `close_gap`, `insert_clip` and a rippled transition), the last track
     /// and a track that still holds clips, a media row a clip still shows
-    /// (`edit_track.rs`), a cut with nothing left to give a transition, a
-    /// request too short to make one and the two ways a rippled one has
-    /// nowhere to shift to (`edit_transition.rs`), an action that would
-    /// overlap another or run past its clip (`edit_action.rs`), a move to a
-    /// track index the document has not got (`edit_clip.rs`), and the
-    /// non-edits #88 gave a sentence: a roll with no cut (`edit_edge.rs`),
-    /// `detach_audio` with no audio to detach, `set_transition_duration`
-    /// with no clip before it or past the pair's overlap limit, and
-    /// `close_gap` aimed at a clip or at a track with nothing after `at`.
+    /// and a marker on a tick another holds (`edit_track.rs`), a cut with
+    /// nothing left to give a transition, a request too short to make one
+    /// and the two ways a rippled one has nowhere to shift to
+    /// (`edit_transition.rs`), an action that would overlap another or run
+    /// past its clip (`edit_action.rs`), a move to a track index the
+    /// document has not got (`edit_clip.rs`), and the non-edits #88 gave a
+    /// sentence: a roll with no cut (`edit_edge.rs`), `detach_audio` with
+    /// no audio to detach, `set_transition_duration` with no clip before it
+    /// or past the pair's overlap limit, and `close_gap` aimed at a clip or
+    /// at a track with nothing after `at`.
     ///
     /// **What still answers `Identity` although a doc comment calls it a
     /// refusal**, deliberately (§11 #88): the clamped edge ops in

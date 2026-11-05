@@ -480,11 +480,12 @@ To hold a different frame, ⌥⇧-drag the still's body (a slip, undo step
 **Slip**). The still stays where it is and holds an earlier or later frame
 of the source.
 
-The command works on a **selected** clip under the playhead and is available
-only when there is one. It needs a clip of a video file: on a clip of an
-audio-only file, a still image, a freeze frame, text, a shape, a graphic, an
-adjustment clip or a nest, the item stays available but shows an error (such as
-`clip 7 is not a media clip`) and nothing changes. A clip of a video file
+The command works on a **selected** clip under the playhead that it can
+freeze, and is dimmed when there is none. It needs a clip of a video file: a
+clip of an audio-only file, a still image, a freeze frame, text, a shape, a
+graphic, an adjustment clip or a nest can't be frozen. With more than one
+selected clip under the playhead, it freezes the earliest one that can be
+frozen and ignores the others. A clip of a video file
 freezes even with its picture switched off, or as the sound half of a detached
 clip, and the still shows the picture. If the still would break the overlap
 rule, as it does on a locked track and nearly always inside a

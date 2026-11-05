@@ -34,9 +34,9 @@ If the playhead sits on the clip's first frame, there's nothing to cut. The stil
 
 ## When it is available
 
-Freeze Frame works on a selected clip under the playhead. With nothing selected there, it's dimmed. A playhead exactly at a clip's end isn't on that clip. With several selected clips under the playhead, it acts on the first.
+Freeze Frame works on a selected clip under the playhead that it can freeze. With none there, it's dimmed. A playhead exactly at a clip's end isn't on that clip. With several selected clips under the playhead, it acts on the earliest one it can freeze.
 
-It needs a clip of a video file. A clip of an audio-only file, text, a shape, a picture, a graphic, an adjustment clip, a nest or another still can't be frozen. The command stays available on those, and Frame Job shows an error saying the clip "is not a media clip" or "has no video properties". Nothing changes.
+It needs a clip of a video file. A clip of an audio-only file, text, a shape, a picture, a graphic, an adjustment clip, a nest or another still can't be frozen, so with only those selected under the playhead the command is dimmed.
 
 A clip of a video file freezes even with its picture switched off, or as the sound half of a [detached](/audio/detach-and-attach/) clip. The still shows the picture either way.
 

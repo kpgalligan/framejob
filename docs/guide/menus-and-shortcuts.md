@@ -41,7 +41,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Item | Shortcut | What it does |
 |---|---|---|
 | New Project | ⌘N | A new, empty project window |
-| New Recording… | ⌥⌘N | Opens the recorder. While a recording runs, the item is called **Stop Recording** and stops it ([Screen recording](screen-recording.md)) |
+| New Recording… | ⌥⌘N | Opens the recorder. While a recording starts or runs, the item is called **Stop Recording** and stops it ([Screen recording](screen-recording.md)) |
 | Pause Recording | | Pauses the running recording. It is called **Resume Recording** while paused, and is enabled only during a recording |
 | New Project from Range… | | Opens the In–Out range as a new untitled project, with its media's caches and its graphics ([New Project from Range](projects-and-media.md#new-project-from-range)). Enabled with an In–Out range set and no nest open |
 | Make Vertical Version… | | Makes a 9:16, 4:5 or 1:1 version of the timeline, each full-frame movie clip following its subject — with Follow Speaker, a wide shot of two to four people cutting to whoever is talking on the microphones you tick — opened as a new untitled project or made in this one ([Make Vertical Version](vertical-and-framing.md#make-vertical-version)) |
@@ -210,7 +210,8 @@ original.
 |---|---|
 | Split | The timeline has any clip |
 | Split at Shot Changes | A selected clip shows a video file's picture |
-| Trim Start / End to Playhead, Freeze Frame | A selected clip is under the playhead |
+| Trim Start / End to Playhead | A selected clip is under the playhead |
+| Freeze Frame | A selected clip of a video file is under the playhead |
 | Detach Audio | Something is selected |
 | Attach Audio | A selected clip is linked to its detached sound or picture |
 | Normalize | A selected clip plays sound |
@@ -259,7 +260,7 @@ field.
 | Item | Shortcut | What it does |
 |---|---|---|
 | New Track | ⇧⌘N | Adds a track |
-| Remove Track | | Removes the current track. If it still holds clips, you are asked first |
+| Remove Track | | Removes the current track. If it still holds clips, you are asked first. Dimmed when the project has only one track |
 | Remove Empty Tracks | | Removes every track that has no clips |
 | Hide Video | | Hides the current track's picture |
 | Mute Audio | | Mutes the current track's sound |

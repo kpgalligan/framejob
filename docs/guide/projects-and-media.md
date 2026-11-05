@@ -118,10 +118,10 @@ Width and height must both be even. An odd value is refused, for example "canvas
 
 | Control | What it does |
 |---|---|
-| **Rate** | 24, 23.976, 25, 30, 29.97, 50, 60, or **Match First Clip**, which takes the rate of the earliest clip on the timeline whose file has video (beeps if there is none). |
+| **Rate** | 24, 23.976, 25, 30, 29.97, 50, 60, or **Match First Clip**, which takes the rate of the earliest clip on the timeline whose file has video (beeps if there is none). **Custom** shows for a rate the popup doesn't list. |
 | **Duration** | Read-only: the timeline's length. |
 
-A project can run at a rate the popup does not list. An opened file at 24, 23.976, 25, 30, 29.97, 48, 50, 60 or 59.94 fps keeps that exact rate; any other rate (screen recordings often have odd ones) is kept to three decimals. The popup then shows **24**, while the Document summary's **Frame rate** row shows the real rate. Picking a popup item changes the rate, and **Match First Clip** brings the file's rate back.
+A project can run at a rate the popup does not list. An opened file at 24, 23.976, 25, 30, 29.97, 48, 50, 60 or 59.94 fps keeps that exact rate; any other rate (screen recordings often have odd ones) is kept to three decimals. The popup then shows **Custom**, while the Document summary's **Frame rate** row shows the real rate. Picking **Custom** beeps and changes nothing. Picking another item changes the rate, and **Match First Clip** brings the file's rate back.
 
 Changing the rate moves every clip start, length, action and marker onto the new frame grid. If two markers land on the same frame at the new rate, the one added first stays and the other is dropped.
 

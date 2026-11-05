@@ -1598,6 +1598,18 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   drop flashes and says nothing else, as a refused plain drag does: no beep
   and no strip sentence. A refused drop after a good tick keeps that good
   frame with its one undo step, as a plain drag always has.
+- **#472 — A marker on a tick another marker holds is refused, naming that
+  marker.** Amends #88's list of the rules that speak. `add_marker` at a
+  held tick, and `set_marker` with a `time` on one, answer `marker {holder}
+  is already at {at} ticks; two markers may not share a frame`, written once
+  in `edit_track.rs`'s `marker_taken`. They were an `Err`, and the reason is
+  #88's for `detach_audio`: Mark ▸ Add Marker and M are live on any frame,
+  and an `Err` is an error alert with the raw ids and ticks, where a refusal
+  is a beep and the inspector's strip. No undo step, as before. An agent now
+  reads `Add Marker was refused at add_marker: …`, which is what the
+  catalog's "refused" already said. A marker drag's live ticks swallow every
+  non-applied answer (`ProjectDocument.updateLiveEdit`), so nothing changes
+  there.
 - **#470 — A rule that can only stop an export is told before anything is
   queued or any file is touched, and a file is replaced only once its
   pipeline has been built.** Two rules can only stop a resolved export: an

@@ -44,6 +44,21 @@ import AppKit
 /// is what an un-retitled button can honestly do. The look and the title
 /// are untouched, since a chrome proof photographs the welcome window.
 extension AppDelegate {
+    /// Whether File ▸ New Recording… stops rather than shows — the title's
+    /// rule, `AppDelegate.validateMenuItem` (#478). It is `newRecording`'s
+    /// switch below read without acting: the two are one rule, so the item
+    /// reads Stop Recording while the panel's attempt is `.starting` too.
+    /// It reads `RecorderPanelController.built`, never `shared`, so a
+    /// validation never builds the panel; a panel not built is idle.
+    static var newRecordingStops: Bool {
+        switch RecorderPanelController.built?.phase {
+        case .recording?, .paused?, .starting?:
+            return true
+        default:
+            return ScreenRecorder.shared.isRecording
+        }
+    }
+
     @objc func newRecording(_ sender: Any?) {
         let panel = RecorderPanelController.shared
         switch panel.phase {

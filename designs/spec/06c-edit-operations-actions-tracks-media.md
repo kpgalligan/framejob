@@ -313,6 +313,8 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.
+  An `add_marker` or a `set_marker` `time` on a tick another marker holds is refused, naming it
+  (`marker 4 is already at 600000 ticks; two markers may not share a frame`, §11 #472).
   Default color `red`.
 - **`set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?,
   timecode_frames?, output?, blending?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size

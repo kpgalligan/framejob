@@ -62,7 +62,7 @@ The first groups make, open, close and save projects, and start or stop a record
 | Item | Keys | What it does | Available when |
 | --- | --- | --- | --- |
 | **New Project** | <kbd>⌘N</kbd> | Opens a new, empty project window straight away, 1920×1080 at 30 fps. See [Start a project](/projects/start-a-project/). | With or without a project open |
-| **New Recording…** | <kbd>⌥⌘N</kbd> | Opens the [recorder panel](/recording/recorder-panel/). While a recording runs the item reads **Stop Recording** and stops it, whether the panel or an agent started it. | With or without a project open |
+| **New Recording…** | <kbd>⌥⌘N</kbd> | Opens the [recorder panel](/recording/recorder-panel/). While a recording starts or runs the item reads **Stop Recording** and stops it, whether the panel or an agent started it. | With or without a project open |
 | **Pause Recording** | | Pauses the running recording. The item reads **Resume Recording** while paused. It beeps if the recording can't pause or resume. | During a recording |
 | **New Project from Range…** | | Opens the in/out range as a new untitled project, with its media's caches and its graphics. See [New Project from Range](/projects/new-project-from-range/). | An in/out range is set and no nest is open |
 | **Make Vertical Version…** | | Makes a 9:16, 4:5 or 1:1 version of the timeline, as a new untitled project or in this one. Each full-frame movie clip follows its subject, and [Follow Speaker](/framing/follow-speaker/) cuts a wide shot of two to four people to whoever is talking. See [Make Vertical Version](/framing/make-vertical-version/). | The project has a clip, no nest is open and no recording is running |
@@ -164,7 +164,7 @@ Everything here but **New Track** and **Remove Empty Tracks** acts on the [curre
 | Item | Keys | What it does |
 | --- | --- | --- |
 | **New Track** | <kbd>⇧⌘N</kbd> | Adds a track at the front, the top lane. See [Add, rename and reorder tracks](/timeline/manage-tracks/). |
-| **Remove Track** | | Removes the current track. If it still holds clips you're asked first and told how many go with it, with **Remove** and **Cancel**. The last track can't be removed. |
+| **Remove Track** | | Removes the current track. If it still holds clips you're asked first and told how many go with it, with **Remove** and **Cancel**. The last track can't be removed, so the item is greyed out while the project has one track. |
 | **Remove Empty Tracks** | | Removes every track that has no clips, keeping one if they're all empty. It beeps when there's nothing to remove. |
 | **Hide Video** | | Hides or shows the track's picture. See [Hide and lock tracks](/timeline/hide-and-lock-tracks/). |
 | **Mute Audio** | | Mutes or unmutes the track's sound. Mute wins over Solo. See [Mute and solo tracks](/audio/mute-and-solo/). |
@@ -183,7 +183,7 @@ Everything here but **New Track** and **Remove Empty Tracks** acts on the [curre
 
 | Item | Keys | What it does | Available when |
 | --- | --- | --- | --- |
-| **Add Marker** | <kbd>M</kbd> (key) | Adds a marker at the playhead, snapped to a frame. A second marker on the same frame adds nothing and shows an alert. See [Markers](/timeline/markers/). | No nest is open |
+| **Add Marker** | <kbd>M</kbd> (key) | Adds a marker at the playhead, snapped to a frame. A second marker on the same frame adds nothing: Frame Job beeps and says why at the foot of the inspector. See [Markers](/timeline/markers/). | No nest is open |
 | **Set In** | <kbd>I</kbd> (key) | Sets the in point at the playhead. With no Out yet, the range runs to the end of the timeline. See [The in/out range](/timeline/in-out-range/). | Always |
 | **Set Out** | <kbd>O</kbd> (key) | Sets the out point at the playhead. With no In yet, the range starts at 0. | Always |
 | **Clear Range** | <kbd>⌥X</kbd> | Clears the in/out range. | A range is set |

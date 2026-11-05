@@ -511,3 +511,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `toolTip`, which would double the popover; VoiceOver reads it as "About
   <section>" with the text as its help. Accepted: one rounded shape in
   square chrome.
+- **#495 — The Document tab's Rate popup reads Custom for a rate it does
+  not list** (2026-11-05). Its items are `Fps.common`, Match First Clip and
+  a trailing **Custom**, the Canvas Preset's own Custom
+  (`DocumentPane.canvasSection`). Custom is shown, and checked, for a
+  project rate the popup does not list, such as 59.94 or 48 fps from a file
+  or an agent; picking it beeps and changes nothing, since no field types a
+  rate there. The popup used to fall back to its first item, so it drew and
+  checked 24 for any unlisted rate. `Fps.common` and the Export sheet's
+  rates are unchanged.

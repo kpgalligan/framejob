@@ -2050,9 +2050,9 @@ fn a_project_always_keeps_one_track() {
 fn two_markers_may_not_share_a_tick() {
     let project = general();
     // The fixture's marker 50 is at 6 000 000.
-    assert_contains(
-        &project.errors(&json!({"op": "add_marker", "at": 6000000})),
-        "marker 50 is already at 6000000 ticks",
+    project.refuses_with(
+        &json!({"op": "add_marker", "at": 6000000}),
+        "marker 50 is already at 6000000 ticks; two markers may not share a frame",
     );
     let second = project.apply(&json!({"op": "add_marker", "at": 1200000, "chapter": true}));
     let after = second.value();
@@ -2062,9 +2062,9 @@ fn two_markers_may_not_share_a_tick() {
     assert_eq!(text(added, "/color"), "red", "the default palette name");
     assert!(flag(added, "/chapter"));
 
-    assert_contains(
-        &second.errors(&json!({"op": "set_marker", "marker": 60, "time": 6000000})),
-        "marker 50 is already at 6000000 ticks",
+    second.refuses_with(
+        &json!({"op": "set_marker", "marker": 60, "time": 6000000}),
+        "marker 50 is already at 6000000 ticks; two markers may not share a frame",
     );
     // A marker dragged left of zero clamps rather than erroring.
     let clamped = project

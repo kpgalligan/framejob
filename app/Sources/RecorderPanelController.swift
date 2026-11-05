@@ -128,6 +128,11 @@ import ScreenCaptureKit
 /// when never set, and the camera's Layout and cutout (CO-82), Corner and off.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
+    /// The panel once `shared` has built it, else nil: a panel never built
+    /// is idle. It exists so File ▸ New Recording…'s validation
+    /// (`AppDelegate.newRecordingStops`, #478) reads the phase without
+    /// building the panel.
+    static private(set) weak var built: RecorderPanelController?
 
     // MARK: - Defaults keys
 
@@ -298,6 +303,7 @@ final class RecorderPanelController: NSWindowController {
                 leading: [statusLabel]),
             width: Self.cardWidth)
         super.init(window: panel)
+        Self.built = self
 
         buildRows(into: content)
         // The card is a subview pinned at the top-left of a plain root, and

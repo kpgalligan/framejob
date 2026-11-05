@@ -30238,6 +30238,31 @@ python3 tools/proof/docs_bugs_b3_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b3_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
+## Docs bugs a4 — menu items that promise what their edit refuses (`docs_bugs_a4_proof.py`, `docs_bugs_a4_probe.swift`; eight mutants by `--mutant`, with `recording_probe.py`'s `retitle`; spec §11 #472, #478, #495)
+
+#473, #472, #478, #490 and #495. **`docs_bugs_a4_proof.py`** drives one instance on a scratch
+`CFFIXED_USER_HOME` under `work/docs-bugs-a4/`, with `media/A.mov` and `media/toneA.m4a`. The F, M
+and T rows read a menu item's state from `perform_menu_item` with no path, which asks each item's
+validator, and perform Clip ▸ Freeze Frame, Mark ▸ Add Marker and Track ▸ Remove Track; a sheet is
+read from `snapshot_ui`'s layout dump and answered with `cancel_sheet`. The same instance makes and
+saves the probe's five packages (`new_project`, `set_canvas`, `save_project`).
+
+**`docs_bugs_a4_probe.swift`** reaches what MCP cannot: File ▸ New Recording…'s title from
+`AppDelegate.validateMenuItem` with the recorder panel's phase, `launched` and the recorder's state
+written by hand under sealed grant doors (N1–N5, `recording_probe.py`'s chrome mode's way; nothing
+records), and the Document tab's Rate popup drawn with `cacheDisplay` into a PNG and picked through
+its own `itemPicked:` (P1–P5). It names only symbols the base has, so it builds over
+`--base-sources` and N1, P1, P2 and P5 are red there by behaviour. `marker-err` is a core mutant: its
+copy gets a real `core/`. A mutant of probe rows only builds the probe over the copy's sources. A
+real ⌥⌘N while the panel reads Starting… is `docs/manual-checks.md` REC-20.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a4_proof.py [--only F1,M1,T1,N1,P1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a4_proof.py
+python3 tools/proof/docs_bugs_a4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a4_proof.py --base-sources <its app/Sources> --expect-red
+```
+
 ## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)
 
 Docs bugs batch c3 (#479, #480, #499, #512, #513, #515, spec §11 GR-36, GR-37, GR-38). The built app

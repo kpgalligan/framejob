@@ -188,12 +188,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(newRecording(_:)) {
-            // File ▸ New Recording… reads Stop Recording while one runs — the
-            // same item, retitled from live state (road map 3, R1c). The state read is the
-            // RECORDER's, so the title also covers a recording the
-            // `record_screen` tool started; `AppDelegate+Recording.swift`
+            // File ▸ New Recording… reads Stop Recording while one starts or
+            // runs — the same item, retitled from live state (road map 3,
+            // R1c), by the rule `newRecording` acts on (#478): the panel's
+            // phase, then the RECORDER, so the title also covers a recording
+            // the `record_screen` tool started; `AppDelegate+Recording.swift`
             // routes the stop to whichever door owns it.
-            item.title = ScreenRecorder.shared.isRecording ? "Stop Recording" : "New Recording…"
+            item.title = Self.newRecordingStops ? "Stop Recording" : "New Recording…"
         }
         if item.action == #selector(pauseOrResumeRecording(_:)) {
             // File ▸ Pause Recording (#98) reads the RECORDER, as the retitle

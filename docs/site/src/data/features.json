@@ -793,7 +793,7 @@
     {
      "id": "project-frame-rate",
      "name": "Project frame rate",
-     "summary": "Picks the project's rate: 24, 23.976, 25, 30, 29.97, 50 or 60 fps, or Match First Clip.",
+     "summary": "Picks the project's rate: 24, 23.976, 25, 30, 29.97, 50 or 60 fps, or Match First Clip. Custom shows a rate it doesn't list.",
      "page": "projects/frame-rate",
      "anchor": "choose-a-rate",
      "where": "Document tab ▸ Frame Rate ▸ Rate"
@@ -809,7 +809,7 @@
     {
      "id": "unlisted-frame-rates",
      "name": "Rates the popup does not list",
-     "summary": "A project can run at a rate the popup doesn't list. The popup then shows 24, and the Frame rate row shows the real rate.",
+     "summary": "A project can run at a rate the popup doesn't list. The popup then shows Custom, and the Frame rate row shows the real rate.",
      "page": "projects/frame-rate",
      "anchor": "rates-the-popup-doesnt-list"
     },
@@ -7013,7 +7013,7 @@
     {
      "id": "speed-freeze-availability",
      "name": "When Freeze Frame is available",
-     "summary": "Freeze Frame works on a selected clip under the playhead and needs a clip of a video file.",
+     "summary": "Freeze Frame works on a selected clip of a video file under the playhead, and is dimmed when there's none.",
      "page": "speed/freeze-frame",
      "anchor": "when-it-is-available",
      "where": "Clip ▸ Freeze Frame",

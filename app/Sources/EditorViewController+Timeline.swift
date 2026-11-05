@@ -204,6 +204,13 @@ extension EditorViewController {
         return selectedClips.filter { $0.contains(now) }
     }
 
+    /// The clips under the playhead `freeze_frame` admits: a media source
+    /// with a video group (`edit_time.rs`'s two refusals, #473). A clip with
+    /// its picture turned off still has the group, and freezes.
+    private var freezableUnderPlayhead: [ClipSnapshot] {
+        clipsUnderPlayhead.filter { $0.source.hasSourceBound && $0.video != nil }
+    }
+
     // MARK: - Clip commands (spec §6, the keys of §9)
 
     /// ⌘T. With nothing selected the core splits every unlocked clip under
@@ -289,7 +296,7 @@ extension EditorViewController {
 
     /// ⇧⌘F — one still clip filling a gap opened at the playhead.
     func freezeSelection() {
-        guard let document = document, let clip = clipsUnderPlayhead.first else {
+        guard let document = document, let clip = freezableUnderPlayhead.first else {
             NSSound.beep()
             return
         }
@@ -490,13 +497,20 @@ extension EditorViewController {
             if view.window?.firstResponder is NSText { return false }
             if transcriptHoldsWords { return true }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
-        case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)),
-            #selector(freezeFrame(_:)):
+        case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)):
             return !clipsUnderPlayhead.isEmpty
+        case #selector(freezeFrame(_:)):
+            // Live only over a clip the core can freeze (#473), the clip
+            // `freezeSelection` then takes.
+            return !freezableUnderPlayhead.isEmpty
         case #selector(splitAtPlayhead(_:)):
             return !document.editedProject.snapshot.clips.isEmpty
-        case #selector(removeTrack(_:)), #selector(toggleTrackHidden(_:)),
-            #selector(toggleTrackMuted(_:)), #selector(toggleTrackLocked(_:)):
+        case #selector(removeTrack(_:)):
+            // The core refuses the last track (#490), so the question is not
+            // asked of it; a nest counts its own tracks, as the rule does.
+            return currentTrack != nil && document.editedProject.snapshot.tracks.count > 1
+        case #selector(toggleTrackHidden(_:)), #selector(toggleTrackMuted(_:)),
+            #selector(toggleTrackLocked(_:)):
             return currentTrack != nil
         case #selector(nextMarker(_:)), #selector(previousMarker(_:)):
             return !document.project.snapshot.markers.isEmpty

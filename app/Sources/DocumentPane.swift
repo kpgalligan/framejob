@@ -246,19 +246,24 @@ final class DocumentPane: InspectorPaneView {
     private func rateSection() -> InspectorSection {
         let binding = self.binding
         let rates = Fps.common
-        let items = rates.map { $0.displayName } + ["Match First Clip"]
+        // "Custom" is what the popup shows, and checks, for a rate it does
+        // not list (#495), the Canvas Preset's own Custom (`canvasSection`).
+        let items = rates.map { $0.displayName } + ["Match First Clip", "Custom"]
         let popup = OptionPopupControl(
             width: 168, items: items,
             read: {
                 let fps = binding.documentCanvas.fps
-                return rates.firstIndex { $0.num == fps.num && $0.den == fps.den } ?? 0
+                return rates.firstIndex { $0.num == fps.num && $0.den == fps.den }
+                    ?? items.count - 1
             },
             write: { [weak self] index in
                 if rates.indices.contains(index) {
                     binding.apply("Frame Rate", [.setCanvas(fps: rates[index])])
-                } else if let fps = self?.firstClipRate() {
+                } else if index == rates.count, let fps = self?.firstClipRate() {
                     binding.apply("Frame Rate", [.setCanvas(fps: fps)])
                 } else {
+                    // Match First Clip with no clip to match, or Custom,
+                    // which changes nothing: no field types a rate here.
                     NSSound.beep()
                 }
             },
