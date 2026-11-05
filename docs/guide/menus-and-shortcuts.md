@@ -361,7 +361,7 @@ next control instead.
 
 | Key | What it does |
 |---|---|
-| Space | Play / pause, wherever the focus is in the window. In a text field, Space types a space. A button focused with Full Keyboard Access keeps Space to press itself. On a canvas you've clicked with Caps Lock on, press and release each toggle playback, so a tap leaves it as it was |
+| Space | Play / pause, wherever the focus is in the window. In a text field, Space types a space. A button focused with Full Keyboard Access keeps Space to press itself |
 | L | Plays forward. Press it again for 2× and then 4× |
 | J | Plays in reverse. Press it again for 2× and then 4× in reverse |
 | K | Pauses |
@@ -369,8 +369,8 @@ next control instead.
 | ↑ / ↓ | Moves to the previous or next edit point |
 | Home / End | Moves to the start or end of the project |
 
-The arrow keys do this even when the preview canvas has focus. They don't
-move the selected clips.
+With the preview canvas focused and a selected clip showing at the playhead,
+the arrow keys nudge that clip instead ([below](#preview-canvas-gestures)).
 
 ### Editing
 
@@ -415,8 +415,8 @@ move the selected clips.
 
 - A canvas drag in progress (move, scale, rotate, crop, line endpoint,
   obscure region): ⎋ puts everything back as it was before you pressed, and
-  no undo step is added. Caps Lock has to be off.
-- Crop mode: ⎋ or ↩, with the canvas focused and Caps Lock off.
+  no undo step is added.
+- Crop mode: ⎋, ↩ or the keypad's Enter, from anywhere but a text field.
 - Region mode (Z, or the Obscure section's **Place on Canvas**). It also
   ends by itself when the selection stops being the clip it was started
   for, or the playhead leaves that clip. Z beeps unless exactly one clip is
@@ -523,9 +523,9 @@ or the Color tab instead.
 | Drag a line or arrow endpoint | Moves that end of the shape |
 | Drag an obscure region's centre grip or one of its eight handles | Moves or resizes that region. ⌥ resizes it around its centre. The grips show only with exactly one unlocked clip selected, outside crop mode. A drag inside the region but away from the grips still moves the clip |
 | Double-click a text clip | Edits the text in place |
-| Double-click any other clip | Turns on crop mode |
-| ← → ↑ ↓ (canvas has focus) | Moves the playhead, as anywhere else in the window ([above](#playback-and-moving-the-playhead)). They don't move the selected clips |
-| Hold Space and drag | Pans a zoomed canvas that is larger than the preview. A Space tap still plays and pauses. Neither works with Caps Lock on |
+| Double-click a video, image or still clip | Turns on crop mode. A shape or graphic beeps, except on a matte track |
+| ← → ↑ ↓ (canvas has focus) | Nudges a selected clip showing at the playhead 1 pixel, or 10 with ⇧. Otherwise moves the playhead, as anywhere else in the window ([above](#playback-and-moving-the-playhead)). During a canvas drag they do nothing |
+| Hold Space and drag | Pans a zoomed canvas that is larger than the preview. A Space tap still plays and pauses |
 | Pinch, or ⌥ / ⌘ with the scroll wheel | Steps the canvas zoom |
 | Scroll | Pans a canvas that is larger than the preview |
 

@@ -36,7 +36,7 @@ These keys need no modifier and act on the editor window. They also work in the 
 | <kbd>N</kbd> | Snapping on or off |
 | <kbd>⎋</kbd> | Deselect the selected action |
 
-<kbd>⇧</kbd> and Caps Lock still count as no modifier, so Caps Lock doesn't stop these keys, apart from [<kbd>Space</kbd> on a canvas you've clicked](/canvas/zoom-and-pan/#space-on-the-canvas). <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> always make it a different key.
+<kbd>⇧</kbd> and Caps Lock still count as no modifier, so Caps Lock doesn't stop these keys. <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> always make it a different key.
 
 The single-letter keys never fire while you're typing. While a sheet is open none of them works, in either window, so the project can't change underneath the sheet. In the Preview Window they also do nothing while a field in the editor window is still being typed in.
 
@@ -48,7 +48,7 @@ A few places claim keys for themselves while they hold the focus:
 
 | Where the focus is | What changes |
 | --- | --- |
-| The preview canvas | Hold <kbd>Space</kbd> and drag to pan a zoomed canvas. A tap of <kbd>Space</kbd> still plays and pauses. |
+| The preview canvas | The arrow keys [nudge a selected clip](/canvas/move-scale-rotate/#nudge-with-the-arrow-keys) that's showing at the playhead. Hold <kbd>Space</kbd> and drag to pan a zoomed canvas. A tap of <kbd>Space</kbd> still plays and pauses. The canvas has the focus from a click or drag on it until you click anywhere else in the window. |
 | The Transcript tab's text | The arrow keys select words. See [Transcript keys](/captions/transcript-keys/). |
 | A selected point on a [curve](/color/curves/) | The arrow keys move the point, <kbd>⌫</kbd> deletes it and <kbd>⎋</kbd> deselects it. |
 | A button, with macOS Full Keyboard Access on | <kbd>Space</kbd> presses the button. |
@@ -111,8 +111,8 @@ In a sheet, <kbd>↩</kbd> presses the main button and <kbd>⎋</kbd> presses **
 
 | What's under way | What <kbd>⎋</kbd> does |
 | --- | --- |
-| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | Puts everything back as it was before you pressed, with no undo step, while Caps Lock is off |
-| Crop mode | Leaves it, as <kbd>↩</kbd> does, while the preview canvas holds the focus and Caps Lock is off. <kbd>C</kbd> leaves it from anywhere. |
+| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | Puts everything back as it was before you pressed, with no undo step |
+| Crop mode | Leaves it, as <kbd>↩</kbd> and the keypad's <kbd>Enter</kbd> do, wherever the focus is, except while you're typing in a field. |
 | Region mode, from <kbd>Z</kbd> or the Obscure section's **Place on Canvas** | Leaves it |
 | The key-colour or qualifier eyedropper | Cancels it |
 | A selected curve point in the Color tab | Deselects it |

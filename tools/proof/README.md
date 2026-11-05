@@ -30067,6 +30067,23 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a1_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a1_proof.py --mutant <name>
 ```
 
+## Docs-bugs batch a2 — canvas keys and crop mode (`docs_bugs_a2_proof.py`, `docs_bugs_a2_probe.swift`; twelve mutants by `--mutant`; spec §11 K-5, K-6, K-7)
+
+#463, #474 and #475. **`docs_bugs_a2_proof.py`** has the app under test make its project over MCP,
+then runs every row but Z1 through **`docs_bugs_a2_probe.swift`**, the app's own sources on that
+package with the Compositor metallib beside the binary: a key press and a double-click can't be sent
+over MCP, and crop mode has no menu item or tool. The app is `.prohibited` and its window alpha 0, so
+nothing takes focus, and no event is posted. Keys go through `EditorWindow.sendEvent`; a press goes
+by `mouseDown(with:)` to the view `hitTest` picks, except F1 and F2, which test what `sendEvent` does
+before dispatch. A beep is not silenced: S1 to S5 may be heard. What a real keyboard sends is TL-18.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a2_proof.py [--only N1,K3]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a2_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
+```
+
 ## The documentation site (`docs_site_proof.py`)
 
 The site in `docs/site/` against the tree, with no app, no build, no network and no node, so it

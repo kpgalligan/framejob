@@ -30,7 +30,7 @@ Crop mode turns the handles on the canvas into crop edges.
 
 </Steps>
 
-<kbd>C</kbd> beeps when no selected clip is showing at the playhead, because there's nothing on the canvas to crop. Double-clicking a text clip opens its text editor instead.
+<kbd>C</kbd> beeps when no selected clip is showing at the playhead, because there's nothing on the canvas to crop. It beeps on a text, shape or graphic clip too, because crop mode opens only on a video clip, image clip or freeze frame, and so does a double-click on a shape or graphic. Double-clicking a text clip opens its text editor instead. A [matte track](#good-to-know) is the exception.
 
 Going in and out of crop mode isn't an edit, so it adds nothing to undo.
 
@@ -43,7 +43,7 @@ The area you're cutting away shows as a faint white shape, inside a dashed outli
 - A drag changes the crop and nothing else. The clip's position stays put, and the picture doesn't shift.
 - A crop drag doesn't snap.
 - At least one source pixel always remains in each direction, however far you drag.
-- Press <kbd>Esc</kbd> during a drag to cancel it, with Caps Lock off. The crop goes back to where it was, with no undo step.
+- Press <kbd>Esc</kbd> during a drag to cancel it. The crop goes back to where it was, with no undo step.
 - Each finished drag is one undo step.
 
 Dragging inside the box still moves the clip, as it does outside crop mode. With several clips selected, the handles belong to the front-most one and crop only that clip.
@@ -54,18 +54,18 @@ Your crop stays when you leave. Any of these leaves crop mode:
 
 | Do this | Good to know |
 | --- | --- |
-| Press <kbd>Return</kbd> | Needs the canvas to have focus, and Caps Lock off. The keypad's <kbd>Enter</kbd> doesn't leave crop mode. |
-| Press <kbd>Esc</kbd> | Needs the canvas to have focus, and Caps Lock off. During a drag, the first <kbd>Esc</kbd> cancels the drag and the next one leaves the mode. |
+| Press <kbd>Return</kbd> or the keypad's <kbd>Enter</kbd> | Works wherever the focus is, except while you're typing in a field. Caps Lock makes no difference. |
+| Press <kbd>Esc</kbd> | Works wherever the focus is, except while you're typing in a field. Caps Lock makes no difference. During a drag, the first <kbd>Esc</kbd> cancels the drag and the next one leaves the mode. With an action selected, the first <kbd>Esc</kbd> leaves crop mode and the next one deselects the action. |
 | Press <kbd>C</kbd> or choose **Crop on Canvas** | <kbd>C</kbd> works wherever the focus is, except while you're typing in a field. |
 | Click empty canvas | This also clears the selection, unless you hold <kbd>⇧</kbd>. |
 
-The canvas has focus once you've clicked or dragged on it, until you click into a field. Without that focus, <kbd>Return</kbd> and <kbd>Esc</kbd> don't leave crop mode, so if you came in with <kbd>C</kbd> or **Crop on Canvas** and haven't touched the canvas since, press <kbd>C</kbd> again to leave.
+Going into crop mode doesn't move the focus, so these keys work however you came in.
 
-Clicking a clip that isn't selected doesn't leave crop mode. That clip becomes the selection, and the crop handles move to it.
+Clicking a video clip, image clip or freeze frame that isn't selected doesn't leave crop mode. That clip becomes the selection, and the crop handles move to it. Clicking a text, shape or graphic clip leaves crop mode, because it can't be cropped.
 
 With several clips selected, crop mode ends if the clip you click isn't the front-most selected clip afterwards. That includes a <kbd>⇧</kbd>-click that takes a clip out of the selection, or adds one behind the front-most.
 
-Crop mode also ends if nothing selected is left on the canvas, for example when you clear the selection in the timeline.
+Crop mode also ends if nothing selected is left on the canvas, for example when you clear the selection in the timeline. It ends too if the front-most selected clip stops being one it can open on, for example when you select a text clip in the timeline, or the playhead reaches a selected shape in front of the clip you were cropping.
 
 ## The Crop section
 
@@ -109,7 +109,8 @@ While you're editing an action, the section's **Reset** is hidden. **Clear** app
 ## Good to know
 
 - Crop mode has no menu item. It's <kbd>C</kbd>, a double-click, or the **Crop on Canvas** button.
-- <kbd>C</kbd> also opens crop mode on a text, shape or graphic clip, and a double-click does on a shape or graphic. They have no Crop section, so there are no fields and no **Reset**. To take that crop off, undo or drag the handles back.
+- On a [matte track](/canvas/matte-tracks/), crop shapes the matte, so <kbd>C</kbd> still opens crop mode on a text, shape or graphic clip there, and a double-click does on a shape or graphic. Those clips have no Crop section, so there are no fields and no **Reset**. To take that crop off, undo or drag the handles back.
+- [Paste Attributes](/editing/paste-attributes/) or an agent's `set_video` can put a crop on a text, shape or graphic clip on any track. The crop draws, and no field shows it.
 - A nest clip has no box on the canvas, so <kbd>C</kbd> beeps on it.
 - A clip on a [locked track](/timeline/hide-and-lock-tracks/) shows no crop handles.
 

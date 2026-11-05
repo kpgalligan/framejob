@@ -236,8 +236,8 @@ selected clip is a graphic clip.
 - **Picture** has Transform (position, scale, rotation, opacity), Shadow,
   Filters, Reflection, Spotlight and Obscure, as for any layer (see
   [Canvas and layers](canvas-and-layers.md)). It has no Crop, Corner Radius
-  or Chroma Key section, though crop mode still works on the canvas (see
-  [Crop](canvas-and-layers.md#crop)).
+  or Chroma Key section. On a matte track, crop mode still works on the canvas
+  (see [Crop](canvas-and-layers.md#crop)).
 - There is no **Color** sub-tab. To grade a graphic, put an adjustment clip
   above it (see [Color grading](color-grading.md)).
 - **Clip** has the clip's timing and Motion, but no Speed section: speed is

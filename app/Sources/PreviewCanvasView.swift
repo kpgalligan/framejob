@@ -168,7 +168,7 @@ final class PreviewCanvasView: NSView {
         self.selection = selection
         self.playhead = playhead
         cachedBoxes = nil
-        if cropMode, primaryBox == nil { setCropMode(false) }
+        if cropMode, primaryBox == nil || primaryRefusesCrop { setCropMode(false) }
         if let editing = editingClip, snapshot.clip(editing) == nil { cancelTextEditing() }
         layoutCanvas()
         overlay.needsDisplay = true
@@ -182,6 +182,7 @@ final class PreviewCanvasView: NSView {
         playhead = time
         cachedBoxes = nil
         guard !selection.isEmpty || cropMode else { return }
+        if cropMode, primaryRefusesCrop { setCropMode(false) }
         overlay.needsDisplay = true
     }
 
@@ -416,10 +417,11 @@ final class PreviewCanvasView: NSView {
     // MARK: - Crop mode
 
     /// C, or a double-click on a clip with pixels (spec §4.2). Refuses with
-    /// no selection rather than entering a mode with no box in it.
+    /// no selection rather than entering a mode with no box in it, and on a
+    /// clip the mode doesn't open on (spec §11 K-7).
     @discardableResult
     func setCropMode(_ on: Bool) -> Bool {
-        let allowed = on && primaryBox != nil
+        let allowed = on && primaryBox != nil && !primaryRefusesCrop
         if on && !allowed { return false }
         guard cropMode != allowed else { return true }
         cropMode = allowed
@@ -560,8 +562,8 @@ final class PreviewCanvasView: NSView {
         window?.invalidateCursorRects(for: overlay)
     }
 
-    /// Double-click: a text clip opens its inline editor, anything with pixels
-    /// enters crop mode (spec §4.2).
+    /// Double-click: a text clip opens its inline editor, and a clip crop mode
+    /// opens on enters it (spec §4.2, §11 K-7). Anything else beeps.
     private func doubleClicked(_ id: UInt32) {
         guard let clip = snapshot.clip(id) else { return }
         if clip.text != nil, case .text = clip.source {
@@ -659,6 +661,7 @@ final class PreviewCanvasView: NSView {
     /// same shape a move drag commits.
     @discardableResult
     func nudge(dx: CGFloat, dy: CGFloat) -> Bool {
+        guard primaryBox != nil else { return false }
         var ops: [ReelOp] = []
         for id in selection.sorted() {
             guard let clip = snapshot.clip(id), snapshot.track(clip.track)?.locked != true
@@ -680,9 +683,7 @@ final class PreviewCanvasView: NSView {
     /// edit still has to be closed, or the document keeps its gesture base
     /// forever and the next edit merges into it.
     func cancelGesture() -> Bool {
-        guard moving != nil || scaling != nil || rotating != nil || cropping != nil
-            || endpointDrag != nil || obscureDrag != nil
-        else { return false }
+        guard isGestureLive else { return false }
         moving = nil
         scaling = nil
         rotating = nil

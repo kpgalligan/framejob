@@ -16,7 +16,7 @@ The symbols are <kbd>⌘</kbd> Command, <kbd>⌥</kbd> Option, <kbd>⇧</kbd> Sh
 
 ## How the keys are shared
 
-- **Keys with no modifier belong to the editor window.** That's <kbd>Space</kbd>, the letters and punctuation on this page and the arrow keys. They don't work while you're typing in a field or while a sheet is open. <kbd>⇧</kbd> and Caps Lock still count as no modifier, apart from [<kbd>Space</kbd> on a canvas you've clicked](/canvas/zoom-and-pan/#space-on-the-canvas). <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> never do.
+- **Keys with no modifier belong to the editor window.** That's <kbd>Space</kbd>, the letters and punctuation on this page and the arrow keys. They don't work while you're typing in a field or while a sheet is open. <kbd>⇧</kbd> and Caps Lock still count as no modifier. <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> never do.
 - **Shortcuts with a modifier are menu shortcuts.** A shortcut does nothing while its menu item is greyed out.
 - **<kbd>⌫</kbd>, <kbd>⌘⌫</kbd>, <kbd>⌘↓</kbd> and <kbd>⌘↑</kbd> switch off while you type in a text field,** where they keep their usual text meaning.
 - **In a sheet,** <kbd>↩</kbd> presses the default button and <kbd>⎋</kbd> cancels.
@@ -48,7 +48,7 @@ An edit point is the start or end of a clip, or either end of the project. <kbd>
 - With macOS Full Keyboard Access on, a focused button, pop-up or segmented control keeps <kbd>Space</kbd> to press itself.
 - With the preview canvas focused, a tap of <kbd>Space</kbd> plays or pauses when you release it, because holding it down is how you [pan](/canvas/zoom-and-pan/). A <kbd>Space</kbd> held to pan doesn't change playback.
 
-The arrow keys move by word in the [Transcript tab](#transcript-text), and move a selected [curve point](/reference/gestures/#color-tab-controls) in the Color tab.
+The arrow keys move by word in the [Transcript tab](#transcript-text), and move a selected [curve point](/reference/gestures/#color-tab-controls) in the Color tab. With the preview canvas focused and a selected clip showing at the playhead, they [nudge that clip](/canvas/move-scale-rotate/#nudge-with-the-arrow-keys) 1 pixel, or 10 with <kbd>⇧</kbd>.
 
 ## Editing
 
@@ -73,7 +73,7 @@ These keys beep instead of acting when:
 - <kbd>,</kbd> or <kbd>.</kbd>: nothing is selected. A nudge also has to keep to the [overlap rule](/editing/how-edits-work/#the-overlap-rule), as a drag does.
 - <kbd>W</kbd> or <kbd>E</kbd>: no selected clip is under the playhead.
 - <kbd>M</kbd>: a [nest](/editing/nests/) is open.
-- <kbd>C</kbd>: nothing selected is on the canvas at the playhead.
+- <kbd>C</kbd>: nothing selected is on the canvas at the playhead, or the clip is a text, shape or graphic clip, because crop mode opens only on a video clip, image clip or freeze frame. A clip on a [matte track](/canvas/crop/#good-to-know) is the exception.
 - <kbd>Z</kbd>: anything other than exactly one clip is selected, or that clip isn't visible at the playhead, or its track is locked.
 
 ## Shortcuts on menu items
@@ -243,8 +243,8 @@ In the Media tab's search field, <kbd>⎋</kbd> empties the field. See [Inspecto
 
 | What's under way | How to leave it |
 | --- | --- |
-| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | <kbd>⎋</kbd> puts everything back as it was before the drag, and adds no undo step. Caps Lock has to be off. |
-| [Crop mode](/canvas/crop/) | <kbd>⎋</kbd> or <kbd>↩</kbd> while the canvas has the focus and Caps Lock is off, or <kbd>C</kbd>. A click on empty canvas leaves it too. |
+| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | <kbd>⎋</kbd> puts everything back as it was before the drag, and adds no undo step. |
+| [Crop mode](/canvas/crop/) | <kbd>⎋</kbd>, <kbd>↩</kbd> or the keypad's <kbd>Enter</kbd> wherever the focus is, except while you're typing in a field, or <kbd>C</kbd>. A click on empty canvas leaves it too. |
 | Region mode, from <kbd>Z</kbd> or the Obscure section's **Place on Canvas** | <kbd>⎋</kbd>. If you started it with <kbd>Z</kbd>, <kbd>Z</kbd> again leaves it too. |
 | The key-colour or qualifier eyedropper | <kbd>⎋</kbd>. The hint on screen reads "Click to pick … · Esc to cancel". |
 | A selected curve point in the Color tab | <kbd>⎋</kbd> deselects it. |

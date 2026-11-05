@@ -1,8 +1,9 @@
 import AppKit
 
-/// The editor's document window, and the two things it decides: where a bare
-/// Space goes (spec §11 K-1, kpgalligan/framejob#35), and when text gives
-/// the keys back (K-4, `TextFocus` below), which it asks first.
+/// The editor's document window, and the three things it decides: where a bare
+/// Space goes (spec §11 K-1, kpgalligan/framejob#35), when text gives the keys
+/// back (K-4, `TextFocus` below), which it asks first, and when the canvas does
+/// (K-5, `CanvasFocus` below).
 ///
 /// **Space is the transport's unless the first responder is typing or claims
 /// it.** The window routes a bare Space key-DOWN (⇧ and ⇪ allowed, any other
@@ -21,7 +22,8 @@ import AppKit
 ///   they press on Space by AppKit's own convention, reachable only under
 ///   Full Keyboard Access, and an accessibility user keeps it;
 /// - the canvas overlay (`CanvasOverlayView`), whose own Space arms a pan and
-///   toggles play on key-UP (`PreviewCanvasView.handleKeyUp`).
+///   toggles play on key-UP (`PreviewCanvasView.handleKeyUp`), under this same
+///   rule (K-5), so a key-up settles only a press the canvas armed.
 /// And nothing is taken while a sheet is attached. An auto-repeat of a Space
 /// the window took is swallowed. A non-editable field editor (a selectable
 /// label), a slider, the window itself and every custom inspector control
@@ -129,6 +131,29 @@ enum EditorKey {
     }
 }
 
+/// The canvas keys' modifier rule (spec §11 K-5): every real arrow carries
+/// `.numericPad` and `.function`, and keypad Enter `.numericPad`.
+enum CanvasKey {
+    /// Device-independent part of `flags` minus [.shift, .capsLock, .numericPad, .function]
+    /// is empty. ⌘ ⌥ ⌃ never. Pure.
+    static func isPlain(_ flags: NSEvent.ModifierFlags) -> Bool {
+        flags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.shift, .capsLock, .numericPad, .function]).isEmpty
+    }
+}
+
+/// When the canvas gives the keys back (spec §11 K-5): a timeline click refuses
+/// first responder, so without this the overlay kept the arrows, nudging a clip
+/// after the person had clicked away from it.
+enum CanvasFocus {
+    /// True when `hit` is outside `canvas`. nil — the click is outside the
+    /// content view, on the title bar — never leaves. Pure.
+    static func leavesOnClick(hit: NSView?, canvas: NSView) -> Bool {
+        guard let hit else { return false }
+        return !hit.isDescendant(of: canvas)
+    }
+}
+
 final class EditorWindow: NSWindow {
     /// Forwards to `super` unchanged. Declared because the unavailable coder
     /// init below is a designated initializer, and declaring one stops Swift
@@ -150,6 +175,7 @@ final class EditorWindow: NSWindow {
     override func sendEvent(_ event: NSEvent) {
         // A key that leaves is spent; a click that leaves is then delivered.
         if leaveText(for: event), event.type == .keyDown { return }
+        leaveCanvas(for: event)
         switch SpaceKey.route(
             event, firstResponder: firstResponder, sheetAttached: attachedSheet != nil)
         {
@@ -186,5 +212,20 @@ final class EditorWindow: NSWindow {
             leaves = false
         }
         return leaves && makeFirstResponder(content)
+    }
+
+    /// `CanvasFocus`'s rule applied: a mouse-down in the content view outside
+    /// the canvas leaves first responder with the content view, and the event
+    /// is then delivered. Nothing is taken while a sheet is attached.
+    private func leaveCanvas(for event: NSEvent) {
+        guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type),
+              attachedSheet == nil, let overlay = firstResponder as? CanvasOverlayView,
+              let canvas = overlay.canvas, let content = contentView
+        else { return }
+        let point = content.superview?.convert(event.locationInWindow, from: nil)
+            ?? event.locationInWindow
+        if CanvasFocus.leavesOnClick(hit: content.hitTest(point), canvas: canvas) {
+            makeFirstResponder(content)
+        }
     }
 }

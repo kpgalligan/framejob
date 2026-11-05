@@ -144,7 +144,8 @@ extension EditorViewController {
     // MARK: - Commands
 
     /// C, and the Crop section's Crop on Canvas button (spec §4.2, §9).
-    /// Refuses with nothing selected rather than entering a mode with no box in it.
+    /// Refuses with nothing selected rather than entering a mode with no box in it,
+    /// and on a clip the mode doesn't open on (spec §11 K-7).
     func toggleCanvasCropMode() {
         guard let canvas = previewCanvas else {
             NSSound.beep()

@@ -3111,6 +3111,15 @@
      "where": "Drag a clip in the preview"
     },
     {
+     "id": "canvas-nudge",
+     "name": "Nudge with the arrow keys",
+     "summary": "With the canvas focused and a selected clip showing at the playhead, the arrow keys move it 1 pixel, or 10 with ⇧.",
+     "page": "canvas/move-scale-rotate",
+     "anchor": "nudge-with-the-arrow-keys",
+     "where": "The arrow keys, after clicking the canvas",
+     "keys": "← → ↑ ↓"
+    },
+    {
      "id": "canvas-scale-handles",
      "name": "Scale with the eight handles",
      "summary": "Drag a corner or edge handle to scale the clip, with the opposite handle pinned in place.",
@@ -3210,7 +3219,7 @@
     {
      "id": "crop-mode",
      "name": "Crop mode",
-     "summary": "Press C, double-click a clip or use Crop on Canvas to crop the selected clip with handles on the canvas.",
+     "summary": "Press C, double-click a video clip, image clip or freeze frame, or use Crop on Canvas to crop the selected clip with handles on the canvas.",
      "page": "canvas/crop",
      "anchor": "crop-mode",
      "where": "C, a double-click on the clip, or Inspector ▸ Clip ▸ Picture ▸ Crop ▸ Crop on Canvas",
@@ -3227,10 +3236,10 @@
     {
      "id": "crop-leave",
      "name": "Leaving crop mode",
-     "summary": "Return, Esc, C, Crop on Canvas or a click on empty canvas leave crop mode, and your crop stays.",
+     "summary": "Return, keypad Enter, Esc, C, Crop on Canvas or a click on empty canvas leave crop mode from any focus but typing, and your crop stays.",
      "page": "canvas/crop",
      "anchor": "leaving-crop-mode",
-     "where": "Return, with the canvas focused",
+     "where": "Return, anywhere but a text field",
      "keys": "Return"
     },
     {

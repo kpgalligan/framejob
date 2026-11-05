@@ -31,9 +31,7 @@ rate and background colour on the Document tab (see
 | Pinch on the trackpad, or ⌥-scroll / ⌘-scroll | Step through the stops |
 | Hold Space and drag, or scroll | Pan, when the zoomed canvas is bigger than the pane |
 
-A Space tap that does not pan still plays and pauses as usual. With Caps Lock
-on, Space doesn't pan a canvas you've clicked: its press and its release each
-toggle playback, so a tap leaves playback as it was.
+A Space tap that does not pan still plays and pauses as usual.
 
 **View ▸ Preview Window** (⇧⌘P) opens a second window with the same picture
 and no handles, for a second display.
@@ -68,11 +66,14 @@ handles.
 | ⌥ while scaling | Scale about the centre instead of pinning the opposite handle |
 | Drag the round grip above the top edge | Rotate about the clip's centre |
 | ⇧ while rotating | Snap the angle to 15° steps |
-| Esc during any drag | Cancel the drag and put the clip back where it was, with no undo step. Caps Lock has to be off |
+| Esc during any drag | Cancel the drag and put the clip back where it was, with no undo step |
 
-The arrow keys don't move a clip, even with the canvas focused. ← and → step
-the playhead by a frame (⇧ for 10 frames), and ↑ and ↓ go to the previous and
-next edit point.
+With the canvas focused and a selected clip showing at the playhead, the arrow
+keys nudge it 1 pixel, or 10 with ⇧. Each press is one undo step named Nudge,
+and with an action selected it moves the action's end state. The canvas has
+the focus from a click or drag on it until a click anywhere else in the window.
+Otherwise ← and → step the playhead by a frame (⇧ for 10 frames), and ↑ and ↓
+go to the previous and next edit point. During a canvas drag they do nothing.
 
 How a scale drag behaves depends on the clip:
 
@@ -128,12 +129,13 @@ shape's box resize, both edit the clip itself. See
 
 ## Crop
 
-Press **C**, or double-click a clip that is not text, to enter crop mode for
-the selected clip. The eight handles become crop edges, and the part being
+Press **C**, or double-click a video, image or still clip, to enter crop mode
+for the selected clip. The eight handles become crop edges, and the part being
 cut away is shown as a faint white area inside the uncropped frame's dashed
-outline. Press **Esc** or **Return** with the canvas focused and Caps Lock
-off, or click empty canvas, to leave crop mode. Clicking a clip that isn't
-selected keeps crop mode on and moves the crop handles to that clip. With
+outline. Press **Esc**, **Return** or the keypad's **Enter** from anywhere but
+a text field, or click empty canvas, to leave crop mode. Clicking a video, image
+or still clip that isn't selected keeps crop mode on and moves the crop handles
+to that clip; clicking a text, shape or graphic clip ends it. With
 several clips selected, crop mode ends if the clip you click isn't the
 front-most selected clip afterwards. A nest clip has no box on the canvas, so **C** only beeps on one.
 
@@ -145,9 +147,10 @@ The Picture tab's **Crop** section has the same four insets as fields, plus a
 **Crop on Canvas** button that enters crop mode. The section appears only for
 clips with pixels of their own, which means video, image and still clips.
 
-**C** also enters crop mode on a text, shape or graphic clip, and a double-click
-does on a shape or graphic. They have no Crop section, so there are no fields
-and no **Reset**. To take that crop off, undo or drag the handles back.
+**C** beeps on a text, shape or graphic clip, and so does a double-click on a
+shape or graphic, except on a matte track, where crop shapes the matte. There
+they enter crop mode. They have no Crop section, so there are no fields and no
+**Reset**. To take that crop off, undo or drag the handles back.
 
 ## Inline text editing
 
@@ -845,8 +848,8 @@ is copied.
 - At most four filters and four obscure regions per clip. Gradients have 2–8
   stops.
 - The Crop, Corner Radius and Chroma Key sections are only for video, image and
-  still clips. A text, shape or graphic clip can still be cropped on the canvas
-  ([Crop](#crop)).
+  still clips. On a matte track, a text, shape or graphic clip can still be
+  cropped on the canvas ([Crop](#crop)).
 - A nest clip can't take a blend mode, and Add Blurred Background is not
   offered for one.
 - Locked tracks can't be edited on the canvas, and hidden tracks can't be

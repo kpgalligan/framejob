@@ -372,6 +372,37 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Esc is unchanged everywhere. Sheets, Settings
   and Welcome are other windows and keep AppKit's dialog keys. No MCP
   mirror: focus is view state, app/CLAUDE.md's exemption.
+- **K-5 — The canvas's keys take ⇧ ⇪ and the keypad and fn flags, an arrow on
+  a focused canvas nudges a clip that is showing, and a press outside the
+  canvas hands the keys back** (kpgalligan/framejob#463, 2026-11-05). The
+  canvas's keys read `CanvasKey.isPlain`: ⇧, ⇪, `.numericPad` and `.function`
+  are allowed, ⌘ ⌥ ⌃ never, because every real arrow carries `.numericPad`
+  and `.function` and keypad Enter `.numericPad`. An arrow on a focused canvas
+  nudges when a selected clip is drawn at the playhead (`primaryBox`), and
+  otherwise stays the transport's: §4.2's nudge is the exception to §9's arrow
+  rows. Space arms only under K-1's rule (⇧ ⇪), and a key-up settles only a
+  press the canvas armed, so ⌥Space and a Space the window took toggle nothing
+  on release. A press in the content view outside the canvas hands the keys to
+  the content view before dispatch, as K-4 does for text, because a timeline
+  click, which refuses first responder, otherwise left the arrows nudging.
+  While a canvas drag is open an arrow does nothing: a committed edit inside a
+  live edit keeps its undo step through Esc, which CI-16 forbids. No MCP
+  mirror: focus is view state, and `set_video` is the nudge's capability.
+- **K-6 — Crop mode's Esc, Return and keypad Enter work from any focus but
+  typing** (kpgalligan/framejob#474, 2026-11-05). They leave the mode from the
+  bare-key map as well as from the canvas, plain by K-5's rule, ahead of its
+  other arms; typing and an attached sheet keep them, as they keep the whole
+  map. Entering the mode takes no focus. Esc leaves crop mode before it
+  deselects an action, as it does on the canvas. No MCP mirror: the mode is
+  view state.
+- **K-7 — Crop mode opens only on a clip with source pixels** (§4.3's rule,
+  `InspectorTab.hasSourcePixels`; kpgalligan/framejob#475, 2026-11-05). C and
+  a double-click beep on any other clip; a text clip's double-click still
+  edits it. The mode ends when its primary clip stops qualifying, by a click,
+  a selection or the playhead. A clip on a matte track keeps the mode whatever
+  its kind, because crop shapes the matte (MT-4) and MT-7 has it handled like
+  any clip; whether it should is held for the owner. `set_video` and
+  `paste_attributes` are unchanged.
 - **SH-3 — An inspector name field is the inspector's value field**
   (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
   sub-tab's string rows, the Document tab's marker name and the clip

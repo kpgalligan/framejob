@@ -300,6 +300,11 @@ the same way.
 - **Expect:** Frame Job beeps, the reason shows at the foot of the inspector, nothing lands, and the dragged row slides back to its row instead of vanishing at the pointer.
 - **Source:** #507.
 
+**TL-18 — Canvas keys on a real keyboard**
+- **Do:** Click a clip on the canvas, press each arrow and ⇧→, then click the timeline and press →. With Caps Lock on, press C and Esc, tap Space, and Space-drag on a zoomed canvas. Press C from the timeline, then keypad Enter.
+- **Expect:** 1 px and 10 px moves, then a frame step with the clip still. Crop mode leaves on each key. Space plays once on release and pans when dragged.
+- **Source:** #463, #474.
+
 **JOB-2 — Split at Shot Changes on a finished video**
 - **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.
 - **Expect:** 1–2: the sheet names the file and its bar moves from "Waiting" through the percentages to "Done", then closes by itself. 3: there is an edit at every hard cut and none inside a shot or the dissolve; ⌘Z takes them all back as one step. 4: the sheet closes at once and nothing is split. 5: after the restore the bar keeps moving, the sheet closes by itself and the split lands.

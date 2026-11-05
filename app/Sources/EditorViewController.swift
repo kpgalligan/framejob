@@ -734,6 +734,7 @@ final class EditorViewController: NSViewController {
         // inherit it, no second copy can drift, and the editor's own path pays
         // nothing for a case it cannot reach.
         if view.window?.attachedSheet != nil { return false }
+        if previewCanvas?.handleCropKey(event) == true { return true }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else {
             return false

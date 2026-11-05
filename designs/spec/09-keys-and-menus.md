@@ -4,17 +4,18 @@
 |---|---|
 | Space | Play / pause — from any focus but a field being typed into (§11 K-1) |
 | J / K / L | Reverse / pause / forward; L again for 2×, 4× |
-| ← / → | Previous / next frame (⇧: 10 frames) |
-| ↑ / ↓ | Previous / next edit point |
+| ← / → | Previous / next frame (⇧: 10 frames). On a focused canvas with a selected clip showing: nudge it 1 px (⇧: 10 px), §4.2, §11 K-5 |
+| ↑ / ↓ | Previous / next edit point. On a focused canvas with a selected clip showing: nudge it 1 px (⇧: 10 px), §4.2, §11 K-5 |
 | Home / End | Start / end |
 | ⌘T | Split at playhead |
 | W / E | Trim start / end to playhead |
 | ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected. With an action selected (§11 CI-1) it removes THAT action instead |
-| esc | Leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With no action selected the key is not consumed |
+| esc | Leave crop mode if it is on (§11 K-6); otherwise leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With neither the key is not consumed |
 | ↩ (canvas text editor) | Apply the text and leave the editor; ⇧↩, ⌘↩, ⌥↩ or ⌃↩ insert a new line (§11 K-2) |
 | esc (canvas text editor) | Leave an unchanged edit; with the text changed, ask Cancel / Revert / Apply (§11 K-2) |
 | esc (timeline rename field) | Close the field and keep the old name; no undo step. Return, Tab or a click elsewhere commits, as its own undo step even when that click also edits |
 | esc (canvas drag) | Cancel the drag in progress — move, scale, rotate, crop, endpoint or region grip: the project goes back to the press's state, with no undo step (§11 CI-16) |
+| esc, return, keypad enter (crop mode) | Leave crop mode, from any focus but typing, ⇧ ⇪ allowed (§11 K-6) |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
@@ -24,7 +25,7 @@
 | I / O / ⌥X | Set in / set out / clear range |
 | N | Toggle snapping |
 | T | Add text clip at playhead |
-| C | Crop mode on the selected clip |
+| C | Crop mode on the selected clip, if it has source pixels or sits on a matte track; a beep otherwise (§11 K-7) |
 | Z | Region mode on the canvas — drag a rectangle over the selected clip to zoom to it (⇧ fills instead of fits), Esc cancels. Z again disarms it, and so does moving the selection: one key in and out, because a modal overlay that has lost focus can no longer be dismissed by Esc |
 | ⇧Z | Fit timeline |
 | ⌘= (⌘+ too) / ⌘- / ⌘0 | Zoom the canvas in / out / fit — the timeline zooms by pinch and ⌥/⌘-scroll, and ⇧Z fits it |

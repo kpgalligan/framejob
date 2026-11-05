@@ -22,7 +22,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`03-window-layout.md`](03-window-layout.md) | 71 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
-| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 180 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
+| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 185 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 144 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
 | [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 364 | The Clip tab's sections: every video section. |
 | [`04.3c-inspector-media-document-assistant.md`](04.3c-inspector-media-document-assistant.md) | 244 | The inspector's Media tab (find band, rows, drags, Consolidate, import), the File menu's caption commands (Import, Generate and Export Captions), the Document tab and the Assistant tab. |
@@ -65,9 +65,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 178 | `make_vertical_version`: its arguments, the size, the step's classes and order, a canvas-size graphic re-sized, the caption step (6), the treatments and reasons, the copy and its old template copies updated (§11 VR-42, VR-44), the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 161 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 325 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 326 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 23830 in 46 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 23864 in 46 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

@@ -1549,7 +1549,9 @@ the key map behind it.
   (`tools/proof/text_focus_probe.swift`).
   `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
-  `handleEditorKey` (#61).
+  `handleEditorKey` (#61). `CanvasKey.isPlain` is the canvas keys' modifier
+  rule (⇧ ⇪ and the keypad and fn flags) and `CanvasFocus` hands the keys
+  back on a press outside the canvas (K-5).
 
 **Timeline.**
 - `TimelineView.swift` (frozen) · `TimelineLayout.swift` (every ticks ↔
@@ -1657,8 +1659,9 @@ the key map behind it.
   `enabled.video` (the Detach switch) is on, so a detached clip reads as audio.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1124 lines) · `CanvasSessions.swift`
-  · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys` — the picture at
+- `PreviewCanvasView.swift` (frozen, 1073 lines) · `CanvasSessions.swift`
+  · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys`
+  · `PreviewCanvasView+Keys.swift` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
   `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER — the reason
@@ -1676,7 +1679,9 @@ the key map behind it.
   outside an AppKit event). Its `textCommitOp` is the one op both canvas
   commits send (Return or blur, and the sheet's Apply), through
   `TextPatch.contentEdit`, so a timed page whose count changes lands
-  untimed (W-2).
+  untimed (W-2). `+Keys` is the canvas's keys: `handleKey`, `handleKeyUp`,
+  `handleCropKey` (Esc, Return, keypad Enter leave crop mode from
+  `handleEditorKey` too, K-6) and `primaryRefusesCrop`, K-7.
 - `PreviewCanvasView+Obscure.swift` — the selected clip's obscure regions on
   the canvas (spec §11 CI-16): outline, centre and eight resize grips drawn
   through the layer's transform; hit test after the layer's own handles

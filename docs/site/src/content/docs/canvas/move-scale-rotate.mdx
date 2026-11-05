@@ -8,7 +8,7 @@ import AtAGlance from '@components/AtAGlance.astro';
 Select a clip on the canvas, then drag it into place. The handles and the grip do the same job as the numbers on the [Picture tab](/canvas/transform/), with the picture in front of you.
 
 <AtAGlance
-  keys={['⌥-drag', '⇧-drag', 'Esc']}
+  keys={['⌥-drag', '⇧-drag', 'Esc', '← → ↑ ↓']}
   where="The preview canvas"
   tools="set_video"
 />
@@ -19,7 +19,13 @@ Drag inside a clip's box to move it. Every selected clip moves by the same amoun
 
 The move [snaps](/canvas/canvas-snapping/) to the canvas and to other layers. Snapping goes by the clip you grabbed, so the whole selection clicks into place together.
 
-To move a clip by an exact number of pixels, type a new value into **Position X** or **Position Y** on the [Picture tab](/canvas/transform/#position). To shift it earlier or later in time, see [Nudge clips](/editing/nudge-clips/).
+To move a clip by an exact number of pixels, type a new value into **Position X** or **Position Y** on the [Picture tab](/canvas/transform/#position), or [nudge it with the arrow keys](#nudge-with-the-arrow-keys). To shift it earlier or later in time, see [Nudge clips](/editing/nudge-clips/).
+
+## Nudge with the arrow keys
+
+Click a clip on the canvas, then press an arrow key to move it 1 pixel, or hold <kbd>⇧</kbd> to move it 10. Each press is one undo step named Nudge. Every selected clip moves by the same amount, and clips on locked tracks stay where they are. With an action selected, the nudge moves the action's end state instead.
+
+This needs the canvas to have the focus and a selected clip showing at the playhead. The canvas has the focus from a click or drag on it until you click anywhere else in the window. Otherwise the arrow keys step the playhead and jump between edit points, as they do everywhere else. During a canvas drag they do nothing.
 
 ## Scale
 
@@ -53,7 +59,7 @@ Hold <kbd>⇧</kbd> while you rotate to snap the angle to 15° steps.
 
 Press <kbd>Esc</kbd> during a canvas drag to put everything back as it was before the drag, with no undo step. This covers move, scale, rotate, crop, line end and obscure region drags. Timeline drags have no such cancel.
 
-<kbd>⇧</kbd> can stay down, but <kbd>Esc</kbd> doesn't cancel while <kbd>⌥</kbd>, <kbd>⌃</kbd> or <kbd>⌘</kbd> is held, or while Caps Lock is on, so let go of those and turn Caps Lock off first.
+<kbd>⇧</kbd> can stay down and Caps Lock can stay on, but <kbd>Esc</kbd> doesn't cancel while <kbd>⌥</kbd>, <kbd>⌃</kbd> or <kbd>⌘</kbd> is held, so let go of those first.
 
 ## The pivot
 
