@@ -660,10 +660,14 @@ extension ReelOp {
         return ReelOp(name: "attach_audio", args: a.values)
     }
 
-    /// Copies placed after the originals' span on the same tracks.
-    static func duplicate(clips: [UInt32]) -> ReelOp {
+    /// Copies placed after the originals' span on the same tracks, or by
+    /// `delta` and to `track`, which `moveClip` reads the same way (spec §11
+    /// #465).
+    static func duplicate(clips: [UInt32], delta: Ticks? = nil, track: UInt32? = nil) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
+        a.put("delta", delta)
+        a.put("track", track)
         return ReelOp(name: "duplicate", args: a.values)
     }
 
@@ -688,7 +692,8 @@ extension ReelOp {
     /// landing exactly at `at` and the rest keeping their offsets from it.
     ///
     /// `payload` is what Copy wrote to the pasteboard —
-    /// `{"clips": [...], "media": [...]}` — and
+    /// `{"clips": [...], "media": [...], "nests": [...]}`, `nests` only when
+    /// a clip shows one — and
     /// `EditorViewController+Clipboard.swift` is the only place that builds
     /// one. **A payload clip's `track` is a DEPTH from the front of the stack**
     /// (0 = front-most), not a track id: the ids in it belong to whichever

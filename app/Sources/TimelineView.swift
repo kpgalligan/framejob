@@ -104,15 +104,17 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var onScrubEnded: (() -> Void)?
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
+    /// A clip drag's tick, kept whole or dropped (`timelineDragUpdated`, spec §11 #465).
+    var onDragUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
     /// A one-shot edit (a header toggle) as one undo step.
     var onEdit: ((String, [ReelOp]) -> Void)?
     /// A rename's commit, as its OWN undo step even when the click that ended it edits too (#69).
     var onGroupedEdit: ((String, [ReelOp]) -> Void)?
     /// Applies ops to the current handle PURELY and hands back the result,
-    /// only so a gesture can learn the ids the core is about to mint for a
-    /// `duplicate` or an `add_track`. Nothing is mutated and no undo step is
-    /// registered — `applying` is pure (spec §5.5), so this is a question.
+    /// only so a gesture can learn the id the core is about to mint for an
+    /// `add_track`. Nothing is mutated and no undo step is registered —
+    /// `applying` is pure (spec §5.5), so this is a question.
     var onProbe: (([ReelOp]) -> ProjectSnapshot?)?
     /// `snapCandidates(excluding:)`, asked once per gesture — never per
     /// refresh: it is an FFI round-trip and a selection change would
@@ -725,7 +727,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             base.rowHeights = dragRowHeights
             session.update(time: time, row: base.unclampedRow(atY: point.y), snapper: dragSnapper)
             clipDrag = session
-            onLiveUpdate?(session.ops(destination: destination(for: session)))
+            onDragUpdate?(session.ops(destination: destination(for: session)))
         } else if var session = trim {
             session.update(time: time, snapper: dragSnapper)
             trim = session
@@ -807,17 +809,31 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     }
 
     /// Compares what the drag asked for with what the core did. `onLiveEnd`
-    /// has already published, so `snapshot` is the answer.
+    /// has already published, so `snapshot` is the answer: the clip asked
+    /// about is the anchor, or on a duplicating drag any clip the drag's base
+    /// did not have, and it landed when it starts at the proposed start on
+    /// the row under the pointer or, past the lanes, when the new track is
+    /// there. Anything else springs back (spec §11 #465).
     private func checkRefusal(of session: ClipDragSession) {
-        // A drop that asked for a new track lands on a row that did not exist
-        // when the drag started, so there is nothing to compare — and a drop
-        // that duplicated moved the copies, not the anchor.
-        guard session.didMove, !session.duplicating, !session.needsNewTrack,
-              let clip = snapshot.clip(session.anchor),
-              let index = snapshot.trackIndex(of: clip.track)
+        let created = session.createdTrack
+        guard session.didMove, !session.needsNewTrack || created != nil, let base = dragBase,
+              let anchor = snapshot.clip(session.anchor)
         else { return }
-        let landedRow = layout.row(forTrackIndex: index)
-        guard clip.start != session.proposedStart || landedRow != session.row else { return }
+        func lane(of clip: ClipSnapshot) -> Int? {
+            snapshot.trackIndex(of: clip.track).map { layout.row(forTrackIndex: $0) }
+        }
+        let known = Set(base.clips.map { $0.id })
+        let copies = snapshot.clips.filter { !known.contains($0.id) }
+        let landed = created.map { id in snapshot.tracks.contains { $0.id == id } }
+            ?? (session.duplicating ? copies : [anchor]).contains {
+                $0.start == session.proposedStart && lane(of: $0) == session.row
+            }
+        guard !landed else { return }
+        let nearest = copies.min {
+            abs($0.start - session.proposedStart) < abs($1.start - session.proposedStart)
+        }
+        let clip = session.duplicating ? nearest ?? anchor : anchor
+        guard let landedRow = lane(of: clip) else { return }
         let row = min(max(session.row, 0), max(layout.trackCount - 1, 0))
         // Both ends of the springback are the clip's BODY, not its lane rect:
         // the redesign insets a bar 3 pt top and bottom
@@ -840,30 +856,14 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         let ids = selection.contains(anchor) ? Array(selection) : [anchor]
         let dragged = snapshot.clips.filter { ids.contains($0.id) }
         guard !dragged.isEmpty else { return }
-        let duplicating = flags.contains(.option)
 
         // Every id the ops will need, probed against the handle the gesture
         // is about to snapshot — the ONE moment the current project and the
         // live-edit base are the same thing.
-        let existingClips = Set(snapshot.clips.map { $0.id })
         let existingTracks = Set(snapshot.tracks.map { $0.id })
-        var copies: [UInt32] = []
-        var copyShift: Ticks = 0
-        var prefix: [ReelOp] = []
-        if duplicating {
-            let probed = onProbe?([.duplicate(clips: ids)])
-            let made = (probed?.clips ?? []).filter { !existingClips.contains($0.id) }
-                .sorted { $0.start < $1.start }
-            if !made.isEmpty {
-                copies = made.map { $0.id }
-                let from = dragged.map { $0.start }.min() ?? 0
-                copyShift = (made.map { $0.start }.min() ?? from) - from
-                prefix = [.duplicate(clips: ids)]
-            }
-        }
         let count = snapshot.tracks.count
-        let top = probeTrack(prefix + [.addTrack(index: count)], existing: existingTracks)
-        let bottom = probeTrack(prefix + [.addTrack(index: 0)], existing: existingTracks)
+        let top = probeTrack([.addTrack(index: count)], existing: existingTracks)
+        let bottom = probeTrack([.addTrack(index: 0)], existing: existingTracks)
 
         dragBase = snapshot
         dragHeights = TimelineLayout.trackHeights(
@@ -875,7 +875,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             anchorRow: layout.row(forTrackIndex: index),
             grabTime: layout.time(atX: point.x),
             spanStart: dragged.map { $0.start }.min() ?? clip.start,
-            trackCount: count, duplicating: !copies.isEmpty, copies: copies, copyShift: copyShift,
+            trackCount: count, duplicating: flags.contains(.option),
             newTrackTop: top, newTrackBottom: bottom,
             row: layout.row(forTrackIndex: index))
         onLiveBegin?()

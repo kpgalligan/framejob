@@ -365,11 +365,21 @@ extension AgentServer {
     }
 
     /// `duplicate` — ⌘D (`duplicateSelection`): copies land after the
-    /// originals' span, ready for a `move_clip`.
+    /// originals' span; and the timeline's ⌥-drag (`ClipDragSession`), which
+    /// names where with `delta` and `track` (spec §11 #465).
     func duplicateClips(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        return try editResult(document, "Duplicate", [.duplicate(clips: clips)])
+        var delta: Ticks?
+        if let raw = a["delta"], !(raw is NSNull) {
+            delta = try timeArg(a, "delta", document)
+        }
+        var track: TrackSnapshot?
+        if let raw = a["track"], !(raw is NSNull) {
+            track = try trackArg(a, "track", document)
+        }
+        return try editResult(
+            document, "Duplicate", [.duplicate(clips: clips, delta: delta, track: track?.id)])
     }
 
     /// `paste` — ⌘V (`EditorViewController+Clipboard.pasteClips`). The app's

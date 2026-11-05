@@ -30032,6 +30032,28 @@ python3 tools/proof/vr6b_proof.py --mutant <name>
 The recorded runs are in `designs/creator-jobs.md`'s VR6b record; JOB-37 is what only a person
 judges.
 
+## Docs-bugs batch a1 — timeline and clipboard (`docs_bugs_a1_proof.py`, `docs_bugs_a1_probe.swift`; eleven mutants by `--mutant`; `core/tests/duplicate_destination.rs`; spec §11 #465)
+
+#464, #465, #507 and #511. **`docs_bugs_a1_proof.py`** has the app under test make its projects over
+MCP, runs the `app` rows there (D7, D8, F1–F5, Z1) and the rest through **`docs_bugs_a1_probe.swift`**,
+the app's own sources on those saved packages. The probe replaces `+[NSPasteboard
+generalPasteboard]` with a private board and exits unless `NSPasteboard.general` answers it, so
+`copy(nil)`, `cut(nil)` and `paste(nil)` never reach the owner's clipboard (row PB reads the real
+board's change count at both ends); its windows are off every display under the `.prohibited`
+policy, and its mouse events are handed straight to the timeline's content view. The script's
+docstring has every row.
+
+`--tree PATH` builds the probe from another tree, `PATH/core/target/release/libframejob_core.a`
+included; `--expect-red` is the run against the base, exiting 0 only when every row not marked
+CONTROL fails and every CONTROL passes.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a1_proof.py [--only N1,D5]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a1_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a1_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a1_proof.py --mutant <name>
+```
+
 ## The documentation site (`docs_site_proof.py`)
 
 The site in `docs/site/` against the tree, with no app, no build, no network and no node, so it

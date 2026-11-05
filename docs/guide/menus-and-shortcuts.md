@@ -117,10 +117,9 @@ timeline with clips. The *current track* is the track of the
 first selected clip. With nothing selected it is the front-most track. See
 [Editing](editing.md).
 
-Copy, Cut and Paste don't work for a nest clip. The clipboard carries no
-nest, so Paste stops with an error and nothing lands, even if other clips
-were copied with it. Cut has already removed the clip by then, so use Undo
-to get it back. Duplicate does copy a nest clip.
+A nest clip pastes as an independent copy: the clipboard carries its nest,
+with every nest inside it. A nest clip's Duplicate shows the same nest as the
+original.
 
 *Agents:* `undo`, `redo`, `paste`, `paste_attributes`, `duplicate`, `delete`,
 `lift_range`, `ripple_delete`, `ripple_delete_range`, `insert_clip`,
@@ -437,7 +436,7 @@ move the selected clips.
 | ⇧-drag | Empty lane | Marquee that adds to the selection |
 | Double-click | Empty part of a lane | Closes that gap |
 | Drag | Clip | Moves the selected clips, in time and to other tracks. Dragging past the top or bottom track puts them on a new track |
-| ⌥-drag | Clip | Duplicates the clips and moves the copies. With no room for Edit ▸ Duplicate, moves the clips themselves |
+| ⌥-drag | Clip | Duplicates the clips where you drop them. A drop with no room there makes no copy |
 | ⌥⇧-drag | Clip | Slip: moves the source under the clip while the clip stays in place |
 | Drag | Clip edge | Trims that edge |
 | ⌥-drag | Clip's end edge | Rate stretch: changes the speed so the clip fills the new length. Works only on a clip that plays a media file. On the start edge, ⌥ trims as usual |

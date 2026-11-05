@@ -400,8 +400,7 @@ extension TimelineContentView {
             let map = owner.sourceMaps(clip.id)
             while x < limit {
                 let time = max(owner.layout.time(atX: x + tile / 2), clip.start)
-                let source = TimelineView.sourceTime(of: clip, in: media, at: time, map: map)
-                let index = Int(max(source, 0) / ReelTime.perSecond)
+                let index = Self.filmstripIndex(of: clip, in: media, at: time, map: map)
                 let image = owner.caches.thumbnail(
                     media: media.id, index: index, in: directory)
                 if let image = image {
@@ -414,6 +413,24 @@ extension TimelineContentView {
         }
         tint.withAlphaComponent(0.54).setFill()
         rect.fill()
+    }
+
+    /// The thumbnail a strip tile at `time` shows, one kept per source second.
+    /// An image has the one, and a still holds the frame at its `at` for its
+    /// whole length, so neither walks the file as the clip goes on. Not in
+    /// `sourceTime`, which the waveform and the subject overlay read too.
+    static func filmstripIndex(
+        of clip: ClipSnapshot, in media: MediaSnapshot, at time: Ticks, map: SourceMap?
+    ) -> Int {
+        switch clip.source {
+        case .image:
+            return 0
+        case .still(_, let at):
+            return Int(max(at, 0) / ReelTime.perSecond)
+        default:
+            let source = TimelineView.sourceTime(of: clip, in: media, at: time, map: map)
+            return Int(max(source, 0) / ReelTime.perSecond)
+        }
     }
 
     /// A thumbnail scaled to COVER `rect` and cropped to it, which is what a

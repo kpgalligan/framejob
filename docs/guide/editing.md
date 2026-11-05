@@ -40,8 +40,8 @@ A new clip covers the whole file, rounded down to whole frames so it never runs 
 Drag a clip's body to move it in time. Drag it up or down to move it to another track. If several clips are selected, dragging any one of them moves them all and keeps their timing and track offsets. Starts stop at zero.
 
 - **Onto a new track:** drop above the top lane to make a new front track, or below the bottom lane to make a new back track.
-- **Duplicate while dragging:** hold ⌥ when you press. Copies are dragged and the originals stay put (undo name "Duplicate Clips"). The drag duplicates first, so it needs the room Edit ▸ Duplicate would need (see [Duplicating](#duplicating)). When the next clip on the track is too close for that, the drag moves the originals instead, with no beep or message, wherever you drop them (undo name "Move Clips").
-- **Refused drops spring back.** While you drag, positions the project refuses are skipped, and the clip stays at the last allowed position. If the drop breaks the overlap rule (see [Limits](#limits)), the clip animates back to that position and lands there. If the drag never reached an allowed position, it animates back to where it was and nothing changes. A duplicate drag lands the same way, without the animation.
+- **Duplicate while dragging:** hold ⌥ when you press. Copies are dragged and the originals stay put (undo name "Duplicate Clips"). The copies need room only where they land, so a clip with another right after it copies like any other. A clip's detached sound is copied too: its copy stays on the sound's track, moves by the same time and needs room there.
+- **Refused drops spring back.** While you drag, positions the project refuses are skipped, and the clip stays at the last allowed position. If the drop breaks the overlap rule (see [Limits](#limits)), the clip animates back to that position and lands there. If the drag never reached an allowed position, it animates back to where it was and nothing changes. A duplicate drag lands the same way, and with no allowed position it makes no copy. A drop past the lanes that can't land makes no new track.
 - **Overlaps make transitions.** A clip dropped so it overlaps the clip before it on the same track gets a Cross Dissolve over the overlap, unless it already has a transition. Clips never push each other out of the way. Other edits do the same; see [Overlaps make transitions](#overlaps-make-transitions).
 
 The whole drag is one undo step, "Move Clips".
@@ -146,13 +146,13 @@ To open room by hand, press ⌥⌘A (**Edit ▸ Select After Playhead**) and dra
 
 **Edit ▸ Duplicate** (⌘D, or the timeline bar's button) puts a copy of each selected clip on the same track, starting right after the selection's span. A selection of several clips keeps its internal timing. The duplicate is refused if the copies would break the overlap rule. To place copies somewhere else, ⌥-drag instead (see [Moving clips](#moving-clips)).
 
-*Agents:* `duplicate` takes `clips`.
+*Agents:* `duplicate` takes `clips`, and `delta` and `track` to land the copies where an ⌥-drag would, read as `move_clip` reads them.
 
 ## Copy, cut and paste
 
 | Command | Shortcut | What it does |
 |---|---|---|
-| **Edit ▸ Copy** | ⌘C | Puts the selected clips on the clipboard, with the media files they show. A selected picture brings its detached sound along, so the pair pastes as a pair; a selected detached sound is copied on its own. Pasted into a text editor, they arrive as a one-line summary such as "Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00". |
+| **Edit ▸ Copy** | ⌘C | Puts the selected clips on the clipboard, with the media files they show and any nests they show. A selected picture brings its detached sound along, so the pair pastes as a pair; a selected detached sound is copied on its own. Pasted into a text editor, they arrive as a one-line summary such as "Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00". |
 | **Edit ▸ Cut** | ⌘X | Copies, then deletes the selection and leaves gaps, as ⌫ does. One undo step. |
 | **Edit ▸ Paste** | ⌘V | Pastes the clipboard's clips at the playhead, then selects them. |
 | **Edit ▸ Paste Attributes** | ⌥⌘V | Copies the copied clip's look onto every selected clip. |
@@ -173,7 +173,7 @@ Cut and Copy are greyed out with nothing selected. Paste is greyed out unless Fr
 
 The target keeps its place, length, speed, animation actions, transition, name, label, and which halves (picture and sound) are switched on. If nothing would change, it beeps.
 
-*Agents:* `paste` takes `at` (the playhead when left out) and a `payload` shaped like what Copy writes, `{"clips": […], "media": […]}`. A payload clip's `track` is its depth from the front, 0 being the front-most lane. The optional `track` argument is the track id where depth 0 lands (default: the front track); deeper lanes follow behind it, and tracks are added as needed. `paste_attributes` takes `clips`, the same `payload`, and optional `groups` and `skip_missing`.
+*Agents:* `paste` takes `at` (the playhead when left out) and a `payload` shaped like what Copy writes, `{"clips": […], "media": […], "nests": […]}`, with `nests` only when a clip shows one. A payload clip's `track` is its depth from the front, 0 being the front-most lane. The optional `track` argument is the track id where depth 0 lands (default: the front track); deeper lanes follow behind it, and tracks are added as needed. `paste_attributes` takes `clips`, the same `payload`, and optional `groups` and `skip_missing`.
 
 ## Splitting picture from sound
 
@@ -222,7 +222,7 @@ Open Nest needs exactly one nest clip selected, and Close Nest is greyed out at 
 
 ### Shared and independent copies
 
-Split, Duplicate (⌘D) and ⌥-drag copies of a nest clip share one nest. Editing inside any of them changes them all, and the nest is only removed once no clip shows it. Copy and Cut don't carry the nest, so pasting a copied nest clip shows an error alert and pastes nothing, even the clips copied with it. Cut still deletes the clip, and Undo brings it back. An agent's `paste` whose `payload` also carries the nest under `nests` makes an independent copy, so editing that nest leaves the original alone.
+Split, Duplicate (⌘D) and ⌥-drag copies of a nest clip share one nest. Editing inside any of them changes them all, and the nest is only removed once no clip shows it. Copy and Cut carry the nest, with every nest inside it, so Paste makes an independent copy: editing that nest leaves the original alone. Clips pasted together that showed one nest share their new one. An agent's `paste` does the same with a `payload` that carries the nest under `nests`.
 
 Inside, the timeline shows the nest's own tracks and clips from the nest's own zero. The canvas shows the nest at its fixed size, without the nest clip's position or scale, so you edit the group on its own terms. The playhead is mapped in and out, so the frame under it doesn't change.
 
@@ -276,7 +276,7 @@ A new edit clears the redo history.
 
 When the project's rules won't allow an edit, the app **beeps** and nothing changes. The rule's own sentence appears at the **foot of the inspector** after "Refused: ", for example "Refused: clips 4 and 7 would overlap by 120000 ticks, more than half of the shorter clip (100000 ticks)". The message stays until the project changes (an edit, an undo or redo, or going into or out of a nest) or until you click it. Moving the playhead or changing the selection doesn't clear it.
 
-An edit that would change nothing, such as a paste of a look the clips already have, beeps too, but shows no message: no rule was broken. A request the project can't use at all, such as pasting a copied nest clip, shows an error alert instead.
+An edit that would change nothing, such as a paste of a look the clips already have, beeps too, but shows no message: no rule was broken. A request the project can't use at all, such as pasting an adjustment clip into an open nest, shows an error alert instead.
 
 During a drag, positions the project refuses are skipped and the clip waits at the last allowed position. A drop on a refused position lands there, with no beep and no message.
 

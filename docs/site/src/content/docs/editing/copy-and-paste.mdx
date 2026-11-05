@@ -78,10 +78,7 @@ Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00
 
 ## Good to know
 
-:::caution
-**Nest clips can't be pasted.** The clipboard holds the nest clip but not what's inside it, so **Paste** shows an error and pastes nothing, even if only one of the copied clips is a nest clip. **Cut** still deletes a nest clip, so press <kbd>⌘Z</kbd> to bring it back. To make another copy of a nest clip, use [Duplicate or ⌥-drag](/editing/duplicate-clips/).
-:::
-
+- A nest clip pastes as an independent copy. Its nest comes with it, with every nest inside it, so editing one leaves the other alone. Clips pasted together that showed one nest share their new one. Pasted into another project, the files inside the nest come across too. To keep showing the same nest, use [Duplicate or ⌥-drag](/editing/duplicate-clips/). See [Shared and independent nest copies](/editing/nest-copies/).
 - A paste lands whole or not at all. If one clip can't go in, Frame Job shows an error naming it and nothing changes. An [adjustment clip](/color/adjustment-clips/), for example, can't be pasted while a [nest](/editing/nests/) is open.
 - Room for a paste isn't unlimited: a project holds up to 64 tracks and 4,096 clips. A paste that would pass either limit shows an error.
 - Copy and Paste work inside a nest. **Copy** takes the clips you picked and counts their depth against the nest's own tracks, and **Paste** lands in the nest that's open.

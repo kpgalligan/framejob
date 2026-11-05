@@ -1551,3 +1551,44 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   answering is still not woken; G-17's other half stands. `video@N` does
   not reach the `av1` row's MP4 sink, whose packets go through
   `ExportPacketSink.swift`.
+
+- **#465 — ⌥-drag is `duplicate {delta, track}`, checked once at the landing;
+  a clip drag's tick of more than one op applies whole or not at all.** It
+  applies §4.4's "⌥-drag duplicates", AU-91 and AU-96 to the drag. `duplicate`
+  gains two optional arguments. `delta` is where the copies land, relative to
+  their originals, snapped to the grid and clamped at 0 over the closure as
+  `move_clip` clamps; absent, the copies land one span later, as they always
+  did. `track` is a destination track, its index delta taken from the
+  back-most, earliest clip the caller NAMED and applied to the copies of the
+  named clips only; absent, each copy stays on its original's track. The
+  drag used to duplicate one span later and then move the copies, so the
+  interim spot had to pass the overlap rule, and a clip with another right
+  after it failed there and the drag fell back to a move, with nothing said.
+  The interim spot and the fallback are both gone: `duplicating` is the ⌥ key
+  and nothing else, the drag sends the one op, and the rule is asked once, at
+  the drop. **The track delta follows AU-91:** an unnamed linked partner's
+  copy keeps its original's track and moves by the one time delta, so a
+  picture ⌥-dragged a lane up lands on the lane under the pointer and its
+  sound's copy stays on the sound's lane. That copy counts for the overlap
+  rule, so a linked picture ⌥-dragged straight up, at no time delta, is
+  refused by its own sound's copy, visibly. A copy of a named clip that would
+  leave the track list is refused in `move_clip`'s sentence, naming the
+  original's id; an unknown track is an `Err`. The span-length-0 identity
+  stands only with `delta` absent: `delta: 0` on the same tracks reaches the
+  rule and is refused. **A refused drop springs back.** `checkRefusal` asks
+  one question of every clip drag, plain or ⌥, on a lane or past the lanes:
+  did the clip asked about land at the proposed start on the row under the
+  pointer, or, past the lanes, on the track the drop made? Anything else
+  flashes from the proposed ghost to where the clip is, as a refused plain
+  move always has. **The tick.** #88's fold in `ReelProject.applying` keeps
+  a list that half applied, which is right for a compound gesture and wrong
+  for a drop past the lanes, where an `add_track` that applied beside a
+  refused move or duplicate would leave an empty track and an undo step. So
+  the clip drag's tick goes through `timelineDragUpdated`: a list of more
+  than one op is tried op by op through `SwitchAngle.Trial` on the live-edit
+  base, and any refusal drops the whole tick, which leaves the last good
+  frame as a refused one-op tick does (#8). #88's fold is not changed, and
+  every other gesture keeps `onLiveUpdate`. **Risks accepted:** a refused ⌥
+  drop flashes and says nothing else, as a refused plain drag does: no beep
+  and no strip sentence. A refused drop after a good tick keeps that good
+  frame with its one undo step, as a plain drag always has.

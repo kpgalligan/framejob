@@ -216,7 +216,7 @@ the same way.
 - **Source:** spec §10 step 6.
 
 **TL-2 — Drags, trims and their transients feel right**
-- **Do:** 1. Drag a clip near another's edge. 2. Trim both edges. 3. ⌥-drag a body (duplicate) and ⌥-drag an edge (rate stretch). 4. Drop a clip where it is refused. 5. Drag a clip's fade handles. 6. ⌘Z after each.
+- **Do:** 1. Drag a clip near another's edge. 2. Trim both edges. 3. ⌥-drag the first of two abutting clips onto free space (a copy lands, the original stays) and ⌥-drag an edge (rate stretch). 4. Drop a clip where it is refused. 5. Drag a clip's fade handles. 6. ⌘Z after each.
 - **Expect:** the snap guide shows; the trim cursor appears at an edge; a refused drop springs back; each gesture is one undo step and undo restores the frame.
 - **Source:** #48; spec §10 step 7.
 
@@ -289,6 +289,11 @@ the same way.
 - **Do:** With a real keyboard and mouse, Full Keyboard Access off, and a clip selected: 1. Click the clip's name in the inspector, type a new name, press Return, then Space. 2. Click the name again, type, then click an empty part of the timeline and press Space. 3. Click an inspector number, type a value, press Tab, then Space. 4. On a text clip, click the Text tab's Content, type, press ⇧Return and type a second line, then press Return and Space. 5. Click into a field and click inside that same field again; click a number field's border. 6. In the Assistant tab, type a message and press Return, then Space. 7. Turn Full Keyboard Access on, click a field and press Tab.
 - **Expect:** 1–4 and 6: each value is applied once (one undo step each), no space appears in any field, and Space plays at once with no beep and no extra click. In 4 ⇧Return starts a new line and Return applies both lines. 5: the field keeps its caret. 7: Tab moves to the next control instead.
 - **Source:** spec §11 K-4.
+
+**TL-17 — A refused Media row slides back**
+- **Do:** Drag a row from the Media tab squarely onto a clip on the timeline and let go.
+- **Expect:** Frame Job beeps, the reason shows at the foot of the inspector, nothing lands, and the dragged row slides back to its row instead of vanishing at the pointer.
+- **Source:** #507.
 
 **JOB-2 — Split at Shot Changes on a finished video**
 - **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.

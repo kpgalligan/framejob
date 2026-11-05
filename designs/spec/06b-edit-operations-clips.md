@@ -283,8 +283,15 @@ the transition ops are §6d.
   twin copies every action whole, with new ids, so it reads the same map (§11 SR-19 (e)). The two clips name each other in `linked` (format 28, §11 AU-90) and are a linked pair from then on.
 - **`attach_audio {clip}`** — Merges a linked picture and its detached sound back into one clip; either half may be named (§11 AU-95). Refuses, each in its own sentence: a clip not linked to a detached sound ("clip C is not linked to a detached sound"); a pair that is not one half with its audio off and one with it on ("clips A and B are not a picture and its detached sound"); and a pair whose start, duration, source, speed or actions' spans and curves differ — a J- or L-cut — ("clip V's picture and clip S's sound do not cover the same time; trim them to match before Attach Audio"). Otherwise the picture's `enabled.audio` turns on and it takes the sound's `audio` group and, action by action at the same index, its `end.audio` (removed where the sound's action has none); its `linked` is cleared and the sound clip removed, its track staying. Clip ▸ Attach Audio (⇧⌥⌘D) sends one per pair.
 
-- **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
-  moves them). A linked partner on an unlocked track is copied too, and the copies are linked to each other (§11 AU-96).
+- **`duplicate {clips, delta?, track?}`** — Copies placed after the originals' span on the same
+  tracks; `delta` and `track` land them elsewhere, read as `move_clip` reads them (⌥-drag sends
+  them, §11 #465): `delta` snapped and clamped at 0 over the closure, `track` a destination whose
+  index delta comes from the back-most, earliest clip named. The overlap rule is checked once, at
+  the landing, and a copy of a named clip off the track list is refused in `move_clip`'s sentence.
+  An unknown track is an error. With `delta` absent a span of length 0 is an identity. A linked
+  partner on an unlocked track is copied too, and the copies are linked to each other (§11 AU-96);
+  an unnamed partner's copy keeps its original's track, moves by the one delta and counts for the
+  rule.
 
 - **`copy_pieces {clip, track, ranges, video?, audio?}`** — Copies `clip`'s pieces between each
   of `ranges`' project times (`[[from, to], …]`) onto `track` at the same times (§11 SW-11,
@@ -302,7 +309,8 @@ the transition ops are §6d.
   Allowed inside a nest. Clip ▸ Switch Angle ▸ (§9) writes with it.
 
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
-  "media": [...]}`, what ⌘C wrote to `com.kgalligan.framejob.clips` — with fresh ids for the clips,
+  "media": [...], "nests": [...]}`, what ⌘C wrote to `com.kgalligan.framejob.clips`, `nests` only
+  when a clip shows one — with fresh ids for the clips,
   their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep
   their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most),
   not an id, since the ids belong to the document copied from: `track` names where depth 0 lands

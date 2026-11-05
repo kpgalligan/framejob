@@ -447,16 +447,29 @@ extension AgentServer {
                 ["clip": clipDescription]),
             opTool(
                 "duplicate",
-                "Copies clips onto the same tracks, placed immediately after the originals' "
-                    + "span — ⌘D. Follow with move_clip to put them anywhere else.",
-                ["clips": clipsDescription]),
+                "Copies clips — ⌘D, or an ⌥-drag with delta and track. With neither, the copies "
+                    + "go on the same tracks, immediately after the originals' span. delta and "
+                    + "track put them anywhere else and read as move_clip's do, and the overlap "
+                    + "rule is asked once, where they land. A detach_audio pair is copied whole, "
+                    + "but only the named clips change track: the partner's copy keeps its track, "
+                    + "and it can be what refuses.",
+                [
+                    "clips": clipsDescription,
+                    "delta": "How far from the originals the copies land, \(ticks) Negative is "
+                        + "earlier, and the earliest stops at 0. Default: one span later.",
+                    "track": "Destination track id for the back-most, earliest clip named; the "
+                        + "other clips named keep their track offsets from it. Default: each "
+                        + "copy stays on its original's track.",
+                ]),
             opTool(
                 "paste",
                 "Inserts a clipboard payload's clips with fresh ids — ⌘V. The earliest clip in "
                     + "the payload lands exactly at `at` and the others keep their offsets from "
                     + "it, so a copied arrangement pastes back intact. The payload is what Copy "
-                    + "(⌘C) put on the pasteboard: {\"clips\": [...], \"media\": [...]}, whose "
-                    + "clips are get_project's clip objects and whose media are its media rows. "
+                    + "(⌘C) put on the pasteboard: {\"clips\": [...], \"media\": [...], "
+                    + "\"nests\": [...]}, whose clips are get_project's clip objects, whose media "
+                    + "are its media rows and whose nests are its nests, there only when a clip "
+                    + "shows one; a pasted nest clip brings its own copy of the nest. "
                     + "TWO things differ from get_project's spelling. A payload clip's `track` "
                     + "is a DEPTH from the front of the track stack (0 = front-most, 1 the lane "
                     + "behind it), not a track id, because the ids belong to the project it was "
@@ -470,7 +483,8 @@ extension AgentServer {
                         + "playhead.",
                     "track": "Track id for the payload's depth 0; the rest follow by "
                         + "the same offset. Default: the front-most track.",
-                    "payload": "{\"clips\": [...], \"media\": [...]} — see above.",
+                    "payload": "{\"clips\": [...], \"media\": [...], \"nests\": [...]} — see "
+                        + "above.",
                 ]),
             opTool(
                 "paste_attributes",
@@ -496,7 +510,8 @@ extension AgentServer {
                     + "nothing changes.",
                 [
                     "clips": clipsDescription,
-                    "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...]}; see paste.",
+                    "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...], "
+                        + "\"nests\": [...]}; see paste.",
                     // The names are the CORE's (`Kind::Groups`); a refusal names the handler's.
                     "groups": "Which groups travel. Default: each of video, audio, text and "
                         + "shape both clips have, never graphic; an empty list is refused.",

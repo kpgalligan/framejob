@@ -225,7 +225,7 @@ Click a row to select it; the selected row is outlined in the accent colour. Sel
 
 ### Putting media on the timeline
 
-- **Drag a row onto a timeline track.** With no modifier it lands at the pointer, snapped to a frame. A drop the overlap rule forbids ([Editing](editing.md#limits)) places nothing: Frame Job beeps and shows the reason at the foot of the inspector. A smaller overlap goes in and makes a Cross Dissolve. Hold **⌥** as you drop to *insert* (the track opens up to make room) or **⇧⌥** to *overwrite* (whatever is under it on that track is replaced).
+- **Drag a row onto a timeline track.** With no modifier it lands at the pointer, snapped to a frame. A drop the overlap rule forbids ([Editing](editing.md#limits)) places nothing: Frame Job beeps, shows the reason at the foot of the inspector, and the drag slides back to its row. A smaller overlap goes in and makes a Cross Dissolve. Hold **⌥** as you drop to *insert* (the track opens up to make room) or **⇧⌥** to *overwrite* (whatever is under it on that track is replaced).
 - **Drag a row onto the canvas.** It lands on a new track at the front, at the playhead.
 - **Edit ▸ Insert at Playhead** / **Edit ▸ Overwrite at Playhead** place the selected row at the playhead. They have no shortcut, and they are off until a row (not a LUT) is selected on the Media tab. The track is the selected clip's track, or the front track when no clip is selected. With a nest open, that is a track inside the nest.
 

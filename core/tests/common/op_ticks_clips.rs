@@ -109,6 +109,13 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             vec![("/clips/0/start", json!(14 * f))],
         ),
         applied(
+            "duplicate.delta",
+            "delta",
+            one.clone(),
+            json!({"op":"duplicate","clips":[10],"delta":off(30,f)}),
+            vec![("/clips/1/start", json!(41 * f))],
+        ),
+        applied(
             "trim_start.to",
             "to",
             one.clone(),

@@ -9,8 +9,8 @@ import AtAGlance from '@components/AtAGlance.astro';
 A nest clip is a view of a [nest](/editing/nests/), not the nest itself. Two clips can show one nest, so an edit inside it reaches both. This page covers which copies share their contents, how to get one that doesn't, and what a trim does to a nest clip.
 
 <AtAGlance
-  menu={['Edit ▸ Duplicate', 'Clip ▸ Split', 'Clip ▸ Un-nest', 'Clip ▸ Nest']}
-  keys={['⌘D', '⌘T', '⇧⌘G', '⌘G']}
+  menu={['Edit ▸ Duplicate', 'Edit ▸ Copy', 'Edit ▸ Paste', 'Clip ▸ Split', 'Clip ▸ Un-nest', 'Clip ▸ Nest']}
+  keys={['⌘D', '⌘C', '⌘V', '⌘T', '⇧⌘G', '⌘G']}
   where="⌥-drag a nest clip"
   tools={['duplicate', 'split', 'paste', 'unnest', 'nest']}
 />
@@ -39,7 +39,9 @@ To cut the contents at a moment, [open the nest](/editing/inside-a-nest/) and sp
 
 ## Make an independent copy
 
-To get a copy you can edit on its own, turn a duplicate back into clips and nest them again.
+To get a copy you can edit on its own, select the nest clip, press <kbd>⌘C</kbd>, move the playhead and press <kbd>⌘V</kbd>. The pasted clip shows a nest of its own, with its own copy of every nest inside it, so editing it leaves the original alone. **Edit ▸ Cut** carries the nest in the same way, and a paste into another project brings the nest and its files with it. Clips pasted together that showed one nest share their new one.
+
+You can also turn a duplicate back into clips and nest them again, without the clipboard.
 
 <Steps>
 
@@ -54,12 +56,6 @@ To get a copy you can edit on its own, turn a duplicate back into clips and nest
 Un-nesting drops the copy's own position, scale, opacity, fades and volume, so set those again on the new nest clip. The new nest also takes the project's current size, which may differ from the original's. Un-nesting gives back everything in the nest, so a [trim](#trim-a-nest-clip) on the copy is gone too.
 
 This separates one level. A nest clip among the contents still shows the same inner nest as the original, so an edit inside that inner nest reaches both. Un-nest it too, before step 3, if you need it separate.
-
-:::caution[Copy and Paste don't work on a nest clip]
-**Edit ▸ Copy** puts the nest clip on the clipboard but not what's inside it. **Edit ▸ Paste** then pastes nothing and shows an alert saying the pasted clip shows a nest "which the payload does not carry". That's true of any selection with a nest clip in it, in this project or another one.
-
-**Edit ▸ Cut** still removes the clip, so after a failed paste, press <kbd>⌘Z</kbd> until it's back.
-:::
 
 ## Trim a nest clip
 
@@ -78,7 +74,7 @@ So you can't hide a nest's opening with a trim. To do that, [open the nest](/edi
 
 ## With an agent
 
-An agent can make the independent copy in one step. `paste` makes a separate nest when it's given the nest's contents as well as the clip, with every level inside it, and editing the copy leaves the original alone. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#paste).
+An agent makes the independent copy as Paste does. `paste` makes a separate nest when it's given the nest's contents as well as the clip, with every level inside it, in the form Copy writes, and editing the copy leaves the original alone. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#paste).
 
 ## Related
 

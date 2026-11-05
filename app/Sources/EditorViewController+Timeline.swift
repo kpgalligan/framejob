@@ -40,6 +40,7 @@ extension EditorViewController {
         timeline.onScrubEnded = { [weak self] in self?.scrubAudioEnded() }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
         timeline.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
+        timeline.onDragUpdate = { [weak self] ops in self?.timelineDragUpdated(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
         timeline.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
         timeline.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
@@ -139,8 +140,8 @@ extension EditorViewController {
     }
 
     /// Applies ops to the current handle PURELY so a gesture can learn the
-    /// ids the core is about to mint (`duplicate`, `add_track`). This is not
-    /// an edit: nothing is published, no undo step is registered, and the
+    /// id the core is about to mint (`add_track`). This is not an edit:
+    /// nothing is published, no undo step is registered, and the
     /// handle it produces is dropped. `applying` is pure (spec §5.5), which
     /// is the only reason asking is legitimate.
     private func timelineProbe(_ ops: [ReelOp]) -> ProjectSnapshot? {
@@ -265,8 +266,8 @@ extension EditorViewController {
         document.applyEdit("Ripple Delete", .rippleDelete(clips: Array(document.selection)))
     }
 
-    /// ⌘D — copies land after the originals' span; ⌥-dragging then moves
-    /// them, which is the same op with a `move_clip` behind it.
+    /// ⌘D — copies land after the originals' span; an ⌥-drag is the same op
+    /// naming where they land (`ClipDragSession`).
     func duplicateSelection() {
         guard let document = document, !document.selection.isEmpty else {
             NSSound.beep()

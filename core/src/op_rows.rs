@@ -57,7 +57,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("freeze_frame", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
     op("detach_audio", &[req("clip", Id)]),
     op("attach_audio", &[req("clip", Id)]),
-    op("duplicate", &[req("clips", Ids)]),
+    op("duplicate", &[req("clips", Ids), opt("delta", Ticks), opt("track", Id)]),
     op("copy_pieces",
        &[req("clip", Id), req("track", Id), req("ranges", Ranges), opt("video", Boolean),
          opt("audio", Boolean)]),

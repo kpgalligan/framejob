@@ -36,12 +36,11 @@ extension MediaPane {
             let when = ReelTime.snapToFrame(max(at, 0), fps: fps)
             switch mode {
             case .add:
-                binding.apply("Add Clip", [.addClip(track: track, media: media, at: when)])
+                return landed("Add Clip", [.addClip(track: track, media: media, at: when)])
             case .insert:
-                binding.apply("Insert", [.insertClip(track: track, media: media, at: when)])
+                return landed("Insert", [.insertClip(track: track, media: media, at: when)])
             case .overwrite:
-                binding.apply(
-                    "Overwrite", [.overwriteClip(track: track, media: media, at: when)])
+                return landed("Overwrite", [.overwriteClip(track: track, media: media, at: when)])
             }
         case .canvas:
             let at = ReelTime.snapToFrame(max(binding.playhead, 0), fps: fps)
@@ -53,14 +52,22 @@ extension MediaPane {
             let probed = inspector?.onProbe?([.addTrack(index: index)])
             guard let track = probed?.tracks.first(where: { !existing.contains($0.id) })?.id else {
                 guard let top = binding.snapshot.tracks.last?.id else { return false }
-                binding.apply("Add Clip", [.addClip(track: top, media: media, at: at)])
-                return true
+                return landed("Add Clip", [.addClip(track: top, media: media, at: at)])
             }
-            binding.apply(
+            return landed(
                 "Add Clip",
                 [.addTrack(index: index), .addClip(track: track, media: media, at: at)])
         }
-        return true
+    }
+
+    /// Applies a drop's edit and answers whether it landed. `binding.apply`
+    /// runs whatever the answer, so a refusal still beeps and shows its
+    /// sentence in the strip; asking first is pure (`onProbe`, nil for a
+    /// refusal, an identity or an error).
+    private func landed(_ name: String, _ ops: [ReelOp]) -> Bool {
+        let landed = inspector?.onProbe?(ops) != nil
+        binding.apply(name, ops)
+        return landed
     }
 
     /// A row was clicked: it becomes the document's selected media, which is

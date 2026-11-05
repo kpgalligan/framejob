@@ -180,11 +180,9 @@ where one ends and the next begins.
   under a wash of the clip's colour. Each thumbnail is the one kept for that
   second of the source, following speed, reverse and speed ramps. A file keeps
   one a second for its first 600 seconds, and anything later shows only the
-  clip's colour. An image has a single thumbnail, drawn along the clip's first
-  second, with only the clip's colour after it, and zoomed out until a 34 pt
-  tile spans more than 2 seconds it shows only its colour. A freeze frame's
-  strip starts at the moment it froze and runs on through the file's later
-  seconds, so past its first second the thumbnails aren't the frame it holds.
+  clip's colour. An image has a single thumbnail, repeated along the whole
+  clip at any zoom, and a freeze frame repeats the thumbnail of the second it
+  holds.
 - **Waveform**: the sound of a clip that has audio, drawn below the
   filmstrip on a clip that has both. Muted, or silenced by another track's
   solo, it draws faded. A nest clip draws no waveform, even when it has sound.

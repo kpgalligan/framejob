@@ -11,7 +11,7 @@ Duplicate makes copies of clips without going through the clipboard. Press a key
   menu="Edit ▸ Duplicate"
   keys={['⌘D', '⌥-drag']}
   where="The Duplicate button in the timeline bar"
-  tools={['duplicate', 'move_clip']}
+  tools={['duplicate']}
 />
 
 ## Duplicate the selection
@@ -30,20 +30,17 @@ To place copies somewhere else, hold <kbd>⌥</kbd> as you press on a clip, then
 
 - If the clip you press is part of the selection, the whole selection is copied. If it isn't, only that clip is.
 - The copies snap and change tracks as a [move](/editing/move-clips/) does. Drop past the top or bottom of the stack to make a new track for them.
-- A spot the timeline can't take is skipped. The copies stay at the last spot along the drag that worked, and if none did, nothing changes.
+- The copies need room only where they land, so a clip with another right after it copies like any other.
+- A spot the timeline can't take is skipped. The copies stay at the last spot along the drag that worked. If you let go on such a spot, a ghost animates back to them, and if no spot worked, it animates back to the clip you pressed and no copy is made.
 - The whole drag is one undo step, called Duplicate Clips.
 
 Hold only <kbd>⌥</kbd>. <kbd>⌥⇧</kbd> on a clip is a [slip](/editing/slip-and-roll/), not a copy.
-
-:::caution
-An ⌥-drag makes its copies by duplicating first, so it needs the room a <kbd>⌘D</kbd> would need. If Duplicate [wouldn't work](#when-duplicate-wont-work) at that moment, because the next clip is too close to the selection, the drag moves the originals instead, wherever you drop them. There's no beep or message, and the undo step is called Move Clips. Undo it, then [copy and paste](/editing/copy-and-paste/) the clip, which has no such limit.
-:::
 
 ## What a copy keeps
 
 A copy is the whole clip: its source, trim, speed, name, label, picture and sound settings, and actions. From then on it's a clip of its own, so changing one doesn't change the other.
 
-- **Linked clips.** If a clip has a [detached sound](/audio/detach-and-attach/), its partner is copied too and the two copies are linked to each other. A partner on a locked track isn't copied.
+- **Linked clips.** If a clip has a [detached sound](/audio/detach-and-attach/), its partner is copied too and the two copies are linked to each other. A partner on a locked track isn't copied. Drag the picture to another track and the sound's copy stays on the sound's track, moved by the same time. It needs room there too, so a picture dragged straight up with no change in time can't land: its sound's copy would sit on the sound.
 - **Nest clips.** A copy of a nest clip made with Duplicate or ⌥-drag shows the same nest as the original, so an edit inside one shows in both. See [Shared and independent nest copies](/editing/nest-copies/).
 
 ## When Duplicate won't work
@@ -54,11 +51,11 @@ Copies follow the same [overlap rule](/editing/how-edits-work/#the-overlap-rule)
 - A longer overlap stops the duplicate. Frame Job beeps, nothing changes, and the reason appears at the foot of the inspector. See [When an edit is refused](/getting-started/refused-edits/).
 - An adjustment clip can't overlap anything, so a copy of one needs clear space.
 
-To duplicate into a tight edit, open room first or use **Edit ▸ Copy** and **Edit ▸ Paste**. A paste that has no room goes on a new track.
+To duplicate into a tight edit, ⌥-drag the copy to a free spot, open room first, or use **Edit ▸ Copy** and **Edit ▸ Paste**. A paste that has no room goes on a new track.
 
 ## With an agent
 
-`duplicate` takes the clips to copy and puts the copies straight after them, as <kbd>⌘D</kbd> does. There's no agent version of an ⌥-drag: follow `duplicate` with [`move_clip`](/mcp/tools-move-and-trim/#move_clip) to put the copies somewhere else. Both also work inside a nest. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#duplicate).
+`duplicate` takes the clips to copy and puts the copies straight after them, as <kbd>⌘D</kbd> does. Give it `delta` and `track` and it lands them where an ⌥-drag would, in one step. It also works inside a nest. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#duplicate).
 
 ## Related
 

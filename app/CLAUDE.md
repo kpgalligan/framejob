@@ -1392,8 +1392,11 @@ the key map behind it.
   `private(set)` `liveEditBase`. `timelineLiveUpdated`/`timelineLiveEnded`
   are also the inspector's live closures (the Clip tab lane's band drags),
   and `timelineLiveEnded` adds the caption re-time as one more live tick
-  before its crossing test; `+Actions`' `removeSelectedActionCommand`
-  appends the plan too.
+  before its crossing test; `timelineDragUpdated` is the clip drag's tick:
+  a list of more than one op is tried through `SwitchAngle.Trial` and
+  dropped whole on a refusal, so a refused drop past the lanes leaves no
+  empty track; `+Actions`' `removeSelectedActionCommand` appends the plan
+  too.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one;
   `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
   when the edit lands outside the menu's event, as a panel's completion does;

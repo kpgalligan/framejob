@@ -13,7 +13,7 @@ These tools make more of what's already on the timeline. They copy clips, copy o
 
 | You want to | Use |
 | --- | --- |
-| Copy clips to straight after the originals | [`duplicate`](#duplicate) |
+| Copy clips, straight after the originals or anywhere else | [`duplicate`](#duplicate) |
 | Place clips from a payload at a time, in this project or another | [`paste`](#paste) |
 | Copy one clip's settings onto other clips | [`paste_attributes`](#paste_attributes) |
 | Group clips into one clip | [`nest`](#nest) |
@@ -52,21 +52,23 @@ Keys Frame Job doesn't know are ignored. A payload that isn't an object, or has 
 
 ## `duplicate`
 
-Copies clips onto their own tracks, placed straight after the span the originals cover, so a selection keeps its internal timing.
+Copies clips, keeping a selection's internal timing. Left to itself it puts them on their own tracks, straight after the span the originals cover. `delta` and `track` put them anywhere else.
 
-It mirrors **Edit ▸ Duplicate** (<kbd>⌘D</kbd>). See [Duplicate clips](/editing/duplicate-clips/).
+It mirrors **Edit ▸ Duplicate** (<kbd>⌘D</kbd>) and, with `delta` and `track`, an <kbd>⌥</kbd>-drag. See [Duplicate clips](/editing/duplicate-clips/).
 
 | Argument | Type | Required | What it does |
 | --- | --- | --- | --- |
 | `clips` | array of integers | Yes | The clips to copy, at least one. |
+| `delta` | integer, ticks | No | How far from their originals the copies land. Negative is earlier, and the earliest copy stops at 0. Left out, one span later. |
+| `track` | integer | No | The track id for the back-most, earliest clip you name. The other clips you name keep their distance from it in the stack. Left out, each copy stays on its original's track. |
 | `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
 | `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
 
-Follow it with [`move_clip`](/mcp/tools-move-and-trim/#move_clip) to put the copies anywhere else. A clip's linked partner on an unlocked track is copied too, and the two copies are linked to each other. A copy of a nest clip shows the same nest as the original. See [Shared and independent nest copies](/editing/nest-copies/).
+A clip's linked partner on an unlocked track is copied too, and the two copies are linked to each other. Only the clips you name change track, so the partner's copy keeps its original's track and moves by the same time. A copy of a nest clip shows the same nest as the original. See [Shared and independent nest copies](/editing/nest-copies/).
 
 **Answers** `new_clips`, the copies.
 
-**Won't run** when a copy would break the [overlap rule](/getting-started/refused-edits/) on its track. Later clips aren't pushed out of the way. An overlap the rule allows gets a Cross Dissolve. An unknown clip id or an empty list is an error.
+**Won't run** when a copy would break the [overlap rule](/getting-started/refused-edits/) where it lands, a partner's copy included, or when a clip you name would land past either end of the track list. Later clips aren't pushed out of the way. An overlap the rule allows gets a Cross Dissolve. An unknown clip or track id, or an empty list, is an error.
 
 ## `paste`
 
@@ -85,7 +87,7 @@ It mirrors **Edit ▸ Paste** (<kbd>⌘V</kbd>), without touching the clipboard.
 What Frame Job does to make the clips fit:
 
 - **Media** is matched to this project by path. A row the project already has is reused, and one it lacks is added. Only files the pasted clips use come across.
-- **Nests** are always copied, never matched, so editing one copy afterwards leaves the other alone. Copy itself writes no `nests` key, so a nest clip on the clipboard can't be pasted, but a payload that carries the nest can.
+- **Nests** are always copied, never matched, so editing one copy afterwards leaves the other alone. Copy writes the nests its clips show, with every nest inside them, and no `nests` key when they show none.
 - **Times** are rounded to this project's frame grid.
 - **Missing tracks** are added at the back.
 - **No room:** a clip that would break the overlap rule on its track goes on a new track in front instead of being dropped. A smaller overlap the rule allows gets a Cross Dissolve.
