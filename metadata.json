@@ -1,0 +1,71 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6PZ01T00T1SHQ17MB1XJFVS",
+  "strategy": "manual-commit",
+  "branch": "worktree-help-docs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/CLAUDE.md",
+    "app/Sources/AgentCatalog+Files.swift",
+    "app/Sources/AgentServer+Media.swift",
+    "app/Sources/AgentServer+MediaFolder.swift",
+    "app/Sources/MediaFolder.swift",
+    "app/Sources/ProjectDocument+Import.swift",
+    "designs/spec/04.3c-inspector-media-document-assistant.md",
+    "designs/spec/07.4-swift-file-map.md",
+    "designs/spec/07.7-import.md",
+    "designs/spec/07.9e-agent-app-state-tools.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/deepening.md",
+    "designs/spec/README.md",
+    "docs/guide/mcp.md",
+    "docs/guide/projects-and-media.md",
+    "docs/manual-checks.md",
+    "docs/site/src/content/docs/mcp/tools-media.mdx",
+    "docs/site/src/content/docs/mcp/tools.mdx",
+    "docs/site/src/content/docs/projects/import-media.mdx",
+    "docs/site/src/content/docs/projects/media-tab.mdx",
+    "docs/site/src/data/features.json",
+    "tools/proof/README.md",
+    "tools/proof/docs_bugs_b2_proof.py",
+    "tools/proof/docs_bugs_b5_probe.swift",
+    "tools/proof/docs_bugs_b5_proof.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 258312,
+    "cache_read_tokens": 1654409,
+    "output_tokens": 8289,
+    "api_call_count": 7,
+    "subagent_tokens": {
+      "input_tokens": 74,
+      "cache_creation_tokens": 270638,
+      "cache_read_tokens": 3464400,
+      "output_tokens": 26797,
+      "api_call_count": 37
+    }
+  },
+  "redaction": {
+    "replacements": 20,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 20,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
