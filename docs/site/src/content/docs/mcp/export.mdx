@@ -131,19 +131,19 @@ A problem Frame Job can see from the request comes back from `export` itself as 
 | A number out of range, or a word it doesn't know | The error names the argument and the value. |
 | An option the preset doesn't have | See [Audio bits](#audio-bits), [Stems](#stems), [Dynamic range](#dynamic-range) and [Encoder speed](#encoder-speed). |
 | A graphic clip in the range with no module, or a module that doesn't compile | "The export was not started: the graphic "…" does not compile — …. Fix the module and export again." A clip with no module reads "has no module in graphics/" in place of "does not compile — …". It names each graphic and its first error, and it covers graphics inside nests. An audio-only preset draws no graphics, so it isn't stopped by one. |
+| More than 600 frames on `gif` or `apng` | "An animated GIF is limited to 600 frames and this range is …. Shorten the range." There's no frame-rate argument. See [The 600-frame limit](/export/gif-and-apng/#the-600-frame-limit). |
+| A size of another shape on a transparent preset | "An export that keeps transparency has to have the canvas's own shape…". See [Transparent presets](#transparent-presets). |
 
 Anything that goes wrong after that comes back from `export_status` as `failed`, with the sentence in `reason`. Check for it even when `export` answered cleanly.
 
 | What went wrong | The `reason` |
 | --- | --- |
-| A size of another shape on a transparent preset | "An export that keeps transparency has to have the canvas's own shape…". See [Transparent presets](#transparent-presets). |
 | A stem's file would be one of the project's media | "The stem “…” would replace media this project uses; export under another name." |
 | A graphic fails while it's drawn | "The export was stopped at frame … of the graphic "…": …. No file was written." |
 | A retimed clip's sound, an isolated voice or a voice effect couldn't be rendered | The sentence names the clip and the reason. |
 | A Remove Background clip's masks couldn't be made | "Clip …'s person masks could not be made: …." A picture set to **Foreground** says foreground masks. |
 | A clip's gate, leveller or de-esser needs a loudness that hasn't been measured | "Clip …'s loudness or speech has not been measured yet…". Wait for the clip's analysis, then export again. |
 | This Mac has no encoder for the preset | "This Mac cannot export with the “…” preset." |
-| More than 600 frames on `gif` or `apng` | "An animated GIF is limited to 600 frames and this range is …." There's no frame-rate argument, so shorten the range. See [The 600-frame limit](/export/gif-and-apng/#the-600-frame-limit). |
 
 A graphic's warnings are different: they don't stop the export, and they arrive as `graphic_warnings` in the `done` result.
 
@@ -177,7 +177,7 @@ There's no frame-rate argument, so the sheet's [frame rate](/export/frame-rate/)
 
 ## Path handling
 
-The folder must exist. A `~` at the start is expanded, and an existing file at the path is replaced. It's removed as writing starts, so an export that stops from then on, such as one over the 600-frame limit, leaves neither file.
+The folder must exist. A `~` at the start is expanded, and an existing file at the path is replaced. It's removed as writing starts, so a job that fails or is cancelled from then on leaves neither file. Anything earlier, such as a refused call or a cancel while the job is measuring loudness, leaves it as it was.
 
 The file always ends in the preset's extension.
 
@@ -187,10 +187,10 @@ The file always ends in the preset's extension.
 | `cut` | `h264` | `cut.mp4` | With no extension, it's added. |
 | `cut.mov` | `h264` | `cut.mp4` | A different media extension is replaced. |
 | `Talk v1.2` | `h264` | `Talk v1.2.mp4` | Any other suffix stays part of the name. |
-| `cut.webm` | `h264` | `cut.webm.mp4` | `.webm` isn't one of the extensions Frame Job replaces. |
-| `cut.mp4` | `av1_webm` | `cut.webm` | `.mp4` is. |
+| `cut.webm` | `h264` | `cut.mp4` | So is `.webm`. |
+| `cut.mp4` | `av1_webm` | `cut.webm` | The same the other way round. |
 
-The extensions it replaces are `.mov`, `.mp4`, `.m4v`, `.m4a`, `.mp3`, `.wav`, `.aif`, `.aiff`, `.caf`, `.framejob`, `.srt`, `.vtt`, `.png`, `.jpg`, `.jpeg`, `.heic` and `.gif`. The returned `path` is always the file that gets written.
+The extensions it replaces are `.mov`, `.mp4`, `.m4v`, `.m4a`, `.mp3`, `.wav`, `.aif`, `.aiff`, `.caf`, `.framejob`, `.srt`, `.vtt`, `.png`, `.jpg`, `.jpeg`, `.heic`, `.gif` and `.webm`. The returned `path` is always the file that gets written.
 
 ## Size
 
@@ -213,7 +213,7 @@ A movie is written at exactly the size asked for. If the shape differs from the 
 - **Even edges.** Every preset but `prores_4444`, `gif` and `apng` needs even dimensions, so an odd width or height is written one pixel smaller. That covers `document` on a project with an odd edge. The `done` result's `width` and `height` are the file's.
 - **GIF and APNG.** A size is a box the picture is fitted inside, keeping its shape and never scaling up. A vertical 1080 × 1920 project's GIF default comes out at 152 × 270.
 - **Audio presets.** A size has no effect, and `preset` isn't one of their sizes.
-- **Transparent movies.** A `[width, height]` of another shape fails. See [Transparent presets](#transparent-presets).
+- **Transparent movies.** A `[width, height]` of another shape is an error. See [Transparent presets](#transparent-presets).
 
 An unknown size returns an error with the list, for example "No export size is called "480p" for h264. The sizes are: document, 2160p, 1440p, 1080p, 720p — or pass [width, height]." A custom size outside 16 to 8192 pixels is an error too. It isn't clamped.
 
@@ -289,7 +289,7 @@ The `done` result lists each one as `stems [{name, tracks, path}]`. `tracks` hol
 - On any other preset `export` returns the error "h264 has no stems; stems applies to audio_m4a, audio_wav and audio_aiff", naming the preset.
 - With no track heard, the error is "stems: no track is heard, so there is no stem to write".
 - If a stem's file would be one of the project's media, the job fails before any stem is written, and `export_status` gives the reason.
-- A failed or cancelled job leaves neither the mix nor any stem behind.
+- A failed or cancelled job leaves neither the mix nor any stem it wrote. A file it hadn't yet replaced stays.
 
 ## Dynamic range
 
@@ -325,7 +325,7 @@ On every other preset `export` returns the error "h264 has no encoder speed; enc
 
 Four presets keep a transparent canvas transparent: `prores_4444`, `hevc_alpha`, `vp9_alpha_webm` and `apng`. See [Transparent exports](/export/transparency/). A GIF can show a fully transparent pixel, but it has no alpha channel, so nothing partial survives.
 
-On the three movie presets, a `[width, height]` of a different shape from the canvas can't be written, because the padding would destroy the alpha channel. `export` queues the job, and `export_status` then reads `failed` with a reason that names both sizes. The shape is judged after an odd edge is evened, and within a pixel the picture fills the frame, so a size in the canvas's own proportions always works, at any scale. Every named size already has the canvas's shape.
+On the three movie presets, a `[width, height]` of a different shape from the canvas can't be written, because the padding would destroy the alpha channel. `export` returns an error that names both sizes, and nothing is queued. The shape is judged after an odd edge is evened, and within a pixel the picture fills the frame, so a size in the canvas's own proportions always works, at any scale. Every named size already has the canvas's shape.
 
 `apng` fits its picture inside the size instead, so this doesn't apply to it.
 

@@ -57,7 +57,7 @@ GIF and APNG files have no sound, so they don't wait for the last two. You can c
 Choose **Cancel**. The button greys out while the export stops, then the sheet closes and the partly written file is removed.
 
 :::caution
-If you chose to replace an existing file in the save panel, that file is gone once you cancel. Cancelling doesn't bring it back.
+A file you chose to replace in the save panel is removed as writing starts, so cancelling once the sheet says "Writing" loses it. Cancelling doesn't bring it back. Cancel before writing starts, during one of the waits above or while it says "Measuring loudness…", and the file stays as it was.
 :::
 
 ## The finish report
@@ -95,13 +95,12 @@ The cursor count comes after the graphic count. A finished row in the Export Que
 | "Clip …'s voice effect could not be rendered: …" | The voice effect couldn't be rendered for that clip. |
 | "Clip …'s person masks could not be made: …" or "Clip …'s foreground masks could not be made: …" | A Remove Background clip's masks failed. No frame is written without them. |
 | "This Mac cannot export with the “…” preset." | This Mac has no encoder for that format. Choose another format. No file is left. |
-| "An export that keeps transparency has to have the canvas's own shape…" | A custom size has a different shape from the canvas. See [Transparent exports](/export/transparency/). |
 
 Other messages come from macOS or the file being written, and appear as they are.
 
 A failure is different from a cancel. A failed Animated GIF, Animated PNG or WebM export removes its partly written file, and so does a failed export with stems, a graphic that fails and a Mac with no encoder. Any other failure while writing can leave a partly written file at the path you chose. It isn't a finished export, so delete it.
 
-A file you chose to replace in the save panel is removed as writing starts, and it doesn't come back. If the export stops from that point on, for example at the [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) or the [same-shape rule](/export/transparency/#the-same-shape-rule), you're left without the old file as well as the new one.
+A file you chose to replace in the save panel is removed as writing starts, and it doesn't come back. If the export fails from that point on, you're left without the old file as well as the new one. Anything that stops it before then leaves the file as it was. The [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) and the [same-shape rule](/export/transparency/#the-same-shape-rule) stop you in the Export sheet, before the save panel.
 
 ## Quitting during an export
 
@@ -113,7 +112,7 @@ Only the [Export Queue](/export/export-queue/) is guarded at quit, so jobs there
 
 ## With an agent
 
-An agent's `export` puts a job on the Export Queue and returns at once, with no progress sheet. A bad argument, a missing folder, an empty timeline or a graphic that doesn't compile comes back from `export` before anything is queued. Failures while writing and the loudness figures come back from `export_status`, and `cancel_export` stops the job.
+An agent's `export` puts a job on the Export Queue and returns at once, with no progress sheet. A bad argument, a missing folder, an empty timeline, a graphic that doesn't compile, a range over the 600-frame limit or a size that breaks the same-shape rule comes back from `export` before anything is queued. Failures while writing and the loudness figures come back from `export_status`, and `cancel_export` stops the job.
 
 Warnings arrive in the finished `export_status` as `graphic_warnings` and `cursor_warnings`, and are left out when there are none. The list of graphic warnings stops after 64 distinct ones. See [Export: start, then poll](/mcp/export/).
 

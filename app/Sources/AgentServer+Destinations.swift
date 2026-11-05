@@ -43,9 +43,12 @@ extension AgentServer {
     /// person types both; `heif` is NOT, because this app never writes one
     /// (`FrameWriter.Format.heic` is `UTType.heic` for the measured reason
     /// recorded there), so a file called `scene.heif` keeps its name.
+    ///
+    /// `webm` is a container this app writes too, so `export {path: "cut.webm",
+    /// preset: "h264"}` writes `cut.mp4`, not `cut.webm.mp4`.
     private static let replaceableExtensions: Set<String> = [
         "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "framejob", "srt", "vtt",
-        "png", "jpg", "jpeg", "heic", "gif",
+        "png", "jpg", "jpeg", "heic", "gif", "webm",
     ]
 
     static func destinationURL(_ path: String, extension ext: String) -> URL {

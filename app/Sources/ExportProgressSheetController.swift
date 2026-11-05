@@ -177,7 +177,8 @@ final class ExportProgressSheetController: NSViewController {
             revealButton.isEnabled = true
         case .failure(let error):
             if case Exporter.ExportError.cancelled = error {
-                try? FileManager.default.removeItem(at: destination)
+                // Only a file this export replaced (spec §11 #470).
+                if exporter.replacedDestination { try? FileManager.default.removeItem(at: destination) }
                 dismiss(self)
                 return
             }

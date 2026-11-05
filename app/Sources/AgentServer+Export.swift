@@ -14,8 +14,9 @@ extension AgentServer {
     /// one writer, so an agent export and a menu export cannot disagree.
     ///
     /// Answers AT ONCE (spec §11 #326): every refusal is made here, before
-    /// anything is queued — the arguments, the core's settings, the folder
-    /// and the graphics gate — and the export is then a job in the Export
+    /// anything is queued — the arguments, the core's settings, the folder,
+    /// the graphics gate, and the frame limit and same-shape rule
+    /// (`Exporter.settingsRefusal`, #470) — and the export is then a job in the Export
     /// Queue, exactly as the sheet's Add to Queue makes one, answered as
     /// `{export_id, path, status}`. `export_status` follows the job and
     /// `cancel_export` stops it (`AgentServer+ExportStatus.swift`); a failure
@@ -76,6 +77,10 @@ extension AgentServer {
         if let refusal = Exporter.graphicsRefusal(
             project: project, settings: settings, graphics: graphics)
         {
+            throw ToolError(message: refusal.localizedDescription)
+        }
+        // The same, for the two rules the sheet shows in its readout (#470).
+        if let refusal = Exporter.settingsRefusal(settings, project: project) {
             throw ToolError(message: refusal.localizedDescription)
         }
         let (id, status) = onMain { () -> (UInt64, String) in

@@ -105,7 +105,8 @@ final class Exporter {
     /// republishes on every edit, and a frame already queued must not be
     /// composed from a project the user changed halfway through the write.
     private var recipeKey: Int?
-    /// Where this export writes — removed by `finish` when a graphic failed.
+    /// Where this export writes — removed by `finish` when a graphic failed
+    /// after the file there was replaced.
     private var destination: URL?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, any Error>) -> Void)?
@@ -159,6 +160,11 @@ final class Exporter {
     /// CU-37 (c)), found by the wait before the build and set on main before
     /// the write; reset in `export`.
     private(set) var cursorWarnings: [ExportCursorWarning] = []
+    /// True once `startWriting` has cleared the path, so whatever is there
+    /// from then on is this export's (spec §11 #470). A cancel removes the
+    /// path only then; before it the file is the one the person already had.
+    /// Read the way `loudnessReport` is; reset in `export`.
+    private(set) var replacedDestination = false
 
     /// Bytes for the measurement's sample buffers, grown once. Raw and
     /// 16-byte aligned rather than an `[UInt8]`, because the samples are
@@ -220,6 +226,7 @@ final class Exporter {
         loudnessReport = nil
         graphicWarnings = []
         cursorWarnings = []
+        replacedDestination = false
         pendingLoudness = nil
         progressHandler = progress
         completionHandler = completion
@@ -343,8 +350,13 @@ final class Exporter {
         // AVFoundation refuses to write over an existing file, and a stale
         // one under a half-written image sequence would be no better. The
         // save panel already asked for permission to replace, so removing it
-        // here is the user's answer being carried out, not a surprise.
-        try? FileManager.default.removeItem(at: url)
+        // here is the user's answer being carried out, not a surprise. It is
+        // moved aside rather than removed until the pipeline exists, so a
+        // pipeline that cannot be built leaves it (spec §11 #470), and each
+        // writer still sees the empty path it always saw. A move that fails
+        // leaves the removal this replaced.
+        let aside = Exporter.moveAside(url)
+        if aside == nil { try? FileManager.default.removeItem(at: url) }
 
         // Which pipeline writes it is the settings' decision rather than this
         // file's: `Exporter.pipeline` reads the core's `avf_preset` and hands
@@ -361,9 +373,12 @@ final class Exporter {
                 built: built, project: project, urls: urls, settings: settings,
                 chapters: chapters, options: options, graphics: graphics, to: url)
         } catch {
+            Exporter.putBack(aside, at: url)
             finish(.failure(error))
             return
         }
+        if let aside = aside { try? FileManager.default.removeItem(at: aside) }
+        replacedDestination = true
         self.writer = writer
         // The gain is not part of choosing a pipeline, so it is handed over
         // after the pick rather than through it: `Exporter.pipeline` stays
@@ -388,6 +403,22 @@ final class Exporter {
             if case .success = result { self.progressHandler?(1) }
             self.finish(Exporter.encoderOutcome(result, settings: settings, destination: url))
         }
+    }
+
+    /// Renames the file at `url` to a hidden name in the same folder, or nil
+    /// when nothing is there or the move failed.
+    private static func moveAside(_ url: URL) -> URL? {
+        let aside = url.deletingLastPathComponent()
+            .appendingPathComponent(".framejob-replaced-\(UUID().uuidString)")
+        return (try? FileManager.default.moveItem(at: url, to: aside)) == nil ? nil : aside
+    }
+
+    /// Undoes `moveAside`, clearing whatever a pipeline that failed to build
+    /// left at `url` first.
+    private static func putBack(_ aside: URL?, at url: URL) {
+        guard let aside = aside else { return }
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.moveItem(at: aside, to: url)
     }
 
     /// The documented progress-timer seam (app/CLAUDE.md). A run-loop timer,
@@ -440,7 +471,8 @@ final class Exporter {
     /// here rather than cleared: both callers read it after their completion
     /// has fired.
     private func finish(_ result: Result<URL, any Error>) {
-        let result = Exporter.graphicOutcome(result, key: recipeKey, destination: destination)
+        let result = Exporter.graphicOutcome(
+            result, key: recipeKey, destination: replacedDestination ? destination : nil)
         loudnessReport = pendingLoudness
         graphicWarnings = Exporter.graphicWarnings(on: recipeKey)
         pendingLoudness = nil

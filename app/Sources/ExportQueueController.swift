@@ -435,6 +435,7 @@ final class ExportQueueController {
         let measured = report.map { " \($0.summary)." } ?? ""
         let warnings = exporter?.graphicWarnings ?? []
         let cursorWarnings = exporter?.cursorWarnings ?? []
+        let replaced = exporter?.replacedDestination ?? false
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
         // from the job, so that releasing it cannot depend on the job still
@@ -477,8 +478,10 @@ final class ExportQueueController {
                     // where the policy is decided, and it is what holds if a
                     // third pipeline ever arrives that is less tidy.
                     // `ExportProgressSheetController.finished` is the same line
-                    // for the same reason.
-                    try? FileManager.default.removeItem(at: jobs[index].destination)
+                    // for the same reason. It runs only once the exporter has
+                    // replaced the file: before that, what is at the path is
+                    // the file the person already had (spec §11 #470).
+                    if replaced { try? FileManager.default.removeItem(at: jobs[index].destination) }
                     jobs[index].state = .cancelled
                     jobs[index].progress = 0
                     jobs[index].message = "Cancelled."

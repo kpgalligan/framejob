@@ -670,6 +670,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the voice stays at full level, and the music sits at 20 % under it.
 - **Source:** #468 (spec §11 AU-157); `docs_bugs_b1_proof.py` D1–D6 read the levels from exports through the op the checkbox sends and the Clip menu, never the real checkbox, the key or the sound.
 
+**SE-43 — A Custom size of another shape, typed and clicked past, stops at the click**
+- **Do:** 1. Open File ▸ Export… and choose HEVC with Alpha. 2. Set Size to Custom… and type 1000 × 1000. 3. Without leaving the field, click **Export…**.
+- **Expect:** a beep, the same-shape sentence in the readout, **Export…** and **Add to Queue** greyed out, and no save panel.
+- **Source:** #470 (spec §11 #470); `docs_bugs_b3_proof.py` G4 and B1 read the card once the size is resolved. No script presses the button, because on the base the press opens a save panel.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

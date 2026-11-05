@@ -47,9 +47,11 @@ A viewer that knows nothing of APNG shows the first frame.
 
 ## The 600-frame limit
 
-An animated GIF or APNG holds at most 600 frames. That's 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. The readout shows the count while you're choosing, but the sheet doesn't stop you. Once you've picked where to save, a longer export stops with no new file, and a file you chose to replace in the save panel has already been removed:
+An animated GIF or APNG holds at most 600 frames. That's 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. With a longer range, the readout says so in place of the usual line, and **Export…** and **Add to Queue** grey out:
 
-> An animated GIF is limited to 600 frames and this range is 720. Shorten the range, or lower the export frame rate.
+> An animated GIF is limited to 600 frames and this range is 750. Shorten the range.
+
+When the chosen rate is above the format's own, the sentence ends "Shorten the range, or lower the export frame rate."
 
 For GIF the way out is a shorter range, because every fixed rate in the **Frame rate:** popup is higher than 12.5 fps. If the popup is on a fixed rate, **Project rate** takes the GIF back to 12.5 fps. An APNG can go down to 24 or 23.976 fps, which gains you about a second.
 

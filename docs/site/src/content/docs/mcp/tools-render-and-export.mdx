@@ -58,7 +58,7 @@ Puts the timeline on the Export Queue and returns at once, as **File â–¸ Exportâ
 
 It returns `{export_id, path, status}` at once, and `status` is `queued` or `running`. Jobs run one at a time, and the queue window isn't opened. The export always writes the whole project, even with a nest open. Follow it with [`export_status`](#export_status) and stop it with [`cancel_export`](#cancel_export). The `export_id` lasts until Frame Job quits.
 
-A problem with the request comes back from this call as an error, before anything is queued. A failure while writing comes back from `export_status`, and so does a size of another shape on a transparent preset. See [What stops an export](/mcp/export/#refusals-and-failures).
+A problem with the request comes back from this call as an error, before anything is queued, and that includes a `gif` or `apng` range over 600 frames and a size of another shape on a transparent preset. A failure while writing comes back from `export_status`. See [What stops an export](/mcp/export/#refusals-and-failures).
 
 In the [Assistant tab](/assistant/what-it-will-not-do/), Frame Job asks you before each `export` runs, naming the file it would write or replace. A client connected over MCP isn't asked.
 

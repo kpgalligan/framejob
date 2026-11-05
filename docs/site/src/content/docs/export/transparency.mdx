@@ -68,7 +68,7 @@ ProRes 4444, HEVC with Alpha and VP9 with Alpha won't write a frame of a differe
 
 Every row in the [**Size:** popup](/export/size/) has the canvas's shape, so this only happens with a **Custom…** size. Scaling is fine, larger or smaller, as long as the proportions hold, and a size within a pixel of the canvas's shape is written.
 
-After the save panel, the export stops with a message naming both sizes: "An export that keeps transparency has to have the canvas's own shape. This canvas is 1920 × 1080 and 1000 × 1000 is a different shape, so the picture would be padded and the padding loses the alpha channel. Export at 1920 × 1080, at one of the sizes in the popup, or at any size with the same proportions." No new file is written, and a file you chose to replace in the save panel has already been removed.
+With such a size, the readout names both sizes in place of the usual line, and **Export…** and **Add to Queue** grey out: "An export that keeps transparency has to have the canvas's own shape. This canvas is 1920 × 1080 and 1000 × 1000 is a different shape, so the picture would be padded and the padding loses the alpha channel. Export at 1920 × 1080, at one of the sizes in the popup, or at any size with the same proportions." If you click **Export…** with the size still being typed, Frame Job beeps and the readout shows the same sentence.
 
 ## Good to know
 

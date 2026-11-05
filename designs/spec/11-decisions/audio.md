@@ -1260,6 +1260,9 @@ preview's statement) records its decisions from AU-150.
   nothing (the pipeline removes the mix and each stem it finished); the line reads "Exported
   “Mix.wav” and 3 stems."; the `export_status` result lists each stem's `{name, tracks, path}`.
   (g) Not measured: the loudness report is the mix's.
+  **Amended by #470** (docs bugs b3): (f)'s "leaves nothing" means nothing the job wrote. A mix the
+  job has not yet replaced stays, so the source collision that stops a job before writing leaves
+  an existing mix as it was.
 - **AU-109 — The proof, and part 2b.** Part 2a's proof is `audio_ap10b_proof.py`: S1–S8 (two
   tracks' stems summing to the mix within 2 LSB at 24 bits, `names` grouping, a loudness target
   leaving every stem byte-identical, mute and solo, a real recording's stem against the soloed

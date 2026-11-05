@@ -12,7 +12,12 @@ import CoreMedia
 /// #294): the frame shows a VP9 track deeper than 8 bits. The generator hands
 /// back an 8-bit image of a 10-bit VP9 file, alone or beside anything, where
 /// it hands back a 16-bit one of HEVC Main 10, HEVC Rext and ProRes 422 HQ
-/// (`log_proof.py` L17's control), so only VP9 is asked about.
+/// alone (`log_proof.py` L17's control), so only VP9 is asked about here.
+///
+/// Beside anything else the generator's depth follows the lowest track that
+/// has video, so a 10-bit HEVC or ProRes clip above an 8-bit clip comes back
+/// 8-bit. `showsDeepSource` is PR-14's question for that, asked after the
+/// generator has answered 8 bits (`Exporter.renderFrameReported`).
 ///
 /// It asks the RECIPE at the frame time, then the COMPOSITION: each `track`
 /// layer's composition track, the segment of it at the frame time, and that
@@ -55,6 +60,24 @@ enum DeepVideoFrame {
         return false
     }
 
+    /// True when the recipe at `max(0, t)` (with `options`) has a `track`
+    /// layer whose composition track's segment at that time reads a file
+    /// whose first video description `isDeepSource` (spec §11 PR-14). A
+    /// reversed clip counts through its 10-bit intermediate (PR-7).
+    static func showsDeepSource(
+        _ project: ReelProject, _ built: BuiltComposition, at t: Ticks, options: RecipeOptions
+    ) -> Bool {
+        guard let recipe = project.recipe(at: max(0, t), options: options) else { return false }
+        let time = CompositionBuilder.time(max(0, t))
+        return recipe.layers.contains { layer in
+            guard case .track(let id) = layer.source,
+                let track = built.composition.track(withTrackID: CMPersistentTrackID(id)),
+                let shown = description(of: track, at: time)
+            else { return false }
+            return isDeepSource(shown)
+        }
+    }
+
     /// The first video description of the file `track`'s segment at `time`
     /// reads: nil for an empty segment, one whose target range does not hold
     /// the time, or one with no file.
@@ -86,5 +109,30 @@ enum DeepVideoFrame {
             record[record.startIndex] == 1
         else { return false }
         return record[record.startIndex + 6] >> 4 > 8
+    }
+
+    /// The ProRes rows, every one of them 10 bits or more.
+    private static let proResSubtypes: Set<CMVideoCodecType> = [
+        kCMVideoCodecType_AppleProRes422Proxy, kCMVideoCodecType_AppleProRes422LT,
+        kCMVideoCodecType_AppleProRes422, kCMVideoCodecType_AppleProRes422HQ,
+        kCMVideoCodecType_AppleProRes4444, kCMVideoCodecType_AppleProRes4444XQ,
+    ]
+
+    /// `isDeep`, or an HEVC description whose `hvcC` record says more than 8
+    /// bits (`bitDepthLumaMinus8`, the low 3 bits of byte 17, in a record of
+    /// at least 18 bytes), or ProRes. AV1 is left out, as in PR-12: it does
+    /// not decode on the host, so no depth of it has been measured.
+    static func isDeepSource(_ description: CMFormatDescription) -> Bool {
+        if isDeep(description) { return true }
+        let atoms = CMFormatDescriptionGetExtension(
+            description,
+            extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms)
+            as? [String: Any]
+        if let record = atoms?["hvcC"] as? Data, record.count >= 18,
+            record[record.startIndex + 17] & 0x07 > 0
+        {
+            return true
+        }
+        return proResSubtypes.contains(CMFormatDescriptionGetMediaSubType(description))
     }
 }

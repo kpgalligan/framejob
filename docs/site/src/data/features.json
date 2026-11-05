@@ -16724,7 +16724,7 @@
     {
      "id": "export-frame-limit",
      "name": "The 600-frame limit",
-     "summary": "An animated GIF or APNG holds at most 600 frames, and a longer export stops after the save panel, before writing anything.",
+     "summary": "An animated GIF or APNG holds at most 600 frames, and a longer range shows a sentence in the readout and greys out Export… and Add to Queue.",
      "page": "export/gif-and-apng",
      "anchor": "the-600-frame-limit",
      "where": "Export sheet ▸ readout"
@@ -16938,7 +16938,7 @@
     {
      "id": "export-stems-overwrite",
      "name": "Overwriting and clean-up",
-     "summary": "A stem replaces a file of its name without asking, but never the project's media, and a cancelled or failed export removes them all.",
+     "summary": "A stem replaces a file of its name without asking, but never the project's media, and a cancelled or failed export removes what it wrote.",
      "page": "export/stems",
      "anchor": "overwriting-and-clean-up",
      "where": "Export sheet ▸ Stems"

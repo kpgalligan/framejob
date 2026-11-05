@@ -50,7 +50,7 @@ VP9 (WebM) that keeps a transparent canvas, for a title or lower third a web pag
 - The picture is 8-bit, with the transparency as a second stream beside it. The [footnote](/export/export-sheet/#the-footnote) ends in `alpha`.
 - It's SDR only, so an HDR project writes its SDR version, and **Dynamic Range:** stays greyed out on **SDR version**.
 - The sound is Opus, as in VP9 (WebM).
-- A **Custom…** size of a different shape from the canvas won't export, because padding would lose the alpha. After the save panel the export stops with a message naming the canvas's size. Every row in the **Size:** popup is fine.
+- A **Custom…** size of a different shape from the canvas won't export, because padding would lose the alpha. The readout names the canvas's size, and **Export…** and **Add to Queue** grey out. Every row in the **Size:** popup is fine.
 - Imported back into Frame Job it shows opaque, because the transparency isn't read. For a transparent clip to bring back in, export ProRes 4444 or HEVC with Alpha.
 
 ## The rate as a soft cap

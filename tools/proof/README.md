@@ -30216,6 +30216,28 @@ python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
+## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; eight mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
+
+#470, #486, #488, #493 and #504. **`docs_bugs_b3_proof.py`** makes its own fixtures under
+`work/docs-bugs-b3/` (ffmpeg with libx264, libx265 and prores_ks, and `sips`) on a scratch
+`CFFIXED_USER_HOME`. The R, S, C, D and W rows run in one instance. A cancel row polls
+`export_status` every 20 ms and cancels on the phase it wants, so the phase is measured, not timed.
+The G rows launch an instance a card, with the choice in the argument domain, so nothing persists
+and nothing presses Export….
+
+**`docs_bugs_b3_probe.swift`** reads what a layout dump cannot say: `exportButton` and `queueButton`
+on a real `ExportSheetController`, its view loaded and never shown, and `Exporter().export` called
+directly over a file. It names only symbols the base has, so it builds over `--base-sources` and B1
+and B2 are red there by behaviour. A press of Export… with a Custom size still being typed is
+`docs/manual-checks.md` SE-43.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b3_proof.py [--only R1,C1,D1,G1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b3_proof.py
+python3 tools/proof/docs_bugs_b3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b3_proof.py --base-sources <its app/Sources> --expect-red
+```
+
 ## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)
 
 Docs bugs batch c3 (#479, #480, #499, #512, #513, #515, spec §11 GR-36, GR-37, GR-38). The built app

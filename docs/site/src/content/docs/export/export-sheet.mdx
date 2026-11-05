@@ -88,7 +88,7 @@ The line under the controls says what size, rate and length the file will have. 
 | An audio-only file | `Audio only · 00:01:12.200` |
 | A GIF or APNG | The movie line, followed by `· 360 frames, no audio` |
 
-When the sheet can't work out a valid file, the readout says what to fix and **Export…** and **Add to Queue** are greyed out. An empty custom field gives "Type a width and a height, or pick a size from the list." or "Type a loudness target in LUFS, or pick one from the list."
+When the sheet can't work out a valid file, the readout says what to fix and **Export…** and **Add to Queue** are greyed out. An empty custom field gives "Type a width and a height, or pick a size from the list." or "Type a loudness target in LUFS, or pick one from the list." A range over the [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) and a custom size that breaks the [same-shape rule](/export/transparency/#the-same-shape-rule) show their own sentences.
 
 ## Estimated time
 
@@ -143,14 +143,14 @@ The sheet ends in three buttons.
 | **Export…** | Opens a save panel, then writes the file behind a [progress sheet](/export/progress-and-report/). It doesn't join the queue and never waits for memory. |
 | **Add to Queue** | Opens the same save panel, then puts the job in the [Export Queue](/export/export-queue/). The job keeps the project as it is now, and you can go on editing. |
 
-**Export…** and **Add to Queue** are greyed out while the sheet can't work out a valid file, for example with an empty custom field, or when the file would have no length.
+**Export…** and **Add to Queue** are greyed out while the sheet can't work out a valid file, for example with an empty custom field or a range over the 600-frame limit, or when the file would have no length.
 
 The save panel suggests the project's name with the format's extension, such as `Board v1.2.mp4`. Its message says what's being written: "Export the timeline as a movie.", "Export the timeline as an animated GIF." or "Export the timeline's audio."
 
 ## Good to know
 
 - An audio-only format on a timeline with no sound stops after the save panel with "There is nothing on the timeline to export — add a clip first."
-- The readout accepts a custom size of a different shape from the canvas, but the movie formats that keep transparency stop on it after the save panel. See [Transparent exports](/export/transparency/).
+- A custom size of a different shape from the canvas greys out **Export…** on the movie formats that keep transparency, and the readout says why. See [Transparent exports](/export/transparency/).
 
 ## With an agent
 

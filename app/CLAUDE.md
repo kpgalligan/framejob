@@ -3020,7 +3020,8 @@ the key map behind it.
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
-  or a deep VP9 track, §11 PR-12). An export is TWO
+  or a deep VP9 track, §11 PR-12, or re-read when the generator answers 8
+  bits for a frame showing a deeper source, §11 PR-14). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float (its 10 ms steps kept by `StepLoudnessMeter`, AU-28), then
   the write from the same float decode, normalised or not, through
@@ -3096,7 +3097,9 @@ the key map behind it.
   `render_frame` and Save Frame… as PNG or HEIC): `reads` is PR-9's deep still
   or `shows`, a recipe `track` layer whose composition segment at the frame
   time reads a VP9 file whose `vpcC` bitDepth is above 8 (`isDeep`), spec §11
-  PR-12.
+  PR-12. `showsDeepSource` is PR-14's wider test (`isDeepSource`: a VP9
+  `vpcC`, an HEVC `hvcC` or ProRes), asked after the generator answers an
+  8-bit image.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call `writeFrame`, so their PNGs are
   byte-identical by construction; `writeFrame` labels a rendered frame BT.709

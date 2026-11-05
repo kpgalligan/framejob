@@ -357,7 +357,9 @@ status}`, where status is `queued` or `running`. Exports run one at a time.
 - An `export_id` is known until Frame Job quits.
 
 Every refusal — a bad argument, a missing folder, a graphic that does not
-compile — comes back from `export` itself, before anything is queued. A
+compile, a `gif` or `apng` range over 600 frames, a size of another shape on
+a transparent movie preset — comes back from `export` itself, before
+anything is queued. A
 failure while writing comes back from `export_status` as `failed` with its
 reason; a graphic that fails during the export stops it, leaving no file,
 and the reason names the graphic and the frame.
@@ -390,8 +392,8 @@ up to about 1.25 times over it on AV1 and about 1.15 times on VP9. On `vp9_alpha
 is the same soft cap on the picture's stream alone, and the alpha stream comes on top of it
 (about 6–15 % of the video at 1080p, up to about 39 % at 640 × 360, measured). `vp9_alpha_webm`
 keeps a transparent canvas, as `prores_4444`, `hevc_alpha` and `apng` do. On those three
-movie presets a `[width, height]` of another shape is not letterboxed: `export` queues it and
-the job fails, with the reason in `export_status`. What each option means is in [Export](export.md).
+movie presets a `[width, height]` of another shape is not letterboxed: `export` returns an
+error naming both sizes and queues nothing. What each option means is in [Export](export.md).
 
 ## Reading the project: get_project
 

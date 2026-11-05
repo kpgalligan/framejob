@@ -1331,6 +1331,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   held job's "Waiting for memory: …" sentence, while the memory limit holds
   an `av1`, `av1_webm` or `vp9_webm` job, and `queued` and `running` add
   `estimated_seconds` on those rows; `export`'s answer is unchanged.
+  **Amended by #486** (docs bugs b3): a call that could only fail still
+  reached the queue when the rule lived in a writer, so `export` asks
+  `Exporter.settingsRefusal` directly after the graphics gate and before
+  `enqueue`. The 600-frame limit and G-33's same-shape rule now refuse at
+  the call, in their own sentences, with no `export_id` (#470). The order
+  is arguments, core settings, folder, graphics gate, then this.
 - **#336 — A composition audio track none of whose segments has a source
   (missing media, a pending reverse, a pending ramp render) holds bundled
   silence over [0, its last segment's end).** Measured at bb73b35
@@ -1592,3 +1598,48 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   drop flashes and says nothing else, as a refused plain drag does: no beep
   and no strip sentence. A refused drop after a good tick keeps that good
   frame with its one undo step, as a plain drag always has.
+- **#470 — A rule that can only stop an export is told before anything is
+  queued or any file is touched, and a file is replaced only once its
+  pipeline has been built.** Two rules can only stop a resolved export: an
+  image row over `ImageSequenceWriter.maxFrames` and G-33's same-shape rule on
+  an alpha row. Both lived in a pipeline's `init`, which ran after
+  `Exporter.startWriting` had removed the file, so a job they stopped left
+  neither the old file nor a new one. `Exporter.settingsRefusal(_:project:)`
+  now answers both from the settings and the project: the image rows ask
+  `ImageSequenceWriter.frameCapRefusal`, every other row asks
+  `checkAlphaSurvivesTheSize` against `plan.renderSizeCG`, which is what
+  `CompositionBuilder` hands `videoComposition.renderSize`. **Three doors ask
+  it.** `export` refuses the call (#326 as amended by #486). The sheet's
+  `syncReadout` shows the sentence in the readout in place of the summary and
+  greys Export… and Add to Queue, with `resolved` left set so Save… can still
+  name the choice; `commit(queue:)` asks once more, because a typed Custom size
+  is resolved only by `endSheetFieldEditing`, inside the click, so that click
+  beeps with no save panel. The writers keep their own checks as the backstop
+  for `Exporter.export`'s direct callers. **The file.** `startWriting` moves
+  the file aside to `.framejob-replaced-<UUID>` in the same folder, so a writer
+  sees the empty path it always saw, builds the pipeline, then on a throw puts
+  the file back and on success removes it and sets `replacedDestination`. A
+  move that fails falls back to the removal this replaces. Any other throw past
+  the doors, such as a stem naming the project's media, now leaves the old file
+  too. **The cancel.** Both `finished` methods removed the path on a cancel
+  whatever had happened, so a cancel during the build or the loudness pass
+  deleted a file nothing had touched. They now remove it only when
+  `replacedDestination` is true, and `finish` hands `graphicOutcome` the
+  destination on the same condition. **Risk accepted:** a cancel or failure once
+  writing has begun still loses the old file. Writing to a temporary file and
+  swapping on success would close that, and needs room for both files at once,
+  so it is the owner's call and not this decision. The queue's `superseded`
+  mark stays at launch, as its comment's "being early is the honest direction"
+  says, for a job that then leaves the file. Amends AU-108 (f).
+- **#504 — The 600-frame sentence offers a lower frame rate only when the
+  chosen rate is above the format's own.** A GIF at its own 12.5 fps has no
+  lower row in the Frame rate popup, and `export` has no rate argument, so
+  "or lower the export frame rate" named something neither reader could do.
+  The sentence ends `Shorten the range.`, and `Shorten the range, or lower the
+  export frame rate.` when `settings.fps` steps faster than the core's own
+  answer for the preset with no overrides. No rate is written in Swift, and no
+  answer from the core means no clause. **Accepted:** APNG's 24 and 23.976 fps
+  rows are below its 25 and go unnamed, because they reach only ranges from
+  24 s to about 25 s. The rule is the rate against the format's own; it never
+  claims a lower rate exists only in that case, and the pages keep saying an
+  APNG can go down to those rows.

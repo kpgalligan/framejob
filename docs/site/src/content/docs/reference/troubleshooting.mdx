@@ -177,8 +177,8 @@ While the timeline is empty, **File ▸ Export…** is greyed out. Add a clip fi
 | "Clip *N*'s retimed audio could not be rendered: …" | A failed render keeps failing exports until you change the clip's timing or reopen Frame Job. |
 | "The export was not started: the graphic…" or "The export was stopped at frame *N* of the graphic…" | Frame Job won't export a graphic that can't draw itself. Fix its [module](/graphics/edit-a-module/) and export again. |
 | "This Mac cannot export with the “*preset*” preset." | This Mac has no encoder for that format. Choose [another format](/export/formats/). |
-| "An animated GIF is limited to 600 frames and this range is *N*." | Shorten the range. If **Frame rate:** is on a fixed rate, **Project rate** takes a GIF down to 12.5 fps, and no fixed rate goes lower. An APNG has the same limit. See [Animated GIF and PNG](/export/gif-and-apng/#the-600-frame-limit). |
-| "An export that keeps transparency has to have the canvas's own shape…" | ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) won't take a size of a different shape. Use a size from the popup, or one with the same proportions. See [Transparent exports](/export/transparency/). |
+| "An animated GIF is limited to 600 frames and this range is *N*." | The readout shows this and **Export…** greys out. Shorten the range. When the chosen rate is above the format's own, the sentence offers a lower rate too: **Project rate** takes a GIF down to 12.5 fps, and no fixed rate goes lower. An APNG has the same limit. See [Animated GIF and PNG](/export/gif-and-apng/#the-600-frame-limit). |
+| "An export that keeps transparency has to have the canvas's own shape…" | The readout shows this and **Export…** greys out. ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) won't take a size of a different shape. Use a size from the popup, or one with the same proportions. See [Transparent exports](/export/transparency/). |
 
 A queued AV1 or VP9 job can sit waiting for memory, so it hasn't stalled. See [The Export Queue](/export/export-queue/).
 
