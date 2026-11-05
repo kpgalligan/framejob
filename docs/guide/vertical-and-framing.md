@@ -151,9 +151,9 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   not cut away and back; two people talking at once are framed together when
   they fit, and while nobody talks the last speaker stays. Every other movie
   clip follows its faces. A shot whose faces cannot be framed by who is
-  talking (it changes shot, say, or the clip that overlaps it most on one of
-  its microphones has its sound off) follows its faces instead, and the
-  summary says why.
+  talking (it changes shot, say, or every clip under it on one of its
+  microphones has its sound off: turn one on, or untick the microphone)
+  follows its faces instead, and the summary says why.
 - **A screen recording with its cursor file** follows the pointer instead of
   a face: the frame sits on the pointer and moves only when it strays from
   the middle of the frame, arrives on each click outside that middle — the

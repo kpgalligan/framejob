@@ -469,8 +469,10 @@ anywhere, so nothing is keyed (CJ-3).
   (b) **Speaker clips.** A class-3 media picture (VR-33) whose file is present and whose media has
   no cursor file, not on a microphone's track, whose span overlaps a clip with audio on at least
   two microphone tracks. Its own `mics`: per microphone in order, the media clip with audio on
-  that track with the greatest overlap with it (ties: the earlier start, then the lower id); a
-  track with none is left out, with its `mic_faces` entry.
+  that track, one with its sound on before one with it off, then the greatest overlap with it
+  (ties: the earlier start, then the lower id); a track with none is left out, with its
+  `mic_faces` entry. A track whose only clip under the shot has its sound off still counts toward
+  the two and stays in `mics`, so the core's sentence reaches the entry's reason.
   (c) **Step (3) with `speaker`.** Every `settings.follow.follows` test in the plan and the tool
   (`VerticalVersion+Plan.swift`'s missing and cursor branches, `AgentServer+VerticalVersion.swift`'s
   targets and `cursor`) becomes `VerticalVersion.analyses` (`follows || speaker`), so a missing

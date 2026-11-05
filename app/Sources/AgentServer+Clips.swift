@@ -91,7 +91,7 @@ extension AgentServer {
     /// 5`). An explicit `null` goes on whole too, rather than being stripped
     /// here — `Option<Value>` reads one as ABSENT (`core/src/edit.rs`), which
     /// is the op envelope's rule for every optional argument, so the clip
-    /// lands on the core's Title preset or its default rectangle. nil is the
+    /// lands on the core's default title or its default rectangle. nil is the
     /// key being missing, and that is the only thing this answers about.
     private func newClipPatchArg(
         _ a: [String: Any], _ key: String, shorthand: String

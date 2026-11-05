@@ -427,10 +427,10 @@ final class VideoPane: InspectorPaneView {
 
     /// The mirrored copy drawn below the layer (§4.3's M3 list).
     ///
-    /// `height` and `falloff` are FRACTIONS of the layer's cropped height —
-    /// half the layer, however big the layer is — so both are dialled as
-    /// percentages; `gap` is source pixels, the frame the crop, the corner
-    /// radius and the shadow's distance already work in.
+    /// `height` is a FRACTION of the layer's cropped height — half the layer,
+    /// however big it is — and `falloff` how far it fades across that height,
+    /// so both are dialled as percentages; `gap` is source pixels, the frame
+    /// the crop, the corner radius and the shadow's distance already work in.
     ///
     /// Every control writes a WHOLE `ReflectionProps`, exactly as Shadow and
     /// Chroma Key do: the patch replaces the object, so each edit re-sends

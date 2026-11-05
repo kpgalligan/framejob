@@ -468,8 +468,9 @@ pub enum FilterKind {
 
 /// A mirrored copy of the layer drawn below it, fading out (M3).
 ///
-/// `height` and `falloff` are fractions rather than pixels so a reflection
-/// survives a scale change: half the layer, however big the layer is.
+/// `height` is a fraction rather than pixels so a reflection survives a
+/// scale change: half the layer, however big the layer is. `falloff` is how
+/// far it fades across that height (0 not at all, 1 transparent at its end).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Reflection {

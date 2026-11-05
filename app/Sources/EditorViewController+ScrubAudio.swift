@@ -4,8 +4,9 @@ import AppKit
 /// the ruler drag's two calls into `ScrubAudio`. The press and every drag
 /// position arrive through `timelineScrubbed`, after `setPlayhead` has
 /// snapped and seeked; mouse-up through `TimelineView.onScrubEnded`. The
-/// ruler drag is the only path: a marker click, `set_playhead` and the
-/// transport keys are seeks and play no grain (AU-135).
+/// ruler drag is the only path: **Go** in the Document tab's Markers list,
+/// Next and Previous Marker, `set_playhead` and the transport keys are seeks
+/// and play no grain (AU-135).
 extension EditorViewController {
 
     func scrubAudioMoved() {

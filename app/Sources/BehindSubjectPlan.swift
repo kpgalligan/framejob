@@ -17,7 +17,7 @@ import Foundation
 ///   track and above the unbroken run of matte tracks in front of it, so it
 ///   sits behind an ordinary track or at the front and no matte targets it
 ///   (MT-2): with `[V, M1→V, M2]` it goes to index 3, not 2.
-/// - **The ops:** `add_track`, `add_text_clip` (the Title preset) at `at`
+/// - **The ops:** `add_track`, `add_text_clip` (the default title) at `at`
 ///   for min(4 s, the clip's rest), `set_video {behind_subject: true}` on the
 ///   title and, only when the clip has no base cutout, `set_video {cutout:
 ///   {background: keep}}` on it (a person's, a picture's too). A new track's

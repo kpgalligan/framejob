@@ -571,10 +571,10 @@ struct FilterProps: Codable, Equatable {
     }
 }
 
-/// A mirrored copy of the layer drawn below it, fading out (M3). `height`
-/// and `falloff` are FRACTIONS of the layer's cropped height, not pixels, so
-/// a reflection survives a scale change; `gap` is source pixels, like the
-/// corner radius and the crop.
+/// A mirrored copy of the layer drawn below it, fading out (M3). `height` is
+/// a FRACTION of the layer's cropped height, not pixels, so a reflection
+/// survives a scale change; `falloff` is how far it fades across that height;
+/// `gap` is source pixels, like the corner radius and the crop.
 struct ReflectionProps: Codable, Equatable {
     var opacity: Double
     var height: Double

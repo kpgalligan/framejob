@@ -1102,7 +1102,7 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 
 **REC-2 — Microphone permission**
 - **Do:** 1. Reset Frame Job's Microphone permission; choose a microphone in the panel; Record. 2. Deny it in Settings; Record again.
-- **Expect:** first, the system microphone prompt naming Frame Job, in front of the panel; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
+- **Expect:** first, the system microphone prompt naming Frame Job, in front of the panel, reading "Frame Job records the microphone you choose, into a file of its own. Nothing is sent anywhere."; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
 - **Source:** spec §11 recording.md; #55 R1.
 
 **REC-3 — Launched from a terminal**

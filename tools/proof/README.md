@@ -30214,3 +30214,21 @@ make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c3_proof.py
 python3 tools/proof/docs_bugs_c3_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c3_proof.py --base-sources <its app/Sources>
 ```
+
+## Follow Speaker's microphone and the words (`docs_bugs_c4_proof.py`)
+
+Docs bugs batch c4 (#491, #503, #505, #506, #514, #516, #517, #518, spec §11 VR-64 (b)). The built app
+under a scratch home, no key and no network, over F-TURNS with Mic A split at 80 %. V rows are the
+microphone a shot takes, through `make_vertical_version` and the sheet; G the missing module's note, B
+the nest note, R the graphic `in` refusal, K and P the shortcuts note and the microphone prompt in the
+built bundle, T each `tools/list` item, and C and W the comments and spec mirrors, read from the tree or
+through `git show` under `--base-rev`. The docstring lists every row and marks the controls; every other
+row is red on a build from before VR-64 (b)'s amendment, and `--expect-red` exits 0 only when that
+holds.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c4_proof.py [--only V1,G1,T7,C10]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c4_proof.py
+python3 tools/proof/docs_bugs_c4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c4_proof.py --base-rev <its sha> --expect-red
+```

@@ -66,9 +66,10 @@ extension VerticalVersion {
     /// VR-64 (b): the present, cursor-free class-3 media pictures off the microphone tracks whose
     /// span overlaps a clip with audio on at least two of them, in id order; [] unless `follow`
     /// is `speaker`. Each one's `mics` are, per microphone in order, the media clip with audio on
-    /// that microphone's track with the greatest overlap (ties: the earlier start, then the lower
-    /// id); a track with none is left out with its `micFaces` entry. A `micFaces` that is not
-    /// one per microphone is passed as given, for the core to refuse in its own sentence.
+    /// that microphone's track, one with its sound on before one with it off, then the greatest
+    /// overlap (ties: the earlier start, then the lower id); a track with none is left out with
+    /// its `micFaces` entry. A `micFaces` that is not one per microphone is passed as given, for
+    /// the core to refuse in its own sentence.
     static func speakerClips(
         _ project: ReelProject, settings: VerticalSettings, missing: Set<UInt32>
     ) -> [SpeakerClip] {
@@ -97,8 +98,10 @@ extension VerticalVersion {
         return out
     }
 
-    /// The media clip with audio on `track` that overlaps `clip` most (ties: the earlier start,
-    /// then the lower id); nil when none overlaps it.
+    /// The media clip with audio on `track` under `clip`, one with its sound on before one with
+    /// it off, then the one overlapping it most (ties: the earlier start, then the lower id); nil
+    /// when none overlaps it. A clip with its sound off stays a candidate, so a track with only
+    /// that counts toward the two and the core's sentence reaches the entry's reason (VR-64 (b)).
     private static func loudest(
         on track: UInt32, under clip: ClipSnapshot, in snapshot: ProjectSnapshot
     ) -> UInt32? {
@@ -110,8 +113,9 @@ extension VerticalVersion {
             else { return false }
             return overlap(other) > 0
         }
+        func soundOff(_ other: ClipSnapshot) -> Int { other.enabled.audio ? 0 : 1 }
         return sounding.min { a, b in
-            (-overlap(a), a.start, a.id) < (-overlap(b), b.start, b.id)
+            (soundOff(a), -overlap(a), a.start, a.id) < (soundOff(b), -overlap(b), b.start, b.id)
         }?.id
     }
 

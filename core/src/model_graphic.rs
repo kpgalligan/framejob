@@ -61,7 +61,8 @@ pub struct GraphicProps {
     pub width: u32,
     pub height: u32,
     /// The graphic's own frame the clip's first frame shows, in ticks.
-    /// Not patchable: `trim_start`, `roll` and `split` own it (G-9).
+    /// Not patchable: `trim_start`, `roll`, `split` and `add_transition`
+    /// move it (G-9, G-18).
     #[serde(rename = "in")]
     pub r#in: Ticks,
     /// The graphic's own length in ticks, or `None` for "the clip's

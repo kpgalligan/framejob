@@ -10,10 +10,11 @@ import AppKit
 ///
 /// **Rotated to the vectorscope** (owner choice 2): each hue sits where the
 /// vectorscope draws it, red `hueRotation` degrees counter-clockwise from 3
-/// o'clock (every 75 % target within 12°), so dragging toward a target moves
-/// the trace toward it. The model's axes are not rotated — red is +x — so
-/// this view turns a model point by `hueRotation` to draw it and a pointer
-/// delta back by it to write one.
+/// o'clock (every 75 % target within about 12.5°: 11.76° on Rec. 709, 12.40° on
+/// BT.2020), so dragging toward a target moves the trace toward it. The
+/// model's axes are not rotated — red is +x — so this view turns a model
+/// point by `hueRotation` to draw it and a pointer delta back by it to write
+/// one.
 ///
 /// **The gesture** (choice 3): a press anywhere in the disc, then the puck
 /// moves by the pointer's DELTA (no jump); one disc radius of travel is the

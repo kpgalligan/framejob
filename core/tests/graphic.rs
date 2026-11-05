@@ -284,7 +284,7 @@ fn set_errs_naming_the_clip_the_key_and_the_value() {
         (json!({"op": "set_graphic", "clips": [11], "patch": [1]}),
          "graphic patch must be a json object, not [1]".to_string()),
         (set(json!({"in": 0})),
-         "\"in\" cannot be patched: trim_start and split own a graphic's in point".to_string()),
+         "\"in\" cannot be patched: trim_start, roll, split and add_transition move a graphic's in point".to_string()),
         (set(json!({"bogus": 1})), "unknown key \"bogus\" in a graphic patch".to_string()),
         (set(json!({"props": {"nope": 1}})), "unknown key \"props.nope\" in a graphic patch".to_string()),
         (set(json!({"props": {"title": 5}})), "props.title must be a string, not 5".to_string()),

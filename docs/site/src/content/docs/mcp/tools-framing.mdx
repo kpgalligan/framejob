@@ -315,7 +315,7 @@ A screen recording whose media has a cursor file follows its cursor, never faces
 
 With `follow: speaker`, a movie clip of two to four people, playing beside two or more of the microphones in `mics`, is framed on whoever is talking, as [`follow: speaker`](#follow-speaker) frames it. Every other movie clip follows its faces.
 
-- Each clip in `mics` stands for its track. Under a shot, the clip used is the one on that track that overlaps the shot most, with its sound on or off. If its sound is off, the shot follows its faces.
+- Each clip in `mics` stands for its track. Under a shot, the clip used is the one on that track with its sound on that overlaps the shot most. A clip with its sound off is used only when nothing else on that track plays under the shot, and then the shot follows its faces.
 - A clip on a microphone's track is never framed this way, and neither is a screen recording with a cursor file.
 - Faces are matched by Frame Job, or named with `mic_faces`.
 - When one clip can't be framed on the speaker, such as a clip that changes shot, it follows its faces instead and its `reason` says why. The rest of the call goes ahead.

@@ -106,7 +106,8 @@ extension AgentServer {
             opTool(
                 "add_text_clip",
                 "Adds a text clip — a title. It has no source, so it can be any length; the "
-                    + "default is 5 s of the Title preset, centred. Style it afterwards with "
+                    + "default is 5 s of white, centred text in Source Sans 3 Bold at 72 px. "
+                    + "Style it afterwards with "
                     + "set_text and place it with set_video (x, y, scale).",
                 [
                     "track": trackDescription,
@@ -118,8 +119,8 @@ extension AgentServer {
                     // (`AgentCatalog+Declarations.swift`).
                     "text": "The words, or the styling too. A plain string is "
                         + "shorthand for {\"content\": …}; an object is a set_text patch "
-                        + "merged over the Title preset. " + textPatchDescription
-                        + " Default: the Title preset's placeholder.",
+                        + "merged over that default. " + textPatchDescription
+                        + " Default: the placeholder \"Title\".",
                 ]),
             opTool(
                 "add_shape_clip",
@@ -436,7 +437,8 @@ extension AgentServer {
                     + "or trim_end with alone: true on the sound makes a J- or L-cut; speed and "
                     + "reverse are refused until attach_audio. Ducking stays with the sound; the "
                     + "picture's is dropped. Refused, saying why, for a non-media clip, media "
-                    + "with no audio, or audio already detached.",
+                    + "with no audio, audio already detached, or a sound that would overlap "
+                    + "what is on the track below.",
                 ["clip": clipDescription]),
             opTool(
                 "attach_audio",

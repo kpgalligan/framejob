@@ -316,11 +316,12 @@ module's default for every property (see
 [Animating a graphic's properties](#animating-a-graphics-properties)).
 
 A value the clip holds for a property the module no longer declares stays,
-dimmed, below the rows, with **⌫** to remove it. If the module is missing
-or doesn't compile, the section reads "The module did not compile — see
-Source. Stored values are listed below." and lists the stored values; Source
-says which it is. A module that declares no properties says "The module
-declares no properties."
+dimmed, below the rows, with **⌫** to remove it. If the module is missing,
+the section reads "No module named "lower-third" in graphics/ — see Source.
+Stored values are listed below.", with the module's own name, and lists the
+stored values. If it doesn't compile, the section reads "The module did not
+compile — see Source. Stored values are listed below." and lists them too. A
+module that declares no properties says "The module declares no properties."
 
 Properties appear only when all the selected clips share one module. With
 several clips selected, a change applies to all of them.

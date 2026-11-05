@@ -73,14 +73,14 @@ extension AgentServer {
                     + "call reframe_clip again to apply. Refused, nothing changed, in this "
                     + "order: a follow other than keep on a text, shape, graphic or "
                     + "adjustment clip; a clip with no picture, or a crop or scale leaving "
-                    + "none; a nest clip, then a still or image clip, with a following kind or "
-                    + "cursor; cursor on a clip whose media has no cursor file, and subject, "
+                    + "none; a nest clip, then a still or image clip, with a following kind, "
+                    + "cursor or speaker; cursor on a clip whose media has no cursor file, and subject, "
                     + "face, person or salient on one whose media has one (a recording with a "
                     + "cursor file follows its cursor, never faces); for layout, a clip with no "
-                    + "camera layout, a clip laid out both as a camera and as a screen, a "
-                    + "screen layout with no camera switch in front of it, the first switch "
-                    + "not a layout Frame Job made on from_width × from_height (edited by "
-                    + "hand), each naming the clip and action; "
+                    + "camera layout or laid out both as a camera and as a screen, each naming "
+                    + "the clip, then a screen layout with no camera switch in front of it or "
+                    + "the first switch not a layout Frame Job made on from_width × from_height "
+                    + "(edited by hand), each naming the clip and action; "
                     + "unless keep or layout, a clip on a matte track or cut by a matte, then a "
                     + "turned "
                     + "clip (a rotation, an action turning it, a spin); with backdrop "
@@ -106,7 +106,8 @@ extension AgentServer {
                         + "its screen's), speaker (cut to whoever is talking, from mics), "
                         + "center, fit or keep.",
                     "zoom": "How tight, 1–4 times the scale that fills the canvas; default 1. "
-                        + "Read by the following kinds and center; refused outside 1–4.",
+                        + "Read by the following kinds, cursor, speaker and center; refused "
+                        + "outside 1–4.",
                     "where_empty": "What a following kind shows where there is nothing to "
                         + "follow: fit (the whole picture, the default) or center. Not read "
                         + "by cursor.",
@@ -124,7 +125,7 @@ extension AgentServer {
                         + "end on the clip (an action left with nothing is removed; volume and "
                         + "every other key stay) and fit the picture to the canvas, so the "
                         + "framing replaces the clip's own moves. Default false: the framing "
-                        + "is composed into them. Not read by keep.",
+                        + "is composed into them. Not read by keep or layout.",
                     "mics": "speaker only: two to four clip ids, each a clip of a sound file "
                         + "(or a detached camera sound) on its own track, one per person in the "
                         + "shot, whose turns say who is talking. Not the clip being framed.",
@@ -224,8 +225,10 @@ extension AgentServer {
                     "mics": [
                         "type": "array", "items": ["type": "integer"],
                         "description": "speaker only, and required with it: two to four clip "
-                            + "ids, each a clip of a sound file on its own track standing for "
-                            + "that track as one person's microphone.",
+                            + "ids, each a clip of a sound file (or a detached camera sound) on "
+                            + "its own track standing for that track as one person's microphone. "
+                            + "Under each shot the track's clip that overlaps it most is used, "
+                            + "one with its sound on before one with it off.",
                     ],
                     "mic_faces": [
                         "type": "array", "items": ["type": "integer"],

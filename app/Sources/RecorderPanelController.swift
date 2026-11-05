@@ -162,8 +162,9 @@ final class RecorderPanelController: NSWindowController {
     static let rates = [30, 60]
     /// The note under Record shortcuts (spec §11 CU-60, CU-62).
     static let recordShortcutsSentence =
-        "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete, Return, Tab "
-        + "or Esc, and when you type, never what you type. Nothing is recorded while an app "
+        "Records each shortcut you press with ⌘ or ⌃, "
+        + "or ⌥ with an arrow, Delete, Forward Delete, Return, Enter, Tab or Esc, "
+        + "and when you type, never what you type. Nothing is recorded while an app "
         + "holds secure input."
 
     /// Where the panel is in a recording's life. `syncPhase()` draws it.

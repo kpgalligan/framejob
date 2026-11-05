@@ -7628,7 +7628,7 @@ def section_chrome(binary, sources):
           "NSAppTransportSecurity" not in current, "project.yml names it")
     check("18: the Microphone string keeps its own \"Nothing is sent anywhere.\", which is "
           "still true of a recording",
-          "a file of its own beside the movie. Nothing is sent anywhere." in current,
+          "into a file of its own. Nothing is sent anywhere." in current,
           "the microphone string moved too")
 
     # --- The photographs: a WINDOW, so `cacheDisplay` can have it.

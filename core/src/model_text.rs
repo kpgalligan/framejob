@@ -100,7 +100,9 @@ pub struct TextProps {
 }
 
 impl Default for TextProps {
-    /// The Title preset: white, centered, at the spec's example font.
+    /// What a text's props start from: white, centered, at the spec's example
+    /// font. `add_text_clip`'s default title puts its own font and words over
+    /// this (`edit_described.rs`).
     fn default() -> Self {
         TextProps {
             content: String::new(),

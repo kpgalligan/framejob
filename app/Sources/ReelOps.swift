@@ -191,11 +191,11 @@ extension ReelOp {
         return ReelOp(name: "add_clip", args: a.values)
     }
 
-    /// A text clip; `duration` defaults to 5 s and `text` to the Title
-    /// preset in the core.
+    /// A text clip; `duration` defaults to 5 s and `text` to the default
+    /// title in the core.
     ///
     /// The op's `text` argument is a `set_text` PATCH, not a string — the
-    /// core merges it over the Title preset — so the whole of `TextPatch`
+    /// core merges it over the default title — so the whole of `TextPatch`
     /// is reachable at creation and the caller's words go in under
     /// `content`. Passing a bare string is what the core answers
     /// `text patch must be a json object` to.
@@ -214,7 +214,7 @@ extension ReelOp {
     /// number or a list where the patch belongs is refused by the CORE, in
     /// the words that name the group (`text patch must be a json object, not
     /// 5`), rather than by a cast on this side that knows less. nil means the
-    /// key is ABSENT, which is what gives the core's own Title preset — and
+    /// key is ABSENT, which is what gives the core's own default title — and
     /// it is why the typed factory above maps rather than passing its
     /// optional straight in: an `Optional<[String: Any]>.none` widened to
     /// `Any?` becomes a non-nil `Any` wrapping a nil, and the key would be

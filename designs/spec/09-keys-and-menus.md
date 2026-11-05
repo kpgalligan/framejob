@@ -310,7 +310,7 @@ the inspector on Clip ▸ Color. It is greyed while a nest is open and when
 there is nothing to cover (no range, no selection and an empty timeline);
 §11 GR-6 has the rules.
 Road map creator-jobs CO5 puts **Text Behind Subject** last in Insert, with no
-key equivalent: a title (the Title preset) on a new "Behind Subject" track
+key equivalent: a title (the default title) on a new "Behind Subject" track
 directly above the cut-out clip at the playhead — the front-most selected clip
 of a video file or picture there, else the front-most with Remove Background, else the
 front-most, on a shown track that is not a matte track — and above any matte

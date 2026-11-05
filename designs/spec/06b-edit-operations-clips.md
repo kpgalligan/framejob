@@ -13,7 +13,7 @@ the transition ops are §6d.
   clip`, §11 GR-8), and so is it for `insert_clip` and `overwrite_clip`.
   Refuses if the overlap rule fails.
 - **`add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}`** — Same
-  placement rules; default text is the Title preset centered, default shape the rectangle — except
+  placement rules; default text is the default title centered, default shape the rectangle — except
   that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a
   diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape,
   merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still
@@ -482,11 +482,12 @@ the transition ops are §6d.
   or appended, a `null` removes its key and the rest keep their order — unchecked, so a key the
   schema no longer has can still be removed — each other value checked as `add_graphic_clip` checks
   them, and the merged map holds at most 64 (an **error** naming the count). `in` is an **error** —
-  the trims and `split` own it (road map 10's G-9, recorded here by G2b) — and so is a clip that is
-  not a graphic, an unknown key and a malformed `schema`. With a `schema`, a `null` for a prop an
-  action on the clip names stores the schema's default instead, so the action's ramp keeps a start
-  (§11 G-34 (d)); without one, or for a key the schema lacks, it removes. The identity when nothing
-  changes, a colour re-sent in another spelling included.
+  `trim_start`, `roll`, `split` and `add_transition` move it (road map 10's G-9 and G-18, recorded
+  here by G2b) — and so is a clip that is not a graphic, an unknown key and a malformed `schema`.
+  With a `schema`, a `null` for a prop an action on the clip names stores the schema's default
+  instead, so the action's ramp keeps a start (§11 G-34 (d)); without one, or for a key the schema
+  lacks, it removes. The identity when nothing changes, a colour re-sent in another spelling
+  included.
 - **`set_clip {clips, patch: {name?: string | null, label?: string | null}}`** — The fifth patch op:
   sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null`
   clears, and so does an empty string — after the trim a name gets on its way in — because an

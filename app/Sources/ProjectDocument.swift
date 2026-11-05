@@ -867,10 +867,10 @@ final class ProjectDocument: NSDocument {
     /// Runs one change-count mutation and posts `.projectDocumentDidChange`
     /// when — and only when — `isDocumentEdited` CROSSED.
     ///
-    /// The window subtitle is the only dirty indicator this app has: under
-    /// `autosavesInPlace` AppKit never sets `NSWindow.isDocumentEdited` and
-    /// never sends `NSWindowController.setDocumentEdited(_:)`, so there is no
-    /// close-button dot (`EditorWindowController.subtitle(for:)` says the rest).
+    /// The window subtitle is the dirty indicator the app writes itself, beside the "— Edited"
+    /// AppKit adds to the title bar: under `autosavesInPlace` AppKit never sets
+    /// `NSWindow.isDocumentEdited` and never sends `NSWindowController.setDocumentEdited(_:)`, so
+    /// there is no close-button dot (`EditorWindowController.subtitle(for:)` says the rest).
     /// Nothing can observe the flag either — `NSDocument.isDocumentEdited` is
     /// not KVO-compliant — so the crossing is published by hand, and
     /// `EditorViewController.refreshFromDocument` rewrites the subtitle off the

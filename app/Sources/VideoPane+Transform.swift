@@ -160,14 +160,14 @@ extension VideoPane {
     /// control cannot do and where the mode goes instead.
     ///
     /// The way in is the round trip the rest of the app already documents
-    /// (`EditorViewController+Nest.swift`): un-group, blend the clip that
-    /// wanted it, group again. A blend on a clip INSIDE a nest is allowed and
+    /// (`EditorViewController+Nest.swift`): un-nest, blend the clip that
+    /// wanted it, nest again. A blend on a clip INSIDE a nest is allowed and
     /// blends against the canvas below the WHOLE nest — spec §5.3's third
     /// honest limit of the flattening — which is what the note is pointing at
     /// rather than promising an equivalent.
     private func nestBlendNote() -> String? {
         guard !VideoPane.blendApplies(to: binding.videoClips) else { return nil }
-        return "A nest has no pixels of its own to blend — un-group it (⇧⌘G) to blend "
+        return "A nest has no pixels of its own to blend — un-nest it (⇧⌘G) to blend "
             + "the clips inside."
     }
 

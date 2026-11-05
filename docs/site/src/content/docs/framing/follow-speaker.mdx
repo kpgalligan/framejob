@@ -87,7 +87,7 @@ When you choose **Make**, the Analyzing sheet runs. Then the sheet comes back on
 
 ## How the shot is cut
 
-A shot is framed this way when it's a full-frame movie, its file is present, it has no cursor file, it isn't on a microphone track, and it overlaps a clip from a file with sound on at least two ticked microphones, with that clip's sound on or off. On each microphone the shot uses the one clip that overlaps it most. Frame Job doesn't count the people in it. The summary counts these shots: "Follows whoever is talking in 1 clip."
+A shot is framed this way when it's a full-frame movie, its file is present, it has no cursor file, it isn't on a microphone track, and it overlaps a clip from a file with sound on at least two ticked microphones, with that clip's sound on or off. On each microphone the shot uses one clip: a clip with its sound on comes first, then the one that overlaps it most. Frame Job doesn't count the people in it. The summary counts these shots: "Follows whoever is talking in 1 clip."
 
 Who talks when is read the way Switch by Speaker reads the microphones, with its default settings, so the two agree.
 
@@ -105,7 +105,7 @@ A shot that can't be framed by who is talking follows its faces instead, and the
 - It changes shot. Follow Speaker frames one wide shot, so split the clip first with **Clip ▸ Split at Shot Changes**.
 - It shows fewer faces than the microphones under it.
 - Nobody talks inside it on those microphones.
-- The clip that overlaps it most on one of its microphones has its sound off, even when another clip on that track plays under the shot. Turn that clip's sound on, or untick the microphone.
+- Every clip under it on one of its microphones has its sound off. Turn one on, or untick the microphone.
 
 ## Good to know
 
