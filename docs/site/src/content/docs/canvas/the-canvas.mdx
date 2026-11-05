@@ -32,11 +32,11 @@ The small line under the picture states the canvas size and frame rate, for exam
 
 ## Layers
 
-Tracks stack back to front, so a track higher in the timeline draws in front of the ones below it. A track doesn't hold one kind of clip: video, image, freeze frame, text, shape, graphic and nest clips can share a track, and you place them all with the same Picture sections, apart from the exceptions on their own pages. All of them but the nest take the same gestures on the canvas.
+Tracks stack back to front, so a track higher in the timeline draws in front of the ones below it. A track doesn't hold one kind of clip: video, image, freeze frame, text, shape, graphic and nest clips can share a track, and you place them all with the same Picture sections, apart from the exceptions on their own pages. All of them take the same drags on the canvas, though a nest clip doesn't crop.
 
 An adjustment clip has no picture of its own, so it has no box on the canvas. Select it on the timeline. See [Adjustment clips](/color/adjustment-clips/).
 
-A nest clip's picture is drawn, but it has no box on the canvas either, so a click passes through it. Select it on the timeline and place it on the [Picture tab](/canvas/picture-tab/), or [open it](/editing/inside-a-nest/) to work on the clips inside.
+A nest clip has one box, the rectangle it's placed in, with the same outline and handles as any clip. A click selects it only where something inside it draws, so a click on an empty part of that rectangle reaches the clip behind. That matters for a nest made with <kbd>⌘G</kbd>, which fills the canvas whatever it holds: a small picture inside it is the part to click, and its outline is the whole canvas. [Open it](/editing/inside-a-nest/) to work on the clips inside.
 
 ## Working on the canvas
 

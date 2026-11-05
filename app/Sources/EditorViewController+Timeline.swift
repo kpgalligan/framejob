@@ -36,6 +36,7 @@ extension EditorViewController {
         // One-line forwards only (app/CLAUDE.md): every body is a named
         // method on this controller.
         timeline.onSelectionChanged = { [weak self] ids in self?.timelineSelected(ids) }
+        timeline.onSelectionSwept = { [weak self] ids in self?.timelineSwept(ids) }
         timeline.onScrub = { [weak self] time in self?.timelineScrubbed(time) }
         timeline.onScrubEnded = { [weak self] in self?.scrubAudioEnded() }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
@@ -120,15 +121,25 @@ extension EditorViewController {
     // MARK: - Intents from the view
 
     /// A PICK, which is not the same thing as a selection change: the
-    /// inspector is told first and unconditionally, because clicking a clip
-    /// means "show me this one" even when it was already selected (the design
-    /// handoff's interaction list, and the reason `clipPicked()` exists rather
-    /// than the panel inferring it from `ids != lastSelection`). The guard
-    /// below still stops an unchanged selection from posting a refresh.
+    /// inspector is told unconditionally, because clicking a clip means "show
+    /// me this one" even when it was already selected (the design handoff's
+    /// interaction list, and the reason `clipPicked()` exists rather than the
+    /// panel inferring it from `ids != lastSelection`). It is told AFTER the
+    /// write, because `clipPicked()` reads the selection. `changed` still
+    /// stops an unchanged selection from posting a refresh.
     private func timelineSelected(_ ids: Set<UInt32>) {
         guard let document = document else { return }
+        let changed = document.selection != ids
+        if changed { document.selection = ids }
         if !ids.isEmpty { inspector?.clipPicked() }
-        guard document.selection != ids else { return }
+        if changed { viewStateDidChange() }
+    }
+
+    /// A marquee or ⌥-click on a track header: a selection change that is not
+    /// a click on a clip, so no pick. The Assistant and Transcript tabs stay
+    /// as they are (spec §11 AI-14, TX-20).
+    private func timelineSwept(_ ids: Set<UInt32>) {
+        guard let document = document, document.selection != ids else { return }
         document.selection = ids
         viewStateDidChange()
     }

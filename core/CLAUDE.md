@@ -1064,10 +1064,11 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-nine keys of a layer written in ONE place (`cursor`
+  `recipe.rs`) is the thirty keys of a layer written in ONE place (`cursor`
   the twenty-seventh, `recipe_cursor.rs`'s, CU-32; `cutout` the twenty-eighth,
   its own `Project::layer_cutout`, CO-21; `blur` the twenty-ninth,
-  `recipe_blur.rs`'s, CU-114)
+  `recipe_blur.rs`'s, CU-114; `nest` the thirtieth, `Project::layer_nest`,
+  the outermost nest clip's moved placement, #476)
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is
@@ -1179,7 +1180,8 @@ governs a module now.
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are
   `recipe.rs`'s `moved` (which `layer` and the routed dissolve's `placement`
-  read) and `frame_of`**: every edit path — `evaluate_clip`,
+  read) and `nest_moved` (which `frame_of` and the layer's `nest` key
+  read)**: every edit path — `evaluate_clip`,
   `clip_state`, `get_project`, splitting, zooming, freezing, the audio plan
   — reads the clip un-moved. It never trusts the file (a non-positive
   duration or period is inactive, amounts clamp) and short-circuits to

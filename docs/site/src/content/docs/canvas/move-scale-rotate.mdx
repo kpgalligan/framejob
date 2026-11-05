@@ -73,8 +73,9 @@ Each canvas drag is one undo step, however many clips it moved, and a click that
 
 - With an action selected, these gestures change that action's end state rather than the clip. See [With an action selected](/canvas/the-canvas/#with-an-action-selected).
 - A clip shows an [action's](/motion/actions/) end state after the action ends. With no action selected, a drag changes the clip's own values, so past a zoom or a [camera layout](/framing/camera-layouts/#resize-or-move-a-laid-out-camera) the picture doesn't move. Select the action first.
+- A camera layout on a clip's first frame is different. With that one clip selected, a move, nudge, scale or crop changes the layout and the clip's own values together, so the clip moves on every frame. With several clips selected, a drag changes only their own values, so such a clip moves on its first frame alone.
 - In [crop mode](/canvas/crop/) the eight handles crop the clip instead of scaling it.
-- A nest clip has no box on the canvas, so you can't grab, scale or rotate it there. Place it on the [Picture tab](/canvas/transform/). Selected with other clips, it moves with them when you drag one of them.
+- A nest clip moves, scales and rotates like any clip, in the box of the rectangle it's placed in. Its scale stays uniform. See [Layers](/canvas/the-canvas/#layers).
 
 ## Related
 

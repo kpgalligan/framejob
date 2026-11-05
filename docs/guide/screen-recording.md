@@ -91,7 +91,7 @@ The recording lands as `record_screen` with `camera` lands it (see [For agents](
 - If a stretch's screen clip isn't playing where its camera starts, that camera goes in the bottom-right corner instead.
 - With **Remove the camera's background when it lands** ticked, the camera's clips then get **Clip ▸ Remove Background** as their own undo step, **Remove Background**, before any [Enhance the microphone](#enhancing-the-microphone) and the boxes under [When it lands](#when-it-lands). Edit ▸ Undo takes it off and keeps the recording.
 
-Each camera clip stays an ordinary clip, and you can choose another layout from **Clip ▸ Camera Layout ▸**. The layout holds the camera in place, so dragging the clip with no action selected doesn't move it; [Camera layouts](canvas-and-layers.md#camera-layouts) says how to change the layout itself. If a tool records a camera beside the screen while the panel is up, the panel's preview reads "The camera is recording." until it ends.
+Each camera clip stays an ordinary clip. Drag it on the canvas and it moves on every frame, or choose another layout from **Clip ▸ Camera Layout ▸**; [Camera layouts](canvas-and-layers.md#camera-layouts) says how the layout and a drag fit together. If a tool records a camera beside the screen while the panel is up, the panel's preview reads "The camera is recording." until it ends.
 
 ### Microphone Only (voice-over)
 

@@ -261,7 +261,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   selection (`refreshCanvas`) AND on the playhead's own path
   (`canvasPlayheadMoved`), and a gesture writes through the target captured
   at mouse-down (`gestureTarget`), so playback entering a span mid-drag
-  does not move the drag's writes.
+  does not move the drag's writes. **Amended by CI-17:** a single clip's
+  gesture on a first-frame cut goes to the cut, and writes the base too.
 - **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
   (phase 5, P10). The end state holding `null` at an optional key is the
   property switched off when the action finishes: the evaluator already
@@ -448,6 +449,30 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   press; the outlines and grips stay drawn under it, as the layer's box and
   handles do. Accepted: a grip under a layer handle is not reachable there,
   and an ellipse is outlined as its box.
+- **CI-17 — A canvas gesture on a clip with a first-frame cut writes the cut
+  and the base; amends CI-13** (#469, 2026-11-05). A **cut** is a layout
+  action (`VerticalVersion.isLayoutAction`) at clip time 0, at most one
+  canvas frame long (CO-61, CO-80 (b)): it holds the clip's placement for
+  every frame after the first, so a base write moves frame 0 alone. With ONE
+  clip selected and no action selected, a move, nudge, scale or crop on a
+  clip whose cut holds a key the gesture writes goes to that cut: it starts
+  from the cut's end and writes it as CI-13's selected action. A gesture on
+  a cut, held this way or selected, writes the same patch to the base too,
+  so frame 0 and the rest stay together: CAM-10 (3)'s "an ordinary clip a
+  person moves". The two ops go as one list, one undo step named as before.
+  The selection is not changed, and the playhead decides nothing, so CI-2
+  stands. Unchanged: every other finished action (CI-13's base); a
+  multi-selection and a shape's box scale stay on the base; a rotate stays
+  on the base unless the cut holds `rotation`, which `PLACEMENT_KEYS` does
+  not name; the inspector's fields keep CI-2 and their ◇. A cut is therefore
+  the one case where a drag and a typed value write different places.
+- **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
+  (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
+  for the row) and each Remove take `InspectorClipTag`, #102's mark for a
+  lone ⊘ button in an animatable section, and not a gutter ⊘: their section
+  animates, and the gutter on a Remove row speaks for the kind popup beside
+  it. Shape rows take the real ⊘ under CI-7, through `paths(of:)`'s
+  `set_shape` group, and CI-9's Reset stays.
 - **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
   supersedes SH-1** (kpgalligan/framejob#100, the owner, 2026-09-30). The
   class, its name, its `init(title:style:target:action:)` and all 28 calls

@@ -111,17 +111,18 @@ extension EditorViewController {
     // MARK: - Intents from the view
 
     /// A PICK, which is not the same thing as a selection change: the
-    /// inspector is told first and unconditionally, because clicking a clip
-    /// means "show me this one" even when it was already selected (the design
-    /// handoff's interaction list, and the reason `clipPicked()` exists rather
-    /// than the panel inferring it from `ids != lastSelection`). The guard
-    /// below still stops an unchanged selection from posting a refresh.
+    /// inspector is told unconditionally, because clicking a clip means "show
+    /// me this one" even when it was already selected (the design handoff's
+    /// interaction list, and the reason `clipPicked()` exists rather than the
+    /// panel inferring it from `ids != lastSelection`). It is told AFTER the
+    /// write, because `clipPicked()` reads the selection. `changed` still
+    /// stops an unchanged selection from posting a refresh.
     private func canvasSelected(_ ids: Set<UInt32>) {
         guard let document = document else { return }
+        let changed = document.selection != ids
+        if changed { document.selection = ids }
         if !ids.isEmpty { inspector?.clipPicked() }
-        guard document.selection != ids else { return }
-        document.selection = ids
-        viewStateDidChange()
+        if changed { viewStateDidChange() }
     }
 
     /// Pinch and ⌥-wheel walk the same four stops as the toolbar popup, so the

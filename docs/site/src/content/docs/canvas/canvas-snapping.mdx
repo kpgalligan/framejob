@@ -20,7 +20,7 @@ Only a move snaps. While you drag a clip, its box snaps to:
 - the canvas's edges, its centre lines and its thirds
 - the edges and centres of every other clip with a box on the canvas at the playhead, including clips on locked tracks
 
-A nest clip has no box, so nothing snaps to it.
+A nest clip's box is the rectangle it's placed in, so that's what snaps, whatever it draws inside.
 
 Frame Job checks the clip's edges and its centre on each axis, and the smallest correction wins. The pull reaches 8 points on screen at any zoom, so it covers fewer canvas pixels the further you zoom in. A snap always lands on a whole canvas pixel.
 

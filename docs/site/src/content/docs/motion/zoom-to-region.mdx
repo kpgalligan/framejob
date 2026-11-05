@@ -69,7 +69,7 @@ Like <kbd>Z</kbd>, it beeps when there's no clip it can work on. See [Which clip
 
 ## Which clip can be zoomed
 
-<kbd>Z</kbd> and Zoom Back need exactly one selected clip that's in the picture at the playhead and isn't on a locked track. Otherwise they beep. So they won't work with several clips selected, with the playhead off the clip, on a sound-only clip or on a nest clip.
+<kbd>Z</kbd> and Zoom Back need exactly one selected clip that's in the picture at the playhead and isn't on a locked track. Otherwise they beep. So they won't work with several clips selected, with the playhead off the clip or on a sound-only clip. On a nest clip the zoom moves everything inside it.
 
 The action also has to fit. Frame Job won't add a zoom that would overlap another action on the clip or run past the clip's end. It beeps and gives the reason at the foot of the inspector. If you'd drawn a rectangle the mode closes too, so press <kbd>Z</kbd> to try again. Near the end of a clip, move the playhead back first. If another action is in the way, shorten it or move the playhead clear of it.
 

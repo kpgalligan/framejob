@@ -37,7 +37,7 @@ From top to bottom, the tab has:
 
 Without a key, the message field is replaced by "Add your Anthropic API key in Settings to use the assistant." and an **Open Settings…** button. **View ▸ Assistant** stays enabled with no key, so the tab can say this; saving the key in Settings brings the message field back at once. If the key file is deleted behind the app's back while the field is showing, sending fails with "No Anthropic API key is set. Set one in Frame Job ▸ Settings… ▸ Assistant."
 
-The tab doesn't switch away on its own while you work in it. The assistant's own edits change the selection without moving you to the Clip tab. Clicking a clip in the timeline or on the canvas still shows the Clip tab. With nothing selected, that click only selects the clip and the tab stays; click the clip again to show the Clip tab.
+The tab doesn't switch away on its own while you work in it. The assistant's own edits change the selection without moving you to the Clip tab. Clicking a clip in the timeline or on the canvas still shows the Clip tab. A marquee on the timeline doesn't.
 
 ## Sending a message
 

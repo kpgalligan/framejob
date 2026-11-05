@@ -30084,6 +30084,26 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
 ```
 
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twelve mutants by `--mutant`; spec §11 CI-17, CI-18)
+
+#469, #476, #471, #481 and #485. **`docs_bugs_a3_proof.py`** has the app under test make twelve
+projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
+through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
+a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
+takes focus. A press goes by `mouseDown(with:)` to the view `hitTest` picks; the divider drag runs
+NSSplitView's own tracking loop on this process's queue. D1's save is then rendered, and N3's
+selection captured with `snapshot_ui`, by the app under test. Its media is in
+`work/docs_bugs_a3_media/`, kept between runs. `nest-no-motion` is a core mutant: its copy gets a
+real `core/` and rebuilds the staticlib. A beep is not silenced: N8 and N9 may be heard. What a real
+hand does is TL-19…TL-22.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a3_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a3_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a3_proof.py --mutant <name>
+```
+
 ## The documentation site (`docs_site_proof.py`)
 
 The site in `docs/site/` against the tree, with no app, no build, no network and no node, so it

@@ -98,6 +98,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     // MARK: - Intent out
 
     var onSelectionChanged: ((Set<UInt32>) -> Void)?
+    /// A marquee or a track's ⌥-click: a selection with no click on a clip.
+    var onSelectionSwept: ((Set<UInt32>) -> Void)?
     /// A scrub: the playhead is view state, so this never becomes an op.
     var onScrub: ((Ticks) -> Void)?
     /// The scrub's mouse-up (its audio stops asking for grains, spec §11 AU-132).
@@ -754,7 +756,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             session.current = point
             marquee = session
             selection = session.selection(in: snapshot, layout: layout)
-            onSelectionChanged?(selection)
+            onSelectionSwept?(selection)
         } else if var session = trackDrag {
             session.update(row: layout.unclampedRow(atY: point.y))
             trackDrag = session
@@ -919,7 +921,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         let ids = Set(snapshot.clips.filter { $0.track == track }.map { $0.id })
         guard selection != ids else { return }
         selection = ids
-        onSelectionChanged?(selection)
+        onSelectionSwept?(selection)
     }
 
     /// A press on empty timeline space — a lane's gap, or above or below

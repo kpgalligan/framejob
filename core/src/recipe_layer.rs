@@ -11,13 +11,13 @@ use crate::evaluate::{json, number};
 use crate::model::{BlendMode, Clip, Look, Project, Source, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-NINE keys of a recipe layer (spec §7.3), and the one place they
+/// The THIRTY keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-nine-key object is a copy that
+/// clip — and a second literal copy of a thirty-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -69,6 +69,12 @@ pub(crate) struct RecipeLayer<'a> {
     /// `{shutter, samples}` (`recipe_blur.rs`, spec §11 CU-114). The burn-in's
     /// is `null`.
     pub blur: Value,
+    /// `null`, or the OUTERMOST nest clip enclosing this layer in the view
+    /// asked, with its own moved placement — `{clip, x, y, scale, rotation,
+    /// crop}` ([`crate::model::Project::layer`], spec §7.3): what the canvas
+    /// draws and hits a nest clip's box from, since a nest clip never draws
+    /// itself. The burn-in's is `null`.
+    pub nest: Value,
     /// `null`, or what step 0 converts the source with — its media's Camera
     /// Log, `{log, gamut}` or `{lut}` (`media_color.rs`, spec §11 GR-16).
     /// Show Ungraded keeps it: it is the file's interpretation, not a grade.
@@ -170,6 +176,7 @@ impl RecipeLayer<'_> {
         out.insert("cursor".to_string(), self.cursor);
         out.insert("cutout".to_string(), self.cutout);
         out.insert("blur".to_string(), self.blur);
+        out.insert("nest".to_string(), self.nest);
         Value::Object(out)
     }
 }

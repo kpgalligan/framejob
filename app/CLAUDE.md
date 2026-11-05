@@ -1354,7 +1354,10 @@ the key map behind it.
   drag), and `savePaneSize`: the timeline height and inspector width are saved
   only from a person's drag of their divider, never a window resize, a
   restore or Hide Inspector (#327; since macOS 12 every resize notification
-  carries `NSSplitViewDividerIndex`, so that key cannot tell them apart).
+  carries `NSSplitViewDividerIndex`, so that key cannot tell them apart); a
+  drag that shows the inspector clears `inspectorCollapsedKey`.
+  `adjustInspector` is ⌥⌘I's `adjustSubviews`, which brings a shown
+  inspector back inside 280–440 pt.
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
@@ -1713,7 +1716,12 @@ the key map behind it.
   text clip's width), and every `begin*` and the nudge start from
   `start(of:in:)` — one `clip_state` at the action's end, decoded through
   `InspectorBinding.decode`. A shape's box scale is `.base` whole
-  (`forScale(of:)`): `set_shape` has no action form.
+  (`forScale(of:)`): `set_shape` has no action form. With no action
+  selected a single clip's gesture goes to its first-frame cut when the cut
+  holds a key it writes, and a cut also writes the base (`heldTarget`, spec
+  §11 CI-17).
+- `CanvasLayerBox.swift` — a pure move out of `CanvasSessions.swift`; a nest
+  clip's one box from the recipe's `nest`, hit on the pictures inside it.
 
 **Inspector.**
 - `InspectorTab.swift` — `InspectorTab` (Clip, Media, Document, Transcript,
@@ -1853,7 +1861,8 @@ the key map behind it.
   walk to reach it before the controls whose label ink and layer border it
   sets; hovered while keyed it draws × and a click removes the row's keys —
   `InspectorRowTag` ("at end", "now …"), `InspectorClipTag` (Normalize's boxed
-  "clip" while an action is selected, #102), and the binding's mark
+  "clip" while an action is selected, #102, and the list add and remove
+  buttons, CI-18), and the binding's mark
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
   ONE `set_action_end` of nulls (a `graphic.props.<key>` path nested one level deeper); `paths` read
   `set_graphic` (`graphic.props.<key>`, and `graphic.<key>` for width/height/length, so those rows
@@ -1952,7 +1961,8 @@ the key map behind it.
   with the Motion Blur row (`video.motion_blur` %, after Blend, greyed by `motionBlurApplies`
   on nest and adjustment clips, spec §11 CU-118 (b));
   +`Transition`,
-  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
+  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Filters` — the
+  Filters section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
   inside an action Rate writes the selected action's `end.speed`
   (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is

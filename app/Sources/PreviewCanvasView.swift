@@ -518,11 +518,11 @@ final class PreviewCanvasView: NSView {
         } else if var session = rotating {
             session.update(point: canvasPoint, snapping: flags.contains(.shift))
             rotating = session
-            onLiveUpdate?([session.op(to: gestureTarget)])
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = cropping {
             session.update(point: canvasPoint)
             cropping = session
-            onLiveUpdate?([session.op(to: gestureTarget)])
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = endpointDrag {
             guard let box = box(for: session.clip) else { return }
             session.update(unit: box.endpointUnit(canvasPoint))
@@ -577,7 +577,7 @@ final class PreviewCanvasView: NSView {
     private func beginMove(anchor: UInt32, at point: CGPoint, flags: NSEvent.ModifierFlags) {
         let ids = selection.contains(anchor) ? selection : [anchor]
         var bases: [UInt32: CGPoint] = [:]
-        gestureTarget = editTarget
+        gestureTarget = heldTarget(.move)
         for id in ids {
             guard let clip = snapshot.clip(id),
                   snapshot.track(clip.track)?.locked != true
@@ -594,7 +594,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginScale(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        let route = editTarget.forScale(of: clip)
+        let route = heldTarget(.scale).forScale(of: clip)
         gestureTarget = route
         let start = route.start(of: clip, in: project)
         let base = start.video
@@ -619,7 +619,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginRotate(_ id: UInt32, at point: CGPoint) {
         guard let clip = snapshot.clip(id) else { return }
-        gestureTarget = editTarget
+        gestureTarget = heldTarget(.rotate)
         let base = gestureTarget.start(of: clip, in: project).video
         let anchor = canvasAnchor(of: clip, in: snapshot.canvas, video: base)
         rotating = CanvasRotateSession(
@@ -631,7 +631,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginCrop(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        gestureTarget = editTarget
+        gestureTarget = heldTarget(.crop)
         let base = gestureTarget.start(of: clip, in: project).video
         cropping = CanvasCropSession(
             clip: id, handle: handle, base: base, sourceSize: box.sourceSize,
@@ -662,17 +662,17 @@ final class PreviewCanvasView: NSView {
     @discardableResult
     func nudge(dx: CGFloat, dy: CGFloat) -> Bool {
         guard primaryBox != nil else { return false }
+        let target = heldTarget(.move)
         var ops: [ReelOp] = []
         for id in selection.sorted() {
             guard let clip = snapshot.clip(id), snapshot.track(clip.track)?.locked != true
             else { continue }
-            let props = editTarget.start(of: clip, in: project).video
-            ops.append(
-                editTarget.op(
-                    video: VideoPatch(
-                        x: canvasRound(props.x + Double(dx)),
-                        y: canvasRound(props.y + Double(dy))),
-                    clip: id))
+            let props = target.start(of: clip, in: project).video
+            ops += target.ops(
+                video: VideoPatch(
+                    x: canvasRound(props.x + Double(dx)),
+                    y: canvasRound(props.y + Double(dy))),
+                clip: id)
         }
         guard !ops.isEmpty else { return false }
         onEdit?("Nudge", ops)

@@ -2,6 +2,21 @@ import AppKit
 
 // MARK: - A layer's box on the canvas
 
+/// Where one layer inside a nest clip draws, in canvas space: what a press on
+/// a nest box is tested against, since a nest's rectangle (a whole canvas,
+/// after ⌘G) can hold far less picture than it covers.
+struct CanvasLayerPicture {
+    let rect: CGRect
+    let anchor: CGPoint
+    let rotation: Double
+
+    func contains(_ point: CGPoint) -> Bool {
+        let v = canvasUnrotate(
+            CGVector(dx: point.x - anchor.x, dy: point.y - anchor.y), degrees: rotation)
+        return rect.contains(CGPoint(x: anchor.x + v.dx, y: anchor.y + v.dy))
+    }
+}
+
 /// One frame-recipe layer paired with the clip it came from and the source
 /// size the platform measured for it — everything the overlay needs to draw
 /// a box, hit-test it, or snap to it.
@@ -20,6 +35,9 @@ struct CanvasLayerBox {
     let sourceSize: CGSize
     /// A locked track is drawn but never hit (spec §4.2).
     let locked: Bool
+    /// A nest clip's pictures on this frame; nil on every other box, which
+    /// hits on `rect` alone.
+    var picture: [CanvasLayerPicture]? = nil
 
     var id: UInt32 { clip.id }
     var rotation: Double { video.rotation }
@@ -57,8 +75,14 @@ struct CanvasLayerBox {
         return CGPoint(x: a.x + v.dx, y: a.y + v.dy)
     }
 
-    /// Hit test in canvas space, rotation included.
-    func contains(_ point: CGPoint) -> Bool { rect.contains(unrotated(point)) }
+    /// Hit test in canvas space, rotation included. A nest is hit on the
+    /// pictures inside its rectangle, so a press where it draws nothing
+    /// reaches what is behind it (spec §4.2's "topmost visible clip").
+    func contains(_ point: CGPoint) -> Bool {
+        guard rect.contains(unrotated(point)) else { return false }
+        guard let picture else { return true }
+        return picture.contains { $0.contains(point) }
+    }
 
     /// The cropped rectangle's four corners in canvas space, TL TR BR BL.
     var corners: [CGPoint] { corners(of: rect) }
@@ -173,9 +197,15 @@ struct CanvasLayerBox {
 
     /// The boxes of one composed frame, back to front — the recipe's own
     /// order, which is the order the compositor draws in and the reverse of
-    /// the order the canvas hit-tests in.
+    /// the order the canvas hit-tests in. The layers out of one nest clip
+    /// make ONE box, at the first one's slot: a nest clip is one clip.
     static func boxes(recipe: FrameRecipe, snapshot: ProjectSnapshot) -> [CanvasLayerBox] {
-        recipe.layers.compactMap { layer in
+        var nests = Set<UInt32>()
+        return recipe.layers.compactMap { layer in
+            if let nest = layer.nest {
+                guard nests.insert(nest.clip).inserted else { return nil }
+                return nestBox(nest, recipe: recipe, snapshot: snapshot)
+            }
             guard let clip = snapshot.clip(layer.clip) else { return nil }
             guard let size = LayerRenderers.measuredSize(for: layer)
                 ?? snapshot.sourceSize(of: clip), size.width > 0, size.height > 0
@@ -184,6 +214,38 @@ struct CanvasLayerBox {
                 clip: clip, canvas: snapshot.canvas, video: layer.videoProps, sourceSize: size,
                 locked: snapshot.track(clip.track)?.locked ?? false)
         }
+    }
+
+    /// A nest clip's box: its own rectangle, at the placement the core entered
+    /// it with, and the pictures of its layers on this frame. `canvasRect` and
+    /// `canvasAnchor` read no field of the `clip` they are given, so the nest's
+    /// clip serves for a layer's folded props.
+    private static func nestBox(
+        _ nest: RecipeNest, recipe: FrameRecipe, snapshot: ProjectSnapshot
+    ) -> CanvasLayerBox? {
+        guard let clip = snapshot.clip(nest.clip), let size = snapshot.sourceSize(of: clip),
+              size.width > 0, size.height > 0
+        else { return nil }
+        var video = clip.videoProps
+        video.x = nest.x
+        video.y = nest.y
+        video.scale = nest.scale
+        video.rotation = nest.rotation
+        video.crop = nest.crop
+        let pictures = recipe.layers.filter { $0.nest?.clip == nest.clip }.compactMap {
+            layer -> CanvasLayerPicture? in
+            guard let drawn = LayerRenderers.measuredSize(for: layer),
+                  drawn.width > 0, drawn.height > 0
+            else { return nil }
+            let props = layer.videoProps
+            return CanvasLayerPicture(
+                rect: canvasRect(of: clip, in: snapshot.canvas, sourceSize: drawn, video: props),
+                anchor: canvasAnchor(of: clip, in: snapshot.canvas, video: props),
+                rotation: props.rotation)
+        }
+        return CanvasLayerBox(
+            clip: clip, canvas: snapshot.canvas, video: video, sourceSize: size,
+            locked: snapshot.track(clip.track)?.locked ?? false, picture: pictures)
     }
 
     /// The degraded path, used only when the core cannot answer with a

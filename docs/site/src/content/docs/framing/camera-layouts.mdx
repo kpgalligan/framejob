@@ -106,11 +106,13 @@ Those later clips keep their own actions, though an action that moves one can [s
 
 ## Resize or move a laid-out camera
 
-The layouts have fixed sizes and places. To go beyond them, change the layout itself. It's an action, and a clip shows an action's end state until a later action changes it, so a drag with no action selected changes the clip's own values, which show only before the switch. From the switch on, the picture stays put. A camera that landed with a recording has its switch on its first frame, so that one frame moves and the rest don't.
+The layouts have fixed sizes and places. A switch on a clip's first frame, which is what a camera that landed with a recording has, is the easy case: select that one clip and drag it. A move, a nudge, a resize or a crop on the canvas changes the switch and the clip's own values together, so the clip moves on every frame, with or without the action selected. A rotate changes the clip's own values, which reach every frame too.
+
+A switch later in a clip takes more. It's an action, and a clip shows an action's end state until a later action changes it, so a drag with no action selected changes the clip's own values, which show only before the switch. From the switch on, the picture stays put. To go past it, change the layout itself.
 
 <Steps>
 
-1. Move the playhead into the switch and select the camera clip. That selects the layout action. For a camera that landed with a recording, the switch is the clip's very first frame.
+1. Move the playhead into the switch and select the camera clip. That selects the layout action.
 
 2. Press <kbd>→</kbd> until the playhead is past the switch, so the preview shows where the action ends. The action stays selected.
 
@@ -120,7 +122,7 @@ The layouts have fixed sizes and places. To go beyond them, change the layout it
 
 </Steps>
 
-A switch on a clip's first frame is one frame long, and that first frame shows the clip's own values, so it stays in the old place. To move it too, put the playhead on the first frame, press <kbd>Esc</kbd>, and type the same values in the Transform rows.
+Typing is the one thing a first-frame switch does differently from a drag. A switch on a clip's first frame is one frame long, and that first frame shows the clip's own values. The Transform rows change one place, so with the action selected the first frame stays where it was. To move it too, put the playhead on the first frame, press <kbd>Esc</kbd>, and type the same values in the Transform rows.
 
 Each stretch of a [paused recording](/recording/pause-and-stop/#paused-recordings-are-stretches) has its own camera clip, so change each one.
 

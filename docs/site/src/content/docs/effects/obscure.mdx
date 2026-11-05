@@ -31,7 +31,7 @@ The region lands pixelated at full strength, and it's one undo step, called Obsc
 
 A region lasts the whole clip and keeps its place on the clip's picture. It doesn't track anything that moves in the footage. To hide something for part of a clip, [split](/editing/splitting/) the clip first and put the region on the piece that needs it. To follow something across the shot, [animate the region](#animate-a-region).
 
-Place on Canvas draws one region and then ends. It needs exactly one selected clip, drawing at the playhead and not on a locked track, with fewer than four regions. Otherwise it beeps, and at four regions the button is greyed.
+Place on Canvas draws one region and then ends. It needs exactly one selected clip, drawing at the playhead and not on a locked track, with fewer than four regions. It beeps on a nest clip, which has no pixels of its own to cover, and otherwise when one of those fails, and at four regions the button is greyed.
 
 While you're drawing:
 

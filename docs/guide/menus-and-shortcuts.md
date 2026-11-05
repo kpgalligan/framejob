@@ -523,7 +523,7 @@ or the Color tab instead.
 | Drag a line or arrow endpoint | Moves that end of the shape |
 | Drag an obscure region's centre grip or one of its eight handles | Moves or resizes that region. ⌥ resizes it around its centre. The grips show only with exactly one unlocked clip selected, outside crop mode. A drag inside the region but away from the grips still moves the clip |
 | Double-click a text clip | Edits the text in place |
-| Double-click a video, image or still clip | Turns on crop mode. A shape or graphic beeps, except on a matte track |
+| Double-click a video, image or still clip | Turns on crop mode. A shape, graphic or nest clip beeps, except on a matte track |
 | ← → ↑ ↓ (canvas has focus) | Nudges a selected clip showing at the playhead 1 pixel, or 10 with ⇧. Otherwise moves the playhead, as anywhere else in the window ([above](#playback-and-moving-the-playhead)). During a canvas drag they do nothing |
 | Hold Space and drag | Pans a zoomed canvas that is larger than the preview. A Space tap still plays and pauses |
 | Pinch, or ⌥ / ⌘ with the scroll wheel | Steps the canvas zoom |

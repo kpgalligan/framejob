@@ -263,9 +263,9 @@ struct CanvasMoveSession {
     /// One op per clip, routed by `target`: each keeps its own position, so
     /// a multi-clip move cannot collapse the selection onto one point.
     func ops(to target: CanvasEditTarget) -> [ReelOp] {
-        bases.keys.sorted().compactMap { id in
-            guard let base = bases[id] else { return nil }
-            return target.op(
+        bases.keys.sorted().flatMap { id -> [ReelOp] in
+            guard let base = bases[id] else { return [] }
+            return target.ops(
                 video: VideoPatch(
                     x: canvasRound(base.x + delta.dx), y: canvasRound(base.y + delta.dy)),
                 clip: id)
@@ -343,7 +343,7 @@ struct CanvasScaleSession {
         uniform.scale = canvasRound(scale)
         switch target {
         case .uniform:
-            return [edit.op(video: uniform, clip: clip)]
+            return edit.ops(video: uniform, clip: clip)
         case .box:
             // Base whatever `edit` says (CI-13): `set_shape` has no action
             // form, and the placement that pins the pivot travels with it.
@@ -355,8 +355,8 @@ struct CanvasScaleSession {
                 .setVideo(clips: [clip], patch: placement),
             ]
         case .textWidth:
-            guard widthOnly else { return [edit.op(video: uniform, clip: clip)] }
-            return [edit.op(text: TextPatch(width: .some(canvasRound(textWidth))), clip: clip)]
+            guard widthOnly else { return edit.ops(video: uniform, clip: clip) }
+            return edit.ops(text: TextPatch(width: .some(canvasRound(textWidth))), clip: clip)
         }
     }
 
@@ -473,8 +473,8 @@ struct CanvasRotateSession {
 
     static let snapDegrees = 15.0
 
-    func op(to target: CanvasEditTarget) -> ReelOp {
-        target.op(video: VideoPatch(rotation: canvasRound(rotation)), clip: clip)
+    func ops(to target: CanvasEditTarget) -> [ReelOp] {
+        target.ops(video: VideoPatch(rotation: canvasRound(rotation)), clip: clip)
     }
 
     mutating func update(point: CGPoint, snapping: Bool) {
@@ -522,8 +522,8 @@ struct CanvasCropSession {
     /// floor, which is also what the core enforces.
     static let minRemaining = 1.0
 
-    func op(to target: CanvasEditTarget) -> ReelOp {
-        target.op(video: VideoPatch(crop: crop), clip: clip)
+    func ops(to target: CanvasEditTarget) -> [ReelOp] {
+        target.ops(video: VideoPatch(crop: crop), clip: clip)
     }
 
     mutating func update(point: CGPoint) {

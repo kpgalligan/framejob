@@ -210,6 +210,19 @@ struct RecipeClipRect: Codable, Equatable {
     var rect: CGRect { CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h) }
 }
 
+/// The outermost nest clip around a layer in the view asked (spec §7.3): its
+/// id and its own placement, evaluated and moved by `video.motion`. A nest
+/// clip never draws itself, so this is what `CanvasLayerBox` builds its box
+/// from.
+struct RecipeNest: Codable, Equatable {
+    let clip: UInt32
+    let x: Double
+    let y: Double
+    let scale: Double
+    let rotation: Double
+    let crop: CropInsets
+}
+
 /// One layer of a composed frame, every property already evaluated through
 /// the clip's actions.
 struct RecipeLayer: Codable, Equatable {
@@ -293,6 +306,9 @@ struct RecipeLayer: Codable, Equatable {
     /// sub-frame placements, or nil when the core draws it sharp. Drawn by
     /// `Compositor+MotionBlur.swift` (CU-117).
     let blur: RecipeBlur?
+    /// The nest clip this layer came out of; nil for a clip the view shows
+    /// directly. The canvas's box only: nothing draws from it.
+    let nest: RecipeNest?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -327,6 +343,7 @@ struct RecipeLayer: Codable, Equatable {
         cursor = c.lenient(.cursor)
         cutout = c.lenient(.cutout)
         blur = c.lenient(.blur)
+        nest = c.lenient(.nest)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer

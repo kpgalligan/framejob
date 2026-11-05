@@ -9,8 +9,8 @@ shape clips, image clips, background plates, and matte tracks, which cut the
 track behind them.
 
 Every clip that draws can be edited the same way: video, image, still, text,
-shape and graphic. A nest clip has no box on the canvas, so you place it with
-the Picture tab's fields instead. A track never holds just one kind of clip.
+shape and graphic. A nest clip takes the same drags, though not crop. A track
+never holds just one kind of clip.
 Tracks stack back to front, and a track higher in the timeline draws in front.
 
 ## The canvas
@@ -49,10 +49,11 @@ and no handles, for a second display.
   [Matte tracks](#matte-tracks)). Because it is topmost inside that box, a
   click there selects the matte clip. To select the clip it cuts, click
   outside the matte clip's box, or use the timeline.
-- A nest clip has no box on the canvas. A click on its picture reaches whatever
-  is behind it, and a selected nest clip gets no outline or handles. Select it
-  on the timeline. Selected with other clips, it moves with them when you drag
-  one of them.
+- A nest clip has one box, the rectangle it is placed in, with an outline and
+  handles like any clip. A click selects it only where something inside it
+  draws, so a click on an empty part of the rectangle reaches the clip behind.
+  A nest made with ⌘G fills the canvas whatever it holds, so a small picture
+  inside it is the part to click, and its outline is the whole canvas.
 
 The selected clips get an outline. The front-most selected clip also gets
 handles.
@@ -137,7 +138,7 @@ a text field, or click empty canvas, to leave crop mode. Clicking a video, image
 or still clip that isn't selected keeps crop mode on and moves the crop handles
 to that clip; clicking a text, shape or graphic clip ends it. With
 several clips selected, crop mode ends if the clip you click isn't the
-front-most selected clip afterwards. A nest clip has no box on the canvas, so **C** only beeps on one.
+front-most selected clip afterwards. Crop mode doesn't open on a nest clip, so **C** and a double-click only beep on one, unless it's on a matte track.
 
 A crop removes edges in place: the picture never shifts as you crop. Crop
 amounts are in the source's own pixels, so they stay correct when you scale
@@ -410,17 +411,26 @@ action on that track takes the layout as its own placement — so a camera cut
 into pieces stays in the corner — and keeps its own actions. Text and
 adjustment clips are left out.
 
-**Moving a laid-out camera:** a clip shows a layout action's end state until a
-later action changes it, so a drag with no action selected changes the clip's
-own values, which show only before the switch. From the switch on, the picture
-stays put. A camera that landed with a recording has its switch on its first
-frame, a one-frame layout action, so that one frame moves and the rest don't.
-To change the layout itself, put the playhead on the switch, select the camera
-clip (which selects the action), press → until the playhead is past the
-switch, then drag the camera or type in the Transform rows, and press **Esc**.
-A first-frame switch's first frame still shows the clip's own values and stays
-in the old place. To move it too, put the playhead on the first frame, press
-**Esc**, and type the same values in the Transform rows.
+**Moving a laid-out camera:** a camera that landed with a recording has its
+switch on its first frame, a one-frame layout action. With that one clip
+selected, a move, nudge, scale or crop on the canvas changes the switch and the
+clip's own values together, so the clip moves on every frame, with or without
+the action selected. A rotate changes the clip's own values, which reach every
+frame too.
+
+A switch later in a clip takes more: a clip shows a layout action's end state
+until a later action changes it, so a drag with no action selected changes the
+clip's own values, which show only before the switch. From the switch on, the
+picture stays put. To change the layout itself, put the playhead on the switch,
+select the camera clip (which selects the action), press → until the playhead
+is past the switch, then drag the camera or type in the Transform rows, and
+press **Esc**.
+
+Typing a first-frame switch is the one difference from a drag. The Transform
+rows change one place, and the switch's first frame shows the clip's own values,
+so with the action selected that frame stays in the old place. To move it too,
+put the playhead on the first frame, press **Esc**, and type the same values in
+the Transform rows.
 
 **The Layout section:** with one clip of a video file selected, the Clip tab's
 Picture sub-tab has a **Layout** section (after Transform and Behind Subject, shut

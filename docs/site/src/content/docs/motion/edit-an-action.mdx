@@ -77,7 +77,7 @@ With an action selected, a blank gutter usually means the row can animate and no
 
 ◇ also shows when no action is selected, on every row an action on the clip animates. It's a quick way to see what's moving before you pick an action.
 
-The **Normalize** button changes the clip whatever is selected. While an action is selected a small boxed **clip** tag follows it, and the tag's tooltip reads "Actions don't animate this. It changes the clip."
+The **Normalize** button changes the clip whatever is selected, and so do the buttons that add or remove a filter or an obscure region. While an action is selected a small boxed **clip** tag follows them, and the tag's tooltip reads "Actions don't animate this. It changes the clip."
 
 ### The "at end" tag
 
@@ -160,7 +160,7 @@ The two default items are greyed while the row already holds its default.
 ## Good to know
 
 - Typing the number a field already shows isn't an edit, so it doesn't add the row to the action.
-- Some rows always change the clip, whatever is selected. Most are marked ⊘, but a shape's own rows and the buttons that add or remove a filter or region carry no mark. [What an action can animate](/motion/what-can-animate/) lists them.
+- Some rows always change the clip, whatever is selected. Most are marked ⊘, and the buttons that add or remove a filter or region show a boxed **clip** tag. [What an action can animate](/motion/what-can-animate/) lists them.
 - Adding or removing a filter or an obscure region changes the clip even inside an action, though dialling a value inside one animates. If the action already animates that list, the whole list then switches at the action's end rather than ramping.
 - With several clips selected, the fields edit the clips themselves. The action lane reads "Select one clip to edit its actions."
 - An end value Frame Job won't take shows the reason at the foot of the inspector. See [When an edit is refused](/motion/change-an-action/#when-an-edit-is-refused).

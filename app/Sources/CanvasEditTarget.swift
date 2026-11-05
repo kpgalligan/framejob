@@ -3,6 +3,11 @@ import Foundation
 /// What a canvas gesture edits (spec §11 CI-13): the clip's BASE props, or
 /// the selected action's END state — the same choice the inspector's fields
 /// make (CI-2), so a drag, a nudge and a typed value all write one place.
+/// The one exception is a clip's first-frame CUT (CI-17): a one-frame layout
+/// action at clip time 0 holds the placement for every frame after the
+/// first, so with one clip and no action selected a gesture goes to the cut
+/// (`holding`) where a typed value still writes the base, and a gesture on a
+/// cut writes the base as well (`ops(video:clip:)`).
 ///
 /// It reaches the canvas as a value on two channels: the refresh that already
 /// follows a selection (`EditorViewController.refreshCanvas`) and the
@@ -23,7 +28,13 @@ struct CanvasEditTarget: Equatable {
         let action: UInt32
         /// The action's end in CLIP time (`ActionSnapshot.endTime`).
         let endTime: Ticks
+        /// The action is the clip's first-frame cut (`isCut`, CI-17).
+        let cut: Bool
     }
+
+    /// The keys a gesture writes, which `holding` asks a cut about: x, y · x, y,
+    /// scale and text.width · rotation · crop.
+    enum Gesture { case move, scale, rotate, crop }
 
     /// What a gesture starts from: the end state for `selected.clip`, the
     /// base for any other clip. `text` is carried because a text clip's
@@ -44,8 +55,47 @@ struct CanvasEditTarget: Equatable {
         guard let clip = document.singleSelectedClip,
               let action = document.selectedActionSnapshot
         else { return .base }
+        let frame = document.editedProject.snapshot.canvas.fps.frameDuration
         return CanvasEditTarget(
-            selected: Selected(clip: clip.id, action: action.id, endTime: action.endTime))
+            selected: Selected(
+                clip: clip.id, action: action.id, endTime: action.endTime,
+                cut: isCut(action, frame: frame)))
+    }
+
+    /// A first-frame cut (CO-61, CO-80 (b)): a layout action at clip time 0,
+    /// at most one canvas frame long. Any longer and it is a move a person
+    /// can see, which keeps CI-13's base.
+    private static func isCut(_ action: ActionSnapshot, frame: Ticks) -> Bool {
+        action.start == 0 && action.duration <= frame && VerticalVersion.isLayoutAction(action)
+    }
+
+    /// The target a `gesture` on `clip` takes with no action selected: its
+    /// first-frame cut when the cut's end holds a key the gesture writes,
+    /// `self` otherwise (CI-17). A rotate stays on the base, because a cut
+    /// holds no `rotation`, and the base shows it on every frame.
+    func holding(_ gesture: Gesture, clip: ClipSnapshot, frame: Ticks) -> CanvasEditTarget {
+        guard selected == nil,
+              let cut = clip.actions.first(where: { Self.isCut($0, frame: frame) }),
+              Self.holds(cut.end, gesture)
+        else { return self }
+        return CanvasEditTarget(
+            selected: Selected(clip: clip.id, action: cut.id, endTime: cut.endTime, cut: true))
+    }
+
+    /// Whether an end patch names any key `gesture` writes.
+    private static func holds(_ end: ActionPatch, _ gesture: Gesture) -> Bool {
+        let video = end.video
+        switch gesture {
+        case .move:
+            return video?.x != nil || video?.y != nil
+        case .scale:
+            return video?.x != nil || video?.y != nil || video?.scale != nil
+                || end.text?.width != nil
+        case .rotate:
+            return video?.rotation != nil
+        case .crop:
+            return video?.crop != nil
+        }
     }
 
     /// The action this target writes on `clip`, nil when `clip` is written
@@ -68,6 +118,24 @@ struct CanvasEditTarget: Equatable {
         return .setActionEnd(clip: clip, action: action, patch: ActionPatch(text: patch))
     }
 
+    /// What a gesture sends: `op(video:clip:)`, and on a cut the same patch
+    /// to the base, so frame 0 and the rest stay together (CI-17). One list,
+    /// so one undo step.
+    func ops(video patch: VideoPatch, clip: UInt32) -> [ReelOp] {
+        let edit = op(video: patch, clip: clip)
+        guard onCut(clip) else { return [edit] }
+        return [edit, .setVideo(clips: [clip], patch: patch)]
+    }
+
+    /// The same for a text clip's wrap width.
+    func ops(text patch: TextPatch, clip: UInt32) -> [ReelOp] {
+        let edit = op(text: patch, clip: clip)
+        guard onCut(clip) else { return [edit] }
+        return [edit, .setText(clips: [clip], patch: patch)]
+    }
+
+    private func onCut(_ clip: UInt32) -> Bool { selected?.clip == clip && selected?.cut == true }
+
     /// `clip_state` at `clip.start + endTime` decoded through
     /// `InspectorBinding.decode` — the inspector's own read of an END state,
     /// video and text from ONE call — for `selected.clip`; the clip's base
@@ -88,6 +156,19 @@ struct CanvasEditTarget: Equatable {
     func forScale(of clip: ClipSnapshot) -> CanvasEditTarget {
         if case .shape = clip.source { return .base }
         return self
+    }
+}
+
+extension PreviewCanvasView {
+    /// The target a gesture starts from and writes: `editTarget` with an
+    /// action selected or anything but one clip selected, otherwise that
+    /// clip's `holding` (CI-17). Asked at mouse-down and never written back:
+    /// `editTarget` stays the document's mode, and the selection stays as it is.
+    func heldTarget(_ gesture: CanvasEditTarget.Gesture) -> CanvasEditTarget {
+        guard editTarget.selected == nil, selection.count == 1, let id = selection.first,
+              let clip = snapshot.clip(id)
+        else { return editTarget }
+        return editTarget.holding(gesture, clip: clip, frame: snapshot.canvas.fps.frameDuration)
     }
 }
 

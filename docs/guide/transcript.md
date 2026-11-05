@@ -91,11 +91,9 @@ you put it for three seconds before it follows again.
 - **Click a word** to move the playhead to it. If the video is playing, it
   keeps playing from there.
 - **Click a timecode** to move the playhead to the start of that paragraph.
-- **Click a selected clip** on the timeline or the canvas while the Transcript
-  shows: the tab stays, and the clip's first word scrolls to the top. The
-  playhead does not move. The click that selects a clip doesn't do this, so
-  click it again; that first click scrolls to the clip selected before it, if
-  there was one.
+- **Click a clip** on the timeline or the canvas while the Transcript shows: the
+  tab stays, and the clip's first word scrolls to the top. The playhead does not
+  move.
 
 Editing the timeline updates the text right away, and the words you were
 reading stay where they were.

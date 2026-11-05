@@ -310,6 +310,26 @@ the same way.
 - **Expect:** 1 px and 10 px moves, then a frame step with the clip still. Crop mode leaves on each key. Space plays once on release and pans when dragged.
 - **Source:** #463, #474.
 
+**TL-19 — A recording's camera drags on a real canvas**
+- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag.
+- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start.
+- **Source:** #469, spec §11 CI-17.
+
+**TL-20 — A nest clip by hand**
+- **Do:** Nest a clip in a corner of the picture over a full-size clip. Click the corner picture, drag it, scale it by a corner, rotate it, then press Z and draw a band. Click elsewhere on the picture. Press C and double-click the nest.
+- **Expect:** The nest selects with an outline around the whole canvas and takes each gesture. The click elsewhere picks the clip behind. C and the double-click beep.
+- **Source:** #476.
+
+**TL-21 — The first click takes the inspector**
+- **Do:** On the Assistant tab with nothing selected, click a clip on the timeline, then again from the Assistant tab on the canvas. On the Transcript tab, click a second clip once. On the Assistant tab, drag a marquee over a clip.
+- **Expect:** The Clip tab shows on the first click each time. The Transcript's top line is that clip's first word. The marquee leaves the Assistant tab showing.
+- **Source:** #471.
+
+**TL-22 — The inspector's divider**
+- **Do:** Drag the inspector's divider hard to the window's right edge and let go. Choose View ▸ Hide Inspector, drag the divider back out, then open a new window.
+- **Expect:** The drag stops at the inspector's smallest width and it never hides. The drag out shows the inspector, and the new window shows it too.
+- **Source:** #485.
+
 **JOB-2 — Split at Shot Changes on a finished video**
 - **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.
 - **Expect:** 1–2: the sheet names the file and its bar moves from "Waiting" through the percentages to "Done", then closes by itself. 3: there is an edit at every hard cut and none inside a shot or the dissolve; ⌘Z takes them all back as one step. 4: the sheet closes at once and nothing is split. 5: after the restore the bar keeps moving, the sheet closes by itself and the split lands.

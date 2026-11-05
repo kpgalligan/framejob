@@ -167,7 +167,7 @@ func names(_ ops: [ReelOp]) -> [String] { ops.map(\.name) }
 // MARK: - K1 the canvas follows the mode (CI-13)
 
 let selected = CanvasEditTarget(
-    selected: .init(clip: 2, action: 4, endTime: at(4.0)))
+    selected: .init(clip: 2, action: 4, endTime: at(4.0), cut: false))
 do {
     let mine = selected.op(video: VideoPatch(x: 5), clip: 2)
     let other = selected.op(video: VideoPatch(x: 5), clip: 7)

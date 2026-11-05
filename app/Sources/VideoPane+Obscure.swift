@@ -147,7 +147,7 @@ extension VideoPane {
                 + "under the playhead"
             rows.append(
                 inspectorRow(
-                    "Region \(index + 1)", [kind, remove],
+                    "Region \(index + 1)", [kind, remove, InspectorClipTag(binding: binding)],
                     mixed: { mixedAt(index) { $0.kind } },
                     binding: binding, writes: edited(index)))
             rows.append(
@@ -232,7 +232,10 @@ extension VideoPane {
                 + "itself, not to the action under the playhead",
             enabled: { list().count < ObscureProps.max })
         rows.append(
-            inspectorButtonRow([add, place, InspectorRowLabel("\(ObscureProps.max) at most")]))
+            inspectorButtonRow([
+                add, place, InspectorClipTag(binding: binding),
+                InspectorRowLabel("\(ObscureProps.max) at most"),
+            ]))
 
         return InspectorSection(
             id: "video.obscure", title: "Obscure",

@@ -41,7 +41,7 @@ A new action from **Add Action** is **Linear**. A zoom action is **Ease In Out**
 - **Graphics.** A graphic clip's properties. Numbers and colours ramp; strings, booleans, choices and images switch at the end. A property the graphic marks as not animatable cannot be put in an action. See [Graphics](graphics.md).
 - **Speed.** A media clip's playback rate, which makes a speed ramp. See [Speed](speed.md).
 
-Some things are never animated. These write the clip itself, whatever is selected. While an action is selected their rows are marked ⊘ in the Clip tab, apart from the Shape sub-tab's rows and the filter and obscure add and remove buttons, which carry no mark:
+Some things are never animated. These write the clip itself, whatever is selected. While an action is selected their rows are marked ⊘ in the Clip tab, and the filter and obscure add and remove buttons show a small boxed "clip" tag:
 
 - The Motion presets section (below).
 - In the Sound sub-tab: Ducking, the fade shapes, the Voice Effect, and a nest clip's Mix to mono. Every other audio setting animates ([Audio](audio.md#animating-the-sound)).
@@ -80,7 +80,7 @@ Frame Job adds a 1-second **Ease In Out** action at the playhead whose end state
 - **Leaving the mode.** Press Esc, press **Z** again, or click the button again. The mode also closes when the selection changes or the playhead leaves the clip. A rectangle too small to mean anything beeps and leaves the mode on so you can draw again.
 - **During motion.** If the clip has a During motion preset, the band shows "This clip has During motion — the zoom is solved without it", because the preset keeps moving the clip under the zoom.
 
-The mode needs exactly one selected clip that is drawn at the playhead and is not on a locked track. A nest clip doesn't count, because it has no box on the canvas. Otherwise **Z** beeps.
+The mode needs exactly one selected clip that is drawn at the playhead and is not on a locked track. Otherwise **Z** beeps. On a nest clip the zoom moves everything inside it.
 
 To zoom a screen recording at every click at once, use **Clip ▸ Auto Zoom…**, which plans these same zoom actions from the recording's cursor file (see [Auto Zoom](screen-recording.md#auto-zoom)).
 

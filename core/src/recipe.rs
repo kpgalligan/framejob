@@ -350,6 +350,7 @@ impl Project {
             cursor: self.layer_cursor(instance.clip, clip_t, &evaluated.video, ends),
             cutout: self.layer_cutout(instance.clip, &evaluated.video),
             blur,
+            nest: self.layer_nest(instance, t),
             input,
             // No blend on an ungraded frame (GR-4, GR-34).
             curve_blends: if ungraded {
@@ -369,6 +370,25 @@ impl Project {
         let evaluated = self.evaluate_clip(instance.clip, clip_t);
         self.frame_of(instance, t)
             .place(&self.moved(instance, clip_t, &evaluated))
+    }
+
+    /// The `nest` key of `instance`'s layer (spec §7.3): `null` for a clip
+    /// the view shows directly, or the outermost nest clip around it and
+    /// where that clip is — its moved placement, the one `frame_of` enters
+    /// it with, because a nest clip's box must sit where its picture does.
+    fn layer_nest(&self, instance: &Instance, t: Ticks) -> Value {
+        let Some(outermost) = instance.inside.first() else {
+            return Value::Null;
+        };
+        let moved = self.nest_moved(&instance.inside, 0, t);
+        let mut out = Map::new();
+        out.insert("clip".to_string(), Value::from(outermost.clip.id));
+        out.insert("x".to_string(), number(moved.x));
+        out.insert("y".to_string(), number(moved.y));
+        out.insert("scale".to_string(), number(moved.scale));
+        out.insert("rotation".to_string(), number(moved.rotation));
+        out.insert("crop".to_string(), json(&moved.crop));
+        Value::Object(out)
     }
 
     /// A clip's evaluated props with `video.motion` turned into placement —
@@ -399,25 +419,29 @@ impl Project {
     /// worth adding the day a deep nest shows up in a profile.
     pub(crate) fn frame_of(&self, instance: &Instance, t: Ticks) -> Frame {
         let mut frame = Frame::TOP;
-        for (i, enclosing) in instance.inside.iter().enumerate() {
-            let clip_t = t.saturating_sub(enclosing.origin);
-            let evaluated = self.evaluate_clip(enclosing.clip, clip_t);
-            // A nest clip's own motion, folded into every layer inside it —
-            // `motion::apply`'s second call site. Its SIZE is the nest's
-            // frozen canvas and its CONTAINER is whatever encloses IT,
-            // which is what the loop gained its index for.
-            let size = Some(nest_size(enclosing.nest));
-            let container = self.container(&instance.inside[..i]);
-            let moved = motion::apply(
-                &evaluated.video,
-                clip_t,
-                enclosing.clip.duration,
-                size,
-                container,
-            );
+        for (level, enclosing) in instance.inside.iter().enumerate() {
+            let moved = self.nest_moved(&instance.inside, level, t);
             frame = frame.enter(&moved, enclosing.nest, &self.canvas);
         }
         frame
+    }
+
+    /// The evaluated props of the nest clip at `inside[level]`, its own
+    /// motion turned into placement — `motion::apply`'s second call site,
+    /// folded into every layer inside it by `frame_of` and published by the
+    /// `nest` key. Its SIZE is the nest's frozen canvas and its CONTAINER is
+    /// whatever encloses IT, which is what `level` is for.
+    fn nest_moved(&self, inside: &[Enclosing], level: usize, t: Ticks) -> VideoProps {
+        let enclosing = &inside[level];
+        let clip_t = t.saturating_sub(enclosing.origin);
+        let evaluated = self.evaluate_clip(enclosing.clip, clip_t);
+        motion::apply(
+            &evaluated.video,
+            clip_t,
+            enclosing.clip.duration,
+            Some(nest_size(enclosing.nest)),
+            self.container(&inside[..level]),
+        )
     }
 
     /// A layer's `source` and `source_size`.

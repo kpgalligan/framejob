@@ -22,10 +22,10 @@ on [Editing](editing.md).
 Drag the dividers to resize the panes. The inspector can be 280–440 pt wide
 (304 pt to start) and the timeline 140 pt up to 60 % of the space under the
 toolbar (300 pt to start). The sizes you drag to are remembered. The inspector
-divider stops at the minimum width until you drag about halfway on to the
-window's edge, which hides the inspector; drag the divider back out to show it.
-**View ▸ Hide Inspector** (⌥⌘I) hides it too and, unlike a drag, is remembered.
-It becomes **Show Inspector** while the inspector is hidden. The window is at
+divider stops at the minimum width however far you drag. **View ▸ Hide
+Inspector** (⌥⌘I) hides the inspector, which is remembered, and becomes **Show
+Inspector** while it is hidden. Dragging the divider back out shows it too, and
+that is remembered as well. The window is at
 least 900 × 620 pt.
 
 ### The toolbar

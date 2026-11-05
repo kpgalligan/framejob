@@ -135,7 +135,7 @@ extension VideoPane {
                 "Take this filter off the clip — the stack itself, not the action "
                 + "under the playhead"
             return inspectorRow(
-                nil, [order, kind, remove],
+                nil, [order, kind, remove, InspectorClipTag(binding: binding)],
                 mixed: {
                     binding.mixedVideo { props in
                         props.filters.indices.contains(index) ? props.filters[index].kind : nil
@@ -182,7 +182,10 @@ extension VideoPane {
             "Append a half-strength blur to the end of the stack — on the clip itself, "
             + "not on the action under the playhead"
         rows.append(
-            inspectorButtonRow([add, InspectorRowLabel("\(FilterProps.max) at most")]))
+            inspectorButtonRow([
+                add, InspectorClipTag(binding: binding),
+                InspectorRowLabel("\(FilterProps.max) at most"),
+            ]))
 
         return InspectorSection(
             id: "video.filters", title: "Filters",

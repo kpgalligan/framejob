@@ -147,7 +147,7 @@
     {
      "id": "gs-selection-follows",
      "name": "Selection follows to the Clip tab",
-     "summary": "Clicking a clip moves the inspector to the Clip tab, unless you're on Transcript, which stays. With nothing selected, the Assistant tab stays for the first click too.",
+     "summary": "Clicking a clip moves the inspector to the Clip tab, unless you're on Transcript, which stays and scrolls to that clip's first word.",
      "page": "getting-started/inspector",
      "anchor": "selection-follows-to-the-clip-tab",
      "where": "Click a clip on the timeline or the canvas"
@@ -10116,10 +10116,10 @@
     {
      "id": "transcript-clip-scrolls",
      "name": "A selected clip scrolls to its words",
-     "summary": "Clicking an already selected clip on the timeline or canvas while the Transcript shows scrolls its first word to the top.",
+     "summary": "Clicking a clip on the timeline or canvas while the Transcript shows scrolls its first word to the top.",
      "page": "captions/follow-the-transcript",
      "anchor": "a-selected-clip-scrolls-to-its-words",
-     "where": "Timeline or canvas, click a selected clip"
+     "where": "Timeline or canvas, click a clip"
     },
     {
      "id": "transcript-loop-selected-words",

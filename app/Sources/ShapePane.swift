@@ -201,7 +201,10 @@ final class ShapePane: InspectorPaneView {
         /// stand. This is the "send it whole" rule above, spelled once so that
         /// no row has to remember it.
         func edited(_ change: (inout Gradient) -> Void) -> [ReelOp] {
-            guard var gradient = current() else { return [] }
+            // A default stands in with the gradient off: those rows are
+            // disabled, so it is never sent, and it is what gives them a
+            // `writes` for CI-7's ⊘.
+            var gradient = current() ?? Gradient()
             change(&gradient)
             return ops(gradient)
         }
@@ -341,7 +344,8 @@ final class ShapePane: InspectorPaneView {
             rows.append(
                 inspectorRow(
                     "Stop \(index + 1)", [swatch, position, remove],
-                    mixed: { mixedAt(index) { $0.color } || mixedAt(index) { $0.at } }))
+                    mixed: { mixedAt(index) { $0.color } || mixedAt(index) { $0.at } },
+                    binding: binding, writes: ops(current())))
         }
         if !on() {
             rows.append(inspectorRow(nil, [InspectorRowLabel("No gradient.")]))
@@ -360,7 +364,10 @@ final class ShapePane: InspectorPaneView {
         add.toolTip =
             "Put a handle on the ramp where the ramp already is — the widest gap, "
             + "at the colour that is already there"
-        rows.append(inspectorButtonRow([add, InspectorRowLabel("\(Gradient.maxStops) at most")]))
+        rows.append(
+            inspectorRow(
+                nil, [add, InspectorRowLabel("\(Gradient.maxStops) at most")],
+                binding: binding, writes: ops(current())))
 
         return InspectorSection(
             id: "shape.gradient", title: "Gradient",
