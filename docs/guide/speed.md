@@ -327,7 +327,7 @@ the clip's length and, above ×1, with its rate.
 While a clip's sound is still rendering, that clip plays silent in the
 preview. An export waits for every render it needs (the Exporting sheet reads
 "Preparing “*name*”…" during the wait, and a queued export's row reads
-"Writing · 0 %") and never writes that sound silent. If a render
+"Preparing… · 0 %") and never writes that sound silent. If a render
 fails, the export fails with "Clip N's retimed audio could not be
 rendered: …". A failed render is not tried again while Frame Job stays open:
 the clip stays silent and exports that need it keep failing until you change

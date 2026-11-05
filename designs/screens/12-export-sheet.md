@@ -19,7 +19,7 @@ now or adds it to a queue.
 Under the bold title "Export", a long paragraph explains the card: the format
 decides the codec and container; size, frame rate and range start as the
 document's; what loudness normalisation does and that every export's sound goes through a
-master limiter that keeps its true peak under −1 dBTP; that a preset remembers choices
+master limiter that keeps its true peak at or under −1 dBTP; that a preset remembers choices
 rather than numbers; how burned-in timecode reads; and what Add to Queue does.
 
 Then a column of labelled rows: Preset "Custom", with a gear pop-up beside it;

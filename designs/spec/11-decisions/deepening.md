@@ -1655,3 +1655,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   24 s to about 25 s. The rule is the rate against the format's own; it never
   claims a lower rate exists only in that case, and the pages keep saying an
   APNG can go down to those rows.
+- **#477 — The delegate refuses a quit while any Export… progress sheet
+  writes, and brings it back.** Asked directly while a sheet's export was
+  writing, `applicationShouldTerminate` answered `.terminateNow`, because the
+  delegate asked only the recorder and the queue: a ProRes 422 MOV stopped at
+  40 % left 197,659,360 bytes with no moov atom, and an H.264 MP4 left 0
+  bytes, neither readable. `ExportProgressSheetController` now keeps a weak
+  registry of the sheets whose export has begun and not finished (added in
+  `viewDidAppear`, removed first thing in `finished`), and `revealWriting()`
+  answers whether any writes. The delegate asks it after the recording branch
+  and before the queue, and when a sheet writes it answers `.terminateCancel`
+  with no alert, whether the sheet is on screen or not, as the recording
+  branch does. A hidden app is unhidden with `NSApp.unhide(nil)`, which also
+  activates it, and a sheet's minimised window is deminiaturized; when neither
+  holds, nothing is moved or activated. The queue's alert is unchanged and is
+  asked after. **Unmeasured:** whether AppKit lets ⌘Q or Dock ▸ Quit reach the
+  delegate at all with the sheet on screen, minimised or hidden. The decision
+  does not depend on it, and `docs/manual-checks.md` SE-44 asks a person.
+  **Accepted:** the document review has already run by the time the delegate
+  is asked (AppKit's order, as for the recording and the queue), and a logout
+  is cancelled while a sheet writes.

@@ -17040,7 +17040,7 @@
     {
      "id": "export-preset-custom",
      "name": "Back to Custom",
-     "summary": "Changing a control by hand puts the Preset popup back on Custom, except for Speed, Bit depth and Stems.",
+     "summary": "Changing a control by hand puts the Preset popup back on Custom.",
      "page": "export/presets",
      "anchor": "back-to-custom",
      "where": "Export sheet ▸ Preset"
@@ -17104,7 +17104,7 @@
     {
      "id": "export-quit-during-sheet",
      "name": "Quitting during a progress sheet",
-     "summary": "Quitting while an Export… progress sheet is writing doesn't ask, and can leave the half-written file behind.",
+     "summary": "Frame Job won't quit while an Export… progress sheet is writing, and brings a minimised window or a hidden Frame Job back.",
      "page": "export/progress-and-report",
      "anchor": "quitting-during-an-export",
      "where": "Exporting sheet"

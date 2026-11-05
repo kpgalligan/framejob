@@ -55,10 +55,35 @@ final class ExportProgressSheetController: NSViewController {
 
     private var didStart = false
     private var didFinish = false
+    /// Set by Cancel: from then on the status line keeps "Stopping…" while the bar and percent
+    /// still move, until `finished` (#508).
+    private var isStopping = false
     /// This export's booking in the encoder ledger (spec §11 CX-18): counted, never held —
     /// a person who chose Export… asked to write now. nil on an AVFoundation row and once
     /// it is over.
     private var ledgerToken: UInt64?
+
+    /// The sheets whose export has begun and not finished: added in `viewDidAppear`, removed
+    /// first thing in `finished`. Weak, so a sheet nothing holds any more is not counted. Read
+    /// only by `revealWriting()`, which the quit asks (spec §11 #477).
+    private static let writing = NSHashTable<ExportProgressSheetController>.weakObjects()
+
+    /// True when any sheet's export has begun and not finished (spec §11 #477). For each one:
+    /// when `NSApp.isHidden`, calls `NSApp.unhide(nil)` (which also activates Frame Job, as the
+    /// recording branch puts its controls in front); when `view.window?.sheetParent`
+    /// `isMiniaturized`, calls its `deminiaturize(nil)`. When neither holds it touches no
+    /// window and does not activate. Main thread.
+    static func revealWriting() -> Bool {
+        let sheets = writing.allObjects
+        guard !sheets.isEmpty else { return false }
+        if NSApp.isHidden { NSApp.unhide(nil) }
+        for sheet in sheets {
+            if let parent = sheet.view.window?.sheetParent, parent.isMiniaturized {
+                parent.deminiaturize(nil)
+            }
+        }
+        return true
+    }
 
     init(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
@@ -112,6 +137,8 @@ final class ExportProgressSheetController: NSViewController {
         super.viewDidAppear()
         guard !didStart else { return }
         didStart = true
+        // Registered before the booking and the call, as an early refusal finishes inside it.
+        Self.writing.add(self)
         // Booked BEFORE `export`, whose early refusals finish synchronously inside it.
         ledgerToken = ExportEncoderLedger.shared.begin(settings)
         exporter.export(
@@ -128,6 +155,7 @@ final class ExportProgressSheetController: NSViewController {
         let clamped = min(max(value, 0), 1)
         bar.doubleValue = clamped
         percentLabel.stringValue = "\(Int((clamped * 100).rounded())) %"
+        guard !isStopping else { return }
         // The exporter names its own phase while it has one. Without this the
         // label would claim to be writing a file during the loudness
         // measurement — which on an audio-only export is half the wait, and
@@ -143,6 +171,7 @@ final class ExportProgressSheetController: NSViewController {
     /// removes the half-written file; success and failure both turn the sheet
     /// into its own result panel rather than trading it for an alert.
     private func finished(_ result: Result<URL, any Error>) {
+        Self.writing.remove(self)
         didFinish = true
         // Cleared before `end`, whose post may launch a held queue job.
         let token = ledgerToken
@@ -200,6 +229,7 @@ final class ExportProgressSheetController: NSViewController {
             return
         }
         stopButton.isEnabled = false
+        isStopping = true
         statusLabel.stringValue = "Stopping…"
         exporter.cancel()
     }

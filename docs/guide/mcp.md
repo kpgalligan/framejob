@@ -341,8 +341,10 @@ status}`, where status is `queued` or `running`. Exports run one at a time.
   Call it again after a pause until status is `done`, `failed` or
   `cancelled`. It always carries `export_id`, `status`, `path` and
   `elapsed` (seconds since `export` was called, or to the finish). While
-  running it adds `progress` (0 to 1), and `phase` while the exporter names
-  one (the loudness measurement). While queued it adds `waiting`, the queue
+  running it adds `progress` (0 to 1), and `phase` while the job has one:
+  "Preparing…" until the file's writer exists (renders, masks and
+  measurements still being made), and "Measuring loudness…" during the
+  loudness pass. While queued it adds `waiting`, the queue
   row's "Waiting for memory: …" sentence, when an AV1 or VP9 job waits for
   memory behind the app's other AV1 and VP9 exports; queued or running, an
   `av1`, `av1_webm`, `vp9_webm` or `vp9_alpha_webm` job adds `estimated_seconds`, the export

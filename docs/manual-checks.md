@@ -675,6 +675,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** a beep, the same-shape sentence in the readout, **Export…** and **Add to Queue** greyed out, and no save panel.
 - **Source:** #470 (spec §11 #470); `docs_bugs_b3_proof.py` G4 and B1 read the card once the size is resolved. No script presses the button, because on the base the press opens a save panel.
 
+**SE-44 — Quitting while an Exporting sheet writes keeps Frame Job open and brings the sheet back** (provisional)
+- **Do:** 1. Start a long File ▸ Export… (choose Export). 2. With the Exporting sheet on screen, press ⌘Q. 3. Minimise the window and press ⌘Q. 4. Press ⌘H, then choose Quit from the Dock menu. 5. Repeat step 3 with an unsaved change in the project.
+- **Expect:** each time, Frame Job stays open, the Exporting sheet keeps writing, and the finished file plays. In step 3 the window comes back out of the Dock. In step 4 Frame Job is shown again and comes to the front. Step 5 doesn't hang.
+- **Source:** #477 (spec §11 #477); `docs_bugs_b4_proof.py` T1/T2 ask the delegate directly, because no script may minimise a window or hide the app.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

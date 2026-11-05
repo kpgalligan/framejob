@@ -73,7 +73,7 @@ Every result carries `export_id`, `status`, `path` and `elapsed`, the seconds si
 | `status` | Also carries |
 | --- | --- |
 | `queued` | `waiting` while an AV1 or VP9 job is held for memory. `estimated_seconds` on `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`. |
-| `running` | `progress`, from 0 to 1. `phase` while the export names one, which is "Measuring loudness…" during the first pass over the mix. `estimated_seconds` on the same four presets. |
+| `running` | `progress`, from 0 to 1. `phase` while the job has one: "Preparing…" until the file's writer exists, while renders, masks and measurements are still being made, and "Measuring loudness…" during the first pass over the mix. `estimated_seconds` on the same four presets. |
 | `done` | What the file holds, in the next table. |
 | `failed` | `reason`, the queue row's sentence. |
 | `cancelled` | `reason`, the queue row's sentence. |

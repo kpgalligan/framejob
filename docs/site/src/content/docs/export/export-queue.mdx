@@ -48,7 +48,8 @@ Each row shows the file's name and where the job has got to.
 | --- | --- | --- |
 | `Waiting` | Queued behind the running job. | **Cancel** |
 | `Waiting for memory: …` | An AV1 or VP9 job [waiting for memory](#the-encoder-memory-wait). | **Cancel** |
-| `Writing · 42 %` | The job is running, with a progress bar beside it. It can stay at `Writing · 0 %` while the job [waits for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs). | **Cancel** |
+| `Preparing… · 0 %` | The job has started and is [waiting for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs) before it writes. Nothing is on disk yet. | **Cancel** |
+| `Writing · 42 %` | The job is writing the file, with a progress bar beside it. | **Cancel** |
 | `Measuring loudness… · 12 %` | The job is measuring the mix before it writes. | **Cancel** |
 | `Stopping…` | You cancelled the job and it hasn't stopped yet. | **Cancel** |
 | `Exported “Board.mp4”.` | The file was written. Any stems, graphic warnings and cursor warnings are counted after the name, then come the [loudness figures](/export/progress-and-report/). | **Show**, **Remove** |
@@ -88,9 +89,7 @@ The alert reads "An export is still being written." and names the running file, 
 - **Quit Anyway** cancels the queue, deletes the partly written file and quits.
 - **Cancel** keeps Frame Job open and the queue running.
 
-:::caution
-Only the queue is guarded this way. An **Export…** progress sheet on screen stops Frame Job quitting, but one out of sight doesn't: with its window minimised or Frame Job hidden, quitting doesn't ask and leaves the partly written file behind. [Quitting during an export](/export/progress-and-report/#quitting-during-an-export) has the detail.
-:::
+Frame Job doesn't quit while an **Export…** progress sheet is writing, whether the sheet is on screen or not. If its window is minimised, the window comes back out of the Dock. If Frame Job is hidden, it's shown again and comes to the front. Cancel the export, or let it finish, then quit. [Quitting during an export](/export/progress-and-report/#quitting-during-an-export) has the detail.
 
 ## The encoder memory wait
 

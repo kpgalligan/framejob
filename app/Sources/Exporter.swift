@@ -465,6 +465,11 @@ final class Exporter {
         return measuring ? "Measuring loudness…" : nil
     }
 
+    /// True from `startWriting`'s `self.writer = writer` until `finish`: the file's writer
+    /// exists, so a phase-less moment is the write and not the wait before it (#500). Main
+    /// thread.
+    var isWriting: Bool { writer != nil }
+
     /// The one exit. Tears down the timer and the recipe slot before the
     /// caller hears anything, so a completion handler that starts another
     /// export finds this one fully unwound. The measurement is PUBLISHED

@@ -47,7 +47,7 @@ Undo and redo usually start a render too, because Frame Job drops the file from 
 
 ## Exports wait for it
 
-An export waits for every render it needs and never writes that sound silent. The Exporting sheet reads "Preparing “*name*”…" during the wait, and a queued export's row reads `Writing · 0 %`. You can cancel either one there. This covers speed ramps and clips at a constant speed other than ×1 with **Keep pitch** off.
+An export waits for every render it needs and never writes that sound silent. The Exporting sheet reads "Preparing “*name*”…" during the wait, and a queued export's row reads `Preparing… · 0 %`. You can cancel either one there. This covers speed ramps and clips at a constant speed other than ×1 with **Keep pitch** off.
 
 An animated GIF or APNG has no sound, so it doesn't wait. An export an agent starts with `export` waits the same way.
 

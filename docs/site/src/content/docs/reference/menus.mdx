@@ -42,12 +42,11 @@ macOS may add items of its own to these menus. Those aren't listed. [Keyboard sh
 | **Show All** | | Shows hidden apps again. |
 | **Quit Frame Job** | <kbd>⌘Q</kbd> | Quits. Projects with unsaved work are dealt with first, as on any Mac. |
 
-Two things can stop a quit:
+Three things can stop a quit:
 
 - **A recording is running.** The quit is cancelled and the recording's controls are put in front of you. Stop the recording first. See [Start, pause and stop](/recording/pause-and-stop/#quit-during-a-recording).
 - **The Export Queue is busy.** An alert reads "An export is still being written." It says what's running and how many more are waiting, and **Quit Anyway** stops the export and deletes the partly written file. See [The Export Queue](/export/export-queue/#quit-with-jobs-in-the-queue).
-
-Only the queue is guarded. Quitting while an **Export…** progress sheet is writing doesn't ask, and leaves a half-written file behind.
+- **An Export… progress sheet is writing.** Frame Job doesn't quit while an **Export…** progress sheet is writing, whether the sheet is on screen or not. If its window is minimised, the window comes back out of the Dock. If Frame Job is hidden, it's shown again and comes to the front. Cancel the export, or let it finish, then quit. See [Quitting during an export](/export/progress-and-report/#quitting-during-an-export).
 
 No agent tool checks for updates or quits the app.
 

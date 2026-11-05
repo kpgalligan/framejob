@@ -1511,7 +1511,9 @@ the key map behind it.
   (spec §9). Menu items are nil-target selectors down the responder chain.
   `AppDelegate.swift` binds the agent socket at launch, then calls
   `ProjectDocumentController.complainUnlessShared()`, and releases the
-  socket at quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
+  socket at quit; at quit it refuses while an Export… progress sheet
+  writes, after `ExportProgressSheetController.revealWriting()` brings it
+  back (spec §11 #477). Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
   spec §11 MC-7); there is no Tools menu.
   `main.swift` calls `CodecLibraries.probeIfAsked()` straight after
   `DecoderSupport.enable()` (it prints the bundled encoders' versions and

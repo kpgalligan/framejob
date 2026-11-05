@@ -397,7 +397,7 @@ final class ExportSheetController: NSViewController {
                 + "range start as the document's and quality as the format's; a GIF or an "
                 + "APNG starts at its own cap and rate. Loudness normalises the whole mix "
                 + "by one gain, and every export's sound goes through a master limiter "
-                + "that keeps its true peak under −1 dBTP. A preset remembers the choices on this card rather than the "
+                + "that keeps its true peak at or under −1 dBTP. A preset remembers the choices on this card rather than the "
                 + "numbers they resolve to, so it means the same thing on a document of "
                 + "another size. Burn in timecode writes the time into the picture on "
                 + "export only — the preview never shows it — and it reads PROJECT time, "

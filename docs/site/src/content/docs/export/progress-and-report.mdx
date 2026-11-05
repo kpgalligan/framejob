@@ -54,7 +54,7 @@ GIF and APNG files have no sound, so they don't wait for the last two. You can c
 
 ## Cancel a running export
 
-Choose **Cancel**. The button greys out while the export stops, then the sheet closes and the partly written file is removed.
+Choose **Cancel**. The button greys out, and the status line reads "Stopping…" until the sheet closes and the partly written file is removed.
 
 :::caution
 A file you chose to replace in the save panel is removed as writing starts, so cancelling once the sheet says "Writing" loses it. Cancelling doesn't bring it back. Cancel before writing starts, during one of the waits above or while it says "Measuring loudness…", and the file stays as it was.
@@ -104,11 +104,9 @@ A file you chose to replace in the save panel is removed as writing starts, and 
 
 ## Quitting during an export
 
-While the Exporting sheet is on screen, Frame Job doesn't quit. Cancel the export, or let it finish and close the sheet, then quit.
+Frame Job doesn't quit while an **Export…** progress sheet is writing, whether the sheet is on screen or not. If its window is minimised, the window comes back out of the Dock. If Frame Job is hidden, it's shown again and comes to the front. Cancel the export, or let it finish, then quit.
 
-If the sheet is out of sight, because its window is minimised or Frame Job is hidden, quitting doesn't ask. The export stops and the partly written file stays where you saved it. A partly written MOV or MP4 won't open.
-
-Only the [Export Queue](/export/export-queue/) is guarded at quit, so jobs there ask before they stop.
+Jobs in the [Export Queue](/export/export-queue/#quit-with-jobs-in-the-queue) ask before they stop.
 
 ## With an agent
 

@@ -179,14 +179,14 @@ Greyed out for the audio-only formats.
 
 ## Presets
 
-A preset stores the **choices** on the card: the format, size row or custom size, frame rate, quality tier, loudness, range and burn-in. It does not store the numbers they resolve to. A preset saved on a 1080p document that says "4K, High" exports at the right 4K size and rate on any other document.
+A preset stores the **choices** on the card: the format, size row or custom size, frame rate, quality tier, speed, bit depth, stems, loudness, range and burn-in. It does not store the numbers they resolve to. A preset saved on a 1080p document that says "4K, High" exports at the right 4K size and rate on any other document.
 
 - **Apply a preset:** pick it from the **Preset** popup. Every control is set exactly as if you had clicked it.
 - **Save a preset:** click the gear and choose **Save…**, type a name and click **Save**. The name field starts with the name of the preset now chosen. Saving under a name that already exists (ignoring case) replaces that preset. The name "Custom" is reserved. While the card has an error, for example an empty custom field, **Save…** beeps and saves nothing.
 - **Delete a preset:** choose it in the popup, then choose **Delete** from the gear. Delete is available only while a saved preset is chosen, and it asks no confirmation. The controls keep the preset's values, so **Save…** under the same name puts it back.
 - **Change a preset:** apply it, adjust the controls, and save again under the same name. There is no separate rename.
 
-Changing the format, size, frame rate, quality, loudness, range, burn-in or a custom field by hand puts the popup back on **Custom**. Changing **Speed**, **Bit depth** or **Stems** doesn't: the popup keeps the preset's name, although a preset stores those three too. The popup also opens on Custom each time, even when the remembered choices happen to match a preset.
+Changing the format, size, frame rate, quality, speed, bit depth, stems, loudness, range, burn-in or a custom field by hand puts the popup back on **Custom**. The popup also opens on Custom each time, even when the remembered choices happen to match a preset.
 
 Presets are kept for your whole account in `~/Library/Application Support/Frame Job/ExportPresets.json`, so every project and window shares them. The **Dynamic Range** choice is not stored in a preset or in the remembered choices.
 
@@ -206,7 +206,7 @@ The save panel suggests the project's name with the format's extension (`Board v
 
 **Exporting** shows a progress bar and a percentage. The status line reads "Preparing “*name*”…", then "Measuring loudness…" while the sound is measured, then "Writing “*name*”…".
 
-- **Cancel** stops the export and removes the half-written file. A file you chose to replace in the save panel is removed as writing starts, so a cancel from then on loses it too. A cancel before then leaves it.
+- **Cancel** stops the export and removes the half-written file. The status line reads "Stopping…" until the sheet closes. A file you chose to replace in the save panel is removed as writing starts, so a cancel from then on loses it too. A cancel before then leaves it.
 - When it finishes, the line reads "Exported “*name*”." followed by what the sound measured, for example `Peak −1.0 dBTP · −14.0 LUFS`. **Show in Finder** reveals the file, and **Close** dismisses the sheet.
 - If a graphic warned while the file was drawn, the line adds a count ("1 graphic warning"), and the tooltip lists each warning with its frame.
 - If a clip's cursor file could not be drawn, the clip is written without its pointer, the line adds a count after the graphic one ("1 cursor warning"), and the tooltip lists each one ("The cursor of media 3 is not drawn: …").
@@ -228,7 +228,7 @@ The save panel suggests the project's name with the format's extension (`Board v
 - Jobs run **one at a time**, in the order they were added, while you keep editing.
 - An **AV1** or **VP9** job also waits for memory. These formats are encoded in software and use a lot of it: about 1.2–2.4 GB at 1080p and 4.4–8.1 GB at 4K for AV1, depending on Speed, and about 0.4–0.5 GB at 1080p and 1.1–1.6 GB at 4K for VP9. All AV1 and VP9 exports running in Frame Job at once, from the queue and from **Export…** progress sheets, may use up to a quarter of the Mac's memory together. A queued AV1 or VP9 job that would go over waits until enough of them finish, and its row says why. The row's status is one line and ends in "…" where the sentence does not fit, which at most window widths is before the figures; hold the pointer over the row and its tooltip ends with the whole sentence: "Waiting for memory: AV1 and VP9 exports running now hold about 2.3 GB of the 4.0 GB this Mac allows them, and this one needs about 2.2 GB." While it waits, a later job that fits runs first. When nothing else is running, a job always starts, however large. An **Export…** sheet never waits: it is counted, and starts straight away.
 - A job holds the timeline **as it was when you confirmed it**, including its media files, reversed clips and graphics. Edits, undos, relinks and even closing the document afterwards do not change what it writes.
-- Each row shows the file's name and its state: **Waiting** (or the memory wait above), *Writing · 42 %* (or the measuring phase), the "Exported …" line with its graphic and cursor warning counts and its loudness figures, **Cancelled.**, **Cancelled before it started.**, or the reason a job failed. The tooltip shows the full path, the format, size and frame rate, the whole memory-wait sentence while a job waits for memory, and any graphic and cursor warnings.
+- Each row shows the file's name and its state: **Waiting** (or the memory wait above), *Preparing… · 0 %* while the job waits for what it needs before writing (a speed ramp's sound, a mask, a measurement), *Writing · 42 %* (or the measuring phase), the "Exported …" line with its graphic and cursor warning counts and its loudness figures, **Cancelled.**, **Cancelled before it started.**, or the reason a job failed. The tooltip shows the full path, the format, size and frame rate, the whole memory-wait sentence while a job waits for memory, and any graphic and cursor warnings.
 - **Cancel** on a row stops that job and removes its half-written file. A file it was replacing stays unless writing had started. On a finished row the button reads **Remove** and takes the row out of the list. **Show** reveals a finished file in the Finder.
 - If a later export writes to the same file, the earlier finished row reads "Overwritten by a later export to the same file."
 - **Clear Finished** removes every finished, cancelled and failed row. **Cancel All** stops the running job and every waiting one.
@@ -239,7 +239,7 @@ Closing the window stops nothing. Opening the export sheet pauses playback which
 
 Quitting while a queued job runs or waits asks first: "An export is still being written." The message names the running file and counts the jobs still waiting ("“*name*” is not finished, and 2 more are waiting."). **Quit Anyway** cancels the queue and deletes the partly written file. This question comes after Frame Job has asked about unsaved documents.
 
-Only queued exports are protected this way. While an **Export…** progress sheet is on screen, Frame Job does not quit. If the sheet is out of sight, because its window is minimised or Frame Job is hidden, quitting does not ask: the export stops and the partly written file stays behind. A partly written MOV or MP4 won't open. Cancel that export first.
+Frame Job doesn't quit while an **Export…** progress sheet is writing, whether the sheet is on screen or not. If its window is minimised, the window comes back out of the Dock. If Frame Job is hidden, it's shown again and comes to the front. Cancel the export, or let it finish, then quit.
 
 ## Saving a single frame
 
@@ -363,4 +363,4 @@ The full reference is [MCP](mcp.md).
 - Queued jobs run one at a time. **Export…** does not join the queue: it writes straight away, behind its own progress sheet.
 - A queued AV1 or VP9 job waits while the AV1 and VP9 exports already running would use more than a quarter of the Mac's memory with it. The memory each needs is a measured figure, not a guarantee: a heavier timeline can use more. An **Export…** sheet is never held, so starting several AV1 or VP9 sheets at once can go past that quarter.
 - The estimated time is the median of three measured exports at each size, of real 4K camera footage on one idle Mac (an Apple M2 Max); AV1 (WebM) uses AV1 (MP4)'s figures. On exports it was not fitted on, 30 seconds at 2560 × 1440, it came within 14 % of the real time; a slower Mac, a busy one or a heavier timeline takes longer.
-- Frame Job does not quit while an **Export…** progress sheet is on screen. With the sheet out of sight, its window minimised or Frame Job hidden, quitting does not ask and leaves a partly written file. Only the Export Queue is guarded at quit.
+- Frame Job doesn't quit while an **Export…** progress sheet is writing, whether the sheet is on screen or not. If its window is minimised, the window comes back out of the Dock. If Frame Job is hidden, it's shown again and comes to the front. Cancel the export, or let it finish, then quit.

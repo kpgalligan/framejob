@@ -30263,6 +30263,34 @@ python3 tools/proof/docs_bugs_a4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a4_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
+## Docs bugs b4 — the Export sheet, its queue row and quitting (`docs_bugs_b4_proof.py`, `docs_bugs_b4_probe.swift`; nine mutants by `--mutant`; spec §11 #477)
+
+#477, #492, #500, #508 and #509. **`docs_bugs_b4_proof.py`** makes its own fixtures under
+`work/docs-bugs-b4/` (ffmpeg with libx264, and ffprobe) on a scratch `CFFIXED_USER_HOME`. One
+instance, launched with `-RCDevRampRenderHold 8`, saves the two packages the probe opens and runs
+A1/A2: an `h264` export of a speed ramp at once, `export_status` polled every 0.1 s beside whether
+the file exists.
+
+**`docs_bugs_b4_probe.swift`** runs the real controllers off-screen (activation policy
+`.prohibited`, a window 20,000 pt off every display), one process per mode, built with
+`FRAMEJOB_DEV_TOOLS` and a `default.metallib` compiled from `app/Resources/Shaders` beside it: the
+sheet's Preset popup after Speed, Bit depth and Stems move (P1–P4) and its hint (H1), a progress
+sheet's status line after Cancel (S1), a queued job's row (R1/R2), and `AppDelegate`'s
+`applicationShouldTerminate` while a progress sheet writes and after it finished (T1/T2; on
+`.terminateNow` the probe exits as a quit would, and ffprobe reads what is left). It names only
+symbols the base has, finds the sheet's labels and button by a view walk, and builds over
+`--base-sources`. PB reads the general pasteboard's change count every 0.25 s, read only, and names
+when it moved. A mutant is built into the probe from a `tree_copy.py` copy; the app under test only
+saves the packages. Quitting from ⌘Q or the Dock with the sheet minimised or Frame Job hidden is
+`docs/manual-checks.md` SE-44.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b4_proof.py [--only A1,P1,S1,R1,T1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b4_proof.py
+python3 tools/proof/docs_bugs_b4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b4_proof.py --base-sources <its app/Sources> --expect-red
+```
+
 ## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)
 
 Docs bugs batch c3 (#479, #480, #499, #512, #513, #515, spec §11 GR-36, GR-37, GR-38). The built app
