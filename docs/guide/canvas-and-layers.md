@@ -128,6 +128,15 @@ The box on screen still shows the frame at the playhead. There are two exception
 shape's box resize, both edit the clip itself. See
 [Motion and transitions](motion-and-transitions.md).
 
+With one clip selected and no action selected, a move, nudge, scale, rotate
+or crop past an action that has ended and holds what the gesture changes (a
+zoom's position and size, say) changes nothing. Frame Job beeps, and the
+inspector's foot names the action: "Refused: action 1 on this clip's lane
+holds its position at the playhead, so a move here would show only before it.
+Select action 1 first." Select it, then drag. Dragging a text clip's left or
+right edge still sets its wrap width when the action holds no width. Before
+the action starts, or inside it after **Esc**, a drag edits the clip itself.
+
 ## Crop
 
 Press **C**, or double-click a video, image or still clip, to enter crop mode
@@ -419,9 +428,11 @@ the action selected. A rotate changes the clip's own values, which reach every
 frame too.
 
 A switch later in a clip takes more: a clip shows a layout action's end state
-until a later action changes it, so a drag with no action selected changes the
-clip's own values, which show only before the switch. From the switch on, the
-picture stays put. To change the layout itself, put the playhead on the switch,
+until a later action changes it. With the playhead past the switch and no
+action selected, a move, nudge, scale or crop on the camera changes nothing:
+Frame Job beeps, and the inspector's foot names the switch's action and asks
+you to select it first. Before the switch, a drag changes the clip's own
+values, which show only until the switch. To change the layout itself, put the playhead on the switch,
 select the camera clip (which selects the action), press → until the playhead
 is past the switch, then drag the camera or type in the Transform rows, and
 press **Esc**.

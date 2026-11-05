@@ -335,6 +335,11 @@ the same way.
 - **Expect:** The drag stops at the inspector's smallest width and it never hides. The drag out shows the inspector, and the new window shows it too.
 - **Source:** #485.
 
+**TL-23 — A gesture past a finished zoom is refused**
+- **Do:** Add a zoom to a clip and put the playhead past its end. Click the clip on the canvas (no action selected), then drag it, resize it by a corner, and press ←.
+- **Expect:** Each beeps, and the inspector's foot reads "Refused: action 1 …" naming the zoom. The Edit menu has no Undo item for any of them, and the picture doesn't change.
+- **Source:** #469, spec §11 CI-19.
+
 **JOB-2 — Split at Shot Changes on a finished video**
 - **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.
 - **Expect:** 1–2: the sheet names the file and its bar moves from "Waiting" through the percentages to "Done", then closes by itself. 3: there is an edit at every hard cut and none inside a shot or the dissolve; ⌘Z takes them all back as one step. 4: the sheet closes at once and nothing is split. 5: after the restore the bar keeps moving, the sheet closes by itself and the split lands.

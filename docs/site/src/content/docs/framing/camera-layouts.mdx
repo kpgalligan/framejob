@@ -108,7 +108,7 @@ Those later clips keep their own actions, though an action that moves one can [s
 
 The layouts have fixed sizes and places. A switch on a clip's first frame, which is what a camera that landed with a recording has, is the easy case: select that one clip and drag it. A move, a nudge, a resize or a crop on the canvas changes the switch and the clip's own values together, so the clip moves on every frame, with or without the action selected. A rotate changes the clip's own values, which reach every frame too.
 
-A switch later in a clip takes more. It's an action, and a clip shows an action's end state until a later action changes it, so a drag with no action selected changes the clip's own values, which show only before the switch. From the switch on, the picture stays put. To go past it, change the layout itself.
+A switch later in a clip takes more. It's an action, and a clip shows an action's end state until a later action changes it. With the playhead past the switch and no action selected, a move, nudge, resize or crop on the camera changes nothing: Frame Job beeps, and [the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip) names the switch's action and asks you to select it first. Before the switch, a drag changes the clip's own values, which show only until the switch. To go past it, change the layout itself.
 
 <Steps>
 

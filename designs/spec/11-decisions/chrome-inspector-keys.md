@@ -263,6 +263,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   at mouse-down (`gestureTarget`), so playback entering a span mid-drag
   does not move the drag's writes. **Amended by CI-17:** a single clip's
   gesture on a first-frame cut goes to the cut, and writes the base too.
+  **Amended by CI-19:** past a finished action holding a key it writes, a
+  single clip's gesture refuses.
 - **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
   (phase 5, P10). The end state holding `null` at an optional key is the
   property switched off when the action finishes: the evaluator already
@@ -404,7 +406,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   edits it. The mode ends when its primary clip stops qualifying, by a click,
   a selection or the playhead. A clip on a matte track keeps the mode whatever
   its kind, because crop shapes the matte (MT-4) and MT-7 has it handled like
-  any clip; whether it should is held for the owner. `set_video` and
+  any clip; the owner kept it (#475, 2026-11-05, 'Keep it'): no Crop section
+  is added, so such a crop has no field and no Reset. `set_video` and
   `paste_attributes` are unchanged.
 - **SH-3 — An inspector name field is the inspector's value field**
   (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
@@ -466,6 +469,38 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   on the base unless the cut holds `rotation`, which `PLACEMENT_KEYS` does
   not name; the inspector's fields keep CI-2 and their ◇. A cut is therefore
   the one case where a drag and a typed value write different places.
+  **Amended by CI-19:** past a finished action holding a key it writes, a
+  single clip's gesture refuses.
+- **CI-19 — A canvas gesture past a finished action that holds a key it
+  writes refuses, when it writes one clip and no action is selected; amends
+  CI-13 and CI-17** (#469, the owner 2026-11-05, "Refuse and explain"). It
+  applies when the selection is exactly the clip the gesture writes (the
+  anchor for a move, the pressed clip for a scale, width, rotate or crop,
+  `primaryBox` for a nudge), no action is selected, the clip's track is
+  unlocked, and some action of that clip that is not its first-frame cut
+  (CI-17) has FINISHED at the playhead — its end at or before the playhead's
+  clip time — with an end naming a key the gesture WRITES: x or y for a move
+  or nudge ("position"); x, y or `scale` for a scale, which is a picture's
+  handles and a text clip's corners and top and bottom edges ("position",
+  "size"); `text.width` alone for a text clip's left or right edge
+  ("width"); `rotation` for a rotate; `crop` for a crop. Then the gesture
+  makes no edit and no undo step: Frame Job beeps and CI-10's strip shows
+  the app's sentence, naming the LATEST such action by its lane number,
+  "action N on this clip's lane holds its position at the playhead, so a
+  move here would show only before it. Select action N first." (the noun is
+  move, resize, rotation or crop; two keys are joined by "and"). A drag
+  refuses on its first drag tick, so a press that only selects stays
+  silent; a nudge refuses at once. The playhead decides here, where CI-17
+  does not let it: before the action starts, or while it runs with no
+  action selected (after Esc), the gesture writes CI-13's base, and a clip
+  whose only holder is its cut keeps CI-17. Unchanged: a multi-selection
+  (CI-13; #529), including a scale, rotate or crop on its primary box; a
+  ⇧-press that takes the dragged clip out of the selection; a shape's box
+  scale and an endpoint drag (`set_shape` has no action form, so selecting
+  the action would not help); obscure grips (CI-16); the inspector's fields
+  (CI-2, ◇); and `set_video`, `set_text` and `set_action_end` over MCP — no
+  tool reaches a canvas gesture, so no agent mirror changes. CI-2 and CI-13
+  stand: the refusal only says where the write would go.
 - **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
   (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
   for the row) and each Remove take `InspectorClipTag`, #102's mark for a

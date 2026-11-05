@@ -30084,9 +30084,9 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
 ```
 
-## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twelve mutants by `--mutant`; spec §11 CI-17, CI-18)
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19)
 
-#469, #476, #471, #481 and #485. **`docs_bugs_a3_proof.py`** has the app under test make twelve
+#469, #476, #471, #481 and #485, and batch a5's CI-19 rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
 projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
 through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
 a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
@@ -30094,8 +30094,21 @@ takes focus. A press goes by `mouseDown(with:)` to the view `hitTest` picks; the
 NSSplitView's own tracking loop on this process's queue. D1's save is then rendered, and N3's
 selection captured with `snapshot_ui`, by the app under test. Its media is in
 `work/docs_bugs_a3_media/`, kept between runs. `nest-no-motion` is a core mutant: its copy gets a
-real `core/` and rebuilds the staticlib. A beep is not silenced: N8 and N9 may be heard. What a real
-hand does is TL-19…TL-22.
+real `core/` and rebuilds the staticlib. A beep is not silenced: N8, N9 and CI-19's refusals may be
+heard. What a real hand does is TL-19…TL-23.
+
+Batch a5 (#469's second half, the owner's "Refuse and explain", spec §11 CI-19) rescored D7 and
+D11, which had pinned the base write past a finished action as CONTROLs, and added D14–D27 and V1.
+"Refused" is the strip at the inspector's foot reading the exact sentence, no undo step, and the
+base and every action's end as stored before. The refused rows are D7, D11, D14 (a corner scale),
+D15 (a nudge), D16 (a crop), D19 (the later of two zooms named), D20 (a landed camera with a later
+zoom) and D26 (a text clip's corner). The CONTROLs are D17 (a rotate past a zoom holding no
+rotation), D18 (a press that only selects stays silent), D21 (CI-17 before the zoom), D22 (the
+action selected), D23 (inside it after Esc), D24 (a shape's box), D25 (a text clip's side edge,
+width only), D27 (a ⇧-press that takes the dragged clip out of a pair) and V1 (`set_video` over
+MCP, in the fixtures' launch). A grip off the overlay's bounds, such as a zoomed box's corner, is
+pressed through the overlay's own `mouseDown(with:)`, and the row prints which door it used. The
+nine `held-*` mutants each break one CI-19 decision.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]

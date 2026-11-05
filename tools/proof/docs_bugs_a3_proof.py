@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Docs-bugs batch a3 (#469, #476, #471, #481, #485; spec §11 CI-17, CI-18): canvas selection and
-the inspector around it.
+the inspector around it; and batch a5's CI-19 rows (#469's second half).
 
     python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3,…] [--tree PATH] [--expect-red]
                                               [--mutant NAME]
@@ -12,7 +12,7 @@ through `docs_bugs_a3_probe.swift`, the app's own sources on those packages: a d
 key press can't be sent over MCP. D1 and N3 are also read back through the app under test: what D1
 saved is rendered beside the undragged project, and `snapshot_ui` captures the preview with the
 nest selected and with nothing selected. N1's click has no MCP door, so N3's capture is the app's
-word for it.
+word for it. V1 is an MCP row on the app under test alone.
 
 `--tree PATH` builds the probe from `PATH/app/Sources`, its bridging header and
 `PATH/core/target/release/libframejob_core.a`. `--expect-red` is the run against the base: it
@@ -26,12 +26,24 @@ Red on the base unless marked CONTROL:
 - #469 (CI-17). D1 a drag at 4 s moves the box and the state at frames 0, 1 and 4 s, one undo step
   "Move" that restores them all; the render differs where the camera went and where it left. D2 a
   corner scale. D3 a nudge. D4 clicked on the timeline first. D5 frame 0, the cut selected: frame 0
-  moves too. D6 frame 0 after Esc. D7 (CONTROL) a plain clip past a zoom: the base, the zoom's end
-  untouched (what the owner is asked about). D8 (CONTROL) before the zoom: the base, the box
-  follows. D9 (CONTROL) a plain clip. D10 (CONTROL) a rotate on a clip with a cut: the base, on
-  every frame, the cut's end gains no key. D11 (CONTROL) a one-frame layout action past clip time 0
-  is not a cut: the base. D12 (CONTROL) a multi-selection: the base. D13 (CONTROL) a shape's box
-  scale on a clip with a cut: the base.
+  moves too. D6 frame 0 after Esc. D8 (CONTROL) before the zoom: the base, the box follows. D9 (CONTROL) a plain clip. D10 (CONTROL) a rotate on a clip with a cut: the base, on
+  every frame, the cut's end gains no key. D12 (CONTROL) a multi-selection: the base. D13
+  (CONTROL) a shape's box scale on a clip with a cut: the base.
+- #469's second half (batch a5, CI-19, the owner's "Refuse and explain"). "Refused" is the strip at
+  the inspector's foot reading the exact sentence, no undo step, and the base and every action's
+  end as stored before. D7 a drag past a finished zoom (5 s): refused naming action 1 and
+  "position", the box unmoved. D11 a one-frame layout action past clip time 0 is not a cut: a drag
+  at 4 s refused. D14 a corner scale past the zoom: "position and size", "resize". D15 a ← nudge.
+  D16 C and a crop-handle drag past the late layout action: "crop". D17 (CONTROL) a rotate past the
+  zoom, which holds no rotation: the base, "Rotate". D18 (CONTROL) a press and release with no
+  travel: selected, silent. D19 two finished zooms: the later one, action 2, is named. D20 the
+  landed camera with a zoom at 2–3 s, at 5 s: action 2 named, the cut untouched. D21 (CONTROL) the
+  same at 1 s: CI-17, the cut and the base move together. D22 (CONTROL) the zoom selected: its end
+  is written. D23 (CONTROL) inside the zoom after Esc: the base. D24 (CONTROL) a shape's box scale
+  past a zoom: the box grows. D25 (CONTROL) a text clip's right edge past a zoom holding no width:
+  the base width. D26 the same clip's corner: refused. D27 (CONTROL) a ⇧-press that takes A out of
+  {A, B}, then a drag of A: A's base, B's zoom not named. V1 (CONTROL, MCP) `set_video {x: −400}`
+  past the zoom: the base −400, the end x 100.
 - #476. N1 a click on the picture selects the nest, a clip behind it. N2 nothing behind. N3 the
   outline and handles (`primaryBox`, a handle hit); `snapshot_ui` differs with the nest selected.
   N4 a drag moves the nest, not the clip behind, undo "Move". N5 scale and rotate. N6 Z arms and a
@@ -58,7 +70,10 @@ Red on the base unless marked CONTROL:
 
 `--mutant NAME` breaks one decision in a `tree_copy.py` copy, builds the probe from it and runs only
 the row it must fail: CAUGHT exits 1, SURVIVED exits 0, a control that could not be performed exits
-2. `cut-any-key` D10, `cut-any-start` D11, `no-cut-base` D5, `nest-no-motion` N11 (the core: the
+2. `cut-any-key` D10, `cut-any-start` D11, `no-cut-base` D5, batch a5's nine (`held-any-time` D8
+and D23, `held-cut-too` D21, `held-earliest` D19, `held-any-key` D17, `held-on-press` D18,
+`held-shape-scale` D24, `held-no-nudge` D15, `held-width-as-scale` D25, `held-selection-first`
+D27), `nest-no-motion` N11 (the core: the
 copy gets a real `core/` and rebuilds its staticlib), `nest-whole-rect` N13, `nest-obscure-open`
 N9, `pick-before-write` P1, `swept-is-pick` P5, `no-shape-path` M1, `collapse-true` S1,
 `no-key-clear` S3, `no-show-clamp` S2. An instrument that cannot run is a scored failure, never an exit.
@@ -93,14 +108,16 @@ FRAME = SEC // 30
 PROBE_BOUND = 540
 CALL_BOUND = 300
 
-PROBE_ROWS = ([f"D{i}" for i in range(1, 14)] + [f"N{i}" for i in range(1, 14)]
+PROBE_ROWS = ([f"D{i}" for i in range(1, 28)] + [f"N{i}" for i in range(1, 14)]
               + [f"P{i}" for i in range(1, 7)] + [f"M{i}" for i in range(1, 6)]
               + [f"S{i}" for i in range(1, 5)])
-ROWS = PROBE_ROWS + ["Z1"]
-CONTROLS = {"D7", "D8", "D9", "D10", "D11", "D12", "D13", "N8", "N9", "N10", "N13", "P6", "M4",
-            "M5", "S4", "Z1"}
+MCP_ROWS = ["V1"]
+ROWS = PROBE_ROWS + MCP_ROWS + ["Z1"]
+CONTROLS = {"D8", "D9", "D10", "D12", "D13", "D17", "D18", "D21", "D22", "D23", "D24", "D25",
+            "D27", "V1", "N8", "N9", "N10", "N13", "P6", "M4", "M5", "S4", "Z1"}
 
 TARGET = "app/Sources/CanvasEditTarget.swift"
+CANVAS = "app/Sources/PreviewCanvasView.swift"
 BOX = "app/Sources/CanvasLayerBox.swift"
 REGION = "app/Sources/EditorViewController+ZoomRegion.swift"
 TIMELINE = "app/Sources/EditorViewController+Timeline.swift"
@@ -150,6 +167,36 @@ MUTANTS = {
         EDITOR, COLLAPSE + "        false\n", COLLAPSE + "        subview === inspectorContainer\n")]),
     "no-key-clear": (["S3"], [(PANES, CLEAR_KEY, "")]),
     "no-show-clamp": (["S2"], [(PANES, SHOW_CLAMP, "        return\n")]),
+    # Batch a5, CI-19: one per decision.
+    "held-any-time": (["D8", "D23"], [(
+        TARGET, "            .filter { !isCut($0, frame: frame) && $0.endTime <= clipTime }\n",
+        "            .filter { !isCut($0, frame: frame) }\n")]),
+    "held-cut-too": (["D21"], [(
+        TARGET, "            .filter { !isCut($0, frame: frame) && $0.endTime <= clipTime }\n",
+        "            .filter { $0.endTime <= clipTime }\n")]),
+    "held-earliest": (["D19"], [(
+        TARGET, "            .max { ($0.endTime, $0.id) < ($1.endTime, $1.id) }\n",
+        "            .min { ($0.endTime, $0.id) < ($1.endTime, $1.id) }\n")]),
+    "held-any-key": (["D17"], [(
+        TARGET, "            .filter { !heldKeys($0.end, gesture).isEmpty }\n", "")]),
+    "held-on-press": (["D18"], [(
+        TARGET, "        return refusedGesture != nil\n",
+        "        if let refused = refusedGesture { onRefuse?(refused.refusal) }\n"
+        "        return refusedGesture != nil\n")]),
+    "held-shape-scale": (["D24"], [(
+        TARGET, "        if gesture == .scale, case .shape = clip.source { return nil }\n", "")]),
+    "held-no-nudge": (["D15"], [(
+        CANVAS, "        if let id = primaryBox?.id, let refusal = heldRefusal(.move, clip: id) {"
+                " onRefuse?(refusal); return true }\n", "")]),
+    "held-width-as-scale": (["D25"], [(
+        TARGET, "        guard clip.text != nil, case .text = clip.source, handle.drivesX, "
+                "!handle.isCorner\n        else { return .scale }\n        return .width\n",
+        "        return .scale\n")]),
+    "held-selection-first": (["D27"], [(
+        TARGET, "        guard editTarget.selected == nil, selection == [id], "
+                "let clip = snapshot.clip(id),\n",
+        "        guard editTarget.selected == nil, selection.count == 1, let first = selection.first,"
+        "\n              let clip = snapshot.clip(first),\n")]),
 }
 
 results = {}
@@ -266,6 +313,50 @@ def make_fixtures(c):
                                         "duration": FRAME})["new_actions"][0]
     c.call_with("set_action_end", {**a, "clip": clip, "action": action, "patch": layout_end()})
     out["late"] = finish(c, a, {"clip": clip})
+
+    # Batch a5's (CI-19).
+    def zoomed(a, clip, end, at=2 * SEC, duration=SEC):
+        action = c.call_with("add_action", {**a, "clip": clip, "at": at,
+                                            "duration": duration})["new_actions"][0]
+        c.call_with("set_action_end", {**a, "clip": clip, "action": action, "patch": end})
+
+    zoom_end = {"video": {"x": 100, "scale": 1.5}}
+    a = fresh(c, "twozoom")
+    clip = clip_of(c, a, track0(c, a), imported(c, a, "screen.mov"))
+    zoomed(a, clip, {"video": {"x": -200}}, SEC, SEC // 2)
+    zoomed(a, clip, {"video": {"x": 100}})
+    out["twozoom"] = finish(c, a, {"clip": clip})
+
+    a = fresh(c, "camzoom")
+    c.call_with("land_recording", {**a, "movie": str(MEDIA / "screen.mov"),
+                                   "voice": [str(MEDIA / "silence.m4a")],
+                                   "camera": str(MEDIA / "camera.mov")})
+    clips = c.call_with("get_project", a)["project"]["clips"]
+    camera = next(x for x in clips if (x.get("video") or {}).get("x") == 624)["id"]
+    zoomed(a, camera, {"video": {"x": 400}})
+    out["camzoom"] = finish(c, a, {"camera": camera})
+
+    a = fresh(c, "shapezoom")
+    clip = c.call_with("add_shape_clip", {**a, "track": track0(c, a), "at": 0,
+                                          "duration": 8 * SEC})["new_clips"][0]
+    zoomed(a, clip, zoom_end)
+    out["shapezoom"] = finish(c, a, {"clip": clip})
+
+    a = fresh(c, "textzoom")
+    clip = c.call_with("add_text_clip", {**a, "track": track0(c, a), "at": 0,
+                                         "duration": 8 * SEC, "text": "Frame Job"})["new_clips"][0]
+    zoomed(a, clip, zoom_end)
+    out["textzoom"] = finish(c, a, {"clip": clip})
+
+    a = fresh(c, "pairzoom")
+    screen = imported(c, a, "screen.mov")
+    left = clip_of(c, a, track0(c, a), screen)
+    c.call_with("set_video", {**a, "clips": [left], "patch": {"scale": 0.4, "x": -500}})
+    top = c.call_with("add_track", a)["new_tracks"][0]
+    right = clip_of(c, a, top, screen)
+    c.call_with("set_video", {**a, "clips": [right], "patch": {"scale": 0.4, "x": 500}})
+    zoomed(a, right, {"video": {"x": 600}})
+    out["pairzoom"] = finish(c, a, {"a": left, "b": right})
 
     a = fresh(c, "shapecut")
     clip = c.call_with("add_shape_clip", {**a, "track": track0(c, a), "at": 0,
@@ -508,6 +599,40 @@ def camera_moved(x):
     return together(x["xs"], -500) and together(x["ys"], -300) and moved_box(x)
 
 
+def sentence(n, what, noun):
+    """CI-19's strip, exactly."""
+    return (f"Refused: action {n} on this clip's lane holds its {what} at the playhead, so a "
+            f"{noun} here would show only before it. Select action {n} first.")
+
+
+def refused(x, n, what, noun):
+    """CI-19's refusal: the sentence at the inspector's foot, no undo step, and the base and every
+    action's end as stored before."""
+    return (x["strip"] == sentence(n, what, noun) and x["undo"] == "" and bool(x["before"])
+            and x["before"] == x["after"])
+
+
+def silent(x, undo):
+    """No refusal shown, and `undo` the step the gesture made."""
+    return x["strip"] is None and x["undo"] == undo
+
+
+def stored_video(state):
+    return json.loads(state["video"])
+
+
+def moved_x(x):
+    return stored_video(x["after"])["x"] - stored_video(x["before"])["x"]
+
+
+def end_x(state, index):
+    return (json.loads(state["ends"][index]).get("video") or {}).get("x")
+
+
+def text_width(state):
+    return json.loads(state["text"]).get("width") if state["text"] else None
+
+
 def score(r):
     def row(name):
         got = r.get(name)
@@ -535,19 +660,49 @@ def score(r):
     told("D4", lambda x: camera_moved(x) and x["undo"] == "Move")
     told("D5", lambda x: x["held"] and camera_moved(x) and x["undo"] == "Move")
     told("D6", lambda x: x["held"] and x["cleared"] and camera_moved(x) and x["undo"] == "Move")
-    told("D7", lambda x: near(x["base"], -400, 14) and x["end"] == x["end_before"] == 100
-         and x["before"] == x["after"] and x["undo"] == "Move")
+    told("D7", lambda x: refused(x, 1, "position", "move") and x["box_before"] == x["box_after"])
     told("D8", lambda x: near(x["base"], -400, 14) and x["end"] == x["end_before"] == 100
          and near(x["after"][0], x["before"][0] - 400, 14) and x["undo"] == "Move")
     told("D9", lambda x: near(x["base"], -400, 14) and x["end"] is None
          and near(x["after"][0], x["before"][0] - 400, 14) and x["undo"] == "Move")
     told("D10", lambda x: x["base"] not in (None, 0) and x["end_rotation"] is None
          and all(near(s, x["base"]) for s in x["states"]) and x["undo"] == "Rotate")
-    told("D11", lambda x: near(x["base"], -400, 14) and x["end"] == x["end_before"] == 100
-         and x["undo"] == "Move")
+    told("D11", lambda x: refused(x, 1, "position", "move"))
     told("D12", lambda x: near(x["base_x"], -500, 14) and x["end_x"] == 624 and x["undo"] == "Move")
     told("D13", lambda x: x["width"] > x["width_before"] and x["end_scale"] == x["end_scale_before"]
          and x["end_x"] == x["end_x_before"] and x["undo"] == "Scale")
+
+    # Batch a5, CI-19.
+    told("D14", lambda x: refused(x, 1, "position and size", "resize")
+         and x["hit"].startswith("handle("))
+    told("D15", lambda x: refused(x, 1, "position", "move"))
+    told("D16", lambda x: x["crop"] and x["hit"].startswith("cropHandle(")
+         and refused(x, 1, "crop", "crop"))
+    told("D17", lambda x: x["hit"].startswith("rotation(") and silent(x, "Rotate")
+         and stored_video(x["after"])["rotation"] != stored_video(x["before"])["rotation"]
+         and x["after"]["ends"] == x["before"]["ends"])
+    zoom = FIXTURE_IDS["zoom"]["clip"]
+    told("D18", lambda x: x["selection"] == [zoom] and silent(x, "") and x["before"] == x["after"])
+    told("D19", lambda x: refused(x, 2, "position", "move"))
+    told("D20", lambda x: refused(x, 2, "position", "move"))
+    told("D21", lambda x: silent(x, "Move") and near(moved_x(x), -400, 14)
+         and near(end_x(x["after"], 0), stored_video(x["after"])["x"])
+         and x["after"]["ends"][1] == x["before"]["ends"][1])
+    told("D22", lambda x: x["selected_before"] is not None and silent(x, "Move")
+         and stored_video(x["after"]) == stored_video(x["before"])
+         and near(end_x(x["after"], 0) - end_x(x["before"], 0), -400, 14))
+    told("D23", lambda x: x["held"] and x["cleared"] and silent(x, "Move")
+         and near(moved_x(x), -400, 14) and x["after"]["ends"] == x["before"]["ends"])
+    told("D24", lambda x: x["hit"].startswith("handle(") and silent(x, "Scale")
+         and json.loads(x["after"]["shape"])["width"] > json.loads(x["before"]["shape"])["width"]
+         and x["after"]["ends"] == x["before"]["ends"])
+    told("D25", lambda x: x["hit"].startswith("handle(") and silent(x, "Scale")
+         and text_width(x["after"]) is not None and text_width(x["after"]) != text_width(x["before"])
+         and x["after"]["ends"] == x["before"]["ends"])
+    told("D26", lambda x: x["hit"].startswith("handle(")
+         and refused(x, 1, "position and size", "resize"))
+    told("D27", lambda x: x["pressed"] == [FIXTURE_IDS["pairzoom"]["b"]] and silent(x, "Move")
+         and abs(moved_x(x)) > 50 and x["other_before"] == x["other_after"])
 
     nest = FIXTURE_IDS["nest"]["nest"]
     behind = FIXTURE_IDS["nest"]["behind"]
@@ -646,18 +801,39 @@ def probe_rows(tree):
     return True
 
 
+def v1(c):
+    """CI-19 leaves `set_video` alone: past the finished zoom, `x: −400` is the base's, and the
+    zoom's end keeps its x."""
+    zoom = FIXTURE_IDS["zoom"]
+    a = {"project": str(WORK / "v1.framejob")}
+    shutil.rmtree(a["project"], ignore_errors=True)
+    shutil.copytree(zoom["path"], a["project"])
+    c.call_with("open_project", {"path": a["project"]})
+    c.call_with("set_playhead", {**a, "t": 5 * SEC})
+    c.call_with("set_video", {**a, "clips": [zoom["clip"]], "patch": {"x": -400}})
+    clip = next(x for x in c.call_with("get_project", a)["project"]["clips"]
+                if x["id"] == zoom["clip"])
+    c.call_with("close_project", {**a, "discard": True})
+    base = (clip.get("video") or {}).get("x")
+    ends = [((x.get("end") or {}).get("video") or {}).get("x") for x in clip.get("actions") or []]
+    check("V1", base == -400 and ends == [100], f"base x {base}, the actions' end x {ends}")
+
+
 def fixtures_by(binary):
     def body(client):
         FIXTURE_IDS.update(make_fixtures(client))
         print(f"  fixtures: {sorted(FIXTURE_IDS)}", flush=True)
+        if "V1" in selected:
+            v1(client)
     return with_app(binary, "fixtures", body)
 
 
 def run_rows(binary, tree):
     make_media()
     if not fixtures_by(binary):
-        for row in PROBE_ROWS:
-            check(row, False, "the fixtures were not made")
+        for row in PROBE_ROWS + MCP_ROWS:
+            if row not in results:
+                check(row, False, "the fixtures were not made")
         return
     if probe_rows(tree) and selected & {"D1", "N3"}:
         if not with_app(binary, "read-back", read_back):

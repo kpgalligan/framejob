@@ -48,6 +48,7 @@ extension EditorViewController {
         canvas.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
         canvas.onLiveCancel = { [weak self] in self?.document?.endLiveEdit("Cancel", cancelled: true) }
         canvas.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        canvas.onRefuse = { [weak self] refusal in self?.canvasRefused(refusal) }
         canvas.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
         canvas.onZoomStep = { [weak self] delta in self?.canvasZoomStepped(delta) }
         canvas.onCropModeChanged = { [weak self] _ in self?.canvasCropModeChanged() }
@@ -123,6 +124,15 @@ extension EditorViewController {
         if changed { document.selection = ids }
         if !ids.isEmpty { inspector?.clipPicked() }
         if changed { viewStateDidChange() }
+    }
+
+    /// A gesture the canvas refused (spec §11 CI-19): a beep and its sentence
+    /// at the inspector's foot (CI-10), as Follow Subject's own refusal is.
+    private func canvasRefused(_ refusal: ReelRefusal) {
+        guard let document = document else { return }
+        NSSound.beep()
+        NotificationCenter.default.post(
+            name: .projectDocumentDidRefuse, object: document, userInfo: ["refusal": refusal])
     }
 
     /// Pinch and ⌥-wheel walk the same four stops as the toolbar popup, so the

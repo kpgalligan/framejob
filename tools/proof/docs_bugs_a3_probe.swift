@@ -1,4 +1,5 @@
-// Docs-bugs batch a3: #469, #476, #471, #481 and #485 through the app's own sources on real
+// Docs-bugs batch a3: #469, #476, #471, #481 and #485 (and batch a5's CI-19 rows, D7, D11 and
+// D14–D27) through the app's own sources on real
 // .framejob packages the app made and saved (`docs_bugs_a3_proof.py` makes them and scores what
 // this prints). Compiled AS main.swift over every file of app/Sources but the app's main.swift,
 // -D FRAMEJOB_DEV_TOOLS, against libframejob_core.a, through swift_build.py. It names no symbol the
@@ -387,6 +388,102 @@ row("D6", "cam", at: 0) { e in
     return out
 }
 
+// MARK: - #469's second half, CI-19 (batch a5)
+
+func encoded<T: Encodable>(_ value: T?) -> Any {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let value, let data = try? encoder.encode(value) else { return NSNull() }
+    return String(decoding: data, as: UTF8.self)
+}
+
+/// What a refusal leaves alone: the clip's base and every action's end as stored, in lane order.
+func stored(_ e: Editor, _ id: UInt32) -> [String: Any] {
+    guard let c = clip(e, id) else { return [:] }
+    return [
+        "video": encoded(c.videoProps), "text": encoded(c.text), "shape": encoded(c.shape),
+        "ends": ActionBands.ordered(c).map { encoded($0.end) },
+    ]
+}
+
+func strip(_ e: Editor) -> Any { e.inspector.refusalStrip.text ?? NSNull() }
+
+/// `act` on `id`, after a click on it unless `click` is false: the stored state before and after,
+/// the box, the strip at the inspector's foot, the undo step and the selection.
+func gesture(_ e: Editor, _ id: UInt32, click: Bool = true, _ act: () -> [String: Any] = { [:] })
+    -> [String: Any]
+{
+    if click, let from = centre(e, id) { clickAt(e, view: from) }
+    let before = stored(e, id)
+    let box = boxRect(e, id)
+    let selectedBefore = J(e.document.selectedAction.map { Double($0) })
+    var out = act()
+    out["before"] = before
+    out["after"] = stored(e, id)
+    out["box_before"] = box
+    out["box_after"] = boxRect(e, id)
+    out["strip"] = strip(e)
+    out["undo"] = undoName(e)
+    out["selection"] = e.document.selection.sorted().map { Int($0) }
+    out["selected_before"] = selectedBefore
+    out["selected"] = J(e.document.selectedAction.map { Double($0) })
+    return out
+}
+
+func dragBy(_ e: Editor, _ id: UInt32, dx: CGFloat, dy: CGFloat = 0) -> [String: Any] {
+    guard let from = centre(e, id) else { return ["no_box": true] }
+    drag(e, from: from, to: offset(e, from, dx: dx, dy: dy))
+    return [:]
+}
+
+/// A drag from a grip: through `hitTest` when the grip is inside the overlay's bounds, as `drag`
+/// does; otherwise straight to the overlay's own `mouseDown(with:)`, `mouseDragged(with:)` and
+/// `mouseUp(with:)`, because a grip off the pane (a box zoomed past the canvas) is one `hitTest`
+/// answers with another view, though the canvas's own `hit(at:)` takes it. The door is printed.
+func gripDrag(_ e: Editor, from grip: CGPoint, to end: CGPoint) -> [String: Any] {
+    let hit = e.canvas.hit(at: grip)
+    guard !e.overlay.bounds.contains(grip) else {
+        drag(e, from: grip, to: end)
+        return ["hit": "\(hit)", "door": "hitTest"]
+    }
+    mouseTarget = e.overlay
+    func send(_ type: NSEvent.EventType, _ point: CGPoint) {
+        let event = NSEvent.mouseEvent(
+            with: type, location: onCanvas(e, point), modifierFlags: [], timestamp: 0,
+            windowNumber: e.window.windowNumber, context: nil, eventNumber: 0,
+            clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+        switch type {
+        case .leftMouseDown: e.overlay.mouseDown(with: event)
+        case .leftMouseDragged: e.overlay.mouseDragged(with: event)
+        default: e.overlay.mouseUp(with: event)
+        }
+        spin(0.05)
+    }
+    send(.leftMouseDown, grip)
+    for step in 1...8 {
+        let f = CGFloat(step) / 8
+        send(.leftMouseDragged, CGPoint(x: grip.x + (end.x - grip.x) * f, y: grip.y + (end.y - grip.y) * f))
+    }
+    send(.leftMouseUp, end)
+    spin(0.4)
+    return ["hit": "\(hit)", "door": "overlay"]
+}
+
+func handleDrag(_ e: Editor, _ id: UInt32, _ handle: CanvasHandle, dx: CGFloat, dy: CGFloat)
+    -> [String: Any]
+{
+    guard let box = e.canvas.box(for: id) else { return ["no_box": true] }
+    let grip = view(e, box.handlePoint(handle))
+    return gripDrag(e, from: grip, to: offset(e, grip, dx: dx, dy: dy))
+}
+
+func rotateGrip(_ e: Editor, _ id: UInt32) -> [String: Any] {
+    guard let box = e.canvas.box(for: id) else { return ["no_box": true] }
+    let grip = view(
+        e, box.rotationHandlePoint(offset: e.canvas.canvasDistance(PreviewCanvasView.rotationOffset)))
+    return gripDrag(e, from: grip, to: offset(e, grip, dx: 160, dy: 60))
+}
+
 /// A plain drag of `id` by 400 canvas pixels left: the base and the clip's first action's end.
 func dragLeft(_ e: Editor, _ id: UInt32) -> [String: Any] {
     guard let from = centre(e, id) else { return ["failed": "no box"] }
@@ -404,7 +501,7 @@ func dragLeft(_ e: Editor, _ id: UInt32) -> [String: Any] {
 }
 
 let ZOOM = id("zoom", "clip")
-row("D7", "zoom", at: 5) { e in dragLeft(e, ZOOM) }
+row("D7", "zoom", at: 5) { e in gesture(e, ZOOM) { dragBy(e, ZOOM, dx: -400) } }
 row("D8", "zoom", at: 1) { e in dragLeft(e, ZOOM) }
 row("D9", "plain", at: 2) { e in dragLeft(e, id("plain", "clip")) }
 row("D10", "cam", at: 4) { e in
@@ -421,7 +518,9 @@ row("D10", "cam", at: 4) { e in
         "undo": undoName(e),
     ]
 }
-row("D11", "late", at: 4) { e in dragLeft(e, id("late", "clip")) }
+row("D11", "late", at: 4) { e in
+    gesture(e, id("late", "clip")) { dragBy(e, id("late", "clip"), dx: -400) }
+}
 row("D12", "cam", at: 4) { e in
     select(e, [CAM, SCREEN])
     var out = dragCamera(e)
@@ -443,6 +542,99 @@ row("D13", "shapecut", at: 4) { e in
         "end_scale_before": J(endScale), "end_scale": J(endVideo(e, shape)?.scale),
         "end_x_before": J(endX), "end_x": J(endVideo(e, shape)?.x), "undo": undoName(e),
     ]
+}
+
+// MARK: - CI-19's rows (batch a5)
+
+row("D14", "zoom", at: 5) { e in
+    gesture(e, ZOOM) { handleDrag(e, ZOOM, .topLeft, dx: -200, dy: -112) }
+}
+row("D15", "zoom", at: 5) { e in
+    gesture(e, ZOOM) {
+        e.window.makeFirstResponder(e.overlay)
+        press(e, scalar(NSLeftArrowFunctionKey), 123, ARROW)
+        return [:]
+    }
+}
+row("D16", "late", at: 4) { e in
+    let late = id("late", "clip")
+    return gesture(e, late) {
+        e.window.makeFirstResponder(e.overlay)
+        press(e, "c", 8)
+        let crop = e.canvas.cropMode
+        guard let box = e.canvas.box(for: late) else { return ["crop": crop, "no_box": true] }
+        let grip = view(e, box.cropHandlePoint(.topLeft))
+        let hit = e.canvas.hit(at: grip)
+        drag(e, from: grip, to: offset(e, grip, dx: 120, dy: 60))
+        return ["crop": crop, "hit": "\(hit)"]
+    }
+}
+row("D17", "zoom", at: 5) { e in gesture(e, ZOOM) { rotateGrip(e, ZOOM) } }
+row("D18", "zoom", at: 5) { e in
+    gesture(e, ZOOM, click: false) {
+        guard let from = centre(e, ZOOM) else { return ["no_box": true] }
+        clickAt(e, view: from)
+        return [:]
+    }
+}
+row("D19", "twozoom", at: 5) { e in
+    gesture(e, id("twozoom", "clip")) { dragBy(e, id("twozoom", "clip"), dx: -400) }
+}
+let CAMZOOM = id("camzoom", "camera")
+row("D20", "camzoom", at: 5) { e in gesture(e, CAMZOOM) { dragBy(e, CAMZOOM, dx: -400) } }
+row("D21", "camzoom", at: 1) { e in gesture(e, CAMZOOM) { dragBy(e, CAMZOOM, dx: -400) } }
+row("D22", "zoom", at: 5) { e in
+    select(e, [ZOOM])
+    guard let action = clip(e, ZOOM)?.actions.first?.id else { return ["failed": "no action"] }
+    e.controller.selectAction(action)
+    spin(0.3)
+    return gesture(e, ZOOM, click: false) { dragBy(e, ZOOM, dx: -400) }
+}
+row("D23", "zoom", at: 2.5) { e in
+    gesture(e, ZOOM) {
+        let held = e.document.selectedAction != nil
+        e.window.makeFirstResponder(e.overlay)
+        press(e, "\u{1b}", 53)
+        let cleared = e.document.selectedAction == nil
+        var out = dragBy(e, ZOOM, dx: -400)
+        out["held"] = held
+        out["cleared"] = cleared
+        return out
+    }
+}
+let SHAPEZOOM = id("shapezoom", "clip")
+row("D24", "shapezoom", at: 5) { e in
+    gesture(e, SHAPEZOOM) { handleDrag(e, SHAPEZOOM, .bottomRight, dx: 120, dy: 80) }
+}
+let TEXTZOOM = id("textzoom", "clip")
+row("D25", "textzoom", at: 5) { e in
+    gesture(e, TEXTZOOM) { handleDrag(e, TEXTZOOM, .right, dx: 150, dy: 0) }
+}
+row("D26", "textzoom", at: 5) { e in
+    gesture(e, TEXTZOOM) { handleDrag(e, TEXTZOOM, .bottomRight, dx: 120, dy: 60) }
+}
+row("D27", "pairzoom", at: 5) { e in
+    let a = id("pairzoom", "a")
+    let b = id("pairzoom", "b")
+    select(e, [a, b])
+    let otherBefore = stored(e, b)
+    var out = gesture(e, a, click: false) {
+        guard let from = centre(e, a) else { return ["no_box": true] }
+        let hit = e.canvas.hit(at: from)
+        e.canvas.beginGesture(at: from, flags: .shift, clicks: 1)
+        let pressed = e.document.selection.sorted().map { Int($0) }
+        for step in 1...8 {
+            let to = offset(e, from, dx: 20 * CGFloat(step), dy: 0)
+            e.canvas.continueGesture(at: to, flags: [])
+            spin(0.05)
+        }
+        e.canvas.endGesture(at: offset(e, from, dx: 160, dy: 0), flags: [])
+        spin(0.4)
+        return ["hit": "\(hit)", "pressed": pressed]
+    }
+    out["other_before"] = otherBefore
+    out["other_after"] = stored(e, b)
+    return out
 }
 
 // MARK: - #476, the nest's box

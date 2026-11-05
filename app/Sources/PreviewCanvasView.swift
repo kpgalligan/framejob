@@ -51,6 +51,8 @@ final class PreviewCanvasView: NSView {
     /// Esc mid-drag: the press's state back, no undo step (spec §11 CI-16).
     var onLiveCancel: (() -> Void)?
     var onEdit: ((String, [ReelOp]) -> Void)?
+    /// A gesture CI-19 refused: the beep and the inspector's strip.
+    var onRefuse: ((ReelRefusal) -> Void)?
     /// An edit from a sheet's completion — outside an AppKit event — which
     /// the document groups itself.
     var onGroupedEdit: ((String, [ReelOp]) -> Void)?
@@ -89,6 +91,8 @@ final class PreviewCanvasView: NSView {
     /// on each live tick and by `canvasPlayheadMoved` as playback enters a span —
     /// and a session's start state was read from the target it began with.
     var gestureTarget = CanvasEditTarget.base
+    /// The press CI-19 refused, until its release (`continueRefusedGesture`).
+    var refusedGesture: CanvasRefusedGesture?
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
     /// View ▸ Show Subjects (spec §11 VR-13): nil while off.
@@ -498,6 +502,7 @@ final class PreviewCanvasView: NSView {
             overlay.needsDisplay = true
             return
         }
+        if continueRefusedGesture() { return }
         // ⌘ suppresses snapping while the drag is in flight, not only at the
         // press; the candidate list the gesture fetched is kept.
         snapper = CanvasSnapper(
@@ -537,6 +542,7 @@ final class PreviewCanvasView: NSView {
     /// Mouse-up. Closes the live edit as ONE undo step (§7.6); a gesture that
     /// changed nothing registers none, because `endLiveEdit` compares handles.
     func endGesture(at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        refusedGesture = nil
         if panning != nil {
             panning = nil
         } else if moving != nil {
@@ -575,6 +581,7 @@ final class PreviewCanvasView: NSView {
     }
 
     private func beginMove(anchor: UInt32, at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        if refusesHeld(.move, clip: anchor) { return }
         let ids = selection.contains(anchor) ? selection : [anchor]
         var bases: [UInt32: CGPoint] = [:]
         gestureTarget = heldTarget(.move)
@@ -594,6 +601,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginScale(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
+        if refusesHeld(CanvasEditTarget.scaleGesture(clip: clip, handle: handle), clip: id) { return }
         let route = heldTarget(.scale).forScale(of: clip)
         gestureTarget = route
         let start = route.start(of: clip, in: project)
@@ -619,6 +627,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginRotate(_ id: UInt32, at point: CGPoint) {
         guard let clip = snapshot.clip(id) else { return }
+        if refusesHeld(.rotate, clip: id) { return }
         gestureTarget = heldTarget(.rotate)
         let base = gestureTarget.start(of: clip, in: project).video
         let anchor = canvasAnchor(of: clip, in: snapshot.canvas, video: base)
@@ -631,6 +640,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginCrop(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
+        if refusesHeld(.crop, clip: id) { return }
         gestureTarget = heldTarget(.crop)
         let base = gestureTarget.start(of: clip, in: project).video
         cropping = CanvasCropSession(
@@ -662,6 +672,7 @@ final class PreviewCanvasView: NSView {
     @discardableResult
     func nudge(dx: CGFloat, dy: CGFloat) -> Bool {
         guard primaryBox != nil else { return false }
+        if let id = primaryBox?.id, let refusal = heldRefusal(.move, clip: id) { onRefuse?(refusal); return true }
         let target = heldTarget(.move)
         var ops: [ReelOp] = []
         for id in selection.sorted() {

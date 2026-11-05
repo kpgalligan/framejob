@@ -47,7 +47,7 @@ under a mutant: it is the tree's binary, not the copy's.
   into its span.
 * `push`: `canvasPlayheadMoved` never writes `editTarget`. The scrub row and
   the capture row fail — the capture row asserts the live target became
-  action 4 (`clip_inspector6_probe.swift:381`), which is the push's doing;
+  action 4 (`clip_inspector6_probe.swift:390`), which is the push's doing;
   the `live` mutant's row holds under `target` and fails alone under `live`,
   as before.
 """
@@ -97,7 +97,7 @@ MUTANTS = {
             "K1 a CanvasMoveSession's ops(to:) through the live edit moves action 4's END x by "
             "the delta (100 → 130, y 0 → 20) and leaves the base at 0 — ONE undo step",
             "K1 nudge in a real editor: with action 4 selected its END x goes 100 → 110 (base "
-            "0); with none the BASE x goes 0 → 10 (end 110)",
+            "0); with none, at its end, the nudge refuses naming action 2 (base 0, end 110)",
             # Added 2026-09-24 (phase 5 review, finding 2): the playhead's entry rule is a
             # routing row.
             SCRUB_ROW,
@@ -107,7 +107,7 @@ MUTANTS = {
     # Added 2026-09-24 (phase 5 review 2): the target a drag writes is captured at mouse-down.
     "live": {
         "file": "PreviewCanvasView.swift",
-        "anchor": "    private(set) var gestureTarget = CanvasEditTarget.base\n",
+        "anchor": "    var gestureTarget = CanvasEditTarget.base\n",
         "replacement": ("    // mutant: the gesture reads the LIVE target on every tick\n"
                         "    var gestureTarget: CanvasEditTarget { get { editTarget } set {} }\n"),
         "expected": [CAPTURE_ROW],
