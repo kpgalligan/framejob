@@ -54,16 +54,12 @@ could not read:
   transcribed, with a **Stop** button beside it.
 - **Stopped. 2 files not read on this Mac.** after you press Stop, with a
   **Read** button that carries on.
-- When two tracks carry the same speech, a note gives the two clips' ids,
-  "Clips 3 and 7 carry the same speech.", and asks you to mute one.
-- A clip with no words is listed with the reason, such as "clip 12 — its audio
-  is switched off" or a clip that plays in reverse. The first three are
-  listed; "…and 4 more clips with no words." stands for the rest, and holding
-  the pointer over it lists them.
-
-The numbers in these notes are the clips' ids in the project. The timeline and
-the inspector show a clip's name, not its id, so a note doesn't say where the
-clip sits. The Assistant can select a clip by its id.
+- When two tracks carry the same speech, a note names the two clips, "“Interview.mov”
+  (clip 5) and “Mic.wav” (clip 6) carry the same speech.", and asks you to mute one.
+- A clip with no words is listed by name with the reason, such as "“Interview.mov”
+  (clip 12) — its audio is switched off" or a clip that plays in reverse. The first
+  three are listed; "…and 4 more clips with no words." stands for the rest, and
+  holding the pointer over it lists them.
 
 ## Where the words come from
 

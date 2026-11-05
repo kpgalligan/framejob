@@ -238,6 +238,7 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   per-window track filter, and Language — is not this phase's.)
   **Amended 2026-11-02, by TX-24:** the status, the same-speech notes and the clips with no words
   live in the tab's bar, pinned above the text, not in a stack scrolled with it.
+  **Amended 2026-11-04, by TX-36:** a clip with no words is listed by its name, its id beside it.
 - **TX-23 — `transcript_view` is a dev tool** (Debug and Release, never Distribution), off main
   with every step through `onMain`: `transcript_view {project?, focus?: boolean, select?: [integer,
   integer] | null, click?: integer, wait?: number}`. It applies `focus` (the view made first
@@ -270,6 +271,8 @@ was asked: the road map names none for TX2b, and TX2a's answers of 2026-11-01 st
   at most 3 rows of "clip N — reason", then "…and N more clips with no words.", whose tooltip
   lists the rest. Everything collapses when empty. A popup is rebuilt only when its titles change.
   Amends TX-22: TX-22's status, notes and no-words rows live in the bar.
+  **Amended 2026-11-04, by TX-36:** the notes and rows name each clip, its id beside the name:
+  "“Interview.mov” (clip 5) — reason".
 - **TX-25 — Words from and Language are per-window view state**, never saved, kept for the pane's
   life whether the tab is hidden or shown. **Words from** lists "All tracks", then each track of
   the edited container by name, in snapshot order; one choice. A chosen track that leaves the

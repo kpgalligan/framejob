@@ -8904,7 +8904,7 @@
     {
      "id": "cleanup-fillers-left-in",
      "name": "Fillers left in whole",
-     "summary": "A filler too short to cut, or whose cut would reach another clip's word, a nest or a transition, stays in whole, and the sheet counts it.",
+     "summary": "A filler too short to cut, or whose cut would reach another clip's word, a nest, or an overlap between two clips on one track or the area around it, stays in whole, and the sheet counts it.",
      "page": "cleanup/remove-filler-words",
      "anchor": "fillers-left-in-whole",
      "where": "Clip ▸ Remove Filler Words…"
@@ -9314,7 +9314,7 @@
     {
      "id": "transcribable-clips",
      "name": "Which clips can be transcribed",
-     "summary": "A clip can be transcribed if it plays forwards from a movie or sound file with an audio track, its audio is on and its file is present.",
+     "summary": "A clip can be transcribed if it plays forwards from a movie or sound file with an audio track, its audio is on and its file is present. Whole timeline and In/out range read only clips you can hear.",
      "page": "captions/what-can-be-transcribed",
      "anchor": "which-clips-can-be-transcribed",
      "where": "File ▸ Generate Captions…"

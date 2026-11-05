@@ -36,7 +36,7 @@ The new clips are [ordinary text clips](/captions/how-captions-work/), so they d
 
 | Argument | Type | Required | What it does |
 | --- | --- | --- | --- |
-| `clips` | array of integers | No | Transcribe only these clips, at least one. Left out, every clip with recorded sound in the timeline or nest that's open. |
+| `clips` | array of integers | No | Transcribe only these clips, at least one, muted or not. Left out, every clip you can hear in the timeline or nest that's open: a clip with recorded sound that's muted, on a muted or soloed-out track, or turned down to nothing is left out. |
 | `engine` | string | No | `apple` (the default) on this Mac, or `assemblyai` in the cloud. See [Transcribe engines](#transcribe-engines). |
 | `language` | string | No | A language tag, such as `en-US`. On this Mac it defaults to the Mac's own language, or the nearest one installed. With AssemblyAI it defaults to `auto`, which detects the language. |
 | `style` | string | No | `subtitles` (the default), `highlight`, `pill`, `karaoke`, `build` or `one_word`. See [Caption styles and paging](#caption-styles-and-paging). |
@@ -87,6 +87,7 @@ Nothing changes and nothing is uploaded when:
 
 - A clip id names nothing, or `clips` is empty.
 - Nothing has recorded sound. The answer reads "Nothing in this timeline has recorded sound to transcribe…", or, for clips you named, "None of those clips can be transcribed" with the reason for each.
+- You named no clips and nothing can be heard: "Nothing in this timeline can be heard, so nothing was transcribed. Name a clip in clips to transcribe it anyway."
 - `style` or `engine` isn't one of its spellings. The answer names them all.
 - `speakers`, `vocabulary` or `refresh` is given with engine `apple`. Giving one at all is enough, even as false.
 - `replace` is given with `subtitles` or with `place: false`. Giving it at all is enough, even as false.

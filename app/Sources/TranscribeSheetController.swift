@@ -78,6 +78,9 @@ final class TranscribeSheetController: NSViewController {
     let snapshot: ProjectSnapshot
     /// The source maps of the handle `snapshot` came from (spec §11 SR-20 (d)).
     let sourceMaps: SourceMaps
+    /// The plan of the handle `snapshot` came from, so what is heard is the
+    /// open nest's when one is open (spec §11 TX-35).
+    private let plan: CompositionPlan?
     let mediaURLs: [UInt32: URL]
     private let selection: Set<UInt32>
     private let inOutRange: (start: Ticks, end: Ticks)?
@@ -178,6 +181,7 @@ final class TranscribeSheetController: NSViewController {
         // an open sheet, so capturing it here is as safe as the rest.
         self.snapshot = document.editedProject.snapshot
         self.sourceMaps = document.editedProject.sourceMap
+        self.plan = document.editedProject.plan
         self.mediaURLs = document.mediaURLs()
         self.selection = document.selection
         self.inOutRange = document.inOutRange
@@ -207,17 +211,50 @@ final class TranscribeSheetController: NSViewController {
         }
     }
 
+    /// What a run over `scope` reads. In/out range and Whole timeline read
+    /// only clips that can be heard; Selected clips reads every clip the gate
+    /// takes, which is how a muted clip gets captions (spec §11 TX-35).
     func jobs(in scope: Scope) -> [Transcriber.Job] {
+        let held = clips(in: scope)
+        return Transcriber.jobs(
+            for: scope == .selection ? held : Transcriber.heard(held, in: plan), in: snapshot,
+            urls: mediaURLs, maps: sourceMaps
+        ).jobs
+    }
+
+    /// What the gate alone would take from `scope`, heard or not.
+    private func gated(in scope: Scope) -> [Transcriber.Job] {
         Transcriber.jobs(
             for: clips(in: scope), in: snapshot, urls: mediaURLs, maps: sourceMaps
         ).jobs
     }
 
-    /// The scope the sheet opens on: what the user pointed at, if it holds
-    /// anything transcribable, then the range they marked, then everything.
+    /// Whether `scope` is empty only because nothing in it can be heard:
+    /// there is sound to read, and the way to it is Selected clips.
+    var unheardScope: Bool {
+        scope != .selection && jobs(in: scope).isEmpty && !gated(in: scope).isEmpty
+    }
+
+    /// The readout with no job, on either engine.
+    var emptySummary: String {
+        unheardScope
+            ? "No clip here can be heard. Select one to caption it." : "Nothing to transcribe"
+    }
+
+    /// The scope the sheet opens on (spec §11 TX-35): what the user pointed
+    /// at, if it holds a clip that can be heard, then the range they marked,
+    /// then everything; and what they pointed at after all when no other
+    /// scope has work, so a muted clip alone opens ready to caption.
     private var defaultScope: Scope {
-        if !jobs(in: .selection).isEmpty { return .selection }
+        let selected = Transcriber.heard(clips(in: .selection), in: plan)
+        if !Transcriber.jobs(for: selected, in: snapshot, urls: mediaURLs, maps: sourceMaps)
+            .jobs.isEmpty
+        {
+            return .selection
+        }
         if inOutRange != nil, !jobs(in: .range).isEmpty { return .range }
+        if !jobs(in: .all).isEmpty { return .all }
+        if !jobs(in: .selection).isEmpty { return .selection }
         return .all
     }
 
@@ -405,7 +442,7 @@ final class TranscribeSheetController: NSViewController {
         let jobs = jobs(in: scope)
         let seconds = jobs.reduce(0) { $0 + $1.sourceLength }
         summaryLabel.stringValue = jobs.isEmpty
-            ? "Nothing to transcribe"
+            ? emptySummary
             : "\(jobs.count) clip\(jobs.count == 1 ? "" : "s") · "
                 + ReelTime.format(seconds, fps: snapshot.canvas.fps, frames: false)
                 + " of audio"
@@ -429,7 +466,7 @@ final class TranscribeSheetController: NSViewController {
                 "This Mac's speech engine named no language with an on-device speech model. "
                     + "Reopen this sheet to ask it again.")
         }
-        if jobs.isEmpty {
+        if jobs.isEmpty, !unheardScope {
             notes.append(
                 "Only a clip whose media has sound can be transcribed, and never one played in "
                     + "reverse.")

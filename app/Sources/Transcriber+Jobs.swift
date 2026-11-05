@@ -189,17 +189,37 @@ extension Transcriber {
         return Ticks(min(scaled, Double(maxSourceTicks)).rounded())
     }
 
+    /// The clips that can be heard (spec §11 TX-35): those with a plan audio
+    /// segment `SilenceDetector.isAudible` passes over its span, TX-10's test
+    /// per clip, so a clip audible anywhere is read whole. Whole timeline,
+    /// In/out range and an unnamed `transcribe` ask it; Selected clips and a
+    /// named `clips` do not, which is how a muted clip gets captions. A nil
+    /// plan answers `clips` unchanged.
+    static func heard(_ clips: [ClipSnapshot], in plan: CompositionPlan?) -> [ClipSnapshot] {
+        guard let plan else { return clips }
+        var heard = Set<UInt32>()
+        for track in plan.audioTracks {
+            for segment in track.segments where segment.duration > 0 {
+                let span = (segment.start, segment.start + segment.duration)
+                if SilenceDetector.isAudible(track.ramps, over: span) { heard.insert(segment.clip) }
+            }
+        }
+        return clips.filter { heard.contains($0.id) }
+    }
+
     /// Whether anything in this project could be transcribed at all — the
     /// menu item's validator, deliberately the cheap snapshot question rather
     /// than a plan, because a validator runs on every menu open.
     ///
     /// It asks the same three things `jobs` asks and in the same order, minus
-    /// the two a snapshot cannot answer without the document's media URLs, so
-    /// the item can only be enabled where a run would find work. `enabled.audio`
-    /// is one of the three: a timeline whose every audible clip has had its
-    /// sound switched off has nothing to transcribe, and a menu item that
-    /// opens a sheet whose only answer is "nothing to transcribe" is the
-    /// dialog `generateCaptionsCommand`'s guard exists to prevent.
+    /// the two a snapshot cannot answer without the document's media URLs.
+    /// `enabled.audio` is one of the three: a timeline whose every audible
+    /// clip has had its sound switched off has nothing to transcribe, and a
+    /// menu item that opens a sheet whose only answer is "nothing to
+    /// transcribe" is the dialog `generateCaptionsCommand`'s guard exists to
+    /// prevent. It does not ask what `heard` asks, so a run can still find no
+    /// work: with every clip muted the sheet opens and says so, and selecting
+    /// a clip is how to caption it (TX-35).
     static func hasTranscribableClip(in snapshot: ProjectSnapshot) -> Bool {
         snapshot.clips.contains { clip in
             guard case .media(let media, _, let reversed) = clip.source, !reversed,

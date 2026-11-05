@@ -72,8 +72,13 @@ enum TimelineTranscript {
     struct NoWords: Equatable {
         let clip: UInt32
         let nestPath: [UInt32]
+        /// The clip's name as the timeline shows it, for a person (TX-36).
+        let name: String
         let tag: String
         let reason: String
+
+        /// The Transcript tab's row; the tool answers `tag` and `reason`.
+        var row: String { "“\(name)” (\(tag)) — \(reason)" }
     }
 
     /// One word on the timeline.
@@ -170,7 +175,9 @@ enum TimelineTranscript {
                 "clip \(entry.clip.id) in nest \($0.name.isEmpty ? "\($0.id)" : $0.name)"
             } ?? "clip \(entry.clip.id)"
             noWords.append(
-                NoWords(clip: entry.clip.id, nestPath: path, tag: tag, reason: problem.reason))
+                NoWords(
+                    clip: entry.clip.id, nestPath: path, name: snapshot.name(of: entry.clip),
+                    tag: tag, reason: problem.reason))
         }
         var instances: [Instance] = []
         for track in plan.audioTracks {

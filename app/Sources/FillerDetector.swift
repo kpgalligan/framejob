@@ -59,6 +59,10 @@ enum FillerDetector {
         let neighbours: [ClipWords]
         let nests: [SilenceDetector.NestExtent]
         let walls: [SilenceDetector.Span]
+        /// Media in scope that a clip would read but for a missing file,
+        /// sorted and distinct: the gate gives these no job and no reason a
+        /// person sees, so the sheet and the tool say it themselves.
+        var missing: [UInt32] = []
     }
 
     /// One run of consecutive fillers in a clip's word order, in source ticks.
@@ -138,6 +142,13 @@ enum FillerDetector {
         let (kept, locked) = onUnlockedTracks(chosen, in: snapshot)
         let (jobs, problems) = Transcriber.jobs(for: kept, in: snapshot, urls: urls, maps: maps)
         let cacheDirectory = document.cacheDirectory
+        var missing: Set<UInt32> = []
+        for clip in kept {
+            guard case .media(let media, _, false) = clip.source, clip.enabled.audio,
+                snapshot.media(media)?.hasAudio == true, urls[media] == nil
+            else { continue }
+            missing.insert(media)
+        }
 
         var clips: [ClipWords] = []
         var needs: Set<UInt32> = []
@@ -180,7 +191,7 @@ enum FillerDetector {
             fps: snapshot.canvas.fps, scope: scope, clips: clips, needsTranscript: needs.sorted(),
             skipped: named == nil ? [] : problems, locked: locked, neighbours: neighbours,
             nests: SilenceDetector.nestExtents(in: snapshot),
-            walls: SilenceDetector.overlapWalls(snapshot))
+            walls: SilenceDetector.overlapWalls(snapshot), missing: missing.sorted())
     }
 
     /// The scope's door: a media's transcript only when its marker serves

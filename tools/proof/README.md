@@ -30135,3 +30135,22 @@ wrapping them); the sync ignoring the rate's sign (`loopend·3`); no `didSet` (`
 `duckers` keeping a linked picture (D5, `a_stale_duck_on_a_picture_half_ducks_nothing`);
 `is_linked_picture` dropping `enabled.video` (`a_sound_half_switched_off_still_ducks`); `setRate`
 with no seek (`loopend·10`); `setRate`'s seek at any rate (`loopend·11`).
+
+## What is heard, what is named, what is missing (`docs_bugs_c2_proof.py`)
+
+Docs bugs batch c2 (#496, #489, #501, #502, spec §11 TX-35, TX-36). The built app with the dummy
+`proof-key` in a scratch `-RCSecretFolder`, AssemblyAI at the loopback `assemblyai_fake.py` under the
+cloud instruments' lock, so nothing is paid for. C rows are what `transcribe` reads, P what the
+Generate Captions sheet reads and says, N the Transcript tab's names, F a missing file, W the wall
+`detect_fillers` names and H the filler sheet's hint and note. What MCP cannot do (a press, a label
+past `snapshot_ui`'s 200 characters) runs in `docs_bugs_c2_probe.swift`, over packages the app saved,
+built through `swift_build.build()` and loaded with `docs_bugs_c2_beep.c`, so a press never sounds.
+The probe names only symbols the base has, so it builds over the base's sources. The docstring lists
+every row and marks the controls; every other row is red on a build from before TX-35.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c2_proof.py [--only C1,P2]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c2_proof.py
+python3 tools/proof/docs_bugs_c2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c2_proof.py --base-sources <its app/Sources>
+```

@@ -53,8 +53,15 @@ extension AgentServer {
             result["skipped"] = outcome.skipped.map { $0.description }
         }
         var notes: [String] = []
-        if outcome.clips.isEmpty, outcome.needsTranscript.isEmpty, outcome.locked.isEmpty {
+        if outcome.clips.isEmpty, outcome.needsTranscript.isEmpty, outcome.locked.isEmpty,
+            input.missing.isEmpty
+        {
             notes.append("Nothing in scope plays speech from a media file, so nothing was read.")
+        }
+        if !input.missing.isEmpty {
+            notes.append(
+                "Media \(Self.fillerList(input.missing)) is missing its file, so its fillers "
+                    + "cannot be found. relink_media finds it again.")
         }
         if !outcome.needsTranscript.isEmpty {
             notes.append(
@@ -80,9 +87,10 @@ extension AgentServer {
     /// transcript cache is written: no caption is placed, no undo step made.
     ///
     /// Refused in this order, every step above the network: the media id,
-    /// a document with nowhere to keep the cache, a media no clip plays from
-    /// its file, then the credential; a media that already has a filler
-    /// transcript answers with no request, between the last two.
+    /// a document with nowhere to keep the cache, a media whose file is
+    /// missing, a media no clip plays from its file, then the credential; a
+    /// media that already has a filler transcript answers with no request,
+    /// between the last two.
     func transcribeForFillers(_ a: [String: Any]) throws -> String {
         guard !Thread.isMainThread else {
             throw ToolError(
@@ -108,10 +116,15 @@ extension AgentServer {
                         + "cannot be transcribed with AssemblyAI. Save it first.")
             }
             let snapshot = document.editedProject.snapshot
+            let urls = document.mediaURLs()
             let jobs = FillerTranscription.jobs(
-                for: media.id, in: snapshot, urls: document.mediaURLs(),
-                maps: document.editedProject.sourceMap)
+                for: media.id, in: snapshot, urls: urls, maps: document.editedProject.sourceMap)
             guard let first = jobs.first else {
+                if urls[media.id] == nil {
+                    throw ToolError(
+                        message: "Media \(media.id)'s file is missing, so it cannot be "
+                            + "transcribed. Relink it first.")
+                }
                 throw ToolError(
                     message: "No clip in this timeline plays media \(media.id) from its file, so "
                         + "it cannot be transcribed.")
@@ -197,7 +210,8 @@ extension AgentServer {
         case .nest(let clip):
             return "it crosses nest clip \(clip), which a cut must not split"
         case .transition:
-            return "it crosses a transition"
+            return "it reaches an overlap between two clips on one track, or the area around "
+                + "it, where a cut would leave one clip's tail under the other"
         }
     }
 

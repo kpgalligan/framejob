@@ -238,11 +238,17 @@ extension AgentServer {
         // Captions… reads the same handle for the same reason.
         let snapshot = document.editedProject.snapshot
         let named = try optionalClipsArg(a, "clips", document)
-        let clips = named.map { ids in ids.compactMap { snapshot.clip($0) } } ?? snapshot.clips
-        let outcome = Transcriber.jobs(
-            for: clips, in: snapshot, urls: document.mediaURLs(),
-            maps: document.editedProject.sourceMap)
-        // An unnamed scope is every clip in the project, and most of them are
+        // An unnamed scope is what the timeline plays out loud, the sheet's
+        // Whole timeline; a clip the caller names is read muted or not (TX-35).
+        let clips = named.map { ids in ids.compactMap { snapshot.clip($0) } }
+            ?? Transcriber.heard(snapshot.clips, in: document.editedProject.plan)
+        let urls = document.mediaURLs()
+        let maps = document.editedProject.sourceMap
+        let outcome = Transcriber.jobs(for: clips, in: snapshot, urls: urls, maps: maps)
+        let unheard = named == nil && outcome.jobs.isEmpty
+            && !Transcriber.jobs(for: snapshot.clips, in: snapshot, urls: urls, maps: maps)
+                .jobs.isEmpty
+        // An unnamed scope is the whole timeline, and much of it is
         // legitimately not speech — listing "clip 3: its source is not a media
         // file" for a whole timeline would bury the one entry that matters.
         // Only clips the caller ASKED for are reported, which is
@@ -250,7 +256,7 @@ extension AgentServer {
         // own file was too malformed to use.
         let problems = named == nil ? [] : outcome.problems
         return TranscriptionScope(
-            jobs: outcome.jobs, problems: problems, named: named != nil,
+            jobs: outcome.jobs, problems: problems, named: named != nil, unheard: unheard,
             frame: max(snapshot.canvas.fps.frameDuration, 1),
             canvas: CGSize(width: snapshot.canvas.width, height: snapshot.canvas.height))
     }
@@ -302,11 +308,19 @@ extension AgentServer {
         /// Whether the caller named the clips, which decides which refusal
         /// is the honest one: "none of THOSE" or "nothing here at all".
         let named: Bool
+        /// Unnamed, no job, and the gate alone would take one: there is sound
+        /// to read and none of it can be heard (TX-35).
+        let unheard: Bool
         let frame: Ticks
         /// What the pager measures pages against.
         let canvas: CGSize
 
         var emptyRefusal: AgentServer.ToolError {
+            if unheard {
+                return ToolError(
+                    message: "Nothing in this timeline can be heard, so nothing was transcribed. "
+                        + "Name a clip in clips to transcribe it anyway.")
+            }
             guard named else {
                 return ToolError(
                     message: "Nothing in this timeline has recorded sound to transcribe. Only a "

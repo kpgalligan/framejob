@@ -54,7 +54,7 @@ Choose **File ▸ Generate Captions…**. The item is greyed out when nothing on
 
 ### What can be transcribed
 
-A clip can be transcribed only if it plays a movie or sound file that has an audio track, its audio is switched on, and its file is present. Mute doesn't switch a clip's audio off here: a clip that is muted, turned down to silence, or on a muted or soloed-out track is still read and captioned, and two clips holding the same speech can give the same words twice. To leave a clip out, use **Selected clips** and leave it unselected. Clips that cannot be transcribed are skipped with a reason:
+A clip can be transcribed only if it plays a movie or sound file that has an audio track, its audio is switched on, and its file is present. **Whole timeline** and **In/out range** also read only clips you can hear: a clip that is muted, turned down to silence, or on a muted or soloed-out track is left out, so a muted camera doesn't repeat the words of the microphone beside it. A clip you can hear anywhere is read whole. To caption a muted clip, select it and choose **Selected clips**, which reads every selected clip, heard or not. Clips that cannot be transcribed are skipped with a reason:
 
 - its source is not a media file (text, shape, still, image, graphic, adjustment clip or nest)
 - it plays in reverse
@@ -76,7 +76,7 @@ Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each 
 | **Speakers** | AssemblyAI only. "split by speaker, coloured in Subtitles". | Off |
 | **Vocabulary** | AssemblyAI only. Names and jargon to expect, separated by commas. | Empty |
 | **Transcribe again** | AssemblyAI only. "ignore any cached transcript" uploads again even when a usable transcript is cached. | Off |
-| **From** | **Selected clips**, **In/out range** or **Whole timeline**. A choice that holds nothing transcribable is greyed. **In/out range** takes every clip that overlaps the range, whole. | Selected clips if the selection holds anything transcribable, else In/out range if one is marked and holds anything transcribable, else Whole timeline. |
+| **From** | **Selected clips**, **In/out range** or **Whole timeline**. A choice that holds nothing transcribable is greyed. **In/out range** takes every clip that overlaps the range, whole. **In/out range** and **Whole timeline** count only clips you can hear. | Selected clips if the selection holds a clip you can hear, else In/out range if a marked range holds one, else Whole timeline if it holds one, else Selected clips if the selection holds anything transcribable, else Whole timeline. |
 | **Style** | **Subtitles** or one of the five word caption styles. See [Caption styles](#caption-styles). | The style you chose last time; Subtitles the first time. |
 | *(looks)* | **Slide the pill**, **Fill words as spoken**, **Dim in pauses**. See [Looks](#looks-for-word-captions). | Each one as you last left it; off the first time. |
 | *(preview)* | A sample page drawn at this canvas's size. | — |
@@ -84,7 +84,7 @@ Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each 
 
 The **Speakers**, **Vocabulary** and **Transcribe again** rows are hidden, not greyed, while Engine is **On this Mac**. They appear when you choose **AssemblyAI**.
 
-Under the grid, a summary line gives the clip count and the length of audio (for example, `3 clips · 00:04:12.000 of audio`) or "Nothing to transcribe". Under the summary is a note explaining anything that is stopping the run. **Generate** is live only when the run can go ahead.
+Under the grid, a summary line gives the clip count and the length of audio (for example, `3 clips · 00:04:12.000 of audio`) or "Nothing to transcribe". When there are clips to read but none of them can be heard, it reads "No clip here can be heard. Select one to caption it." Under the summary is a note explaining anything that is stopping the run. **Generate** is live only when the run can go ahead.
 
 ### On this Mac
 

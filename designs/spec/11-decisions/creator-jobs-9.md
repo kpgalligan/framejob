@@ -699,3 +699,22 @@ Nothing is sent anywhere, so nothing is keyed (CJ-3).
     `voice-strangers-cursor`. `cursor_layer_proof.py` has B3 (and B3b) and B5, and mutant
     `ripple-write-skipped` by hand. `cursor_proof.py` has granted B1 and B4 and K17's
     `in_picture` false. JOB-21, JOB-27 and JOB-28 are the person's.
+
+## Docs bugs c2 (2026-11-04)
+
+- **TX-35 — Whole timeline, In/out range and an unnamed `transcribe` read only clips that can be
+  heard.** The test is TX-10's: a plan audio segment `SilenceDetector.isAudible` passes, per clip,
+  so a clip audible anywhere is read whole. Selected clips and a named `clips` keep every clip the
+  gate takes: selecting both of two clips reads both, and that is how a person captions a muted
+  clip. The sheet opens on Selected clips only when they hold a clip that can be heard, or when no
+  other scope has work. `Transcriber.jobs` is unchanged, because `no_words`, the fillers and
+  `CaptionRetime` share it, and `hasTranscribableClip` stays the cheap snapshot question, so with
+  nothing heard the sheet opens and says so. An unnamed `transcribe` with nothing heard is refused:
+  "Nothing in this timeline can be heard, so nothing was transcribed. Name a clip in clips to
+  transcribe it anyway."
+- **TX-36 — The Transcript tab names a clip as the timeline does, its id beside the name** (amends
+  TX-22, TX-24). The same-speech note reads "“Interview.mov” (clip 5) and “Mic.wav” (clip 6) carry
+  the same speech. Mute one, or switch its audio off, to read it once." and a no-words row
+  "“Interview.mov” (clip 5) — its audio is switched off", "(clip 5 in nest Intro)" in a nest. The
+  tool's `notes`, `tag` and TX-10's sentence are unchanged: an agent reads ids. The owner's TX1
+  answer was "name the pair", and no decision weighs a person being unable to look an id up.

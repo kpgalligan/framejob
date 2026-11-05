@@ -24,7 +24,7 @@ Under the title, a paragraph explains that each run of filler words is cut and
 the timeline closes over it as one edit, that a cut is widened to the 32 ms
 speech grid but never into the words beside it, with its edges snapped inward
 to the frame grid, and that a filler which would cut into another clip's word, a
-nest or a transition is left in. Below it, "No cuts" in small monospaced type —
+nest, or an overlap between two clips on one track or the area around it is left in. Below it, "No cuts" in small monospaced type —
 nothing in this project has been transcribed with filler words yet — and a grey
 note: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
 

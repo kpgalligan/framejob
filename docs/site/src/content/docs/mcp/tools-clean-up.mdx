@@ -93,7 +93,7 @@ Each run of fillers is widened outward to a 32 ms grid, never into the words bes
 | `locked` | Clips on a locked track, which weren't read, because `ripple_delete_ranges` neither cuts nor moves a locked track. |
 | `scope`, `clips` | `selected` or `all`, and the clips that ran. |
 | `skipped` | When you named `clips`, each one it couldn't read, with the reason. |
-| `note` | Sentences on any of the above. |
+| `note` | Sentences on any of the above, and on media whose file is missing: "Media 3 is missing its file, so its fillers cannot be found. relink_media finds it again." |
 | `project` | The project summary. |
 
 A filler is dropped whole when:
@@ -101,7 +101,7 @@ A filler is dropped whole when:
 - it's too short once it's on both grids
 - it overlaps a word of another clip on any unlocked track, because the cut reaches every unlocked track, not only the clips it read. Only a clip whose file has a kept AssemblyAI transcript, made with or without filler words, is checked
 - it reaches a nest clip on an unlocked track
-- it reaches a transition on an unlocked track, or the area around one
+- it reaches an overlap between two clips on one unlocked track, with a stored transition or without one, or the area around it, as wide again as the overlap on each side
 
 ## `transcribe_for_fillers`
 
@@ -137,6 +137,7 @@ A media that already has a transcript made with filler words makes no request an
 **Refuses:**
 
 - A document with nowhere to keep its transcript cache. Save it first.
+- A media whose file is missing: "Media 3's file is missing, so it cannot be transcribed. Relink it first."
 - A media no clip plays from its file.
 - With no key, where it would upload: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
 

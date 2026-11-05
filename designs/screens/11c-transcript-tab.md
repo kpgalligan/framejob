@@ -31,8 +31,8 @@ this Mac, a line under the rows reads "Reading “name” on this Mac… NN % (k
 n)" in the accent colour, wrapping, with a small bordered "Stop" button at its
 right; after Stop it reads "Stopped. 2 files not read on this Mac." with a
 "Read" button instead. Under that, when they apply, come notes in the accent
-colour: that two clips say the same thing, then at most three rows "clip N —
-reason" for clips with no words, then "…and N more clips with no words.", whose
+colour: that two clips say the same thing, by name, then at most three rows
+"“name” (clip N) — reason" for clips with no words, then "…and N more clips with no words.", whose
 tooltip lists the rest. Each line wraps at the panel's width; a bar with nothing
 to say shows only its two rows.
 

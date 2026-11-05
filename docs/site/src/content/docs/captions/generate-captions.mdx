@@ -55,7 +55,7 @@ From top to bottom:
 | **Speakers:** | AssemblyAI only. "split by speaker, coloured in Subtitles". | Off |
 | **Vocabulary:** | AssemblyAI only. Names and jargon to expect, separated by commas. | Empty |
 | **Transcribe again:** | AssemblyAI only. "ignore any cached transcript". | Off |
-| **From:** | [What to transcribe](#choose-what-to-transcribe). | Selected clips if the selection holds anything transcribable, else In/out range if a marked range does, else Whole timeline |
+| **From:** | [What to transcribe](#choose-what-to-transcribe). | Selected clips if the selection holds a clip you can hear, else In/out range if a marked range holds one, else Whole timeline if it holds one, else Selected clips if the selection holds anything transcribable, else Whole timeline |
 | **Style:** | [How the captions look](#choose-a-style). | The style you chose last time, Subtitles the first time |
 | Three look boxes | **Slide the pill**, **Fill words as spoken** and **Dim in pauses**. See [Looks for word captions](/captions/word-caption-looks/). | Each as you last left it, off the first time |
 | Sample preview | [A sample page](#check-the-sample-preview) in the chosen style. | |
@@ -69,7 +69,9 @@ From top to bottom:
 
 **In/out range** takes every clip that overlaps the range, whole, so captions can run past the range's edges. Clips that can't be read don't count towards any of the three.
 
-Every clip with its sound switched on is read, muted or not, and Frame Job doesn't notice two clips holding the same speech. On a show with cameras and microphones, **Whole timeline** can give you the same words more than once. Select each person's microphone and choose **Selected clips** instead.
+**In/out range** and **Whole timeline** count only clips you can hear: a clip that's muted, turned down to silence, or on a muted or soloed-out track is left out. **Selected clips** reads every selected clip it can, heard or not, so select a muted clip to caption it.
+
+Frame Job doesn't notice two clips holding the same speech. On a show with cameras and microphones all playing, **Whole timeline** can give you the same words more than once. Mute the cameras, or select each person's microphone and choose **Selected clips**.
 
 ## Choose an engine
 
@@ -118,7 +120,7 @@ The box only works for a word style, with a track it may replace, and it's dimme
 
 ## Read the summary and the note
 
-Under the rows, a summary line gives the size of the run, for example `3 clips · 00:04:12.000 of audio`. With nothing to do, it reads "Nothing to transcribe". With AssemblyAI it prices the run instead. See [Transcribe with AssemblyAI](/captions/assemblyai-transcription/).
+Under the rows, a summary line gives the size of the run, for example `3 clips · 00:04:12.000 of audio`. With nothing to do, it reads "Nothing to transcribe". When there are clips to read but none of them can be heard, it reads "No clip here can be heard. Select one to caption it." With AssemblyAI it prices the run instead. See [Transcribe with AssemblyAI](/captions/assemblyai-transcription/).
 
 Under that, a note explains anything stopping the run. With nothing transcribable, it reads "Only a clip whose media has sound can be transcribed, and never one played in reverse."
 
@@ -178,7 +180,7 @@ Everything else starts fresh each time, including **Language:**, **From:**, **Re
 `transcribe` does what the sheet does, with these differences:
 
 - It always gets the captions back, with each word's timing for a word style, whether or not it places them. With `place: false` it places nothing, so an agent can read a transcript and check it first. That changes nothing in the project and makes no undo step.
-- It takes the clips by id, or every clip with recorded sound if it names none.
+- It takes the clips by id, muted or not, or every clip you can hear if it names none. With none named and nothing to hear, the call stops with a message.
 - `replace` only works with a word style and when the captions are being placed. Anywhere else the call stops with a message, and a placed run lists the tracks it removed under `replaced`.
 - `speakers`, `vocabulary` and `refresh` are the three AssemblyAI rows, and each stops the call without `engine: "assemblyai"`.
 - It never reads or writes what the sheet remembers. It uses the on-device engine and Subtitles unless it asks for something else, every time.

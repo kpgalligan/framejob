@@ -1120,8 +1120,10 @@ detail there.
   container before the window.
   `+Rules` holds TX-11's editability (nest, transition wall, locked track,
   in that order) and the same-speech note (≥ 5 s overlap, LCS ≥ 0.6 of the
-  shorter side). `window`, `overlapping`, `page` (2,000 words, `next_from`
-  on a frame floor) and `frameFloor` are TX-13's. `TranscriptFill` is one
+  shorter side). `sameSpeech` is the tool's sentence and `sameSpeechShown`
+  the tab's, by name (TX-36); `NoWords.row` is the tab's row. `window`,
+  `overlapping`, `page` (2,000 words, `next_from` on a frame floor) and
+  `frameFloor` are TX-13's. `TranscriptFill` is one
   per document, keyed by `recipeKey` and dropped when the document closes.
   Owners `want`, `release` and `wait`; one serial `.userInitiated` queue
   reads each media whole through `TranscriptReader.recognize` into

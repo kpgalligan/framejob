@@ -55,10 +55,11 @@ Some clips can't be read:
 | Clip | What happens |
 | --- | --- |
 | It's on a locked track | Its fillers aren't read, because the cut can neither cut nor move it. The sheet counts them: "1 clip is on a locked track, which the cut neither cuts nor moves, so its fillers were not read." |
-| It plays in reverse, its sound is switched off, its file is missing, or its file has no audio track | It has no words to read, and it's passed over without a note. |
+| It plays in reverse, its sound is switched off, or its file has no audio track | It has no words to read, and it's passed over without a note. |
+| Its file is missing | It has no words to read. The sheet says so: "“Interview.mov” is missing, so its fillers cannot be found. Relink it, then open this sheet again." |
 | It's a [nest](/editing/nests/) | The words inside a nest aren't read from outside it. Open the nest with <kbd>⌘↓</kbd> and run the command there, where it works on the nest's own timeline. |
 
-When none of those clips has words to read, the sheet says "Nothing in scope plays speech from a media file, so nothing was read."
+When none of those clips has words to read and no file is missing, the sheet says "Nothing in scope plays speech from a media file, so nothing was read."
 
 ## What gets cut
 
@@ -80,9 +81,9 @@ A filler is never trimmed. Frame Job leaves the whole run in when:
 - It's too short to cut. A tiny filler can end up with nothing left once it's on both grids.
 - Cutting it would reach a word spoken in another clip on any unlocked track, whether or not that clip is being read. The cut runs across every unlocked track, so it would take that word with it.
 - Cutting it would reach a nest clip on an unlocked track.
-- Cutting it would reach a transition on an unlocked track, or the area around one.
+- Cutting it would reach an overlap between two clips on one unlocked track, with or without a [transition](/motion/transitions/), or the area around it.
 
-The sheet counts these, one for each run: "2 fillers are left in: too short to cut, or cutting would reach another clip's word, a nest or a transition."
+The sheet counts these, one for each run: "2 fillers are left in: too short to cut, or cutting would reach another clip's word, a nest, or an overlap between two clips on one track or the area around it."
 
 ## Good to know
 

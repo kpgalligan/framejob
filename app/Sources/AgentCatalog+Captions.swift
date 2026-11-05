@@ -179,8 +179,10 @@ extension AgentServer {
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,
-                        "description": "Transcribe only these clips — the sheet's scope. Omit "
-                            + "for every clip in the project that has recorded sound. Only a "
+                        "description": "Transcribe only these clips — the sheet's scope; a muted "
+                            + "clip you name is read. Omit for every clip the timeline plays out "
+                            + "loud: a clip with recorded sound that is muted, on a muted or "
+                            + "soloed-out track, or turned down to nothing is left out. Only a "
                             + "clip playing a movie or sound file can be transcribed, and not "
                             + "one played in REVERSE, whose words would come out backwards; a "
                             + "clip you name that cannot be is reported under skipped.",
