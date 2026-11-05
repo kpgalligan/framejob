@@ -106,7 +106,7 @@ Leaving the span keeps the action selected. To leave it, press **Esc**, click th
 
 While an action is selected, every field in the Clip tab shows and sets that action's **end state**, the values the clip reaches at the action's end. The same goes for the canvas: dragging the selected clip's handles writes the end state. The arrow keys don't nudge the clip; they move the playhead.
 
-Unchecking a switch inside an action (a shadow or an outline, for example) turns that property off when the action ends. A qualifier range is the exception: see [Color grading](color-grading.md).
+Unchecking a switch inside an action (a shadow, an outline or a qualifier range, for example) turns that property off when the action ends.
 
 The Clip tab marks each row so you can see what the action touches:
 

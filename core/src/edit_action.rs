@@ -277,9 +277,10 @@ impl Project {
     /// ([`check_cutout_end`], spec §11 CO-20): both are the clip's base.
     ///
     /// `off` (spec §11 CI-14) is the one way to STORE a `null`: each
-    /// `"group.key"` path is written as `null` after the merge and the
-    /// prune, which keys that optional property off at the action's end.
-    /// It refuses what `patch` refuses ([`check_off`]).
+    /// `"group.key"` path, `audio.eq.<slot>` (AU-88) or
+    /// `video.qualifier.<range>` (GR-36) is written as `null` after the
+    /// merge and the prune, which keys that optional property off at the
+    /// action's end. It refuses what `patch` refuses ([`check_off`]).
     ///
     /// `graphic` is `edit_action_graphic.rs`'s (G-34), read against
     /// `schema`; a prop the clip's map lacks gets its start in this edit.

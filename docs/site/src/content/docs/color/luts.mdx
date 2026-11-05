@@ -98,7 +98,7 @@ The section warns you in two cases. Neither stops you, and the LUT still applies
 
 | The warning | When it shows | What it means |
 | --- | --- | --- |
-| "This clip's file is converted by Camera Log; a camera LUT here converts it twice." | A selected clip's look is a LUT and its file has a [Camera Log](/hdr/camera-log/) setting, or is a PQ file. | A creative LUT is fine there. A camera LUT would convert the footage a second time. |
+| "This clip's file is converted by Camera Log; a camera LUT here converts it twice." | A selected clip's look is a LUT and its file has a [Camera Log](/hdr/camera-log/) setting. | A creative LUT is fine there. A camera LUT would convert the footage a second time. |
 | "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709." | A selected clip's look is a LUT and the [project is HDR](/hdr/dynamic-range/). | The LUT's values keep their 0-to-1 meaning. Frame Job doesn't adapt them for HDR. |
 
 ## A changed file
@@ -121,11 +121,11 @@ A LUT counts as used by every clip whose look it is, on the timeline or in a nes
 
 2. Read the alert, which counts the clips that would lose the look and the files that would lose their Camera Log. For example, "It is the look of 3 clips, which keep their place and lose the look."
 
-3. Choose **Remove and Clear Looks**, or **Cancel**.
+3. Choose the button, which names what it clears, or **Cancel**: **Remove and Clear Looks** for looks, **Remove and Clear Camera Log** for a Camera Log, or **Remove and Clear Looks and Camera Log** for both.
 
 </Steps>
 
-**Remove and Clear Looks** removes the LUT, clears the look from those clips and clears the Camera Log from those files, as one undo step, **Remove Media**. The clips stay where they are. An unused LUT is removed straight away, with no alert.
+The button removes the LUT, clears the look from those clips and clears the Camera Log from those files, as one undo step, **Remove Media**. The clips stay where they are. An unused LUT is removed straight away, with no alert.
 
 ## With an agent
 

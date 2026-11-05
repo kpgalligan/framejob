@@ -11,7 +11,8 @@ import AppKit
 /// 0–100 %, one step "Qualifier Blur"), then Pick from Canvas and the Show
 /// Selection switch, both sent to the editor as commands
 /// (`EditorViewController+Qualifier.swift`, `+Seeing`). A checkbox writes
-/// `{}` or `null` (one step named after the range); a strip drag is the live trio; a field one commit; each sends the
+/// `{}` or `null` (one step named after the range; with an action selected the
+/// `null` keys the range off at the end, spec §11 GR-36); a strip drag is the live trio; a field one commit; each sends the
 /// WHOLE range to every selected clip, the first clip's values being the
 /// ones shown (the mixed badge says when the others differ). Every row
 /// writes `video.qualifier`, so a keyed action marks them all as one key.
@@ -43,7 +44,7 @@ extension VideoPane {
                 mixed: { binding.mixedVideo { $0.qualifier.blur } }))
         let pick = commandButton(
             "Pick from Canvas", #selector(EditorViewController.pickQualifier(_:)),
-            toolTip: "Click the preview to centre the ranges on a colour (Esc cancels)")
+            toolTip: "Click the preview to centre the ranges on a color (Esc cancels)")
         let show = OptionCheckboxControl(
             label: "Show Selection",
             read: { [weak self] in

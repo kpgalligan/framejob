@@ -187,6 +187,24 @@ struct ColorQualifierPatch: Codable, Equatable {
         self.blur = blur
     }
 
+    /// A stored `null` is `.off`, not absent (GR-36): an action's end read back
+    /// through here has to keep a range it keyed off, or the row loses its ◆.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hue = Self.write(c, .hue)
+        saturation = Self.write(c, .saturation)
+        luma = Self.write(c, .luma)
+        invert = c.lenient(.invert)
+        blur = c.lenient(.blur)
+    }
+
+    private static func write<T, Key>(
+        _ c: KeyedDecodingContainer<Key>, _ key: Key
+    ) -> QualifierWrite<T>? {
+        let read: QualifierWrite<T>?? = c.nullable(key)
+        return read.map { $0 ?? .off }
+    }
+
     /// The section's Reset: every range off, Invert off and Blur 0.
     static let reset = ColorQualifierPatch(
         hue: .off, saturation: .off, luma: .off, invert: false, blur: 0)

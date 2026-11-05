@@ -125,7 +125,8 @@ detail there.
   The typed `setActionEnd` LIFTS every top-level null out of its patch into
   `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
   at the end), and a null slot inside `audio.eq` into `audio.eq.<slot>`
-  (AU-88); `setActionEndRaw`'s nulls stay removals, which is what
+  (AU-88), and a null range inside `video.qualifier` into
+  `video.qualifier.<range>` (GR-36); `setActionEndRaw`'s nulls stay removals, which is what
   `clearOps` and every agent call send, and it writes `off` only when non-empty and `schema` only when non-nil
   (the agent door fills it for a graphic end from the module's current
   revision, spec §11 G-34).

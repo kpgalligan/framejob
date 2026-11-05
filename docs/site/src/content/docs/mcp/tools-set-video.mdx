@@ -361,7 +361,7 @@ The qualifier is for adjustment clips only. On any other clip it's an error nami
 
 A range merges: `{hue: {}}` turns hue on at centre 30, width 50, softness 25, and saturation and luma turn on at low 0, high 1, softness 0.1. A partial range keeps the rest, and `null` turns a range off. The selection is the product of the ranges that are on. A value outside its bounds is refused, never clamped.
 
-In an action the numbers animate, the hue centre taking the short way round, so 350 to 10 passes 0. A range turned on, and `invert`, switch when the action ends. An action can't turn off a range the clip already has on: `null` there only takes the range out of the action's end.
+In an action the numbers animate, the hue centre taking the short way round, so 350 to 10 passes 0. A range turned on or off, and `invert`, switch when the action ends. To turn a range off there, name it in `off`, as in `video.qualifier.hue`. A `null` in `patch` only takes the range out of the action's end.
 
 `render_frame` with `selection` set to the adjustment clip's id draws what the qualifier selects, as [Show Selection](/color/show-selection/) does. See [Check the picture: render_frame](/mcp/render-frame/#selection).
 

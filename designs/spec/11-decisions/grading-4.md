@@ -369,3 +369,33 @@ nothing of Concat is opened, at design time or build time.
     Matte Finesse controls); no blur of the matte; no ⌥-fine or double-click on the house slider.
   - Risk accepted: 24 px is a first number, judged by GRD-14 on real footage; a blurred qualifier
     is a real share of a heavy 4K frame's headroom, paid only by a clip that uses it.
+- **GR-36 — `off` takes `video.qualifier.<range>`, so a range unticked in an action switches off at
+  its end (#480).** GR-13's "a range turned on or off, and Invert, switch at the end" had no way to
+  write the off half: a null range in `patch` is a removal, so the box's press left the end with an
+  empty `qualifier`, the clip's range on and the box ticked.
+  - **The path.** `set_action_end.off` accepts `video.qualifier.hue`, `.saturation` and `.luma`,
+    each storing `null` at that range of the end's `qualifier`. It extends CI-14 and AU-88's "only
+    three-part path": there are now two. Any other third part (`invert` and `blur` included) is
+    refused naming the three; `off: ["video.qualifier"]` stays refused by the group's read; a range
+    the patch also names takes the both-sentence.
+  - **The app.** `ReelOp.setActionEnd` lifts a null range inside `video.qualifier` into that path,
+    as it lifts an EQ slot, so the checkbox, the row's Set end value to default and Pick from
+    Canvas on a near-grey all key the range off. `ColorQualifierPatch` keeps a stored `null` as
+    `.off` when it reads an end, so a keyed-off range wears ◆ and "at end" and can be taken out by
+    its row's ×. `setActionEndRaw` is untouched: `clearOps` and an agent's nulls stay removals.
+  - **What it reads.** With an action selected a row reads the end, so the box reads unticked at
+    any playhead; the picture holds the range until the action's end and drops it there. Ticking
+    it again writes `{}` over the stored `null`, the range on at the clip's numbers.
+  - No format bump, for CI-14's reason: `end` is stored as found, and such a `null` was always
+    legal on read. Like `patch`, `off` has no clip-kind check: on a picture clip it stores an
+    inert `null`.
+- **GR-37 — The LUT Remove button names what it clears (#512).** A used LUT's Remove asks with
+  `Remove and Clear Looks` when it is only a look, `Remove and Clear Camera Log` when it is only a
+  file's Camera Log, and `Remove and Clear Looks and Camera Log` when it is both. The sentences above
+  the button and what the button does are unchanged; a video or audio file keeps `Remove and Delete
+  Clips`. Amends GR-8's one title and extends GR-16's clearing, which named no button.
+- **GR-38 — The Qualifier's hint and tooltip spell "color", the app's label spelling (#515).** The
+  hint reads `Click to pick the color to qualify · Esc to cancel` and Pick from Canvas's tooltip
+  `Click the preview to centre the ranges on a color (Esc cancels)`, as the Chroma Key's hint and
+  the app's Color and Key Color labels do. Amends GR-13's quoted string only; it decided no
+  spelling. "Centre" stays, a GR-13 caption.

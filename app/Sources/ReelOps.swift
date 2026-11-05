@@ -1219,7 +1219,8 @@ extension ReelOp {
     /// too, because a preset is anchored to the clip's two ends and an
     /// action is a ramp between two states.
     ///
-    /// `off` is `"group.key"` paths the core writes as `null` after the
+    /// `off` is `"group.key"` paths (and `audio.eq.<slot>`, AU-88, and
+    /// `video.qualifier.<range>`, GR-36) the core writes as `null` after the
     /// merge — the property keyed OFF at the end (spec §11 CI-14) — and is
     /// written only when non-empty, so every call without it is the JSON it
     /// always was. A null in `patch` stays a REMOVAL (`clearOps`, agents).
@@ -1242,8 +1243,9 @@ extension ReelOp {
     /// LIFTED out of the patch into `off`, so the end state holds the
     /// property off rather than losing the key (spec §11 CI-14). Removal
     /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls. A
-    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88).
-    /// `graphic`'s one value is its `props` map, so the lift never touches
+    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88), and a
+    /// null range inside `video.qualifier` to `video.qualifier.<range>`
+    /// (GR-36). `graphic`'s one value is its `props` map, so the lift never touches
     /// it; `schema` is the module's current revision, which a graphic end
     /// needs (spec §11 G-34 (c), (l)).
     static func setActionEnd(
@@ -1264,6 +1266,14 @@ extension ReelOp {
                     eq[slot] = nil
                 }
                 fields["eq"] = eq
+            }
+            // So is a qualifier range turned off (GR-36).
+            if group == "video", var qualifier = fields["qualifier"] as? [String: Any] {
+                for (range, value) in qualifier where value is NSNull {
+                    off.append("video.qualifier.\(range)")
+                    qualifier[range] = nil
+                }
+                fields["qualifier"] = qualifier
             }
             groups[group] = fields
         }

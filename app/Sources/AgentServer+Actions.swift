@@ -216,7 +216,10 @@ extension AgentServer {
     /// Reduction, Gate, De-esser, Compressor, Limiter and Voice Isolation
     /// sections with an action selected, a switch turned off there an `off`
     /// path, an EQ slot `audio.eq.<slot>` (`AudioPatch.routedInsideAction`,
-    /// spec §11 AU-88).
+    /// spec §11 AU-88). `off`'s `video.qualifier.<range>` is the Color
+    /// sub-tab's Qualifier section with an action selected: a range's
+    /// checkbox unticked, its Set end value to default and a near-grey Pick
+    /// from Canvas (`ReelOp.setActionEnd`, spec §11 GR-36).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and

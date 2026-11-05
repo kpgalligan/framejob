@@ -30195,3 +30195,22 @@ make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b2_proof.py
 python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
+
+## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)
+
+Docs bugs batch c3 (#479, #480, #499, #512, #513, #515, spec §11 GR-36, GR-37, GR-38). The built app
+under a scratch home, no key and no network. L rows are the LUT warning, Q a qualifier range keyed off
+through `off` and the pictures either side of the action's end, P the same through the real Hue box,
+row menu and pick, R the LUT Remove button, F the filter order's words, T the Camera Log's words and H
+the pick hints. What MCP cannot send (a press, a row menu's item, an alert) runs in
+`docs_bugs_c3_probe.swift`, over packages the app saved, with no window on any display and an
+`NSAlert` read through a recorder. The probe names only symbols the base has, so it builds over the
+base's sources. The docstring lists every row and marks the controls; every other row is red on a
+build from before GR-36.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c3_proof.py [--only L1,Q1,P1,R1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c3_proof.py
+python3 tools/proof/docs_bugs_c3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c3_proof.py --base-sources <its app/Sources>
+```

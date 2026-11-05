@@ -230,10 +230,9 @@ final class VideoPane: InspectorPaneView {
 
     /// The filter stack (§4.3's M3 list), at most `FilterProps.max` deep.
     ///
-    /// **Order is the whole point.** The compositor applies `video.filters`
-    /// in the order they are listed, so blur-then-sepia and sepia-then-blur
-    /// are different pictures, and a control set that cannot say which comes
-    /// first would be lying about what the layer does. That is why each
+    /// **Order matters among the point filters.** The compositor applies
+    /// Sepia, Noir, Vignette and Invert in the order listed, after Blur,
+    /// Sharpen and Pixelate, wherever those sit. That is why each
     /// filter's row leads with a POSITION popup rather than an ordinal label:
     /// the number both shows where the filter sits and is the thing that
     /// moves it. It occupies the label column the rest of the inspector
@@ -326,7 +325,8 @@ final class VideoPane: InspectorPaneView {
                 },
                 enabled: { true },
                 onEdit: { binding.edited() })
-            order.toolTip = "Where this filter sits in the stack; they are applied in order"
+            order.toolTip = "Where this filter sits in the stack. Sepia, Noir, Vignette and "
+                + "Invert apply in stack order; Blur, Sharpen and Pixelate always apply first."
             let kind = OptionPopupControl(
                 width: 92, items: kinds.map { $0.displayName },
                 read: { kinds.firstIndex(of: at(index)?.kind ?? .blur) ?? 0 },

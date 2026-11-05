@@ -129,12 +129,17 @@ pub(crate) fn check_cutout_end(patch: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// The EQ's seven slots, the one group whose slot `off` may name (AU-88).
+/// The EQ's seven slots, whose slot `off` may name (AU-88).
 #[rustfmt::skip]
 const EQ_SLOTS: [&str; 7] =
     ["high_pass", "low_shelf", "band_1", "band_2", "band_3", "high_shelf", "low_pass"];
 
-/// One `off` path: `group.key`, or `audio.eq.<slot>` with its `slot`.
+/// The qualifier's three ranges, which `off` may name (GR-36); `invert` and
+/// `blur` are values rather than switches, so they are not among them.
+const QUALIFIER_RANGES: [&str; 3] = ["hue", "saturation", "luma"];
+
+/// One `off` path: `group.key`, or `audio.eq.<slot>` or
+/// `video.qualifier.<range>` with that third part in `slot`.
 pub(crate) struct OffPath<'a> {
     group: &'a str,
     key: &'a str,
@@ -142,9 +147,10 @@ pub(crate) struct OffPath<'a> {
 }
 
 /// Reads `set_action_end`'s `off` list (spec §11 CI-14) into its paths,
-/// refusing in this order: a path that is not `group.key` or
-/// `audio.eq.<slot>` (AU-88; an unknown slot named against the seven), a
-/// group an end patch may not name, `video.motion`, `text.words` and
+/// refusing in this order: a path that is not `group.key`,
+/// `audio.eq.<slot>` (AU-88; an unknown slot named against the seven) or
+/// `video.qualifier.<range>` (GR-36; an unknown range named against the
+/// three), a group an end patch may not name, `video.motion`, `text.words` and
 /// `video.cutout` (spec §11 CO-20), a path
 /// `patch` also names, and whatever the group's read says of a `null` there
 /// — an unknown key, a REQUIRED key (`video.opacity`).
@@ -159,6 +165,15 @@ pub(crate) fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<OffP
                 return Err(format!(
                     "off path \"{path}\" names no EQ slot: \"{slot}\" is not one of {}",
                     EQ_SLOTS.join(", ")
+                ))
+            }
+            ["video", "qualifier", range] if QUALIFIER_RANGES.contains(range) => {
+                ("video", "qualifier", Some(*range))
+            }
+            ["video", "qualifier", range] => {
+                return Err(format!(
+                    "off path \"{path}\" names no qualifier range: \"{range}\" is not one of {}",
+                    QUALIFIER_RANGES.join(", ")
                 ))
             }
             _ => {
@@ -215,8 +230,9 @@ fn object_at<'v>(map: &'v mut Map<String, Value>, key: &str) -> Option<&'v mut M
 }
 
 /// Writes `null` at `group.key` of an end state, or at `audio.eq.<slot>`
-/// (AU-88) — the property keyed OFF. A group or `eq` slot that is not an
-/// object (`end` is stored as the file had it) is replaced by `{}`.
+/// (AU-88) or `video.qualifier.<range>` (GR-36) — the property keyed OFF. A
+/// group, `eq` or `qualifier` that is not an object (`end` is stored as the
+/// file had it) is replaced by `{}`.
 pub(crate) fn key_off(end: &mut Value, path: &OffPath<'_>) {
     let Value::Object(groups) = end else {
         return;

@@ -547,9 +547,9 @@ struct ChromaProps: Codable, Equatable {
     }
 }
 
-/// One image filter and how much of it. Order matters: the compositor
-/// applies `VideoProps.filters` in order, so blur-then-sepia and
-/// sepia-then-blur are different pictures.
+/// One image filter and how much of it. The compositor applies Sepia, Noir,
+/// Vignette and Invert in `VideoProps.filters`' order, after Blur, Sharpen
+/// and Pixelate, which apply first wherever they sit.
 struct FilterProps: Codable, Equatable {
     let kind: FilterKind
     /// 0 = present but doing nothing, 1 = full effect.

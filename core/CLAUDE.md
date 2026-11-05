@@ -833,8 +833,8 @@ governs a module now.
   `check_cutout_end` (a patch's
   `video.cutout` naming `subject` or `quality`, a `null` included, refused,
   `subject` first), and `off` (spec §11 CI-14), the one way to STORE a
-  `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` the only
-  three-part one, AU-88; it refuses what `patch` refuses, and `merge_group`'s
+  `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` (AU-88) and
+  `video.qualifier.<range>` (GR-36) the only three-part ones; it refuses what `patch` refuses, and `merge_group`'s
   read of a `null` for an unknown or a required key) and `key_off` (written
   after the merge and the prune; a non-object group slot is replaced by `{}`,
   never indexed). `END_PATCH` is `edit_action_graphic.rs`'s too.

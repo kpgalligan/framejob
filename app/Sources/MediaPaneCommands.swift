@@ -252,8 +252,12 @@ extension MediaPane {
                 ? "It is used by 1 clip, which will be removed with it."
                 : "It is used by \(users.count) clips, which will be removed with it."
         }
+        // The title names what the button clears (spec §11 GR-37).
+        let cleared = (users.isEmpty ? [] : ["Looks"]) + (converted > 0 ? ["Camera Log"] : [])
         alert.addButton(
-            withTitle: entry.kind == .lut ? "Remove and Clear Looks" : "Remove and Delete Clips")
+            withTitle: entry.kind == .lut
+                ? "Remove and Clear " + cleared.joined(separator: " and ")
+                : "Remove and Delete Clips")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }

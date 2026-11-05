@@ -253,7 +253,7 @@ Right-click a row for:
 **Remove** on an unused file removes it at once, as one undo step. If clips use it, Frame Job asks first:
 
 - For footage: "Remove "*name*"? It is used by 3 clips, which will be removed with it." **Remove and Delete Clips** removes the file and those clips, including any inside nests, as one undo step.
-- For a LUT: the alert counts the clips whose look it is ("which keep their place and lose the look") and the files whose Camera Log it is ("which lose it"). **Remove and Clear Looks** removes the LUT and clears those looks and conversions; the clips stay.
+- For a LUT: the alert counts the clips whose look it is ("which keep their place and lose the look") and the files whose Camera Log it is ("which lose it"). The button names what it clears, **Remove and Clear Looks**, **Remove and Clear Camera Log** or **Remove and Clear Looks and Camera Log**: it removes the LUT and clears those looks and conversions, and the clips stay.
 
 Removing media never deletes the file from disk.
 

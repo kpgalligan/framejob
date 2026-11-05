@@ -93,7 +93,7 @@ extension MediaPane {
             },
             enabled: { selected() != nil },
             onEdit: { binding.edited() })
-        popup.toolTip = "How this file's log footage is converted to Rec. 709"
+        popup.toolTip = "How this file's log footage is converted to the project's color"
         let readout = inspectorReadout(width: InspectorMetrics.popupWidth + 52) {
             guard let media = selected() else { return "Select a video in the list" }
             let title = CameraLogChoice(media.color).title(in: binding.documentSnapshot)

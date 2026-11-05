@@ -176,12 +176,12 @@ Frame Job reads 3D LUTs whose `LUT_3D_SIZE` is from 2 to 65. It refuses any othe
 
 The Look section warns you in two cases:
 
-- "This clip's file is converted by Camera Log; a camera LUT here converts it twice." A creative LUT is fine there; a camera LUT would convert the footage a second time. A PQ (HDR10) file with a LUT look shows this warning too, with or without a Camera Log.
+- "This clip's file is converted by Camera Log; a camera LUT here converts it twice." A creative LUT is fine there; a camera LUT would convert the footage a second time.
 - "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709."
 
 See [HDR and colour management](hdr-and-color.md) for camera log and HLG projects.
 
-**Removing a LUT.** A LUT counts as used by every clip whose look it is, and by every file whose Camera Log it is. Removing it from the Media tab asks first, naming those uses, and its **Remove and Clear Looks** button removes the LUT and clears the look from those clips (they keep their place) and the Camera Log from those files. An action whose end names the removed LUT keeps that end, which now means no look: once the action ends, the clip draws without one, even if it has a look of its own.
+**Removing a LUT.** A LUT counts as used by every clip whose look it is, and by every file whose Camera Log it is. Removing it from the Media tab asks first, naming those uses, and its button, which names what it clears (**Remove and Clear Looks**, **Remove and Clear Camera Log** or **Remove and Clear Looks and Camera Log**), removes the LUT and clears the look from those clips (they keep their place) and the Camera Log from those files. An action whose end names the removed LUT keeps that end, which now means no look: once the action ends, the clip draws without one, even if it has a look of its own.
 
 *Agents:* `set_video` with `look: {kind, amount}`. `kind` is one of `warm`, `cool`, `teal_orange`, `vivid`, `faded`, `vintage`, `dramatic`, `black_white` or `lut`, and `look: null` removes the look. For a LUT, call `import_media` with the `.cube` file, then `set_video {look: {kind: "lut", media: <id>}}`.
 
@@ -256,7 +256,7 @@ Press **Pick from Canvas**, then click the picture in the preview. Frame Job sam
 - Luma is re-centred only if it was already on.
 - A range that was already on keeps its width and softness.
 
-The pick is one undo step named "Qualifier". Press Esc or the button again to cancel; changing the selection also cancels. A click outside the canvas beeps and leaves the mode armed. The button works only when every selected clip is an adjustment clip. Arming it cancels any other canvas mode that is armed, such as the chroma key's eyedropper or a Zoom to Region drag. With an action selected, the picked ranges go to the action's end state, and a near-grey click only takes Hue out of that end state, so a Hue the clip has on stays on.
+The pick is one undo step named "Qualifier". Press Esc or the button again to cancel; changing the selection also cancels. A click outside the canvas beeps and leaves the mode armed. The button works only when every selected clip is an adjustment clip. Arming it cancels any other canvas mode that is armed, such as the chroma key's eyedropper or a Zoom to Region drag. With an action selected, the picked ranges go to the action's end state, and a near-grey click turns Hue off at the action's end, even if the clip has it on.
 
 ### Show Selection
 
@@ -300,7 +300,7 @@ Most grade settings can be animated. Select an action on the clip's action lane,
 - **Light, Color, wheels, Strength, the look's Amount and the qualifier's numbers** ramp smoothly. An animated hue centre takes the short way round the colour wheel; 350° to 10° passes through 0°.
 - **Curves** animate between any two curves, even with different numbers of points, and from or to a straight line. Inside an action, a channel cell's **Reset Red** (or whichever channel) and the row's **Set end value to default** write a straight curve to the action's end, so the curve animates back to neutral.
 - **Turning a look on or off, or changing it, applies to the clip itself, not to the action**, even with an action selected. A look that differs between start and end switches whole at the action's end, Amount included. Amount animates only while the look stays the same.
-- **Turning a qualifier range on** switches at the action's end. An action can't turn off a range the clip has on: unticking it with an action selected, or choosing **Set end value to default** on its row, only takes the range back out of the action. The box stays ticked, and the Qualifier rows show ◆ until you choose **Clear**.
+- **Turning a qualifier range on or off** switches at the action's end. Unticking a range the clip has on with an action selected, or choosing **Set end value to default** on its row, turns it off there: the box reads unticked, and the picture keeps the range until the end. **Remove from action N** or **Clear** takes the whole qualifier back out of the action.
 
 While an action is selected, a grade section's header shows **Clear** in place of **Reset**, and only when the action animates one of that section's rows: it removes the section's settings from the action. Right-click a grade row for **Remove from action N** or **Set end value to default**.
 
@@ -313,7 +313,7 @@ The grade controls show the action's animation in their own way:
 
 Sliders carry the same marks as everywhere else in the inspector; see [Motion and transitions](motion-and-transitions.md).
 
-*Agents:* `add_action`, then `set_action_end` with a `video` patch carrying `color`, `wheels`, `curves`, `look.amount` or `qualifier`. A qualifier range set to `null` there only leaves the end state, and `off` can't name `video.qualifier` or a range inside it.
+*Agents:* `add_action`, then `set_action_end` with a `video` patch carrying `color`, `wheels`, `curves`, `look.amount` or `qualifier`. A qualifier range set to `null` there only leaves the end state; to turn one off at the end, name it in `off`, as in `video.qualifier.hue`.
 
 ## Copying a grade: Paste Attributes
 

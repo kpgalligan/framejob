@@ -1065,6 +1065,7 @@ landed (`git log` at `e55de46` has no AP6).
   unknown slot is refused naming the seven, and a slot the patch also names is refused in the
   both-sentence. `ReelOp.setActionEnd` lifts an `NSNull` slot inside `audio.eq` into that path.
   Agents use `set_action_end`; there is no new tool, op or format.
+  Extended by GR-36: `off` also accepts `video.qualifier.<range>`, a second three-part path.
 - **AU-89 — The proof.** `audio_ap8b_proof.py`: probe rows A1–A8 over `app/Sources` (the
   interpolation and its held numbers, an automated EQ and pan block-size invariant, the per-sample
   pan, the track-wide stages from a point, the Amount per frame, the routing, the wanted sets,

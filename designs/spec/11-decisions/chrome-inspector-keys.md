@@ -279,7 +279,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   off"; the RAW builder, which `clearOps` and every agent call use,
   forwards its nulls as removals and its caller chooses `off` itself. Extended by AU-88: `off` also accepts
   `audio.eq.<slot>`, one EQ slot keyed off, which the typed builder lifts
-  from a null slot inside `audio.eq`.
+  from a null slot inside `audio.eq`. Extended by GR-36: `off` also accepts
+  `video.qualifier.<range>`, one qualifier range keyed off, which the typed
+  builder lifts from a null range inside `video.qualifier`.
 - **CI-15 — Every sub-row carries `mixed`, and the collapse is the one
   animation** (phase 5, P12 and Reduce Motion). A row nested under a switch
   (a shadow's Blur, a compressor's Ratio, a stroke's Width) shows the

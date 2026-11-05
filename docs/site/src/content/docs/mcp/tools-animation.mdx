@@ -203,9 +203,9 @@ Above ×12 the clip's audio is left out, and the call that takes it there answer
 ```
 
 - A path is `"group.key"`, with a group of `video`, `audio` or `text` and one of its top-level keys, such as `video.shadow`, `text.width` or `audio.limiter`.
-- One deeper path exists: `audio.eq.<slot>` switches that EQ slot off. The slots are `high_pass`, `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` and `low_pass`.
+- Two deeper paths exist. `audio.eq.<slot>` switches that EQ slot off: the slots are `high_pass`, `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` and `low_pass`. `video.qualifier.<range>` switches that qualifier range off: the ranges are `hue`, `saturation` and `luma`.
 - Only optional keys can go off. A required key such as `video.opacity` is refused.
-- `video.qualifier` is refused too, and a path can't reach a range inside it, so a qualifier range the clip has on stays on. A range set to `null` in `patch` only leaves the end state.
+- `video.qualifier` on its own is refused too, and so are its `invert` and `blur`, which aren't ranges. A range set to `null` in `patch` only leaves the end state.
 - A path can't also be named in `patch`.
 - `graphic` paths are refused: name the value a prop ends at in `patch`.
 - `video.cutout` is refused: `set_video` with `{cutout: null}` removes a cutout.

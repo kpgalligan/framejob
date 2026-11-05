@@ -56,7 +56,7 @@ Right-click the LUT's row on the Media tab and choose **Remove**. The alert says
 - "It is the Camera Log of 2 files, which lose it."
 - "It is the look of 1 clip, which keeps its place and loses the look. …and the Camera Log of 2 files, which lose it."
 
-**Remove and Clear Looks** removes the LUT as one undo step, **Remove Media**. Those files go back to no conversion, so they show the log picture as recorded. Clips that had it as a look stay where they are and lose the look. A PQ file keeps its peak. **Cancel** changes nothing.
+The button names what it clears: **Remove and Clear Camera Log**, or **Remove and Clear Looks and Camera Log** when clips have the LUT as a look too. It removes the LUT as one undo step, **Remove Media**. Those files go back to no conversion, so they show the log picture as recorded. Clips that had it as a look stay where they are and lose the look. A PQ file keeps its peak. **Cancel** changes nothing.
 
 The `.cube` file on your disk is never touched. See [Remove media](/projects/remove-media/).
 
@@ -68,7 +68,7 @@ If a clip's look is a `.cube` LUT and its file has a Camera Log, the Look sectio
 
 It's only a warning, and Frame Job changes nothing, because a creative LUT on top of a conversion is fine. If the look really is a camera LUT, keep it in one place: either in the **Log** popup or as the clip's look, not both.
 
-The eight built-in looks never show this warning. A `.cube` look on a PQ (HDR10) file does show it, even with **Log** set to **None**.
+The eight built-in looks never show this warning.
 
 ## Good to know
 

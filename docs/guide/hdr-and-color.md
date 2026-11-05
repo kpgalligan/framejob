@@ -63,11 +63,11 @@ An **Apple Log** or **Apple Log 2** file is recognised by its label when you imp
 
 A LUT that is some file's Camera Log counts as used: **Unused only** hides it, and Remove asks first.
 
-If you remove that LUT from the Media list, the alert says how many files use it as their Camera Log, for example "the Camera Log of 2 files, which lose it". **Remove and Clear Looks** removes it, and those files go back to no conversion.
+If you remove that LUT from the Media list, the alert says how many files use it as their Camera Log, for example "the Camera Log of 2 files, which lose it". **Remove and Clear Camera Log** removes it, and those files go back to no conversion. The button reads **Remove and Clear Looks and Camera Log** when clips have the LUT as a look too.
 
 ### Camera Log and looks
 
-Camera Log is applied before any look. If a clip's file is converted by Camera Log and you also give the clip a camera LUT as a look, the Look section warns: "This clip's file is converted by Camera Log; a camera LUT here converts it twice." It is only a warning, because a creative LUT on top is legitimate. A PQ (HDR10) file with a LUT look shows the same warning, even with **Log** set to **None**. See [Colour grading](color-grading.md).
+Camera Log is applied before any look. If a clip's file is converted by Camera Log and you also give the clip a camera LUT as a look, the Look section warns: "This clip's file is converted by Camera Log; a camera LUT here converts it twice." It is only a warning, because a creative LUT on top is legitimate. See [Colour grading](color-grading.md).
 
 *Agents:* `set_media_color` (`color` is `{log, gamut?}`, `{lut}` or `null`); `get_project`'s `media[].color` shows `detected: true` for a file set at import.
 

@@ -11106,10 +11106,10 @@
     {
      "id": "color-lut-remove",
      "name": "Removing a LUT in use",
-     "summary": "Removing a LUT in use asks first, counting its uses. Remove and Clear Looks clears them and keeps the clips.",
+     "summary": "Removing a LUT in use asks first, counting its uses. Its button names what it clears and keeps the clips.",
      "page": "color/luts",
      "anchor": "remove-a-lut-in-use",
-     "where": "Media tab ▸ right-click a LUT row ▸ Remove ▸ Remove and Clear Looks"
+     "where": "Media tab ▸ right-click a LUT row ▸ Remove"
     },
     {
      "id": "color-lut-warn-hlg",
@@ -11704,7 +11704,7 @@
     {
      "id": "color-animate-qualifier-switch",
      "name": "A qualifier range switches",
-     "summary": "A range turned on in an action appears whole at its end, and an action can't turn off a range the clip has on.",
+     "summary": "A range turned on or off in an action switches whole at its end.",
      "page": "color/animate-a-grade",
      "anchor": "a-qualifier-range-switches",
      "where": "Clip tab ▸ Color ▸ Qualifier, with an action selected"
@@ -12071,7 +12071,7 @@
     {
      "id": "log-lut-remove",
      "name": "Removing a Camera Log LUT",
-     "summary": "Removing a LUT in use says how many files lose it, and Remove and Clear Looks sends them back to no conversion.",
+     "summary": "Removing a LUT in use says how many files lose it, and Remove and Clear Camera Log sends them back to no conversion.",
      "page": "hdr/log-luts",
      "anchor": "remove-the-lut",
      "where": "Media tab ▸ right-click the LUT ▸ Remove"
