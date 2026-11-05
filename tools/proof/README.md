@@ -30202,7 +30202,8 @@ package the app saved, then damaged; on a Debug build lldb is attached first, so
 the debugger and no crash report window appears, and a Release run scores a dead instance as a
 failure. `-NSOpen` is never used, because on the fix its alert would reach the screen: that alert is
 `docs/manual-checks.md` PB-16. An attach makes `Popen.poll` answer 0, so these rows ask `ps`, and
-end the instance by its pid.
+end the instance by its pid. F1, F2 and F4 send the folder to `relink_media` on an imported `A.mov`,
+since `import_media` imports a folder's files (#497, batch b5 below).
 
 **`docs_bugs_b2_probe.swift`** runs what MCP cannot send: a Media tab drop through `MediaPane` on a
 private pasteboard, and `importCaptionsCommand()` and `addImageBackground(nil)` whole, `NSOpenPanel`
@@ -30289,6 +30290,30 @@ make app-debug && python3 tools/proof/docs_bugs_b4_proof.py [--only A1,P1,S1,R1,
 make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b4_proof.py
 python3 tools/proof/docs_bugs_b4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b4_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; eight mutants by `--mutant`; spec §11 #497)
+
+#497. **`docs_bugs_b5_proof.py`** makes its own fixtures under `work/docs-bugs-b5/` (ffmpeg) on a
+scratch `CFFIXED_USER_HOME`: a `Shoot` folder of two movies, a LUT, a still, a Matroska file with no
+extension, a `.txt`, a hidden movie, a subfolder, an `.rtfd` and a `.framejob`, a link to it, an
+empty folder named `Shoot.mov`, `Broken` (a movie and a text file named `.mov`) and `Docs` (a `.txt`).
+The M rows send `import_media` to one instance and read `imported`, `skipped`, the refusals, `undo`
+and `tools/list`; M6, M9 and M10 are controls on a file, a Matroska file and a package. The same
+instance saves an empty project for the probe.
+
+**`docs_bugs_b5_probe.swift`** runs the drop MCP cannot send: `MediaPane.draggingEntered` and
+`performDragOperation` with a stub drag over a private pasteboard, on a copy of that package per row,
+with `-RCFFmpegPath /nonexistent/ffmpeg`, `NSAlert.runModal` replaced, `ProjectDocument.copyWatch` a
+counting no-op for each drop (so `Take 3`'s copy shows no progress panel) and its window 20,000 pt off
+every display. It names only symbols the base has, so it builds over `--base-sources`. A Finder drag
+itself is `docs/manual-checks.md` PB-17.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b5_proof.py [--only M1,D1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b5_proof.py
+python3 tools/proof/docs_bugs_b5_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b5_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
 ## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)

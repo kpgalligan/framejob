@@ -36,9 +36,11 @@ are needed at proof time.
   A4 placed, `render_frame`'s mean within 8/255 a channel of the same picture's PNG render. A5 a
   10-bit AVIF: `kind: image` and renders. A6 `bad.avif`, plain text ImageIO cannot parse: exactly
   `Could not read bad.avif.`. A7 (c) PNG and HEIC.
-- Folder sentence: F1 `import_media` on `Shoot`, default policy, ffmpeg present: no "ffmpeg" in the
-  answer. F2 a folder named `Shoot.mov`. F3 (c) an ffmpeg-made `.flv` keeps the clause (an `.avi`
-  opens in AVFoundation and is refused by its codec, with no clause). F4 a symbolic link to `Shoot`.
+- Folder sentence: F1 `relink_media` of an imported `A.mov` to `Shoot`, default policy, ffmpeg
+  present: no "ffmpeg" in the answer (`import_media` imports a folder's files since #497, so the F
+  rows probe the folder through `relink_media`, the other door that probes it). F2 a folder named
+  `Shoot.mov`. F3 (c) `import_media` on an ffmpeg-made `.flv` keeps the clause (an `.avi` opens in
+  AVFoundation and is refused by its codec, with no clause). F4 a symbolic link to `Shoot`.
 - Probe, `docs_bugs_b2_probe.swift` through `swift_build.build()`: D1 an AVIF dropped on the Media
   tab: `kind: image`, no consent, no sheet. D2 Add Background: `kind: image`, one clip more, no
   consent. D3 (c) a PNG dropped. C1 `importCaptionsCommand()` on the French cp1252 file: the clip
@@ -491,9 +493,15 @@ def policy_row(binary, row, arguments):
 
 def folder_rows(client):
     project = Project(client, "folders")
+    media = {}
 
     def plain(row, name):
-        answer = try_import(project, name)
+        if "id" not in media:
+            media["id"] = project.op("import_media", path=str(MEDIA / "A.mov"))["media"]
+        try:
+            answer = project.op("relink_media", media=media["id"], path=str(FILES / name))
+        except mcp.ToolError as error:
+            answer = str(error)
         ok = isinstance(answer, str) and f"Could not read {name}." in answer \
             and "ffmpeg" not in answer
         check(row, ok, str(answer)[:240])

@@ -39,9 +39,11 @@ Adding a file that's already in the list changes nothing. A file Frame Job can't
 
 ## Drop on the Media tab
 
-Drag files from the Finder onto the Media tab to add them to this project. It works like **Add Media…**, with one difference: a drop has no list of allowed types, so Frame Job tries every file you drop. That's how a format the panels don't list gets in.
+Drag files or folders from the Finder onto the Media tab to add them to this project. It works like **Add Media…**, with one difference: a drop has no list of allowed types, so Frame Job tries every file you drop. That's how a format the panels don't list gets in.
 
-Frame Job doesn't look inside a folder. A folder takes the drop like a file, then shows the alert **Could not read** with its name, and nothing in it is added. Any files dropped with it are still added. To bring in a shoot's cameras and microphones, open the folder in the Finder, select the files and drop those.
+A folder adds the media files directly inside it: movies, sound files, pictures, `.cube` LUTs, and WebM or Matroska files. They're added in the order the Finder lists them by name, so `Clip 2.mov` comes before `Clip 10.mov`. Frame Job looks one level down only. Folders inside it, packages such as another Frame Job project, hidden files and files that aren't media are left out, with no alert. A media file in the folder that Frame Job can't read still shows its alert, and the rest are added. A folder with nothing to add does nothing.
+
+Files dropped with a folder are added with its files, in the order you dropped them, all as one undo step.
 
 A Finder drop anywhere else on the window, such as the canvas or the timeline, doesn't add to this project. It opens the file as a new project of its own, as a drop on the Dock icon does. See [Open a project](/projects/open-a-project/).
 
@@ -108,7 +110,7 @@ If you have ffmpeg installed, Frame Job may offer to convert a file before it sh
 
 ## With an agent
 
-[`import_media`](/mcp/tools-media/#import_media) does what **Add Media…** does, one file at a time, and it never stops to ask a question. It takes the file's path, absolute or starting with `~`, and gives back the new media id with what it found in the file: its kind, length, size, frame rate, and whether it has video, sound or transparency. Place the file with [`add_clip`](/mcp/tools-adding-clips/#add_clip).
+[`import_media`](/mcp/tools-media/#import_media) does what **Add Media…** does, for a file, or the media files in a folder, and it never stops to ask a question. It takes the path, absolute or starting with `~`, and for a file gives back the new media id with what it found in the file: its kind, length, size, frame rate, and whether it has video, sound or transparency. Given a folder, it adds the files a drop of that folder would, and lists what it added and what it left out. Place the files with [`add_clip`](/mcp/tools-adding-clips/#add_clip).
 
 [`add_media`](/mcp/tools-media/#add_media) is different: it adds an entry from a description you supply and doesn't look at the file. Only the path is needed, and a path already in the list changes nothing. Use it only to replay a project's own JSON. See [Tools: media](/mcp/tools-media/).
 

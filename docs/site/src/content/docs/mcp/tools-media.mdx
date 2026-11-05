@@ -27,10 +27,10 @@ Reads a movie, sound file, picture or `.cube` LUT and adds it to the media list,
 
 | Argument | Type | Required | What it does |
 | --- | --- | --- | --- |
-| `path` | string | Yes | The file, as an absolute path or one starting with `~`. |
+| `path` | string | Yes | The file, or a folder, as an absolute path or one starting with `~`. |
 | `project` | string | No | The project to add it to. Leave it out for the frontmost one. |
 
-It answers:
+For a file, it answers:
 
 | Key | What it is |
 | --- | --- |
@@ -50,6 +50,22 @@ A [WebM or Matroska file](/projects/webm-and-matroska/) is copied into a `.mov` 
 A tool call never asks, so where the app would offer to convert a file with ffmpeg, this answers with the reason instead. Convert it from the app's window, or [set Frame Job to always convert](/projects/ffmpeg-conversion/#with-an-agent).
 
 It's refused when nothing exists at `path`, or when the file can't be read. A file whose path is already on the list changes nothing, and the answer says so. The undo step is called "Add Media".
+
+### A folder
+
+Given a folder, or a link to one, `import_media` adds the media files directly inside it, as [a drop of the folder on the Media tab](/projects/import-media/#drop-on-the-media-tab) does. It looks one level down, takes the files in the order the Finder lists them by name, and adds them all as one undo step, "Add Media" for one file or "Add 3 Media Files" for three. Hidden files are left out and not listed. A package, such as a Frame Job project, is read as a file, not a folder.
+
+It answers:
+
+| Key | What it is |
+| --- | --- |
+| `folder` | The folder you named. |
+| `imported` | One entry per file added, in the Finder's order, each with the keys a file's answer has, from `media` to `has_alpha`, and `original` when there is one. |
+| `skipped` | One `{path, reason}` per item left out, always present. The reason is "not a media file", "a folder", "a package", "already in the media list", or why the file couldn't be read. |
+| `note` | What to do next: `add_clip` for each file, or `set_video` with a look for a LUT. |
+| `project` | The `project` summary. |
+
+When nothing is added, the call is refused. An empty folder answers "Nothing in *folder* was added: it has no files directly inside it." Otherwise it names each item and why, as in "Nothing in *folder* was added. Skipped: readme.txt (not a media file)."
 
 ## `add_media`
 

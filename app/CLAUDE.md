@@ -499,6 +499,11 @@ detail there.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
   folder under it: `0700` at each level it makes, an existing folder left
   alone (#108).
+- `MediaFolder.swift`: a folder handed to an import door (spec §11 #497):
+  `isFolder`, `isMedia`, `list` (the media files directly inside, in Finder
+  order; hidden files left out; every other visible item named as skipped)
+  and `expand`. `ProjectDocument.importMedia` and
+  `AgentServer+MediaFolder.swift` (`import_media` on a folder) share it.
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `AnalysisMasks+Image.swift` ·

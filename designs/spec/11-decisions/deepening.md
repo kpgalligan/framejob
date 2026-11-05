@@ -1675,3 +1675,35 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Accepted:** the document review has already run by the time the delegate
   is asked (AppKit's order, as for the recording and the queue), and a logout
   is cancelled while a sheet writes.
+- **#497 — a folder at an import door imports the media files directly
+  inside it.** A folder dropped on the Media tab, alone or among files, and
+  a folder given to `import_media` are replaced by the media files directly
+  inside them, one level down, sorted by `localizedStandardCompare` on the
+  name, as the Finder sorts (`Clip 2.mov` before `Clip 10.mov`). A link to a
+  folder counts as the folder; a package (a `.framejob`, an `.rtfd`) is not a
+  folder, and a package dropped on its own is probed as it always was. Media
+  is what an import door can read: a `.cube` by its extension
+  (`MediaImporter.isLUT`), a type conforming to `public.audiovisual-content`,
+  a still of `MediaImporter.imageTypes`, or a file beginning with an EBML
+  header (`ContainerRewrap.isMatroska`, so a Matroska file with no extension
+  counts); a `.psd`, an `.svg` and a `.txt` do not. Hidden files are left out
+  and never named. Subfolders, packages and files that are not media are
+  skipped with no alert, and `import_media` names each in its `skipped`
+  (`a folder`, `a package`, `not a media file`). The drop's files are probed
+  in place, in the drop's order, and commit as the drop's one undo step
+  ("Add 2 Media Files"). A media file that will not read still shows its
+  alert on the drop, and on the tool it is a `skipped` reason in the probe's
+  own sentence. A file already in the media list is skipped by the tool as
+  `already in the media list`; on the drop the core's `add_media` keeps the
+  one entry, as for a dropped file, and the undo step's name still counts
+  it. A folder that yields nothing adds nothing and says nothing on
+  the drop; the tool refuses, `Nothing in Shoot was added: it has no files
+  directly inside it.` or `Nothing in Shoot was added. Skipped: readme.txt
+  (not a media file).` `import_media` on a folder answers `{folder,
+  imported, skipped, note, project}`, `imported` in Finder order with each
+  file's probe as a file's answer gives it; a file keeps its answer. **Out:**
+  recursion past one level, and any folder handling at Add Media… (whose
+  panel chooses no folder), File ▸ Open, the window or Dock drop, Add
+  Background, `relink_media` and `open_project`. **Risks accepted:** for a
+  drop, the listing and its header sniff run on the main thread; a tool call
+  on a large folder waits `probeCeiling` per file.

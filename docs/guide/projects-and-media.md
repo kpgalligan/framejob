@@ -161,9 +161,9 @@ Caption files (`.srt`, `.vtt`) are not media: bring them in with **File ▸ Impo
 
 Adding puts files in the Media tab, **not** on the timeline. Place them from there (see [Putting media on the timeline](#putting-media-on-the-timeline)).
 
-You can also drag files from the Finder onto the **Media tab**. That adds them to this project. Frame Job does not look inside a folder: a dropped folder shows "Could not read *folder*.", nothing in it is added, and any files dropped with it are still added. A Finder drop anywhere else on the window (the canvas, the timeline) *opens* the file as a project of its own, as a drop on the Dock icon does.
+You can also drag files or folders from the Finder onto the **Media tab**. That adds them to this project. A folder adds the media files directly inside it (movies, sound, pictures, `.cube` LUTs, WebM and Matroska), one level down, in the order the Finder lists them by name (`Clip 2.mov` before `Clip 10.mov`). Folders inside it, packages such as another project, hidden files and files that are not media are left out with no alert; a media file in it that cannot be read still shows its alert, and a folder with nothing to add does nothing. Files dropped with a folder are added with its files, in the drop's order, as one undo step. A Finder drop anywhere else on the window (the canvas, the timeline) *opens* the file as a project of its own, as a drop on the Dock icon does.
 
-*Agents:* `import_media` (takes a `path`; answers the new media id and what the check found: kind, duration, display size, frame rate, video/audio/alpha). `add_media` is the raw op behind it, taking a descriptor you supply.
+*Agents:* `import_media` (takes a `path`; answers the new media id and what the check found: kind, duration, display size, frame rate, video/audio/alpha; given a folder, it adds what a drop of the folder would and answers `imported` and `skipped`, each skip with its reason). `add_media` is the raw op behind it, taking a descriptor you supply.
 
 ### WebM and Matroska files
 

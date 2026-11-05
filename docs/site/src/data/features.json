@@ -880,7 +880,7 @@
     {
      "id": "drop-on-media-tab",
      "name": "Drop files on the Media tab",
-     "summary": "Dragging files from the Finder onto the Media tab adds them to this project, including types the panels don't list.",
+     "summary": "Dragging files or a folder from the Finder onto the Media tab adds them to this project, including types the panels don't list. A folder adds the media files directly inside it.",
      "page": "projects/import-media",
      "anchor": "drop-on-the-media-tab",
      "where": "Drag from the Finder onto the Media tab"

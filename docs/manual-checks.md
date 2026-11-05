@@ -128,6 +128,11 @@ the same way.
 - **Expect:** each time an alert reads "`<name>` does not contain a readable project.json.", Frame Job stays running and the other window stays open.
 - **Source:** #482; `docs_bugs_b2_proof.py` P1–P7 score `open_project`, whose refusal shows no alert: the proof cannot show this alert without putting a window in front of you.
 
+**PB-17 — A folder dropped on the Media tab adds the media files in it**
+- **Do:** 1. Make a folder holding two movies, a `.txt`, a subfolder with a movie in it, and a hidden movie (`cp A.mov .h.mov` in Terminal). 2. Drag the folder from the Finder onto the Media tab. 3. Choose Edit ▸ Undo. 4. Drag the folder onto the Media tab together with another movie.
+- **Expect:** while dragging, the pointer shows the copy badge; the two movies are added in the Finder's order as one undo step, "Add 2 Media Files", with no alert; the undo takes both out; the mixed drop adds three.
+- **Source:** #497; `docs_bugs_b5_proof.py`'s D rows reach the drop's handler through a stub drag, not a Finder drag.
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.
