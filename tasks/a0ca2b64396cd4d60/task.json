@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a0ca2b64396cd4d60",
+  "agent_id": "a0ca2b64396cd4d60",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/audio/duck-by-speech.mdx",
+    "docs/site/src/content/docs/audio/ducking.mdx",
+    "docs/site/src/content/docs/audio/voice-effects.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 291605,
+    "cache_read_tokens": 4156451,
+    "output_tokens": 33288,
+    "api_call_count": 18
+  },
+  "started_at": "2026-11-04T16:47:51.371163-05:00",
+  "completed_at": "2026-11-04T16:53:04.619583-05:00"
+}

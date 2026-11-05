@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "aff9c838fb018251f",
+  "agent_id": "aff9c838fb018251f",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/timeline.md"
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 181623,
+    "cache_read_tokens": 1012255,
+    "output_tokens": 6902,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-04T18:46:26.568948-05:00",
+  "completed_at": "2026-11-04T18:47:37.026584-05:00"
+}

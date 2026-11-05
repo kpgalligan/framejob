@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ad2145348f73e7e40",
+  "agent_id": "ad2145348f73e7e40",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-framing.mdx",
+    "docs/site/src/content/docs/mcp/tools-multicam.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 326756,
+    "cache_read_tokens": 3730877,
+    "output_tokens": 45970,
+    "api_call_count": 18
+  },
+  "started_at": "2026-11-04T17:06:23.257442-05:00",
+  "completed_at": "2026-11-04T17:13:17.171361-05:00"
+}

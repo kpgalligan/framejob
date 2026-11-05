@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a5540070ba57a3c7c",
+  "agent_id": "a5540070ba57a3c7c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/motion/entrances-and-exits.mdx",
+    "docs/site/src/content/docs/motion/motion-presets.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 171237,
+    "cache_read_tokens": 2656313,
+    "output_tokens": 34408,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-04T16:47:11.523779-05:00",
+  "completed_at": "2026-11-04T16:52:45.421301-05:00"
+}

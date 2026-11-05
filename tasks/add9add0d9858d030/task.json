@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "add9add0d9858d030",
+  "agent_id": "add9add0d9858d030",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/captions/re-lay-captions.mdx",
+    "docs/site/src/content/docs/captions/restyle-captions.mdx",
+    "docs/site/src/content/docs/captions/subtitles.mdx",
+    "docs/site/src/content/docs/captions/word-caption-looks.mdx",
+    "docs/site/src/content/docs/captions/word-caption-styles.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 254351,
+    "cache_read_tokens": 2090808,
+    "output_tokens": 41836,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T16:52:10.130652-05:00",
+  "completed_at": "2026-11-04T16:58:39.679105-05:00"
+}

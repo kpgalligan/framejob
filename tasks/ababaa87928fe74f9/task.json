@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "ababaa87928fe74f9",
+  "agent_id": "ababaa87928fe74f9",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/projects-and-media.md"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 113619,
+    "cache_read_tokens": 757199,
+    "output_tokens": 19713,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T18:00:13.270682-05:00",
+  "completed_at": "2026-11-04T18:03:16.514627-05:00"
+}

@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "af8806c6251fcdae4",
+  "agent_id": "af8806c6251fcdae4",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/framing/reframe-clip.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 259348,
+    "cache_read_tokens": 2298530,
+    "output_tokens": 28267,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T16:58:28.53429-05:00",
+  "completed_at": "2026-11-04T17:02:48.99172-05:00"
+}

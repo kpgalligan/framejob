@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a8af91ffbb49ed9b7",
+  "agent_id": "a8af91ffbb49ed9b7",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/permissions.mdx",
+    "docs/site/src/content/docs/recording/speed-up-typing.mdx",
+    "docs/site/src/content/docs/recording/when-a-recording-stops.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 220650,
+    "cache_read_tokens": 2700889,
+    "output_tokens": 40273,
+    "api_call_count": 18
+  },
+  "started_at": "2026-11-04T17:00:57.990871-05:00",
+  "completed_at": "2026-11-04T17:07:12.783998-05:00"
+}

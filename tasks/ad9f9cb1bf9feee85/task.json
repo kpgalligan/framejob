@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ad9f9cb1bf9feee85",
+  "agent_id": "ad9f9cb1bf9feee85",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/reference/clip-menu.mdx",
+    "docs/site/src/content/docs/reference/menus.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 278305,
+    "cache_read_tokens": 4731746,
+    "output_tokens": 51191,
+    "api_call_count": 26
+  },
+  "started_at": "2026-11-04T17:07:14.765499-05:00",
+  "completed_at": "2026-11-04T17:14:59.148965-05:00"
+}

@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a33e62e404a261f35",
+  "agent_id": "a33e62e404a261f35",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/cleanup/how-cleanup-cuts-work.mdx",
+    "docs/site/src/content/docs/cleanup/remove-silences.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 143119,
+    "cache_read_tokens": 1388016,
+    "output_tokens": 24756,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T16:51:42.48776-05:00",
+  "completed_at": "2026-11-04T16:55:26.329796-05:00"
+}

@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "a6fa7b2142464c079",
+  "agent_id": "a6fa7b2142464c079",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/export/audio-only.mdx",
+    "docs/site/src/content/docs/export/bit-depth.mdx",
+    "docs/site/src/content/docs/export/encoder-speed.mdx",
+    "docs/site/src/content/docs/export/frame-rate.mdx",
+    "docs/site/src/content/docs/export/quality.mdx",
+    "docs/site/src/content/docs/export/size.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 208813,
+    "cache_read_tokens": 2262982,
+    "output_tokens": 42022,
+    "api_call_count": 17
+  },
+  "started_at": "2026-11-04T17:01:25.769889-05:00",
+  "completed_at": "2026-11-04T17:07:48.126464-05:00"
+}

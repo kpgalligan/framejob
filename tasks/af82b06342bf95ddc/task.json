@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "af82b06342bf95ddc",
+  "agent_id": "af82b06342bf95ddc",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/hdr/dynamic-range.mdx",
+    "docs/site/src/content/docs/hdr/hdr10-peak.mdx",
+    "docs/site/src/content/docs/hdr/log-luts.mdx",
+    "docs/site/src/content/docs/hdr/show-sdr-version.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 293624,
+    "cache_read_tokens": 2793725,
+    "output_tokens": 39080,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T16:54:59.749108-05:00",
+  "completed_at": "2026-11-04T17:00:56.080367-05:00"
+}

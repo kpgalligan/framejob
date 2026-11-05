@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a8d503d9baf26c1b6",
+  "agent_id": "a8d503d9baf26c1b6",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/captions.md"
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 191307,
+    "cache_read_tokens": 1303485,
+    "output_tokens": 22405,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-04T18:04:38.911605-05:00",
+  "completed_at": "2026-11-04T18:08:05.46387-05:00"
+}

@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a36c9580d39875cc0",
+  "agent_id": "a36c9580d39875cc0",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/projects-and-media.md",
+    "docs/site/src/content/docs/projects/open-a-project.mdx",
+    "docs/site/src/content/docs/reference/framejob-package.mdx",
+    "docs/site/src/content/docs/reference/troubleshooting.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 85448,
+    "cache_read_tokens": 921581,
+    "output_tokens": 15545,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T18:43:40.785327-05:00",
+  "completed_at": "2026-11-04T18:46:26.889583-05:00"
+}

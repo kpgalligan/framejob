@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "ab3ad0a163d9e60b6",
+  "agent_id": "ab3ad0a163d9e60b6",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/get-project.mdx",
+    "docs/site/src/content/docs/mcp/nests.mdx",
+    "docs/site/src/content/docs/mcp/render-frame.mdx",
+    "docs/site/src/content/docs/mcp/typical-session.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 62,
+    "cache_creation_tokens": 339091,
+    "cache_read_tokens": 6483569,
+    "output_tokens": 45522,
+    "api_call_count": 29
+  },
+  "started_at": "2026-11-04T17:34:13.460024-05:00",
+  "completed_at": "2026-11-04T17:41:24.032929-05:00"
+}

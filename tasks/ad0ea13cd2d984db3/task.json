@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "ad0ea13cd2d984db3",
+  "agent_id": "ad0ea13cd2d984db3",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-move-and-trim.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 136257,
+    "cache_read_tokens": 1384220,
+    "output_tokens": 19995,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T17:48:16.11778-05:00",
+  "completed_at": "2026-11-04T17:51:18.014609-05:00"
+}

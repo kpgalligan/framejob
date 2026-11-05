@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a0eb1971353a7d34e",
+  "agent_id": "a0eb1971353a7d34e",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/speed.md",
+    "docs/site/src/content/docs/mcp/tools-speed.mdx",
+    "docs/site/src/content/docs/speed/freeze-frame.mdx",
+    "docs/site/src/data/features.json"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 148353,
+    "cache_read_tokens": 1953800,
+    "output_tokens": 15943,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T18:40:03.831595-05:00",
+  "completed_at": "2026-11-04T18:43:13.941487-05:00"
+}

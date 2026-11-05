@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "a61aa6090cf254755",
+  "agent_id": "a61aa6090cf254755",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/editing/add-clips.mdx",
+    "docs/site/src/content/docs/editing/how-edits-work.mdx",
+    "docs/site/src/content/docs/editing/insert-and-overwrite.mdx",
+    "docs/site/src/content/docs/editing/move-clips.mdx",
+    "docs/site/src/content/docs/editing/nudge-clips.mdx",
+    "docs/site/src/content/docs/editing/trimming.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 224291,
+    "cache_read_tokens": 2961482,
+    "output_tokens": 47632,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-04T16:40:46.608033-05:00",
+  "completed_at": "2026-11-04T16:48:14.94553-05:00"
+}

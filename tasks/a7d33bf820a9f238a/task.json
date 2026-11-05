@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a7d33bf820a9f238a",
+  "agent_id": "a7d33bf820a9f238a",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/text-and-shapes/gradients.mdx",
+    "docs/site/src/content/docs/text-and-shapes/image-clips.mdx",
+    "docs/site/src/content/docs/text-and-shapes/lines-and-arrows.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 256005,
+    "cache_read_tokens": 2649002,
+    "output_tokens": 30150,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T16:45:34.735721-05:00",
+  "completed_at": "2026-11-04T16:50:24.056766-05:00"
+}

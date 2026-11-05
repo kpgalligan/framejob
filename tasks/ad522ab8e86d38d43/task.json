@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ad522ab8e86d38d43",
+  "agent_id": "ad522ab8e86d38d43",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/assistant/chat.mdx",
+    "docs/site/src/content/docs/assistant/set-up.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 223859,
+    "cache_read_tokens": 2306318,
+    "output_tokens": 28657,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T17:02:00.387295-05:00",
+  "completed_at": "2026-11-04T17:06:21.655937-05:00"
+}

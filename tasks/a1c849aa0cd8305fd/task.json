@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a1c849aa0cd8305fd",
+  "agent_id": "a1c849aa0cd8305fd",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-animation.mdx",
+    "docs/site/src/content/docs/mcp/tools-clip-properties.mdx",
+    "docs/site/src/content/docs/mcp/tools-set-video.mdx",
+    "docs/site/src/content/docs/mcp/tools-transitions.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 345059,
+    "cache_read_tokens": 5741031,
+    "output_tokens": 57515,
+    "api_call_count": 24
+  },
+  "started_at": "2026-11-04T17:03:36.297341-05:00",
+  "completed_at": "2026-11-04T17:11:57.410631-05:00"
+}

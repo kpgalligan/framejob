@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "afe341512a9ea03c8",
+  "agent_id": "afe341512a9ea03c8",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/export/av1-and-vp9.mdx",
+    "docs/site/src/content/docs/export/export-sheet.mdx",
+    "docs/site/src/content/docs/export/formats.mdx",
+    "docs/site/src/content/docs/export/gif-and-apng.mdx",
+    "docs/site/src/content/docs/export/h264-and-hevc.mdx",
+    "docs/site/src/content/docs/export/prores.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 217379,
+    "cache_read_tokens": 2262316,
+    "output_tokens": 40189,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:59:09.082393-05:00",
+  "completed_at": "2026-11-04T17:05:04.978094-05:00"
+}

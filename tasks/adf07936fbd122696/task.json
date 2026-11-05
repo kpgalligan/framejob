@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "adf07936fbd122696",
+  "agent_id": "adf07936fbd122696",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/multicam/copy-pieces.mdx",
+    "docs/site/src/content/docs/multicam/switch-angle.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 142764,
+    "cache_read_tokens": 869699,
+    "output_tokens": 25572,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T16:59:30.047026-05:00",
+  "completed_at": "2026-11-04T17:03:31.022234-05:00"
+}

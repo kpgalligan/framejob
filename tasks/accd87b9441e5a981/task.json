@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "accd87b9441e5a981",
+  "agent_id": "accd87b9441e5a981",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/reference/gestures.mdx",
+    "docs/site/src/content/docs/reference/keyboard-shortcuts.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 125365,
+    "cache_read_tokens": 868980,
+    "output_tokens": 15677,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T17:48:53.05612-05:00",
+  "completed_at": "2026-11-04T17:51:14.656334-05:00"
+}

@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a8554f802707aa8b5",
+  "agent_id": "a8554f802707aa8b5",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/record-a-camera.mdx",
+    "docs/site/src/content/docs/recording/record-a-display.mdx",
+    "docs/site/src/content/docs/recording/record-a-window.mdx",
+    "docs/site/src/content/docs/recording/recorder-panel.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 252541,
+    "cache_read_tokens": 2407414,
+    "output_tokens": 34189,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:58:37.472478-05:00",
+  "completed_at": "2026-11-04T17:03:45.733492-05:00"
+}

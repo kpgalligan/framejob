@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "ad2d1f1b325b5059f",
+  "agent_id": "ad2d1f1b325b5059f",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-audio.mdx",
+    "docs/site/src/content/docs/mcp/tools-set-audio.mdx",
+    "docs/site/src/content/docs/mcp/tools-tracks-and-markers.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 64,
+    "cache_creation_tokens": 399024,
+    "cache_read_tokens": 7807766,
+    "output_tokens": 43866,
+    "api_call_count": 30
+  },
+  "started_at": "2026-11-04T17:36:57.601307-05:00",
+  "completed_at": "2026-11-04T17:43:36.979436-05:00"
+}

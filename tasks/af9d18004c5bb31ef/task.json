@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "af9d18004c5bb31ef",
+  "agent_id": "af9d18004c5bb31ef",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/captions/edit-captions.mdx",
+    "docs/site/src/content/docs/captions/export-captions.mdx",
+    "docs/site/src/content/docs/captions/follow-the-transcript.mdx",
+    "docs/site/src/content/docs/captions/transcript-tab.mdx",
+    "docs/site/src/content/docs/captions/transcript-words.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 256797,
+    "cache_read_tokens": 5382901,
+    "output_tokens": 38099,
+    "api_call_count": 29
+  },
+  "started_at": "2026-11-04T17:23:56.546524-05:00",
+  "completed_at": "2026-11-04T17:29:51.429628-05:00"
+}

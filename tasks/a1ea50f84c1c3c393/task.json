@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a1ea50f84c1c3c393",
+  "agent_id": "a1ea50f84c1c3c393",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/text-and-shapes/shape-clips.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 331734,
+    "cache_read_tokens": 5781127,
+    "output_tokens": 32956,
+    "api_call_count": 25
+  },
+  "started_at": "2026-11-04T17:11:14.737671-05:00",
+  "completed_at": "2026-11-04T17:16:28.592762-05:00"
+}

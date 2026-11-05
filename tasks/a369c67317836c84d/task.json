@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a369c67317836c84d",
+  "agent_id": "a369c67317836c84d",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/effects/chroma-key.mdx",
+    "docs/site/src/content/docs/effects/remove-background.mdx",
+    "docs/site/src/content/docs/effects/shadow.mdx",
+    "docs/site/src/content/docs/effects/text-behind-subject.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 212538,
+    "cache_read_tokens": 3142226,
+    "output_tokens": 35637,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-04T16:46:20.010155-05:00",
+  "completed_at": "2026-11-04T16:51:40.58721-05:00"
+}

@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a46402563d95f828b",
+  "agent_id": "a46402563d95f828b",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/cleanup/remove-filler-words.mdx",
+    "docs/site/src/content/docs/cleanup/voice-or-level.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 250316,
+    "cache_read_tokens": 1931617,
+    "output_tokens": 32613,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T16:51:09.355846-05:00",
+  "completed_at": "2026-11-04T16:56:15.174881-05:00"
+}

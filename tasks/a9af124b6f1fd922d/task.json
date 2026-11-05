@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a9af124b6f1fd922d",
+  "agent_id": "a9af124b6f1fd922d",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/framing/follow-speaker.mdx",
+    "docs/site/src/content/docs/framing/make-vertical-version.mdx",
+    "docs/site/src/content/docs/framing/vertical-what-changes.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 121873,
+    "cache_read_tokens": 1013496,
+    "output_tokens": 16662,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-04T17:49:13.7376-05:00",
+  "completed_at": "2026-11-04T17:51:47.776918-05:00"
+}

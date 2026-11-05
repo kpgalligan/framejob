@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a4383f0293270db81",
+  "agent_id": "a4383f0293270db81",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/patches.mdx",
+    "docs/site/src/content/docs/mcp/tool-calls.mdx",
+    "docs/site/src/content/docs/mcp/units-and-ids.mdx",
+    "docs/site/src/content/docs/mcp/what-a-call-answers.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 348522,
+    "cache_read_tokens": 4859395,
+    "output_tokens": 53673,
+    "api_call_count": 22
+  },
+  "started_at": "2026-11-04T17:03:08.964221-05:00",
+  "completed_at": "2026-11-04T17:11:30.084136-05:00"
+}

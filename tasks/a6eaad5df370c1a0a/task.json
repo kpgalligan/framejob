@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a6eaad5df370c1a0a",
+  "agent_id": "a6eaad5df370c1a0a",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/auto-zoom.mdx",
+    "docs/site/src/content/docs/recording/shortcut-overlays.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 183946,
+    "cache_read_tokens": 1627617,
+    "output_tokens": 26132,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T17:27:56.930614-05:00",
+  "completed_at": "2026-11-04T17:31:56.218164-05:00"
+}

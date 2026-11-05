@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "ac1aabf298946bb41",
+  "agent_id": "ac1aabf298946bb41",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/get-project.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 109643,
+    "cache_read_tokens": 648730,
+    "output_tokens": 13913,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-04T17:51:06.765712-05:00",
+  "completed_at": "2026-11-04T17:53:12.947935-05:00"
+}

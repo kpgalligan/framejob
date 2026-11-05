@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a4d1db2024dc7193e",
+  "agent_id": "a4d1db2024dc7193e",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/cleanup/voice-or-level.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 254232,
+    "cache_read_tokens": 1588170,
+    "output_tokens": 25856,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T17:20:49.059752-05:00",
+  "completed_at": "2026-11-04T17:24:46.759707-05:00"
+}

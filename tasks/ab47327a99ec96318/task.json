@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ab47327a99ec96318",
+  "agent_id": "ab47327a99ec96318",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/timeline.md",
+    "docs/site/src/content/docs/timeline/reading-a-clip.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 91214,
+    "cache_read_tokens": 932928,
+    "output_tokens": 11626,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T18:50:26.028707-05:00",
+  "completed_at": "2026-11-04T18:52:23.156604-05:00"
+}

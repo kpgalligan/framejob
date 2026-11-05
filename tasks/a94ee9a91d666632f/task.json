@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a94ee9a91d666632f",
+  "agent_id": "a94ee9a91d666632f",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/color-grading.md"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 131778,
+    "cache_read_tokens": 1042826,
+    "output_tokens": 23791,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-04T18:00:13.289397-05:00",
+  "completed_at": "2026-11-04T18:03:58.137274-05:00"
+}

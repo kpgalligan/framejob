@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "afd500e03a83185ac",
+  "agent_id": "afd500e03a83185ac",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/export.md",
+    "docs/guide/hdr-and-color.md",
+    "docs/site/src/content/docs/export/save-frame.mdx",
+    "docs/site/src/content/docs/hdr/precision.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 118768,
+    "cache_read_tokens": 1979917,
+    "output_tokens": 23669,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-04T18:45:59.850863-05:00",
+  "completed_at": "2026-11-04T18:50:08.276062-05:00"
+}

@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "aea82b1905a36b204",
+  "agent_id": "aea82b1905a36b204",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/export.md",
+    "docs/site/src/content/docs/mcp/tools-render-and-export.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 100526,
+    "cache_read_tokens": 1237253,
+    "output_tokens": 12406,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T18:45:02.221614-05:00",
+  "completed_at": "2026-11-04T18:47:05.974366-05:00"
+}

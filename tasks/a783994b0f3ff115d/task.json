@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a783994b0f3ff115d",
+  "agent_id": "a783994b0f3ff115d",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/hdr-and-color.md",
+    "docs/site/src/content/docs/hdr/camera-log.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 85264,
+    "cache_read_tokens": 990175,
+    "output_tokens": 11670,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T18:42:52.727584-05:00",
+  "completed_at": "2026-11-04T18:44:58.823044-05:00"
+}

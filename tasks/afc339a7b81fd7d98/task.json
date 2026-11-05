@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "afc339a7b81fd7d98",
+  "agent_id": "afc339a7b81fd7d98",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/mcp.md"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 188176,
+    "cache_read_tokens": 721742,
+    "output_tokens": 16156,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-04T18:04:11.287231-05:00",
+  "completed_at": "2026-11-04T18:06:41.712125-05:00"
+}

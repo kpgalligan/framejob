@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "afeb54645378467b2",
+  "agent_id": "afeb54645378467b2",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/effects/hide-while-silent.mdx",
+    "docs/site/src/content/docs/effects/obscure.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 240667,
+    "cache_read_tokens": 4943971,
+    "output_tokens": 36616,
+    "api_call_count": 29
+  },
+  "started_at": "2026-11-04T17:16:36.031883-05:00",
+  "completed_at": "2026-11-04T17:22:27.578632-05:00"
+}

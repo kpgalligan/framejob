@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a81e8f1e15291f396",
+  "agent_id": "a81e8f1e15291f396",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/audio.md",
+    "docs/guide/captions.md",
+    "docs/guide/mcp.md",
+    "docs/guide/multicam.md"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 238837,
+    "cache_read_tokens": 3005925,
+    "output_tokens": 29475,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-04T18:48:59.373-05:00",
+  "completed_at": "2026-11-04T18:53:53.753583-05:00"
+}

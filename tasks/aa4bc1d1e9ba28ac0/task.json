@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "aa4bc1d1e9ba28ac0",
+  "agent_id": "aa4bc1d1e9ba28ac0",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/cursor.mdx",
+    "docs/site/src/content/docs/recording/files-and-formats.mdx",
+    "docs/site/src/content/docs/recording/when-it-lands.mdx",
+    "docs/site/src/content/docs/recording/where-it-lands.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 137199,
+    "cache_read_tokens": 1386039,
+    "output_tokens": 20982,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T17:47:33.419984-05:00",
+  "completed_at": "2026-11-04T17:50:51.426638-05:00"
+}

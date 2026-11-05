@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a7489d95352d34035",
+  "agent_id": "a7489d95352d34035",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/speed.md",
+    "docs/site/src/content/docs/speed/edit-a-ramped-clip.mdx",
+    "docs/site/src/content/docs/speed/rate-stretch.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 97449,
+    "cache_read_tokens": 985087,
+    "output_tokens": 10225,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T18:41:43.084532-05:00",
+  "completed_at": "2026-11-04T18:43:27.762265-05:00"
+}

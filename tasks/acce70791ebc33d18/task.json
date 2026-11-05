@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "acce70791ebc33d18",
+  "agent_id": "acce70791ebc33d18",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tool-calls.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 105574,
+    "cache_read_tokens": 1057194,
+    "output_tokens": 14966,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T17:48:36.260916-05:00",
+  "completed_at": "2026-11-04T17:50:52.821506-05:00"
+}

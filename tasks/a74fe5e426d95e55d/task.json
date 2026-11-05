@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a74fe5e426d95e55d",
+  "agent_id": "a74fe5e426d95e55d",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/hdr-and-color.md"
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 123255,
+    "cache_read_tokens": 1342231,
+    "output_tokens": 21810,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T18:05:43.800194-05:00",
+  "completed_at": "2026-11-04T18:09:13.65499-05:00"
+}

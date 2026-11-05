@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a7b9a32440949d869",
+  "agent_id": "a7b9a32440949d869",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/reference/glossary.mdx",
+    "docs/site/src/content/docs/reference/limits.mdx",
+    "docs/site/src/content/docs/reference/open-source.mdx",
+    "docs/site/src/content/docs/reference/troubleshooting.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 238580,
+    "cache_read_tokens": 4391818,
+    "output_tokens": 48916,
+    "api_call_count": 26
+  },
+  "started_at": "2026-11-04T17:07:50.198117-05:00",
+  "completed_at": "2026-11-04T17:15:00.579242-05:00"
+}

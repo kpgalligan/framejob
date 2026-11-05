@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a50fa7c5ed2f7213a",
+  "agent_id": "a50fa7c5ed2f7213a",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/reference/context-menus.mdx",
+    "docs/site/src/content/docs/reference/remembered-choices.mdx",
+    "docs/site/src/content/docs/reference/settings.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 74,
+    "cache_creation_tokens": 381682,
+    "cache_read_tokens": 7378079,
+    "output_tokens": 53832,
+    "api_call_count": 36
+  },
+  "started_at": "2026-11-04T17:38:13.253341-05:00",
+  "completed_at": "2026-11-04T17:46:33.05004-05:00"
+}

@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "ae861bcd5de547315",
+  "agent_id": "ae861bcd5de547315",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/captions/delete-words.mdx",
+    "docs/site/src/content/docs/captions/shorten-pauses.mdx",
+    "docs/site/src/content/docs/captions/transcript-keys.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 171442,
+    "cache_read_tokens": 1461414,
+    "output_tokens": 32734,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T16:52:24.212414-05:00",
+  "completed_at": "2026-11-04T16:57:34.690344-05:00"
+}

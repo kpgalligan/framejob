@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a631ad22b360a193b",
+  "agent_id": "a631ad22b360a193b",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/graphics/insert-a-graphic.mdx",
+    "docs/site/src/content/docs/graphics/what-is-a-graphic.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 221953,
+    "cache_read_tokens": 3205256,
+    "output_tokens": 34699,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-04T17:25:43.038646-05:00",
+  "completed_at": "2026-11-04T17:31:07.422265-05:00"
+}

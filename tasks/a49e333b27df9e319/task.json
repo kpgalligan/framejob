@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "a49e333b27df9e319",
+  "agent_id": "a49e333b27df9e319",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/text-and-shapes/fonts.mdx",
+    "docs/site/src/content/docs/text-and-shapes/shape-clips.mdx",
+    "docs/site/src/content/docs/text-and-shapes/shape-settings.mdx",
+    "docs/site/src/content/docs/text-and-shapes/text-box.mdx",
+    "docs/site/src/content/docs/text-and-shapes/text-reveal.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 188098,
+    "cache_read_tokens": 2142907,
+    "output_tokens": 40055,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T16:40:46.614501-05:00",
+  "completed_at": "2026-11-04T16:47:07.66718-05:00"
+}

@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a132783753cb03e83",
+  "agent_id": "a132783753cb03e83",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/reference/file-formats.mdx",
+    "docs/site/src/content/docs/reference/file-locations.mdx",
+    "docs/site/src/content/docs/reference/framejob-package.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 218554,
+    "cache_read_tokens": 4015807,
+    "output_tokens": 36848,
+    "api_call_count": 28
+  },
+  "started_at": "2026-11-04T17:35:30.904584-05:00",
+  "completed_at": "2026-11-04T17:41:09.55263-05:00"
+}

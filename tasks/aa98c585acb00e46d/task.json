@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "aa98c585acb00e46d",
+  "agent_id": "aa98c585acb00e46d",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/editing/copy-and-paste.mdx",
+    "docs/site/src/content/docs/editing/duplicate-clips.mdx",
+    "docs/site/src/content/docs/editing/enable-picture-and-sound.mdx",
+    "docs/site/src/content/docs/editing/nests.mdx",
+    "docs/site/src/content/docs/editing/paste-attributes.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 211006,
+    "cache_read_tokens": 2591916,
+    "output_tokens": 42845,
+    "api_call_count": 19
+  },
+  "started_at": "2026-11-04T16:40:46.607829-05:00",
+  "completed_at": "2026-11-04T16:47:28.521993-05:00"
+}

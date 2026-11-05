@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a537bd29fb346e841",
+  "agent_id": "a537bd29fb346e841",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/audio.md"
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 102375,
+    "cache_read_tokens": 786069,
+    "output_tokens": 10455,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T18:50:28.578166-05:00",
+  "completed_at": "2026-11-04T18:52:13.621349-05:00"
+}

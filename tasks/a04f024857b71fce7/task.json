@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a04f024857b71fce7",
+  "agent_id": "a04f024857b71fce7",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/color/adjustment-clips.mdx",
+    "docs/site/src/content/docs/color/qualifiers.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 185846,
+    "cache_read_tokens": 2735940,
+    "output_tokens": 37422,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-04T16:53:32.889363-05:00",
+  "completed_at": "2026-11-04T16:59:27.936411-05:00"
+}

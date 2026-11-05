@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a1aaacbac39aa078a",
+  "agent_id": "a1aaacbac39aa078a",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/timeline/hide-and-lock-tracks.mdx",
+    "docs/site/src/content/docs/timeline/manage-tracks.mdx",
+    "docs/site/src/content/docs/timeline/track-height.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 312047,
+    "cache_read_tokens": 2789053,
+    "output_tokens": 30404,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T17:11:57.613377-05:00",
+  "completed_at": "2026-11-04T17:16:34.251293-05:00"
+}

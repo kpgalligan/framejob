@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ab6a909e94db9ac11",
+  "agent_id": "ab6a909e94db9ac11",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/canvas-and-layers.md",
+    "docs/site/src/content/docs/canvas/crop.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 73438,
+    "cache_read_tokens": 581168,
+    "output_tokens": 10010,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T18:40:50.059424-05:00",
+  "completed_at": "2026-11-04T18:42:30.305615-05:00"
+}

@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a52e6264355cd8b18",
+  "agent_id": "a52e6264355cd8b18",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/motion/add-a-transition.mdx",
+    "docs/site/src/content/docs/motion/transition-settings.mdx",
+    "docs/site/src/content/docs/motion/transition-styles.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 274295,
+    "cache_read_tokens": 2789768,
+    "output_tokens": 36152,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T16:47:11.644816-05:00",
+  "completed_at": "2026-11-04T16:52:49.879141-05:00"
+}

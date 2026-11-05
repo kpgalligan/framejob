@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a0273f170e2300258",
+  "agent_id": "a0273f170e2300258",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/settings.md",
+    "docs/site/src/content/docs/captions/assemblyai-key.mdx",
+    "docs/site/src/content/docs/captions/assemblyai-privacy.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 86920,
+    "cache_read_tokens": 656182,
+    "output_tokens": 8912,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T18:44:14.586979-05:00",
+  "completed_at": "2026-11-04T18:45:40.812221-05:00"
+}

@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a98932975893f2299",
+  "agent_id": "a98932975893f2299",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/color/animate-a-grade.mdx",
+    "docs/site/src/content/docs/color/copy-a-grade.mdx",
+    "docs/site/src/content/docs/color/vectorscope.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 241324,
+    "cache_read_tokens": 4467222,
+    "output_tokens": 48308,
+    "api_call_count": 27
+  },
+  "started_at": "2026-11-04T16:53:49.598452-05:00",
+  "completed_at": "2026-11-04T17:01:23.098736-05:00"
+}

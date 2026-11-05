@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "abb1434467c061df3",
+  "agent_id": "abb1434467c061df3",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/assistant.md"
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 140339,
+    "cache_read_tokens": 831523,
+    "output_tokens": 6908,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-04T18:47:10.174747-05:00",
+  "completed_at": "2026-11-04T18:48:22.222017-05:00"
+}

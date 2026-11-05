@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a517a39efb2622cbf",
+  "agent_id": "a517a39efb2622cbf",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/framing/camera-layouts.mdx",
+    "docs/site/src/content/docs/framing/layout-section.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 268690,
+    "cache_read_tokens": 2389541,
+    "output_tokens": 34751,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T16:57:41.284463-05:00",
+  "completed_at": "2026-11-04T17:03:07.170423-05:00"
+}

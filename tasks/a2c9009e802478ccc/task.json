@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a2c9009e802478ccc",
+  "agent_id": "a2c9009e802478ccc",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/speed/captions-and-speed.mdx",
+    "docs/site/src/content/docs/speed/edit-a-ramped-clip.mdx",
+    "docs/site/src/content/docs/speed/ramp-audio.mdx",
+    "docs/site/src/content/docs/speed/retime-range.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 178138,
+    "cache_read_tokens": 2655723,
+    "output_tokens": 40391,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-04T16:47:01.710045-05:00",
+  "completed_at": "2026-11-04T16:53:25.299753-05:00"
+}

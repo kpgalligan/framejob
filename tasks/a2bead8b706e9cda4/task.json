@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a2bead8b706e9cda4",
+  "agent_id": "a2bead8b706e9cda4",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/vertical-and-framing.md",
+    "docs/site/src/content/docs/framing/follow-speaker.mdx",
+    "docs/site/src/content/docs/mcp/tools-framing.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 114188,
+    "cache_read_tokens": 1581061,
+    "output_tokens": 20344,
+    "api_call_count": 18
+  },
+  "started_at": "2026-11-04T18:46:28.230271-05:00",
+  "completed_at": "2026-11-04T18:50:34.227977-05:00"
+}

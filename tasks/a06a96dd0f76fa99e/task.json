@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a06a96dd0f76fa99e",
+  "agent_id": "a06a96dd0f76fa99e",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/cleanup/false-starts.mdx",
+    "docs/site/src/content/docs/cleanup/filler-transcripts.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 159072,
+    "cache_read_tokens": 1054764,
+    "output_tokens": 27894,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T16:52:33.96288-05:00",
+  "completed_at": "2026-11-04T16:56:53.806962-05:00"
+}

@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "ac039ff505cffa004",
+  "agent_id": "ac039ff505cffa004",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/projects/background-and-timecode.mdx",
+    "docs/site/src/content/docs/projects/canvas-size.mdx",
+    "docs/site/src/content/docs/projects/document-tab.mdx",
+    "docs/site/src/content/docs/projects/frame-rate.mdx",
+    "docs/site/src/content/docs/projects/save-and-revert.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 312155,
+    "cache_read_tokens": 6346303,
+    "output_tokens": 51968,
+    "api_call_count": 28
+  },
+  "started_at": "2026-11-04T16:40:46.609635-05:00",
+  "completed_at": "2026-11-04T16:49:27.138644-05:00"
+}

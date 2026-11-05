@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a8cd6f0859e800c44",
+  "agent_id": "a8cd6f0859e800c44",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-copy-and-nest.mdx",
+    "docs/site/src/content/docs/mcp/tools-cut-and-delete.mdx",
+    "docs/site/src/content/docs/mcp/tools-speed.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 46,
+    "cache_creation_tokens": 282556,
+    "cache_read_tokens": 4233045,
+    "output_tokens": 50384,
+    "api_call_count": 23
+  },
+  "started_at": "2026-11-04T17:04:26.865932-05:00",
+  "completed_at": "2026-11-04T17:11:57.324746-05:00"
+}

@@ -1,0 +1,30 @@
+{
+  "tool_use_id": "ab7b8d70ca6453dd2",
+  "agent_id": "ab7b8d70ca6453dd2",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/framing/camera-layouts.mdx",
+    "docs/site/src/content/docs/framing/follow-speaker.mdx",
+    "docs/site/src/content/docs/framing/follow-subject.mdx",
+    "docs/site/src/content/docs/framing/layout-section.mdx",
+    "docs/site/src/content/docs/framing/make-vertical-version.mdx",
+    "docs/site/src/content/docs/framing/reframe-clip.mdx",
+    "docs/site/src/content/docs/framing/show-subjects.mdx",
+    "docs/site/src/content/docs/framing/vertical-what-changes.mdx",
+    "docs/site/src/content/docs/mcp/tools-framing.mdx",
+    "docs/site/src/content/docs/mcp/tools-multicam.mdx",
+    "docs/site/src/content/docs/multicam/one-microphone.mdx",
+    "docs/site/src/content/docs/multicam/set-up.mdx",
+    "docs/site/src/content/docs/multicam/switch-angle.mdx",
+    "docs/site/src/content/docs/multicam/switch-by-speaker.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 453848,
+    "cache_read_tokens": 7641993,
+    "output_tokens": 63927,
+    "api_call_count": 24
+  },
+  "started_at": "2026-11-04T18:00:13.155917-05:00",
+  "completed_at": "2026-11-04T18:09:41.335892-05:00"
+}

@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ac5e437eba93c5b0c",
+  "agent_id": "ac5e437eba93c5b0c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/motion/change-an-action.mdx",
+    "docs/site/src/content/docs/motion/edit-an-action.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 272518,
+    "cache_read_tokens": 4384644,
+    "output_tokens": 35904,
+    "api_call_count": 24
+  },
+  "started_at": "2026-11-04T17:19:34.707472-05:00",
+  "completed_at": "2026-11-04T17:25:10.952884-05:00"
+}

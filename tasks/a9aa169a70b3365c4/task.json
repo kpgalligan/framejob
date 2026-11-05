@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a9aa169a70b3365c4",
+  "agent_id": "a9aa169a70b3365c4",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/canvas-and-layers.md",
+    "docs/guide/screen-recording.md",
+    "docs/site/src/content/docs/framing/camera-layouts.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 136183,
+    "cache_read_tokens": 1968015,
+    "output_tokens": 23779,
+    "api_call_count": 19
+  },
+  "started_at": "2026-11-04T18:38:16.812659-05:00",
+  "completed_at": "2026-11-04T18:42:55.688032-05:00"
+}

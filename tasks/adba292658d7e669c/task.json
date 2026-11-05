@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "adba292658d7e669c",
+  "agent_id": "adba292658d7e669c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/multicam.md"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 239494,
+    "cache_read_tokens": 1690143,
+    "output_tokens": 17457,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T18:05:41.068361-05:00",
+  "completed_at": "2026-11-04T18:08:26.197597-05:00"
+}

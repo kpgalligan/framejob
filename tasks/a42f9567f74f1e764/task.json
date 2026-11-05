@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a42f9567f74f1e764",
+  "agent_id": "a42f9567f74f1e764",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/canvas/corner-radius.mdx",
+    "docs/site/src/content/docs/canvas/crop.mdx",
+    "docs/site/src/content/docs/canvas/picture-tab.mdx",
+    "docs/site/src/content/docs/canvas/transform.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 339955,
+    "cache_read_tokens": 5696216,
+    "output_tokens": 47107,
+    "api_call_count": 24
+  },
+  "started_at": "2026-11-04T17:12:11.469165-05:00",
+  "completed_at": "2026-11-04T17:19:18.245733-05:00"
+}

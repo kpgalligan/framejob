@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a7b273e9e6f589271",
+  "agent_id": "a7b273e9e6f589271",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/export/export-queue.mdx",
+    "docs/site/src/content/docs/export/transparency.mdx",
+    "docs/site/src/content/docs/export/what-an-export-includes.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 80,
+    "cache_creation_tokens": 287681,
+    "cache_read_tokens": 7548209,
+    "output_tokens": 45219,
+    "api_call_count": 39
+  },
+  "started_at": "2026-11-04T17:33:33.776682-05:00",
+  "completed_at": "2026-11-04T17:40:34.567602-05:00"
+}

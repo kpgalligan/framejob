@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "aba7279fdde8ec1a7",
+  "agent_id": "aba7279fdde8ec1a7",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/camera-beside-the-screen.mdx",
+    "docs/site/src/content/docs/recording/menu-bar-item.mdx",
+    "docs/site/src/content/docs/recording/pause-and-stop.mdx",
+    "docs/site/src/content/docs/recording/system-audio-and-microphone.mdx",
+    "docs/site/src/content/docs/recording/voice-overs.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 300452,
+    "cache_read_tokens": 2831573,
+    "output_tokens": 41731,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T17:00:03.43019-05:00",
+  "completed_at": "2026-11-04T17:06:21.434169-05:00"
+}

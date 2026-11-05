@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a44b716dfd638cceb",
+  "agent_id": "a44b716dfd638cceb",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/motion/during-presets.mdx",
+    "docs/site/src/content/docs/motion/motion-blur.mdx",
+    "docs/site/src/content/docs/motion/transitions.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 280479,
+    "cache_read_tokens": 3305770,
+    "output_tokens": 36906,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T16:46:20.544018-05:00",
+  "completed_at": "2026-11-04T16:52:07.925981-05:00"
+}

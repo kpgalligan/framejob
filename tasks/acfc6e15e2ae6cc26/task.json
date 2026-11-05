@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "acfc6e15e2ae6cc26",
+  "agent_id": "acfc6e15e2ae6cc26",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/when-it-lands.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 91522,
+    "cache_read_tokens": 955518,
+    "output_tokens": 13031,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T18:46:28.763608-05:00",
+  "completed_at": "2026-11-04T18:48:46.220548-05:00"
+}

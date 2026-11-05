@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a82c8f4bedfffa1be",
+  "agent_id": "a82c8f4bedfffa1be",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/framing/follow-subject.mdx",
+    "docs/site/src/content/docs/framing/show-subjects.mdx",
+    "docs/site/src/content/docs/framing/what-is-found.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 226460,
+    "cache_read_tokens": 2521434,
+    "output_tokens": 34330,
+    "api_call_count": 19
+  },
+  "started_at": "2026-11-04T17:27:50.140287-05:00",
+  "completed_at": "2026-11-04T17:33:03.034462-05:00"
+}

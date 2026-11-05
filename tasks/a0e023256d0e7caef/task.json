@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a0e023256d0e7caef",
+  "agent_id": "a0e023256d0e7caef",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/graphics/templates.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 200131,
+    "cache_read_tokens": 3027389,
+    "output_tokens": 35415,
+    "api_call_count": 20
+  },
+  "started_at": "2026-11-04T16:56:13.620047-05:00",
+  "completed_at": "2026-11-04T17:01:52.333537-05:00"
+}

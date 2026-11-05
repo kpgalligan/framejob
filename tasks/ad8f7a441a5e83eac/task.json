@@ -1,0 +1,14 @@
+{
+  "tool_use_id": "ad8f7a441a5e83eac",
+  "agent_id": "ad8f7a441a5e83eac",
+  "subagent_type": "workflow-subagent",
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 207080,
+    "cache_read_tokens": 1768217,
+    "output_tokens": 9525,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-04T18:38:16.810321-05:00",
+  "completed_at": "2026-11-04T18:40:00.682136-05:00"
+}

@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a95ac80b7bc8cbbad",
+  "agent_id": "a95ac80b7bc8cbbad",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/motion/actions.mdx",
+    "docs/site/src/content/docs/motion/add-an-action.mdx",
+    "docs/site/src/content/docs/motion/select-an-action.mdx",
+    "docs/site/src/content/docs/motion/what-can-animate.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 326332,
+    "cache_read_tokens": 3686244,
+    "output_tokens": 38604,
+    "api_call_count": 18
+  },
+  "started_at": "2026-11-04T16:45:46.180423-05:00",
+  "completed_at": "2026-11-04T16:51:46.735106-05:00"
+}

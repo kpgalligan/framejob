@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "ad0e4cce84bbb87dc",
+  "agent_id": "ad0e4cce84bbb87dc",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/canvas/backgrounds.mdx",
+    "docs/site/src/content/docs/canvas/matte-tracks.mdx",
+    "docs/site/src/content/docs/canvas/mattes-in-nests.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 188623,
+    "cache_read_tokens": 1952903,
+    "output_tokens": 35176,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:40:46.610012-05:00",
+  "completed_at": "2026-11-04T16:46:18.255866-05:00"
+}

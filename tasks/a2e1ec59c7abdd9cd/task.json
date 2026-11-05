@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "a2e1ec59c7abdd9cd",
+  "agent_id": "a2e1ec59c7abdd9cd",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/audio/animate-sound.mdx",
+    "docs/site/src/content/docs/audio/fades.mdx",
+    "docs/site/src/content/docs/audio/how-audio-works.mdx",
+    "docs/site/src/content/docs/audio/sound-tab.mdx",
+    "docs/site/src/content/docs/audio/volume-line.mdx",
+    "docs/site/src/content/docs/audio/volume.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 42,
+    "cache_creation_tokens": 327561,
+    "cache_read_tokens": 4554621,
+    "output_tokens": 46742,
+    "api_call_count": 19
+  },
+  "started_at": "2026-11-04T16:47:14.61962-05:00",
+  "completed_at": "2026-11-04T16:54:30.899785-05:00"
+}

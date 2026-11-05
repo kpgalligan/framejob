@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a0a8b4a31c94cb050",
+  "agent_id": "a0a8b4a31c94cb050",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/cleanup-tools.md"
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 66364,
+    "cache_read_tokens": 480117,
+    "output_tokens": 7303,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-04T18:51:26.213517-05:00",
+  "completed_at": "2026-11-04T18:52:42.414266-05:00"
+}

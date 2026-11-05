@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ab0a910f835ae2175",
+  "agent_id": "ab0a910f835ae2175",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-analysis.mdx",
+    "docs/site/src/content/docs/mcp/tools-captions.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 301884,
+    "cache_read_tokens": 2764410,
+    "output_tokens": 46313,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-04T17:03:48.890807-05:00",
+  "completed_at": "2026-11-04T17:10:48.267514-05:00"
+}

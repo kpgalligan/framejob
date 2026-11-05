@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a22c76d5d5c4cc496",
+  "agent_id": "a22c76d5d5c4cc496",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/transcript.md"
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 137562,
+    "cache_read_tokens": 970756,
+    "output_tokens": 6616,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T18:06:13.240229-05:00",
+  "completed_at": "2026-11-04T18:07:15.26526-05:00"
+}

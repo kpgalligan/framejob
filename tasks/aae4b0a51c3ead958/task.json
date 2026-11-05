@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "aae4b0a51c3ead958",
+  "agent_id": "aae4b0a51c3ead958",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/editing.md"
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 242707,
+    "cache_read_tokens": 1956049,
+    "output_tokens": 24724,
+    "api_call_count": 11
+  },
+  "started_at": "2026-11-04T18:03:44.194721-05:00",
+  "completed_at": "2026-11-04T18:07:37.158609-05:00"
+}

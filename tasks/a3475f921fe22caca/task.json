@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a3475f921fe22caca",
+  "agent_id": "a3475f921fe22caca",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/effects/filters.mdx",
+    "docs/site/src/content/docs/effects/reflection.mdx",
+    "docs/site/src/content/docs/effects/spotlight.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 172100,
+    "cache_read_tokens": 1829533,
+    "output_tokens": 34755,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:45:39.509951-05:00",
+  "completed_at": "2026-11-04T16:51:07.398927-05:00"
+}

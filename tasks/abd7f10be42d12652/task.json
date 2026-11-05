@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "abd7f10be42d12652",
+  "agent_id": "abd7f10be42d12652",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/captions/generate-captions.mdx",
+    "docs/site/src/content/docs/captions/how-captions-work.mdx",
+    "docs/site/src/content/docs/captions/import-captions.mdx",
+    "docs/site/src/content/docs/captions/what-can-be-transcribed.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 211032,
+    "cache_read_tokens": 2366035,
+    "output_tokens": 37387,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T16:51:48.854089-05:00",
+  "completed_at": "2026-11-04T16:57:39.116534-05:00"
+}

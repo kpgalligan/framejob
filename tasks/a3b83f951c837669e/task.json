@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "a3b83f951c837669e",
+  "agent_id": "a3b83f951c837669e",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/export/burn-in-timecode.mdx",
+    "docs/site/src/content/docs/export/loudness.mdx",
+    "docs/site/src/content/docs/export/presets.mdx",
+    "docs/site/src/content/docs/export/progress-and-report.mdx",
+    "docs/site/src/content/docs/export/range.mdx",
+    "docs/site/src/content/docs/export/stems.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 30,
+    "cache_creation_tokens": 224904,
+    "cache_read_tokens": 2210514,
+    "output_tokens": 37064,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T17:01:54.13953-05:00",
+  "completed_at": "2026-11-04T17:07:42.990842-05:00"
+}

@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a928be4760d80310c",
+  "agent_id": "a928be4760d80310c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/recording/cursor-files.mdx",
+    "docs/site/src/content/docs/recording/cursor-settings.mdx",
+    "docs/site/src/content/docs/recording/record-shortcuts.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 275666,
+    "cache_read_tokens": 2481908,
+    "output_tokens": 37842,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T17:00:20.871297-05:00",
+  "completed_at": "2026-11-04T17:06:12.48991-05:00"
+}

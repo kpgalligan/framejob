@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a98c5ae3df1f64f96",
+  "agent_id": "a98c5ae3df1f64f96",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/assistant/what-it-will-not-do.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 293243,
+    "cache_read_tokens": 4835682,
+    "output_tokens": 41723,
+    "api_call_count": 23
+  },
+  "started_at": "2026-11-04T17:31:57.835693-05:00",
+  "completed_at": "2026-11-04T17:38:09.111595-05:00"
+}

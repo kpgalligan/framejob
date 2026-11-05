@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ad18134cfa906f768",
+  "agent_id": "ad18134cfa906f768",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/hdr/dynamic-range.mdx",
+    "docs/site/src/content/docs/hdr/hdr10-peak.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 88,
+    "cache_creation_tokens": 242710,
+    "cache_read_tokens": 6886083,
+    "output_tokens": 41551,
+    "api_call_count": 44
+  },
+  "started_at": "2026-11-04T17:26:58.838012-05:00",
+  "completed_at": "2026-11-04T17:33:31.968328-05:00"
+}

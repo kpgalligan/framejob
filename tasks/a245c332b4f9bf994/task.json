@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a245c332b4f9bf994",
+  "agent_id": "a245c332b4f9bf994",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/helper-and-socket.mdx",
+    "docs/site/src/content/docs/mcp/overview.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 157286,
+    "cache_read_tokens": 2595062,
+    "output_tokens": 26970,
+    "api_call_count": 22
+  },
+  "started_at": "2026-11-04T17:32:03.661194-05:00",
+  "completed_at": "2026-11-04T17:36:13.367242-05:00"
+}

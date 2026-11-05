@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a8543ada2a1bfa486",
+  "agent_id": "a8543ada2a1bfa486",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/projects/ffmpeg-conversion.mdx",
+    "docs/site/src/content/docs/projects/import-media.mdx",
+    "docs/site/src/content/docs/projects/webm-and-matroska.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 187065,
+    "cache_read_tokens": 1916949,
+    "output_tokens": 31472,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:40:41.267343-05:00",
+  "completed_at": "2026-11-04T16:45:32.435537-05:00"
+}

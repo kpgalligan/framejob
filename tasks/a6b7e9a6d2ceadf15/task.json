@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a6b7e9a6d2ceadf15",
+  "agent_id": "a6b7e9a6d2ceadf15",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/record-screen.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 123602,
+    "cache_read_tokens": 1147220,
+    "output_tokens": 16280,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T17:51:18.567479-05:00",
+  "completed_at": "2026-11-04T17:53:43.793099-05:00"
+}

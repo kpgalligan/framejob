@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "ad8198ed7c34356c5",
+  "agent_id": "ad8198ed7c34356c5",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-set-video.mdx",
+    "docs/site/src/content/docs/recording/cursor.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 92498,
+    "cache_read_tokens": 755561,
+    "output_tokens": 7851,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T18:42:49.643564-05:00",
+  "completed_at": "2026-11-04T18:44:13.075244-05:00"
+}

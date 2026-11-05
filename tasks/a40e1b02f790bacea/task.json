@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "a40e1b02f790bacea",
+  "agent_id": "a40e1b02f790bacea",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/multicam/one-microphone.mdx",
+    "docs/site/src/content/docs/multicam/set-up.mdx",
+    "docs/site/src/content/docs/multicam/switch-by-speaker.mdx",
+    "docs/site/src/content/docs/multicam/switch-settings.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 236814,
+    "cache_read_tokens": 1859481,
+    "output_tokens": 34046,
+    "api_call_count": 12
+  },
+  "started_at": "2026-11-04T16:58:04.592963-05:00",
+  "completed_at": "2026-11-04T17:03:18.322387-05:00"
+}

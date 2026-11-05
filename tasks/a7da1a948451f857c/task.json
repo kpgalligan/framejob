@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "a7da1a948451f857c",
+  "agent_id": "a7da1a948451f857c",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/assistant/context-and-compaction.mdx",
+    "docs/site/src/content/docs/assistant/cost.mdx",
+    "docs/site/src/content/docs/assistant/privacy.mdx",
+    "docs/site/src/content/docs/assistant/stop-a-turn.mdx",
+    "docs/site/src/content/docs/assistant/what-it-will-not-do.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 253945,
+    "cache_read_tokens": 2719392,
+    "output_tokens": 37044,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T17:02:27.752931-05:00",
+  "completed_at": "2026-11-04T17:08:07.459172-05:00"
+}

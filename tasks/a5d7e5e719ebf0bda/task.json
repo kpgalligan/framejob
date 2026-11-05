@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "a5d7e5e719ebf0bda",
+  "agent_id": "a5d7e5e719ebf0bda",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/export.md",
+    "docs/site/src/content/docs/export/gif-and-apng.mdx",
+    "docs/site/src/content/docs/reference/troubleshooting.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 88620,
+    "cache_read_tokens": 726758,
+    "output_tokens": 10227,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-04T18:52:15.302-05:00",
+  "completed_at": "2026-11-04T18:53:55.410526-05:00"
+}

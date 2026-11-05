@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "a4f9c283119fd7fef",
+  "agent_id": "a4f9c283119fd7fef",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/hdr/camera-log.mdx",
+    "docs/site/src/content/docs/hdr/how-sources-are-read.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 34,
+    "cache_creation_tokens": 272019,
+    "cache_read_tokens": 3029039,
+    "output_tokens": 29386,
+    "api_call_count": 15
+  },
+  "started_at": "2026-11-04T16:53:30.500666-05:00",
+  "completed_at": "2026-11-04T16:58:02.829386-05:00"
+}

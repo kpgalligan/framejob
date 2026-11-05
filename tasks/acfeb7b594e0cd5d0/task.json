@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "acfeb7b594e0cd5d0",
+  "agent_id": "acfeb7b594e0cd5d0",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/timeline/playback.mdx",
+    "docs/site/src/content/docs/timeline/reading-a-clip.mdx",
+    "docs/site/src/content/docs/timeline/ruler-and-playhead.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 28,
+    "cache_creation_tokens": 232014,
+    "cache_read_tokens": 2254387,
+    "output_tokens": 32067,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-04T16:40:41.269354-05:00",
+  "completed_at": "2026-11-04T16:45:44.423454-05:00"
+}

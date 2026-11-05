@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a978888a904eaa773",
+  "agent_id": "a978888a904eaa773",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/graphics.md"
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 132638,
+    "cache_read_tokens": 670722,
+    "output_tokens": 5448,
+    "api_call_count": 7
+  },
+  "started_at": "2026-11-04T18:51:42.593913-05:00",
+  "completed_at": "2026-11-04T18:52:39.894636-05:00"
+}

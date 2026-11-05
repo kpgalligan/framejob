@@ -1,0 +1,19 @@
+{
+  "tool_use_id": "abd32c0a65c26a1db",
+  "agent_id": "abd32c0a65c26a1db",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/guide/audio.md",
+    "docs/site/src/content/docs/audio/detach-and-attach.mdx",
+    "docs/site/src/content/docs/audio/ducking.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 234252,
+    "cache_read_tokens": 3134597,
+    "output_tokens": 18513,
+    "api_call_count": 17
+  },
+  "started_at": "2026-11-04T18:38:16.812345-05:00",
+  "completed_at": "2026-11-04T18:41:19.334193-05:00"
+}

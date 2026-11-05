@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "ad2bccb5ef34cc6db",
+  "agent_id": "ad2bccb5ef34cc6db",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/audio/compressor.mdx",
+    "docs/site/src/content/docs/audio/eq.mdx",
+    "docs/site/src/content/docs/audio/leveller.mdx",
+    "docs/site/src/content/docs/audio/limiter.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 38,
+    "cache_creation_tokens": 166970,
+    "cache_read_tokens": 2399959,
+    "output_tokens": 31099,
+    "api_call_count": 19
+  },
+  "started_at": "2026-11-04T16:48:43.934515-05:00",
+  "completed_at": "2026-11-04T16:53:29.225855-05:00"
+}

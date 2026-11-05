@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "a82aea89405401417",
+  "agent_id": "a82aea89405401417",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/mcp/tools-adding-clips.mdx",
+    "docs/site/src/content/docs/mcp/tools-media.mdx",
+    "docs/site/src/content/docs/mcp/tools-move-and-trim.mdx",
+    "docs/site/src/content/docs/mcp/tools-projects.mdx",
+    "docs/site/src/content/docs/mcp/tools-view-state.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 318783,
+    "cache_read_tokens": 4127842,
+    "output_tokens": 54067,
+    "api_call_count": 22
+  },
+  "started_at": "2026-11-04T17:03:25.81666-05:00",
+  "completed_at": "2026-11-04T17:11:32.908395-05:00"
+}

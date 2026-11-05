@@ -1,0 +1,22 @@
+{
+  "tool_use_id": "a12277a76f0db1ace",
+  "agent_id": "a12277a76f0db1ace",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/speed/change-speed.mdx",
+    "docs/site/src/content/docs/speed/fit-to-duration.mdx",
+    "docs/site/src/content/docs/speed/keep-pitch.mdx",
+    "docs/site/src/content/docs/speed/overview.mdx",
+    "docs/site/src/content/docs/speed/rate-stretch.mdx",
+    "docs/site/src/content/docs/speed/speed-section.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 314463,
+    "cache_read_tokens": 3716988,
+    "output_tokens": 47057,
+    "api_call_count": 16
+  },
+  "started_at": "2026-11-04T16:46:22.911242-05:00",
+  "completed_at": "2026-11-04T16:53:28.641815-05:00"
+}

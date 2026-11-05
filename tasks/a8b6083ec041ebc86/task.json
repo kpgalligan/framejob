@@ -1,0 +1,17 @@
+{
+  "tool_use_id": "a8b6083ec041ebc86",
+  "agent_id": "a8b6083ec041ebc86",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/getting-started/inspector.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 20,
+    "cache_creation_tokens": 82458,
+    "cache_read_tokens": 602902,
+    "output_tokens": 12276,
+    "api_call_count": 9
+  },
+  "started_at": "2026-11-04T18:44:21.267805-05:00",
+  "completed_at": "2026-11-04T18:46:26.625341-05:00"
+}

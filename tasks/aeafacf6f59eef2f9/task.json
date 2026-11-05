@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "aeafacf6f59eef2f9",
+  "agent_id": "aeafacf6f59eef2f9",
+  "subagent_type": "workflow-subagent",
+  "files": [
+    "docs/site/src/content/docs/editing/inside-a-nest.mdx",
+    "docs/site/src/content/docs/editing/nest-copies.mdx"
+  ],
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 204332,
+    "cache_read_tokens": 3079229,
+    "output_tokens": 40329,
+    "api_call_count": 22
+  },
+  "started_at": "2026-11-04T16:40:41.281314-05:00",
+  "completed_at": "2026-11-04T16:47:12.952327-05:00"
+}
